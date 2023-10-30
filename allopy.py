@@ -4,7 +4,13 @@ import pandas as pd
 import numpy as np
 import regex as re
 from fractions import Fraction
+from math import prod
+
+# because we love functional programming...
+from functools import reduce
 import itertools
+from itertools import chain
+
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import ipywidgets as widgets
@@ -92,6 +98,57 @@ def beat_duration(ratio, bpm, beat_ratio='1/4'):
   return tempo_factor * ratio_value * (beat_denominator / beat_numerator)
 
 
+def metric_modulation(old_tempo, old_note_value, new_note_value):
+  '''
+  Calculate metric modulation and return the new tempo (in BPM).
+  '''
+  old_duration = 60 * old_note_value / old_tempo
+  new_tempo = 60 * new_note_value / old_duration
+  return new_tempo
+  
+
+class RT:
+    def __init__(self, data):
+        self.data = data
+
+    @property
+    def duration(self):
+        return self.data[0]
+
+    @property
+    def time_signature(self):
+        return self.data[1][0]
+
+    @property
+    def subdivisions(self):
+        return self.data[1][1]
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+
+def measure_ratios(tree):
+    if not tree:
+        return []
+
+    if isinstance(tree, RT):
+        tree = tree.subdivisions
+
+    # divisor for the current tree level
+    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
+
+    result = []
+    for s in tree:
+        if isinstance(s, tuple):
+            D, S = s
+            ratio = Fraction(abs(D), div)
+            result.extend([ratio * el for el in measure_ratios(S)])
+        else:
+            result.append(Fraction(s, div))
+
+    return result
+
+
 def freq_to_midicents(frequency):
   return 100 * (12 * np.log2(frequency / 440.0) + 69)
 
@@ -106,6 +163,20 @@ def ratio_to_cents(ratio):
   else:  # assuming ratio is already a float
     numerator, denominator = ratio, 1.0
   return 1200 * np.log2(numerator / denominator)
+
+
+def octave_reduce(interval):
+    while interval >= 2:
+        interval /= 2
+    return interval
+
+
+def hexany(prime_factors=[1,3,5,7], r=2):
+    # calculate CPS based on the r-length combinations of prime factors
+    products = [eval('*'.join(map(str, comb))) for comb in itertools.combinations(prime_factors, r)]
+    scale = sorted([octave_reduce(product) for product in products])
+    return products, scale
+
 
 def analyze_score(df):
   '''
@@ -148,7 +219,7 @@ def plot_dataframe(df, column_name):
 
   for i, (idx, row) in enumerate(df.iterrows()):
     start_time = float(row['start'])
-    end_time = start_time + float(row['dur']) + float(row['releaseTime'])
+    end_time = start_time + float(row['dur'])# + float(row['releaseTime'])
     freq_val = row[column_name]
 
     ax.plot([start_time, end_time], [freq_val, freq_val], c=colors[i], linewidth=2)
@@ -165,5 +236,48 @@ def plot_dataframe(df, column_name):
   ax.set_ylabel(column_name + ' (Hz)', color='white')
   ax.tick_params(colors='white')
   ax.grid(True, which="both", ls="--", c='gray')
+
+def plot_rhythm(lst, is_MM=False, ax=None):
+  def generate_unique_colors(n):
+    """Generate n distinct colors."""
+    colors = []
+    while len(colors) < n:
+      color = (random.random(), random.random(), random.random())
+      if color not in colors and color != (1, 1, 1):  # ensure not white
+        colors.append(color)
+    return colors
+  legend_handles = []
+  durations = rhythm_pair(lst, is_MM)
+  unique_durations = list(set(durations))
+  color_map = dict(zip(unique_durations, generate_unique_colors(len(unique_durations))))
+
+  for dur in unique_durations:
+    legend_handles.append(plt.Rectangle((0,0), 1, 1, fc=color_map[dur], label=str(dur)))
+
+
+  if ax is None:
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+  start = 0
+  for dur in durations:
+    ax.fill_between([start, start + dur], 0, 1, color=color_map[dur])
+    start += dur
+
+  ax.set_xlim(0, start)
+  ax.set_ylim(0, 1)
+  ax.set_yticks([0.5])
+  ax.set_yticklabels(["MM" if is_MM else "Basic"])
+  ax.set_xlabel("Duration (in beats)")
+  ax.set_facecolor('black')
+  ax.get_yaxis().set_tick_params(direction='in', pad=10)
+
+  # remove spines and ticks
+  for spine in ax.spines.values():
+    spine.set_visible(True)
+  ax.tick_params(left=False, bottom=False)
+
+  ax.legend(handles=legend_handles, title="Duration", loc="upper right")
+
+  return ax
 
   plt.show()
