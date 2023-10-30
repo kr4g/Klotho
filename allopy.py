@@ -1,3 +1,5 @@
+from imports import *
+
 def synthSeq_to_df(filepath):
   '''
   Parses a .synthSequence file and returns the score as a Pandas DataFrame
