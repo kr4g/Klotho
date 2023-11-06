@@ -83,7 +83,9 @@ def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_
   Returns:
   float: The new tempo in beats per minute after the metric modulation.
   '''
-  return current_tempo * (current_beat_value / new_beat_value)
+  current_duration = 60 / current_tempo * current_beat_value
+  new_tempo = 60 / current_duration * new_beat_value
+  return new_tempo
 
 class RT:
   def __init__(self, data):
