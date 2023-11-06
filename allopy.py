@@ -42,7 +42,7 @@ def get_score_duration(df: pd.DataFrame) -> float:
       duration = d
   return duration
 
-def beat_duration(ratio, bpm: float, beat_ratio: str = '1/4') -> float:
+def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
   '''
   Calculate the duration in seconds of a musical beat given a ratio and tempo.
 
@@ -66,13 +66,14 @@ def beat_duration(ratio, bpm: float, beat_ratio: str = '1/4') -> float:
   beat_numerator, beat_denominator = map(int, beat_ratio.split('/'))
   return tempo_factor * ratio_value * (beat_denominator / beat_numerator)
 
-
 def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_value: float) -> float:
   '''
   Determine the new tempo (in BPM) for a metric modulation from one metric value to another.
 
   Metric modulation is calculated by maintaining the duration of a beat constant while changing
   the note value that represents the beat, effectively changing the tempo.
+  
+  see:  https://en.wikipedia.org/wiki/Metric_modulation
 
   Args:
   current_tempo (float): The original tempo in beats per minute.
@@ -82,10 +83,7 @@ def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_
   Returns:
   float: The new tempo in beats per minute after the metric modulation.
   '''
-  current_duration = 60 * current_beat_value / current_tempo
-  new_tempo = 60 * new_beat_value / current_duration
-  return new_tempo
-
+  return current_tempo * (current_beat_value / new_beat_value)
 
 class RT:
   def __init__(self, data):
@@ -107,29 +105,27 @@ class RT:
     return self.data[key]
 
 def measure_ratios(tree):
-    if not tree:
-        return []
+  if not tree:
+    return []
 
-    if isinstance(tree, RT):
-        tree = tree.subdivisions
+  if isinstance(tree, RT):
+    tree = tree.subdivisions
 
-    # divisor for the current tree level
-    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
+  # divisor for the current tree level
+  div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
 
-    result = []
-    for s in tree:
-        if isinstance(s, tuple):
-            D, S = s
-            ratio = Fraction(abs(D), div)
-            result.extend([ratio * el for el in measure_ratios(S)])
-        else:
-            result.append(Fraction(s, div))
-
-    return result
+  result = []
+  for s in tree:
+    if isinstance(s, tuple):
+      D, S = s
+      ratio = Fraction(abs(D), div)
+      result.extend([ratio * el for el in measure_ratios(S)])
+    else:
+      result.append(Fraction(s, div))
+  return result
 
 def freq_to_midicents(frequency):
   return 100 * (12 * np.log2(frequency / 440.0) + 69)
-
 
 def midicents_to_freq(midicents):
   return 440.0 * (2 ** ((midicents - 6900) / 1200.0))
@@ -142,19 +138,16 @@ def ratio_to_cents(ratio):
     numerator, denominator = ratio, 1.0
   return 1200 * np.log2(numerator / denominator)
 
-
 def octave_reduce(interval, octave=1):
     while interval >= 2**octave:
         interval /= 2
     return interval
-
 
 def hexany(prime_factors=[1,3,5,7], r=2):
     # calculate CPS based on the r-length combinations of prime factors
     products = [eval('*'.join(map(str, comb))) for comb in itertools.combinations(prime_factors, r)]
     scale = sorted([octave_reduce(product) for product in products])
     return products, scale
-  
   
 def n_et(interval=2, divisions=12, nth_division=1):
   '''
@@ -166,7 +159,6 @@ def n_et(interval=2, divisions=12, nth_division=1):
   :return: The frequency ratio of the nth division
   '''
   return interval ** (nth_division / divisions)
-
 
 def chord_mult(sonority1, sonority2):
   '''
