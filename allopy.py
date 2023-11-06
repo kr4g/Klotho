@@ -88,6 +88,16 @@ def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_
   return new_tempo
 
 class RT:
+  '''
+  A rhythm tree is a list representing a rhythmic structure. This list is organized hierarchically in sub lists, 
+  just as time is organized in measures, time signatures, pulses and rhythmic elements in the traditional notation.
+
+  Hence, the expression form of rhythm trees is crucially different from that of onsets and offsets. It can be 
+  exacting and not very "ergonomic", from a musician's point of view : rhythm trees can be long, with a great number 
+  of parenthesis and sub lists nested within each others.
+
+  see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
+  '''
   def __init__(self, data):
     self.data = data
 
@@ -107,6 +117,28 @@ class RT:
     return self.data[key]
 
 def measure_ratios(tree):
+  '''
+  Algorithm 1: MeasureRatios
+  - **Data**: 'S' is the part of a RT
+  - **Result**: Transforms the part '(s)' of a composed UT into fractional proportions.
+    ```python
+    div = for all 's' elements of 'S' do
+      if 's' is a list of the form (DS) then
+        return |D of s|;
+      else
+        return |s|;
+      end if
+    end for all
+    begin
+      for all 's' of 'S' do
+        if 's' is a list then
+          return (|D of s| / div) * MeasureRatios('S' of 's');
+        else
+          |s|/div;
+        end if
+      end for all
+    end
+  '''
   if not tree:
     return []
 
@@ -126,34 +158,93 @@ def measure_ratios(tree):
       result.append(Fraction(s, div))
   return result
 
-def freq_to_midicents(frequency):
+
+# ------------------------------------------------------------------------------------
+# PITCH- AND FREQUENCY-BASED TOOLS
+# ------------------------------------------------------------------------------------
+
+def freq_to_midicents(frequency: float) -> float:
+  '''
+  Convert a frequency in Hertz to MIDI cents notation.
+
+  Args:
+  frequency: The frequency in Hertz to convert.
+
+  Returns:
+  The MIDI cent value as a float.
+  '''
   return 100 * (12 * np.log2(frequency / 440.0) + 69)
 
-def midicents_to_freq(midicents):
+def midicents_to_freq(midicents: float) -> float:
+  '''
+  Convert MIDI cents back to a frequency in Hertz.
+  
+  Args:
+    midicents: The MIDI cent value to convert.
+    
+  Returns:
+    The corresponding frequency in Hertz as a float.
+  '''
   return 440.0 * (2 ** ((midicents - 6900) / 1200.0))
 
-
-def ratio_to_cents(ratio):
+def ratio_to_cents(ratio: Union[str, float]) -> float:
+  '''
+  Convert a musical interval ratio to cents, a logarithmic unit of measure.
+  
+  Args:
+    ratio: The musical interval ratio as a string (e.g., '3/2') or float.
+    
+  Returns:
+    The interval in cents as a float.
+  '''
   if isinstance(ratio, str):
     numerator, denominator = map(float, ratio.split('/'))
   else:  # assuming ratio is already a float
     numerator, denominator = ratio, 1.0
   return 1200 * np.log2(numerator / denominator)
 
-def octave_reduce(interval, octave=1):
-    while interval >= 2**octave:
-        interval /= 2
-    return interval
+def octave_reduce(interval: float, octave: int = 1) -> float:
+  '''
+  Reduce an interval to within the span of a specified octave.
+  
+  Args:
+    interval: The musical interval to be octave-reduced.
+    octave: The span of the octave for reduction, default is 1 octave.
+    
+  Returns:
+    The octave-reduced interval as a float.
+  '''
+  while interval >= 2**octave:
+    interval /= 2
+  return interval
 
-def hexany(prime_factors=[1,3,5,7], r=2):
-    # calculate CPS based on the r-length combinations of prime factors
-    products = [eval('*'.join(map(str, comb))) for comb in itertools.combinations(prime_factors, r)]
-    scale = sorted([octave_reduce(product) for product in products])
-    return products, scale
+def hexany(prime_factors: List[int] = [1,3,5,7], r: int = 2) -> Tuple[List[float], List[float]]:
+  '''
+  Calculate a Hexany scale from a list of prime factors and a rank value.
+  
+  The Hexany is a six-note scale in just intonation derived from combinations
+  of prime factors, as conceptualized by Erv Wilson.
+  
+  see:  https://en.wikipedia.org/wiki/Hexany
+  
+  Args:
+    prime_factors: List of primes to generate the Hexany.
+    r: Rank value indicating the number of primes to combine.
+    
+  Returns:
+    A tuple containing two lists:
+    - The first list contains the products of combinations of prime factors.
+    - The second list is the sorted Hexany scale after octave reduction.
+  '''
+  products = [prod(comb) for comb in itertools.combinations(prime_factors, r)]
+  scale = sorted([octave_reduce(product) for product in products])
+  return products, scale
   
 def n_et(interval=2, divisions=12, nth_division=1):
   '''
   Calculate the size of the nth division of an interval in equal temperament.
+  
+  see:  https://en.wikipedia.org/wiki/Equal_temperament
 
   :param interval: The interval to divide (default is 2 for an octave)
   :param divisions: The number of equal divisions
