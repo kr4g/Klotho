@@ -6,6 +6,8 @@ import regex as re
 from fractions import Fraction
 from math import prod
 
+from typing import Union, List, Tuple, Dict, Set
+
 # because we love functional programming...
 from functools import reduce
 import itertools
