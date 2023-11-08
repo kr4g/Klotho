@@ -117,28 +117,6 @@ class RT:
     return self.data[key]
 
 def measure_ratios(tree):
-  '''
-  Algorithm 1: MeasureRatios
-  - **Data**: 'S' is the part of a RT
-  - **Result**: Transforms the part '(s)' of a composed UT into fractional proportions.
-    ```python
-    div = for all 's' elements of 'S' do
-      if 's' is a list of the form (DS) then
-        return |D of s|;
-      else
-        return |s|;
-      end if
-    end for all
-    begin
-      for all 's' of 'S' do
-        if 's' is a list then
-          return (|D of s| / div) * MeasureRatios('S' of 's');
-        else
-          |s|/div;
-        end if
-      end for all
-    end
-  '''
   if not tree:
     return []
 
@@ -203,6 +181,18 @@ def ratio_to_cents(ratio: Union[str, float]) -> float:
     numerator, denominator = ratio, 1.0
   return 1200 * np.log2(numerator / denominator)
 
+def cents_to_ratio(cents: float) -> str:
+  '''
+  Convert a musical interval in cents to a ratio.
+  
+  Args:
+    cents: The interval in cents to convert.
+    
+  Returns:
+    The interval ratio as a float.
+  '''
+  return 2 ** (cents / 1200)
+
 def octave_reduce(interval: float, octave: int = 1) -> float:
   '''
   Reduce an interval to within the span of a specified octave.
@@ -257,6 +247,8 @@ def chord_mult(sonority1, sonority2):
   '''
   Given two sonorities as lists, return a list of lists where each pitch of
   the first sonority acts as the fundamental for the entire second sonority.
+  
+  see: https://en.wikipedia.org/wiki/Multiplication_(music)#Pitch_multiplication
 
   :param sonority1: A list representing the first sonority
   :param sonority2: A list representing the second sonority
