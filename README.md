@@ -17,7 +17,7 @@ AlloPy works as both a Python scripting toolkit and 'on-the-fly' via a Python in
 If you want to use AlloPy with AlloLib Playground, first install AlloLib Playground [https://github.com/AlloSphere-Research-Group/allolib_playground](here).
 
 1. **Clone the Repository**:
-   First, clone the AlloPy repository (into the `./allolib_playground/` directory of your system if you want to work with AlloLib/Gamma). Use the following command in your terminal or command prompt:
+   First, clone the AlloPy repository (into the `/allolib_playground/` directory of your system if you want to work with AlloLib/Gamma) by running the following command in your terminal or command prompt:
    
    ```
    git clone https://github.com/your-repo/AlloPy.git
@@ -27,7 +27,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     Navigate to the `/AlloPy/` directory within the `/allolib_playground/` folder:
    
     ```
-    cd ./allolib_playground/AlloPy/
+    cd AlloPy/
     ```
 
 3. **Install Dependencies**:
@@ -35,6 +35,38 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     
     ```
     pip install -r requirements.txt
+    ```
+
+4. **Play**.
+    To work with `AlloPy` as a scripting tool, create a directory within the `/AlloPy/` directory and save your scripts there.``
+
+    The `./allolib_playground/AlloPy/examples/` directory contains examples of how to use the modules in the `AlloPy` package as a scripting tool.
+
+    To use `AlloPy` as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `/AlloPy/` directory by running the command:
+
+    ```
+    Python
+    ```
+
+    Then, once the interpreter loads, import from `allopy` as needed.  For example:
+
+    ```
+    >>> from allopy import tonos
+    >>> tonos.midicents_to_freq(6900)
+    440.0
+    ```
+
+    ```
+    >>> from allopy import topos
+    >>> topos.iso_pairs(('⚛', '∿'), ('Ξ', '≈'))
+    (('⚛', 'Ξ'), ('∿', '≈'), ('⚛', '≈'), ('∿', 'Ξ'))
+    ```
+
+    Or import the entire package:
+    ```
+    >>> import allopy as al
+    >>> al.aikous.Dynamics.mf
+    0.2512
     ```
 
 ---
