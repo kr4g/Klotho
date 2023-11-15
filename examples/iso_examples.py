@@ -33,14 +33,13 @@ def isorhythm(color: list, talea: list, end=True, kwargs=None):
     '''
     # color_len = len(color)
     talea_len = len(talea)
-    iso_pairs_list = topos.iso_pairs(color, talea)
     
     min_amp = aikous.Dynamics.ppp
     max_amp = aikous.Dynamics.p
     
     start_time = 0.0
     rows_list = []
-    for i, (i_color, i_talea) in enumerate(iso_pairs_list):
+    for i, (i_color, i_talea) in enumerate(topos.iso_pairs(color, talea)):
         # -----------
         amplitude = min_amp       # default amplitude
         if i % talea_len == 0:    # accent at each talea cycle
