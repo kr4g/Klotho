@@ -18,16 +18,24 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 1. **Clone the Repository**:
    First, clone the AlloPy repository (into the `./allolib_playground/` directory of your system if you want to work with AlloLib/Gamma). Use the following command in your terminal or command prompt:
-   ```git clone https://github.com/your-repo/AlloPy.git```
+   
+   ```
+   git clone https://github.com/your-repo/AlloPy.git
+   ```
 
 2. **Navigate to the AlloPy Directory**:
 Change to the `AlloPy` directory within the `allolib_playground` folder:
-    ```cd ./allolib_playground/AlloPy/```
-
+   
+    ```
+    cd ./allolib_playground/AlloPy/
+    ```
 
 3. **Install Dependencies**:
 Install the required dependencies by running:
-    ```pip install -r requirements.txt```
+    
+    ```
+    pip install -r requirements.txt
+    ```
 
 ---
 
