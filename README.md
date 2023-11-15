@@ -24,14 +24,14 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
    ```
 
 2. **Navigate to the AlloPy Directory**:
-Change to the `AlloPy` directory within the `allolib_playground` folder:
+    Navigate to the `/AlloPy/` directory within the `/allolib_playground/` folder:
    
     ```
     cd ./allolib_playground/AlloPy/
     ```
 
 3. **Install Dependencies**:
-Install the required dependencies by running:
+    Install the required dependencies by running:
     
     ```
     pip install -r requirements.txt
