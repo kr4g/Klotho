@@ -11,18 +11,83 @@ from IPython.display import display
 
 from allopy import chronos
 from allopy.topos import topos
+from allopy.aikous import aikous
 from allopy.skora import skora
 
 FILEPATH = skora.set_score_path()
 
 # ---------------------------------------------------------------------------------------------
 
+def isorhythm(color: list, talea: list, end=True, kwargs=None):
+    '''
+    **iso_pairs** (from the Greek for "the same rhythm") is a musical technique using a 
+    repeating rhythmic pattern, called a *talea*, in at least one voice part throughout 
+    a composition. *Taleae* are typically applied to one or more melodic patterns of 
+    pitches or *colores*, which may be of the same or a different length from the *talea*.
+    
+    see: https://en.wikipedia.org/wiki/iso_pairs
+    
+    Args:
+        color (list): a list of pitches
+        talea (list): a list of durations
+    '''
+    color_len = len(color)
+    talea_len = len(talea) 
+    iso_len = color_len * talea_len
+    min_amp = aikous.Dynamics.ppp
+    max_amp = aikous.Dynamics.p
+    
+    start_time = 0.0
+    rows_list = []
+    for i in range(iso_len):
+        i_color = i % color_len
+        i_talea = i % talea_len
+        
+        # -----------
+        amplitude = min_amp       # default amplitude
+        if i % talea_len == 0:    # accent at each talea cycle
+            amplitude = max_amp   # accent amplitude
+            
+        new_row = {
+            'start'      : start_time,
+            'dur'        : talea[i_talea],
+            'synthName'  : 'PluckedString',
+            'amplitude'  : amplitude,
+            'frequency'  : color[i_color],
+        }
+        if kwargs:
+            # kwargs['attackTime']  = talea[i_talea] * 0.05
+            kwargs['releaseTime'] = talea[i_talea] * 3.47
+            for key, value in kwargs.items():
+                new_row[key] = value
+        rows_list.append(new_row)
+        # -----------
+        start_time += talea[i_talea]
+
+    # last note
+    if end:
+        new_row = {
+            'start'      : start_time,
+            'dur'        : max(talea),
+            'synthName'  : 'PluckedString',
+            'amplitude'  : amplitude,
+            'frequency'  : color[0],
+        }
+        if kwargs:
+            # kwargs['attackTime']  = talea[i_talea] * 0.01
+            kwargs['releaseTime'] = talea[i_talea] * 6.23
+            for key, value in kwargs.items():
+                new_row[key] = value
+        rows_list.append(new_row)
+    
+    return rows_list
+
 def iso_test(color_ratios = (1/1, 9/8, 4/3),
              talea_ratios = (1/4, 1/8, 1/16, 1/16),
              root_freq    = 440,
              tempo        = 60,
              kwargs       = None):
-    iso = topos.isorhythm(
+    iso = isorhythm(
         [root_freq * ratio for ratio in color_ratios],
         [chronos.beat_duration(t, tempo) for t in talea_ratios],
         kwargs=kwargs,

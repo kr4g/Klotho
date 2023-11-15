@@ -3,26 +3,24 @@ import sys
 import os
 from pathlib import Path
 
-root_path = Path(__file__).parent.parent
-sys.path.append(str(root_path))
+sys.path.append(str(Path(__file__).parent.parent))
+FILEPATH = skora.set_score_path()
+
+from allopy import chronos
+from allopy.chronos.rhythm_pairs import rhythm_pair as RP
+from allopy import tonos
+from allopy.topos import poly_sequence_differential_superimposition as PSDS
+from allopy.aikous import aikous
+from allopy.skora import skora
 
 import numpy as np
 from math import prod
 import pandas as pd
 from IPython.display import display
 
-from allopy import chronos
-from allopy.chronos.rhythm_pairs import rhythm_pair as RP
-from allopy import tonos
-from allopy.topos import topos
-from allopy.aikous import aikous
-from allopy.skora import skora
-
-FILEPATH = skora.set_score_path()
-
 def rp_layer_1_bass(proportions: list):
     p_scale = 0.23
-    prolats_MM = RP(proportions, True)
+    prolats_MM = PSDS(proportions, True)
     prolats_MM = np.array(prolats_MM) * p_scale
     
     start_time = 0.0
@@ -70,7 +68,7 @@ def rp_layer_1_bass(proportions: list):
 
 def rp_layer_2_rhy(proportions: list):
     p_scale = 0.23
-    prolats = RP(proportions, False)
+    prolats = PSDS(proportions, False)
     prolats = np.array(prolats) * p_scale
     
     start_time = 0.0

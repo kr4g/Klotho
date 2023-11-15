@@ -4,74 +4,12 @@
 '''
 The `topos` base module.
 '''
-
 from allopy.chronos import chronos
 from allopy.aikous import aikous
+
 from sympy.utilities.iterables import cartes
-
-def isorhythm(color: list, talea: list, end=True, kwargs=None):
-    '''
-    **iso_pairs** (from the Greek for "the same rhythm") is a musical technique using a 
-    repeating rhythmic pattern, called a *talea*, in at least one voice part throughout 
-    a composition. *Taleae* are typically applied to one or more melodic patterns of 
-    pitches or *colores*, which may be of the same or a different length from the *talea*.
-    
-    see: https://en.wikipedia.org/wiki/iso_pairs
-    
-    Args:
-        color (list): a list of pitches
-        talea (list): a list of durations
-    '''
-    color_len = len(color)
-    talea_len = len(talea) 
-    iso_len = color_len * talea_len
-    min_amp = aikous.Dynamics.ppp
-    max_amp = aikous.Dynamics.p
-    
-    start_time = 0.0
-    rows_list = []
-    for i in range(iso_len):
-        i_color = i % color_len
-        i_talea = i % talea_len
-        
-        # -----------
-        amplitude = min_amp       # default amplitude
-        if i % talea_len == 0:    # accent at each talea cycle
-            amplitude = max_amp   # accent amplitude
-            
-        new_row = {
-            'start'      : start_time,
-            'dur'        : talea[i_talea],
-            'synthName'  : 'PluckedString',
-            'amplitude'  : amplitude,
-            'frequency'  : color[i_color],
-        }
-        if kwargs:
-            # kwargs['attackTime']  = talea[i_talea] * 0.05
-            kwargs['releaseTime'] = talea[i_talea] * 3.47
-            for key, value in kwargs.items():
-                new_row[key] = value
-        rows_list.append(new_row)
-        # -----------
-        start_time += talea[i_talea]
-
-    # last note
-    if end:
-        new_row = {
-            'start'      : start_time,
-            'dur'        : max(talea),
-            'synthName'  : 'PluckedString',
-            'amplitude'  : amplitude,
-            'frequency'  : color[0],
-        }
-        if kwargs:
-            # kwargs['attackTime']  = talea[i_talea] * 0.01
-            kwargs['releaseTime'] = talea[i_talea] * 6.23
-            for key, value in kwargs.items():
-                new_row[key] = value
-        rows_list.append(new_row)
-    
-    return rows_list
+import numpy as np
+from math import prod
 
 def iso_pairs(l1: list, l2: list) -> list:
     '''
@@ -101,22 +39,6 @@ def iso_pairs(l1: list, l2: list) -> list:
     '''
     return [(l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2))]
 
-def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> list:
-    '''
-    Given a list of metric beat ratios and a list of pulses, generates a sequence of 
-    events that cycles through combinations of each metric ratio repeated for each
-    pulse in the pulse list.
-    '''
-    metric_ratio_cps = list(cartes(metric_ratios, metric_ratios))  # cartesian product of metric ratios
-    # durations = []
-    duration_pulse_pairs = []
-    for i, (ratio_1, ratio_2) in enumerate(metric_ratio_cps):
-        tempo = chronos.metric_modulation(bpm, ratio_1, ratio_2)
-        duration = chronos.beat_duration(1/10, tempo)
-        # durations.extend([duration] * pulses[i % len(pulses)])
-        duration_pulse_pairs.append((duration, pulses[i % len(pulses)]))
-    return duration_pulse_pairs
-
 def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
     '''
     Generates a sequence of pairs by first creating a Cartesian product of list l1 with itself,
@@ -136,3 +58,14 @@ def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
     [('A', 'A', 1), ('B', 'A', 2), ('A', 'A', 3), ('B', 'B', 1), ('A', 'B', 2), ('B', 'B', 3)]
     '''
     return iso_pairs(list(cartes(l1, l1)), l2)
+
+def poly_sequence_differential_superimposition(lst, is_MM=False):
+    total_product = prod(lst)
+    if is_MM:
+        sequences = [np.arange(0, total_product + 1, total_product // x) for x in lst]
+    else:
+        sequences = [np.arange(0, total_product + 1, x) for x in lst]
+    combined_sequence = np.unique(np.concatenate(sequences))
+    deltas = np.diff(combined_sequence)
+    return tuple(deltas)
+    
