@@ -31,7 +31,6 @@ def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> lis
         duration = chronos.beat_duration(1/10, tempo)
         duration_pulse_pairs.append((duration, nPulse))
     return duration_pulse_pairs
-    
     # borked
     # return [(chronos.beat_duration(1/10, chronos.metric_modulation(bpm,
     #                                                                ratio_1,
