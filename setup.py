@@ -25,7 +25,7 @@ setup(
     # tests_require=[
     #     'pytest',
     # ],
-    description='A Python package for computer-assisted music composition.',
+    description='A Python module designed to work in tandem with AlloLib Playground as a computer-assisted metacompositional toolkit, work environment, score editor, and general educational resource.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/kr4g/AlloPy',

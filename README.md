@@ -1,7 +1,9 @@
 # AlloPy
-Python computer-assisted composition tools for AlloLib
+AlloPy is an open source Python package designed to work in tandem with AlloLib Playground as a computer-assisted metacompositional toolkit, work environment, score editor, and general educational resource.
 
 Download AlloLib Playground here:  https://github.com/AlloSphere-Research-Group/allolib_playground
+
+AlloPy was developed by Ryan Millett as a metacomposition-oriented curriculum supplement for MAT 276IA as part of the AlloSphere Research Group under the supervision of Dr. Kuchera-Morin.
 
 [AlloPy](https://github.com/kr4g/AlloPy) by Ryan Millett is licensed under [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1).
 
