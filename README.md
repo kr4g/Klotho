@@ -1,5 +1,5 @@
 # AlloPy
-AlloPy is an open source Python package designed to work in tandem with AlloLib Playground as a computer-assisted metacompositional toolkit, work environment, score editor, and general educational resource.
+AlloPy is an open source Python package designed to work in tandem with AlloLib Playground as a computer-assisted toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of transmodal metacomposition.
 
 Download AlloLib Playground here:  https://github.com/AlloSphere-Research-Group/allolib_playground
 
