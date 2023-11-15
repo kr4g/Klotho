@@ -24,19 +24,20 @@ def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> lis
     events that cycles through combinations of each metric ratio repeated for each
     pulse in the pulse list.
     '''
-    # duration_pulse_pairs = []
+    duration_pulse_pairs = []
     CPS = topos.cyclic_cartesian_pairs(metric_ratios, pulses)
-    # for i, ((ratio_1, ratio_2), nPulse) in enumerate(CPS):
-    #     tempo = chronos.metric_modulation(bpm, ratio_1, ratio_2)
-    #     duration = chronos.beat_duration(1/10, tempo)
-    #     duration_pulse_pairs.append((duration, nPulse))
-    # return duration_pulse_pairs
+    for i, ((ratio_1, ratio_2), nPulse) in enumerate(CPS):
+        tempo    = chronos.metric_modulation(bpm, ratio_1, ratio_2)
+        duration = chronos.beat_duration(1/10, tempo)
+        duration_pulse_pairs.append((duration, nPulse))
+    return duration_pulse_pairs
     
-    return [(chronos.beat_duration(1/10, 
-             chronos.metric_modulation(bpm, ratio_1, ratio_2)),
-             nPulse
-        ) for i, ((ratio_1, ratio_2), nPulse) in enumerate(CPS)]
-    
+    # return [(chronos.beat_duration(1/10, chronos.metric_modulation(bpm,
+    #                                                                ratio_1,
+    #                                                                ratio_2)),
+    #          nPulse
+    #     ) for ((ratio_1, ratio_2), nPulse) in CPS]
+
 def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
     '''
     '''
@@ -46,7 +47,7 @@ def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
     freq_ratios = [tonos.cents_to_ratio(cent) for cent in [600, 0, -700, -100]]
     # octaves = [0.5, 1.0, 2.0, 3.0]
     octaves = [0.25, 0.5, 1.0, 2.0]
-    np.random.seed(969)
+    np.random.seed(666)
     np.random.shuffle(octaves)
     i_freq = 0
     attackTime = min([p[0] for p in duration_pulse_pairs])
@@ -54,7 +55,7 @@ def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
         dur        = duration * 0.667
         amplitude  = np.random.choice([aikous.Dynamics.pp, aikous.Dynamics.p,
                                        aikous.Dynamics.mf, aikous.Dynamics.f]) * 0.17
-        root_freq  = (666 * 1.6**-3) * tonos.cents_to_ratio(1067)**octaves[i % 4]
+        root_freq  = (999 * 1.9692**-2) * tonos.cents_to_ratio(1067)**octaves[i % 4]
         pan        = np.random.uniform(-1.0, 1.0)
         amFunc     = np.random.randint(0, 3)
         reverb_min = np.interp(i, [0, len(duration_pulse_pairs)], [0.0, 0.09])
@@ -90,8 +91,8 @@ def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
 
 if __name__ == '__main__':
     # Example 00
-    # metric_ratios = (1/5, 1/7, 1/4, 1/11, 1/3, 1/13)
-    metric_ratios = (1/5, 1/7, 1/4, 1/3, 1/11)
+    metric_ratios = (1/5, 1/7, 1/4, 1/11, 1/3, 1/13)
+    # metric_ratios = (1/5, 1/7, 1/4, 1/3, 1/11)
     pulses = (5, 3, 13, 2, 8)
     tempo = 66
     score_df_00 = metric_modulation_ex(metric_ratios, pulses, tempo)

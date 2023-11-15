@@ -153,3 +153,6 @@ def db_amp(db: float) -> float:
   float: The amplitude.
   '''
   return 10 ** (db / 20)
+
+def percieved_tempo(durations: list):
+  pass
