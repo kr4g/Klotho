@@ -1,0 +1,30 @@
+'''
+--------------------------------------------------------------------------------------
+The following description is based on the Preface from "The Topos of Music" by Guerino 
+Mazzola
+
+see:  https://link.springer.com/book/10.1007/978-3-0348-8141-8
+
+***
+
+This module deals with the topos, the very concept of music.
+
+The name *topos* has been chosen to commicate a double message:
+
+First, the Greek word "topos" alludes to the logical and transcendental location of 
+the concept of music in the sense of Aristotle's and Kant's topic.
+
+The second message is intimately entwined with the first since the present concept
+framework of the musical sign system is technically based on topos theory, so the
+topos of music recieves its topos-theoretica foundation.  In this perspective, the
+the double message of this module's title in fact condenses to a unified intention: 
+
+to unite philosphical insight with mathematical explicitness.
+--------------------------------------------------------------------------------------
+'''
+
+from .topos import *
+
+__all__ = [
+    # 'topos',
+]
