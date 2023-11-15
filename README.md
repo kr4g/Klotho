@@ -6,9 +6,9 @@ Download AlloLib Playground here:  https://github.com/AlloSphere-Research-Group/
 
 Developed by Ryan Millett as part of the AlloSphere Research Group under the supervision of Dr. Kuchera-Morin.
 
-[AlloPy](https://github.com/kr4g/AlloPy) by Ryan Millett is licensed under [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1).
-
 [The AlloSphere Research Group](https://github.com/AlloSphere-Research-Group)
+
+[AlloPy](https://github.com/kr4g/AlloPy) by Ryan Millett is licensed under [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1).
 
 ![CC Icon](https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1)
 ![BY Icon](https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1)
