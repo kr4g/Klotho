@@ -31,18 +31,16 @@ def isorhythm(color: list, talea: list, end=True, kwargs=None):
         color (list): a list of pitches
         talea (list): a list of durations
     '''
-    color_len = len(color)
-    talea_len = len(talea) 
-    iso_len = color_len * talea_len
+    # color_len = len(color)
+    talea_len = len(talea)
+    iso_pairs_list = topos.iso_pairs(color, talea)
+    
     min_amp = aikous.Dynamics.ppp
     max_amp = aikous.Dynamics.p
     
     start_time = 0.0
     rows_list = []
-    for i in range(iso_len):
-        i_color = i % color_len
-        i_talea = i % talea_len
-        
+    for i, (i_color, i_talea) in enumerate(iso_pairs_list):
         # -----------
         amplitude = min_amp       # default amplitude
         if i % talea_len == 0:    # accent at each talea cycle
@@ -50,19 +48,19 @@ def isorhythm(color: list, talea: list, end=True, kwargs=None):
             
         new_row = {
             'start'      : start_time,
-            'dur'        : talea[i_talea],
+            'dur'        : i_talea,
             'synthName'  : 'PluckedString',
             'amplitude'  : amplitude,
-            'frequency'  : color[i_color],
+            'frequency'  : i_color,
         }
         if kwargs:
             # kwargs['attackTime']  = talea[i_talea] * 0.05
-            kwargs['releaseTime'] = talea[i_talea] * 3.47
+            kwargs['releaseTime'] = i_talea * 3.47
             for key, value in kwargs.items():
                 new_row[key] = value
         rows_list.append(new_row)
         # -----------
-        start_time += talea[i_talea]
+        start_time += i_talea
 
     # last note
     if end:
@@ -75,7 +73,7 @@ def isorhythm(color: list, talea: list, end=True, kwargs=None):
         }
         if kwargs:
             # kwargs['attackTime']  = talea[i_talea] * 0.01
-            kwargs['releaseTime'] = talea[i_talea] * 6.23
+            kwargs['releaseTime'] = i_talea * 6.23
             for key, value in kwargs.items():
                 new_row[key] = value
         rows_list.append(new_row)
