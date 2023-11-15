@@ -27,8 +27,8 @@ def iso_test(color_ratios = (1/1, 9/8, 4/3),
         [chronos.beat_duration(t, tempo) for t in talea_ratios],
         kwargs=kwargs,
     )
-    pfields = ['start', 'dur', 'synthName', 'amplitude', 'frequency']
-    score_df = pd.DataFrame(columns=pfields + list(kwargs.keys()))
+    pfields_std = ['start', 'dur', 'synthName', 'amplitude', 'frequency']
+    score_df = skora.make_score_df(pfields=pfields_std + list(kwargs.keys()))
     score_df = skora.concat_rows(score_df, iso)
     return score_df
     

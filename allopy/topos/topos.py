@@ -99,11 +99,7 @@ def iso_pairs(l1: list, l2: list) -> list:
     >>> iso_pairs([1, 2], ['A', 'B', 'C'])
     [(1, 'A'), (2, 'B'), (1, 'C'), (2, 'A'), (1, 'B'), (2, 'C')]
     '''
-    l3 = []
-    len_iso = len(l1) * len(l2)
-    for i in range(len_iso):
-        l3.append((l1[i % len(l1)], l2[i % len(l2)]))
-    return l3
+    return [(l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2))]
 
 def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> list:
     '''
@@ -111,8 +107,7 @@ def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> lis
     events that cycles through combinations of each metric ratio repeated for each
     pulse in the pulse list.
     '''
-    # compute cartesian produce of metric ratios
-    metric_ratio_cps = list(cartes(metric_ratios, metric_ratios))
+    metric_ratio_cps = list(cartes(metric_ratios, metric_ratios))  # cartesian product of metric ratios
     # durations = []
     duration_pulse_pairs = []
     for i, (ratio_1, ratio_2) in enumerate(metric_ratio_cps):
@@ -137,7 +132,7 @@ def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
         list: A list of tuples, each containing a pair from the Cartesian product of l1 and an element from l2.
 
     Example:
-    >>> cyclicCartesianPairs(['A', 'B'], [1, 2, 3])
+    >>> cyclic_cartesian_pairs(['A', 'B'], [1, 2, 3])
     [('A', 'A', 1), ('B', 'A', 2), ('A', 'A', 3), ('B', 'B', 1), ('A', 'B', 2), ('B', 'B', 3)]
     '''
     return iso_pairs(list(cartes(l1, l1)), l2)

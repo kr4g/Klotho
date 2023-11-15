@@ -28,6 +28,12 @@ def set_score_path(synth_name: str = 'Integrated'):
         raise FileNotFoundError("allolib_playground directory not found in the path hierarchy.")
 
     return current_path / f'tutorials/audiovisual/bin/{synth_name}-data'
+  
+def make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency')):
+  '''
+  Creates a DataFrame with the given pfields as columns.
+  '''
+  return pd.DataFrame(columns=pfields)
 
 def synthSeq_to_df(filepath):
   '''

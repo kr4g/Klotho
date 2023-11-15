@@ -65,7 +65,7 @@ def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
             start_time += duration
             i_freq += 1
     pfields = ['start', 'dur', 'synthName', 'amplitude', 'frequency', 'attackTime', 'releaseTime', 'sustain', 'pan', 'amFunc', 'am1', 'am2', 'amRise', 'amRatio', 'reverberation']
-    score_df = pd.DataFrame(columns=pfields)
+    score_df = skora.make_score_df(pfields=pfields)
     score_df = skora.concat_rows(score_df, rows_list)
     return score_df
 

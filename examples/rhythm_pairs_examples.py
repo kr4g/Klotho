@@ -64,7 +64,7 @@ def rp_layer_1_bass(proportions: list):
         start_time += prol_MM
 
     pfields = ['start_time', 'dur', 'synthName', 'frequency', 'amplitude', 'attackTime', 'releaseTime', 'sustain', 'idx1', 'idx2', 'idx3', 'carMul', 'modMul', 'vibRate1', 'vibRate2', 'vibRise', 'vibDepth', 'pan', 'table', 'reverberation']
-    score_df = pd.DataFrame(columns=pfields)
+    score_df = skora.make_score_df(pfields=pfields)
     score_df = skora.concat_rows(score_df, rows_list)
     return score_df
 
@@ -113,7 +113,7 @@ def rp_layer_2_rhy(proportions: list):
         start_time += prol
 
     pfields = ['start_time', 'dur', 'synthName', 'frequency', 'amplitude', 'attackTime', 'releaseTime', 'sustain', 'idx1', 'idx2', 'idx3', 'carMul', 'modMul', 'vibRate1', 'vibRate2', 'vibRise', 'vibDepth', 'pan', 'table', 'reverberation']
-    score_df = pd.DataFrame(columns=pfields)
+    score_df = skora.make_score_df(pfields=pfields)
     score_df = skora.concat_rows(score_df, rows_list)
     return score_df
 
@@ -169,7 +169,7 @@ def rp_layer_3_tb(proportions: list):
             start_time += dur
 
     pfields = ['start_time', 'dur', 'synthName', 'frequency', 'amplitude', 'attackTime', 'releaseTime', 'sustain', 'idx1', 'idx2', 'idx3', 'carMul', 'modMul', 'vibRate1', 'vibRate2', 'vibRise', 'vibDepth', 'pan', 'table', 'reverberation']
-    score_df = pd.DataFrame(columns=pfields)
+    score_df = skora.make_score_df(pfields=pfields)
     score_df = skora.concat_rows(score_df, rows_list)
     return score_df
 
