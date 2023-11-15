@@ -50,7 +50,7 @@ class Tempo(Enum, metaclass=DirectValueEnumMeta):
   Example use:
   `>>> Tempo.Adagio`
   '''
-  Larghissimo                  = (12, 24)
+  Larghissimo                  = (11, 24)
   Adagissimo_Grave             = (24, 40)
   Largo                        = (40, 66)
   Larghetto                    = (44, 66)
