@@ -4,13 +4,14 @@ import os
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
-FILEPATH = skora.set_score_path()
 
 from allopy import chronos
 from allopy.chronos.rhythm_pairs import rhythm_pair as RP
 from allopy import tonos
 from allopy.aikous import aikous
 from allopy.skora import skora
+
+FILEPATH = skora.set_score_path()
 
 import numpy as np
 from math import prod

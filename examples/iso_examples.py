@@ -6,15 +6,15 @@ from pathlib import Path
 root_path = Path(__file__).parent.parent
 sys.path.append(str(root_path))
 
-import pandas as pd
-from IPython.display import display
-
 from allopy import chronos
 from allopy.topos import topos
 from allopy.aikous import aikous
 from allopy.skora import skora
 
 FILEPATH = skora.set_score_path()
+
+import pandas as pd
+from IPython.display import display
 
 # ---------------------------------------------------------------------------------------------
 
@@ -179,5 +179,5 @@ if __name__ == '__main__':
     # Example 03 (merge Examples 01 and 02)
     # tempo = 33
     score_df_03 = skora.merge_parts_dfs([score_df_01, score_df_02])
-    filename = 'iso_pairs_ex_03.synthSequence'
+    filename = 'iso_pairs_ex_combined.synthSequence'
     skora.df_to_synthSeq(score_df_03, os.path.join(FILEPATH, filename))

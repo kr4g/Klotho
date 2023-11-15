@@ -4,13 +4,14 @@ import os
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
-FILEPATH = skora.set_score_path()
 
 from allopy import chronos
 from allopy import tonos
 from allopy.topos import topos
 from allopy.aikous import aikous
 from allopy.skora import skora
+
+FILEPATH = skora.set_score_path()
 
 import numpy as np
 import pandas as pd
