@@ -10,6 +10,9 @@ from allopy.aikous import aikous
 from sympy.utilities.iterables import cartes
 import numpy as np
 from math import prod
+from fractions import Fraction
+
+TOPOS_WARNINGS = True
 
 def iso_pairs(l1: list, l2: list) -> list:
     '''
@@ -26,18 +29,25 @@ def iso_pairs(l1: list, l2: list) -> list:
     different from computing the Cartesian product.
 
     Args:
-        l1 (list): The first list.
-        l2 (list): The second list.
+        l1 (list): The first list, consisting of Type 1.
+        l2 (list): The second list, consisting of Type 2.
     
     Returns:
         list: A list of tuples where each element from l1 is paired with each 
         element from l2.
 
     Example:
-    >>> iso_pairs([1, 2], ['A', 'B', 'C'])
-    [(1, 'A'), (2, 'B'), (1, 'C'), (2, 'A'), (1, 'B'), (2, 'C')]
+    >>> iso_pairs(('⚛', '∿'), ('Ξ', '≈'))
+    (('⚛', 'Ξ'), ('∿', '≈'), ('⚛', '≈'), ('∿', 'Ξ'))
     '''
-    return [(l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2))]
+    if TOPOS_WARNINGS:
+        if Fraction(len(l1), len(l2)).denominator == 1:
+            print('PAY HEED! THE TOPOS CAUTIONS YOU: The length of the lists should not evenly divide.' + 
+                'Otherwise, the cyclic pairing will be equivalent to a Cartesian product.  If this is your intention, ' +
+                'The Topos bids you to proceed.  If this is not your intention, The Topos suggests you ' +
+                'provide lists of indivisible lengths.  The Topos has spoken.')
+
+    return tuple((l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2)))
 
 def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
     '''
@@ -47,25 +57,17 @@ def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
     cycling through l2 as necessary.
 
     Args:
-        l1 (list): The first list.
-        l2 (list): The second list.
+        l1 (list): The first list, consisting of Type 1.
+        l2 (list): The second list, consisting of Type 2.
     
     Returns:
         list: A list of tuples, each containing a pair from the Cartesian product of l1 and an element from l2.
 
     Example:
-    >>> cyclic_cartesian_pairs(['A', 'B'], [1, 2, 3])
-    [('A', 'A', 1), ('B', 'A', 2), ('A', 'A', 3), ('B', 'B', 1), ('A', 'B', 2), ('B', 'B', 3)]
+    >>> cyclic_cartesian_pairs(['Ψ', '⧭', 'Ω'], ('¤', '〄'))
+    (('Ψ', 'Ψ'), '¤'), (('Ψ', '⧭'), '〄'), (('Ψ', 'Ω'), '¤'),
+    (('⧭', 'Ψ'), '〄'), (('⧭', '⧭'), '¤'), (('⧭', 'Ω'), '〄'),
+    (('Ω', 'Ψ'), '¤'), (('Ω', '⧭'), '〄'), (('Ω', 'Ω'), '¤')
     '''
-    return iso_pairs(list(cartes(l1, l1)), l2)
-
-def poly_sequence_differential_superimposition(lst, is_MM=False):
-    total_product = prod(lst)
-    if is_MM:
-        sequences = [np.arange(0, total_product + 1, total_product // x) for x in lst]
-    else:
-        sequences = [np.arange(0, total_product + 1, x) for x in lst]
-    combined_sequence = np.unique(np.concatenate(sequences))
-    deltas = np.diff(combined_sequence)
-    return tuple(deltas)
+    return iso_pairs(tuple(cartes(l1, l1)), l2)
     

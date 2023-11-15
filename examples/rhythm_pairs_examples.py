@@ -9,7 +9,6 @@ FILEPATH = skora.set_score_path()
 from allopy import chronos
 from allopy.chronos.rhythm_pairs import rhythm_pair as RP
 from allopy import tonos
-from allopy.topos import poly_sequence_differential_superimposition as PSDS
 from allopy.aikous import aikous
 from allopy.skora import skora
 
@@ -20,7 +19,7 @@ from IPython.display import display
 
 def rp_layer_1_bass(proportions: list):
     p_scale = 0.23
-    prolats_MM = PSDS(proportions, True)
+    prolats_MM = RP(proportions, True)
     prolats_MM = np.array(prolats_MM) * p_scale
     
     start_time = 0.0
@@ -68,7 +67,7 @@ def rp_layer_1_bass(proportions: list):
 
 def rp_layer_2_rhy(proportions: list):
     p_scale = 0.23
-    prolats = PSDS(proportions, False)
+    prolats = RP(proportions, False)
     prolats = np.array(prolats) * p_scale
     
     start_time = 0.0

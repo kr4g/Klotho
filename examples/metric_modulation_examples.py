@@ -36,7 +36,6 @@ def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> lis
              nPulse
         ) for i, ((ratio_1, ratio_2), nPulse) in enumerate(CPS)]
     
-
 def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
     '''
     '''
