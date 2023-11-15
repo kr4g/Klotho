@@ -71,28 +71,3 @@ def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
     (('Ω', 'Ψ'), '¤'), (('Ω', '⧭'), '〄'), (('Ω', 'Ω'), '¤')
     '''
     return iso_pairs(tuple(cartes(l1, l1)), l2)
-
-def context_sensitive_parsing(rules, axiom):
-    i = 0
-    while i < len(axiom):
-        replaced = False
-        for context, replacement in rules.items():
-            if "<" in context and ">" in context:  # this is a context-sensitive rule
-                left, middle, right = regex.match(r'(.*)<(.*)>(.*)', context).groups()
-                left = left.replace('*', '.*')
-                right = right.replace('*', '.*')
-                pattern = regex.compile(f'(?<={left}){middle}(?={right})')
-
-                if pattern.match(axiom, pos=i):
-                    axiom = axiom[:i] + replacement + axiom[i+len(middle):]
-                    replaced = True
-                    i += len(replacement) - 1
-                    break
-        if not replaced: # this is a context-free rule
-            for context, replacement in rules.items():
-                if context == axiom[i]:
-                    axiom = axiom[:i] + replacement + axiom[i+1:]
-                    i += len(replacement) - 1
-                    break
-        i += 1
-    return axiom

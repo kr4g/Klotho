@@ -81,8 +81,8 @@ def rp_layer_2_rhy(proportions: list):
         max_amp   = np.interp(i, [0, len(prolats)], [aikous.Dynamics.f, aikous.Dynamics.fff])
         amplitude = np.interp(i, [0, len(prolats)], [min_amp, max_amp])
         vibDepth  = 0.0
-        reverb_min = np.interp(i, [0, len(prolats)], [0.05, 0.01])
-        reverb_max = np.interp(i, [0, len(prolats)], [0.1, reverb_min])
+        reverb_min = np.interp(i, [0, len(prolats)], [0.01, 0.005])
+        reverb_max = np.interp(i, [0, len(prolats)], [0.05, reverb_min])
         reverberation = np.interp(i, [0, len(prolats)], [reverb_min, reverb_max])
         
         new_row = {
