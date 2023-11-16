@@ -55,13 +55,14 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> from allopy import tonos
     >>> tonos.midicents_to_freq(6900)
     440.0
+    >>> tonos.scales.hexany([1,3,5,7], 2)
+    ([3, 5, 7, 15, 21, 35], [1.09375, 1.25, 1.3125, 1.5, 1.75, 1.875])
     ```
 
     ```
     >>> from allopy.chronos import rhythm_trees as rt
-    >>> rt.measure_ratios(rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1)))))))
-    [Fraction(1, 4), Fraction(1, 6), Fraction(1, 6), Fraction(1, 6), Fraction(1, 12), Fraction(1, 30), Fraction(1, 60), Fraction(1, 30), Fraction(1, 12)]
-    >>> 
+    >>> [str(r) for r in rt.measure_ratios(rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1)))))))]
+    ['1/4', '1/6', '1/6', '1/6', '1/12', '1/30', '1/60', '1/30', '1/12']
     ```
 
     ```
