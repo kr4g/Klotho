@@ -17,20 +17,21 @@ AlloPy works as both a Python scripting toolkit and 'on-the-fly' via a Python in
 If you want to use AlloPy with AlloLib Playground, first install AlloLib Playground [https://github.com/AlloSphere-Research-Group/allolib_playground](here).
 
 1. **Clone the Repository**:
+
    First, clone the AlloPy repository (into the `/allolib_playground/` directory of your system if you want to work with AlloLib/Gamma) by running the following command in your terminal or command prompt:
    
    ```
    git clone https://github.com/kr4g/AlloPy.git
    ```
 
-2. **Navigate to the AlloPy Directory**:
-    Navigate to the `/AlloPy/` directory within the `/allolib_playground/` folder:
+2. **Navigate to the `AlloPy/` Directory**:
    
     ```
     cd AlloPy/
     ```
 
 3. **Install Dependencies**:
+
     Install the required dependencies by running:
     
     ```
@@ -41,7 +42,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     To work with `AlloPy` as a scripting tool, create a directory within the `/AlloPy/` directory and save your scripts there.``
 
-    The `./allolib_playground/AlloPy/examples/` directory contains examples of how to use the modules in the `AlloPy` package as a scripting tool.
+    The `AlloPy/examples/` directory contains examples of how to use the modules in the `AlloPy` package as a scripting tool.
 
     To use `AlloPy` as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `/AlloPy/` directory by running the command:
 
@@ -67,8 +68,12 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     ```
     >>> from allopy import topos
-    >>> topos.iso_pairs(('⚛', '∿', '♢'), ('Ξ', '≈'))
+    >>> iso = topos.iso_pairs(('\U+269B', '∿', '♢'), ('Ξ', '≈'))
+    >>> iso
     (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))
+    >>> kleis = ('∆','Σ','Ψ','Ω','ζ')
+    >>> topos.homotopic_map(kleis, iso)
+    (('∆', (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))), ('Σ', (('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'))), ('Ψ', (('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'))), ('Ω', (('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'))), ('ζ', (('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'))))
     ```
 
     Or import the entire package:
@@ -76,8 +81,8 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> import allopy as al
     >>> al.aikous.Dynamics.mf
     0.2512
-    >>> aikous.Tempo.Largo
-    (40, 66)
+    >>> al.chronos.beat_duration(1/4, 120)
+    0.5
     ```
 
 ---
