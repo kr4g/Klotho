@@ -74,6 +74,8 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> import allopy as al
     >>> al.aikous.Dynamics.mf
     0.2512
+    >>> aikous.Tempo.Largo
+    (40, 66)
     ```
 
 ---
