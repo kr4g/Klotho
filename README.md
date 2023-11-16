@@ -68,7 +68,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     ```
     >>> from allopy import topos
-    >>> iso = topos.iso_pairs(('\U+269B', '∿', '♢'), ('Ξ', '≈'))
+    >>> iso = topos.iso_pairs(('⚛', '∿', '♢'), ('Ξ', '≈'))
     >>> iso
     (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))
     >>> kleis = ('∆','Σ','Ψ','Ω','ζ')
