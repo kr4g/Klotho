@@ -37,7 +37,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     pip install -r requirements.txt
     ```
 
-4. **Play**.
+4. **Play**:
     To work with `AlloPy` as a scripting tool, create a directory within the `/AlloPy/` directory and save your scripts there.``
 
     The `./allolib_playground/AlloPy/examples/` directory contains examples of how to use the modules in the `AlloPy` package as a scripting tool.
