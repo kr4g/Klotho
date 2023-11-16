@@ -116,6 +116,34 @@ def freq_to_pitchclass(freq: float, A4_Hz=440.0, A4_MIDI=69):
   cents_diff = (midi - midi_round) * 100
   return f'{pitch_label}{octave}', cents_diff
 
+import numpy as np
+
+def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=440.0, A4_MIDI=69):
+
+  '''
+  Converts a pitch class with offset in cents to a frequency.
+  
+  Args:
+    pitchclass: The pitch class (like "C4") to convert.
+    cent_offset: The cents offset, default is 0.0.
+    A4_Hz: The frequency of A4, default is 440 Hz.
+    A4_MIDI: The MIDI note number of A4, default is 69.
+  
+  Returns:
+    The frequency in Hertz.
+  '''
+  PITCH_LABELS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+  note = pitchclass[:-1]
+  octave = int(pitchclass[-1])
+  note_index = PITCH_LABELS.index(note)
+  midi = note_index + (octave + 1) * 12
+  midi = midi - A4_MIDI
+  midi = midi + cent_offset / 100
+  frequency = A4_Hz * (2 ** (midi / 12))
+  return frequency
+
+  
+
 def octave_reduce(interval: float, octave: int = 1) -> float:
   '''
   Reduce an interval to within the span of a specified octave.

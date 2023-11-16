@@ -49,7 +49,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
     Python
     ```
-
+    
     Then, once the interpreter loads, import from `allopy` as needed.  For example:
 
     ```
@@ -58,11 +58,17 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     440.0
     >>> tonos.scales.hexany([1,3,5,7], 2)
     ([3, 5, 7, 15, 21, 35], [1.09375, 1.25, 1.3125, 1.5, 1.75, 1.875])
+    >>> tonos.pitchclass_to_freq('A4')
+    440.0
+    >>> tonos.pitchclass_to_freq('A4', -32)
+    431.941776308572
     ```
 
+    `AlloPy` supports [https://support.ircam.fr/docs/om/om6-manual/co/RT1.html](Rhythm Trees), as implemented in the [https://openmusic-project.github.io/](OpenMusic) composition software.
     ```
     >>> from allopy.chronos import rhythm_trees as rt
-    >>> [str(r) for r in rt.measure_ratios(rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1)))))))]
+    >>> r_tree = rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1))))))
+    >>> [str(r) for r in rt.measure_ratios(r_tree)]
     ['1/4', '1/6', '1/6', '1/6', '1/12', '1/30', '1/60', '1/30', '1/12']
     ```
 
@@ -76,6 +82,10 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     (('∆', (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))), ('Σ', (('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'))), ('Ψ', (('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'))), ('Ω', (('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'))), ('ζ', (('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'))))
     ```
 
+    ```
+    >>> from allopy import chronos, tonos, aikous, skora
+    ```
+
     Or import the entire package:
     ```
     >>> import allopy as al
@@ -83,8 +93,19 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     0.2512
     >>> al.chronos.beat_duration(1/4, 120)
     0.5
+    >>> score_df = al.skora.make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency'))
+    >>> frequency = al.tonos.pitchclass_to_freq('D4', cent_offset = -16) 
+    >>> ratio = al.tonos.cents_to_ratio(386)
+    >>> new_row = {
+            'start'      : 0.0,
+            'dur'        : al.chronos.beat_duration(metric_ratio=1/9, bpm=76),
+            'synthName'  : 'mySynth',
+            'amplitude'  : al.aikous.Dynamics.mf,
+            'frequency'  : frequency * ratio,
+        }
+    >>> score_df = skora.concat_rows(score_df, [new_row])
+    >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
-
 ---
 
 ## License
