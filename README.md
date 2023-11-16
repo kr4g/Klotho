@@ -49,7 +49,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
     Python
     ```
-    
+
     Then, once the interpreter loads, import from `allopy` as needed.  For example:
 
     ```
@@ -82,28 +82,24 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     (('∆', (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))), ('Σ', (('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'))), ('Ψ', (('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'))), ('Ω', (('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'))), ('ζ', (('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'))))
     ```
 
-    ```
-    >>> from allopy import chronos, tonos, aikous, skora
-    ```
-
     Or import the entire package:
     ```
     >>> import allopy as al
     >>> al.aikous.Dynamics.mf
     0.2512
-    >>> al.chronos.beat_duration(1/4, 120)
+    >>> al.chronos.beat_duration(metric_ratio=1/4, bpm=120)
     0.5
     >>> score_df = al.skora.make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency'))
-    >>> frequency = al.tonos.pitchclass_to_freq('D4', cent_offset = -16) 
+    >>> frequency = al.tonos.pitchclass_to_freq('D3', cent_offset = -16) 
     >>> ratio = al.tonos.cents_to_ratio(386)
-    >>> new_row = {
+    >>> rows = [{
             'start'      : 0.0,
-            'dur'        : al.chronos.beat_duration(metric_ratio=1/9, bpm=76),
+            'dur'        : al.chronos.beat_duration(1/9, 76),
             'synthName'  : 'mySynth',
-            'amplitude'  : al.aikous.Dynamics.mf,
-            'frequency'  : frequency * ratio,
-        }
-    >>> score_df = skora.concat_rows(score_df, [new_row])
+            'amplitude'  : al.aikous.Dynamics.ff,
+            'frequency'  : frequency * ratio**i,
+        } for i in range(9)]
+    >>> score_df = skora.concat_rows(score_df, rows)
     >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
 ---
