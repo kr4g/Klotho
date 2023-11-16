@@ -57,9 +57,16 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
 
     ```
+    >>> from allopy.chronos import rhythm_trees as rt
+    >>> rt.measure_ratios(rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1)))))))
+    [Fraction(1, 4), Fraction(1, 6), Fraction(1, 6), Fraction(1, 6), Fraction(1, 12), Fraction(1, 30), Fraction(1, 60), Fraction(1, 30), Fraction(1, 12)]
+    >>> 
+    ```
+
+    ```
     >>> from allopy import topos
-    >>> topos.iso_pairs(('⚛', '∿'), ('Ξ', '≈'))
-    (('⚛', 'Ξ'), ('∿', '≈'), ('⚛', '≈'), ('∿', 'Ξ'))
+    >>> topos.iso_pairs(('⚛', '∿', '♢'), ('Ξ', '≈'))
+    (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))
     ```
 
     Or import the entire package:

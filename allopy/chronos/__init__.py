@@ -16,7 +16,6 @@ cycles of creation and destruction within the universe.
 
 from .chronos        import *
 from .rhythm_trees   import *
-from .rhythm_pairs   import *
 from .temporal_units import *
 
 __all__ = [
