@@ -15,7 +15,7 @@ from fractions import Fraction
 
 TOPOS_WARNINGS = True
 
-def iso_pairs(l1: list, l2: list) -> list:
+def iso_pairs(l1: list, l2: list) -> tuple:
     '''
     Generates pairs of elements from two lists, l1 and l2, in a cyclic manner. 
 
@@ -41,16 +41,15 @@ def iso_pairs(l1: list, l2: list) -> list:
     >>> iso_pairs(('⚛', '∿'), ('Ξ', '≈'))
     (('⚛', 'Ξ'), ('∿', '≈'), ('⚛', '≈'), ('∿', 'Ξ'))
     '''
-    if TOPOS_WARNINGS:
-        if Fraction(len(l1), len(l2)).denominator == 1:
-            print('PAY HEED! THE TOPOS CAUTIONS YOU: The length of the lists should not evenly divide.' + 
-                'Otherwise, the cyclic pairing will be equivalent to a Cartesian product.  If this is your intention, ' +
-                'The Topos bids you to proceed.  If this is not your intention, The Topos suggests you ' +
-                'provide lists of indivisible lengths.  The Topos has spoken.')
+    if TOPOS_WARNINGS and Fraction(len(l1), len(l2)).denominator == 1:
+        print('PAY HEED! THE TOPOS CAUTIONS YOU: The lengths of the lists should not evenly divide.' + 
+            'Otherwise, the cyclic pairing will be equivalent to a Cartesian product.  If this is your intention, ' +
+            'The Topos bids you to proceed.  If this is not your intention, The Topos suggests you ' +
+            'provide lists of indivisible lengths.  The Topos has spoken.')
 
     return tuple((l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2)))
 
-def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
+def cyclic_cartesian_pairs(l1: list, l2: list) -> tuple:
     '''
     Generates a sequence of pairs by first creating a Cartesian product of list l1 with itself,
     and then cycling through these pairs while pairing them with elements from list l2.
@@ -71,3 +70,29 @@ def cyclic_cartesian_pairs(l1: list, l2: list) -> list:
     (('Ω', 'Ψ'), '¤'), (('Ω', '⧭'), '〄'), (('Ω', 'Ω'), '¤')
     '''
     return iso_pairs(tuple(cartes(l1, l1)), l2)
+
+def homotopic_map(l1: tuple, l2: tuple) -> tuple:
+    '''
+    Maps each element of tuple l1 to a unique "path" (sub-tuple) in tuple l2. 
+    Each element from l1 is paired with a shifted version of l2, ensuring 
+    that each pair is unique and resembles a distinct "path".
+    Warns if l1 is longer than l2, as this would disrupt the creation of distinct paths.
+
+    Args:
+        l1 (tuple): The first tuple of elements.
+        l2 (tuple): The second tuple of elements to form paths.
+
+    Returns:
+        tuple: A tuple of pairs, each pair consists of an element from l1 and a unique path in l2.
+
+    Example:
+    >>> homotopic_map(('Δ', 'Θ'), ('λ', 'μ', 'ν'))
+    (('Δ', ('λ', 'μ', 'ν')), ('Θ', ('μ', 'ν', 'λ')))
+    '''
+    if TOPOS_WARNINGS and len(l1) > len(l2):
+        print('PAY HEED! THE TOPOS CAUTIONS YOU: The first list is longer than the second. ' +
+              'This may result in non-unique paths for each element in the first list. If this is your intention, ' +
+                'The Topos bids you to proceed.  If this is not your intention, The Topos suggests you ' +
+                'swap the lists.  The Topos has spoken.')
+
+    return tuple((l1[i], tuple(l2[i % len(l2):] + l2[:i % len(l2)])) for i in range(len(l1)))

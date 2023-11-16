@@ -25,7 +25,7 @@ setup(
     # tests_require=[
     #     'pytest',
     # ],
-    description='A Python module designed to work in tandem with AlloLib Playground as a computer-assisted metacompositional toolkit, work environment, score editor, and general educational resource.',
+    description='AlloPy is an open source Python package designed to work as both a stand-alone software and in tandem with AlloLib Playground as a computer-assisted toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of transmodal metacomposition.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/kr4g/AlloPy',
