@@ -230,7 +230,9 @@ And so then there was now a resiliant harmony, resonating from the subatomic to 
 
 #### The `AlloPy` Package Structure:  The Five Modules
 
-Lo there, friend.  *Friður sé með þér!*  Welcome to the world of `AlloPy`.
+Lo there, friend.  *Friður sé með þér!*  
+
+Welcome to the world of `AlloPy`.
 
 Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of `AlloPy` will guide you in your journey.
 
