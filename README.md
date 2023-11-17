@@ -1,5 +1,5 @@
 # AlloPy
-`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with `AlloLib Playground` as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of multimedia metacomposition.
+`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with `AlloLib Playground` as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of *extemporal* multimedia metacomposition.
 
 Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.ucsb.edu/students/#rmillett) as part of the AlloSphere Research Group, under the supervision of Dr. Kuchera-Morin, at the University of California, Santa Barbara.
 
@@ -234,7 +234,7 @@ Lo there, friend.  *Friður sé með þér!*  Welcome to the world of `AlloPy`.
 
 Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of `AlloPy` will guide you in your journey.
 
-Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of multimedia metacomposition.
+Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of *extemporal* multimedia metacomposition.
 
 ### `Chronos` 
 
