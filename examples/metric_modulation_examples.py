@@ -54,7 +54,7 @@ def metric_modulation_ex(metric_ratios: list, pulses: list, bpm: float = 60):
     for i, (duration, n) in enumerate(duration_pulse_pairs):
         dur        = duration * 0.667
         amplitude  = np.random.choice([aikous.Dynamics.pp, aikous.Dynamics.p,
-                                       aikous.Dynamics.mf, aikous.Dynamics.f]) * 0.17
+                                       aikous.Dynamics.mf, aikous.Dynamics.f]) * 0.96
         root_freq  = (999 * 1.9692**-2) * tonos.cents_to_ratio(1067)**octaves[i % 4]
         pan        = np.random.uniform(-1.0, 1.0)
         amFunc     = np.random.randint(0, 3)

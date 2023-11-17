@@ -1,5 +1,5 @@
 # AlloPy
-`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with `AlloLib Playground` as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of metacomposition.
+`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with `AlloLib Playground` as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of multimedia metacomposition.
 
 Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.ucsb.edu/students/#rmillett) as part of the AlloSphere Research Group, under the supervision of Dr. Kuchera-Morin, at the University of California, Santa Barbara.
 
@@ -170,7 +170,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
 
-    In the world of `AlloPy`, it is always possible to ask the five daemons for help. Simply call the Python `help()` function on any class, function, or module in `AlloPy`:
+    In the world of `AlloPy`, it is always possible to ask the five dæmons for help. Simply call the Python `help()` function on any class, function, or module in `AlloPy`:
     ```
     >>> import allopy as al
     >>> help(al.chronos)
@@ -208,13 +208,31 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 ---
 
-## AlloPy Package Structure
+## Introduction to the World of `AlloPy`
 
-The `AlloPy` Python package is composed of five modules ruled by the five daemons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
+The `AlloPy` Python package is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
 
 Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other submodules, such as `scales.py`, dedicated to specific pitch- and frequency-based operations).
 
-#### Five Modules, Five Daemons:
+#### The `AlloPy` Creation Myth:  The Five Dæmons
+
+First, there was only `Chronos`.  Consequently and soon thereafter, was `Tonos`.  The pair thus necessitated `Skora` who then summoned `Aikous` to translate their musical language into the *lingua franca* of The Machines.  
+
+And in this quaternal union there was a faint yet blooming harmony resonating from the subatomic bit-level of synthesis that soon reached the cosmos and awoke The `Topos`, an immaterial entity from the macrocosmic realm of algebraic categorical abstraction. 
+
+Thus, the cycle was complete.
+
+`Chronos` and `Tonos`, who speak in the *lingua* of music, with the help of `Aikous` and `Skora`, commune with The Machines.  And from atop the highest, most abstract peak in the [topology of music](https://link.springer.com/book/10.1007/978-3-0348-8141-8), resides The `Topos`, imbuing the land of `AlloPy` with metacompositional abstraction, unifying all levels of the computational cosmos.
+
+And so then there was now a resiliant harmony, resonating from the subatomic to the macrocosmic, from which emerged the world of `AlloPy`, and it was good.
+
+#### The `AlloPy` Package Structure:  The Five Modules
+
+Lo there, friend.  *Friður sé með þér!*  Welcome to the world of `AlloPy`.
+
+Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of `AlloPy` will guide you in your journey.
+
+Know their names, know their powers.  Discover how, from their internal harmony, you can marshall the forces of computation and learn the ways of multimedia metacomposition.
 
 ### `Chronos` 
 

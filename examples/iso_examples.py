@@ -101,10 +101,10 @@ if __name__ == '__main__':
     # --------------------------------------------------
     
     # Example 00
-    color_ratios = (1/1, 9/8, 4/3)
+    color_ratios = (1/1, 9/8, 5/4)
     talea_ratios = (1/4, 1/8, 1/12, 1/12, 1/12)
-    root_freq    = 440
-    tempo        = 60
+    root_freq    = 400
+    tempo        = 54
     kwargs       = {
         'attackTime'  : 0.05, 
         'releaseTime' : 10.0,
@@ -165,7 +165,7 @@ if __name__ == '__main__':
         'Pan2'        : 1.0,
         'PanRise'     : 0.0,
     }
-    score_df_02 = iso_test(color_ratios = color_ratios_inv,
+    score_df_02 = iso_test(color_ratios = color_ratios,
                            talea_ratios = talea_ratios_comp,
                            root_freq    = root_freq * 2,
                            tempo        = tempo * 2,
