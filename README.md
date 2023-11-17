@@ -103,10 +103,14 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     440.0
     >>> tonos.freq_to_pitchclass(440.0)
     'A4'
-    >>> tonos.pitchclass_to_freq('A4', cent_offset = -32)
+    >>> freq = tonos.pitchclass_to_freq('A4', cent_offset = -32)
+    >>> freq
     431.941776308572
-    >>> tonos.scales.hexany([1,3,5,7], 2)
+    >>> hexany = tonos.scales.hexany([1,3,5,7], 2)
+    >>> hexany
     ([3, 5, 7, 15, 21, 35], [1.09375, 1.25, 1.3125, 1.5, 1.75, 1.875])
+    >>> [freq * ratio for ratio in hexany.ratios]
+    [472.4363178375006, 539.927220385715, 566.9235814050007, 647.912664462858, 755.898108540001, 809.8908305785725]
     ```
 
     `AlloPy` supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
