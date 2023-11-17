@@ -39,9 +39,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 4. **Play**:
 
-    To work with `AlloPy` as a scripting tool, create a directory within the `/AlloPy/` directory and save your scripts there.
-
-    To use`AlloPy` as a scripting tool, the [`AlloPy/examples/`](https://github.com/kr4g/AlloPy/tree/main/examples) directory contains examples of how to use the modules in this manner.
+    To work with `AlloPy` as a scripting tool, create a directory within the `/AlloPy/` directory and save your scripts there.  The [`AlloPy/examples/`](https://github.com/kr4g/AlloPy/tree/main/examples) directory contains examples of how to use the modules in this manner.
 
     To use `AlloPy` as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `/AlloPy/` directory by running the command:
 
