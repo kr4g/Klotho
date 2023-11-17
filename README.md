@@ -154,7 +154,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
             'start'      : i * duration,
             'dur'        : duration,
             'synthName'  : 'mySynth',
-            'amplitude'  : np.interp(i, [0,repeats], [min_amp, max_amp]),
+            'amplitude'  : np.interp(i, [0, repeats], [min_amp, max_amp]),
             'frequency'  : frequency * ratio**i,
         } for i in range(repeats)]
     >>> score_df = skora.concat_rows(score_df, rows)
