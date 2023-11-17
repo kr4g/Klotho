@@ -163,8 +163,31 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     In the world of `AlloPy`, it is always possible to ask the five daemons for help. Simply call the Python `help()` function on any class, function, or module in `AlloPy`:
     ```
-    >>> 
+    >>> import allopy as al
+    >>> help(al.chronos)
+    Help on package allopy.chronos in allopy:
+
+    NAME
+        allopy.chronos - --------------------------------------------------------------------------------------
+
+    DESCRIPTION
+        `Chronos` is a specialized module for working with time and rhythm in music.
+        
+        The word "chronos" originates from Ancient Greek and is deeply rooted in both language 
+        and mythology. In Greek, "χρόνος" (chronos) means "time".
+        
+        In Greek mythology, Chronos (not to be confused with Cronus, the Titan) is personified as 
+        the god of time. His representation often symbolizes the endless passage of time and the 
+        cycles of creation and destruction within the universe.
+        
+        --------------------------------------------------------------------------------------
+
+    PACKAGE CONTENTS
+        chronos
+        rhythm_trees
+        temporal_units
     ```
+    Press `q` in the terminal window to leave the help screen and return to the interpreter.
 
     Even in this 'on-the-fly', interpreter-based paradigm, `AlloPy` is designed to integrate directly with the `AlloLib Playground` in any IDE of choice.  
     
