@@ -199,7 +199,9 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 ---
 
-## Working with `AlloLib` and `AlloPy`: Audiovisual Synthesis and Metacomposition Tutorial Series
+## Education
+
+### Working with `AlloLib` and `AlloPy`: Audiovisual Synthesis and Metacomposition Tutorial Series
 
 The `AlloLib Playground` is an application development space for working with the classes and functions of `AlloLib` and `Gamma` C++ libraries.  Along with `AlloLib` and `Gamma`, the Playground sits "close to the metal" in C++ and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
