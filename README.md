@@ -182,10 +182,10 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ε : κκ
     >>> random_rules = {k: v + ' ' for k, v in random_rules.items()}
     >>> gens = 11
-    >>> l_str_dict = grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
-    >>> l_str_dict[4]
+    >>> l_str_gens = grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
+    >>> l_str_gens[4]
     '∏ σᛃπᚠ κᛃνᚷ ᛃ ε∜ Υ∉ √ᚷ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ σᛃπᚠ κᛃνᚷ ᛃ ε∜ σᛃπᚠ σᛃπᚠ '
-    >>> l_str_dict[5]
+    >>> l_str_gens[5]
     'Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ ∏ ε∜ κκ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κκ ∏ σᛃπᚠ κᛃνᚷ ᛃ ε∜ Υ∉ √ᚷ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ σᛃπᚠ κᛃνᚷ ᛃ ε∜ σᛃπᚠ σᛃπᚠ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ '
     ```
 
