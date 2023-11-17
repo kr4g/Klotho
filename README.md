@@ -23,7 +23,7 @@ Each of the five modules contains a base module named after itself as well as va
 
 ### `Tonos` 
 
-*Teacher of Tones:  <something> of pitch and frequency*
+*Teacher of Tones:  zygós of pitch and frequency*
 
 (description)
 
