@@ -282,7 +282,7 @@ Consult The Topos for guidance and you will receive it, but know that The Topos 
 
 The `AlloLib Playground` is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.
 
-Tthe Playground, then, sits "close to the metal" in C++ and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
+The Playground thus sits "close to the metal" in C++ and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
 `AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as `AlloLib`.
 
