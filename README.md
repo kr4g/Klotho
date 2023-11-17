@@ -17,21 +17,21 @@ Each of the five modules contains a base module named after itself as well as va
 
 ### `Chronos` 
 
-*Lord of Time:  knower of all things temporal*
+***Lord of Time:***  *knower of all things temporal*
 
 (description)
 
 ### `Tonos` 
 
-*Teacher of Tones:  zygós of pitch and frequency*
+***Teacher of Tones:***  *zygós of pitch, hyphantēs of frequency*
 
 (description)
 
 ### `Topos`
 
-*Master of Music Mysterium:  your mentor in Musimathics*
+***Master of Music Mysterium:***  *your mentor in Musimathics*
 
-The `Topos` is the most abstract and, thus, mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly.  Instead, The `Topos` deals with the abstract topology, that is, [`The Topos of Music`](https://link.springer.com/book/10.1007/978-3-0348-8141-8)—the highly abstract realm of *extemporal metacomposition*.
+The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly.  Instead, The `Topos` deals with the abstract topology, that is, [`The Topos of Music`](https://link.springer.com/book/10.1007/978-3-0348-8141-8)—the highly abstract realm of *extemporal metacomposition*.
 
 The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software implemented in Common LISP.
 
@@ -39,13 +39,13 @@ Every `topos.py` function is inherently recursive, allowing for the construction
 
 ### `Aikous` 
 
-*Goddess of musical perception and practicality: your link from sensory algebra to synthesis reality*
+***Goddess of Perception and Practicality:*** *your link from musical algebra to synthesis reality*
 
 (description)
 
 ### `Skora` 
 
-*The Scribe:  keeper of scores, numen of notation*
+***The Scribe:***  *keeper of scores, numen of notation*
 
 (description)
 
@@ -165,7 +165,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 ## Working with `AlloLib` and `AlloPy`: Audiovisual Synthesis and Metacomposition Tutorial Series
 
-The `AlloLib Playground` is an application development space for working with the classes and functions of `AlloLib` and `Gamma` C++ libraries.  The Playground sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
+The `AlloLib Playground` is an application development space for working with the classes and functions of `AlloLib` and `Gamma` C++ libraries.  Along with `AlloLib` and `Gamma`, the Playground sits "close to the metal" in C++ and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
 `AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as `AlloLib`.
 
