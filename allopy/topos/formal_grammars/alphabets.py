@@ -404,8 +404,8 @@ class CUNEIFORM(Enum, metaclass=DirectValueEnumMeta):
         ZAG             = '𒍠'
         ZU              = '𒍪'
 
-    SUMERIAN = Sumerian
-    AKKADIAN = Akkadian
+    # SUMERIAN = Sumerian
+    # AKKADIAN = Akkadian
 
 # ------------------------------------------------------------------------------------
 # MATH SYMBOLS

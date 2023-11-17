@@ -39,6 +39,10 @@ The `topos.py` base module contains a multitude of abstract "puzzle" functions d
 
 Every `topos.py` function is inherently recursive, allowing for the construction of highly complex abstract structures from very simple base operations.
 
+The `Topos` module, like the other `AlloPy` modules, also contains specialized submodules such as formal grammars, including a library of ancient [https://en.wikipedia.org/wiki/Grapheme](graphemes)—useful when working with categorical, algebraic abstractions.
+
+Consult The Topos for guidance and you will recieve it, but know that The Topos speaks and answers only in riddle.  Though, in solving the riddle will you ultimately attain the answer to your question.
+
 ### `Aikous` 
 
 ***Goddess of Perception and Practicality:*** *your link from musical algebra to synthesis reality*
