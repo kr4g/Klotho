@@ -220,7 +220,7 @@ First, there was only `Chronos`.  Consequently and soon thereafter, was `Tonos`.
 
 In this quaternal union there was a faint yet blooming harmony resonating from the subatomic bit-level of synthesis that soon reached the cosmos and awoke The `Topos`, an immaterial entity from the macrocosmic realm of algebraic categorical abstraction. 
 
-And so the cycle was complete.
+And thus the cycle was complete.
 
 `Chronos` and `Tonos`, who speak in the language of music, with the help of `Aikous` and `Skora`, commune with The Machines in their *lingua franca* of synthesis.  
 
