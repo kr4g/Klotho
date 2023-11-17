@@ -278,7 +278,7 @@ Consult The Topos for wisdom and you will receive it, but know that The Topos sp
 
 ## Education
 
-### Into the AlloVerse:  an Audiovisual Synthesis and Metacomposition Tutorial Series for working with `AlloLib` and `AlloPy`
+### Into the AlloVerse:  an Audiovisual Synthesis and Metacomposition tutorial series for working with `AlloLib` and `AlloPy`
 
 The `AlloLib Playground` is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.
 
