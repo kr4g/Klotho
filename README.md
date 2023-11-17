@@ -140,15 +140,17 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> al.chronos.beat_duration(metric_ratio=1/4, bpm=120)
     0.5
     >>> score_df = al.skora.make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency'))
+    >>> duration = al.chronos.beat_duration(1/9, 76)
     >>> frequency = al.tonos.pitchclass_to_freq('D3', cent_offset = -16) 
     >>> ratio = al.tonos.cents_to_ratio(386)
+    >>> repeats = 9
     >>> rows = [{
-            'start'      : i * 0.5,
-            'dur'        : al.chronos.beat_duration(1/9, 76),
+            'start'      : i * duration,
+            'dur'        : duration,
             'synthName'  : 'mySynth',
-            'amplitude'  : al.aikous.Dynamics.ff,
+            'amplitude'  : al.aikous.Dynamics.ff * (i / repeats),
             'frequency'  : frequency * ratio**i,
-        } for i in range(9)]
+        } for i in range(repeats)]
     >>> score_df = skora.concat_rows(score_df, rows)
     >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
