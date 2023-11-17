@@ -6,7 +6,11 @@ The `aikous` base module.
 '''
 
 import numpy as np
+import pandas as pd
 from enum import Enum, EnumMeta
+
+A4_Hz   = 440.0
+A4_MIDI = 69
 
 class DirectValueEnumMeta(EnumMeta):
   def __getattribute__(cls, name):
@@ -120,7 +124,6 @@ class Articulation(Enum, metaclass=DirectValueEnumMeta):
   Example use:
   `>>> Articulation.Staccato`
   '''
-
   Legato    = (0.9, 1.0, 0.9)  # Longer attack, full decay, high sustain
   Staccato  = (0.1, 0.5, 0.3)  # Quick attack, shortened decay, low sustain
   Marcato   = (0.2, 0.7, 0.6)  # Quick attack, moderate decay, medium sustain
@@ -129,6 +132,29 @@ class Articulation(Enum, metaclass=DirectValueEnumMeta):
   Portato   = (0.3, 0.9, 0.7)  # Moderate attack, full decay, medium-high sustain
   Accent    = (0.2, 0.8, 0.4)  # Quick attack, slightly shortened decay, medium-low sustain
   Sforzando = (0.2, 1.0, 0.5)  # Very quick attack, full decay, medium sustain
+
+class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
+  class N_TET_12(Enum, metaclass=DirectValueEnumMeta):
+    C  = 0
+    Cs = 1
+    D  = 2
+    Ds = 3
+    E  = 4
+    F  = 5
+    Fs = 6
+    G  = 7
+    Gs = 8
+    A  = 9
+    As = 10
+    B  = 11
+
+    @classmethod
+    def values(cls):
+        return [cls.C, cls.Cs, cls.D, cls.Ds, cls.E, cls.F, cls.Fs, cls.G, cls.Gs, cls.A, cls.As, cls.B]
+
+    @classmethod
+    def names(cls):
+        return ['C', 'C3', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
 def amp_db(amp: float) -> float:
   '''
@@ -157,5 +183,11 @@ def db_amp(db: float) -> float:
 def percieved_tempo(durations: list) -> float:
   '''
   Given a list of durations, returns the percieved tempo.
+  '''
+  pass
+
+def duration_event_density(durations: list, amplitudes: list, frequencies: list):
+  '''
+  Given a list of durations, returns the duration event density.
   '''
   pass

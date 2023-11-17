@@ -10,10 +10,20 @@ computations related to pitch and frequency in music.
 --------------------------------------------------------------------------------------
 '''
 
+from allopy import aikous
+
 from typing import Union, List, Tuple, Dict, Set
 from math import prod
 import numpy as np
 import itertools
+
+from enum import Enum, EnumMeta
+class DirectValueEnumMeta(EnumMeta):
+    def __getattribute__(cls, name):
+        member = super().__getattribute__(name)
+        if isinstance(member, cls):
+            return member.value
+        return member
 
 def freq_to_midicents(frequency: float) -> float:
   '''
@@ -95,7 +105,7 @@ def cents_to_ratio(cents: float) -> str:
   '''
   return 2 ** (cents / 1200)
 
-def freq_to_pitchclass(freq: float, A4_Hz=440.0, A4_MIDI=69):
+def freq_to_pitchclass(freq: float):
   '''
   Converts a frequency to a pitch class with offset in cents.
   
@@ -107,8 +117,8 @@ def freq_to_pitchclass(freq: float, A4_Hz=440.0, A4_MIDI=69):
   Returns:
     A tuple containing the pitch class and the cents offset.
   '''
-  PITCH_LABELS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-  midi = A4_MIDI + 12 * np.log2(freq / A4_Hz)
+  PITCH_LABELS = aikous.PITCH_CLASSES.N_TET_12.names()
+  midi = aikous.A4_MIDI + 12 * np.log2(freq / aikous.A4_Hz)
   midi_round = round(midi)
   note_index = int(midi_round) % 12
   octave = int(midi_round // 12) - 1  # MIDI starts from C-1
@@ -132,7 +142,7 @@ def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=440.0, A
   Returns:
     The frequency in Hertz.
   '''
-  PITCH_LABELS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+  PITCH_LABELS = aikous.PITCH_CLASSES.N_TET_12.names()
   note = pitchclass[:-1]
   octave = int(pitchclass[-1])
   note_index = PITCH_LABELS.index(note)
