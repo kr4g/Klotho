@@ -13,7 +13,7 @@ Download `AlloLib Playground` here:  https://github.com/AlloSphere-Research-Grou
 
 The `AlloPy` Python package is composed of five modules ruled by the five daemons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
 
-Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other submodules, such as `scales.py`, dedicated to specific pitch- and frequency-based operations).
+Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other submodules, such as `scales.py`, dedicated to specific pitch- and frequency-based operations).
 
 #### Five Modules, Five Daemons:
 
