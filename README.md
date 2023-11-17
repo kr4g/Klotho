@@ -33,7 +33,7 @@ Each of the five modules contains a base module named after itself as well as va
 
 ***Master of Music Mysterium:***  *your mentor in Musimathics*
 
-The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The `Topos` deals with the abstract topology, the [`Topos of Music`](https://link.springer.com/book/10.1007/978-3-0348-8141-8)—a highly abstract realm of *extemporal metacomposition*.
+The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The `Topos` deals with the abstract topology, the [`Topos of Music`](https://link.springer.com/book/10.1007/978-3-0348-8141-8)—the realm of *extemporal metacomposition*.
 
 The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software implemented in Common LISP.
 
