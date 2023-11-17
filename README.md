@@ -250,7 +250,7 @@ Know their names, know their powers.  Discover how, from their internal harmony,
 
 ### `Topos`
 
-***Master of Music Mysterium:***  *mentor in Musimathics*
+***Master of Music Mysterium:***  *mentor in musimathics*
 
 The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The `Topos` deals with the abstract topology, the [`Topos`](https://link.springer.com/book/10.1007/978-3-0348-8141-8) of Music.
 
