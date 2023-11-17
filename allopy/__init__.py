@@ -4,6 +4,8 @@ from .topos       import * # ToposClass, topos_function
 from .aikous      import * # AikousClass, aikous_function
 from .skora       import * # SkoraClass, skora_function
 
+from .topos.formal_grammars import * # Alphabets, Grammars
+
 __all__ = [
     # 'ChronosClass', 'chronos_function',
     # 'TonosClass', 'tonos_function',
