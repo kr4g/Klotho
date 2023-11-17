@@ -149,6 +149,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> import numpy as np
     >>> alpha = np.array([s.value for s in S1] + [s.value for s in S2])
     >>> np.random.shuffle(alpha)
+    >>> alpha = alpha[:13]
     >>> random_rules = grammars.rand_rules(alpha, word_length_max=5)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
