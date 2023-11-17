@@ -150,7 +150,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
 
-    It is always possible to ask for help, simply call the Python `help()` function on any class, function, or module in `AlloPy`:
+    In the world of `AlloPy`, it is always possible to ask the five daemons for help. Simply call the Python `help()` function on any class, function, or module in `AlloPy`:
     ```
     >>> 
     ```
