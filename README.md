@@ -278,13 +278,13 @@ Consult The Topos for guidance and you will receive it, but know that The Topos 
 
 ## Education
 
-### Into the *AlloVerse*:  Working with `AlloLib` and `AlloPy`, an Audiovisual Synthesis and Metacomposition Tutorial Series
+### Into the AlloVerse:  an Audiovisual Synthesis and Metacomposition Tutorial Series for working with `AlloLib` and `AlloPy`
 
 The `AlloLib Playground` is an application development space for working with the classes and functions of `AlloLib` and `Gamma` C++ libraries.  Along with `AlloLib` and `Gamma`, the Playground sits "close to the metal" in C++ and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
 `AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as `AlloLib`.
 
-When used in concert, `AlloLib` and `AlloPy` bridge the subatomic, sample-level world of sound synthesis and graphical computation with the macrocosmic, "outside of time" realm of music composition and poly-sensory metacomposition.  Together, they form a unified *AlloVerse* where students, artists, composers, and researchers can move freely between all levels of a distributed, multimedia composition system.
+When used in concert, `AlloLib` and `AlloPy` bridge the subatomic, bit-level world of sound synthesis and graphical computation with the macrocosmic, "outside of time" realm of music composition and poly-sensory metacomposition.  Together, they form a unified *AlloVerse* where students, artists, composers, and researchers can move freely between all levels of a distributed, multimedia composition system.
 
 *Coming soon...*
 
