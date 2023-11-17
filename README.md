@@ -45,7 +45,7 @@ Consult The Topos for guidance and you will recieve it, but know that The Topos 
 
 ### `Aikous` 
 
-***Goddess of Perception and Practicality:*** *your link from musical algebra to synthesis reality*
+***Goddess of Perception and Practicality:*** *the threader of musical algebra and synthesis reality*
 
 (description)
 
