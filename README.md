@@ -139,13 +139,13 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     Formal Grammars:
     ```
-    >>> from allopy.topos import formal_grammars
-    >>> S1 = formal_grammars.alphabets.RUNIC.OLD_NORSE.Elder_Futhark
-    >>> S2 = formal_grammars.alphabets.AncientGreek
+    >>> from allopy.topos.formal_grammars import alphabets, grammars
+    >>> S1 = alphabets.RUNIC.OLD_NORSE.Elder_Futhark
+    >>> S2 = alphabets.AncientGreek
     >>> import numpy as np
     >>> alpha = np.array([s.value for s in S1] + [s.value for s in S2])
     >>> np.random.shuffle(alpha)
-    >>> random_rules = formal_grammars.grammars.rand_rules(alpha, word_length_max=5)
+    >>> random_rules = grammars.rand_rules(alpha, word_length_max=5)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
     ... 
@@ -162,9 +162,9 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ν : ᛃ
     ᛃ : κᛃνᚷ
     ε : κκ
-    >>> S3 = formal_grammars.alphabets.Mathematical
+    >>> S3 = alphabets.Mathematical
     >>> constraints = {a: np.random.choice([s.value for s in S3]) for a in alpha[:len(alpha)//8]}
-    >>> random_rules = formal_grammars.grammars.constrain_rules(random_rules, constraints)
+    >>> random_rules = grammars.constrain_rules(random_rules, constraints)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
     ᚠ : ᚷᚠᛃᚷ∋
@@ -182,8 +182,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ε : κκ
     >>> random_rules = {k: v + ' ' for k, v in random_rules.items()}
     >>> gens = 11
-    >>> l_str_dict = formal_grammars.grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
-    >>> l_str_dict[gens]
+    >>> l_str_dict = grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
     >>> l_str_dict[4]
     '∏ σᛃπᚠ κᛃνᚷ ᛃ ε∜ Υ∉ √ᚷ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ σᛃπᚠ κᛃνᚷ ᛃ ε∜ σᛃπᚠ σᛃπᚠ '
     >>> l_str_dict[5]
