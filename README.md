@@ -218,11 +218,13 @@ Each of the five modules contains a base module named after itself as well as va
 
 First, there was only `Chronos`.  Consequently and soon thereafter, was `Tonos`.  The pair thus necessitated `Skora` who then summoned `Aikous` to translate their musical language into the *lingua franca* of The Machines.  
 
-And in this quaternal union there was a faint yet blooming harmony resonating from the subatomic bit-level of synthesis that soon reached the cosmos and awoke The `Topos`, an immaterial entity from the macrocosmic realm of algebraic categorical abstraction. 
+In this quaternal union there was a faint yet blooming harmony resonating from the subatomic bit-level of synthesis that soon reached the cosmos and awoke The `Topos`, an immaterial entity from the macrocosmic realm of algebraic categorical abstraction. 
 
-Thus, the cycle was complete.
+And so the cycle was complete.
 
-`Chronos` and `Tonos`, who speak in the *lingua* of music, with the help of `Aikous` and `Skora`, commune with The Machines in their *lingua franca* of synthesis.  And from atop the highest, most abstract peak in the [topology of music](https://link.springer.com/book/10.1007/978-3-0348-8141-8), resides The `Topos`, imbuing the land of `AlloPy` with metacompositional abstraction, unifying all levels of the computational cosmos.
+`Chronos` and `Tonos`, who speak in the language of music, with the help of `Aikous` and `Skora`, commune with The Machines in their *lingua franca* of synthesis.  
+
+From atop the highest, most abstract peak in the [topology of music](https://link.springer.com/book/10.1007/978-3-0348-8141-8), resides The `Topos`, imbuing the land of `AlloPy` with metacompositional abstraction, unifying all levels of the computational cosmos.
 
 And so then there was now a resiliant harmony, resonating from the subatomic to the macrocosmic, from which emerged the world of `AlloPy`, and it was good.
 
