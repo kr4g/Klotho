@@ -234,7 +234,7 @@ Lo there, friend.  *Friður sé með þér!*  Welcome to the world of `AlloPy`.
 
 Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of `AlloPy` will guide you in your journey.
 
-Know their names, know their powers.  Discover how, from their internal harmony, you can marshall the forces of computation and learn the ways of multimedia metacomposition.
+Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of multimedia metacomposition.
 
 ### `Chronos` 
 
