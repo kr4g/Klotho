@@ -9,54 +9,6 @@ Download `AlloLib Playground` here: https://github.com/AlloSphere-Research-Group
 
 ---
 
-## AlloPy Package Structure
-
-The `AlloPy` Python package is composed of five modules ruled by the five daemons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
-
-Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other submodules, such as `scales.py`, dedicated to specific pitch- and frequency-based operations).
-
-#### Five Modules, Five Daemons:
-
-### `Chronos` 
-
-***Lord of Time:***  *knower of all things temporal*
-
-(description)
-
-### `Tonos` 
-
-***Teacher of Tones:***  *zygós of pitch and frequency*
-
-(description)
-
-### `Topos`
-
-***Master of Music Mysterium:***  *your mentor in Musimathics*
-
-The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The `Topos` deals with the abstract topology, the [`Topos`](https://link.springer.com/book/10.1007/978-3-0348-8141-8) of Music.
-
-The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software implemented in Common LISP.
-
-Every `topos.py` function is inherently recursive and all work with the same input and output type—the tuple.  This means that outputs can be feedback into inputs and/or routed to the inputs of other functions, etc., allowing for the construction of highly complex abstract structures from very simple base operations.
-
-The `Topos` module, like the other `AlloPy` modules, also contains specialized submodules such as formal grammars, including basic rewrite rule generation and a library of ancient [graphemes](https://en.wikipedia.org/wiki/Grapheme)—useful when working with categorical, algebraic abstractions.
-
-Consult The Topos for guidance and you will receive it, but know that The Topos speaks and answers only in riddle.  Though, in solving the riddle, will you ultimately attain the answer to your question.
-
-### `Aikous` 
-
-***Goddess of Perception and Practicality:*** *the threader of musical algebra and synthesis reality*
-
-(description)
-
-### `Skora` 
-
-***The Scribe:***  *keeper of scores, numen of notation*
-
-(description)
-
----
-
 ## Installation
 
 AlloPy works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
@@ -253,6 +205,54 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running `AlloLib` app—*no need to close and re-run the application when making changes to your scores.*  
     
     See VS Code integration section for more details.
+
+---
+
+## AlloPy Package Structure
+
+The `AlloPy` Python package is composed of five modules ruled by the five daemons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
+
+Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other submodules, such as `scales.py`, dedicated to specific pitch- and frequency-based operations).
+
+#### Five Modules, Five Daemons:
+
+### `Chronos` 
+
+***Lord of Time:***  *knower of all things temporal*
+
+(description)
+
+### `Tonos` 
+
+***Teacher of Tones:***  *zygós of pitch and frequency*
+
+(description)
+
+### `Topos`
+
+***Master of Music Mysterium:***  *your mentor in Musimathics*
+
+The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The `Topos` deals with the abstract topology, the [`Topos`](https://link.springer.com/book/10.1007/978-3-0348-8141-8) of Music.
+
+The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software implemented in Common LISP.
+
+Every `topos.py` function is inherently recursive and all work with the same input and output type—the tuple.  This means that outputs can be feedback into inputs and/or routed to the inputs of other functions, etc., allowing for the construction of highly complex abstract structures from very simple base operations.
+
+The `Topos` module, like the other `AlloPy` modules, also contains specialized submodules such as formal grammars, including basic rewrite rule generation and a library of ancient [graphemes](https://en.wikipedia.org/wiki/Grapheme)—useful when working with categorical, algebraic abstractions.
+
+Consult The Topos for guidance and you will receive it, but know that The Topos speaks and answers only in riddle.  Though, in solving the riddle, will you ultimately attain the answer to your question.
+
+### `Aikous` 
+
+***Goddess of Perception and Practicality:*** *the threader of musical algebra and synthesis reality*
+
+(description)
+
+### `Skora` 
+
+***The Scribe:***  *keeper of scores, numen of notation*
+
+(description)
 
 ---
 
