@@ -121,6 +121,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ['1/4', '1/6', '1/6', '1/6', '1/12', '1/30', '1/60', '1/30', '1/12']
     ```
 
+    Abstract tools for metacomposition:
     ```
     >>> from allopy import topos
     >>> iso = topos.iso_pairs(('⚛', '∿', '♢'), ('Ξ', '≈'))
