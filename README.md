@@ -255,7 +255,7 @@ The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modu
 
 The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software implemented in Common LISP.
 
-Every `topos.py` function is inherently recursive and all work with the same input and output type—the tuple.  This means that outputs can be feedback into inputs and/or routed to the inputs of other functions, etc., allowing for the construction of highly complex abstract structures from very simple base operations.
+Every `topos.py` function is inherently recursive and all work with the same input and output type—the tuple.  This means that outputs can feedback into inputs and/or routed to the inputs of other functions, etc., allowing for the construction of highly complex abstract structures from the interweaving of very simple base operations.
 
 The `Topos` module, like the other `AlloPy` modules, also contains specialized submodules such as formal grammars, including basic rewrite rule generation and a library of ancient [graphemes](https://en.wikipedia.org/wiki/Grapheme)—useful when working with categorical, algebraic abstractions.
 
