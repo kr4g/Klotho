@@ -5,7 +5,7 @@ Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.
 
 [The AlloSphere Research Group](https://github.com/AlloSphere-Research-Group)
 
-Download `AlloLib Playground` here: https://github.com/AlloSphere-Research-Group/allolib_playground
+Download AlloLib Playground here: https://github.com/AlloSphere-Research-Group/allolib_playground
 
 ---
 
@@ -17,7 +17,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 1. **Clone the Repository**:
 
-   First, clone the AlloPy repository (into the `/allolib_playground/` directory of your system if you want to work with AlloLib/Gamma) by running the following command in your terminal or command prompt:
+   First, clone the AlloPy repository (into the `allolib_playground/` directory of your system if you want to work with AlloLib/Gamma) by running the following command in your terminal or command prompt:
    
    ```
    git clone https://github.com/kr4g/AlloPy.git
@@ -39,9 +39,9 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 4. **Play**:
 
-    To work with `AlloPy` as a scripting tool, create a directory within the `/AlloPy/` directory and save your scripts there.  The [`AlloPy/examples/`](https://github.com/kr4g/AlloPy/tree/main/examples) directory contains examples of how to use the modules in this manner.
+    To work with AlloPy in a scripting context, create a directory within the `AlloPy/` directory and save your scripts there.  [`AlloPy/examples/`](https://github.com/kr4g/AlloPy/tree/main/examples) contains examples of how to use the modules in this manner.
 
-    To use `AlloPy` as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `/AlloPy/` directory by running the command:
+    To use AlloPy as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `AlloPy/` directory by running the command:
 
     ```
     Python
@@ -67,7 +67,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     [472.4363178375006, 539.927220385715, 566.9235814050007, 647.912664462858, 755.898108540001, 809.8908305785725]
     ```
 
-    `AlloPy` supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
+    AlloPy supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
     ```
     >>> from allopy.chronos import rhythm_trees as rt
     >>> r_tree = rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1))))))
@@ -167,7 +167,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
 
-    In the world of `AlloPy`, it is always possible to ask the five dæmons for help. Simply call the Python `help()` function on any class, function, or module in `AlloPy`:
+    In the world of AlloPy, it is always possible to ask the five dæmons for help. Simply call the Python `help()` function on any class, function, or module in AlloPy:
     ```
     >>> import allopy as al
     >>> help(al.chronos)
@@ -197,9 +197,9 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     ### Integration with AlloLib Playground
 
-    Even in this 'on-the-fly', interpreter-based paradigm, `AlloPy` is designed to integrate directly with the `AlloLib Playground` in any IDE of choice.  
+    Even in this 'on-the-fly', interpreter-based paradigm, AlloPy is designed to integrate directly with the AlloLib Playground in any IDE of choice.  
     
-    This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running `AlloLib` app—*no need to close and re-run the application when making changes to your scores.*  
+    This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running AlloLib app—*no need to close and re-run the application when making changes to your scores.*  
     
     See VS Code integration section for more details.
 
@@ -219,9 +219,7 @@ In this quaternal union there was a faint yet shoring transmission emitting from
 
 Thus the cycle was complete.
 
-`Chronos` and `Tonos`, who speak in the language of music, with the help of `Aikous` and `Skora`, commune with The Machines in the language of synthesis.  
-
-From atop the highest, most abstract peak in the [topology of music](https://link.springer.com/book/10.1007/978-3-0348-8141-8), resides The `Topos`, imbuing the land of `AlloPy` with metacompositional abstraction, unifying all levels of the computational cosmos.
+`Chronos` and `Tonos`, who speak in the language of music, with the help of `Aikous` and `Skora`, commune with The Machines in the language of synthesis.  From atop the highest, most abstract peak in the [topology of music](https://link.springer.com/book/10.1007/978-3-0348-8141-8), resides The `Topos`, imbuing the land of AlloPy with metacompositional abstraction, unifying all levels of the computational cosmos.
 
 And so then there was a resiliant harmony, resonating from the subatomic to the macrocosmic, from which emerged the world of `AlloPy`, and it was good.
 
@@ -229,9 +227,9 @@ And so then there was a resiliant harmony, resonating from the subatomic to the 
 
 Lo there, friend.  *Friður sé með þér!*  
 
-Welcome to the world of `AlloPy`.
+Welcome to the world of AlloPy.
 
-Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of `AlloPy` will guide you in your journey.
+Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of AlloPy will guide you in your journey.
 
 Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of *extemporal* multimedia metacomposition.
 
@@ -279,13 +277,11 @@ Consult The Topos for wisdom and you will receive it, but know that The Topos sp
 
 ### **Into the AlloVerse:**  *an Audiovisual Synthesis and Metacomposition tutorial series for working with AlloLib Playground and AlloPy*
 
-The `AlloLib Playground` is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.
+The `AlloLib Playground` is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.  The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
-The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
+`AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as AlloLib.
 
-`AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as `AlloLib`.
-
-When used in concert, `AlloLib` and `AlloPy` bridge the subatomic, bit-level world of sound synthesis and graphical computation with the macrocosmic, "outside of time" realm of music composition and poly-sensory metacomposition.  Together, they form a unified *AlloVerse* where students, artists, composers, and researchers can move freely between all levels of a distributed, multimedia composition system.
+When used in concert, AlloLib Playground and AlloPy bridge the subatomic, bit-level world of sound synthesis and graphical computation with the macrocosmic, "outside of time" realm of music composition and poly-sensory metacomposition.  Together, they form a unified *AlloVerse* where students, artists, composers, and researchers can move freely between all levels of a distributed, multimedia composition system.
 
 *Coming soon...*
 
