@@ -13,7 +13,8 @@ import regex
 from math import prod
 from fractions import Fraction
 
-TOPOS_WARNINGS = True
+class config:
+    TOPOS_WARNINGS = True
 
 def iso_pairs(l1: list, l2: list) -> tuple:
     '''
@@ -41,11 +42,11 @@ def iso_pairs(l1: list, l2: list) -> tuple:
     >>> iso_pairs(('⚛', '∿'), ('Ξ', '≈'))
     (('⚛', 'Ξ'), ('∿', '≈'), ('⚛', '≈'), ('∿', 'Ξ'))
     '''
-    if TOPOS_WARNINGS and Fraction(len(l1), len(l2)).denominator == 1 or Fraction(len(l2), len(l1)).denominator == 1:
-        print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\n The lengths of the lists should not evenly divide.  ' + 
-            'Otherwise, the cyclic pairing will be equivalent to a simple element-wise pairing.  If' + 
+    if config.TOPOS_WARNINGS and (Fraction(len(l1), len(l2)).denominator == 1 or Fraction(len(l2), len(l1)).denominator == 1):
+        print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\nThe lengths of the lists should not evenly divide.  ' + 
+            'Otherwise, the cyclic pairing will be equivalent to a simple element-wise pairing.  If ' + 
             'this is your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
-            'The Topos suggests you provide lists of indivisible lengths.\n\n  The Topos has spoken.\n')
+            'The Topos suggests you pass lists of indivisible lengths.\n\n  The Topos has spoken.\n')
         if input('Do you wish to proceed? (y/n): ').lower() not in ('y', 'yes'):
             return
     return tuple((l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2)))
@@ -90,9 +91,9 @@ def homotopic_map(l1: tuple, l2: tuple) -> tuple:
     >>> homotopic_map(('Δ', 'Θ'), ('λ', 'μ', 'ν'))
     (('Δ', ('λ', 'μ', 'ν')), ('Θ', ('μ', 'ν', 'λ')))
     '''
-    if TOPOS_WARNINGS:
+    if config.TOPOS_WARNINGS:
         if len(l1) > len(l2):
-            print('PAY HEED! THE TOPOS CAUTIONS YOU: The first list is longer than the second. ' +
+            print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\nThe first list is longer than the second. ' +
                   'This will result in non-unique paths for each element in the first list. If this is ' +
                   'your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
                   'The Topos suggests you adjust their lengths accordingly. Know that passing lists of ' + 
@@ -100,7 +101,7 @@ def homotopic_map(l1: tuple, l2: tuple) -> tuple:
             if input('Do you wish to proceed? (y/n) ').lower() not in ('y', 'yes'):
                 return
         elif len(l1) < len(l2):
-            print('PAY HEED! THE TOPOS CAUTIONS YOU: The first list is shorter than the second. ' +
+            print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\nThe first list is shorter than the second. ' +
                   'This means that not all possible paths through the second list will be used. If this is ' +
                   'your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
                   'The Topos suggests you adjust their lengths accordingly. Know that passing lists of ' +

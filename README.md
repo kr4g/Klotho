@@ -70,25 +70,34 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     AlloPy supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
     ```
     >>> from allopy.chronos import rhythm_trees as rt
-    >>> r_tree = rt.RT(('?', ((4, 4), (1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1))))))
-    >>> [str(r) for r in rt.measure_ratios(r_tree)]
+    >>> r_tree = rt.RT(('?', ((4, 4), ((1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1)))) )))
+    >>> m_ratios = rt.measure_ratios(r_tree)
+    >>> [str(ratio) for ratio in m_ratios]
     ['1/4', '1/6', '1/6', '1/6', '1/12', '1/30', '1/60', '1/30', '1/12']
+    >>> from allopy.chronos import beat_duration
+    >>> durations = [beat_duration(metric_ratio=ratio, bpm=66) for ratio in m_ratios]
+    >>> [round(dur, 3) for dur in durations]
+    [0.909, 0.606, 0.606, 0.606, 0.303, 0.121, 0.061, 0.121, 0.303]
     ```
 
     Abstract tools for metacomposition:
     ```
     >>> from allopy import topos
-    >>> iso = topos.iso_pairs(('⚛', '∿', '♢'), ('Ξ', '≈'))
+    >>> color, talea = ('Θ', 'Ξ'), ('∝', '∴', '∫')
+    >>> iso = topos.iso_pairs(color, talea)
     >>> iso
-    (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'))
-    >>> kleis = ('∆','Σ','Ψ','Ω','ζ')
-    >>> for e in topos.homotopic_map(kleis, iso): print(e)
+    (('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'))
+    >>> kleis = ('∆','Σ','Ψ','∐','Ω','ζ')
+    >>> h_map = topos.homotopic_map(kleis, iso)
+    >>> for e in h_map: print(e)
     ... 
-    ('∆', (('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈')))
-    ('Σ', (('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ')))
-    ('Ψ', (('♢', 'Ξ'), ('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈')))
-    ('Ω', (('⚛', '≈'), ('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ')))
-    ('ζ', (('∿', 'Ξ'), ('♢', '≈'), ('⚛', 'Ξ'), ('∿', '≈'), ('♢', 'Ξ'), ('⚛', '≈')))
+    ('∆', (('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫')))
+    ('Σ', (('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝')))
+    ('Ψ', (('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴')))
+    ('∐', (('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫')))
+    ('Ω', (('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝')))
+    ('ζ', (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
+    >>> 
     ```
 
     Formal Grammars:

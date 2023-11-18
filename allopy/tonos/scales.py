@@ -25,8 +25,8 @@ def hexany(prime_factors: List[int] = [1,3,5,7], r: int = 2) -> Tuple[List[float
   products = [prod(comb) for comb in combinations(prime_factors, r)]
   scale = sorted([octave_reduce(product) for product in products])
   return products, scale
-  
-def n_tet(interval=2, divisions=12, nth_division=1):
+
+def n_tet(divisions=12, equave=2, nth_division=1):
   '''
   Calculate the size of the nth division of an interval in equal temperament.
   
@@ -37,4 +37,4 @@ def n_tet(interval=2, divisions=12, nth_division=1):
   :param nth_division: The nth division to calculate
   :return: The frequency ratio of the nth division
   '''
-  return interval ** (nth_division / divisions)
+  return equave ** (nth_division / divisions)

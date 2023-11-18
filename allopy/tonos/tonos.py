@@ -9,13 +9,13 @@ computations related to pitch and frequency in music.
 
 --------------------------------------------------------------------------------------
 '''
-
-from allopy import aikous
-
 from typing import Union, List, Tuple, Dict, Set
-from math import prod
+# from math import prod
 import numpy as np
-import itertools
+# import itertools
+
+A4_Hz   = 440.0
+A4_MIDI = 69
 
 from enum import Enum, EnumMeta
 class DirectValueEnumMeta(EnumMeta):
@@ -24,6 +24,37 @@ class DirectValueEnumMeta(EnumMeta):
         if isinstance(member, cls):
             return member.value
         return member
+      
+class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
+  class N_TET_12(Enum, metaclass=DirectValueEnumMeta):
+    C  = 0
+    Cs = 1
+    Db = 1
+    D  = 2
+    Ds = 3
+    Eb = 3
+    E  = 4
+    Es = 5
+    Fb = 4
+    F  = 5
+    Fs = 6
+    Gb = 6
+    G  = 7
+    Gs = 8
+    Ab = 8
+    A  = 9
+    As = 10
+    Bb = 10
+    B  = 11
+    Bs = 0
+
+    # @classmethod
+    # def names(cls):
+    #     return ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+    class names:
+      as_sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+      as_flats  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
 
 def freq_to_midicents(frequency: float) -> float:
   '''
@@ -117,8 +148,8 @@ def freq_to_pitchclass(freq: float):
   Returns:
     A tuple containing the pitch class and the cents offset.
   '''
-  PITCH_LABELS = aikous.PITCH_CLASSES.N_TET_12.names()
-  midi = aikous.A4_MIDI + 12 * np.log2(freq / aikous.A4_Hz)
+  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names()
+  midi = A4_MIDI + 12 * np.log2(freq / A4_Hz)
   midi_round = round(midi)
   note_index = int(midi_round) % 12
   octave = int(midi_round // 12) - 1  # MIDI starts from C-1
@@ -142,17 +173,19 @@ def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=440.0, A
   Returns:
     The frequency in Hertz.
   '''
-  PITCH_LABELS = aikous.PITCH_CLASSES.N_TET_12.names()
-  note = pitchclass[:-1]
-  octave = int(pitchclass[-1])
+  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names()
+  if pitchclass[-1].isdigit():
+        note = pitchclass[:-1]
+        octave = int(pitchclass[-1])
+  else:  # Default to octave 4 if no octave is provided
+      note = pitchclass
+      octave = 4
   note_index = PITCH_LABELS.index(note)
   midi = note_index + (octave + 1) * 12
   midi = midi - A4_MIDI
   midi = midi + cent_offset / 100
   frequency = A4_Hz * (2 ** (midi / 12))
   return frequency
-
-  
 
 def octave_reduce(interval: float, octave: int = 1) -> float:
   '''
@@ -169,8 +202,8 @@ def octave_reduce(interval: float, octave: int = 1) -> float:
     interval /= 2
   return interval
 
-def norgard(n = 0):
-  '''
-  Per Norgard "Infinity Series" (1972)
-  '''
-  pass
+# def norgard(n = 0):
+#   '''
+#   Per Norgard "Infinity Series" (1972)
+#   '''
+#   pass
