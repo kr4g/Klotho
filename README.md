@@ -103,7 +103,6 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> random_rules = grammars.rand_rules(alpha, word_length_max=5)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
-    ... 
     ᚠ : ᚷᚠᛃᚷκ
     ᛗ : ε
     Ζ : ε
