@@ -211,7 +211,7 @@ The `AlloPy` Python package is composed of five modules ruled by the five dæmon
 
 Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other specialized submodules, such as `scales.py`).
 
-#### The AlloPy Creation Myth:  The Five Dæmons
+#### AlloPy Creation Myth:  The Five Dæmons
 
 First, there was only `Chronos`.  Consequently and soon thereafter, was `Tonos`.  The pair thus necessitated `Skora` who then summoned `Aikous` to translate their language of time and tones into the *lingua franca* of The Machines.  
 
@@ -225,7 +225,7 @@ From atop the highest, most abstract peak in the [topology of music](https://lin
 
 And so then there was a resiliant harmony, resonating from the subatomic to the macrocosmic, from which emerged the world of `AlloPy`, and it was good.
 
-#### The AlloPy Package Structure:  The Five Modules
+#### AlloPy Package Structure:  The Five Modules
 
 Lo there, friend.  *Friður sé með þér!*  
 
