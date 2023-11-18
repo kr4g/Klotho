@@ -195,7 +195,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
     Press `q` in the terminal window to leave the help screen and return to the interpreter.
 
-    ### Integration with `AlloLib Playground`
+    ### Integration with AlloLib Playground
 
     Even in this 'on-the-fly', interpreter-based paradigm, `AlloPy` is designed to integrate directly with the `AlloLib Playground` in any IDE of choice.  
     
