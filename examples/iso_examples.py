@@ -13,6 +13,7 @@ from allopy.skora import skora
 
 FILEPATH = skora.set_score_path()
 
+import numpy as np
 import pandas as pd
 from IPython.display import display
 
@@ -34,8 +35,8 @@ def isorhythm(color: list, talea: list, end=True, kwargs=None):
     # color_len = len(color)
     talea_len = len(talea)
     
-    min_amp = aikous.Dynamics.ppp
-    max_amp = aikous.Dynamics.p
+    min_amp = aikous.Dynamics.ppp.max
+    max_amp = aikous.Dynamics.mf.min
     
     start_time = 0.0
     rows_list = []
