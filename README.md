@@ -236,7 +236,7 @@ And so then there was a resiliant harmony, resonating from the subatomic to the 
 
 Lo there, friend.  *Friður sé með þér!*  
 
-Welcome to the world of AlloPy.
+Welcome to the world of `AlloPy`.
 
 Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of AlloPy will guide you in your journey.
 
