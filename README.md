@@ -216,12 +216,6 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
 ## Introduction to the World of AlloPy
 
-The `AlloPy` Python package is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
-
-Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other specialized submodules, such as `scales.py`).
-
-#### The Five Modules
-
 Lo there, friend.  *Friður sé með þér!*  
 
 Welcome to the world of `AlloPy`.
@@ -229,6 +223,12 @@ Welcome to the world of `AlloPy`.
 Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of AlloPy will guide you in your journey.
 
 Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of *extemporal* multimedia metacomposition.
+
+#### The Five Modules
+
+The `AlloPy` Python package is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
+
+Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other specialized submodules, such as `scales.py`).
 
 ### `Chronos` 
 
