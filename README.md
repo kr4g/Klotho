@@ -228,19 +228,39 @@ Know their names, know their powers.  Discover how, from their internal harmony,
 
 The `AlloPy` Python package is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
 
-Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain (e.g., `Tonos` contains a base module `tonos.py` with basic pitch/frequency tools as well as other specialized submodules, such as `scales.py`).
+Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain.
 
 ### `Chronos` 
 
 ***Lord of Time:***  *knower of all things temporal*
 
-(description)
+First, there was only `Chronos`.  Cognitor of the clock, `Chronos` contains calculations and computations for both [conceptual (i.e., *chronometric*) and perceptual (i.e., *psychological*) time](https://www.scribd.com/document/45643859/Grisey-Tempus-ex-machina).
+
+(examples)
+
+The `chronos.py` base module contains basic calculation tools for converting between musical time units and chronometric units (e.g., beat durations in seconds) as well as other time-based utilities.  The submodules contain materials oriented around more abstract representations and interpretations of musical time deeply inspired by the ancient practices of counterpoint through and beyond the *New Complexity*.
+
+(examples)
+
+For example, `Chronos` fully supports the use of [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html) (`rhythm_trees.py`) as featured in the [OpenMusic](https://openmusic-project.github.io/) computer-assisted composition software as well as modules for working with [*L’Unité Temporelle*](https://hal.science/hal-03961183/document) (`temporal_units.py`), an algebraic formalization of temporal proportion and a generalization of rhythm trees, posited by Karim Haddad.
+
+(examples)
 
 ### `Tonos` 
 
 ***Teacher of Tones:***  *zygós of pitch and frequency*
 
-(description)
+Consequently and soon thereafter, was `Tonos`.  Though structured as discrete modules, `Chronos` and `Tonos` are deeply entwined (as the sensation of tone is, at its foundation, an artifact of time) and so their respective abstractions are designed to flow fluidly between one another.  For instance, the fractional decomposition used to calculate the temporal ratios partitioning blocks of time, as in the case of Rhythm Trees, could also be thought of as a means of dividing a stretch of pitch-space—and *vise versa*.  
+
+(examples)
+
+As with his chronometric companion, the `tonos.py` base module consists of a toolkit for general pitch- and frequency-based calculations and conversions.  Specialized modules emphasize more conceptual tone-based abstractions such as [*Hexany*](https://en.wikipedia.org/wiki/Hexany) as well as other [n-EDO](https://en.xen.wiki/w/EDO) and [Just](https://en.xen.wiki/w/Just_intonation) microtonal paradigms.
+
+(examples)
+
+`Tonos` also supports the use of `Scala` (.scl) tuning files as implemented in the [Scala](https://www.huygens-fokker.org/scala/) microtonality software.  Any scale from the [Scala archive](https://www.huygens-fokker.org/scala/downloads.html) (consisting of more than **5,200** unique scales) can be imported into `AlloPy` as well as support for generating and saving your own, custom .scl scale and tuning files.
+
+(examples)
 
 ### `Topos`
 
@@ -250,23 +270,49 @@ The `Topos` is the most abstract and, thus, most mysterious of the `AlloPy` modu
 
 The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software implemented in Common LISP.
 
+(examples)
+
 Every `topos.py` function is inherently recursive and all work with the same input and output type—the tuple.  This means that outputs can feedback into inputs and/or pipe into the inputs of other functions, etc., allowing for the construction of highly complex abstract structures from the interweaving of very simple base operations.
+
+(examples)
 
 The `Topos` module, like the other `AlloPy` modules, also contains specialized submodules such as formal grammars, including basic rewrite rule generation and a library of ancient [graphemes](https://en.wikipedia.org/wiki/Grapheme)—useful when working with categorical, algebraic abstractions.
 
-Consult The Topos for wisdom and you will receive it, but know that The Topos speaks and answers only in riddle.  Though, in solving the riddle, will you ultimately attain the answer to your question.
+(examples)
+
+Consult The Topos for guidance and you will receive it, but know that The Topos speaks and answers only in riddle.  Though, in solving the riddle, will you ultimately attain the answer to your question.
 
 ### `Aikous` 
 
 ***Goddess of Perception and Practicality:*** *the threader of musical algebra and synthesis reality*
 
-(description)
+Throughout the synapses of this hyper-network of conceptual abstraction, flows the mana of `Aikous`, who interlaces the higher-order symbolic representations of musical expression with the working reality of sound synthesis.  While The `Topos` arbitrates over the algebra, `Aikous` conceives the calculus.
+
+`Aikous` contains basic tools for converting between *percieved* units (e.g., musical dynamics such as `mp` and `fff`) and synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements—i.e., *crescendi* and *diminuendi*.  `Aikous` is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
+
+(examples)
 
 ### `Skora` 
 
 ***The Scribe:***  *keeper of scores, numen of notation*
 
-(description)
+Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.  That is to say, `Skora` is keeper of record for all musical events as they must be known and tublated for processing by The Machines.
+
+The `Gamma` synth instruments in `AlloLib` use a [command-line](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  `Skora` converts this tabular format into an data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computation functions available in the "data science" computing paradigm.
+
+(*A short tutorial note list basics, including pfields, can be found [here]()*)
+
+(examples)
+
+`Skora` then also leverages the power of `Numpy` to perform complex computations on any slice of the *Score DataFrame*.  This allows for a more fluid approach to editing and, most interesting, *generating* `AlloLib` note lists dynamically.  `AlloPy` can then function as both a computational composition aid or a data sonification tool—and everything in between.
+
+The `Skora` module also provides tools for managing and merging multiple separate parts, making larger-scale arrangements easier to maintain.
+
+(examples)
+
+Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://lilypond.org/development.html) are presently in development.
+
+(examples)
 
 ---
 
