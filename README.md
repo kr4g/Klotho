@@ -238,7 +238,7 @@ First, there was only `Chronos`.  Cognitor of the clock, `Chronos` contains calc
 
 (examples)
 
-The `chronos.py` base module contains basic calculation tools for converting between musical time units and chronometric units (e.g., beat durations in seconds) as well as other time-based utilities.  The submodules contain materials oriented around more abstract representations and interpretations of musical time deeply inspired by the ancient practices of counterpoint through and beyond the *New Complexity*.
+The `chronos.py` base module contains basic calculation tools for converting between musical time units and chronometric units (e.g., beat durations in seconds) as well as other time-based utilities.  The submodules contain materials oriented around more abstract representations and interpretations of musical time deeply inspired by the [ancient practices](https://en.wikipedia.org/wiki/Canon_(music)) of temporal counterpoint through, and beyond, the [*New Complexity*](https://en.wikipedia.org/wiki/New_Complexity).
 
 (examples)
 
@@ -288,7 +288,7 @@ Consult The Topos for guidance and you will receive it, but know that The Topos 
 
 Throughout the synapses of this hyper-network of conceptual abstraction, flows the mana of `Aikous`, who interlaces the higher-order symbolic representations of musical expression with the working reality of sound synthesis.  While The `Topos` arbitrates over the algebra, `Aikous` conceives the calculus.
 
-`Aikous` contains basic tools for converting between *percieved* units (e.g., musical dynamics such as `mp` and `fff`) and synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements—i.e., *crescendi* and *diminuendi*.  `Aikous` is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
+`Aikous` contains basic tools for converting between *conceptual* units (e.g., musical dynamics such as `mp` and `fff`) and *concrete* synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements—i.e., *crescendi* and *diminuendi*.  `Aikous` is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
 
 (examples)
 
