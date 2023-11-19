@@ -5,3 +5,4 @@ regex
 matplotlib
 ipywidgets
 IPython
+tabulate

@@ -25,7 +25,7 @@ def ratio_pulse_pairs(metric_ratios: list, pulses: list, bpm: float = 60) -> lis
     pulse in the pulse list.
     '''
     duration_pulse_pairs = []
-    CPS = topos.cyclic_cartesian_pairs(metric_ratios, pulses)
+    CPS = topos.cartesian_iso_pairs(metric_ratios, pulses)
     for i, ((ratio_1, ratio_2), nPulse) in enumerate(CPS):
         tempo    = chronos.metric_modulation(bpm, ratio_1, ratio_2)
         duration = chronos.beat_duration(1/10, tempo)

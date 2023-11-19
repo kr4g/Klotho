@@ -148,7 +148,7 @@ def freq_to_pitchclass(freq: float):
   Returns:
     A tuple containing the pitch class and the cents offset.
   '''
-  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names()
+  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
   midi = A4_MIDI + 12 * np.log2(freq / A4_Hz)
   midi_round = round(midi)
   note_index = int(midi_round) % 12
@@ -173,7 +173,7 @@ def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=440.0, A
   Returns:
     The frequency in Hertz.
   '''
-  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names()
+  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
   if pitchclass[-1].isdigit():
         note = pitchclass[:-1]
         octave = int(pitchclass[-1])

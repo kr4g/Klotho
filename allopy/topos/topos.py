@@ -15,6 +15,7 @@ from fractions import Fraction
 
 class config:
     TOPOS_WARNINGS = True
+    TOPOS_SUGGESTIONS = True
 
 def iso_pairs(l1: list, l2: list) -> tuple:
     '''
@@ -47,11 +48,15 @@ def iso_pairs(l1: list, l2: list) -> tuple:
             'Otherwise, the cyclic pairing will be equivalent to a simple element-wise pairing.  If ' + 
             'this is your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
             'The Topos suggests you pass lists of indivisible lengths.\n\n  The Topos has spoken.\n')
-        if input('Do you wish to proceed? (y/n): ').lower() not in ('y', 'yes'):
+        if input('Do you wish to proceed? (y/n): ').lower() in ('y', 'yes'):
+            pass
+        elif config.TOPOS_SUGGESTIONS:
+            print('\nThe Topos suggests you pass lists of indivisible lengths.\n\n')
             return
+            
     return tuple((l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2)))
 
-def cyclic_cartesian_pairs(l1: list, l2: list) -> tuple:
+def cartesian_iso_pairs(l1: list, l2: list) -> tuple:
     '''
     Generates a sequence of pairs by first creating a Cartesian product of list l1 with itself,
     and then cycling through these pairs while pairing them with elements from list l2.
@@ -66,7 +71,7 @@ def cyclic_cartesian_pairs(l1: list, l2: list) -> tuple:
         list: A list of tuples, each containing a pair from the Cartesian product of l1 and an element from l2.
 
     Example:
-    >>> cyclic_cartesian_pairs(['Ψ', '⧭', 'Ω'], ('¤', '〄'))
+    >>> cartesian_iso_pairs(['Ψ', '⧭', 'Ω'], ('¤', '〄'))
     (('Ψ', 'Ψ'), '¤'), (('Ψ', '⧭'), '〄'), (('Ψ', 'Ω'), '¤'),
     (('⧭', 'Ψ'), '〄'), (('⧭', '⧭'), '¤'), (('⧭', 'Ω'), '〄'),
     (('Ω', 'Ψ'), '¤'), (('Ω', '⧭'), '〄'), (('Ω', 'Ω'), '¤')
