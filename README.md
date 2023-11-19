@@ -222,7 +222,7 @@ Each of the five modules contains a base module named after itself as well as va
 
 #### AlloPy Creation Myth:  The Five Dæmons
 
-First, there was only **Chronos**.  Consequently and soon thereafter, was **Tonos**.  The pair thus necessitated Skora who then summoned **Aikous** to translate their language of time and tones into the *lingua franca* of The Machines.  
+First, there was only **Chronos**.  Consequently and soon thereafter, was **Tonos**.  The pair called upon **Skora**, who then summoned **Aikous**, to translate their language of time and tones into the *lingua franca* of The Machines.  
 
 In this quaternal union there was a faint yet shoring transmission emitting from the subatomic bit-level, eventually radiating into the beyond and so conjured The **Topos**, an immaterial entity from the macrocosmic realm of algebraic categorical abstraction. 
 
