@@ -172,7 +172,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> # computed elsewhere...
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
     ... 
-    ((0.0, '1'), (('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121)))
+    ((0.0, '1.0'), (('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121)))
     ((0.909, '19/34'), (('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909)))
     ((0.97, '9/17'), (('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061)))
     ((1.091, '8/17'), (('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121)))
@@ -227,54 +227,63 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     Formal Grammars:
     ```
-    >>> from allopy.topos.formal_grammars import alphabets, grammars
-    >>> S1 = alphabets.RUNIC.OLD_NORSE.Elder_Futhark
-    >>> S2 = alphabets.AncientGreek
+    >>> from allopy.topos import formal_grammars as frgr
+    >>> S1 = list(set([s.value for s in frgr.alphabets.RUNIC.OLD_NORSE.Elder_Futhark]))
+    >>> S2 = list(set([s.value for s in frgr.alphabets.LOGOGRAPHIC.ANCIENT_EGYPTIAN.logographic]))
     >>> import numpy as np
-    >>> alpha = np.array([s.value for s in S1] + [s.value for s in S2])
+    >>> alpha = np.array(S1 + S2[:len(S1)])
     >>> np.random.shuffle(alpha)
     >>> alpha = alpha[:13]
-    >>> random_rules = grammars.rand_rules(alpha, word_length_max=5)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
-    ᚠ : ᚷᚠᛃᚷκ
-    ᛗ : ε
-    Ζ : ε
-    θ : ᛃᚷ
-    Ω : Υ
-    π : σθσ
-    Υ : Ω
-    ᚷ : εν
-    σ : Υε
-    κ : σᛃπᚠ
-    ν : ᛃ
-    ᛃ : κᛃνᚷ
-    ε : κκ
+    ᚺ : ᛞ
+    ᛇ : ᛟ𓌍𓋱ᛟ
+    ᛟ : 𓌉ᛟ
+    ᛈ : ᛈ
+    ᚦ : ᛞ𓋱𓌍
+    ᛊ : ᛇ𓋱
+    𓌍 : 𓌉ᚢᛟ𓌍
+    ᚠ : ᚺᛟᚢ𓌍
+    𓋱 : 𓌉
+    ᚨ : ᚺ
+    ᚢ : ᚨᚺ
+    𓌉 : 𓋱ᚦ
+    ᛞ : ᚠᚨᚠ
     >>> S3 = alphabets.Mathematical
     >>> constraints = {a: np.random.choice([s.value for s in S3]) for a in alpha[:len(alpha)//8]}
     >>> random_rules = grammars.constrain_rules(random_rules, constraints)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
-    ᚠ : ᚷᚠᛃᚷ∋
-    ᛗ : ∯
-    Ζ : ∲
-    θ : √ᚷ
-    Ω : ∖
-    π : σθ∝
-    Υ : ∏
-    ᚷ : ε∜
-    σ : Υ∉
-    κ : σᛃπᚠ
-    ν : ᛃ
-    ᛃ : κᛃνᚷ
-    ε : κκ
+    ᚺ : 𒆹
+    ᛇ : ᛟ𒊘𓋱ᛟ
+    ᛟ : 𓌉𒄑
+    ᛈ : 𒋤
+    ᚦ : ᛞ𓋱𒋼
+    ᛊ : 𒍪𓋱
+    𓌍 : 𓌉ᚢᛟ𓌍
+    ᚠ : ᚺᛟᚢ𓌍
+    𓋱 : 𓌉
+    ᚨ  : ᚺ
+    ᚢ : ᚨᚺ
+    𓌉 : 𓋱ᚦ
+    ᛞ : ᚠᚨᚠ
     >>> random_rules = {k: v + ' ' for k, v in random_rules.items()}
     >>> gens = 11
     >>> l_str_gens = grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
-    >>> l_str_gens[4]
-    '∏ σᛃπᚠ κᛃνᚷ ᛃ ε∜ Υ∉ √ᚷ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ σᛃπᚠ κᛃνᚷ ᛃ ε∜ σᛃπᚠ σᛃπᚠ '
-    >>> l_str_gens[5]
-    'Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ ∏ ε∜ κκ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κκ ∏ σᛃπᚠ κᛃνᚷ ᛃ ε∜ Υ∉ √ᚷ ε∜ ᚷᚠᛃᚷ∋ κᛃνᚷ ε∜ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ σᛃπᚠ κᛃνᚷ ᛃ ε∜ σᛃπᚠ σᛃπᚠ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ σᛃπᚠ κᛃνᚷ ᛃ ε∜ κᛃνᚷ κκ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ Υ∉ κᛃνᚷ σθ∝ ᚷᚠᛃᚷ∋ '
+    >>> for i in range(3,9): print(f'Gen {i}:\n',l_str_gens[i])
+    ... 
+    Gen 3:
+    𓌉 ᛞ𓋱𒋼 
+    Gen 4:
+    𓋱ᚦ ᚠᚨᚠ 𓌉 
+    Gen 5:
+    𓌉 ᛞ𓋱𒋼 ᚺᛟᚢ𓌍 ᚺ ᚺᛟᚢ𓌍 𓋱ᚦ 
+    Gen 6:
+    𓋱ᚦ ᚠᚨᚠ 𓌉 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𒆹 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 
+    Gen 7:
+    𓌉 ᛞ𓋱𒋼 ᚺᛟᚢ𓌍 ᚺ ᚺᛟᚢ𓌍 𓋱ᚦ 𓋱ᚦ ᚺ 𒆹 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓋱ᚦ ᚺ 𒆹 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓋱ᚦ ᚠᚨᚠ 𓌉 
+    Gen 8:
+    𓋱ᚦ ᚠᚨᚠ 𓌉 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𒆹 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 𓌉 ᛞ𓋱𒋼 𒆹 𓌉 ᛞ𓋱𒋼 ᚺ 𒆹 𓋱ᚦ 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 𒆹 𓌉 ᛞ𓋱𒋼 ᚺ 𒆹 𓋱ᚦ 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 ᚺᛟᚢ𓌍 ᚺ ᚺᛟᚢ𓌍 𓋱ᚦ 
     ```
 
     Or, import the entire package:
