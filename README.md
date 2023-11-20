@@ -92,7 +92,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> m_ratios = rt.measure_ratios(r_tree)
     >>> [str(ratio) for ratio in m_ratios]
     ['7/31', '2/31', '1/62', '3/62', '1/31', '5/31', '1/31', '3/62', '1/62', '11/31']
-    >>> the tree will always sum to 1
+    >>> # the tree will always sum to 1
     >>> float(sum([r for r in r_ratios]))
     1.0
     >>> from allopy import chronos
@@ -200,10 +200,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     (('Ω', 'φ'), (('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝')))
     (('ζ', 'Ϡ'), (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
     >>>
-    >>>
-    >>>
-    >>>
-    >>> # we could also perform some more transformation and create a new code...
+    >>> # we could also perform more transformation and create a new encoding...
     >>> h_map_hyper = tuple(topos.homotopic_map(topos.cartesian_iso_pairs(s1,
                                                                           kleis_l[:4]),
                                                                           topos.iso_pairs(s2,
