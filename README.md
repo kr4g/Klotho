@@ -186,7 +186,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>>
     >>>
     >>>
-    >>> # we could also perform some more algebra and create a new code...
+    >>> # we could also perform some more transformation and create a new code...
     >>> h_map_hyper = tuple(topos.homotopic_map(topos.cartesian_iso_pairs(s1,
                                                                           kleis_l[:4]),
                                                                           topos.iso_pairs(s2,
