@@ -73,11 +73,12 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
     >>> from allopy.chronos import rhythm_trees as rt
     >>> # tree-graph representation using LISP-like syntax
-    >>> subdivisions = (1,1,1,1,1)
+    >>> subdivisions = (1,1,1,1,1) # initial tree proportions (no branches yet)
     >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
     >>> m_ratios = rt.measure_ratios(r_tree) # evaluates to a list of metric proportions dividing an abstract unit of time
     >>> [str(ratio) for ratio in m_ratios]
     ['1/5', '1/5', '1/5', '1/5', '1/5']
+    >>>
     >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
     1.0
     >>> # add "branches"
@@ -86,16 +87,20 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> m_ratios = rt.measure_ratios(r_tree)
     >>> [str(ratio) for ratio in m_ratios]
     ['1/5', '1/5', '1/15', '1/15', '1/15', '1/5', '1/5']
+    >>>
+    >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
+    1.0
     >>> # add more branches and change leaf-node proportions
     >>> subdivisions = (7,2,(3,(1,3,2)),5,(3, (2,3,1)),11)
     >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
     >>> m_ratios = rt.measure_ratios(r_tree)
     >>> [str(ratio) for ratio in m_ratios]
     ['7/31', '2/31', '1/62', '3/62', '1/31', '5/31', '1/31', '3/62', '1/62', '11/31']
+    >>>
     >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
     1.0
-    >>> from allopy import chronos
     >>> # when given a reference tempo in bpm, `Chronos` can convert these ratios into durations in seconds
+    >>> from allopy import chronos
     >>> durations = [chronos.beat_duration(ratio=ratio, bpm=66) for ratio in r_ratios]
     >>> [round(dur, 3) for dur in durations]
     [0.821, 0.235, 0.059, 0.176, 0.117, 0.587, 0.117, 0.176, 0.059, 1.29]
@@ -118,6 +123,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ('∐', (('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫')))
     ('Ω', (('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝')))
     ('ζ', (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
+    >>>
     >>> # encoding / decoding
     >>> from allopy.topos.random import rando
     >>> cy_s1 = rando.rand_encode(s1, tonos.PITCH_CLASSES.N_TET_12.names.as_sharps[::2])
@@ -125,7 +131,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> proportions
     ('1/6', '1/30', '1/12', '1/4', '1/60')
     >>> cy_s2 = rando.rand_encode(s2, [str(ratio) for ratio in proportions])
-    >>> # ciphers:  musical pitch names, metric or "beat" ratios
+    >>> # ciphers -->  {musical pitch names}, {metric or "beat" ratios}
     >>> cy_s1, cy_s2
     ({'Θ': 'A#', 'Ξ': 'D'}, {'∝': '1/4', '∴': '1/60', '∫': '1/30'})
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2}): print(e)
@@ -136,6 +142,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ('∐', (('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30')))
     ('Ω', (('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4')))
     ('ζ', (('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60')))
+    >>>
     >>> # take the cumulative sum of the ratios in the first line...
     >>> import numpy as np
     >>> cantus = [0] + [topos.Fraction(cy_s2[p[1]]) for p in iso[:len(kleis) - 1]]
@@ -180,7 +187,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> # convert all the scaling ratios into normalized floats and pitch names into frequencies...
     >>> # computed elsewhere...
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
-    .. 
+    ...
     ((0.0, 1.0), ((466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121)))
     ((0.909, 0.75), ((293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909)))
     ((0.97, 0.733), ((466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061)))
@@ -200,11 +207,9 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     (('ζ', 'Ϡ'), (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
     >>>
     >>> # we could also perform more transformation and create a new encoding...
-    >>> h_map_hyper = tuple(topos.homotopic_map(topos.cartesian_iso_pairs(s1,
-                                                                          kleis_l[:4]),
-                                                                          topos.iso_pairs(s2,
-                                                                                          kleis_r[:5])))
-    >>> h_map_hyper
+    >>> h_map_hyper = tuple(topos.homotopic_map(topos.cartesian_iso_pairs(s1, kleis_l[:4]), topos.iso_pairs(s2, kleis_r[:5])))
+    >>> for e in h_map_hyper: print(e)
+    ...
     ((('Θ', 'Θ'), '∆'), (('∝', 'λ'), ('∴', 'ε'), ('∫', 'ψ'), ('∝', 'π'), ('∴', 'φ'), ('∫', 'λ'), ('∝', 'ε'), ('∴', 'ψ'), ('∫', 'π'), ('∝', 'φ'), ('∴', 'λ'), ('∫', 'ε'), ('∝', 'ψ'), ('∴', 'π'), ('∫', 'φ')))
     ((('Θ', 'Ξ'), 'Σ'), (('∴', 'ε'), ('∫', 'ψ'), ('∝', 'π'), ('∴', 'φ'), ('∫', 'λ'), ('∝', 'ε'), ('∴', 'ψ'), ('∫', 'π'), ('∝', 'φ'), ('∴', 'λ'), ('∫', 'ε'), ('∝', 'ψ'), ('∴', 'π'), ('∫', 'φ'), ('∝', 'λ')))
     ((('Ξ', 'Θ'), 'Ψ'), (('∫', 'ψ'), ('∝', 'π'), ('∴', 'φ'), ('∫', 'λ'), ('∝', 'ε'), ('∴', 'ψ'), ('∫', 'π'), ('∝', 'φ'), ('∴', 'λ'), ('∫', 'ε'), ('∝', 'ψ'), ('∴', 'π'), ('∫', 'φ'), ('∝', 'λ'), ('∴', 'ε')))
@@ -221,6 +226,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ((('Θ', 'Ξ'), 'Σ'), (('∴', 'π'), ('∫', 'φ'), ('∝', 'λ'), ('∴', 'ε'), ('∫', 'ψ'), ('∝', 'π'), ('∴', 'φ'), ('∫', 'λ'), ('∝', 'ε'), ('∴', 'ψ'), ('∫', 'π'), ('∝', 'φ'), ('∴', 'λ'), ('∫', 'ε'), ('∝', 'ψ')))
     ((('Ξ', 'Θ'), 'Ψ'), (('∫', 'φ'), ('∝', 'λ'), ('∴', 'ε'), ('∫', 'ψ'), ('∝', 'π'), ('∴', 'φ'), ('∫', 'λ'), ('∝', 'ε'), ('∴', 'ψ'), ('∫', 'π'), ('∝', 'φ'), ('∴', 'λ'), ('∫', 'ε'), ('∝', 'ψ'), ('∴', 'π')))
     ((('Ξ', 'Ξ'), '∐'), (('∝', 'λ'), ('∴', 'ε'), ('∫', 'ψ'), ('∝', 'π'), ('∴', 'φ'), ('∫', 'λ'), ('∝', 'ε'), ('∴', 'ψ'), ('∫', 'π'), ('∝', 'φ'), ('∴', 'λ'), ('∫', 'ε'), ('∝', 'ψ'), ('∴', 'π'), ('∫', 'φ')))
+    >>>
     >>> # and so on...
     ```
 

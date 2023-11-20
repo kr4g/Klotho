@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from allopy import chronos
-from allopy.chronos.rhythm_pairs import rhythm_pair as RP
+from allopy.chronos.temporal_units import rhythm_pair as RP
 from allopy import tonos
 from allopy.aikous import aikous
 from allopy.skora import skora
