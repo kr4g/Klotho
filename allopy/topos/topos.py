@@ -114,11 +114,3 @@ def homotopic_map(l1: tuple, l2: tuple) -> tuple:
             if input('Do you wish to proceed? (y/n) ').lower() not in ('y', 'yes'):
                 return
     return tuple((l1[i], tuple(l2[i % len(l2):] + l2[:i % len(l2)])) for i in range(len(l1)))
-
-def h_map_inv(h_map: tuple) -> tuple:
-    out = []
-    for i in range(len(h_map)**2):
-        line = h_map[0][i % len(h_map[0])]
-        for p in line:
-            out.append(h_map[i % len(line)][0], p)
-    return out

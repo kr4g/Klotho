@@ -78,7 +78,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> m_ratios = rt.measure_ratios(r_tree) # evaluates to a list of metric proportions dividing an abstract unit of time
     >>> [str(ratio) for ratio in m_ratios]
     ['1/5', '1/5', '1/5', '1/5', '1/5']
-    >>> float(sum([r for r in r_ratios]))
+    >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
     1.0
     >>> # add "branches"
     >>> subdivisions = (1,1,(1,(1,1,1)),1,1)
@@ -92,8 +92,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> m_ratios = rt.measure_ratios(r_tree)
     >>> [str(ratio) for ratio in m_ratios]
     ['7/31', '2/31', '1/62', '3/62', '1/31', '5/31', '1/31', '3/62', '1/62', '11/31']
-    >>> # the tree will always sum to 1
-    >>> float(sum([r for r in r_ratios]))
+    >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
     1.0
     >>> from allopy import chronos
     >>> # when given a reference tempo in bpm, `Chronos` can convert these ratios into durations in seconds
