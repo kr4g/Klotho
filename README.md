@@ -228,62 +228,42 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     Formal Grammars:
     ```
     >>> from allopy.topos import formal_grammars as frgr
-    >>> S1 = list(set([s.value for s in frgr.alphabets.RUNIC.OLD_NORSE.Elder_Futhark]))
-    >>> S2 = list(set([s.value for s in frgr.alphabets.LOGOGRAPHIC.ANCIENT_EGYPTIAN.logographic]))
-    >>> import numpy as np
-    >>> alpha = np.array(S1 + S2[:len(S1)])
-    >>> np.random.shuffle(alpha)
-    >>> alpha = alpha[:13]
+    >>> S1 = ('F','f','G','+','-')
+    >>> random_rules = frgr.grammars.rand_rules(S1, word_length_max=5)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
-    ᚺ : ᛞ
-    ᛇ : ᛟ𓌍𓋱ᛟ
-    ᛟ : 𓌉ᛟ
-    ᛈ : ᛈ
-    ᚦ : ᛞ𓋱𓌍
-    ᛊ : ᛇ𓋱
-    𓌍 : 𓌉ᚢᛟ𓌍
-    ᚠ : ᚺᛟᚢ𓌍
-    𓋱 : 𓌉
-    ᚨ : ᚺ
-    ᚢ : ᚨᚺ
-    𓌉 : 𓋱ᚦ
-    ᛞ : ᚠᚨᚠ
-    >>> S3 = alphabets.Mathematical
-    >>> constraints = {a: np.random.choice([s.value for s in S3]) for a in alpha[:len(alpha)//8]}
+    F : -FF-+-f
+    f : -Gf+G
+    G : fF-Ff-
+    + : --fG
+    - : fGff
+    >>> S2 = ('#','&','!')
+    >>> constraints = {a: np.random.choice(S2) for a in alpha[:len(alpha)//2]}
+    >>> constraints
+    {'F': '!', 'f': '&', 'G': '!', '+': '#', '-': '#'}
     >>> random_rules = grammars.constrain_rules(random_rules, constraints)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
-    ᚺ : 𒆹
-    ᛇ : ᛟ𒊘𓋱ᛟ
-    ᛟ : 𓌉𒄑
-    ᛈ : 𒋤
-    ᚦ : ᛞ𓋱𒋼
-    ᛊ : 𒍪𓋱
-    𓌍 : 𓌉ᚢᛟ𓌍
-    ᚠ : ᚺᛟᚢ𓌍
-    𓋱 : 𓌉
-    ᚨ  : ᚺ
-    ᚢ : ᚨᚺ
-    𓌉 : 𓋱ᚦ
-    ᛞ : ᚠᚨᚠ
+    F : -FF-+-!
+    f : -&f+G
+    G : f!-Ff-
+    + : -#fG
+    - : fG#f
     >>> random_rules = {k: v + ' ' for k, v in random_rules.items()}
     >>> gens = 11
     >>> l_str_gens = grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
-    >>> for i in range(3,9): print(f'Gen {i}:\n',l_str_gens[i])
+    >>> for i in range(0,5): print(f'Gen {i}:\n',l_str_gens[i])
     ... 
+    Gen 0:
+    G
+    Gen 1:
+    f!-Ff- 
+    Gen 2:
+    -&f+G fG#f -FF-+-! -&f+G fG#f 
     Gen 3:
-    𓌉 ᛞ𓋱𒋼 
+    fG#f -&f+G -#fG f!-Ff- -&f+G f!-Ff- -&f+G fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f fG#f -&f+G -#fG f!-Ff- -&f+G f!-Ff- -&f+G 
     Gen 4:
-    𓋱ᚦ ᚠᚨᚠ 𓌉 
-    Gen 5:
-    𓌉 ᛞ𓋱𒋼 ᚺᛟᚢ𓌍 ᚺ ᚺᛟᚢ𓌍 𓋱ᚦ 
-    Gen 6:
-    𓋱ᚦ ᚠᚨᚠ 𓌉 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𒆹 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 
-    Gen 7:
-    𓌉 ᛞ𓋱𒋼 ᚺᛟᚢ𓌍 ᚺ ᚺᛟᚢ𓌍 𓋱ᚦ 𓋱ᚦ ᚺ 𒆹 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓋱ᚦ ᚺ 𒆹 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓋱ᚦ ᚠᚨᚠ 𓌉 
-    Gen 8:
-    𓋱ᚦ ᚠᚨᚠ 𓌉 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𒆹 𒆹 𓌉𒄑 ᚨᚺ 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 𓌉 ᛞ𓋱𒋼 𒆹 𓌉 ᛞ𓋱𒋼 ᚺ 𒆹 𓋱ᚦ 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 𒆹 𓌉 ᛞ𓋱𒋼 ᚺ 𒆹 𓋱ᚦ 𓋱ᚦ ᚨᚺ 𓌉𒄑 𓌉ᚢᛟ𓌍 𓌉 ᛞ𓋱𒋼 ᚺᛟᚢ𓌍 ᚺ ᚺᛟᚢ𓌍 𓋱ᚦ 
+    -&f+G f!-Ff- -&f+G fG#f -&f+G -#fG f!-Ff- fG#f -&f+G f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G f!-Ff- -&f+G fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f -&f+G f!-Ff- -&f+G fG#f -&f+G f!-Ff- -&f+G f!-Ff- -&f+G -&f+G f!-Ff- -&f+G fG#f -&f+G -#fG f!-Ff- fG#f -&f+G f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- 
     ```
 
     Or, import the entire package:
@@ -432,7 +412,7 @@ Throughout the synapses of this hyper-network of conceptual abstraction, flows t
 
 Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.  That is to say, `Skora` is keeper of record for all musical events as they must be known and tublated for processing by The Machines.
 
-The `Gamma` synth instruments in `AlloLib` use a [command-line](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  `Skora` converts this tabular format into an data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computation functions available in the "data science" computing paradigm.
+The `Gamma` synth instruments in `AlloLib` use a [standard numeric](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  `Skora` converts this tabular format into an data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computation functions available in the "data science" computing paradigm.
 
 (*A short tutorial note list basics, including pfields, can be found [here]()*)
 
