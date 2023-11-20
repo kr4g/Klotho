@@ -73,16 +73,33 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
     >>> from allopy.chronos import rhythm_trees as rt
     >>> # tree-graph representation using LISP-like syntax
-    >>> r_tree = rt.RT(('?', ((4, 4), ((1, (2, (1, 1, 1)), (1, (1, (1, (2, 1, 2)), 1)))) )))
+    >>> subdivisions = (1,1,1,1,1)
+    >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
     >>> m_ratios = rt.measure_ratios(r_tree) # evaluates to a list of metric proportions dividing an abstract unit of time
     >>> [str(ratio) for ratio in m_ratios]
-    ['1/4', '1/6', '1/6', '1/6', '1/12', '1/30', '1/60', '1/30', '1/12']
-    >>>
+    ['1/5', '1/5', '1/5', '1/5', '1/5']
+    >>> float(sum([r for r in r_ratios]))
+    1.0
+    >>> # add "branches"
+    >>> subdivisions = (1,1,(1,(1,1,1)),1,1)
+    >>> r_tree = rt.RT(('?', ((4, 4), )))
+    >>> m_ratios = rt.measure_ratios(r_tree)
+    >>> [str(ratio) for ratio in m_ratios]
+    ['1/5', '1/5', '1/15', '1/15', '1/15', '1/5', '1/5']
+    >>> # add more branches and change leaf-node proportions
+    >>> subdivisions = (7,2,(3,(1,3,2)),5,(3, (2,3,1)),11)
+    >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
+    >>> m_ratios = rt.measure_ratios(r_tree)
+    >>> [str(ratio) for ratio in m_ratios]
+    ['7/31', '2/31', '1/62', '3/62', '1/31', '5/31', '1/31', '3/62', '1/62', '11/31']
+    >>> the tree will always sum to 1
+    >>> float(sum([r for r in r_ratios]))
+    1.0
     >>> from allopy import chronos
     >>> # when given a reference tempo in bpm, `Chronos` can convert these ratios into durations in seconds
-    >>> durations = [chronos.beat_duration(metric_ratio=ratio, bpm=66) for ratio in m_ratios]
+    >>> durations = [chronos.beat_duration(ratio=ratio, bpm=66) for ratio in r_ratios]
     >>> [round(dur, 3) for dur in durations]
-    [0.909, 0.606, 0.606, 0.606, 0.303, 0.121, 0.061, 0.121, 0.303]
+    [0.821, 0.235, 0.059, 0.176, 0.117, 0.587, 0.117, 0.176, 0.059, 1.29]
     ```
 
     Abstract tools for metacomposition:
