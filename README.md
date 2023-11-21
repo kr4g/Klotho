@@ -74,8 +74,18 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> (15, 21, 35, 105), ('35/32', '21/16', '105/64', '15/8')
     >>> 
     >>> # multiply these ratios by a root frequency to create scales
-    >>> [round(freq * ratio, 2) for ratio in hexany.ratios]
+    >>> scale_freqs = [round(freq * ratio, 2) for ratio in hexany.ratios]
+    >>> scale_freqs
     [481.25, 550.0, 577.5, 660.0, 770.0, 825.0]
+    >>> # see the scale degrees as pitch classes with offset in cents...
+    >>> for pc, cents in [tonos.freq_to_pitchclass(f) for f in scale_freqs]: print(pc, round(cents,2))
+    ... 
+    B4 -44.86
+    C#5 -13.69
+    D5 -29.22
+    E5 1.96
+    G5 -31.17
+    G#5 -11.73
     ```
 
     AlloPy supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
