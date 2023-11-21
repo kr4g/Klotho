@@ -31,20 +31,18 @@ def rand_encode(keys, values, allow_repeats=False):
 
     return assignments
 
-def linear_encode(keys, values, allow_repeats=False):
-    '''
-    Assigns values from the values list to the keys list in a linear fashion. Allows for an option to repeat values.
+# def linear_encode(keys, values, allow_repeats=False):
+#     '''
+#     Assigns values from the values list to the keys list in a linear fashion. Allows for an option to repeat values.
     
-    Args:
-    - keys (list): A list of string symbols to be used as dictionary keys.
-    - values (list): A list of string symbols to be assigned linearly to the keys.
-    - allow_repeats (bool): If True, values will be repeated by re-shuffling once all are used.
+#     Args:
+#     - keys (list): A list of string symbols to be used as dictionary keys.
+#     - values (list): A list of string symbols to be assigned linearly to the keys.
+#     - allow_repeats (bool): If True, values will be repeated by re-shuffling once all are used.
     
-    Returns:
-    - dict: A dictionary with keys from the keys list and values from the values list.
-    '''
-    if not keys or not values:
-        return {}  # Return an empty dictionary if either list is empty
+#     Returns:
+#     - dict: A dictionary with keys from the keys list and values from the values list.
+#     '''
+#     if not keys or not values:
+#         return {}  # Return an empty dictionary if either list is empty
 
-    assignments = {}
-    values_pool = values.copy()

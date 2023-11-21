@@ -98,17 +98,17 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> [str(ratio) for ratio in m_ratios]
     ['1/5', '1/5', '1/5', '1/5', '1/5']
     >>>
-    >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
+    >>> sum(m_ratios) # the tree will always sum to 1
     1.0
     >>> # add "branches"
     >>> subdivisions = (1,1,(1,(1,1,1)),1,1)
-    >>> r_tree = rt.RT(('?', ((4, 4), )))
+    >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
     >>> m_ratios = rt.measure_ratios(r_tree)
     >>> [str(ratio) for ratio in m_ratios]
     ['1/5', '1/5', '1/15', '1/15', '1/15', '1/5', '1/5']
     >>>
-    >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
-    1.0
+    >>> sum(m_ratios) # the tree will always sum to 1
+    Fraction(1, 1)
     >>> # add more branches and change leaf-node proportions
     >>> subdivisions = (7,2,(3,(1,3,2)),5,(3, (2,3,1)),11)
     >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
@@ -116,8 +116,8 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> [str(ratio) for ratio in m_ratios]
     ['7/31', '2/31', '1/62', '3/62', '1/31', '5/31', '1/31', '3/62', '1/62', '11/31']
     >>>
-    >>> float(sum([r for r in r_ratios])) # the tree will always sum to 1
-    1.0
+    >>> sum(m_ratios) # the tree will always sum to 1
+    Fraction(1, 1)
     >>> # when given a reference tempo in bpm, `Chronos` can convert these ratios into durations in seconds
     >>> from allopy import chronos
     >>> durations = [chronos.beat_duration(ratio=ratio, bpm=66) for ratio in r_ratios]

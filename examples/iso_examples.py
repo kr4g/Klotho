@@ -35,8 +35,8 @@ def isorhythm(color: list, talea: list, end=True, kwargs=None):
     # color_len = len(color)
     talea_len = len(talea)
     
-    min_amp = aikous.Dynamics.ppp.max
-    max_amp = aikous.Dynamics.mf.min
+    min_amp = aikous.DYNAMICS.pp.max
+    max_amp = aikous.DYNAMICS.mf.min
     
     start_time = 0.0
     rows_list = []
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     
     # attackTime = min(talea_ratios)
     kwargs       = {
-        'attackTime'  : 9.0, 
+        'attackTime'  : 0.07, 
         'releaseTime' : 9.0,
         'sustain'     : 0.833,  
         'Pan1'        : -1.0,
@@ -159,7 +159,7 @@ if __name__ == '__main__':
     
     # attackTime = min(talea_ratios_comp)
     kwargs = {
-        'attackTime'  : 6.0, 
+        'attackTime'  : 0.05, 
         'releaseTime' : 9.0,
         'sustain'     : 0.9296,  
         'Pan1'        : 1.0,
