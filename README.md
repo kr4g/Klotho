@@ -99,7 +99,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ['1/5', '1/5', '1/5', '1/5', '1/5']
     >>>
     >>> sum(m_ratios) # the tree will always sum to 1
-    1.0
+    Fraction(1, 1)
     >>> # add "branches"
     >>> subdivisions = (1,1,(1,(1,1,1)),1,1)
     >>> r_tree = rt.RT(('?', ((4, 4), subdivisions)))
