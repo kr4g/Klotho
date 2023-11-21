@@ -60,10 +60,14 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> freq = tonos.pitchclass_to_freq('A4', cent_offset = -32)
     >>> freq
     431.941776308572
-    >>> hexany = tonos.scales.hexany([1,3,5,7], 2)
+    >>>
+    >>> # make a Hexany from some prime factors...
+    >>> primes = (1,3,5,7)
+    >>> hexany = tonos.scales.hexany(primes, 2)
     >>> # returns a list of products and a list of octave-reduced scale ratios
-    >>> hexany
-    ([3, 5, 7, 15, 21, 35], [1.09375, 1.25, 1.3125, 1.5, 1.75, 1.875])
+    >>> # (CP factors), (scale ratios)
+    >>> hexany.primes, hexany.ratios
+    (3, 5, 7, 15, 21, 35), ('35/32', '5/4', '21/16', '3/2', '7/4', '15/8')
     >>> # multiply these ratios by a root frequency to create scales
     >>> [freq * ratio for ratio in hexany.ratios]
     [472.4363178375006, 539.927220385715, 566.9235814050007, 647.912664462858, 755.898108540001, 809.8908305785725]

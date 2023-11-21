@@ -2,9 +2,10 @@
 from typing import Union, List, Tuple, Dict, Set
 from math import prod
 from itertools import combinations
+from fractions import Fraction
 from allopy.tonos.tonos import octave_reduce
 
-def hexany(prime_factors: List[int] = [1,3,5,7], r: int = 2) -> Tuple[List[float], List[float]]:
+def hexany(prime_factors: Tuple[int] = (1,3,5,7), r: int = 2) -> Tuple[List[float], List[float]]:
   '''
   Calculate a Hexany scale from a list of prime factors and a rank value.
   
@@ -22,8 +23,8 @@ def hexany(prime_factors: List[int] = [1,3,5,7], r: int = 2) -> Tuple[List[float
     - The first list contains the products of combinations of prime factors.
     - The second list is the sorted Hexany scale after octave reduction.
   '''
-  products = [prod(comb) for comb in combinations(prime_factors, r)]
-  scale = sorted([octave_reduce(product) for product in products])
+  products = tuple([prod(comb) for comb in combinations(prime_factors, r)])
+  scale = tuple(sorted([octave_reduce(Fraction(product)) for product in products]))
   return products, scale
 
 def n_tet(divisions=12, equave=2, nth_division=1):
