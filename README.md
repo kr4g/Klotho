@@ -164,7 +164,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     '17/30'
     >>> # based offset times, compute a corresponding scaling factor...  
     >>> offsets = [topos.Fraction(r) for r in offsets] # back to Fractions for the computation...
-    >>> prolations = [topos.Fraction(1,1) - offset for offset in offsets]
+    >>> prolations = [cantus_sum - offset for offset in offsets]
     >>> cy_kleis = rando.lin_encode(kleis, [(off, prol) for off, prol in zip(offsets, prolations)])
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
     ... 
@@ -246,7 +246,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> constraints = {a: np.random.choice(S2) for a in alpha[:len(alpha)//2]}
     >>> constraints
     {'F': '!', 'f': '&', 'G': '!', '+': '#', '-': '#'}
-    >>> random_rules = grammars.constrain_rules(random_rules, constraints)
+    >>> random_rules = frgr.grammars.constrain_rules(random_rules, constraints)
     >>> for axiom, sub in random_rules.items(): print(f'{axiom} : {sub}')
     ... 
     F : -FF-+-!
@@ -256,7 +256,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     - : fG#f
     >>> random_rules = {k: v + ' ' for k, v in random_rules.items()}
     >>> gens = 11
-    >>> l_str_gens = grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
+    >>> l_str_gens = frgr.grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
     >>> for i in range(0,5): print(f'Gen {i}:\n',l_str_gens[i])
     ... 
     Gen 0:
@@ -407,7 +407,7 @@ Consult The Topos for guidance and you will receive it, but know that The Topos 
 
 Throughout the synapses of this hyper-network of conceptual abstraction, flows the mana of `Aikous`, who interlaces the higher-order symbolic representations of musical expression with the working reality of sound synthesis.  While The `Topos` arbitrates over the algebra, `Aikous` conceives the calculus.
 
-`Aikous` contains basic tools for converting between *conceptual* units (e.g., musical dynamics such as `mp` and `fff`) and *concrete* synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements—i.e., *crescendi* and *diminuendi*.  `Aikous` is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
+`Aikous` contains basic tools for converting between *conceptual* units (e.g., musical dynamics such as `mp` and `fff`) and *concrete* synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements—e.g., *crescendi* and *diminuendi*.  `Aikous` is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
 
 (examples)
 
@@ -415,9 +415,9 @@ Throughout the synapses of this hyper-network of conceptual abstraction, flows t
 
 ***The Scribe:***  *keeper of scores, numen of notation*
 
-Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.  That is to say, `Skora` is keeper of record for all musical events as they must be known and tublated for processing by The Machines.
+Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.  That is to say, `Skora` is keeper of record for all musical events as they must be known and as they must be tublated for The Machines.
 
-The `Gamma` synth instruments in `AlloLib` use a [standard numeric](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  `Skora` converts this tabular format into an data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computation functions available in the "data science" computing paradigm.
+The `Gamma` synth instruments in `AlloLib` use a [standard numeric](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  `Skora` converts this tabular format into a data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computations available in the "data science" paradigm.
 
 (*A short tutorial note list basics, including pfields, can be found [here]()*)
 
