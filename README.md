@@ -68,6 +68,11 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> # (CP factors), (scale ratios)
     >>> hexany.primes, hexany.ratios
     (3, 5, 7, 15, 21, 35), ('35/32', '5/4', '21/16', '3/2', '7/4', '15/8')
+    >>> 
+    >>> # same prime factors but with 3-wise combination products...
+    >>> tonos.scales.hexany(primes, 3)
+    >>> (15, 21, 35, 105), ('35/32', '21/16', '105/64', '15/8')
+    >>> 
     >>> # multiply these ratios by a root frequency to create scales
     >>> [freq * ratio for ratio in hexany.ratios]
     [472.4363178375006, 539.927220385715, 566.9235814050007, 647.912664462858, 755.898108540001, 809.8908305785725]
