@@ -509,7 +509,7 @@ The AlloLib Playground is an application development space for working with the 
 
 `AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as AlloLib.
 
-When used in concert, AlloLib Playground and AlloPy bridge the subatomic, bit-level world of sound synthesis and graphical computation with the macrocosmic, "outside of time" realm of music composition and poly-sensory metacomposition.  Together, they form a unified *AlloVerse* where students, artists, composers, and researchers can move freely between all levels of a distributed, multimedia composition system.
+When used in concert, AlloLib Playground and AlloPy form a computer-assisted composition framework for working with poly-sensory metacompositional materials and realizing the results with an audiovisual application.  Students, artists, composers, and researchers can then move freely between all levels of a distributed, multimedia composition system.
 
 *Coming soon...*
 
