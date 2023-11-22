@@ -207,11 +207,11 @@ Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://li
 
 ## Feature Overview
 
-`AlloPy` extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex and abstract materials not easily accessible with conventional notation softwares.  
+`AlloPy` extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with conventional notation softwares.  
 
 The ethos of AlloPy draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/) (which also influenced [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) for Max), although without the patching.
 
-AlloPy seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  It is then also closer to the abstract, algebraic language of Music in its *extemporal* representations.
+AlloPy seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of AlloPy's core features, particularly in the `Topos` module, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of Music in its *extemporal* representations.
 
 Basic examples from each AlloPy module, here used in an 'on-the-fly' context via the Python interpreter:
 
