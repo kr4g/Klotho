@@ -73,6 +73,40 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
     ```
 
+    In the world of AlloPy, it is always possible to ask the five dæmons for help. Simply call the Python `help()` function on any class, function, or module in AlloPy:
+    ```
+    >>> import allopy as al
+    >>> help(al.chronos)
+    Help on package allopy.chronos in allopy:
+
+    NAME
+        allopy.chronos - --------------------------------------------------------------------------------------
+
+    DESCRIPTION
+        `Chronos` is a specialized module for working with time and rhythm in music.
+        
+        The word "chronos" originates from Ancient Greek and is deeply rooted in both language 
+        and mythology. In Greek, "χρόνος" (chronos) means "time".
+        
+        In Greek mythology, Chronos (not to be confused with Cronus, the Titan) is personified as 
+        the god of time. His representation often symbolizes the endless passage of time and the 
+        cycles of creation and destruction within the universe.
+        
+        --------------------------------------------------------------------------------------
+
+    PACKAGE CONTENTS
+        chronos
+        rhythm_trees
+        temporal_units
+    ```
+    Press `q` in the terminal window to leave the help screen and return to the interpreter.
+
+## Feature Overview
+
+`AlloPy` extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more 'advanced' materials not easily acheivable in conventional notation softwares.
+
+Basic examples from each AlloPy module, here used in an 'on-the-fly' context via the Python interpreter:
+
 ### Rhythm Trees
 
 AlloPy supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
@@ -260,8 +294,13 @@ Further reduce musical abstractions to synthesis parameters (e.g., pitchclass na
 ((2.061, 0.533), ((293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061)))
 >>> # this generates a prolation canon with scaling of each voice relative to the cantus
 >>> # see `AlloPy/examples/`
+```
+
+Permute the symbolic abstractions into new forms
+```
 >>> # we could then revise our initial abstraction to include the addition of a scaling factor,
 >>> # but, now, "re-abstracted" into a new generalization which itself can be re-interpreted...
+>>> for e in h_map: print(e)
 ...
 (('∆', 'λ'), (('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫')))
 (('Σ', 'ε'), (('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝')))
@@ -270,10 +309,6 @@ Further reduce musical abstractions to synthesis parameters (e.g., pitchclass na
 (('Ω', 'φ'), (('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝')))
 (('ζ', 'Ϡ'), (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
 >>>
-```
-
-Permute the symbolic abstractions into new forms
-```
 >>> # we could also perform more transformation and create a new encoding...
 >>> h_map_hyper = tuple(topos.homotopic_map(topos.cartesian_iso_pairs(s1, kleis_l[:4]), topos.iso_pairs(s2, kleis_r[:5])))
 >>> for e in h_map_hyper: print(e)
@@ -350,35 +385,7 @@ Gen 4:
 -&f+G f!-Ff- -&f+G fG#f -&f+G -#fG f!-Ff- fG#f -&f+G f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G f!-Ff- -&f+G fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f -&f+G f!-Ff- -&f+G fG#f -&f+G f!-Ff- -&f+G f!-Ff- -&f+G -&f+G f!-Ff- -&f+G fG#f -&f+G -#fG f!-Ff- fG#f -&f+G f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- 
 ```
 
----    
-
-In the world of AlloPy, it is always possible to ask the five dæmons for help. Simply call the Python `help()` function on any class, function, or module in AlloPy:
-```
->>> import allopy as al
->>> help(al.chronos)
-Help on package allopy.chronos in allopy:
-
-NAME
-    allopy.chronos - --------------------------------------------------------------------------------------
-
-DESCRIPTION
-    `Chronos` is a specialized module for working with time and rhythm in music.
-    
-    The word "chronos" originates from Ancient Greek and is deeply rooted in both language 
-    and mythology. In Greek, "χρόνος" (chronos) means "time".
-    
-    In Greek mythology, Chronos (not to be confused with Cronus, the Titan) is personified as 
-    the god of time. His representation often symbolizes the endless passage of time and the 
-    cycles of creation and destruction within the universe.
-    
-    --------------------------------------------------------------------------------------
-
-PACKAGE CONTENTS
-    chronos
-    rhythm_trees
-    temporal_units
-```
-Press `q` in the terminal window to leave the help screen and return to the interpreter.
+---   
 
 ### Integration with AlloLib Playground
 
