@@ -207,7 +207,7 @@ Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://li
 
 ## Feature Overview
 
-`AlloPy` extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more 'advanced' and abstract materials not easily accessible with conventional notation softwares.  
+`AlloPy` extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex and abstract materials not easily accessible with conventional notation softwares.  
 
 The ethos of AlloPy draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/), which also influenced the [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) libraries for Max, although without the patching.  AlloPy seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  It is then also closer to the abstract, algebraic language of Music in its *extemporal* representations.
 
