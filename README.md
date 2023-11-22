@@ -5,7 +5,7 @@ Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.
 
 [The AlloSphere Research Group](https://github.com/AlloSphere-Research-Group)
 
-AlloPy [integrates](https://github.com/kr4g/AlloPy/tree/main#integration-with-allolib-playground) with `AlloLib Playground`, a C++ application development space for working with `AlloLib` and `Gamma`, audiovisual and sound synthesis libraries developed by The AlloSphere Research Group.
+AlloPy [integrates](https://github.com/kr4g/AlloPy/tree/main#integration-with-allolib-playground) with AlloLib Playground, a C++ application development space for working with `AlloLib` and `Gamma`, audiovisual and sound synthesis libraries developed by The AlloSphere Research Group.
 
 Download AlloLib Playground here: https://github.com/AlloSphere-Research-Group/allolib_playground
 
