@@ -48,9 +48,34 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ```
 
     Once the interpreter loads, import from `allopy` as needed.
-    
-    For example:
 
+    Or, import the entire package:
+    ```
+    >>> import allopy as al
+    >>> al.aikous.Dynamics.mf
+    0.2512
+    >>> al.chronos.beat_duration(metric_ratio=1/4, bpm=120)
+    0.5
+    >>> score_df = al.skora.make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency'))
+    >>> duration = al.chronos.beat_duration(1/9, 76)
+    >>> min_amp, max_amp = al.aikous.Dynamics.mp, al.aikous.Dynamics.ff
+    >>> frequency = al.tonos.pitchclass_to_freq('D3', cent_offset = -16) 
+    >>> ratio = al.tonos.cents_to_ratio(386)
+    >>> repeats = 9
+    >>> rows = [{
+            'start'      : i * duration,
+            'dur'        : duration,
+            'synthName'  : 'mySynth',
+            'amplitude'  : np.interp(i, [0, repeats], [min_amp, max_amp]),
+            'frequency'  : frequency * ratio**i,
+        } for i in range(repeats)]
+    >>> score_df = skora.concat_rows(score_df, rows)
+    >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
+    ```
+    
+    ### Microtonality
+
+    AlloPy supports both *n*-TET and JI-based tuning systems.
     ```
     >>> from allopy import tonos
     >>> tonos.midicents_to_freq(6900)
@@ -87,6 +112,13 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     G5 -31.17
     G#5 -11.73
     ```
+
+    *n*-TET tunings are not limited to octave divisions.  `Tonos` can compute any *n*-divisions of any arbitrary interval, i.e., non-octave scales and tunings such as Bohlen-Pierce:
+    ```
+    ...
+    ```
+
+    ### Rhythm Trees
 
     AlloPy supports [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html), as implemented in the [OpenMusic](https://openmusic-project.github.io/) composition software.
     ```
@@ -125,9 +157,12 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     [0.821, 0.235, 0.059, 0.176, 0.117, 0.587, 0.117, 0.176, 0.059, 1.29]
     ```
 
-    Abstract tools for metacomposition:
+    ### Abstract tools for metacomposition:
+
+    Create intricate mappings from symbolic, non-typed elements
     ```
     >>> from allopy import topos
+    >>> 
     >>> s1, s2 = ('Θ', 'Ξ'), ('∝', '∴', '∫')
     >>> iso = topos.iso_pairs(s1, s2)
     >>> iso
@@ -142,13 +177,16 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ('∐', (('Ξ', '∝'), ('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫')))
     ('Ω', (('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝')))
     ('ζ', (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
-    >>>
+    ```
+    
+    Reduce symbolic abstractions to musical abstractions
+    ```
     >>> # encoding / decoding
     >>> from allopy.topos.random import rando
     >>> cy_s1 = rando.rand_encode(s1, tonos.PITCH_CLASSES.N_TET_12.names.as_sharps[::2])
-    >>> proportions = tuple(set([str(ratio) for ratio in m_ratios])) # from the previous example
-    >>> proportions
-    ('1/6', '1/30', '1/12', '1/4', '1/60')
+    >>> proportions = tuple(set(m_ratios)) # `m_ratios` from the previous example
+    >>> [str(ratio) for ratio in proportions]
+    ['1/6', '1/30', '1/12', '1/4', '1/60']
     >>> cy_s2 = rando.rand_encode(s2, [str(ratio) for ratio in proportions])
     >>> # ciphers -->  {musical pitch names}, {metric or "beat" ratios}
     >>> cy_s1, cy_s2
@@ -165,8 +203,8 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> # take the cumulative sum of the ratios in the first line...
     >>> import numpy as np
     >>> cantus = [0] + [topos.Fraction(cy_s2[p[1]]) for p in iso[:len(kleis) - 1]]
-    >>> offsets = [str(r) for r in np.cumsum(cantus)]
-    >>> cy_kleis = rando.lin_encode(kleis, offsets)
+    >>> offsets = [r for r in np.cumsum(cantus)]
+    >>> cy_kleis = rando.lin_encode(kleis, [str(r) for r in offsets])
     >>> cy_kleis
     {'∆': '1/60', 'Σ': '1/4', 'Ψ': '1/60', '∐': '1/4', 'Ω': '1/30', 'ζ': '0'}
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
@@ -177,42 +215,49 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     ('3/10', (('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30')))
     ('11/20', (('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4')))
     ('17/30', (('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60')))
+    ```
+
+    Expand the underlying mappings
+    ```    
     >>> # for each offset time, compute a scaling factor for the paired ratios
     >>> cantus_sum = np.sum([meas for meas in cantus])
     >>> str(cantus_sum)
     '17/30'
     >>> # based offset times, compute a corresponding scaling factor...  
-    >>> offsets = [topos.Fraction(r) for r in offsets] # back to Fractions for the computation...
     >>> prolations = [cantus_sum - offset for offset in offsets]
     >>> cy_kleis = rando.lin_encode(kleis, [(off, prol) for off, prol in zip(offsets, prolations)])
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
     ... 
     (('0', '1'), (('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60'), ('D', '1/30')))
-    (('1/4', '3/4'), (('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4')))
-    (('4/15', '11/15'), (('A#', '1/30'), ('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60')))
-    (('3/10', '7/10'), (('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30')))
-    (('11/20', '9/20'), (('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4')))
-    (('17/30', '13/30'), (('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60')))
+    (('1/4', '23/60'), (('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4')))
+    (('4/15', '31/60'), (('A#', '1/30'), ('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60')))
+    (('3/10', '7/15'), (('D', '1/4'), ('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30')))
+    (('11/20', '3/10'), (('A#', '1/60'), ('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4')))
+    (('17/30', '8/15'), (('D', '1/30'), ('A#', '1/4'), ('D', '1/60'), ('A#', '1/30'), ('D', '1/4'), ('A#', '1/60')))
     >>> # convert all the metric ratios into durations in seconds...
     >>> # computed elsewhere...
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
     ... 
     ((0.0, '1'), (('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121)))
-    ((0.909, '3/4'), (('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909)))
-    ((0.97, '11/15'), (('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061)))
-    ((1.091, '7/10'), (('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121)))
-    ((2.0, '9/20'), (('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909)))
-    ((2.061, '13/30'), (('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061)))
+    ((0.909, '23/60'), (('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909)))
+    ((0.97, '31/60'), (('A#', 0.121), ('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061)))
+    ((1.091, '7/15'), (('D', 0.909), ('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121)))
+    ((2.0, '3/10'), (('A#', 0.061), ('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909)))
+    ((2.061, '8/15'), (('D', 0.121), ('A#', 0.909), ('D', 0.061), ('A#', 0.121), ('D', 0.909), ('A#', 0.061)))
+    ```
+
+    Further reduce musical abstractions to synthesis parameters (e.g., pitchclass names become frequencies in Hertz, beat ratios become durations in seconds...)
+    ```
     >>> # convert all the scaling ratios into normalized floats and pitch names into frequencies...
     >>> # computed elsewhere...
     >>> for e in rando.decode(h_map, {**cy_s1, **cy_s2, **cy_kleis}): print(e)
     ...
     ((0.0, 1.0), ((466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121)))
-    ((0.909, 0.75), ((293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909)))
-    ((0.97, 0.733), ((466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061)))
-    ((1.091, 0.3), ((293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121)))
-    ((2.0, 0.55), ((466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909)))
-    ((2.061, 0.567), ((293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061)))
+    ((0.909, 0.383), ((293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909)))
+    ((0.97, 0.517), ((466.16, 0.121), (293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061)))
+    ((1.091, 0.467), ((293.66, 0.909), (466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121)))
+    ((2.0, 0.3), ((466.16, 0.061), (293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909)))
+    ((2.061, 0.533), ((293.66, 0.121), (466.16, 0.909), (293.66, 0.061), (466.16, 0.121), (293.66, 0.909), (466.16, 0.061)))
     >>> # this generates a prolation canon with scaling of each voice relative to the cantus
     >>> # see `AlloPy/examples/`
     >>> # we could then revise our initial abstraction to include the addition of a scaling factor,
@@ -225,6 +270,10 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     (('Ω', 'φ'), (('Θ', '∴'), ('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝')))
     (('ζ', 'Ϡ'), (('Ξ', '∫'), ('Θ', '∝'), ('Ξ', '∴'), ('Θ', '∫'), ('Ξ', '∝'), ('Θ', '∴')))
     >>>
+    ```
+
+    Permute the symbolic abstractions into new forms
+    ```
     >>> # we could also perform more transformation and create a new encoding...
     >>> h_map_hyper = tuple(topos.homotopic_map(topos.cartesian_iso_pairs(s1, kleis_l[:4]), topos.iso_pairs(s2, kleis_r[:5])))
     >>> for e in h_map_hyper: print(e)
@@ -249,7 +298,9 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     >>> # and so on...
     ```
 
-    Formal Grammars:
+    ### Formal Grammars:
+
+    Generate replacement rules for any alphabet
     ```
     >>> from allopy.topos import formal_grammars as frgr
     >>> S1 = ('F','f','G','+','-')
@@ -261,6 +312,10 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     G : fF-Ff-
     + : --fG
     - : fGff
+    ```
+
+    Rules can be modified with conditional constraints
+    ```
     >>> S2 = ('#','&','!')
     >>> constraints = {a: np.random.choice(S2) for a in alpha[:len(alpha)//2]}
     >>> constraints
@@ -273,8 +328,13 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     G : f!-Ff-
     + : -#fG
     - : fG#f
+    ```
+
+    Generate word strings by applying the grammar to an initial axiom
+    ```
     >>> random_rules = {k: v + ' ' for k, v in random_rules.items()}
     >>> gens = 11
+    >>> # generate string starting from random initial axiom
     >>> l_str_gens = frgr.grammars.gen_str(generations=gens, axiom=np.random.choice(alpha), rules=random_rules)
     >>> for i in range(0,5): print(f'Gen {i}:\n',l_str_gens[i])
     ... 
@@ -290,29 +350,7 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
     -&f+G f!-Ff- -&f+G fG#f -&f+G -#fG f!-Ff- fG#f -&f+G f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G f!-Ff- -&f+G fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f fG#f -FF-+-! -FF-+-! fG#f -#fG fG#f -&f+G f!-Ff- -&f+G fG#f -&f+G f!-Ff- -&f+G f!-Ff- -&f+G -&f+G f!-Ff- -&f+G fG#f -&f+G -#fG f!-Ff- fG#f -&f+G f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- -&f+G fG#f -FF-+-! -&f+G fG#f fG#f -&f+G -#fG f!-Ff- 
     ```
 
-    Or, import the entire package:
-    ```
-    >>> import allopy as al
-    >>> al.aikous.Dynamics.mf
-    0.2512
-    >>> al.chronos.beat_duration(metric_ratio=1/4, bpm=120)
-    0.5
-    >>> score_df = al.skora.make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency'))
-    >>> duration = al.chronos.beat_duration(1/9, 76)
-    >>> min_amp, max_amp = al.aikous.Dynamics.mp, al.aikous.Dynamics.ff
-    >>> frequency = al.tonos.pitchclass_to_freq('D3', cent_offset = -16) 
-    >>> ratio = al.tonos.cents_to_ratio(386)
-    >>> repeats = 9
-    >>> rows = [{
-            'start'      : i * duration,
-            'dur'        : duration,
-            'synthName'  : 'mySynth',
-            'amplitude'  : np.interp(i, [0, repeats], [min_amp, max_amp]),
-            'frequency'  : frequency * ratio**i,
-        } for i in range(repeats)]
-    >>> score_df = skora.concat_rows(score_df, rows)
-    >>> skora.df_to_synthSeq(score_df, 'path/to/score/dir/my_score.synthSequence')
-    ```
+    ---    
 
     In the world of AlloPy, it is always possible to ask the five dæmons for help. Simply call the Python `help()` function on any class, function, or module in AlloPy:
     ```

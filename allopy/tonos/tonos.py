@@ -136,6 +136,9 @@ def cents_to_ratio(cents: float) -> str:
   '''
   return 2 ** (cents / 1200)
 
+def cents_to_setclass(cent_value: float = 0.0, n_tet: int = 12):
+   return (cent_value / 100)  % n_tet
+
 def freq_to_pitchclass(freq: float):
   '''
   Converts a frequency to a pitch class with offset in cents.

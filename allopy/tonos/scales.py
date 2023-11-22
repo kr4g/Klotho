@@ -3,7 +3,7 @@ from typing import Union, List, Tuple, Dict, Set
 from math import prod
 from itertools import combinations
 from fractions import Fraction
-from allopy.tonos.tonos import octave_reduce
+from allopy.tonos.tonos import *
 
 def hexany(prime_factors: Tuple[int] = (1,3,5,7), r: int = 2) -> Tuple[List[float], List[float]]:
   '''
@@ -39,3 +39,16 @@ def n_tet(divisions=12, equave=2, nth_division=1):
   :return: The frequency ratio of the nth division
   '''
   return equave ** (nth_division / divisions)
+
+def ratios_n_tet(divisions=12, equave=2):
+  '''
+  Calculate the ratios of the divisions of an interval in equal temperament.
+  
+  see:  https://en.wikipedia.org/wiki/Equal_temperament
+
+  :param interval: The interval to divide (default is 2 for an octave)
+  :param divisions: The number of equal divisions
+  :return: A list of the frequency ratios of the divisions
+  '''
+  return [n_tet(divisions, equave, nth_division) for nth_division in range(divisions)]
+
