@@ -106,9 +106,28 @@ def midicents_to_freq(midicents: float) -> float:
   Returns:
     The corresponding frequency in Hertz as a float.
   '''
-  return 440.0 * (2 ** ((midicents - 6900) / 1200.0))
+  return 440.0 * (2 ** ((midicents - A4_MIDI * 100) / 1200.0))
 
-def ratio_to_cents(ratio: Union[str, float]) -> float:
+def midicents_to_pitchclass(midicents: float) -> str:
+  '''
+  Convert MIDI cents to a pitch class with offset in cents.
+  
+  Args:
+    midicents: The MIDI cent value to convert.
+    
+  Returns:
+    A tuple containing the pitch class and the cents offset.
+  '''
+  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
+  midi = midicents / 100
+  midi_round = round(midi)
+  note_index = int(midi_round) % len(PITCH_LABELS)
+  octave = int(midi_round // len(PITCH_LABELS)) - 1  # MIDI starts from C-1
+  pitch_label = PITCH_LABELS[note_index]
+  cents_diff = (midi - midi_round) * 100
+  return f'{pitch_label}{octave}', cents_diff
+
+def ratio_to_cents(ratio: Union[str, float], round_to: int = 4) -> float:
   '''
   Convert a musical interval ratio to cents, a logarithmic unit of measure.
   
@@ -122,7 +141,7 @@ def ratio_to_cents(ratio: Union[str, float]) -> float:
     numerator, denominator = map(float, ratio.split('/'))
   else:  # assuming ratio is already a float
     numerator, denominator = ratio, 1.0
-  return 1200 * np.log2(numerator / denominator)
+  return round(1200 * np.log2(numerator / denominator), round_to)
 
 def cents_to_ratio(cents: float) -> str:
   '''
@@ -136,8 +155,22 @@ def cents_to_ratio(cents: float) -> str:
   '''
   return 2 ** (cents / 1200)
 
-def cents_to_setclass(cent_value: float = 0.0, n_tet: int = 12):
-   return (cent_value / 100)  % n_tet
+def cents_to_setclass(cent_value: float = 0.0, n_tet: int = 12, round_to: int = 2) -> float:
+   return round((cent_value / 100)  % n_tet, round_to)
+
+def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int = 2) -> float:
+  '''
+  Convert a musical interval ratio to a set class.
+  
+  Args:
+    ratio: The musical interval ratio as a string (e.g., '3/2') or float.
+    n_tet: The number of divisions in the octave, default is 12.
+    round_to: The number of decimal places to round to, default is 2.
+    
+  Returns:
+    The set class as a float.
+  '''
+  return cents_to_setclass(ratio_to_cents(ratio), n_tet, round_to)
 
 def freq_to_pitchclass(freq: float):
   '''
@@ -152,10 +185,11 @@ def freq_to_pitchclass(freq: float):
     A tuple containing the pitch class and the cents offset.
   '''
   PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
-  midi = A4_MIDI + 12 * np.log2(freq / A4_Hz)
+  n_PITCH_LABELS = len(PITCH_LABELS)
+  midi = A4_MIDI + n_PITCH_LABELS * np.log2(freq / A4_Hz)
   midi_round = round(midi)
-  note_index = int(midi_round) % 12
-  octave = int(midi_round // 12) - 1  # MIDI starts from C-1
+  note_index = int(midi_round) % n_PITCH_LABELS
+  octave = int(midi_round // n_PITCH_LABELS) - 1  # MIDI starts from C-1
   pitch_label = PITCH_LABELS[note_index]
   cents_diff = (midi - midi_round) * 100
   return f'{pitch_label}{octave}', cents_diff
