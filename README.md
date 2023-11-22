@@ -252,6 +252,11 @@ Fraction(1, 1)
 [0.821, 0.235, 0.059, 0.176, 0.117, 0.587, 0.117, 0.176, 0.059, 1.29]
 ```
 
+When paired with *temporal units*, rhythm trees create complex mirco-rhythmic layers
+```
+...
+```
+
 ### Microtonality
 
 AlloPy supports both *n*-TET and JI-based tuning systems.
@@ -293,6 +298,11 @@ G#5 -11.73
 ```
 
 *n*-TET tunings are not limited to octave divisions.  `Tonos` can compute any *n*-divisions of any arbitrary interval, i.e., non-octave scales and tunings such as Bohlen-Pierce:
+```
+...
+```
+
+Combine both approaches.  For instance, set an interval as a Just ratio and slice it into *n*-number of equally-tempered steps:
 ```
 ...
 ```
