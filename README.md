@@ -505,7 +505,7 @@ See VS Code integration section for more details.
 
 ### **Into the AlloVerse:**  *an Audiovisual Synthesis and Metacomposition tutorial series for working with AlloLib Playground and AlloPy*
 
-The `AlloLib Playground` is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.  The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
+The AlloLib Playground is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.  The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
 `AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as AlloLib.
 
