@@ -125,7 +125,7 @@ def midicents_to_pitchclass(midicents: float) -> str:
   octave = int(midi_round // len(PITCH_LABELS)) - 1  # MIDI starts from C-1
   pitch_label = PITCH_LABELS[note_index]
   cents_diff = (midi - midi_round) * 100
-  return f'{pitch_label}{octave}', cents_diff
+  return f'{pitch_label}{octave}', round(cents_diff, 4)
 
 def ratio_to_cents(ratio: Union[str, float], round_to: int = 4) -> float:
   '''
