@@ -59,22 +59,53 @@ class RT:
   see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
   '''
   def __init__(self, data):
-    self.data = data
+    self.__data = data
+    self.__duration = 1 if data[0] == '?' else data[0]
+    self.__time_signature = data[1][0]
+    self.__subdivisions = data[1][1]
+    self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
 
   @property
   def duration(self):
-    return self.data[0]
+    # return self.data[0]
+    # self.__duration = sum(abs(r) for r in self.ratios)
+    return self.__duration
 
   @property
   def time_signature(self):
-    return self.data[1][0]
+    return self.__time_signature
 
   @property
   def subdivisions(self):
-    return self.data[1][1]
+    # return self.data[1][1]
+    return self.__subdivisions
+  
+  @property
+  def ratios(self):
+    # if self._subdivisions != self.subdivisions:
+    #   self._subdivisions = self.subdivisions
+    self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
+    # return measure_ratios(self.subdivisions)
+    return self.__ratios
+  
+  @property
+  def factors(self):
+    return factor(self.subdivisions)
+  
+  def rotate(self, n=1):     
+    # self.__subdivisions = self.subdivisions[n:] + self.subdivisions[:n]
+    factors = factor(self.subdivisions)
+    n = n % len(factors)
+    factors = factors[n:] + factors[:n]
+    refactored = refactor(self.__subdivisions, factors)
+    return RT((self.duration, (self.time_signature, refactored)))
 
   def __getitem__(self, key):
     return self.data[key]
+  
+  def __repr__(self):
+    ratios = ', '.join(tuple([str(r) for r in self.ratios]))
+    return f'Duration: {self.duration}\nTime Signature: {self.time_signature}\nSubdivisions: {self.subdivisions}\nRatios: {ratios}'
 
 # ------------------------------------------------------------------------------------
 # Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
@@ -163,3 +194,66 @@ def strict_decomposition(fractions, meas):
     num, denom = meas
     common_denom = reduce(lambda a, b: gcd(a, b.denominator), fractions, fractions[0].denominator)
     return [Fraction((f / common_denom).numerator * num, denom) for f in fractions]
+
+# def factor(subdivs, factors=None):
+#     factors = [] if factors is None else factors
+#     for element in subdivs:
+#         if isinstance(element, tuple):
+#             factor(element, factors)
+#         else:
+#             factors.append(element)
+#     return factors
+
+# def refactor(subdivs, factors, index=0):    
+#     result = []
+#     for element in subdivs:
+#         if isinstance(element, tuple):
+#             nested_result, index = refactor(element, factors, index)
+#             result.append(nested_result)
+#         else:
+#             result.append(factors[index])
+#             index += 1
+#     return result, index
+
+def factor(subdivs):
+    def _factor(subdivs, acc):
+        for element in subdivs:
+            if isinstance(element, tuple):
+                _factor(element, acc)
+            else:
+                acc.append(element)
+        return acc
+    return tuple(_factor(subdivs, []))
+
+def refactor(subdivs, factors):
+    def _refactor(subdivs, index):
+        result = []
+        for element in subdivs:
+            if isinstance(element, tuple):
+                nested_result, index = _refactor(element, index)
+                result.append(nested_result)
+            else:
+                result.append(factors[index])
+                index += 1
+        return tuple(result), index
+    return _refactor(subdivs, 0)[0]
+
+
+if __name__ == '__main__':  
+    # ------------------------------------------------------------------------------------
+    # Rhythm Tree Examples
+    # ------------------------------------------------------------------------------------
+    # 
+    subdivisions = ((13, (3,1,2)), (21, (5,(13, (34,21,55)),8)), (5, (3,5,2)), (8, (5,(13, (34,89,55)),8)), (34, (3,1,2)))
+    r_tree = RT(('?', ((4, 4), subdivisions)))
+    print(r_tree)
+
+    factors = factor(subdivisions)
+    print(factors)
+    print(f'\nFactors: {r_tree.factors}')
+
+    print(f'\nrefactor...\n')
+    for i in range(len(factors)):
+        # r_tree_rotate = r_tree.rotate(i)
+        print(r_tree.rotate(i).subdivisions)
+

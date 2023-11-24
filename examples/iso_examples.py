@@ -45,6 +45,8 @@ def materials(color: list, talea: list, acct: int = 0, end=True, kwargs=None):
     start_time = 0.0
     rows_list = []
     _mult = False
+    color_mult = color_ratios[i_mult % len(color_ratios)] if _mult else 1
+    i_mult = 0
     for i, (i_color, i_talea) in enumerate(topos.iso_pairs(color, talea)):
         # -----------
         amplitude = np.random.uniform(min_amp.min, min_amp.max)       # default amplitude
@@ -53,8 +55,9 @@ def materials(color: list, talea: list, acct: int = 0, end=True, kwargs=None):
         
         if i % mult == 0:
             _mult = not _mult
+            color_mult = color_ratios[i_mult % len(color_ratios)] if _mult else 1
+            i_mult += 1
         
-        color_mult = 3/2 if _mult else 1
         new_row = {
             'start'      : start_time,
             'dur'        : i_talea,
@@ -115,21 +118,14 @@ if __name__ == '__main__':
     talea_ratios = (1/4, 1/8, 1/12, 1/12, 1/12)
     root_freq    = 400
     tempo        = 54
-    kwargs       = {
-        'attackTime'  : 0.0833, 
-        'releaseTime' : 10.0,
-        'sustain'     : 0.9,  
-        'Pan1'        : 0.0,
-        'Pan2'        : 0.0,
-        'PanRise'     : 0.0,
-    }
+    kwargs       = {'attackTime': 0.0833, 'releaseTime': 10.0, 'sustain': 0.9, 'Pan1': 0.0, 'Pan2': 0.0, 'PanRise': 0.0}
     
     # score_df_00 = composition(kwargs=kwargs)
     score_df_00 = composition(color_ratios = color_ratios,
-                           talea_ratios = talea_ratios,
-                           root_freq    = root_freq,
-                           tempo        = tempo,
-                           kwargs       = kwargs)
+                              talea_ratios = talea_ratios,
+                              root_freq    = root_freq,
+                              tempo        = tempo,
+                              kwargs       = kwargs)
     filename = 'iso_pairs_ex_00.synthSequence'
     skora.df_to_synthSeq(score_df_00, os.path.join(FILEPATH, filename))
     
@@ -153,10 +149,10 @@ if __name__ == '__main__':
         'PanRise'     : 0.0,
     }
     score_df_01 = composition(color_ratios = color_ratios,
-                           talea_ratios = talea_ratios,
-                           root_freq    = root_freq,
-                           tempo        = tempo,
-                           kwargs       = kwargs)
+                              talea_ratios = talea_ratios,
+                              root_freq    = root_freq,
+                              tempo        = tempo,
+                              kwargs       = kwargs)
     filename = 'iso_pairs_ex_01.synthSequence'
     skora.df_to_synthSeq(score_df_01, os.path.join(FILEPATH, filename))
     
@@ -178,10 +174,10 @@ if __name__ == '__main__':
         'PanRise'     : 0.0,
     }
     score_df_02 = composition(color_ratios = color_ratios_rotated,
-                           talea_ratios = talea_ratios_rotated,
-                           root_freq    = root_freq * tonos.cents_to_ratio(-33.333),
-                           tempo        = tempo * 1,
-                           kwargs       = kwargs)
+                              talea_ratios = talea_ratios_rotated,
+                              root_freq    = root_freq * tonos.cents_to_ratio(-33.333),
+                              tempo        = tempo * 1,
+                              kwargs       = kwargs)
     filename = 'iso_pairs_ex_02.synthSequence'
     skora.df_to_synthSeq(score_df_02, os.path.join(FILEPATH, filename))
     
