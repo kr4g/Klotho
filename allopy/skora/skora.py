@@ -77,6 +77,14 @@ def df_to_synthSeq(df, filepath):
     for index, row in df.iterrows():
       f.write('@ ' + ' '.join(map(str, row.values)) + '\n')
 
+def notelist_to_synthSeq(notelist, filepath):
+  '''
+  Converts a list of dictionaries to a .synthSequence file
+  '''
+  with open(filepath, 'w') as f:
+    for row in notelist:
+      f.write('@ ' + ' '.join(map(str, row.values())) + '\n')
+
 def make_row(rows_list: list, new_row: dict):
   '''
   
