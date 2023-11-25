@@ -27,44 +27,38 @@ def materials(metric_ratios: list, pulses: list, bpm: float = 60) -> list:
     duration_pulse_pairs = []
     CPS = topos.cartesian_iso_pairs(metric_ratios, pulses)
     current_bpm = bpm
-    temp_map  = np.append(np.linspace(bpm, bpm*6.33, len(metric_ratios)**2),                          # Section I
-                          np.linspace(bpm / 1.167, bpm*9.66, len(metric_ratios)**2 - len(pulses)*3))  # Section II    
+    temp_map  = np.append(np.linspace(bpm, bpm*6.667, len(metric_ratios)**2),                          # Section I
+                          np.linspace(bpm / 1.167, bpm*9.333, len(metric_ratios)**2 - len(pulses)*3))  # Section II    
     for i, ((ratio_1, ratio_2), nPulse) in enumerate(CPS):
         tempo    = chronos.metric_modulation(current_bpm, ratio_1, ratio_2)
         duration = chronos.beat_duration(1/13, tempo)
         duration_pulse_pairs.append((duration, nPulse))
-        if i < len(temp_map):
+        if i < len(temp_map):  # follow the tempo map until it runs out...
             current_bpm = temp_map[i]
-        else:  # Section III to the end
-            current_bpm = np.interp(i, [0, len(CPS)], [bpm * 3, bpm * 1.167])
+        else:                  # ...then ritardando until the end 
+            current_bpm = np.interp(i, [0, len(CPS)], [bpm * 3, bpm * 1.167])                          # Section III
     return duration_pulse_pairs
-    # borked
-    # return [(chronos.beat_duration(1/10, chronos.metric_modulation(bpm,
-    #                                                                ratio_1,
-    #                                                                ratio_2)),
-    #          nPulse
-    #     ) for ((ratio_1, ratio_2), nPulse) in CPS]
 
 def composition(metric_ratios: list, pulses: list, bpm: float = 60):
     '''
     '''
     duration_pulse_pairs = materials(metric_ratios, pulses, bpm)
-    start_time = 0.0
-    rows_list = []
-    pitch_contour = [6, 0, -7, -1]
-    freq_ratios     = [tonos.cents_to_ratio(sc * 100) for sc in pitch_contour]
-    freq_ratios_inv = [tonos.cents_to_ratio(-1 * sc * 100) for sc in pitch_contour]
-    octaves = np.array([0.25, 2.0, 0.5, 1.0])
-    oct_warp = 1.0
+    
+    start_time           = 0.0
+    start_time_II        = sum([d*p for d, p in duration_pulse_pairs[:len(metric_ratios)**2 + 1]])
+    pitch_contour        = [6, 0, -7, -1]
+    freq_ratios          = [tonos.cents_to_ratio(sc * 100) for sc in pitch_contour]
+    freq_ratios_inv      = [tonos.cents_to_ratio(-1 * sc * 100) for sc in pitch_contour]
+    octaves              = np.array([0.25, 2.0, 0.5, 1.0])
+    oct_warp             = 1.0
     # octaves = [0.25, 0.5, 1.0, 2.0]
     # np.random.seed(999)
     # np.random.shuffle(octaves)
 
-    start_time_II = sum([d*p for d, p in duration_pulse_pairs[:len(metric_ratios)**2 + 1]])
-
     i_freq = 0
+    rows_list = []
     np.random.seed(616)
-    attackTime = min([p[0] for p in duration_pulse_pairs])
+    min_pulse = min([p[0] for p in duration_pulse_pairs])
     for i, (duration, n_Pulses) in enumerate(duration_pulse_pairs):
         CONDITION_I  = i <= len(metric_ratios)**2# or i >= len(duration_pulse_pairs) - len(pulses)*3
         CONDITION_II = i >= len(duration_pulse_pairs) - len(pulses)*3
@@ -74,6 +68,7 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
         dynamic    = np.random.choice([aikous.DYNAMICS.ppp, aikous.DYNAMICS.p, aikous.DYNAMICS.mf, aikous.DYNAMICS.ff]) # * 0.9692
         freqs      = freq_ratios # freq_ratios_inv if i % len(pulses) == 0 else freq_ratios
         root_freq  = (999 * 1.9692**-2) * freqs[i % len(freqs)] * tonos.cents_to_ratio(1133)**(octaves[i % 4] * oct_warp)
+        attackTime = min(0.01, min_pulse * dur)
         pan        = np.random.uniform(-1.0, 1.0)
         amFunc     = np.random.choice((0, 2))
         amRatio    = np.random.uniform(0.9692, 1.167)
@@ -103,7 +98,8 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
                 'synthName'     : 'OscAM',
                 'amplitude'     : amplitude,
                 'frequency'     : frequency,
-                'attackTime'    : np.interp(n_pulse, [0, n_Pulses], [dur * 0.0333, dur * 0.167]),
+                'attackTime'    : attackTime,
+                # 'attackTime'    : np.interp(n_pulse, [0, n_Pulses], [attackTime * 0.0333, attackTime * 0.167]),
                 # 'releaseTime'   : dur * 0.13 + (n_pulse * 0.37),
                 'releaseTime'   : np.interp(n_pulse, [0, n_Pulses], [dur * 0.13, dur * 6.667]),
                 'sustain'       : 0.833,
@@ -113,7 +109,7 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
                 'am2'           : 0.0,
                 'amRise'        : dur,
                 'amRatio'       : amRatio,
-                'reverberation' : reverberation,
+                # 'reverberation' : reverberation,
                 # 'visualMode'    : amFunc,
             }
             rows_list.append(new_row)
@@ -137,7 +133,7 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
                 'synthName'     : 'OscAM',
                 'amplitude'     : amplitude,
                 'frequency'     : frequency,
-                'attackTime'    : dur,
+                'attackTime'    : dur * 0.333,
                 # 'releaseTime'   : dur * 0.13 + (n_pulse * 0.37),
                 'releaseTime'   : dur * 3,
                 'sustain'       : 0.9692,
@@ -147,24 +143,31 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
                 'am2'           : 1.0,
                 'amRise'        : dur,
                 'amRatio'       : amRatio,
-                'reverberation' : reverberation,
+                # 'reverberation' : reverberation,
                 # 'visualMode'    : amFunc,
             }
             rows_list.append(new_row)
             start_time_II += dur
             i_freq += 1
 
-    pfields = ['start', 'dur', 'synthName', 'amplitude', 'frequency', 'attackTime', 'releaseTime', 'sustain', 'pan', 'amFunc', 'am1', 'am2', 'amRise', 'amRatio', 'reverberation']#, 'visualMode']
-    score_df = skora.make_score_df(pfields=pfields)
-    score_df = skora.concat_rows(score_df, rows_list)
-    return score_df
+    # pfields = ['start', 'dur', 'synthName', 'amplitude', 'frequency', 'attackTime', 'releaseTime', 'sustain', 'pan', 'amFunc', 'am1', 'am2', 'amRise', 'amRatio']#, 'reverberation', 'visualMode']
+    # score_df = skora.make_score_df(pfields=pfields)
+    # score_df = skora.concat_rows(score_df, rows_list)
+    # return score_df
+    return rows_list
 
-if __name__ == '__main__':
+def examples():
+    # ------------------------------------------------------------------------------------
     # Example 00
-    metric_ratios = (1/5, 1/7, 1/16, 1/3, 1/13)
-    # metric_ratios = (1/5, 1/7, 1/3)
-    pulses = (11, 7, 13)
-    init_tempo = 33
-    score_df_00 = composition(metric_ratios, pulses, init_tempo)
+    # ------------------------------------------------------------------------------------
+    # metric_ratios = (1/5, 1/7, 1/16, 1/3, 1/13)
+    metric_ratios = (1/5, 1/7, 1/3, 1/11)
+    pulses        = (11, 7, 13)
+    init_tempo    = 33
+    
+    comp = composition(metric_ratios, pulses, init_tempo)
     filename = 'metric_modulation_ex_01_v4.synthSequence'
-    skora.df_to_synthSeq(score_df_00, os.path.join(FILEPATH, filename))
+    skora.notelist_to_synthSeq(comp, os.path.join(FILEPATH, filename))
+    
+if __name__ == '__main__':
+    examples()
