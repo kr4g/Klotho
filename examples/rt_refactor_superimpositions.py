@@ -23,7 +23,7 @@ def materials(rhythm_tree: rt.RT) -> list:
     '''
     return [rhythm_tree.rotate(i) for i in range(len(rhythm_tree.factors))]
 
-def example(r_trees: list, init_bpm: float = 66):
+def example(r_trees: list, hexany: tonos.scales.Hexany = tonos.scales.Hexany((1, 3, 5, 13), 2), use_hex=False, inv_freq_range=True, init_bpm: float = 66, start_offset: float = 0.0):
     '''
     '''
     tempo = init_bpm
@@ -31,9 +31,11 @@ def example(r_trees: list, init_bpm: float = 66):
     rand_oct = 1
     rows_list = []
     for i, r_tree in enumerate(r_trees):
-        start_time = np.random.uniform(0.167, 0.333)
+        start_time = start_offset + np.random.uniform(0.167, 0.333)
         r_ratios = r_tree.ratios
-        freq_min = np.random.uniform(313.0, 327.0) / 2
+        denom = (hexany.primes[i % len(hexany.primes)] /  max(hexany.primes)) if use_hex else 2
+        freq_min = np.random.uniform(313.0, 327.0) / denom
+        freq_range = [333.0 / denom, freq_min] if inv_freq_range else [freq_min / 333.0, denom]
         amp_curve = lfo_sin(np.random.uniform(freq_min/16, freq_min/17), len(r_ratios)) * 0.5 + 0.5
         for j, r in enumerate(r_ratios):
             cresc = np.interp(j, [0.0, len(r_ratios)], [0.333, 1.0])
@@ -46,8 +48,12 @@ def example(r_trees: list, init_bpm: float = 66):
                     freq_min = freq_min * rand_oct * 0.5
             amp_max = np.interp(j, [0.0, len(r_ratios)], [amplitude, aikous.DYNAMICS.mp.max])
             amplitude = aikous.DYNAMICS.mp.max*0.43 if j == 0 else amp_max * amp_curve[j] * cresc
-            frequency = np.interp(j, [0, len(r_ratios)], [333.0 / 2, freq_min])
+            frequency = np.interp(j, [0, len(r_ratios)], freq_range)
             frequency = frequency * rand_oct if j > len(r_ratios) // (8/5) else frequency
+            while frequency > 999.0:
+                frequency /= 2.0
+            while frequency < 99.0:
+                frequency *= 2.0
             attackTime = min(max(0.009692, dur * np.random.uniform(0.167, 0.333)), 0.0667)
             new_row = {
                 'start'       : start_time,
@@ -89,7 +95,8 @@ def composition(r_trees: list, hexany: tonos.scales.Hexany = tonos.scales.Hexany
         attk_curve = lfo_sin(np.random.uniform(1.667, 3.333), len(r_ratios)) * 0.5 + 0.5
         for j, r in enumerate(r_ratios):
             # tempo = np.interp(j, [0, len(r_ratios)], [init_bpm, init_bpm*(13/8)])
-            dur = chronos.beat_duration(r, tempo)
+            duration = chronos.beat_duration(r, tempo)
+            dur = duration #* 0.1667
             cresc = np.interp(j, [0.0, len(r_ratios)], [0.963, 1.0])
             amplitude = np.random.uniform(dyn_range[0].min, dyn_range[1].min) * amp_curve[j] * cresc
             amplitude = np.random.uniform(aikous.DYNAMICS.mp.max, aikous.DYNAMICS.mf.min) if j == 0 else amplitude
@@ -151,7 +158,7 @@ def composition(r_trees: list, hexany: tonos.scales.Hexany = tonos.scales.Hexany
                 # pfield("freqUp3", 8.0, 0.1, 10);
                 # pfield("freqUp4", 9.0, 0.1, 10);
                 # pfield("pan", 0.0, -1.0, 1.0);
-                amp = amplitude * 0.0043
+                amp = amplitude * 0.00667
                 ampStri = np.random.uniform(0.5, 1.0)
                 attackStri = attackTime#np.random.uniform(0.1, 3.0)
                 releaseStri = np.random.uniform(0.1, dur*cresc)
@@ -204,15 +211,15 @@ def composition(r_trees: list, hexany: tonos.scales.Hexany = tonos.scales.Hexany
                     'pan'         : pan,
                 }
             rows_list.append(new_row)
-            start_time += dur
+            start_time += duration
     return rows_list
 
-def composition_ii(r_trees: list, equaves: list = [0.125, 0.25, 0.5, 0, 1], dyn_range: list = [aikous.DYNAMICS.ppp, aikous.DYNAMICS.p], init_bpm: float = 60, start_offset: float = 0.0):
+def composition_ii(r_trees: list, hexany: tonos.scales.Hexany = tonos.scales.Hexany((1, 3, 5, 13), 2), equaves: list = [0.125, 0.25, 0.5, 0, 1], dyn_range: list = [aikous.DYNAMICS.ppp, aikous.DYNAMICS.p], init_bpm: float = 60, start_offset: float = 0.0):
     '''
     '''
     tempo = init_bpm
     rows_list = []
-    freq_ratios = [1.0] + [f for f in tonos.scales.Hexany((1, 3, 5, 13), 2).ratios]
+    freq_ratios = [1.0] + [f for f in hexany.ratios]
     for i, r_tree in enumerate(r_trees[:len(r_trees) // 1]):
         start_time = start_offset + np.random.uniform(0.167, 0.23)
         i_freq = 0
@@ -278,7 +285,7 @@ def compositions():
     # print(r_tree)
     # print(f'Factors {r_tree.factors}\n')
     r_tree_rotations = materials(r_tree)
-    exmpl = example(r_trees=r_tree_rotations, init_bpm=8 * (8/5))
+    exmpl = example(r_trees=r_tree_rotations, init_bpm=5 * (13/5))
     # for r_tree in r_tree_rotations:
     #     print(r_tree.subdivisions)
 
@@ -293,7 +300,7 @@ def compositions():
     subdivisions_i = (8, (13, (21, 13, 13)), (5, (8, (8, (8, 8, 3, 5)), (21, ((13, (21, 13, 8)), 5, (8, ((13, (21, 13, 13)), 8, (5, (3, 2, 1)))))))))
     r_tree_i = rt.RT((8, ((1, 1), subdivisions_i)))
     r_tree_rotations_i = materials(r_tree_i)
-    comp_i = composition(r_trees=r_tree_rotations_i[:len(r_tree_rotations_i)//2], init_bpm=13 * (13/8))
+    comp_i = composition(r_trees=r_tree_rotations_i[:len(r_tree_rotations_i)//2], init_bpm=39 * (13/8))
 
     filename = 'rt_refactoring_ex_01_rt_ratios.synthSequence'
     # score_df_01 = skora.concat_rows(skora.make_score_df(pfields=pfields), comp)
@@ -308,7 +315,7 @@ def compositions():
     subdivisions_ii = ((34, (13, (8, ((5, (3, 2, 1)), 3, 2)), 5, 3)), 13, (21, (1, 1, 2, 3, 5, 8, 13)))
     r_tree_ii = rt.RT((13, ((1, 1), subdivisions_ii)))
     r_tree_rotations_ii = materials(r_tree_ii)
-    comp_ii = composition_ii(r_trees=r_tree_rotations_ii, init_bpm=21 * (21/13))
+    comp_ii = composition_ii(r_trees=r_tree_rotations_ii, init_bpm=15 * (21/13))
 
     filename = 'rt_refactoring_ex_02_hexany.synthSequence'
     # score_df_01 = skora.concat_rows(skora.make_score_df(pfields=pfields), comp)
@@ -331,6 +338,49 @@ def compositions():
     filename = 'rt_refactoring_ex_03_merged.synthSequence'
     skora.notelist_to_synthSeq(comp, os.path.join(FILEPATH, filename))
             
+    # ----------------------------------------------------------------------------------------------------------------
+    # Merge Examples 00, 01, 02 w/ Different Rhythm Trees
+    # ----------------------------------------------------------------------------------------------------------------
+
+    hex                 = tonos.scales.Hexany((1, 3, 5, 9, 11), 3)
+    hex_i               = tonos.scales.Hexany((1, 5, 9), 2)
+    # hex_ii              = tonos.scales.Hexany((1, 3, 5, 7, 13, 21), 3)
+    hex_ii              = tonos.scales.Hexany((1, 13, 23, 31, 47, 51, 53), 4)
+    max_rotations       = 9
+
+    subdivisions        = ((3, (9, 3, 3)), 1, (6, (6, 9, 9, 3)), 1, (9, (9, 3, 9, 6, 9, 3, 1, 1)))
+    subdivisions_i      = ((3, (3, 1, 3)), (9, subdivisions), (6, (3, 1, 6, 1, (9, (6, 3, 9, 3, 1, 1)))))
+    subdivisions_ii     = ((6, subdivisions_i), (9, subdivisions_i))
+    
+    r_tree              = rt.RT((9, ((1, 1), subdivisions_ii)))
+    r_tree_i            = rt.RT((6, ((1, 1), subdivisions_i)))
+    r_tree_ii           = rt.RT((2, ((1, 1), subdivisions)))
+
+    r_tree_rotations    = materials(r_tree)
+    r_tree_rotations_i  = materials(r_tree_i)
+    r_tree_rotations_ii = materials(r_tree_ii)
+
+    init_bpm            = 54
+    init_bpm_i          = 27
+    init_bpm_ii         = 9
+    
+    
+    comp_i_b = composition(r_trees=r_tree_rotations_i[:max_rotations], hexany=hex_i, init_bpm=init_bpm_i, start_offset=0)
+    offset_time = start_offset(comp_i_b)
+
+    exmpl_b = example(r_trees=r_tree_rotations[:max_rotations], hexany=hex_ii, use_hex=True, inv_freq_range=False, init_bpm=init_bpm, start_offset=offset_time)
+    offset_time = start_offset(exmpl_b)
+
+    comp_ii_b = composition_ii(r_trees=r_tree_rotations_ii[:max_rotations], hexany=hex, init_bpm=init_bpm_ii, start_offset=offset_time)
+    offset_time = start_offset(comp_ii_b)
+
+    comp_b = comp_i_b + exmpl_b + comp_ii_b
+    filename = 'rt_refactoring_ex_03_merged_v2.synthSequence'
+    skora.notelist_to_synthSeq(comp_b, os.path.join(FILEPATH, filename))
+    
+    # comp_c = comp + comp_b
+    # filename = 'rt_refactoring_ex_03_merged_v2.synthSequence'
+    # skora.notelist_to_synthSeq(comp, os.path.join(FILEPATH, filename))
 
 if __name__ == '__main__':
     compositions()
