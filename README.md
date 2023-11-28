@@ -534,7 +534,7 @@ See VS Code integration section for more details.
 
 ### **Into the AlloVerse:**  *tutorial series for working with AlloLib Playground and AlloPy*
 
-The [Colab notebook]() is the first in a tutorial series oriented toward the building and manipulation of *metacompositional* materials derived from the abstractions of music topology and synthesizing the materials as audiovisual compositions.
+The [Colab notebook]() is the first in a tutorial series oriented toward the building and manipulation of *metacompositional* materials centered around the abstractions of music topology and synthesizing the materials as audiovisual compositions.
 
 The AlloLib Playground is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.  The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
