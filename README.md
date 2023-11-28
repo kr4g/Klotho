@@ -113,7 +113,7 @@ Whether you know the path in which you seek or if you are but a curious wanderer
 
 Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of *extemporal* multimedia metacomposition.
 
-#### The Five Modules
+#### Five Modules, Five Dæmons
 
 The `AlloPy` Python package is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
 
