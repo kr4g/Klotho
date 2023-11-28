@@ -540,7 +540,7 @@ The AlloLib Playground is an application development space for working with the 
 
 When used in concert, AlloLib Playground and AlloPy form a computer-assisted composition framework for working with poly-sensory materials and realizing the results with a custom audiovisual application.  Students, artists, composers, and researchers can then move freely between all levels of a distributed, multimedia composition system.
 
-The above mentioned [Colab notebook]() is the first in a tutorial series oriented toward the construction of *metacompositional* materials centered around the abstractions of music topology, realized through audiovisual applications and compositions.
+The above mentioned [Colab notebook]() is the first in a tutorial series oriented toward the construction of *metacompositional* materials centered around the abstractions of music topology.
 
 *Coming soon...*
 
