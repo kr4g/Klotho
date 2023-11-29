@@ -526,9 +526,7 @@ Gen 4:
 
 ### Integration with AlloLib Playground
 
-Even in this 'on-the-fly', interpreter-based paradigm, AlloPy is designed to integrate directly with the AlloLib Playground in any IDE of choice.  
-
-This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running AlloLib app—*no need to close and re-run the application when making changes to your scores.*  
+AlloPy is designed to integrate directly with the AlloLib Playground in any IDE of choice.  This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running AlloLib app—*no need to close and re-run the application when making changes to your scores.*  
 
 See VS Code integration section for more details.
 
@@ -536,7 +534,7 @@ See VS Code integration section for more details.
 
 ## Education
 
-### **Into the AlloVerse:**  *an Audiovisual Synthesis and Metacomposition tutorial series for working with AlloLib Playground and AlloPy*
+### **Into the AlloVerse:**  an Audiovisual Synthesis and Metacomposition tutorial series for working with AlloLib Playground and AlloPy
 
 The AlloLib Playground is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.  The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
