@@ -10,7 +10,7 @@ from allopy.tonos.tonos import *
 #   scale = tuple(sorted([octave_reduce(Fraction(product)) for product in products]))
 #   return products, scale
 
-class Hexany:    
+class Hexany:
   '''
   Calculate a Hexany scale from a list of prime factors and a rank value.
   
@@ -67,4 +67,3 @@ def ratios_n_tet(divisions=12, equave=2):
   :return: A list of the frequency ratios of the divisions
   '''
   return [n_tet(divisions, equave, nth_division) for nth_division in range(divisions)]
-
