@@ -42,9 +42,9 @@ def example(r_trees: list, hexany: tonos.scales.Hexany = tonos.scales.Hexany((1,
             # tempo = np.interp(j, [0, len(r_ratios)], [init_bpm, init_bpm*(8/5)])
             dur = chronos.beat_duration(r, tempo)
             amplitude = np.random.uniform(aikous.DYNAMICS.ppp.max, aikous.DYNAMICS.p.min)
-            if j > len(r_ratios) // 3:
+            if j > len(r_ratios) // (3/2):
                 rand_oct = 2**np.random.choice([0.25, 0.5, 0, 1])
-                if j > len(r_ratios) // (5/3):
+                if j > len(r_ratios) // (5/2):
                     freq_min = freq_min * rand_oct * 0.5
             amp_max = np.interp(j, [0.0, len(r_ratios)], [amplitude, aikous.DYNAMICS.mp.max])
             amplitude = aikous.DYNAMICS.mp.max*0.43 if j == 0 else amp_max * amp_curve[j] * cresc
@@ -285,7 +285,7 @@ def compositions():
     # print(r_tree)
     # print(f'Factors {r_tree.factors}\n')
     r_tree_rotations = materials(r_tree)
-    exmpl = example(r_trees=r_tree_rotations, init_bpm=5 * (13/5))
+    exmpl = example(r_trees=r_tree_rotations, init_bpm=11 * (13/5))
     # for r_tree in r_tree_rotations:
     #     print(r_tree.subdivisions)
 
