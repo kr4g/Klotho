@@ -280,12 +280,13 @@ def compositions():
     # Example 00
     # ----------------------------------------------------------------------------------------------------------------
     subdivisions = ((34, (13, 8, 5)), (13, ((13, 8, 5))), (21, ((13, (3, 2)), 8, (5, (3, 2, (1, (3, 2, 1, (1, (13, 8, 5)))))))))
+    # subdivisions = ((21, (8, (5, (3, 2, (1, (3, 2, 1, (1, (13, 8, 5)))))))))
     # subdivisions = (1, 1, 1, 1, 1)
-    r_tree = rt.RT((5, ((1, 1), subdivisions)))
+    r_tree = rt.RT((3, ((1, 1), subdivisions)))
     # print(r_tree)
     # print(f'Factors {r_tree.factors}\n')
     r_tree_rotations = materials(r_tree)
-    exmpl = example(r_trees=r_tree_rotations, init_bpm=11 * (13/5))
+    exmpl = example(r_trees=r_tree_rotations, init_bpm=21 * (13/5))
     # for r_tree in r_tree_rotations:
     #     print(r_tree.subdivisions)
 
