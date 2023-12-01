@@ -1,5 +1,5 @@
 # AlloPy
-`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with other synthesis applications as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of *extemporal* multimedia metacomposition.
+`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with external synthesis applications as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of *extemporal* multimedia metacomposition.
 
 Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.ucsb.edu/students/#rmillett) as part of the AlloSphere Research Group, under the supervision of Dr. Kuchera-Morin, at the University of California, Santa Barbara.
 
