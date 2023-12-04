@@ -90,12 +90,14 @@ def make_notelist(pfields: dict = {}):
   seq_len = max([len(pfields[key]) for key in pfields.keys()])
   note_list = []
   start = 0.0 if 'start' not in pfields.keys() else pfields['start'][0]
-  for i in range(seq_len):    
+  for i in range(seq_len):
+    if not isinstance(pfields['synthName'], list):
+      pfields['synthName'] = [pfields['synthName']]
     new_row = getattr(PFIELDS, pfields['synthName'][i % len(pfields['synthName'])], None).value.copy()
     new_row['start'] = start
     for key in pfields.keys():
       pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]
-      new_row[key] = pfields[i % len(pfields[key])]
+      new_row[key] = pfield[i % len(pfields[key])]
     note_list.append(new_row)
     start += new_row['dur']
   # FILEPATH = os.path.join(set_score_path(), f'{score_name}.synthSequence')
