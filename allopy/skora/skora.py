@@ -85,22 +85,22 @@ def notelist_to_synthSeq(notelist, filepath):
     for row in notelist:
       f.write('@ ' + ' '.join(map(str, row.values())) + '\n')
 
-def make_score(score_name: str = 'seq', pfields: dict = {}, return_note_list: bool = False):
+def make_notelist(pfields: dict = {}):
   from .instruments import PFIELDS
   seq_len = max([len(pfields[key]) for key in pfields.keys()])
   note_list = []
-  start = 0.0
+  start = 0.0 if 'start' not in pfields.keys() else pfields['start'][0]
   for i in range(seq_len):    
     new_row = getattr(PFIELDS, pfields['synthName'][i % len(pfields['synthName'])], None).value.copy()
     new_row['start'] = start
     for key in pfields.keys():
-      new_row[key] = pfields[key][i % len(pfields[key])]
+      pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]
+      new_row[key] = pfields[i % len(pfields[key])]
     note_list.append(new_row)
     start += new_row['dur']
-  FILEPATH = os.path.join(set_score_path(), f'{score_name}.synthSequence')
-  notelist_to_synthSeq(note_list, FILEPATH)
-  if return_note_list:
-    return note_list
+  # FILEPATH = os.path.join(set_score_path(), f'{score_name}.synthSequence')
+  # notelist_to_synthSeq(note_list, FILEPATH)
+  return note_list
 
 def make_row(rows_list: list, new_row: dict):
   '''
