@@ -1,5 +1,5 @@
 # AlloPy
-`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with other synthesis applications as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of *extemporal* multimedia metacomposition.
+`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with external synthesis applications as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of *extemporal* multimedia metacomposition.
 
 Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.ucsb.edu/students/#rmillett) as part of the AlloSphere Research Group, under the supervision of Dr. Kuchera-Morin, at the University of California, Santa Barbara.
 
@@ -113,7 +113,7 @@ Whether you know the path in which you seek or if you are but a curious wanderer
 
 Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of *extemporal* multimedia metacomposition.
 
-#### The Five Modules
+#### Five Modules, Five Dæmons
 
 The `AlloPy` Python package is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
 
@@ -524,23 +524,21 @@ Gen 4:
 
 ---   
 
-### Integration with AlloLib Playground
+## Integration with AlloLib Playground
 
 AlloPy is designed to integrate directly with the AlloLib Playground in any IDE of choice.  This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running AlloLib app—*no need to close and re-run the application when making changes to your scores.*  
 
 See VS Code integration section for more details.
 
----
-
-## Education
-
-### **Into the AlloVerse:**  an Audiovisual Synthesis and Metacomposition tutorial series for working with AlloLib Playground and AlloPy
+### **Into the AlloVerse:**  tutorial series for working with AlloLib Playground and AlloPy
 
 The AlloLib Playground is an application development space for working with the classes and functions of the `AlloLib` and `Gamma` C++ libraries.  The Playground thus sits "close to the metal" and allows users to work directly at the sample-level of audio synthesis and at the framerate of graphics rendering.
 
 `AlloPy`, implemented in Python, exists "above the metal" and serves as an abstract toolkit for working with low-level distributed systems such as AlloLib.
 
-When used in concert, AlloLib Playground and AlloPy form a computer-assisted composition framework for working with poly-sensory metacompositional materials and realizing the results with an audiovisual application.  Students, artists, composers, and researchers can then move freely between all levels of a distributed, multimedia composition system.
+When used in concert, AlloLib Playground and AlloPy form a computer-assisted composition framework for working with poly-sensory materials and realizing the results with a custom audiovisual application.  Students, artists, composers, and researchers can then move freely between all levels of a distributed, multimedia composition system.
+
+The above mentioned [Colab notebook]() is the first in a tutorial series oriented toward the construction of *metacompositional* materials centered around the abstractions of music topology.
 
 *Coming soon...*
 
