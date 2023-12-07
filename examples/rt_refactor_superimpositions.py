@@ -286,7 +286,7 @@ def compositions():
     # print(r_tree)
     # print(f'Factors {r_tree.factors}\n')
     r_tree_rotations = materials(r_tree)
-    exmpl = example(r_trees=r_tree_rotations, init_bpm=21 * (13/5))
+    exmpl = example(r_trees=r_tree_rotations, init_bpm=34 * (13/5))
     # for r_tree in r_tree_rotations:
     #     print(r_tree.subdivisions)
 
@@ -316,7 +316,7 @@ def compositions():
     subdivisions_ii = ((34, (13, (8, ((5, (3, 2, 1)), 3, 2)), 5, 3)), 13, (21, (1, 1, 2, 3, 5, 8, 13)))
     r_tree_ii = rt.RT((13, ((1, 1), subdivisions_ii)))
     r_tree_rotations_ii = materials(r_tree_ii)
-    comp_ii = composition_ii(r_trees=r_tree_rotations_ii, init_bpm=15 * (21/13))
+    comp_ii = composition_ii(r_trees=r_tree_rotations_ii, init_bpm=21 * (21/13))
 
     filename = 'rt_refactoring_ex_02_hexany.synthSequence'
     # score_df_01 = skora.concat_rows(skora.make_score_df(pfields=pfields), comp)

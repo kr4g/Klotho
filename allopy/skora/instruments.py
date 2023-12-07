@@ -56,20 +56,21 @@ class PFIELDS(Enum):
     }
 
     OscAM = {
-        'start'      : 0,
-        'dur'        : 1,
-        'synthName'  : 'OscAM',
-        'amplitude'  : 0.45,
-        'frequency'  : 440,
-        'attackTime' : 0.01,
-        'releaseTime': 0.1,
-        'sustain'    : 0.5,
-        'pan'        : 0.0,
-        'amFunc'     : 0.0,
-        'am1'        : 0.75,
-        'am2'        : 0.75,
-        'amRise'     : 0.75,
-        'amRatio'    : 0.75,
+        'start'        : 0,
+        'dur'          : 1,
+        'synthName'    : 'OscAM',
+        'amplitude'    : 0.45,
+        'frequency'    : 440,
+        'attackTime'   : 0.01,
+        'releaseTime'  : 0.1,
+        'sustain'      : 0.5,
+        'pan'          : 0.0,
+        'amFunc'       : 0.0,
+        'am1'          : 0.75,
+        'am2'          : 0.75,
+        'amRise'       : 0.75,
+        'amRatio'      : 0.75,
+        'reverberation': 0.0,
     }
 
     AddSyn = {
@@ -114,3 +115,4 @@ class PFIELDS(Enum):
         'Pan2'       : 0.0,
         'PanRise'    : 0.0,
     }
+    

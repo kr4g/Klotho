@@ -89,7 +89,7 @@ def make_notelist(pfields: dict = {}):
   from .instruments import PFIELDS
   seq_len = max([len(pfields[key]) for key in pfields.keys()])
   note_list = []
-  start = 0.0 if 'start' not in pfields.keys() else pfields['start'][0]
+  start = 0.33 if 'start' not in pfields.keys() else pfields['start'][0]
   for i in range(seq_len):
     if not isinstance(pfields['synthName'], list):
       pfields['synthName'] = [pfields['synthName']]
@@ -100,8 +100,6 @@ def make_notelist(pfields: dict = {}):
       new_row[key] = pfield[i % len(pfields[key])]
     note_list.append(new_row)
     start += new_row['dur']
-  # FILEPATH = os.path.join(set_score_path(), f'{score_name}.synthSequence')
-  # notelist_to_synthSeq(note_list, FILEPATH)
   return note_list
 
 def make_row(rows_list: list, new_row: dict):

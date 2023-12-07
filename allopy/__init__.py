@@ -6,6 +6,7 @@ from .skora       import * # SkoraClass, skora_function
 
 from .topos.formal_grammars import * # Alphabets, Grammars
 from .topos.random import * # Random
+from .topos.sets import *
 
 __all__ = [
     # 'ChronosClass', 'chronos_function',
