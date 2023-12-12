@@ -196,7 +196,7 @@ def freq_to_pitchclass(freq: float):
 
 import numpy as np
 
-def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=440.0, A4_MIDI=69):
+def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
 
   '''
   Converts a pitch class with offset in cents to a frequency.

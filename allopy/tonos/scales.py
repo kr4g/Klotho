@@ -10,9 +10,9 @@ from allopy.tonos.tonos import *
 #   scale = tuple(sorted([octave_reduce(Fraction(product)) for product in products]))
 #   return products, scale
 
-class Hexany:
+class CPS:
   '''
-  Calculate a Hexany scale from a list of prime factors and a rank value.
+  Calculate a Combination Product Set (CPS) scale from a list of prime factors and a rank value.
   
   The Hexany is a six-note scale in just intonation derived from combinations
   of prime factors, as conceptualized by Erv Wilson.
@@ -28,19 +28,19 @@ class Hexany:
     - The first list contains the products of combinations of prime factors.
     - The second list is the sorted Hexany scale after octave reduction.
   '''
-  def __init__(self, prime_factors: Tuple[int] = (1, 3, 5, 7), r: int = 2):
-    self.primes = prime_factors
+  def __init__(self, factors: Tuple[int] = (1, 3, 5, 7), r: int = 2):
+    self.factors = factors
     self.r = r
     self.products, self.ratios = self.calculate()
 
   def calculate(self) -> Tuple[List[int], List[str]]:
-    products = [prod(comb) for comb in combinations(self.primes, self.r)]
+    products = [prod(comb) for comb in combinations(self.factors, self.r)]
     ratios = sorted([octave_reduce(Fraction(product)) for product in products])
     return tuple(products), tuple(ratios)
 
   def __repr__(self):
     r_str = tuple([str(r) for r in self.ratios])
-    out = f'{self.products}, {r_str}'
+    out = f'{self.factors} -> {self.products}, {r_str}'
     return out
 
 def n_tet(divisions=12, equave=2, nth_division=1):

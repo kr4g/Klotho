@@ -157,8 +157,6 @@ def measure_ratios(tree):
             result.append(Fraction(s, div))
     return result
 
-from fractions import Fraction
-
 def reduced_decomposition(fractions, meas):
     '''
     Algorithm 2: ReducedDecomposition
@@ -238,7 +236,6 @@ def refactor(subdivs, factors):
         return tuple(result), index
     return _refactor(subdivs, 0)[0]
 
-
 if __name__ == '__main__':  
     # ------------------------------------------------------------------------------------
     # Rhythm Tree Examples
@@ -256,4 +253,3 @@ if __name__ == '__main__':
     for i in range(len(factors)):
         # r_tree_rotate = r_tree.rotate(i)
         print(r_tree.rotate(i).subdivisions)
-
