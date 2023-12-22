@@ -7,6 +7,8 @@ HELP
 --------------------------------------------------------------------------------------
 '''
 
+from .instruments import PFIELDS
+
 import numpy as np
 import pandas as pd
 import regex as re
@@ -85,22 +87,83 @@ def notelist_to_synthSeq(notelist, filepath):
     for row in notelist:
       f.write('@ ' + ' '.join(map(str, row.values())) + '\n')
 
-def make_notelist(pfields: dict = {}):
-  from .instruments import PFIELDS
-  seq_len = max([len(pfields[key]) for key in pfields.keys()])
+def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
+  
+  # if `pfields` is empty or incomplete, use default values
+  if not pfields:
+    pfields = getattr(PFIELDS, 'SineEnv', None).value.copy()
+  elif 'synthName' not in pfields.keys():
+    pfields['synthName'] = ['SineEnv']
+
+  # else:
+  #   # if 'synthName' not in pfields.keys():
+  #   pfields['synthName'] = ['SineEnv'] if 'synthName' not in pfields.keys() else pfields['synthName'] if isinstance(pfields['synthName'], list) else [pfields['synthName']]
+  #   for key, value in pfields_temp.items():
+  #     if key not in pfields:
+  #       pfields[key] = value
+
+  # if not all(k in pfields.keys() for k in pfields_SineEnv.keys()):
+  #   for key in pfields_SineEnv.keys():
+  #     if key not in pfields.keys():
+  #       pfields[key] = pfields_SineEnv[key]
+  
+  # pfields = {
+  #   key: value if isinstance(pfields[key], list) else [value] if key != 'start' else continue for key, value in pfields.items()
+  # }  # if pfield is not a list, make it a list
+  
+  if loop_param == 'max':
+    seq_len = max(len(value) if isinstance(value, list) else 1 for value in pfields.values())
+  elif loop_param == 'min':
+    seq_len = min(len(value) if isinstance(value, list) else 1 for value in pfields.values())
+  elif loop_param in pfields.keys():
+    seq_len = len(pfields[loop_param]) if isinstance(pfields[loop_param], list) else 1
+  else:
+    seq_len = 8
+
+  pfields['start'] = 0.167 if 'start' not in pfields.keys() else pfields['start']
+  pfields['dur']   = [1.0] if 'dur' not in pfields.keys() else pfields['dur'] if isinstance(pfields['dur'], list) else [pfields['dur']]
+  pfields['dc']    = [1.0] if 'dc' not in pfields.keys() else pfields['dc'] if isinstance(pfields['dc'], list) else [pfields['dc']]
+
+  # print(pfields)
   note_list = []
-  start = 0.33 if 'start' not in pfields.keys() else pfields['start'][0]
-  for i in range(seq_len):
-    if not isinstance(pfields['synthName'], list):
-      pfields['synthName'] = [pfields['synthName']]
-    new_row = getattr(PFIELDS, pfields['synthName'][i % len(pfields['synthName'])], None).value.copy()
-    new_row['start'] = start
-    for key in pfields.keys():
-      pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]
-      new_row[key] = pfield[i % len(pfields[key])]
-    note_list.append(new_row)
-    start += new_row['dur']
+  if not isinstance(pfields['synthName'], list):
+    pfields['synthName'] = [pfields['synthName']]
+  for i_syn, synthName in enumerate(pfields['synthName']):
+    start = pfields['start'][0] if isinstance(pfields['start'], list) else pfields['start']
+    for i in range(seq_len):
+      # new_row = getattr(PFIELDS, pfields['synthName'][i % len(pfields['synthName'])], None).value.copy()
+      new_row = getattr(PFIELDS, synthName, None).value.copy()
+      new_row['start'] = start
+      for key in pfields.keys():
+        pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]  # if pfield is not a list, make it a list
+        # print(key, pfield)
+        # Check pfield...
+        if key not in new_row.keys() or key in ['start', 'synthName']:  # ignore undefined and reserved pfields
+          if key == 'amplitude':
+            new_row['amp'] = pfields[key][i % len(pfields[key])]
+          if key == 'frequency':
+            new_row['freq'] = pfields[key][i % len(pfields[key])]
+          continue
+        
+        if key == 'dur':
+          # TODO: also check for articulation data...
+          new_row[key] = pfield[i % len(pfield)] * pfields['dc'][i % len(pfields['dc'])]  # apply duty cycle to duration
+        else:
+          new_row[key] = pfield[i % len(pfield)]  # set pfield value
+        
+      note_list.append(new_row)                                    # append new row to the notelist
+      if isinstance(pfields['start'], list):                       # if start is a list,
+        start = pfields['start'][(i + 1) % len(pfields['start'])]  # get the next start time
+      else:                                                        # otherwise,
+        start += pfields['dur'][i % len(pfields['dur'])]           # increment start time by the current duration
+
   return note_list
+
+def play(pfields: dict = {}, loop_param: str = 'max', filename: str = 'play.synthSequence', inst: str = 'Integrated'):
+  notelist = make_notelist(pfields=pfields, loop_param=loop_param)
+  filepath = set_score_path(inst)
+  notelist_to_synthSeq(notelist, os.path.join(filepath, filename))
+  print(f'created "{filename}" in {filepath}...\n')
 
 def make_row(rows_list: list, new_row: dict):
   '''
@@ -215,3 +278,27 @@ def plot_dataframe(df, column_name):
   ax.set_ylabel(column_name + ' (Hz)', color='white')
   ax.tick_params(colors='white')
   ax.grid(True, which="both", ls="--", c='gray')
+
+if __name__ == '__main__':
+  # ------------------------------------------------------------------------------------
+  # SCORE TOOLS
+  # ------------------------------------------------------------------------------------
+  '''
+  --------------------------------------------------------------------------------------
+  HELP
+  --------------------------------------------------------------------------------------
+  '''
+  freqs = [110 * n for n in range(1, 11)]
+  notelist = make_notelist(pfields={
+    # 'start'      : list(np.linspace(0.0833, 13.33, 36)**0.5),
+    'dur'        : [np.random.uniform(0.25, 0.75) for _ in range(36)],
+    'dc'         : [np.random.uniform(0.1, 0.7) for _ in range(23)],
+    'synthName'  : 'OscAM',
+    'frequency'  : freqs,
+    'amplitude'  : [a*0.2 + 0.6*a*(min(freqs) / freqs[i % len(freqs)]) for i, a in enumerate([np.random.uniform(0.005, 0.1) for _ in range(5)])],
+    # 'attackTime' : list(np.linspace(0.3, 0.005, 36)**2),
+    'attackTime' : list(np.linspace(0.6, 0.0, 36)**2),
+    'releaseTime': list(np.linspace(1.0, 0.0, 36)**1.3),
+  })
+  notelist_to_synthSeq(notelist, os.path.join(set_score_path(), 'notelist_gen.synthSequence'))
+  

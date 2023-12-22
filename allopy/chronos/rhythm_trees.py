@@ -58,12 +58,22 @@ class RT:
 
   see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
   '''
-  def __init__(self, data):
-    self.__data = data
-    self.__duration = 1 if data[0] == '?' else data[0]
-    self.__time_signature = data[1][0]
-    self.__subdivisions = data[1][1]
-    self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
+#   def __init__(self, data):
+#     self.__data = data
+#     self.__duration = 1 if data[0] == '?' else data[0]
+#     self.__time_signature = data[1][0]
+#     self.__subdivisions = data[1][1]
+#     self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
+  def __init__(self, duration='?', time_signature=(1,1), subdivisions=(1,), decomp=None):
+    self.__duration = 1 if duration == '?' else duration
+    self.__time_signature = time_signature
+    self.__subdivisions = subdivisions
+    self.__decomp = decomp
+    self.__ratios = tuple(self.__duration * r for r in measure_ratios(self.subdivisions))
+    if self.__decomp == 'strict':
+        self.__ratios = strict_decomposition(self.__ratios, self.__time_signature)
+    elif self.__decomp == 'reduced':
+        self.__ratios = reduced_decomposition(self.__ratios, self.__time_signature)
 
   @property
   def duration(self):
@@ -79,12 +89,16 @@ class RT:
   def subdivisions(self):
     # return self.data[1][1]
     return self.__subdivisions
+
+  @property
+  def decomp(self):
+    return self.__decomp
   
   @property
   def ratios(self):
     # if self._subdivisions != self.subdivisions:
     #   self._subdivisions = self.subdivisions
-    self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
+    # self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
     # return measure_ratios(self.subdivisions)
     return self.__ratios
   
@@ -98,14 +112,14 @@ class RT:
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
     refactored = refactor(self.__subdivisions, factors)
-    return RT((self.duration, (self.time_signature, refactored)))
+    return RT(duration=self.duration, time_signature=self.time_signature, subdivisions=refactored, decomp=self.decomp)
 
-  def __getitem__(self, key):
-    return self.data[key]
+#   def __getitem__(self, key):
+#     return self.data[key]
   
   def __repr__(self):
     ratios = ', '.join(tuple([str(r) for r in self.ratios]))
-    return f'Duration: {self.duration}\nTime Signature: {self.time_signature}\nSubdivisions: {self.subdivisions}\nRatios: {ratios}'
+    return f'Duration: {self.duration}\nTime Signature: {self.time_signature}\nSubdivisions: {self.subdivisions}\nDecomposition: {self.decomp}\nRatios: {ratios}'
 
 # ------------------------------------------------------------------------------------
 # Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 

@@ -15,26 +15,45 @@ class PFIELDS(Enum):
         'pan'        : 0.0,
     }
 
-    FMWT = {
+    Vib = {
         'start'      : 0,
         'dur'        : 1,
-        'synthName'  : 'FMWT',
-        'frequency'  : 440,
+        'synthName'  : 'Vib',
         'amplitude'  : 0.45,
+        'frequency'  : 440,
         'attackTime' : 0.01,
         'releaseTime': 0.1,
         'sustain'    : 0.5,
-        'idx1'       : 0.01,
-        'idx2'       : 7,
-        'idx3'       : 5,
-        'carMul'     : 1,
-        'modMul'     : 1.0007,
-        'vibRate1'   : 0.01,
-        'vibRate2'   : 0.5,
-        'vibRise'    : 0,
-        'vibDepth'   : 0,
+        'curve'      : 4.0,
         'pan'        : 0.0,
         'table'      : 0,
+        'vibRate1'   : 3.5,
+        'vibRate2'   : 5.8,
+        'vibRise'    : 0.5,
+        'vibDepth'   : 0.005,     
+    }
+
+    FMWT = {
+        'start'        : 0,
+        'dur'          : 1,
+        'synthName'    : 'FMWT',
+        'frequency'    : 440,
+        'amplitude'    : 0.45,
+        'attackTime'   : 0.01,
+        'releaseTime'  : 0.1,
+        'sustain'      : 0.5,
+        'idx1'         : 0.01,
+        'idx2'         : 7,
+        'idx3'         : 5,
+        'carMul'       : 1,
+        'modMul'       : 1.0007,
+        'vibRate1'     : 0.01,
+        'vibRate2'     : 0.5,
+        'vibRise'      : 0,
+        'vibDepth'     : 0,
+        'pan'          : 0.0,
+        'table'        : 0,
+        'reverberation': 0.0,
     }
 
     OscTrm = {
@@ -71,6 +90,7 @@ class PFIELDS(Enum):
         'amRise'       : 0.75,
         'amRatio'      : 0.75,
         'reverberation': 0.0,
+        'visualMode'   : 0.0,
     }
 
     AddSyn = {
@@ -79,6 +99,7 @@ class PFIELDS(Enum):
         'synthName'  : 'AddSyn',
         'amp'        : 0.45,
         'frequency'  : 440,
+        'ampStri'    : 0.5,
         'attackStri' : 0.1,
         'releaseStri': 0.1,
         'sustainStri': 0.8,

@@ -74,7 +74,7 @@ def materials():
     # print()
     proportions = tuple([np.random.randint(1,8) for _ in range(len(l2))])
     # r_tree = rt.RT(('?', ((4, 4), proportions)))
-    beat_ratios = rt.measure_ratios(rt.RT(('?', ((4, 4), proportions))))
+    beat_ratios = rt.measure_ratios(rt.RT(('?', ((1, 1), proportions))))
     enc_l1 = rando.rand_encode(l1, tonos.PITCH_CLASSES.N_TET_12.names.as_sharps[::2])
     enc_l2 = rando.rand_encode(l2, [str(r) for r in beat_ratios])
     

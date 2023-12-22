@@ -6,7 +6,9 @@ The `aikous` base module.
 '''
 
 import numpy as np
+from numpy.polynomial import Polynomial
 import pandas as pd
+import matplotlib.pyplot as plt
 from enum import Enum, EnumMeta
 
 class DirectValueEnumMeta(EnumMeta):
@@ -137,6 +139,13 @@ def db_amp(db: float) -> float:
   float: The amplitude.
   '''
   return 10 ** (db / 20)
+
+def amp_freq_scale(freq: float):
+  frequencies_sample = np.array([20, 100, 500, 1000, 5000, 10000, 20000], dtype=float)
+  loudness_sample = np.array([0.3, 0.8, 1.0, 1.0, 0.9, 0.8, 0.5], dtype=float)
+  p = Polynomial.fit(frequencies_sample, loudness_sample, deg=4)
+  return p(freq)
+
 
 # def rubato(durations: list) -> float:
 #   '''
