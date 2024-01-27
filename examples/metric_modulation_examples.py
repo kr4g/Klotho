@@ -46,7 +46,7 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
     
     start_time           = 0.0
     start_time_II        = sum([d*p for d, p in duration_pulse_pairs[:len(metric_ratios)**2 + 1]])
-    pitch_contour        = [6, 0, -7, -1]
+    pitch_contour        = [0, -5, -6, -11]
     freq_ratios          = [tonos.cents_to_ratio(sc * 100) for sc in pitch_contour]
     freq_ratios_inv      = [tonos.cents_to_ratio(-1 * sc * 100) for sc in pitch_contour]
     octaves              = np.array([0.25, 2.0, 0.5, 1.0])
@@ -65,9 +65,9 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
         CONDITION_III = not CONDITION_I and not CONDITION_II
 
         dur        = duration * 0.667
-        dynamic    = np.random.choice([aikous.DYNAMICS.ppp, aikous.DYNAMICS.p, aikous.DYNAMICS.mf, aikous.DYNAMICS.ff]) # * 0.9692
+        dynamic    = np.random.choice([aikous.DYNAMICS.pp, aikous.DYNAMICS.mp, aikous.DYNAMICS.f, aikous.DYNAMICS.fff]) # * 0.9692
         freqs      = freq_ratios # freq_ratios_inv if i % len(pulses) == 0 else freq_ratios
-        root_freq  = (999 * 1.9692**-2) * freqs[i % len(freqs)] * tonos.cents_to_ratio(1133)**(octaves[i % 4] * oct_warp)
+        root_freq  = (999) * freqs[i % len(freqs)] * 2**(octaves[i % 4] * oct_warp)
         attackTime = min(0.01, min_pulse * dur)
         pan        = np.random.uniform(-1.0, 1.0)
         amFunc     = np.random.choice((0, 2))
@@ -79,7 +79,7 @@ def composition(metric_ratios: list, pulses: list, bpm: float = 60):
             frequency = root_freq
             if CONDITION_I or CONDITION_II:  
                 # the pitch sequence cycles per pulse and we use 'OscAM'
-                amplitude  = np.random.uniform(dynamic.min, dynamic.max) * np.interp(n_pulse, [0, n_Pulses], [0.0833, 1.0])
+                amplitude  = np.random.uniform(dynamic.min, dynamic.max) * np.interp(n_pulse, [0, n_Pulses], [0.1, 1.0])
                 frequency  = root_freq * freq_ratios[i_freq % len(freq_ratios)]
 
             else: # implicit CONDITION_III
