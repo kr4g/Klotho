@@ -69,6 +69,7 @@ class TEMPO(MinMaxEnum):
   Example use:
   `>>> Tempo.Adagio`
   '''
+  
   Larghissimo                  = (11, 24)
   Adagissimo_Grave             = (24, 40)
   Largo                        = (40, 66)
@@ -128,7 +129,7 @@ def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
   Returns:
   float: The beat duration in seconds.
   '''
-  
+
   tempo_factor = 60 / bpm
   if isinstance(ratio, str):
     ratio_numerator, ratio_denominator = map(int, ratio.split('/'))
@@ -176,6 +177,7 @@ def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_
   Returns:
   float: The new tempo in beats per minute after the metric modulation.
   '''
+
   current_duration = 60 / current_tempo * current_beat_value
   new_tempo = 60 / current_duration * new_beat_value
   return new_tempo

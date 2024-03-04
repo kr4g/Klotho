@@ -27,9 +27,9 @@ def rp_layer_1_bass(proportions: list):
     rows_list = []
     for i, prol_MM in enumerate(prolats_MM):
         dur = prol_MM
-        frequency = 55# * (6/5)**i
-        min_amp   = np.interp(i, [0, len(prolats_MM)], [aikous.Dynamics.mf.min, aikous.Dynamics.p.max])
-        max_amp   = np.interp(i, [0, len(prolats_MM)], [aikous.Dynamics.f.min, aikous.Dynamics.fff.max])
+        frequency = 36# * (6/5)**i
+        min_amp   = np.interp(i, [0, len(prolats_MM)], [aikous.DYNAMICS.mf.min, aikous.DYNAMICS.p.max])
+        max_amp   = np.interp(i, [0, len(prolats_MM)], [aikous.DYNAMICS.f.min, aikous.DYNAMICS.fff.max])
         amplitude = np.interp(i, [0, len(prolats_MM)], [min_amp, max_amp])
         vibDepth  = np.interp(i, [0.0, len(prolats_MM)], [0.0, 0.667])**2.167
         
@@ -77,8 +77,8 @@ def rp_layer_2_rhy(proportions: list):
         dur = prol
         max_oct = int(np.interp(i, [0, len(prolats)], [3.0, 11.0]))
         frequency = 55 * (6/5)#**(i % max_oct)
-        min_amp   = np.interp(i, [0, len(prolats)], [aikous.Dynamics.pp.max, aikous.Dynamics.mf.max])
-        max_amp   = np.interp(i, [0, len(prolats)], [aikous.Dynamics.f.min, aikous.Dynamics.fff.max])
+        min_amp   = np.interp(i, [0, len(prolats)], [aikous.DYNAMICS.pp.max, aikous.DYNAMICS.mf.max])
+        max_amp   = np.interp(i, [0, len(prolats)], [aikous.DYNAMICS.f.min, aikous.DYNAMICS.fff.max])
         amplitude = np.interp(i, [0, len(prolats)], [min_amp, max_amp])
         vibDepth  = 0.0
         reverb_min = np.interp(i, [0, len(prolats)], [0.01, 0.005])
@@ -134,8 +134,8 @@ def rp_layer_3_tb(proportions: list):
         repeats = int(multiples[prop] + 1)
         for i in range(1, repeats):
             # print(f'{prop} * {i} = {prop * i}')
-            min_amp   = np.interp(i, [0, repeats], [aikous.Dynamics.ppp.min, aikous.Dynamics.mp.min])**2
-            max_amp   = np.interp(i, [0, repeats], [aikous.Dynamics.mf.min, aikous.Dynamics.ff.max])**2
+            min_amp   = np.interp(i, [0, repeats], [aikous.DYNAMICS.ppp.min, aikous.DYNAMICS.mp.min])**2
+            max_amp   = np.interp(i, [0, repeats], [aikous.DYNAMICS.mf.min, aikous.DYNAMICS.ff.max])**2
             amplitude = np.interp(i, [0, repeats], [min_amp, max_amp])
             vibRate2  = np.interp(i, [0, repeats], [0.0, 1.0])**2.167
             vibDepth  = np.interp(i, [0, repeats], [0.0, 0.0667])

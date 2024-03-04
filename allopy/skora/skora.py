@@ -141,8 +141,12 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
         if key not in new_row.keys() or key in ['start', 'synthName']:  # ignore undefined and reserved pfields
           if key == 'amplitude':
             new_row['amp'] = pfields[key][i % len(pfields[key])]
+          if key == 'amp':
+            new_row['amplitude'] = pfields[key][i % len(pfields[key])]          
           if key == 'frequency':
             new_row['freq'] = pfields[key][i % len(pfields[key])]
+          if key == 'freq':
+            new_row['frequency'] = pfields[key][i % len(pfields[key])]
           continue
         
         if key == 'dur':

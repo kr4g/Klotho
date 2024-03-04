@@ -31,12 +31,13 @@ class CPS:
   def __init__(self, factors: Tuple[int] = (1, 3, 5, 7), r: int = 2):
     self.factors = factors
     self.r = r
-    self.products, self.ratios = self.calculate()
+    self.pairs, self.products, self.ratios = self.calculate()
 
-  def calculate(self) -> Tuple[List[int], List[str]]:
-    products = [prod(comb) for comb in combinations(self.factors, self.r)]
-    ratios = sorted([octave_reduce(Fraction(product)) for product in products])
-    return tuple(products), tuple(ratios)
+  def calculate(self):
+    combos = tuple(combinations(self.factors, self.r))
+    products = tuple(prod(comb) for comb in combos)
+    ratios = sorted(tuple(octave_reduce(Fraction(product)) for product in products))
+    return combos, products, ratios
 
   def __repr__(self):
     r_str = tuple([str(r) for r in self.ratios])
