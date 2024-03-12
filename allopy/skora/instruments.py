@@ -1,10 +1,22 @@
 from enum import Enum, EnumMeta
 
-class PFIELDS(Enum):
-    # STD = {
-    # }
+class SafeDict(dict):
+    """Custom dictionary that safely ignores assignments to non-existent keys."""
+    def __setitem__(self, key, value):
+        if key in self:
+            super().__setitem__(key, value)
 
-    SineEnv = {
+class PFIELDS(Enum):    
+    # def __new__(cls, **kwargs):
+    #     obj = object.__new__(cls)
+    #     obj._value_ = SafeDict(**kwargs)
+    #     return obj
+    
+    def __call__(self):
+        # return self.value.copy()
+        return SafeDict(self.value)
+
+    SineEnv = SafeDict({
         'start'      : 0,
         'dur'        : 1,
         'synthName'  : 'SineEnv',
@@ -13,9 +25,9 @@ class PFIELDS(Enum):
         'attackTime' : 0.01,
         'releaseTime': 0.1,
         'pan'        : 0.0,
-    }
+    })
 
-    Vib = {
+    Vib = SafeDict({
         'start'      : 0,
         'dur'        : 1,
         'synthName'  : 'Vib',
@@ -31,9 +43,9 @@ class PFIELDS(Enum):
         'vibRate2'   : 5.8,
         'vibRise'    : 0.5,
         'vibDepth'   : 0.005,     
-    }
+    })
 
-    FMWT = {
+    FMWT = SafeDict({
         'start'        : 0,
         'dur'          : 1,
         'synthName'    : 'FMWT',
@@ -54,9 +66,9 @@ class PFIELDS(Enum):
         'pan'          : 0.0,
         'table'        : 0,
         'reverberation': 0.0,
-    }
+    })
 
-    OscTrm = {
+    OscTrm = SafeDict({
         'start'      : 0,
         'dur'        : 1,
         'synthName'  : 'OscTrm',
@@ -72,9 +84,9 @@ class PFIELDS(Enum):
         'trm2'       : 5.8,
         'trmRise'    : 0.5,
         'trmDepth'   : 0.1,
-    }
+    })
 
-    OscAM = {
+    OscAM = SafeDict({
         'start'        : 0,
         'dur'          : 1,
         'synthName'    : 'OscAM',
@@ -91,9 +103,9 @@ class PFIELDS(Enum):
         'amRatio'      : 0.75,
         'reverberation': 0.0,
         'visualMode'   : 0.0,
-    }
+    })
 
-    AddSyn = {
+    AddSyn = SafeDict({
         'start'      : 0,
         'dur'        : 1,
         'synthName'  : 'AddSyn',
@@ -121,9 +133,9 @@ class PFIELDS(Enum):
         'freqUp3'    : 8.0,
         'freqUp4'    : 9.0,
         'pan'        : 0.0,
-    }
+    })
 
-    PluckedString = {
+    PluckedString = SafeDict({
         'start'      : 0,
         'dur'        : 1,
         'synthName'  : 'PluckedString',
@@ -135,5 +147,5 @@ class PFIELDS(Enum):
         'Pan1'       : 0.0,
         'Pan2'       : 0.0,
         'PanRise'    : 0.0,
-    }
+    })
     
