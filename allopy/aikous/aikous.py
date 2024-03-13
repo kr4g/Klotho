@@ -37,6 +37,10 @@ class MinMaxEnum(Enum):
 
     def __rmul__(self, other):
         return self.__mul__(other)
+    
+    def __call__(self):
+        return np.random.uniform(self.min, self.max)
+
 
 class DYNAMICS(MinMaxEnum):
   '''
@@ -141,8 +145,8 @@ def db_amp(db: float) -> float:
   return 10 ** (db / 20)
 
 def amp_freq_scale(freq: float):
-  frequencies_sample = np.array([20, 100, 500, 1000, 5000, 10000, 20000], dtype=float)
-  loudness_sample = np.array([0.3, 0.8, 1.0, 1.0, 0.9, 0.8, 0.5], dtype=float)
+  frequencies_sample = np.array([20, 100, 500, 1000, 3000, 4000, 6000, 10000, 20000], dtype=float)
+  loudness_sample = np.array([0.2, 0.4, 0.8, 0.9, 1.0, 0.9, 0.8, 0.6, 0.4], dtype=float)
   p = Polynomial.fit(frequencies_sample, loudness_sample, deg=4)
   return p(freq)
 

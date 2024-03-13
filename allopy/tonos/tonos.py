@@ -239,6 +239,25 @@ def octave_reduce(interval: float, octave: int = 1) -> float:
     interval /= 2
   return interval
 
+def wrap_freq(freq: float, lower: float = 100, upper: float = 5000) -> float:
+  '''
+  Wrap a frequency value to within a specified range.
+  
+  Args:
+    freq: The frequency to be wrapped.
+    lower: The lower bound of the range.
+    upper: The upper bound of the range.
+    
+  Returns:
+    The wrapped frequency as a float.
+  '''
+  while freq < lower:
+      freq *= 2
+  while freq > upper:
+      freq /= 2
+  
+  return freq
+
 # def norgard(n = 0):
 #   '''
 #   Per Norgard "Infinity Series" (1972)

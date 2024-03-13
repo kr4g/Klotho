@@ -9,7 +9,7 @@ computations related to time and rhythm in music.
 
 --------------------------------------------------------------------------------------
 '''
-
+import numpy as np
 from fractions import Fraction
 
 from enum import Enum, EnumMeta
@@ -181,3 +181,57 @@ def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_
   current_duration = 60 / current_tempo * current_beat_value
   new_tempo = 60 / current_duration * new_beat_value
   return new_tempo
+
+# def rubato(durations: list, accelerando: bool = True, intensity: float = 0.5) -> list:
+#   '''
+#   Apply rubato to a list of durations.
+
+#   Rubato is a musical term for expressive and flexible tempo, often used to convey emotion or
+#   to create a sense of freedom in the music. This function applies rubato to a list of durations
+#   by stretching or compressing the durations according to the given parameters.
+
+#   Args:
+#   durations (list): A list of durations in seconds.
+#   accelerando (bool, optional): Whether to apply an accelerando (True) or a ritardando (False), defaults to True.
+#   intensity (float, optional): The intensity of the rubato effect, defaults to 0.5.
+
+#   Returns:
+#   list: The list of durations with rubato applied.
+#   '''
+#   assert 0 <= intensity <= 1, "Intensity must be between 0 and 1"
+  
+#   total_duration = sum(durations)
+#   n = len(durations)  
+#   max_increment = n if accelerando else 1
+#   min_increment = 1 if accelerando else n
+#   increments = [((max_increment - i) if accelerando else (i + 1)) * intensity + (1 - intensity) for i in range(n)]  
+#   total_increments = sum(increments)
+#   increment_durations = [total_duration * (inc / total_increments) for inc in increments]
+  
+#   correction = total_duration - sum(increment_durations)
+#   correction_per_duration = correction / n
+#   corrected_durations = [d + correction_per_duration for d in increment_durations]
+
+#   return corrected_durations
+
+def rubato(durations, accelerando=True, intensity=0.5):
+    assert 0 <= intensity <= 1, "Intensity must be between 0 and 1"
+    
+    durations = np.array(durations)
+    total_duration = durations.sum()
+    n = len(durations)
+    
+    if accelerando:
+        increments = np.linspace(n, 1, n)
+    else:
+        increments = np.linspace(1, n, n)
+    
+    increments = increments * intensity + (1 - intensity)
+    increments_scaled = increments / increments.sum() * total_duration
+    
+    # Apply correction by scaling
+    corrected_total = increments_scaled.sum()
+    scaling_factor = total_duration / corrected_total
+    corrected_durations = increments_scaled * scaling_factor
+
+    return corrected_durations.tolist()

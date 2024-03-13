@@ -14,7 +14,7 @@ class PFIELDS(Enum):
     
     def __call__(self):
         # return self.value.copy()
-        return SafeDict(self.value)
+        return SafeDict(self.value.copy())
 
     SineEnv = SafeDict({
         'start'      : 0,
@@ -106,33 +106,34 @@ class PFIELDS(Enum):
     })
 
     AddSyn = SafeDict({
-        'start'      : 0,
-        'dur'        : 1,
-        'synthName'  : 'AddSyn',
-        'amp'        : 0.45,
-        'frequency'  : 440,
-        'ampStri'    : 0.5,
-        'attackStri' : 0.1,
-        'releaseStri': 0.1,
-        'sustainStri': 0.8,
-        'ampLow'     : 0.5,
-        'attackLow'  : 0.001,
-        'releaseLow' : 0.1,
-        'sustainLow' : 0.8,
-        'ampUp'      : 0.6,
-        'attackUp'   : 0.01,
-        'releaseUp'  : 0.075,
-        'sustainUp'  : 0.9,
-        'freqStri1'  : 1.0,
-        'freqStri2'  : 2.001,
-        'freqStri3'  : 3.0,
-        'freqLow1'   : 4.009,
-        'freqLow2'   : 5.002,
-        'freqUp1'    : 6.0,
-        'freqUp2'    : 7.0,
-        'freqUp3'    : 8.0,
-        'freqUp4'    : 9.0,
-        'pan'        : 0.0,
+        'start'        : 0,
+        'dur'          : 1,
+        'synthName'    : 'AddSyn',
+        'amp'          : 0.45,
+        'frequency'    : 440,
+        'ampStri'      : 0.5,
+        'attackStri'   : 0.1,
+        'releaseStri'  : 0.1,
+        'sustainStri'  : 0.8,
+        'ampLow'       : 0.5,
+        'attackLow'    : 0.001,
+        'releaseLow'   : 0.1,
+        'sustainLow'   : 0.8,
+        'ampUp'        : 0.6,
+        'attackUp'     : 0.01,
+        'releaseUp'    : 0.075,
+        'sustainUp'    : 0.9,
+        'freqStri1'    : 1.0,
+        'freqStri2'    : 2.001,
+        'freqStri3'    : 3.0,
+        'freqLow1'     : 4.009,
+        'freqLow2'     : 5.002,
+        'freqUp1'      : 6.0,
+        'freqUp2'      : 7.0,
+        'freqUp3'      : 8.0,
+        'freqUp4'      : 9.0,
+        'pan'          : 0.0,
+        'reverberation': 0.0,
     })
 
     PluckedString = SafeDict({
