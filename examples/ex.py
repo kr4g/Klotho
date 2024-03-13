@@ -34,11 +34,12 @@ def materials():
     return material
 
 def layer1(material: dict, bpm: float = 120, rubato=True):
+    materials['root_freq_seq'] = []
     durs = [chronos.beat_duration(r, bpm) for r_tree in material['r_trees'] for r in r_tree.ratios]
     if rubato:
         # grab sublists of 7, apply rubato
-        sublist = np.array([chronos.rubato(durs[i:i+7], accelerando=True, intensity=np.random.uniform(0.667,1.0)) for i in range(0, len(durs), 7)])
-        durs = np.concatenate(sublist)
+        sublists = np.array([chronos.rubato(durs[i:i+7], accelerando=True, intensity=np.random.uniform(0.667,1.0)) for i in range(0, len(durs), 7)])
+        durs = np.concatenate(sublists)
 
     start_time = 0.1
     row_list = []
@@ -95,6 +96,7 @@ def layer1(material: dict, bpm: float = 120, rubato=True):
         new_row['visualMode']    = np.random.randint(3)
 
         row_list.append(new_row)
+        materials['freq_seq'].append({'start': start_time, 'root_freq': root_freq, 'ratio': ratio})
         start_time += dur
 
     return row_list
@@ -137,8 +139,10 @@ def layer2(material: dict, bpm: float = 120, rubato=True):
 if __name__ == '__main__':    
     mats = materials()
 
-    layer_1 = layer1(mats, 84)
-    layer_2 = layer2(mats, 84)
+    bpm = 84
+
+    layer_1 = layer1(mats, bpm)
+    layer_2 = layer2(mats, bpm)
 
     comp = layer_1 + layer_2
 
