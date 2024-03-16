@@ -1,4 +1,4 @@
-# File: temporal_unit_block.py
+# temporal_unit_block.py
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsTextItem
 from PySide6.QtGui import QBrush, QColor, QPen
 from PySide6.QtCore import Qt, QRectF
@@ -19,8 +19,5 @@ class TemporalUnitBlock(QGraphicsRectItem):
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        if self.y() < 0:
-            self.setY(0)
-        else:
-            y_position = round(self.y() / self.track_height) * self.track_height
-            self.setY(max(y_position, 0))  # Ensures we don't go above track 1
+        y_position = round(self.y() / self.track_height) * self.track_height
+        self.setY(y_position)

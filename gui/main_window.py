@@ -1,43 +1,19 @@
 import sys
-from PySide6.QtWidgets import QGraphicsTextItem, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QVBoxLayout, QWidget
-from PySide6.QtGui import QPainter, QColor, QPen
+from PySide6.QtWidgets import QPushButton, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
 
 from .temporal_unit_block import TemporalUnitBlock
-
-class RulerWidget(QWidget):
-    def __init__(self, orientation, parent=None):
-        super().__init__(parent)
-        self.orientation = orientation
-        self.setMinimumHeight(20)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.fillRect(event.rect(), QColor("#323232"))  # Ruler color
-
-        # tic marks
-        tic_pen = QPen(QColor("#ffffff"), 1)
-        painter.setPen(tic_pen)
-
-        tic_interval = 20
-        tic_length = 10
-
-        # Draw ruler tics
-        label_margin = 30  # label margin
-        for i in range(label_margin, self.width(), tic_interval):
-            if self.orientation == "top":
-                painter.drawLine(i, self.height(), i, self.height() - tic_length)
-            else:
-                painter.drawLine(i, 0, i, tic_length)
+from .ruler import Ruler
+# from .grid import BackgroundGrid
+from .materials_palette import MaterialsPalette
 
 class MaquetteMainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
+    def __init__(self, *args, **kwargs):
+        super(MaquetteMainWindow, self).__init__(*args, **kwargs)
         self.lane_height = 60
         self.next_lane_number = 1
         self.num_tracks = 0
-        self.track_labels = {}  
+        self.initUI()
 
     def initUI(self):
         self.setWindowTitle("Maquette")
@@ -47,8 +23,12 @@ class MaquetteMainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        self.top_ruler = RulerWidget("top")
-        self.bottom_ruler = RulerWidget("bottom")
+        self.showMaterialsBtn = QPushButton("Show Materials")
+        self.showMaterialsBtn.clicked.connect(self.toggleMaterialsPalette)
+        layout.addWidget(self.showMaterialsBtn)
+
+        self.top_ruler = Ruler("top")
+        self.bottom_ruler = Ruler("bottom")
 
         self.graphicsView = QGraphicsView()
         self.graphicsView.setStyleSheet("background-color: #323232;")
@@ -62,25 +42,17 @@ class MaquetteMainWindow(QMainWindow):
         self.scene.setSceneRect(0, 0, 2000, 2000)
     
     def mouseDoubleClickEvent(self, event):
-        mouse_position = self.graphicsView.mapToScene(event.position().toPoint())        
+        mouse_position = self.graphicsView.mapToScene(event.position().toPoint())
+        y_click_position = mouse_position.y()
+        lane_height = self.lane_height
+        lane_y_upper_boundary = (int(y_click_position // lane_height) * lane_height)
         
-        y_position = self.num_tracks * self.lane_height
-        
+        # Create and add a new block to the scene
         new_block_width = 100
-        new_block_height = self.lane_height - 5
-        new_block = TemporalUnitBlock(mouse_position.x(), y_position, new_block_width, new_block_height, self.lane_height)
-
+        new_block_height = lane_height - 5
+        new_block_x_position = mouse_position.x() - (new_block_width / 2)
+        new_block = TemporalUnitBlock(new_block_x_position, lane_y_upper_boundary, new_block_width, new_block_height, lane_height)
         self.scene.addItem(new_block)
-        
-        track_number = self.num_tracks + 1
-        if track_number not in self.track_labels:
-            track_label = QGraphicsTextItem(str(track_number))
-            track_label.setDefaultTextColor(Qt.white)
-            track_label.setPos(-30, y_position)  # Adjust x as needed to position labels in the margin
-            self.scene.addItem(track_label)
-            self.track_labels[track_number] = track_label
-        
-        self.num_tracks += 1
 
     def addBlock(self, position):
         scene_position = self.graphicsView.mapToScene(position)
@@ -94,9 +66,18 @@ class MaquetteMainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         self.scene.setSceneRect(0, 0, self.graphicsView.viewport().width(), self.graphicsView.viewport().height())
-        super().resizeEvent(event)
-        for track_number, label in self.track_labels.items():
-            label.setPos(-30, (track_number - 1) * self.lane_height)
+        super(MaquetteMainWindow, self).resizeEvent(event)
+    
+    def toggleMaterialsPalette(self):
+        if not hasattr(self, 'materialsPalette'):
+            self.materialsPalette = MaterialsPalette()
+        if self.materialsPalette.isVisible():
+            self.materialsPalette.hide()
+            self.showMaterialsBtn.setText("Show Materials")
+        else:
+            self.materialsPalette.show()
+            self.showMaterialsBtn.setText("Hide Materials")
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
