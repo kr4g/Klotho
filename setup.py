@@ -21,7 +21,8 @@ setup(
         'matplotlib',
         'ipywidgets',
         'IPython',
-        'tabulate'
+        'tabulate',
+        'PySide6',
     ],
     # tests_require=[
     #     'pytest',

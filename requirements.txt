@@ -6,3 +6,4 @@ matplotlib
 ipywidgets
 IPython
 tabulate
+PySide6
