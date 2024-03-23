@@ -121,6 +121,9 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
         plen = len(pfield)
         pidx = i % len(pfields[key]) if isinstance(pfields[key], list) else 0
 
+        if key in ['start', 'synthName']:  # ignore these keys
+          continue
+
         if key not in new_row.keys():  # check for name variations
           if key == 'amplitude':
             new_row['amp'] = pfields[key][pidx]
@@ -130,9 +133,6 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
             new_row['freq'] = pfields[key][pidx]
           if key == 'freq':
             new_row['frequency'] = pfields[key][pidx]
-          continue
-
-        if key in ['start', 'synthName']:  # ignore these keys
           continue
         
         # Get the pfield value
