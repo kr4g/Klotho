@@ -10,6 +10,7 @@ computations related to pitch and frequency in music.
 --------------------------------------------------------------------------------------
 '''
 from typing import Union, List, Tuple, Dict, Set
+from fractions import Fraction
 # from math import prod
 import numpy as np
 # import itertools
@@ -168,7 +169,7 @@ def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int =
   '''
   return cents_to_setclass(ratio_to_cents(ratio), n_tet, round_to)
 
-def freq_to_pitchclass(freq: float):
+def freq_to_pitchclass(freq: float, cent_round: int = 4):
   '''
   Converts a frequency to a pitch class with offset in cents.
   
@@ -188,7 +189,7 @@ def freq_to_pitchclass(freq: float):
   octave = int(midi_round // n_PITCH_LABELS) - 1  # MIDI starts from C-1
   pitch_label = PITCH_LABELS[note_index]
   cents_diff = (midi - midi_round) * 100
-  return f'{pitch_label}{octave}', cents_diff
+  return f'{pitch_label}{octave}', round(cents_diff, cent_round)
 
 def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
   '''
@@ -230,6 +231,15 @@ def octave_reduce(interval: float, octave: int = 1) -> float:
   '''
   while interval >= 2**octave:
     interval /= 2
+  return interval
+
+def fold_interval(interval: Union[Fraction, float], equave: Union[Fraction, float] = 2, equaves: int = 1) -> float:
+  '''
+  '''
+  while interval < 1/equave**equaves:
+    interval *= equave
+  while interval > equave**equaves:
+    interval /= equave
   return interval
 
 def fold_freq(freq: float, lower: float = 100, upper: float = 5000, equave: float = 2.0) -> float:

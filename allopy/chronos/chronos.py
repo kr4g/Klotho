@@ -108,7 +108,6 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     seconds %= 60
     s = int(seconds)
     ms = int((seconds - s) * 1000)    
-    
     return f'{h}:{m:02}:{s:02}:{ms:03}' if as_string else (h, m, s, ms)
 
 def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
@@ -136,7 +135,7 @@ def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
   beat_numerator, beat_denominator = map(int, beat_ratio.split('/'))
   return tempo_factor * ratio_value * (beat_denominator / beat_numerator)
 
-def duration_beat(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominator: float = 16) -> Fraction:
+def quantize(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominator: float = 16) -> Fraction:
   '''
   Finds the closest beat ratio for a given duration at a certain tempo.
   
@@ -198,10 +197,7 @@ def rubato(durations, accelerando=True, intensity=0.5):
     total_duration = durations.sum()
     n = len(durations)
     
-    if accelerando:
-        increments = np.linspace(n, 1, n)
-    else:
-        increments = np.linspace(1, n, n)
+    increments = np.linspace(n, 1, n) if accelerando else np.linspace(1, n, n)
     
     increments = increments * intensity + (1 - intensity)
     increments_scaled = increments / increments.sum() * total_duration
