@@ -33,7 +33,6 @@ class MinMaxEnum(Enum):
     def __rmul__(self, other):
         return self.__mul__(other)
 
-
 class TEMPO(MinMaxEnum):
   '''
   Enum for musical tempo markings mapped to beats per minute (bpm).
@@ -67,9 +66,8 @@ class TEMPO(MinMaxEnum):
   ----------------|----------------------|----------------
 
   Example use:
-  `>>> Tempo.Adagio`
-  '''
-  
+  `>>> Tempo.Adagio.min`
+  '''  
   Larghissimo                  = (11, 24)
   Adagissimo_Grave             = (24, 40)
   Largo                        = (40, 66)
@@ -103,8 +101,7 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     Returns:
     str: The formatted duration string in the form 'hours:minutes:seconds:milliseconds'.
     tuple: The formatted duration as a tuple of integers in the form (hours, minutes, seconds, milliseconds).
-    '''
-    
+    '''    
     h = int(seconds // 3600)
     seconds %= 3600
     m = int(seconds // 60)
@@ -129,7 +126,6 @@ def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
   Returns:
   float: The beat duration in seconds.
   '''
-
   tempo_factor = 60 / bpm
   if isinstance(ratio, str):
     ratio_numerator, ratio_denominator = map(int, ratio.split('/'))
@@ -151,8 +147,7 @@ def duration_beat(duration: float, bpm: float, beat_ratio: str = '1/4', max_deno
   
   Returns:
   str: The closest beat ratio as a string in the form 'numerator/denominator'.
-  '''
-  
+  '''  
   approximate_ratio = lambda x: Fraction(x).limit_denominator(max_denominator)
   
   beat_numerator, beat_denominator = map(int, beat_ratio.split('/'))
@@ -177,44 +172,26 @@ def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_
   Returns:
   float: The new tempo in beats per minute after the metric modulation.
   '''
-
   current_duration = 60 / current_tempo * current_beat_value
   new_tempo = 60 / current_duration * new_beat_value
   return new_tempo
 
-# def rubato(durations: list, accelerando: bool = True, intensity: float = 0.5) -> list:
-#   '''
-#   Apply rubato to a list of durations.
-
-#   Rubato is a musical term for expressive and flexible tempo, often used to convey emotion or
-#   to create a sense of freedom in the music. This function applies rubato to a list of durations
-#   by stretching or compressing the durations according to the given parameters.
-
-#   Args:
-#   durations (list): A list of durations in seconds.
-#   accelerando (bool, optional): Whether to apply an accelerando (True) or a ritardando (False), defaults to True.
-#   intensity (float, optional): The intensity of the rubato effect, defaults to 0.5.
-
-#   Returns:
-#   list: The list of durations with rubato applied.
-#   '''
-#   assert 0 <= intensity <= 1, "Intensity must be between 0 and 1"
-  
-#   total_duration = sum(durations)
-#   n = len(durations)  
-#   max_increment = n if accelerando else 1
-#   min_increment = 1 if accelerando else n
-#   increments = [((max_increment - i) if accelerando else (i + 1)) * intensity + (1 - intensity) for i in range(n)]  
-#   total_increments = sum(increments)
-#   increment_durations = [total_duration * (inc / total_increments) for inc in increments]
-  
-#   correction = total_duration - sum(increment_durations)
-#   correction_per_duration = correction / n
-#   corrected_durations = [d + correction_per_duration for d in increment_durations]
-
-#   return corrected_durations
-
 def rubato(durations, accelerando=True, intensity=0.5):
+    '''
+    Apply rubato to a list of durations.
+
+    Rubato is a musical term for expressive and flexible tempo, often used to convey emotion or
+    to create a sense of freedom in the music. This function applies rubato to a list of durations
+    by stretching or compressing the durations according to the given parameters.
+
+    Args:
+    durations (list): A list of durations in seconds.
+    accelerando (bool, optional): Whether to apply an accelerando (True) or a ritardando (False), defaults to True.
+    intensity (float, optional): The intensity of the rubato effect, defaults to 0.5.
+
+    Returns:
+    list: The list of durations with rubato applied.
+    '''
     assert 0 <= intensity <= 1, "Intensity must be between 0 and 1"
     
     durations = np.array(durations)

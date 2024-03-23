@@ -58,27 +58,16 @@ class RT:
 
   see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
   '''
-#   def __init__(self, data):
-#     self.__data = data
-#     self.__duration = 1 if data[0] == '?' else data[0]
-#     self.__time_signature = data[1][0]
-#     self.__subdivisions = data[1][1]
-#     self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
-  def __init__(self, duration='?', time_signature=(1,1), subdivisions=(1,), decomp=None):
-    self.__duration = 1 if duration == '?' else duration
+  def __init__(self, duration='?', time_signature=(1,1), subdivisions=(1,), strict_decomp=False):
+    self.__duration       = Fraction(1, 1) if duration == '?' else Fraction(duration)
     self.__time_signature = time_signature
-    self.__subdivisions = subdivisions
-    self.__decomp = decomp
-    self.__ratios = tuple(self.__duration * r for r in measure_ratios(self.subdivisions))
-    if self.__decomp == 'strict':
-        self.__ratios = strict_decomposition(self.__ratios, self.__time_signature)
-    elif self.__decomp == 'reduced':
-        self.__ratios = reduced_decomposition(self.__ratios, self.__time_signature)
+    self.__subdivisions   = subdivisions
+    self.__strict_decomp  = strict_decomp
+    self.__ratios         = tuple(self.__duration * r for r in measure_ratios(self.subdivisions))
+    self.__ratios         = strict_decomposition(self.__ratios, self.__duration) if self.__strict_decomp else self.__ratios
 
   @property
   def duration(self):
-    # return self.data[0]
-    # self.__duration = sum(abs(r) for r in self.ratios)
     return self.__duration
 
   @property
@@ -87,7 +76,6 @@ class RT:
 
   @property
   def subdivisions(self):
-    # return self.data[1][1]
     return self.__subdivisions
 
   @property
@@ -96,27 +84,19 @@ class RT:
   
   @property
   def ratios(self):
-    # if self._subdivisions != self.subdivisions:
-    #   self._subdivisions = self.subdivisions
-    # self.__ratios = tuple([self.__duration * r for r in measure_ratios(self.subdivisions)])
-    # return measure_ratios(self.subdivisions)
     return self.__ratios
   
   @property
   def factors(self):
     return factor(self.subdivisions)
   
-  def rotate(self, n=1):     
-    # self.__subdivisions = self.subdivisions[n:] + self.subdivisions[:n]
+  def rotate(self, n=1):
     factors = factor(self.subdivisions)
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
     refactored = refactor(self.__subdivisions, factors)
     return RT(duration=self.duration, time_signature=self.time_signature, subdivisions=refactored, decomp=self.decomp)
 
-#   def __getitem__(self, key):
-#     return self.data[key]
-  
   def __repr__(self):
     ratios = ', '.join(tuple([str(r) for r in self.ratios]))
     return f'Duration: {self.duration}\nTime Signature: {self.time_signature}\nSubdivisions: {self.subdivisions}\nDecomposition: {self.decomp}\nRatios: {ratios}'
@@ -193,7 +173,7 @@ def reduced_decomposition(fractions, meas):
     :return: List of reduced proportions.
     '''
     num, denom = meas
-    return [Fraction(f.numerator * num, f.denominator * denom) for f in fractions]
+    return tuple(Fraction(f.numerator * num, f.denominator * denom) for f in fractions)
 
 def strict_decomposition(fractions, meas):
     '''
@@ -205,27 +185,7 @@ def strict_decomposition(fractions, meas):
     '''
     num, denom = meas
     common_denom = reduce(lambda a, b: gcd(a, b.denominator), fractions, fractions[0].denominator)
-    return [Fraction((f / common_denom).numerator * num, denom) for f in fractions]
-
-# def factor(subdivs, factors=None):
-#     factors = [] if factors is None else factors
-#     for element in subdivs:
-#         if isinstance(element, tuple):
-#             factor(element, factors)
-#         else:
-#             factors.append(element)
-#     return factors
-
-# def refactor(subdivs, factors, index=0):    
-#     result = []
-#     for element in subdivs:
-#         if isinstance(element, tuple):
-#             nested_result, index = refactor(element, factors, index)
-#             result.append(nested_result)
-#         else:
-#             result.append(factors[index])
-#             index += 1
-#     return result, index
+    return tuple(Fraction((f / common_denom).numerator * num, denom) for f in fractions)
 
 def factor(subdivs):
     def _factor(subdivs, acc):
@@ -255,15 +215,6 @@ if __name__ == '__main__':
     # Rhythm Tree Examples
     # ------------------------------------------------------------------------------------
     # 
-    subdivisions = ((13, (3,1,2)), (21, (5,(13, (34,21,55)),8)), (5, (3,5,2)), (8, (5,(13, (34,89,55)),8)), (34, (3,1,2)))
-    r_tree = RT(('?', ((4, 4), subdivisions)))
+    subdivisions = ((2, (1, 2, 1)), (5, (2, 1, (3, (3, 2)), 1)))
+    r_tree = RT(subdivisions=subdivisions)
     print(r_tree)
-
-    factors = factor(subdivisions)
-    print(factors)
-    print(f'\nFactors: {r_tree.factors}')
-
-    print(f'\nrefactor...\n')
-    for i in range(len(factors)):
-        # r_tree_rotate = r_tree.rotate(i)
-        print(r_tree.rotate(i).subdivisions)

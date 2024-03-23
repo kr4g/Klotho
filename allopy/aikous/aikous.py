@@ -41,7 +41,6 @@ class MinMaxEnum(Enum):
     def __call__(self):
         return np.random.uniform(self.min, self.max)
 
-
 class DYNAMICS(MinMaxEnum):
   '''
   Enum for musical dynamics mapped to decibels.
@@ -149,16 +148,3 @@ def amp_freq_scale(freq: float):
   loudness_sample = np.array([0.2, 0.4, 0.8, 0.9, 1.0, 0.9, 0.8, 0.6, 0.4], dtype=float)
   p = Polynomial.fit(frequencies_sample, loudness_sample, deg=4)
   return p(freq)
-
-
-# def rubato(durations: list) -> float:
-#   '''
-#   Given a list of durations, returns the percieved tempo.
-#   '''
-#   pass
-
-# def duration_event_density(durations: list, amplitudes: list, frequencies: list):
-#   '''
-#   Given a list of durations, returns the duration event density.
-#   '''
-#   pass

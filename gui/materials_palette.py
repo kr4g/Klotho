@@ -20,7 +20,6 @@ class MaterialBlock(QPushButton):
         elif action == option2Action:
             print("Option 2 was selected")
 
-
 class MaterialsPalette(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -41,7 +40,7 @@ class MaterialsPalette(QWidget):
         
         self.layout.addStretch(1)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app = QApplication([])
     palette = MaterialsPalette()
     palette.show()

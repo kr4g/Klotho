@@ -47,11 +47,7 @@ class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
     Bb = 10
     B  = 11
     Bs = 0
-
-    # @classmethod
-    # def names(cls):
-    #     return ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-
+  
     class names:
       as_sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
       as_flats  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
@@ -80,7 +76,7 @@ def freq_to_midicents(frequency: float) -> float:
   Returns:
   The MIDI cent value as a float.
   '''
-  return 100 * (12 * np.log2(frequency / 440.0) + 69)
+  return 100 * (12 * np.log2(frequency / A4_Hz) + A4_MIDI)
 
 def midicents_to_freq(midicents: float) -> float:
   '''
@@ -106,7 +102,7 @@ def midicents_to_freq(midicents: float) -> float:
   Returns:
     The corresponding frequency in Hertz as a float.
   '''
-  return 440.0 * (2 ** ((midicents - A4_MIDI * 100) / 1200.0))
+  return A4_Hz * (2 ** ((midicents - A4_MIDI * 100) / 1200.0))
 
 def midicents_to_pitchclass(midicents: float) -> str:
   '''
@@ -194,10 +190,7 @@ def freq_to_pitchclass(freq: float):
   cents_diff = (midi - midi_round) * 100
   return f'{pitch_label}{octave}', cents_diff
 
-import numpy as np
-
 def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
-
   '''
   Converts a pitch class with offset in cents to a frequency.
   
@@ -239,9 +232,9 @@ def octave_reduce(interval: float, octave: int = 1) -> float:
     interval /= 2
   return interval
 
-def wrap_freq(freq: float, lower: float = 100, upper: float = 5000) -> float:
+def fold_freq(freq: float, lower: float = 100, upper: float = 5000, equave: float = 2.0) -> float:
   '''
-  Wrap a frequency value to within a specified range.
+  Fold a frequency value to within a specified range.
   
   Args:
     freq: The frequency to be wrapped.
@@ -249,13 +242,12 @@ def wrap_freq(freq: float, lower: float = 100, upper: float = 5000) -> float:
     upper: The upper bound of the range.
     
   Returns:
-    The wrapped frequency as a float.
+    The folded frequency as a float.
   '''
   while freq < lower:
-      freq *= 2
+      freq *= equave
   while freq > upper:
-      freq /= 2
-  
+      freq /= equave  
   return freq
 
 # def norgard(n = 0):

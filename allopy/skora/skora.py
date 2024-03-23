@@ -94,22 +94,6 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
     pfields = getattr(PFIELDS, 'SineEnv', None).value.copy()
   elif 'synthName' not in pfields.keys():
     pfields['synthName'] = ['SineEnv']
-
-  # else:
-  #   # if 'synthName' not in pfields.keys():
-  #   pfields['synthName'] = ['SineEnv'] if 'synthName' not in pfields.keys() else pfields['synthName'] if isinstance(pfields['synthName'], list) else [pfields['synthName']]
-  #   for key, value in pfields_temp.items():
-  #     if key not in pfields:
-  #       pfields[key] = value
-
-  # if not all(k in pfields.keys() for k in pfields_SineEnv.keys()):
-  #   for key in pfields_SineEnv.keys():
-  #     if key not in pfields.keys():
-  #       pfields[key] = pfields_SineEnv[key]
-  
-  # pfields = {
-  #   key: value if isinstance(pfields[key], list) else [value] if key != 'start' else continue for key, value in pfields.items()
-  # }  # if pfield is not a list, make it a list
   
   if loop_param == 'max':
     seq_len = max(len(value) if isinstance(value, list) else 1 for value in pfields.values())
@@ -131,13 +115,10 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
   for i_syn, synthName in enumerate(pfields['synthName']):
     start = pfields['start'][0] if isinstance(pfields['start'], list) else pfields['start']
     for i in range(seq_len):
-      # new_row = getattr(PFIELDS, pfields['synthName'][i % len(pfields['synthName'])], None).value.copy()
       new_row = getattr(PFIELDS, synthName, None).value.copy()
       new_row['start'] = start
       for key in pfields.keys():
-        pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]  # if pfield is not a list, make it a list
-        # print(key, pfield)
-        # Check pfield...
+        pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]
         if key not in new_row.keys() or key in ['start', 'synthName']:  # ignore undefined and reserved pfields
           if key == 'amplitude':
             new_row['amp'] = pfields[key][i % len(pfields[key])]
@@ -150,16 +131,16 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
           continue
         
         if key == 'dur':
-          # TODO: also check for articulation data...
           new_row[key] = pfield[i % len(pfield)] * pfields['dc'][i % len(pfields['dc'])]  # apply duty cycle to duration
         else:
           new_row[key] = pfield[i % len(pfield)]  # set pfield value
-        
-      note_list.append(new_row)                                    # append new row to the notelist
+      
+      if new_row['dur'] > 0:
+        note_list.append(new_row)                                  # append new row to the notelist
       if isinstance(pfields['start'], list):                       # if start is a list,
         start = pfields['start'][(i + 1) % len(pfields['start'])]  # get the next start time
       else:                                                        # otherwise,
-        start += pfields['dur'][i % len(pfields['dur'])]           # increment start time by the current duration
+        start += abs(pfields['dur'][i % len(pfields['dur'])])      # increment start time by the current duration
 
   return note_list
 
