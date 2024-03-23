@@ -143,8 +143,7 @@ def db_amp(db: float) -> float:
   '''
   return 10 ** (db / 20)
 
-def amp_freq_scale(freq: float,
-                   freqs: list = [20, 100, 500, 1000, 3000, 4000, 6000, 10000, 20000],
+def amp_freq_scale(freq: float, freqs: list = [20, 100, 500, 1000, 3000, 4000, 6000, 10000, 20000],
                    amps: list = [0.2, 0.4, 0.8, 0.9, 1.0, 0.9, 0.8, 0.6, 0.4],
                    deg: int = 4) -> float:
   frequencies_sample = np.array(freqs, dtype=float)

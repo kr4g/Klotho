@@ -108,7 +108,6 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
   pfields['dur']   = [1.0] if 'dur' not in pfields.keys() else pfields['dur'] if isinstance(pfields['dur'], list) else [pfields['dur']]
   pfields['dc']    = [1.0] if 'dc' not in pfields.keys() else pfields['dc'] if isinstance(pfields['dc'], list) else [pfields['dc']]
 
-  # print(pfields)
   note_list = []
   if not isinstance(pfields['synthName'], list):
     pfields['synthName'] = [pfields['synthName']]
@@ -119,23 +118,30 @@ def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
       new_row['start'] = start
       for key in pfields.keys():
         pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]
-        if key not in new_row.keys() or key in ['start', 'synthName']:  # ignore undefined and reserved pfields
+        plen = len(pfield)
+        pidx = i % len(pfields[key]) if isinstance(pfields[key], list) else 0
+
+        if key not in new_row.keys():  # check for name variations
           if key == 'amplitude':
-            new_row['amp'] = pfields[key][i % len(pfields[key])]
+            new_row['amp'] = pfields[key][pidx]
           if key == 'amp':
-            new_row['amplitude'] = pfields[key][i % len(pfields[key])]          
+            new_row['amplitude'] = pfields[key][pidx]          
           if key == 'frequency':
-            new_row['freq'] = pfields[key][i % len(pfields[key])]
+            new_row['freq'] = pfields[key][pidx]
           if key == 'freq':
-            new_row['frequency'] = pfields[key][i % len(pfields[key])]
+            new_row['frequency'] = pfields[key][pidx]
+          continue
+
+        if key in ['start', 'synthName']:  # ignore these keys
           continue
         
+        # Get the pfield value
         if key == 'dur':
-          new_row[key] = pfield[i % len(pfield)] * pfields['dc'][i % len(pfields['dc'])]  # apply duty cycle to duration
+          new_row[key] = pfield[i % plen] * pfields['dc'][i % len(pfields['dc'])]  # apply duty cycle to duration
         else:
-          new_row[key] = pfield[i % len(pfield)]  # set pfield value
+          new_row[key] = pfield[i % plen]  # set pfield value
       
-      if new_row['dur'] > 0:
+      if new_row['dur'] > 0:                                       # negative durations mean rest (skip)
         note_list.append(new_row)                                  # append new row to the notelist
       if isinstance(pfields['start'], list):                       # if start is a list,
         start = pfields['start'][(i + 1) % len(pfields['start'])]  # get the next start time

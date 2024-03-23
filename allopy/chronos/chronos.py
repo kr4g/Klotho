@@ -131,7 +131,6 @@ def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
     ratio_value = ratio_numerator / ratio_denominator
   else:
     ratio_value = float(ratio)
-  # ratio_value = Fraction(ratio)
   beat_numerator, beat_denominator = map(int, beat_ratio.split('/'))
   return tempo_factor * ratio_value * (beat_denominator / beat_numerator)
 
