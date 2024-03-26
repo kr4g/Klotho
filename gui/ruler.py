@@ -8,7 +8,7 @@ class Ruler(QWidget):
         self.orientation = orientation
         if self.orientation in ["top", "bottom"]:
             self.setMinimumHeight(20)
-        else:  # left or right orientations
+        else:
             self.setMinimumWidth(20)
         self.setBackgroundRole(QPalette.Base)
         self.setAutoFillBackground(True)
@@ -29,7 +29,7 @@ class Ruler(QWidget):
                     painter.drawLine(i, self.height(), i, self.height() - tic_length)
                 elif self.orientation == "bottom":
                     painter.drawLine(i, 0, i, tic_length)
-        else:  # Handling left and right orientations
+        else:
             for i in range(0, self.height(), tic_interval):
                 if self.orientation == "left":
                     painter.drawLine(self.width() - tic_length, i, self.width(), i)
