@@ -1,20 +1,10 @@
-from enum import Enum, EnumMeta
+from enum import Enum
+from utils.data_structures.dictionaries import SafeDict
 
-class SafeDict(dict):
-    """Custom dictionary that safely ignores assignments to non-existent keys."""
-    def __setitem__(self, key, value):
-        if key in self:
-            super().__setitem__(key, value)
-
-class PFIELDS(Enum):    
-    # def __new__(cls, **kwargs):
-    #     obj = object.__new__(cls)
-    #     obj._value_ = SafeDict(**kwargs)
-    #     return obj
-    
+class PFIELDS(Enum):
     def __call__(self):
-        # return self.value.copy()
-        return SafeDict(self.value.copy())
+        # return SafeDict(self.value.copy())
+        return self.value.copy()
 
     SineEnv = SafeDict({
         'start'      : 0,

@@ -18,13 +18,7 @@ import numpy as np
 A4_Hz   = 440.0
 A4_MIDI = 69
 
-from enum import Enum, EnumMeta
-class DirectValueEnumMeta(EnumMeta):
-    def __getattribute__(cls, name):
-        member = super().__getattribute__(name)
-        if isinstance(member, cls):
-            return member.value
-        return member
+from utils.data_structures.enums import DirectValueEnumMeta, Enum
       
 class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
   class N_TET_12(Enum, metaclass=DirectValueEnumMeta):
@@ -235,6 +229,15 @@ def octave_reduce(interval: float, octave: int = 1) -> float:
 
 def fold_interval(interval: Union[Fraction, float], equave: Union[Fraction, float] = 2, equaves: int = 1) -> float:
   '''
+  Fold an interval to within a specified range.
+
+  Args:
+    interval: The interval to be wrapped.
+    equave: The equave value, default is 2.
+    equaves: The number of equaves, default is 1.
+
+  Returns:
+    The folded interval as a float.
   '''
   while interval < 1/equave**equaves:
     interval *= equave

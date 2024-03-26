@@ -8,17 +8,19 @@ HELP
 '''
 
 from .instruments import PFIELDS
+from utils.data_structures.dictionaries import SafeDict
 
 import numpy as np
 import pandas as pd
 import regex as re
+import json
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
 import os
 from pathlib import Path
 
-def set_score_path(synth_name: str = 'Integrated'):
+def set_score_path(synth_dir: str = 'tutorials/audiovisual', synth_name: str = 'Integrated'):
     current_path = Path(os.getcwd())
     if current_path.name != 'AlloPy':
         raise EnvironmentError("This script must be run from within the 'AlloPy/' directory.")
@@ -28,9 +30,65 @@ def set_score_path(synth_name: str = 'Integrated'):
 
     if current_path.name != 'allolib_playground':
         raise FileNotFoundError("allolib_playground directory not found in the path hierarchy.")
+    score_path = os.path.join(current_path, synth_dir, 'bin', f'{synth_name}-data')
+    # return current_path / f'{synth_dir}/bin/{synth_name}-data'
+    return score_path
 
-    return current_path / f'tutorials/audiovisual/bin/{synth_name}-data'
-  
+def extract_pfields(filepath):
+    with open(filepath, 'r') as file:
+        cpp_contents = file.read()
+
+    instruments = {}
+
+    class_start_pattern = re.compile(r'class (\w+) :')
+    param_pattern = re.compile(r'createInternalTriggerParameter\(\s*"(\w+)"\s*,\s*([\d.+-]+)')
+
+    class_starts = [m.start() for m in class_start_pattern.finditer(cpp_contents)]
+    class_starts.append(len(cpp_contents))
+
+    for i in range(len(class_starts)-1):
+        class_block = cpp_contents[class_starts[i]:class_starts[i+1]]
+        class_name_match = class_start_pattern.search(class_block)
+        if class_name_match:
+            class_name = class_name_match.group(1)
+            init_start_match = re.search(r'(virtual\s+)?void\s+init\(\)', class_block)
+            if init_start_match:
+                init_start = init_start_match.start()
+                init_end = class_block.find('}', init_start)
+                init_block = class_block[init_start:init_end]
+                params = {"start": 0, "dur": 1, "synthName": class_name}  # standard pfields
+                for param_match in param_pattern.finditer(init_block):
+                    param_name, default_value_str = param_match.groups()
+                    if param_name != "synthName":
+                        default_value = float(default_value_str) if '.' in default_value_str else int(default_value_str)
+                    else:
+                        default_value = default_value_str
+                    params[param_name] = default_value
+                instruments[class_name] = params
+
+    instruments_json = json.dumps(instruments, indent=4)
+    target_directory = Path('./utils/instruments')
+    target_directory.mkdir(parents=True, exist_ok=True)
+    output_file_path = target_directory / (Path(filepath).stem + '.json')
+
+    with open(output_file_path, 'w') as json_file:
+        json_file.write(instruments_json)
+        print(f'New JSON file created at: {output_file_path}')
+
+def get_pfields(instrument_file, instrument_name):
+    instruments_dir = './utils/instruments'
+    base_name = os.path.splitext(os.path.basename(instrument_file))[0] + '.json'
+    json_path = os.path.join(instruments_dir, base_name)
+
+    if not os.path.exists(json_path):
+        extract_pfields(instrument_file)
+
+    with open(json_path, 'r') as file:
+        instruments_data = json.load(file)
+
+    instrument_pfields = instruments_data.get(instrument_name, {})
+    return SafeDict(instrument_pfields)
+
 def make_score_df(pfields=('start', 'dur', 'synthName', 'amplitude', 'frequency')):
   '''
   Creates a DataFrame with the given pfields as columns.

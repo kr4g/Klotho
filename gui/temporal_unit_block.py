@@ -22,9 +22,11 @@
 #         y_position = round(self.y() / self.track_height) * self.track_height
 #         self.setY(y_position)
 
-from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsTextItem, QMenu
+from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsTextItem, QMenu, QGraphicsSceneMouseEvent
 from PySide6.QtGui import QBrush, QColor, QPen, QCursor
 from PySide6.QtCore import Qt, QRectF
+
+from .code_editor import CodeEditorDialog
 
 class TemporalUnitBlock(QGraphicsRectItem):
     def __init__(self, x, y, width, height, track_height, parent=None):
@@ -34,6 +36,20 @@ class TemporalUnitBlock(QGraphicsRectItem):
         self.setFlag(QGraphicsRectItem.ItemIsMovable)
         self.setFlag(QGraphicsRectItem.ItemIsSelectable)  # Enable selection
         self.track_height = track_height
+        self.script = None
+        self.data_dict = {}
+    
+    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self.editScript()
+        super().mouseDoubleClickEvent(event)
+
+    def editScript(self):
+        dialog = CodeEditorDialog()
+        dialog.code_editor.setPlainText(self.script)
+        if dialog.exec():
+            self.script = dialog.code_editor.toPlainText()
+            self.data_dict = dialog.result_dict
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:

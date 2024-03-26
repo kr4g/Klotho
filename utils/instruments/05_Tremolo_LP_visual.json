@@ -1,0 +1,19 @@
+{
+    "OscTrm": {
+        "start": 0,
+        "dur": 1,
+        "synthName": "OscTrm",
+        "amplitude": 0.03,
+        "frequency": 60,
+        "attackTime": 0.1,
+        "releaseTime": 2.0,
+        "sustain": 0.6,
+        "curve": 4.0,
+        "pan": 0.0,
+        "table": 0,
+        "trm1": 3.5,
+        "trm2": 5.8,
+        "trmRise": 0.5,
+        "trmDepth": 0.1
+    }
+}

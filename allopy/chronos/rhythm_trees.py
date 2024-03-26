@@ -80,7 +80,7 @@ class RT:
 
   @property
   def decomp(self):
-    return self.__decomp
+    return 'Strict' if self.__strict_decomp else 'Reduced'
   
   @property
   def ratios(self):
@@ -95,7 +95,7 @@ class RT:
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
     refactored = refactor(self.__subdivisions, factors)
-    return RT(duration=self.duration, time_signature=self.time_signature, subdivisions=refactored, decomp=self.decomp)
+    return RT(duration=self.duration, time_signature=self.time_signature, subdivisions=refactored, strict_decomp=self.__strict_decomp)
 
   def __repr__(self):
     ratios = ', '.join(tuple([str(r) for r in self.ratios]))

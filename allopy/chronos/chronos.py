@@ -11,27 +11,7 @@ computations related to time and rhythm in music.
 '''
 import numpy as np
 from fractions import Fraction
-
-from enum import Enum, EnumMeta
-class MinMaxEnum(Enum):
-    @property
-    def min(self):
-        return self.value[0]
-
-    @property
-    def max(self):
-        return self.value[1]
-    
-    def __repr__(self):
-        return repr(self.value)
-    
-    def __mul__(self, other):
-        if isinstance(other, (int, float)):
-            return (self.min * other, self.max * other)
-        return NotImplemented
-
-    def __rmul__(self, other):
-        return self.__mul__(other)
+from utils.data_structures.enums import MinMaxEnum
 
 class TEMPO(MinMaxEnum):
   '''
