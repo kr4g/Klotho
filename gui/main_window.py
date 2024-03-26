@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QPushButton, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QVBoxLayout, QWidget, QGridLayout
 from PySide6.QtCore import Qt
 
 from .temporal_unit_block import TemporalUnitBlock
@@ -16,26 +16,32 @@ class MaquetteMainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("Maquette")
-        self.setGeometry(100, 100, 800, 600)  # initial window size
-
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
 
+        grid_layout = QGridLayout(central_widget)
+
+        self.left_ruler = Ruler("left")
+        self.right_ruler = Ruler("right")
         self.top_ruler = Ruler("top")
         self.bottom_ruler = Ruler("bottom")
-
         self.graphicsView = QGraphicsView()
         self.graphicsView.setStyleSheet("background-color: #323232;")
         self.scene = QGraphicsScene()
         self.graphicsView.setScene(self.scene)
 
-        layout.addWidget(self.top_ruler)
-        layout.addWidget(self.graphicsView, 1)
-        layout.addWidget(self.bottom_ruler)
-        
-        self.scene.setSceneRect(0, 0, 2000, 2000)
+        # Place rulers and graphicsView in the grid
+        grid_layout.addWidget(self.top_ruler, 0, 1)
+        grid_layout.addWidget(self.left_ruler, 1, 0)
+        grid_layout.addWidget(self.graphicsView, 1, 1)
+        grid_layout.addWidget(self.right_ruler, 1, 2)
+        grid_layout.addWidget(self.bottom_ruler, 2, 1)
+
+        grid_layout.setColumnStretch(1, 1)
+        grid_layout.setRowStretch(1, 1)
+
+        self.scene.setSceneRect(0, 0, 2000, 1000)  # Initial scene size
+
     
     def mouseDoubleClickEvent(self, event):
         mouse_position = self.graphicsView.mapToScene(event.position().toPoint())
