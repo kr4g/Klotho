@@ -53,7 +53,7 @@ class ArticulationEnum(Enum):
       return self.value[0]
 
   @property
-  def dur(self):
+  def dur(self):  # treated like dc, basically decay
       return self.value[1]
   
   @property
@@ -78,14 +78,14 @@ class ARTICULATION(ArticulationEnum):
   Example use:
   `>>> Articulation.Staccato`
   '''
-  Legato    = (0.9, 1.0, 0.9, 0.0)   # Longer attack, full decay, high sustain
-  Staccato  = (0.1, 0.5, 0.3, 0.0)   # Quick attack, shortened decay, low sustain
-  Marcato   = (0.2, 0.7, 0.6, 0.0)   # Quick attack, moderate decay, medium sustain
-  Tenuto    = (0.9, 1.1, 0.9, 0.0)   # Longer attack, extended decay, high sustain
-  Spiccato  = (0.05, 0.4, 0.2, 0.0)  # Very quick attack, short decay, very low sustain
-  Portato   = (0.3, 0.9, 0.7, 0.0)   # Moderate attack, full decay, medium-high sustain
-  Accent    = (0.2, 0.8, 0.4, 0.0)   # Quick attack, slightly shortened decay, medium-low sustain
-  Sforzando = (0.2, 1.0, 0.5, 0.0)   # Very quick attack, full decay, medium sustain
+  Legato    = ()  # Longer attack, full decay, high sustain
+  Staccato  = ()  # Quick attack, shortened decay, low sustain
+  Marcato   = ()  # Quick attack, moderate decay, medium sustain
+  Tenuto    = ()  # Longer attack, extended decay, high sustain
+  Spiccato  = ()  # Very quick attack, short decay, very low sustain
+  Portato   = ()  # Moderate attack, full decay, medium-high sustain
+  Accent    = ()  # Quick attack, slightly shortened decay, medium-low sustain
+  Sforzando = ()  # Very quick attack, full decay, medium sustain
 
 def amp_db(amp: float) -> float:
   '''
@@ -111,8 +111,8 @@ def db_amp(db: float) -> float:
   '''
   return 10 ** (db / 20)
 
-def amp_freq_scale(freq: float, freqs: list = [20, 100, 500, 1000, 3000, 4000, 6000, 10000, 20000],
-                   amps: list = [0.2, 0.4, 0.8, 0.9, 1.0, 0.9, 0.8, 0.6, 0.4],
+def amp_freq_scale(freq: float, freqs: list = [20,  100, 500, 1000, 3000, 4000, 6000, 10000, 20000],
+                   amps: list               = [0.2, 0.4, 0.8, 0.9,  1.0,  0.9,  0.8,  0.6,   0.4],
                    deg: int = 4) -> float:
   frequencies_sample = np.array(freqs, dtype=float)
   loudness_sample    = np.array(amps, dtype=float)

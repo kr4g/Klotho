@@ -23,10 +23,6 @@ class MaquetteMainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        self.showMaterialsBtn = QPushButton("Show Materials")
-        self.showMaterialsBtn.clicked.connect(self.toggleMaterialsPalette)
-        layout.addWidget(self.showMaterialsBtn)
-
         self.top_ruler = Ruler("top")
         self.bottom_ruler = Ruler("bottom")
 
@@ -68,16 +64,6 @@ class MaquetteMainWindow(QMainWindow):
         self.scene.setSceneRect(0, 0, self.graphicsView.viewport().width(), self.graphicsView.viewport().height())
         super(MaquetteMainWindow, self).resizeEvent(event)
     
-    def toggleMaterialsPalette(self):
-        if not hasattr(self, 'materialsPalette'):
-            self.materialsPalette = MaterialsPalette()
-        if self.materialsPalette.isVisible():
-            self.materialsPalette.hide()
-            self.showMaterialsBtn.setText("Show Materials")
-        else:
-            self.materialsPalette.show()
-            self.showMaterialsBtn.setText("Hide Materials")
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
