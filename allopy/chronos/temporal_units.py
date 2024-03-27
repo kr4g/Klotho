@@ -1,5 +1,31 @@
+from fractions import Fraction
 import numpy as np
 from math import prod
+
+class UT:
+    def __init__(self, tempus: tuple, prolatio: tuple, tempo: float = 60, beat = '1/4') -> None:
+        self.tempus      = Fraction(tempus[0], tempus[1]) if isinstance(tempus, tuple) else tempus
+        self.prolationis = prolatio
+        self.tempo       = tempo
+        self.beat        = Fraction(beat)
+    
+    @property
+    def tempus(self):
+        return self.__tempus
+    
+    @property
+    def prolationis(self):        
+        return self.__prolationis
+    
+    @property
+    def tempo(self):
+        return self.__tempo
+
+    @property
+    def beat(self):
+        return self.__beat
+
+
 
 def rhythm_pair(lst, is_MM=True):
     total_product = prod(lst)
@@ -11,17 +37,6 @@ def rhythm_pair(lst, is_MM=True):
     deltas = np.diff(combined_sequence)
     return tuple(deltas)
 
-if __name__ == '__main__':  
-    # ------------------------------------------------------------------------------------
-    # Rhythm Pair Examples
-    # ------------------------------------------------------------------------------------
-    # 
-    print(f'\nRhythm Pair Examples\n')
-    prolationis = (3, 5, 7)
-    r_pair_MM = rhythm_pair(prolationis, True)
-    print(f'Prolationis: {prolationis}\nPartitions:  {r_pair_MM}\n')
 
-    print(f'\nRhythm Pair as the subdivision of a Rhythm Tree\n')
-    import rhythm_trees as rt
-    r_tree = rt.RT(('?', ((1, 1), r_pair_MM)))
-    print(f'{r_tree}\n')
+if __name__ == '__main__':  
+    pass

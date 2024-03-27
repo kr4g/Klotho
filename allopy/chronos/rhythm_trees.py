@@ -23,6 +23,7 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 from fractions import Fraction
 from math import gcd
 from functools import reduce
+import numpy as np
 
 class RT:
   '''
@@ -60,11 +61,11 @@ class RT:
   '''
   def __init__(self, duration='?', time_signature=(1,1), subdivisions=(1,), strict_decomp=False):
     self.__duration       = Fraction(1, 1) if duration == '?' else Fraction(duration)
-    self.__time_signature = time_signature
+    self.__time_signature = Fraction(time_signature)
     self.__subdivisions   = subdivisions
     self.__strict_decomp  = strict_decomp
     self.__ratios         = tuple(self.__duration * r for r in measure_ratios(self.subdivisions))
-    self.__ratios         = strict_decomposition(self.__ratios, self.__duration) if self.__strict_decomp else self.__ratios
+    self.__ratios         = strict_decomposition(self.__ratios, self.__time_signature) if self.__strict_decomp else self.__ratios
 
   @property
   def duration(self):
@@ -151,7 +152,7 @@ def measure_ratios(tree):
             result.append(Fraction(s, div))
     return result
 
-def reduced_decomposition(fractions, meas):
+def reduced_decomposition(ratios, meas):
     '''
     Algorithm 2: ReducedDecomposition
     
@@ -168,24 +169,45 @@ def reduced_decomposition(fractions, meas):
     
     Reduces the proportions in fractions according to the given Tempus (meas).
     
-    :param fractions: List of Fraction objects representing proportions.
+    :param ratios: List of Fraction objects representing proportions.
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of reduced proportions.
     '''
     num, denom = meas
-    return tuple(Fraction(f.numerator * num, f.denominator * denom) for f in fractions)
+    return tuple(Fraction(f.numerator * num, f.denominator * denom) for f in ratios)
 
-def strict_decomposition(fractions, meas):
+def strict_decomposition(ratios, meas):
     '''
+    Algorithm 3: StrictDecomposition
+    
+    Pseudocode by Karim Haddad
+    
+    Data: liste is a list of proportions resulting from MeasureRatios; meas is the Tempus
+    Result: List of proportions with common denominators.
+    
+    num = numerator of meas;
+    denom = denominator of meas;
+    pgcd = gcd of the list;
+    pgcd_denom = denominator of pgcd;
+    
+    begin
+        foreach i of liste do
+            [ ((i/pgcd) * num) , pgcd_denom ];
+        end foreach
+    end
+    
     Decomposes the proportions in fractions with a common denominator, according to Tempus (meas).
     
-    :param fractions: List of Fraction objects representing proportions.
+    :param ratios: List of Fraction objects representing proportions.
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of proportions with a common denominator.
     '''
     num, denom = meas
-    common_denom = reduce(lambda a, b: gcd(a, b.denominator), fractions, fractions[0].denominator)
-    return tuple(Fraction((f / common_denom).numerator * num, denom) for f in fractions)
+    pgcd = reduce(gcd, (ratio.numerator for ratio in ratios))
+    pgcd_denom = denom
+    # return tuple(Fraction((ratio.numerator // pgcd) * num, pgcd_denom) for ratio in ratios)
+    return tuple(Fraction((Fraction(ratio.numerator, pgcd) * num), pgcd_denom) for ratio in ratios)
+
 
 def factor(subdivs):
     def _factor(subdivs, acc):
@@ -209,6 +231,45 @@ def refactor(subdivs, factors):
                 index += 1
         return tuple(result), index
     return _refactor(subdivs, 0)[0]
+
+def calc_onsets(ratios):
+   return np.cumsum([abs(r) for r in ratios]) - ratios[0]
+
+
+# ------------------------------------------------------------------------------------
+# EXPERIMENTAL
+# ------------------------------------------------------------------------------------
+def sum_proportions(tree):
+    return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
+
+def notate(tree, level=0):
+    if isinstance(tree, RT):
+        return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
+    
+    if isinstance(tree, tuple) and level == 0:
+        tuplet_value = sum_proportions(tree)
+        return f'\tuplet {tuplet_value}/d ' + '{{' + notate(tree, level+1) + '}}'
+    else:
+        result = ""
+        for element in tree:
+            if isinstance(element, int):  # Rest or single note
+                if element < 0:  # Rest
+                    result += f" -{abs(element)}"
+                else:  # Single note
+                    result += f" {element}"
+            elif isinstance(element, tuple):  # Subdivision
+                D, S = element
+                if isinstance(D, int):  # If D is an integer, calculate the proportion
+                    tuplet_value = sum_proportions(S) if isinstance(S, tuple) else D
+                else:  # If D is a tuple, it's a nested tuplet
+                    tuplet_value = sum_proportions(D)
+                result += f' \\tuplet {tuplet_value}/d {{{notate(S, level+1)}}}'
+            if level == 0:
+                result = result.strip() + ' '
+        return result.strip()
+# ------------------------------------------------------------------------------------
+
+
 
 if __name__ == '__main__':  
     # ------------------------------------------------------------------------------------
