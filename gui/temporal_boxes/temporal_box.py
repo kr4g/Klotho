@@ -101,24 +101,12 @@ class TemporalBox(QGraphicsRectItem):
 
     def adjustScale(self, newScaleFactor, oldScaleFactor):
         if oldScaleFactor == 0: return  # Avoid division by zero
-
-        # Calculate the ratio of the new scale factor to the old scale factor
         scaleFactorRatio = newScaleFactor / oldScaleFactor
-
-        # Retrieve the current rectangle defining the box
         currentRect = self.rect()
-        
-        # Calculate the new position and width of the box using the scale factor ratio
-        # The left side (x-coordinate) and width of the box should both scale proportionally
         newLeft = currentRect.left() * scaleFactorRatio
         newWidth = currentRect.width() * scaleFactorRatio
-
-        # Set the new rectangle for the box with the scaled position and width
         self.setRect(QRectF(newLeft, currentRect.y(), newWidth, currentRect.height()))
         self.update()
-
-
-
 
     def deleteItem(self):
         self.scene().removeItem(self)

@@ -60,21 +60,18 @@ class MaquetteMainWindow(QMainWindow):
         super(MaquetteMainWindow, self).resizeEvent(event)
 
     def updateSceneRect(self):
-        # Expand the scene rect to include all items
         currentRect = self.scene.itemsBoundingRect()
         viewportRect = QRectF(0, 0, self.graphicsView.viewport().width(), self.graphicsView.viewport().height())
         newRect = currentRect.united(viewportRect)
         self.scene.setSceneRect(newRect)
     
     def updateRulerScale(self, newTicInterval):
-        # Update the tic intervals of both rulers
         self.top_ruler.adjustTicInterval(newTicInterval)
         self.bottom_ruler.adjustTicInterval(newTicInterval)
     
-    # Example of connecting scale change to TemporalBox instances
     def onScaleChanged(self, newScaleFactor):
         oldScaleFactor = self.currentScaleFactor
-        self.currentScaleFactor = newScaleFactor  # Update the current scale factor
+        self.currentScaleFactor = newScaleFactor
         for item in self.scene.items():
             if isinstance(item, TemporalBox):
                 item.adjustScale(newScaleFactor, oldScaleFactor)
