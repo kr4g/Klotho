@@ -32,6 +32,9 @@ class MaquetteMainWindow(QMainWindow):
         self.right_ruler = Ruler("right")
         self.top_ruler = Ruler("top")
         self.bottom_ruler = Ruler("bottom")
+
+        self.top_ruler.scaleChanged.connect(self.updateRulerScale)
+        self.bottom_ruler.scaleChanged.connect(self.updateRulerScale)
         
         grid_layout.addWidget(self.top_ruler, 0, 1)
         grid_layout.addWidget(self.bottom_ruler, 2, 1)
@@ -59,6 +62,12 @@ class MaquetteMainWindow(QMainWindow):
         viewportRect = QRectF(0, 0, self.graphicsView.viewport().width(), self.graphicsView.viewport().height())
         newRect = currentRect.united(viewportRect)
         self.scene.setSceneRect(newRect)
+    
+    def updateRulerScale(self, newTicInterval):
+        # Update the tic intervals of both rulers
+        self.top_ruler.adjustTicInterval(newTicInterval)
+        self.bottom_ruler.adjustTicInterval(newTicInterval)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
