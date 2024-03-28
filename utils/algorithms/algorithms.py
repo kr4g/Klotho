@@ -108,6 +108,122 @@ def strict_decomposition(frac, meas):
     return tuple(Fraction((Fraction(ratio.numerator, pgcd) * meas.numerator),
                                     pgcd_denom) for ratio in frac)
 
+# Algorithm 4: PermutList
+def permut_list(lst:tuple, pt:int):
+    '''
+    Algorithm 4: PermutList
+    
+    Pseudocode by Karim Haddad
+    
+    Data: lst is a list with n finite elements; pt is the position of the element where circular permutation of list lst begins
+    Result: List circularly permuted starting from position pt
+    
+    begin
+        n = 0;
+        while n ≠ (pt + 1) do
+            lst = ([car of lst] [cdr of lst]);
+            n = n + 1;
+        end while
+        return lst;
+    end
+    
+    /* car = returns the first element of lst  */
+    /* cdr = returns lst without its first element  */
+    
+    :param lst: List of elements to be permuted.
+    :param pt: Starting position for the permutation.
+    :return: Circularly permuted list.
+    '''
+    pt = pt % len(lst)
+    return lst[pt:] + lst[:pt]
+
+# Algorithm 5: AutoRef
+def autoref(lst:tuple):
+    '''
+    Algorithm 5: AutoRef
+    
+    Pseudocode by Karim Haddad
+
+    Data: lst est une liste à n éléments finis
+    Result: Liste doublement permuteé circulairement.
+
+    begin
+        n = 0;
+        lgt = nombre d'éléments dans la liste;
+        foreach elt in lst do
+            while n ≠ (lgt + 1) do
+                return [elt, (PermutList(lst, n))];
+                n = n + 1;
+            end while
+        end foreach
+    end
+    
+    Applies circular permutations to each element in the list and combines them with the original element to create a list of lists.
+
+    :param lst: List of finite elements to be doubly circularly permuted.
+    :return: List containing the original element and its permutations.
+    '''
+    result = []
+    for n, elt in enumerate(lst):
+        result.append((elt, permut_list(lst, n + 1)))
+    return tuple(result)
+
+# AutoRef Matrices
+def rotmat(lst:tuple, mode:str='G'):
+    '''
+    Matrices for lst = (3,4,5,7):
+
+    Mode G (Group Rotation):
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)))
+    ((5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)))
+    ((7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)))
+
+    Mode S:
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)))
+    ((3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)), (5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)))
+    ((3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)))
+
+    Mode D:
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)))
+    ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)))
+    ((7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)))
+
+    Mode C (Circular Rotation):
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)))
+    ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)))
+    ((7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)))
+    '''
+    result = []
+    if mode == 'G':        
+        for i in range(len(lst)):
+            l = permut_list(lst, i)
+            result.append(autoref(l))
+    elif mode == 'S':
+        for i in range(len(lst)):
+            l = tuple((lst[j], permut_list(lst, i + j + 1)) for j in range(len(lst)))
+            result.append(l)
+    elif mode == 'D':
+        l1 = autoref(lst)
+        for i in range(len(lst)):
+            l = permut_list(lst, i)
+            result.append(tuple((elem, l1[j][1]) for j, elem in enumerate(l)))
+    elif mode == 'C':
+        l1 = autoref(permut_list(lst, 0))
+        l2 = autoref(permut_list(lst, 2))
+        for i in range(len(lst)):
+            l = permut_list(lst, i)
+            lp = l1 if i % 2 == 0 else l2
+            result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))    
+    return tuple(result)
+
 def factor(subdivs:tuple):
     def _factor(subdivs, acc):
         for element in subdivs:
@@ -130,6 +246,13 @@ def refactor(subdivs:tuple, factors:tuple):
                 index += 1
         return tuple(result), index
     return _refactor(subdivs, 0)[0]
+
+def rotate_tree(subdivisions:tuple, n=1):
+    factors = factor(subdivisions)
+    n = n % len(factors)
+    factors = factors[n:] + factors[:n]
+    return refactor(subdivisions, factors)
+    
 
 def calc_onsets(ratios:tuple):
    return tuple(np.cumsum([abs(r) for r in ratios]) - ratios[0])

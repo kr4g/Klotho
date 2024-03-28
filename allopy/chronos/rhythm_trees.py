@@ -20,7 +20,7 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 
 from fractions import Fraction
 from typing import Union, Tuple
-from utils.algorithms.algorithms import measure_ratios, reduced_decomposition, strict_decomposition, calc_onsets, factor, refactor
+from utils.algorithms.algorithms import measure_ratios, reduced_decomposition, strict_decomposition, calc_onsets, factor, refactor, rotate_tree
 
 class RT:
     '''
@@ -107,14 +107,11 @@ class RT:
         return ratios
 
     def rotate(self, n=1):
-        factors = factor(self.__subdivisions)
-        n = n % len(factors)
-        factors = factors[n:] + factors[:n]
-        refactored = refactor(self.__subdivisions, factors)
-        return RT(duration=self.__duration,
-                  time_signature=self.__time_signature,
-                  subdivisions=refactored,
-                  decomp=self.__decomp)
+        refactored = rotate_tree(self.__subdivisions, n)
+        return RT(duration       = self.__duration,
+                  time_signature = self.__time_signature,
+                  subdivisions   = refactored,
+                  decomp         = self.__decomp)
 
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
