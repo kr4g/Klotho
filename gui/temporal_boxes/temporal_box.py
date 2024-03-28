@@ -7,14 +7,12 @@ class TemporalBox(QGraphicsRectItem):
         super().__init__(x, y, width, height, parent)
         self.setBrush(QBrush(QColor(100, 200, 255)))
         self.setPen(QPen(QColor(80, 169, 200)))
-        # Set item flags
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setFlag(QGraphicsItem.ItemIsFocusable)
-        # Enable hover events
         self.setAcceptHoverEvents(True)
         self.materials = {}
-        self.edgeMargin = 5.0  # Margin around the edges to detect resizing
+        self.edgeMargin = 5.0  # detect resizing
         self.resizing = False
         self.resizeDirection = None
 
@@ -44,14 +42,12 @@ class TemporalBox(QGraphicsRectItem):
             newRect = QRectF(self.rect())
             pos = event.pos()
             if self.resizeDirection == 'horizontal':
-                # If mouse is left of the center, adjust left edge; otherwise, adjust right edge
-                if pos.x() < newRect.center().x():
+                if pos.x() < newRect.center().x(): # left
                     newRect.setLeft(pos.x())
                 else:
                     newRect.setRight(pos.x())
             elif self.resizeDirection == 'vertical':
-                # If mouse is above the center, adjust top edge; otherwise, adjust bottom edge
-                if pos.y() < newRect.center().y():
+                if pos.y() < newRect.center().y(): # top
                     newRect.setTop(pos.y())
                 else:
                     newRect.setBottom(pos.y())
