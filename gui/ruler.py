@@ -76,11 +76,14 @@ class Ruler(QWidget):
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.isDragging:
-            # scaling factor
             deltaY = event.pos().y() - self.dragStartY
-            if abs(deltaY) > 2:  # sensitivity
-                self.scaleChanged.emit(max(5, min(30, self.ticInterval + deltaY // 5)))
+            if abs(deltaY) > 2:  # Adding sensitivity control
+                newScale = max(5, min(30, self.ticInterval + deltaY // 5))
+                self.scaleChanged.emit(newScale)  # Ensure this is being called
+                self.ticInterval = newScale
                 self.dragStartY = event.pos().y()
+                self.update()
+
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self.isDragging = False

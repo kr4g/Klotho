@@ -9,6 +9,7 @@ class MaquetteMainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MaquetteMainWindow, self).__init__(*args, **kwargs)
         self.setWindowTitle("Maquette")
+        self.currentScaleFactor = 15
         self.initUI()
         self.resize(1400, 700)
 
@@ -35,6 +36,8 @@ class MaquetteMainWindow(QMainWindow):
 
         self.top_ruler.scaleChanged.connect(self.updateRulerScale)
         self.bottom_ruler.scaleChanged.connect(self.updateRulerScale)
+        self.top_ruler.scaleChanged.connect(self.onScaleChanged)
+        self.bottom_ruler.scaleChanged.connect(self.onScaleChanged)
         
         grid_layout.addWidget(self.top_ruler, 0, 1)
         grid_layout.addWidget(self.bottom_ruler, 2, 1)
@@ -67,6 +70,15 @@ class MaquetteMainWindow(QMainWindow):
         # Update the tic intervals of both rulers
         self.top_ruler.adjustTicInterval(newTicInterval)
         self.bottom_ruler.adjustTicInterval(newTicInterval)
+    
+    # Example of connecting scale change to TemporalBox instances
+    def onScaleChanged(self, newScaleFactor):
+        oldScaleFactor = self.currentScaleFactor
+        self.currentScaleFactor = newScaleFactor  # Update the current scale factor
+        for item in self.scene.items():
+            if isinstance(item, TemporalBox):
+                item.adjustScale(newScaleFactor, oldScaleFactor)
+
 
 
 if __name__ == '__main__':
