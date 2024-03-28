@@ -107,7 +107,7 @@ Consult The Topos for guidance and you will receive it, but know that The Topos 
 
 `Aikous` interlaces the higher-order symbolic representations of musical expression with the working reality of sound synthesis.  While The Topos arbitrates over the algebra, Aikous conceives the calculus.
 
-Aikous contains basic tools for converting between *conceptual* units (e.g., musical dynamics such as `mp` and `fff`) and *concrete* synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements—e.g., *crescendi* and *diminuendi*.  Aikous is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
+Aikous contains basic tools for converting between *conceptual* units (e.g., musical dynamics such as `mp` and `fff`) and *concrete* synthesis units (e.g., amplitude and deicibel values) as well as functions for creating smooth curves and interpolations between discrete musical elements.  Aikous is then best suited for the score-writing aspect of the compositional process, as she performs the computations necessary to weave a sense of continuous expression across the succession of discrete events.
 
 ### `Skora` 
 

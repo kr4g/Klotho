@@ -1,8 +1,9 @@
 
 from typing import Union, Tuple
 from fractions import Fraction
-from math import gcd
+from math import gcd, prod
 from functools import reduce
+import numpy as np
 
 # ------------------------------------------------------------------------------------
 # RHYTHM TREE ALGORITHMS
@@ -188,6 +189,7 @@ def rotmat(lst:tuple, mode:str='G'):
     ((7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)))
     '''
     result = []
+    mode = mode.upper()
     if mode == 'G':        
         for i in range(len(lst)):
             l = permut_list(lst, i)
@@ -207,7 +209,9 @@ def rotmat(lst:tuple, mode:str='G'):
         for i in range(len(lst)):
             l = permut_list(lst, i)
             lp = l1 if i % 2 == 0 else l2
-            result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))    
+            result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))
+    else:
+        result = lst
     return tuple(result)
 
 # Algorithm 6: SymbolicApprox
@@ -307,6 +311,7 @@ def get_group_subdivision(G:tuple):
     if bin(n).count("1") == 1:      # n is binary
         m = symbolic_approx(n)
     elif (n * 3 / 2).is_integer():  # n is ternary
+    # elif n % 3 == 0:  # n is ternary
         m = symbolic_approx(n) * 3 / 2
     else:
         num = n
@@ -326,7 +331,7 @@ def get_group_subdivision(G:tuple):
     
     return [n, m]
 
-def factor(subdivs:tuple):
+def factor_tree(subdivs:tuple):
     def _factor(subdivs, acc):
         for element in subdivs:
             if isinstance(element, tuple):
@@ -336,7 +341,7 @@ def factor(subdivs:tuple):
         return acc
     return tuple(_factor(subdivs, []))
 
-def refactor(subdivs:tuple, factors:tuple):
+def refactor_tree(subdivs:tuple, factors:tuple):
     def _refactor(subdivs, index):
         result = []
         for element in subdivs:
@@ -349,8 +354,20 @@ def refactor(subdivs:tuple, factors:tuple):
         return tuple(result), index
     return _refactor(subdivs, 0)[0]
 
-def rotate_tree(subdivisions:tuple, n=1):
-    factors = factor(subdivisions)
+def rotate_tree(subdivs:tuple, n=1):
+    factors = factor_tree(subdivs)
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
-    return refactor(subdivisions, factors)
+    return refactor_tree(subdivs, factors)
+
+# ------------------------------------------------------------------------------------
+
+def rhythm_pair(lst, is_MM=True):
+    total_product = prod(lst)
+    if is_MM:
+        sequences = [np.arange(0, total_product + 1, total_product // x) for x in lst]
+    else:
+        sequences = [np.arange(0, total_product + 1, x) for x in lst]
+    combined_sequence = np.unique(np.concatenate(sequences))
+    deltas = np.diff(combined_sequence)
+    return tuple(deltas)

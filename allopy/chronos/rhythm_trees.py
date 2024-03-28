@@ -20,7 +20,7 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 
 from fractions import Fraction
 from typing import Union, Tuple
-from utils.algorithms.algorithms import measure_ratios, reduced_decomposition, strict_decomposition, calc_onsets, factor, refactor, rotate_tree
+from utils.algorithms.algorithms import measure_ratios, reduced_decomposition, strict_decomposition, factor_tree, refactor_tree, rotate_tree
 
 class RT:
     '''
@@ -86,7 +86,7 @@ class RT:
 
     @property
     def factors(self):
-        return factor(self.__subdivisions)
+        return factor_tree(self.__subdivisions)
     
     @property
     def ratios(self):
@@ -127,9 +127,11 @@ def sum_proportions(tree):
     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
 
 def notate(tree, level=0):
+    # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
     if isinstance(tree, RT):
         return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
     
+    print(f'tree: {tree}, level: {level}')
     if isinstance(tree, tuple) and level == 0:
         tuplet_value = sum_proportions(tree)
         return f'\tuplet {tuplet_value}/d ' + '{{' + notate(tree, level+1) + '}}'
@@ -151,6 +153,32 @@ def notate(tree, level=0):
             if level == 0:
                 result = result.strip() + ' '
         return result.strip()
+
+# def notate(tree, level=0):
+#     if isinstance(tree, RT):
+#         return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
+    
+#     if isinstance(tree, tuple) and level == 0:
+#         tuplet_value = sum_proportions(tree)
+#         return f'\tuplet {tuplet_value}/d ' + '{{' + notate(tree, level+1) + '}}'
+#     else:
+#         result = ""
+#         for element in tree:
+#             if isinstance(element, int):  # Rest or single note
+#                 if element < 0:  # Rest
+#                     result += f" -{abs(element)}"
+#                 else:  # Single note
+#                     result += f" {element}"
+#             elif isinstance(element, tuple):  # Subdivision
+#                 D, S = element
+#                 if isinstance(D, int):  # If D is an integer, calculate the proportion
+#                     tuplet_value = sum_proportions(S) if isinstance(S, tuple) else D
+#                 else:  # If D is a tuple, it's a nested tuplet
+#                     tuplet_value = sum_proportions(D)
+#                 result += f' \\tuplet {tuplet_value}/d {{{notate(S, level+1)}}}'
+#             if level == 0:
+#                 result = result.strip() + ' '
+#         return result.strip()
 # ------------------------------------------------------------------------------------
 
 
