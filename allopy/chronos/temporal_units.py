@@ -2,6 +2,7 @@ from fractions import Fraction
 from typing import Union
 
 from .rhythm_trees import RT
+from utils.algorithms.algorithms import measure_ratios
 from allopy.chronos.chronos import beat_duration
 
 class UT:
@@ -18,6 +19,15 @@ class UT:
         self.__beat        = Fraction(beat) if isinstance(self.__beat, str) else beat 
         self.__duration    = 0
     
+    @classmethod
+    def from_tree(cls, tree:Union[RT, tuple]):
+        meas = sum(measure_ratios(tree.subdivisions)) if isinstance(tree, tuple) else tree.time_signature
+        s = tree.subdivisions if isinstance(tree, tuple) else tree.subdivisions
+        return cls(tempus      = meas,
+                   prolatio    = s,
+                   tempo       = None,
+                   beat        = None)
+
     @property
     def tempus(self):
         return self.__tempus

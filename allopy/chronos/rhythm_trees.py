@@ -68,6 +68,13 @@ class RT:
         self.__decomp         = decomp
         self.__ratios         = self.__set_ratios()
 
+    @classmethod
+    def from_tuple(cls, tup:Tuple):
+        return cls(duration       = 1,
+                   time_signature = sum(measure_ratios(tup)),
+                   subdivisions   = tup,
+                   decomp         = 'reduced')
+
     @property
     def duration(self):
         return self.__duration
