@@ -360,6 +360,27 @@ def rotate_tree(subdivs:tuple, n=1):
     factors = factors[n:] + factors[:n]
     return refactor_tree(subdivs, factors)
 
+def sum_proportions(subdivisions:tuple):
+    return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivisions)
+
+def measure_complexity(tree:tuple):
+    '''
+    Assumes a tree in the form (D S) where D represents a duration and S represents a list
+    of subdivisions.  S can be also be in the form (D S).
+
+    Recursively traverses the tree.  For any element, if the sum of S != D, return True.
+    '''    
+    for s in tree:
+        if isinstance(s, tuple):
+            D, S = s
+            div = sum_proportions(S)
+            # XXX - this only works for duple meters!!!!!
+            if bin(div).count("1") != 1 and div != D:
+                return True
+            else:
+                return measure_complexity(S)
+    return False
+
 # ------------------------------------------------------------------------------------
 
 def rhythm_pair(lst, is_MM=True):

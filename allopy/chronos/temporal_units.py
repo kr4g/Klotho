@@ -1,22 +1,22 @@
 from fractions import Fraction
 from typing import Union
 
-from rhythm_trees import RT
+from .rhythm_trees import RT
 from allopy.chronos.chronos import beat_duration
 
 class UT:
     def __init__(self,
-                 tempus:Union[str, Fraction]     = '1/1',
-                 prolatio:Union[RT, tuple, str]  = (1,),
-                 tempo:Union[None, float]        = None,
-                 beat:Union[None, str, Fraction] = None):
+                 tempus:Union[str,Fraction]      = '1/1',
+                 prolatio:Union[RT,tuple,str]    = 'r',
+                 tempo:Union[None,float]         = None,
+                 beat:Union[None,str,Fraction]   = None):
         
-        self.__prolationis = prolatio
-        self.__type        = self.__set_type(prolatio) # sets self.__prolationis as a RT object
+        self.__type        = None
         self.__tempus      = Fraction(tempus)
+        self.__prolationis = self.__set_prolationis(prolatio) # RT object
         self.__tempo       = tempo
         self.__beat        = Fraction(beat) if isinstance(self.__beat, str) else beat 
-        # self.__duration    = self.duration
+        self.__duration    = 0
     
     @property
     def tempus(self):
@@ -57,37 +57,39 @@ class UT:
                                                 beat_ratio = beat) for r in self.__prolationis.ratios)
         return self.__duration
     
-    def __set_type(self, prolatio):
-        ut_type = None
-        if isinstance(prolatio, str):
+    def __set_prolationis(self, prolatio):
+        if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
+            self.__type = 'Ensemble'
+            prolatio = RT(duration       = prolatio.duration,
+                          time_signature = self.__tempus,  # ...the UT wins
+                          subdivisions   = prolatio.subdivisions)
+        elif isinstance(prolatio, tuple):
+            self.__type = 'Ensemble'
+            prolatio = RT(duration       = 1,
+                          time_signature = self.__tempus,
+                          subdivisions   = prolatio)
+        elif isinstance(prolatio, str):
             prolatio = prolatio.lower()
             if prolatio in {'p', 'pulse', 'phase'}:
-                self.__prolationis = RT(duration       = 1,
-                                        time_signature = self.__tempus,
-                                        subdivisions   = (1,) * self.__tempus.numerator)
-                return 'Pulse'
+                self.__type = 'Pulse'
+                prolatio = RT(duration       = 1,
+                              time_signature = self.__tempus,
+                              subdivisions   = (1,) * self.__tempus.numerator)
             elif prolatio in {'d', 'duration', 'dur'}:
-                self.__prolationis = RT(duration       = 1,
-                                        time_signature = self.__tempus,
-                                        subdivisions   = (1,))
-                return 'Duration'
+                self.__type = 'Duration'
+                prolatio = RT(duration       = 1,
+                              time_signature = self.__tempus,
+                              subdivisions   = (1,))
             elif prolatio in {'r', 'rest', 'silence'}:
-                self.__prolationis = RT(duration       = 1,
-                                        time_signature = self.__tempus,
-                                        subdivisions   = (-1,))
-                return 'Silence'
-        elif isinstance(prolatio, RT) or isinstance(prolatio, tuple):
-            self.__prolationis = RT(duration       = 1,
-                                    time_signature = self.__tempus,
-                                    subdivisions   = prolatio) if isinstance(prolatio, tuple) else prolatio
-            subdivs = prolatio.subdivisions
-            ut_type = 'Pulse' if all(isinstance(s, int) for s in subdivs) and len(set(subdivs)) == 1 else 'Ensemble'
-            sub_sum = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivs)
-            num = prolatio.time_signature.numerator
-            return f'{ut_type} (Simple)' if sub_sum != num else f'{ut_type} (Complex)'
+                self.__type = 'Silence'
+                prolatio = RT(duration       = 1,
+                              time_signature = self.__tempus,
+                              subdivisions   = (-1,))
+            else:
+                raise ValueError(f'Invalid string: {prolatio}')
         else:
             raise ValueError(f'Invalid prolationis: {prolatio}')
-        return ut_type
+        return prolatio
 
 
 if __name__ == '__main__':  

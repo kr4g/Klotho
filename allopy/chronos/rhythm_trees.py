@@ -20,7 +20,7 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 
 from fractions import Fraction
 from typing import Union, Tuple
-from utils.algorithms.algorithms import measure_ratios, reduced_decomposition, strict_decomposition, factor_tree, refactor_tree, rotate_tree
+from utils.algorithms.algorithms import *
 
 class RT:
     '''
@@ -108,14 +108,22 @@ class RT:
                   time_signature = self.__time_signature,
                   subdivisions   = refactored,
                   decomp         = self.__decomp)
+    
+    def is_complex(self):
+        div = sum_proportions(self.__subdivisions)
+        if bin(div).count('1') != 1 and div != self.__time_signature.numerator:
+            return True
+        return measure_complexity(self.__subdivisions)
 
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
+        rt_type = 'complex' if self.is_complex() else 'simple'
         return (
-            f'duration: {self.__duration}\n'
+            f'Duration: {self.__duration}\n'
             f'Time Signature: {self.__time_signature}\n'
             f'Subdivisions: {self.__subdivisions}\n'
             f'Decomposition: {self.__decomp}\n'
+            f'Type: {rt_type}\n'
             f'Ratios: {ratios}\n'
         )
 
@@ -123,8 +131,8 @@ class RT:
 # ------------------------------------------------------------------------------------
 # EXPERIMENTAL
 # ------------------------------------------------------------------------------------
-def sum_proportions(tree):
-    return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
+# def sum_proportions(tree):
+#     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
 
 def notate(tree, level=0):
     # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
