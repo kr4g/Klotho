@@ -313,7 +313,8 @@ def get_group_subdivision(G:tuple):
     
     if subdiv == 1:
         n = ds
-    elif (ds / subdiv).is_integer() and ((ds / subdiv) in {1, 2, 4, 8} or (subdiv / ds) in {1, 2, 4, 8}):
+    # elif (ds / subdiv).is_integer() and ((ds / subdiv) in {1, 2, 4, 8} or (subdiv / ds) in {1, 2, 4, 8}):
+    elif (ds / subdiv).is_integer() and ((ds // subdiv).bit_length() == 1 or (subdiv // ds).bit_length() == 1):
         n = ds
     else:
         n = subdiv
@@ -324,11 +325,14 @@ def get_group_subdivision(G:tuple):
         m = symbolic_approx(n) * 3 / 2
     else:
         num = n
-        if num + 1 == ds or num == ds:
+        if num + 1 == ds:# or num == ds:
             m = ds
+        elif num == ds:
+            m = num
         elif num < ds:
-            m = [num * 2, ds]
-        elif num < (ds * 2) / 1:
+            # m = [num * 2, ds]
+            return [num * 2, ds]
+        elif num < (ds * 2) - 1:
             m = ds
         else:
             pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
