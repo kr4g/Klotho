@@ -7,17 +7,18 @@ from functools import reduce
 # ------------------------------------------------------------------------------------
 # RHYTHM TREE ALGORITHMS
 # ----------------------
-# Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
+# 
+# All Pseudocode by Karim Haddad unless otherwise noted.
+# 
+# "Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
 # composed of (DS), that is its part constituting the proportions which can also 
-# encompass other tree structures.  —- Karim Haddad
+# encompass other tree structures."  —- Karim Haddad
 # ------------------------------------------------------------------------------------
 
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivisions:Tuple):
     '''
     Algorithm 1: MeasureRatios
-
-    Pseudocode by Karim Haddad
 
     Data: S is the part of a RT
     Result: Transforms the part (s) of a rhythm tree into fractional proportions.
@@ -55,8 +56,6 @@ def reduced_decomposition(frac, meas):
     '''
     Algorithm 2: ReducedDecomposition
     
-    Psuedocode by Karim Haddad
-    
     Data: frac is a list of proportions; meas is the Tempus
     Result: Reduction of the proportions of frac.
     
@@ -65,9 +64,7 @@ def reduced_decomposition(frac, meas):
             (f * [numerator of meas]) / [denominator of meas];
         end for all
     end
-    
-    Reduces the proportions in fractions according to the given Tempus (meas).
-    
+        
     :param ratios: List of Fraction objects representing proportions.
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of reduced proportions.
@@ -79,8 +76,6 @@ def reduced_decomposition(frac, meas):
 def strict_decomposition(frac, meas):
     '''
     Algorithm 3: StrictDecomposition
-    
-    Pseudocode by Karim Haddad
     
     Data: liste is a list of proportions resulting from MeasureRatios; meas is the Tempus
     Result: List of proportions with common denominators.
@@ -95,9 +90,7 @@ def strict_decomposition(frac, meas):
             [ ((i/pgcd) * num) , pgcd_denom ];
         end foreach
     end
-    
-    Decomposes the proportions in fractions with a common denominator, according to Tempus (meas).
-    
+        
     :param ratios: List of Fraction objects representing proportions.
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of proportions with a common denominator.
@@ -111,8 +104,6 @@ def strict_decomposition(frac, meas):
 def permut_list(lst:tuple, pt:int):
     '''
     Algorithm 4: PermutList
-    
-    Pseudocode by Karim Haddad
     
     Data: lst is a list with n finite elements; pt is the position of the element where circular permutation of list lst begins
     Result: List circularly permuted starting from position pt
@@ -140,8 +131,6 @@ def permut_list(lst:tuple, pt:int):
 def autoref(lst:tuple):
     '''
     Algorithm 5: AutoRef
-    
-    Pseudocode by Karim Haddad
 
     Data: lst est une liste à n éléments finis
     Result: Liste doublement permuteé circulairement.
@@ -157,8 +146,6 @@ def autoref(lst:tuple):
         end foreach
     end
     
-    Applies circular permutations to each element in the list and combines them with the original element to create a list of lists.
-
     :param lst: List of finite elements to be doubly circularly permuted.
     :return: List containing the original element and its permutations.
     '''
@@ -226,9 +213,8 @@ def rotmat(lst:tuple, mode:str='G'):
 # Algorithm 6: SymbolicApprox
 def symbolic_approx(n:int):
     '''
-    Psuedocode by Karim Haddad
-
     Algorithm 6: SymbolicApprox
+
     Data: n is an integer (1 = whole note, 2 = half note, 4 = quarter note, ...)
     Result: Returns the note value corresponding to the denominator of a time signature or a given Tempus
     begin
@@ -267,9 +253,8 @@ def symbolic_approx(n:int):
 # Algorithm 10: GetGroupSubdivision
 def get_group_subdivision(G:tuple):
     '''
-    Psuedocode by Karim Haddad
-
     Algorithm 10: GetGroupSubdivision
+
     Data: G is a group in the form (DS)
     Result: Provides the value of the "irrational" composition of the prolationis of a complex Temporal Unit
     ds = symbolic duration of G;
