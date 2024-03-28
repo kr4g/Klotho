@@ -67,6 +67,7 @@ class RT:
         self.__subdivisions   = subdivisions
         self.__decomp         = decomp
         self.__ratios         = self.__set_ratios()
+        self.__complex        = self._complex()
 
     @classmethod
     def from_tuple(cls, tup:Tuple):
@@ -98,7 +99,18 @@ class RT:
     @property
     def ratios(self):
         return self.__ratios
+    
+    @property
+    def is_complex(self):
+        return self.__complex
 
+    def rotate(self, n=1):
+        refactored = rotate_tree(self.__subdivisions, n)
+        return RT(duration       = self.__duration,
+                  time_signature = self.__time_signature,
+                  subdivisions   = refactored,
+                  decomp         = self.__decomp)
+    
     def __set_ratios(self):
         # Mesure Ratios
         ratios = tuple(self.__duration * r for r in measure_ratios(self.__subdivisions))
@@ -108,15 +120,8 @@ class RT:
         elif self.__decomp == 'strict':
             ratios = strict_decomposition(ratios, self.__time_signature)
         return ratios
-
-    def rotate(self, n=1):
-        refactored = rotate_tree(self.__subdivisions, n)
-        return RT(duration       = self.__duration,
-                  time_signature = self.__time_signature,
-                  subdivisions   = refactored,
-                  decomp         = self.__decomp)
     
-    def is_complex(self):
+    def _complex(self):
         div = sum_proportions(self.__subdivisions)
         if bin(div).count('1') != 1 and div != self.__time_signature.numerator:
             return True

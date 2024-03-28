@@ -156,7 +156,7 @@ def autoref(lst:tuple):
     return tuple(result)
 
 # AutoRef Matrices
-def rotmat(lst:tuple, mode:str='G'):
+def autoref_rotmat(lst:tuple, mode:str='G'):
     '''
     Matrices for lst = (3,4,5,7):
 

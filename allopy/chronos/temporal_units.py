@@ -8,7 +8,7 @@ from allopy.chronos.chronos import beat_duration
 class UT:
     def __init__(self,
                  tempus:Union[str,Fraction]      = '1/1',
-                 prolatio:Union[RT,tuple,str]    = 'r',
+                 prolatio:Union[RT,tuple,str]    = 'd',
                  tempo:Union[None,float]         = None,
                  beat:Union[None,str,Fraction]   = None):
         
@@ -21,8 +21,8 @@ class UT:
     
     @classmethod
     def from_tree(cls, tree:Union[RT, tuple]):
-        meas = sum(measure_ratios(tree.subdivisions)) if isinstance(tree, tuple) else tree.time_signature
-        s = tree.subdivisions if isinstance(tree, tuple) else tree.subdivisions
+        meas = sum(measure_ratios(tree)) if isinstance(tree, tuple) else tree.time_signature
+        s = tree if isinstance(tree, tuple) else tree.subdivisions
         return cls(tempus      = meas,
                    prolatio    = s,
                    tempo       = None,
@@ -69,12 +69,14 @@ class UT:
     
     def __set_prolationis(self, prolatio):
         if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
-            self.__type = 'Ensemble'
+            comp = '(Complex)' if prolatio.is_complex() else '(Simple)'
+            self.__type = f'Ensemble {comp}'
             prolatio = RT(duration       = prolatio.duration,
                           time_signature = self.__tempus,  # ...the UT wins
                           subdivisions   = prolatio.subdivisions)
         elif isinstance(prolatio, tuple):
-            self.__type = 'Ensemble'
+            comp = '(Complex)' if prolatio.is_complex() else '(Simple)'
+            self.__type = f'Ensemble {comp}'
             prolatio = RT(duration       = 1,
                           time_signature = self.__tempus,
                           subdivisions   = prolatio)
