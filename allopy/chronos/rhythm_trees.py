@@ -57,7 +57,7 @@ class RT:
     see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
     '''
     def __init__(self, 
-                 duration:int                        = '?',
+                 duration:int                        = 1,
                  time_signature:Union[Fraction, str] = '1/1',
                  subdivisions:Tuple                  = (1,),
                  decomp:str                          = 'reduced'):
@@ -91,10 +91,6 @@ class RT:
     @property
     def ratios(self):
         return self.__ratios
-    
-    @property
-    def onsets(self):
-        return calc_onsets(self.__ratios)
 
     def __set_ratios(self):
         # Mesure Ratios
@@ -115,14 +111,12 @@ class RT:
 
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
-        # onsets = ', '.join(tuple([str(o) for o in self.onsets]))
         return (
             f'duration: {self.__duration}\n'
             f'Time Signature: {self.__time_signature}\n'
             f'Subdivisions: {self.__subdivisions}\n'
             f'Decomposition: {self.__decomp}\n'
             f'Ratios: {ratios}\n'
-            # f'Onsets: {onsets}\n'
         )
 
 

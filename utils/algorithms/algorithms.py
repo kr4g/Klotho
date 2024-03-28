@@ -3,7 +3,6 @@ from typing import Union, Tuple
 from fractions import Fraction
 from math import gcd
 from functools import reduce
-import numpy as np
 
 # ------------------------------------------------------------------------------------
 # RHYTHM TREE ALGORITHMS
@@ -224,6 +223,120 @@ def rotmat(lst:tuple, mode:str='G'):
             result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))    
     return tuple(result)
 
+# Algorithm 6: SymbolicApprox
+def symbolic_approx(n:int):
+    '''
+    Psuedocode by Karim Haddad
+
+    Algorithm 6: SymbolicApprox
+    Data: n is an integer (1 = whole note, 2 = half note, 4 = quarter note, ...)
+    Result: Returns the note value corresponding to the denominator of a time signature or a given Tempus
+    begin
+        if n = 1 then
+            return 1;
+        else if n belongs to {4, 5, 6, 7} then
+            return 4;
+        else if n belongs to {8, 9, 10, 11, 12, 13, 14} then
+            return 8;
+        else if n belongs to {15, 16} then
+            return 16;
+        else
+            pi = first power of 2 <= n;
+            ps = first power of 2 >= n;
+            if |n - pi| > |n - ps| then
+                return ps;
+            else
+                return pi;
+            end if
+        end case
+    end
+    '''
+    if n == 1:
+        return 1
+    elif n in {4, 5, 6, 7}:
+        return 4
+    elif n in {8, 9, 10, 11, 12, 13, 14}:
+        return 8
+    elif n in {15, 16}:
+        return 16
+    else:
+        pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
+        ps = 2 ** n.bit_length()        # first power of 2 >= n
+        return ps if abs(n - pi) > abs(n - ps) else pi
+
+# Algorithm 10: GetGroupSubdivision
+def get_group_subdivision(G:tuple):
+    '''
+    Psuedocode by Karim Haddad
+
+    Algorithm 10: GetGroupSubdivision
+    Data: G is a group in the form (DS)
+    Result: Provides the value of the "irrational" composition of the prolationis of a complex Temporal Unit
+    ds = symbolic duration of G;
+    subdiv = sum of the elements of S;
+
+    n = {
+        if subdiv = 1 then
+            return ds;
+        else if ds/subdiv is an integer && (ds/subdiv is a power of 2 OR subdiv/ds is a power of 2) then
+            return ds;
+        else
+            return subdiv;
+        end if
+    };
+
+    m = {
+        if n is binary then
+            return SymbolicApprox(n);
+        else if n is ternary then
+            return SymbolicApprox(n) * 3/2;
+        else
+            num = numerator of n; if (num + 1) = ds then
+                return ds;
+            else if num = ds then return num;
+            else if num < ds then return [n = num * 2, m = ds];
+            else if num < ((ds * 2) / 1) then return ds;
+            else
+                pi = first power of 2 <= n; ps = first power of 2 > n;  if |n - pi| > |n - ps| then
+                    return ps;
+                else
+                    return pi;
+                end if
+            end if
+        end if
+    }
+
+    return [n, m];
+    '''
+    ds, S = G  # G is of form (DS) where D is the symbolic duration and S is the sum of elements
+    subdiv = sum(S)
+    
+    if subdiv == 1:
+        n = ds
+    elif (ds / subdiv).is_integer() and ((ds / subdiv) in {1, 2, 4, 8} or (subdiv / ds) in {1, 2, 4, 8}):
+        n = ds
+    else:
+        n = subdiv
+    
+    if bin(n).count("1") == 1:      # n is binary
+        m = symbolic_approx(n)
+    elif (n * 3 / 2).is_integer():  # n is ternary
+        m = symbolic_approx(n) * 3 / 2
+    else:
+        num = n
+        if num + 1 == ds or num == ds:
+            m = ds
+        elif num < ds:
+            m = [num * 2, ds]
+        elif num < (ds * 2) / 1:
+            m = ds
+        else:
+            pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
+            ps = 2 ** n.bit_length()        # first power of 2 > n
+            m = ps if abs(n - pi) > abs(n - ps) else pi
+    
+    return [n, m]
+
 def factor(subdivs:tuple):
     def _factor(subdivs, acc):
         for element in subdivs:
@@ -252,7 +365,3 @@ def rotate_tree(subdivisions:tuple, n=1):
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
     return refactor(subdivisions, factors)
-    
-
-def calc_onsets(ratios:tuple):
-   return tuple(np.cumsum([abs(r) for r in ratios]) - ratios[0])

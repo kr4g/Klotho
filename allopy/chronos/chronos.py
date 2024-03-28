@@ -114,6 +114,9 @@ def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
   beat_numerator, beat_denominator = map(int, beat_ratio.split('/'))
   return tempo_factor * ratio_value * (beat_denominator / beat_numerator)
 
+def calc_onsets(durations:tuple):
+   return tuple(np.cumsum([abs(r) for r in durations]) - durations[0])
+
 def quantize(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominator: float = 16) -> Fraction:
   '''
   Finds the closest beat ratio for a given duration at a certain tempo.
