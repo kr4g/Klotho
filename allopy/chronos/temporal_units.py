@@ -69,14 +69,14 @@ class UT:
     
     def __set_prolationis(self, prolatio):
         if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
-            comp = '(Complex)' if prolatio.is_complex() else '(Simple)'
-            self.__type = f'Ensemble {comp}'
+            comp = 'Complex' if prolatio.is_complex() else 'Simple'
+            self.__type = f'Ensemble ({comp})'
             prolatio = RT(duration       = prolatio.duration,
                           time_signature = self.__tempus,  # ...the UT wins
                           subdivisions   = prolatio.subdivisions)
         elif isinstance(prolatio, tuple):
-            comp = '(Complex)' if prolatio.is_complex() else '(Simple)'
-            self.__type = f'Ensemble {comp}'
+            comp = 'Complex' if prolatio.is_complex() else 'Simple'
+            self.__type = f'Ensemble ({comp})'            
             prolatio = RT(duration       = 1,
                           time_signature = self.__tempus,
                           subdivisions   = prolatio)
