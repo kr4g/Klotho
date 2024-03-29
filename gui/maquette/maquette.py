@@ -29,9 +29,9 @@ class MaquetteMainWindow(QMainWindow):
         self.scene.changed.connect(self.updateSceneRect)
         self.graphicsView.setScene(self.scene)
         
-        self.left_ruler = Ruler("left")
-        self.right_ruler = Ruler("right")
-        self.top_ruler = Ruler("top")
+        self.left_ruler   = Ruler("left")
+        self.right_ruler  = Ruler("right")
+        self.top_ruler    = Ruler("top")
         self.bottom_ruler = Ruler("bottom")
 
         self.top_ruler.scaleChanged.connect(self.updateRulerScale)
@@ -61,7 +61,9 @@ class MaquetteMainWindow(QMainWindow):
 
     def updateSceneRect(self):
         currentRect = self.scene.itemsBoundingRect()
-        viewportRect = QRectF(0, 0, self.graphicsView.viewport().width(), self.graphicsView.viewport().height())
+        viewportRect = QRectF(0, 0,
+                              self.graphicsView.viewport().width(),
+                              self.graphicsView.viewport().height())
         newRect = currentRect.united(viewportRect)
         self.scene.setSceneRect(newRect)
     
@@ -75,7 +77,6 @@ class MaquetteMainWindow(QMainWindow):
         for item in self.scene.items():
             if isinstance(item, TemporalBox):
                 item.adjustScale(newScaleFactor, oldScaleFactor)
-
 
 
 if __name__ == '__main__':

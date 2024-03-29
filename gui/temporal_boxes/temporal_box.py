@@ -28,10 +28,22 @@ class TemporalBox(QGraphicsRectItem):
             self.showContextMenu(event.screenPos())
         pos = event.pos()
         rect = self.rect()
-        if QRectF(rect.left(), rect.top(), self.edgeMargin, rect.height()).contains(pos) or QRectF(rect.right() - self.edgeMargin, rect.top(), self.edgeMargin, rect.height()).contains(pos):
+        if QRectF(rect.left(),
+                  rect.top(),
+                  self.edgeMargin,
+                  rect.height()).contains(pos) or QRectF(rect.right() - self.edgeMargin,
+                                                         rect.top(),
+                                                         self.edgeMargin,
+                                                         rect.height()).contains(pos):
             self.resizing = True
             self.resizeDirection = 'horizontal'
-        elif QRectF(rect.left(), rect.top(), rect.width(), self.edgeMargin).contains(pos) or QRectF(rect.left(), rect.bottom() - self.edgeMargin, rect.width(), self.edgeMargin).contains(pos):
+        elif QRectF(rect.left(),
+                    rect.top(),
+                    rect.width(),
+                    self.edgeMargin).contains(pos) or QRectF(rect.left(),
+                                                             rect.bottom() - self.edgeMargin,
+                                                             rect.width(),
+                                                             self.edgeMargin).contains(pos):
             self.resizing = True
             self.resizeDirection = 'vertical'
         else:
@@ -65,13 +77,25 @@ class TemporalBox(QGraphicsRectItem):
     def hoverMoveEvent(self, event):
         pos = event.pos()
         rect = self.rect()
-        if QRectF(rect.left(), rect.top(), self.edgeMargin, rect.height()).contains(pos):
+        if QRectF(rect.left(),
+                  rect.top(),
+                  self.edgeMargin,
+                  rect.height()).contains(pos):
             self.setCursor(QCursor(Qt.SizeHorCursor))
-        elif QRectF(rect.right() - self.edgeMargin, rect.top(), self.edgeMargin, rect.height()).contains(pos):
+        elif QRectF(rect.right() - self.edgeMargin,
+                    rect.top(),
+                    self.edgeMargin,
+                    rect.height()).contains(pos):
             self.setCursor(QCursor(Qt.SizeHorCursor))
-        elif QRectF(rect.left(), rect.top(), rect.width(), self.edgeMargin).contains(pos):
+        elif QRectF(rect.left(),
+                    rect.top(),
+                    rect.width(),
+                    self.edgeMargin).contains(pos):
             self.setCursor(QCursor(Qt.SizeVerCursor))
-        elif QRectF(rect.left(), rect.bottom() - self.edgeMargin, rect.width(), self.edgeMargin).contains(pos):
+        elif QRectF(rect.left(),
+                    rect.bottom() - self.edgeMargin,
+                    rect.width(),
+                    self.edgeMargin).contains(pos):
             self.setCursor(QCursor(Qt.SizeVerCursor))
         else:
             self.setCursor(QCursor(Qt.ArrowCursor))
@@ -100,7 +124,7 @@ class TemporalBox(QGraphicsRectItem):
         return super().itemChange(change, value)
 
     def adjustScale(self, newScaleFactor, oldScaleFactor):
-        if oldScaleFactor == 0: return  # Avoid division by zero
+        if oldScaleFactor == 0: return  # avoid division by zero
         scaleFactorRatio = newScaleFactor / oldScaleFactor
         currentRect = self.rect()
         newLeft = currentRect.left() * scaleFactorRatio
