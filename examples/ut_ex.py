@@ -42,13 +42,14 @@ def pre_compositional_materials(G:tuple = (3, 5, 7, 11, 13)) -> dict:
     return materials
 
 def layer1(material:dict, start_offset:float=0.05) -> list:
-    note_list = []
     dyn = aikous.DYNAMICS
     attk_max = lambda d: d * 0.1667
     amp_scale = lambda freq: aikous.amp_freq_scale(freq) * 0.45
     ratio_seq = material['hexany'].ratios
     np.random.shuffle(ratio_seq)
     ratio_seq = cycle(ratio_seq)
+
+    note_list = []
     for i, ut in enumerate(material['ut_seq']):
         # if i != 2: continue
         root_freq = tonos.pitchclass_to_freq('F#2') * material['hexany'].ratios[i]
@@ -75,7 +76,6 @@ def layer1(material:dict, start_offset:float=0.05) -> list:
             am1         = np.random.randint(1)
             am2         = 0.0 if am1 == 1 else 1
             amRise      = duration * 0.25
-            # amRatio     = amRatio
             if j % len(material['hexany'].ratios) == 0:
                 amRatio = tonos.fold_interval(interval = float(np.random.choice(material['hexany'].products)),
                                               equave   = 2,
