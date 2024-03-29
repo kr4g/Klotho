@@ -20,6 +20,8 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 
 from fractions import Fraction
 from typing import Union, Tuple
+from math import gcd
+
 from utils.algorithms.algorithms import *
 
 class RT:
@@ -67,7 +69,7 @@ class RT:
         self.__subdivisions   = subdivisions
         self.__decomp         = decomp
         self.__ratios         = self.__set_ratios()
-        self.__complex        = self._complex()
+        self.__type           = self.__set_complexity()
 
     @classmethod
     def from_tuple(cls, tup:Tuple):
@@ -101,8 +103,8 @@ class RT:
         return self.__ratios
     
     @property
-    def is_complex(self):
-        return self.__complex
+    def type(self):
+        return self.__type
 
     def rotate(self, n=1):
         refactored = rotate_tree(self.__subdivisions, n)
@@ -111,17 +113,29 @@ class RT:
                   subdivisions   = refactored,
                   decomp         = self.__decomp)
     
+    def concat(self, other):
+        if isinstance(other, RT):
+            numer_1, denom_1 = self.__time_signature.numerator, self.__time_signature.denominator
+            numer_2, denom_2 = other.__time_signature.numerator, other.__time_signature.denominator
+            lcm_denom = (denom_1 * denom_2) // gcd(denom_1, denom_2)
+            d1 = numer_1 * (lcm_denom // denom_1)
+            d2 = numer_2 * (lcm_denom // denom_2)
+            subdivs = ((d1, self.__subdivisions), (d2, other.__subdivisions))
+            return RT(duration       = 1,
+                      time_signature = self.__time_signature + other.__time_signature,
+                      subdivisions   = subdivs,
+                      decomp         = self.__decomp)
+        raise ValueError('Invalid Rhythm Tree')
+
     def __set_ratios(self):
-        # Mesure Ratios
         ratios = tuple(self.__duration * r for r in measure_ratios(self.__subdivisions))
-        # Decompose Ratios
         if self.__decomp == 'reduced':
             ratios = reduced_decomposition(ratios, self.__time_signature)
         elif self.__decomp == 'strict':
             ratios = strict_decomposition(ratios, self.__time_signature)
         return ratios
     
-    def _complex(self):
+    def __set_complexity(self):
         div = sum_proportions(self.__subdivisions)
         if bin(div).count('1') != 1 and div != self.__time_signature.numerator:
             return True
@@ -129,7 +143,7 @@ class RT:
 
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
-        rt_type = 'complex' if self.is_complex() else 'simple'
+        rt_type = 'complex' if self.__type else 'simple'
         return (
             f'Duration: {self.__duration}\n'
             f'Time Signature: {self.__time_signature}\n'
@@ -143,41 +157,13 @@ class RT:
 # ------------------------------------------------------------------------------------
 # EXPERIMENTAL
 # ------------------------------------------------------------------------------------
-# def sum_proportions(tree):
-#     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in tree)
-
-def notate(tree, level=0):
-    # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
-    if isinstance(tree, RT):
-        return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
-    
-    print(f'tree: {tree}, level: {level}')
-    if isinstance(tree, tuple) and level == 0:
-        tuplet_value = sum_proportions(tree)
-        return f'\tuplet {tuplet_value}/d ' + '{{' + notate(tree, level+1) + '}}'
-    else:
-        result = ""
-        for element in tree:
-            if isinstance(element, int):  # Rest or single note
-                if element < 0:  # Rest
-                    result += f" -{abs(element)}"
-                else:  # Single note
-                    result += f" {element}"
-            elif isinstance(element, tuple):  # Subdivision
-                D, S = element
-                if isinstance(D, int):  # If D is an integer, calculate the proportion
-                    tuplet_value = sum_proportions(S) if isinstance(S, tuple) else D
-                else:  # If D is a tuple, it's a nested tuplet
-                    tuplet_value = sum_proportions(D)
-                result += f' \\tuplet {tuplet_value}/d {{{notate(S, level+1)}}}'
-            if level == 0:
-                result = result.strip() + ' '
-        return result.strip()
 
 # def notate(tree, level=0):
+#     # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
 #     if isinstance(tree, RT):
 #         return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
     
+#     print(f'tree: {tree}, level: {level}')
 #     if isinstance(tree, tuple) and level == 0:
 #         tuplet_value = sum_proportions(tree)
 #         return f'\tuplet {tuplet_value}/d ' + '{{' + notate(tree, level+1) + '}}'
@@ -199,6 +185,7 @@ def notate(tree, level=0):
 #             if level == 0:
 #                 result = result.strip() + ' '
 #         return result.strip()
+
 # ------------------------------------------------------------------------------------
 
 

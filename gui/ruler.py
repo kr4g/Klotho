@@ -56,7 +56,10 @@ class Ruler(QWidget):
             yEnd = self.height() if self.orientation == "top" else ticLength
 
             # primary tic
-            painter.drawLine(intervalCount * self.ticInterval, yStart, intervalCount * self.ticInterval, yEnd)
+            painter.drawLine(intervalCount * self.ticInterval,
+                             yStart,
+                             intervalCount * self.ticInterval,
+                             yEnd)
             
             # sub-tics
             if self.ticInterval > 20:
@@ -83,7 +86,6 @@ class Ruler(QWidget):
                 self.ticInterval = newScale
                 self.dragStartY = event.pos().y()
                 self.update()
-
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self.isDragging = False

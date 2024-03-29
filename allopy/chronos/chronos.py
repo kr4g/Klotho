@@ -9,6 +9,7 @@ computations related to time and rhythm in music.
 
 --------------------------------------------------------------------------------------
 '''
+from typing import Union
 import numpy as np
 from fractions import Fraction
 from utils.data_structures.enums import MinMaxEnum
@@ -90,7 +91,7 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     ms = int((seconds - s) * 1000)    
     return f'{h}:{m:02}:{s:02}:{ms:03}' if as_string else (h, m, s, ms)
 
-def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
+def beat_duration(ratio: Union[Fraction, str], bpm: float, beat_ratio: Union[Fraction, str] = '1/4') -> float:
   '''
   Calculate the duration in seconds of a musical beat given a ratio and tempo.
 
@@ -106,13 +107,9 @@ def beat_duration(ratio: str, bpm: float, beat_ratio: str = '1/4') -> float:
   float: The beat duration in seconds.
   '''
   tempo_factor = 60 / bpm
-  if isinstance(ratio, str):
-    ratio_numerator, ratio_denominator = map(int, ratio.split('/'))
-    ratio_value = ratio_numerator / ratio_denominator
-  else:
-    ratio_value = float(ratio)
-  beat_numerator, beat_denominator = map(int, beat_ratio.split('/'))
-  return tempo_factor * ratio_value * (beat_denominator / beat_numerator)
+  ratio_value  = float(Fraction(ratio))
+  beat_ratio   = Fraction(beat_ratio)
+  return tempo_factor * ratio_value * (beat_ratio.denominator / beat_ratio.numerator)
 
 def calc_onsets(durations:tuple):
    return tuple(np.cumsum([abs(r) for r in durations]) - durations[0])

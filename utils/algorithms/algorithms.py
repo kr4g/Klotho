@@ -6,7 +6,7 @@ from functools import reduce
 import numpy as np
 
 # ------------------------------------------------------------------------------------
-# RHYTHM TREE ALGORITHMS
+# TREE ALGORITHMS
 # ----------------------
 # 
 # All Pseudocode by Karim Haddad unless otherwise noted.
@@ -383,6 +383,13 @@ def measure_complexity(tree:tuple):
 
 # ------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------------
+# TIME BLOCK ALGORITHMS
+# ----------------------
+#
+# 
+# ------------------------------------------------------------------------------------
+
 def rhythm_pair(lst, is_MM=True):
     total_product = prod(lst)
     if is_MM:
@@ -392,3 +399,4 @@ def rhythm_pair(lst, is_MM=True):
     combined_sequence = np.unique(np.concatenate(sequences))
     deltas = np.diff(combined_sequence)
     return tuple(deltas)
+
