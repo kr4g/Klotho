@@ -3,7 +3,7 @@ from typing import Union
 
 from .rhythm_trees import RT
 from utils.algorithms.algorithms import measure_ratios
-from allopy.chronos.chronos import beat_duration
+from allopy.chronos.chronos import beat_duration, calc_onsets
 
 class UT:
     def __init__(self,
@@ -17,7 +17,6 @@ class UT:
         self.__prolationis = self.__set_prolationis(prolatio) # RT object
         self.__tempo       = tempo
         self.__beat        = self.__set_beat(beat, prolatio)
-        self.__duration    = None
     
     @classmethod
     def from_tree(cls, tree:Union[RT, tuple]):
@@ -26,7 +25,7 @@ class UT:
         return cls(tempus   = meas,
                    prolatio = s,
                    tempo    = None,
-                   beat     = None)
+                   beat     = '1/1')
 
     @property
     def tempus(self):
@@ -57,14 +56,31 @@ class UT:
         return self.__type
     
     @property
-    def duration(self):
+    def onsets(self):
+        return calc_onsets(self.durations)
+
+    @property
+    def durations(self):
         if self.__tempo is None:
             return None
-        self.__duration = sum(beat_duration(ratio      = r,
-                                            bpm        = self.__tempo,
-                                            beat_ratio = self.__beat) for r in self.__prolationis.ratios)
-        return self.__duration
+        return [beat_duration(ratio      = r,
+                              bpm        = self.__tempo,
+                              beat_ratio = self.__beat) for r in self.__prolationis.ratios]
+
+    @property
+    def duration(self):
+        if self.__tempo is None:
+            return 0
+        return sum(self.durations)
     
+    @tempo.setter
+    def tempo(self, tempo:Union[None,float,int]):
+        self.__tempo = tempo
+    
+    @beat.setter
+    def beat(self, beat:Union[str,Fraction]):
+        self.__beat = Fraction(beat)
+
     def __set_prolationis(self, prolatio):
         if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
             prolatio = RT(duration       = prolatio.duration,
@@ -102,7 +118,7 @@ class UT:
         return prolatio
     
     def __set_beat(self, beat, prolatio):
-        if isinstance(beat, str):
+        if isinstance(prolatio, str):
             prolatio = prolatio.lower()
             if prolatio in {'p', 'pulse', 'phase',
                             'd', 'duration', 'dur',
@@ -170,6 +186,12 @@ class UT:
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
+    
+    def __iter__(self):
+        return zip(
+            self.onsets,
+            self.durations,
+        )
     
     def __repr__(self):
         return (

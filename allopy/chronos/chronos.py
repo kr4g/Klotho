@@ -133,7 +133,7 @@ def quantize(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominat
   beat_count = duration / reference_beat_duration
   return approximate_ratio(beat_count)
 
-def metric_modulation(current_tempo: float, current_beat_value: float, new_beat_value: float) -> float:
+def metric_modulation(current_tempo:float, current_beat_value:Union[Fraction,str,float], new_beat_value:Union[Fraction,str,float]) -> float:
   '''
   Determine the new tempo (in BPM) for a metric modulation from one metric value to another.
 
