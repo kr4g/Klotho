@@ -298,8 +298,8 @@ def get_group_subdivision(G:tuple):
     return [n, m];
     '''
     ds, S = G  # G is of form (DS) where D is the symbolic duration and S is the sum of elements
-    # subdiv = sum(S)
-    subdiv = sum_proportions(S)
+    subdiv = sum(S)
+    # subdiv = sum_proportions(S)
     
     if subdiv == 1:
         n = ds

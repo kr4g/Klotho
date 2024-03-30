@@ -17,7 +17,6 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 
 --------------------------------------------------------------------------------------
 '''
-
 from fractions import Fraction
 from typing import Union, Tuple
 from math import gcd
@@ -160,28 +159,28 @@ class RT:
 
 def notate(tree, level=0):
     # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
-    if isinstance(tree, RT):
-        return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
+    if level == 0:
+        return f'\\time {tree.time_signature}\n' + notate(tree, level + 1)
     
     # print(f'tree: {tree}, level: {level}')
-    if isinstance(tree, tuple) and level == 0:
-        tuplet_value = sum_proportions(tree)
-        return f'\tuplet {tuplet_value}/d' + '{{' + notate(tree, level+1) + '}}'
+    if level == 1:
+        tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
+        m, n = get_group_subdivision(tup)
+        return f'\\tuplet {m}/{n} ' + '{{' + notate(tree.subdivisions, level + 1) + '}}'
     else:
         result = ""
         for element in tree:
-            if isinstance(element, int):  # Rest or single note
+            if isinstance(element, int):      # Rest or single note
                 if element < 0:  # Rest
                     result += f" -{abs(element)}"
                 else:  # Single note
                     result += f" {element}"
-            elif isinstance(element, tuple):  # Subdivision
+            elif isinstance(element, tuple):  # Subdivision                
                 D, S = element
-                if isinstance(D, int):  # If D is an integer, calculate the proportion
-                    tuplet_value = sum_proportions(S) if isinstance(S, tuple) else D
-                else:  # If D is a tuple, it's a nested tuplet
-                    tuplet_value = sum_proportions(D)
-                result += f' \\tuplet {tuplet_value}/d {{{notate(S, level+1)}}}'
+                # print(f'D: {D}, S: {S}')
+                tup = D, (sum_proportions(S),)
+                m, n = get_group_subdivision(tup)
+                result += f' \\tuplet {m}/{n} {{{notate(S, level + 1)}}}'
             if level == 0:
                 result = result.strip() + ' '
         return result.strip()
@@ -193,5 +192,8 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------
     # Rhythm Tree Examples
     # ------------------------------------------------------------------------------------
-    # 
-    pass
+    print('Rhythm Tree Examples')
+    s = ((4, (3, (8, (3, 4)))), -3)
+    rt = RT(time_signature='4/3', subdivisions=s)
+    print(rt)
+    print(notate(rt))

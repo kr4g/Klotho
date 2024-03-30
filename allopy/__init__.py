@@ -8,6 +8,8 @@ from .topos.formal_grammars import * # Alphabets, Grammars
 from .topos.random import * # Random
 from .topos.sets import *
 
+# from utils import *
+
 __all__ = [
     # 'ChronosClass', 'chronos_function',
     # 'TonosClass', 'tonos_function',
