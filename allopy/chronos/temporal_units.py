@@ -63,9 +63,9 @@ class UT:
     def durations(self):
         if self.__tempo is None:
             return None
-        return [beat_duration(ratio      = r,
-                              bpm        = self.__tempo,
-                              beat_ratio = self.__beat) for r in self.__prolationis.ratios]
+        return tuple(beat_duration(ratio      = r,
+                                   bpm        = self.__tempo,
+                                   beat_ratio = self.__beat) for r in self.__prolationis.ratios)
 
     @property
     def duration(self):

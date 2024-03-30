@@ -158,33 +158,33 @@ class RT:
 # EXPERIMENTAL
 # ------------------------------------------------------------------------------------
 
-# def notate(tree, level=0):
-#     # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
-#     if isinstance(tree, RT):
-#         return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
+def notate(tree, level=0):
+    # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
+    if isinstance(tree, RT):
+        return f'\time {tree.time_signature}\n' + notate(tree.subdivisions, level)
     
-#     print(f'tree: {tree}, level: {level}')
-#     if isinstance(tree, tuple) and level == 0:
-#         tuplet_value = sum_proportions(tree)
-#         return f'\tuplet {tuplet_value}/d ' + '{{' + notate(tree, level+1) + '}}'
-#     else:
-#         result = ""
-#         for element in tree:
-#             if isinstance(element, int):  # Rest or single note
-#                 if element < 0:  # Rest
-#                     result += f" -{abs(element)}"
-#                 else:  # Single note
-#                     result += f" {element}"
-#             elif isinstance(element, tuple):  # Subdivision
-#                 D, S = element
-#                 if isinstance(D, int):  # If D is an integer, calculate the proportion
-#                     tuplet_value = sum_proportions(S) if isinstance(S, tuple) else D
-#                 else:  # If D is a tuple, it's a nested tuplet
-#                     tuplet_value = sum_proportions(D)
-#                 result += f' \\tuplet {tuplet_value}/d {{{notate(S, level+1)}}}'
-#             if level == 0:
-#                 result = result.strip() + ' '
-#         return result.strip()
+    # print(f'tree: {tree}, level: {level}')
+    if isinstance(tree, tuple) and level == 0:
+        tuplet_value = sum_proportions(tree)
+        return f'\tuplet {tuplet_value}/d' + '{{' + notate(tree, level+1) + '}}'
+    else:
+        result = ""
+        for element in tree:
+            if isinstance(element, int):  # Rest or single note
+                if element < 0:  # Rest
+                    result += f" -{abs(element)}"
+                else:  # Single note
+                    result += f" {element}"
+            elif isinstance(element, tuple):  # Subdivision
+                D, S = element
+                if isinstance(D, int):  # If D is an integer, calculate the proportion
+                    tuplet_value = sum_proportions(S) if isinstance(S, tuple) else D
+                else:  # If D is a tuple, it's a nested tuplet
+                    tuplet_value = sum_proportions(D)
+                result += f' \\tuplet {tuplet_value}/d {{{notate(S, level+1)}}}'
+            if level == 0:
+                result = result.strip() + ' '
+        return result.strip()
 
 # ------------------------------------------------------------------------------------
 

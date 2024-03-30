@@ -80,8 +80,9 @@ def get_pfields(instrument_file, instrument_name):
     base_name = os.path.splitext(os.path.basename(instrument_file))[0] + '.json'
     json_path = os.path.join(instruments_dir, base_name)
 
-    if not os.path.exists(json_path):
-        extract_pfields(instrument_file)
+    # if not os.path.exists(json_path):
+    #     extract_pfields(instrument_file)
+    extract_pfields(instrument_file)
 
     with open(json_path, 'r') as file:
         instruments_data = json.load(file)

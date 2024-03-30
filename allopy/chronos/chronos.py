@@ -91,7 +91,7 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     ms = int((seconds - s) * 1000)    
     return f'{h}:{m:02}:{s:02}:{ms:03}' if as_string else (h, m, s, ms)
 
-def beat_duration(ratio: Union[Fraction, str], bpm: float, beat_ratio: Union[Fraction, str] = '1/4') -> float:
+def beat_duration(ratio:Union[Fraction, str], bpm:float, beat_ratio:Union[Fraction, str] = '1/4') -> float:
   '''
   Calculate the duration in seconds of a musical beat given a ratio and tempo.
 

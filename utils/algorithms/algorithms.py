@@ -298,7 +298,8 @@ def get_group_subdivision(G:tuple):
     return [n, m];
     '''
     ds, S = G  # G is of form (DS) where D is the symbolic duration and S is the sum of elements
-    subdiv = sum(S)
+    # subdiv = sum(S)
+    subdiv = sum_proportions(S)
     
     if subdiv == 1:
         n = ds
@@ -308,11 +309,11 @@ def get_group_subdivision(G:tuple):
     else:
         n = subdiv
     
-    if bin(n).count("1") == 1:      # n is binary
+    if bin(n).count('1') == 1:      # n is binary
         m = symbolic_approx(n)
     elif (n * 3 / 2).is_integer():  # n is ternary
     # elif n % 3 == 0:  # n is ternary
-        m = symbolic_approx(n) * 3 / 2
+        m = int(symbolic_approx(n) * 3 / 2)
     else:
         num = n
         if num + 1 == ds:# or num == ds:
@@ -399,4 +400,3 @@ def rhythm_pair(lst, is_MM=True):
     combined_sequence = np.unique(np.concatenate(sequences))
     deltas = np.diff(combined_sequence)
     return tuple(deltas)
-

@@ -24,8 +24,8 @@ that prevail, and upon the skill and the soul of the composer."
 '''
 
 from .tonos  import *
-from .scales import *
-from .chords import *
+from .combination_product_sets import *
+from .sonorities import *
 
 __all__ = [
     # 'TonosClass', 'tonos_function',
