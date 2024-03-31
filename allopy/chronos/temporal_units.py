@@ -1,5 +1,6 @@
 from fractions import Fraction
 from typing import Union
+import numpy as np
 
 from .rhythm_trees import RT
 from utils.algorithms.algorithms import measure_ratios
@@ -187,6 +188,11 @@ class UT:
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
     
+    def __and__(self, other:'UT'):
+        if isinstance(other, UT):
+            return UTSeq((self, other))
+        raise ValueError('Invalid Operand')
+    
     def __iter__(self):
         return zip(
             self.onsets,
@@ -198,6 +204,22 @@ class UT:
             f'Tempus: {self.__tempus}\n'
             f'Prolationis: {self.__prolationis.subdivisions}\n'            
         )
+
+class UTSeq:
+    def __init__(self, ut_seq:tuple[UT]):
+        self.__seq = ut_seq
+    
+    def __and__(self, other:Union[UT, 'UTSeq']):
+        if isinstance(other, UT):
+            return TB((self.__seq, (other,)))
+        elif isinstance(other, UTSeq):
+            return TB((self.__seq, other.__seq))
+        raise ValueError('Invalid Operand')
+
+# Time Block
+class TB:
+    def __init__(self, tb:tuple[UTSeq]):
+        self.__tb = tb
 
 if __name__ == '__main__':  
     pass
