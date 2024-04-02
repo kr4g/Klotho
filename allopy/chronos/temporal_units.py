@@ -159,19 +159,16 @@ class UT:
         raise ValueError('Invalid Operand')
 
     def __mul__(self, other:Union['UT', Fraction, int]):
-        if isinstance(other, UT):
-            new_tempus = self.__tempus * other.__tempus
-            return UT(tempus   = new_tempus,
-                      prolatio = 'd',
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        elif isinstance(other, (Fraction, int)):
+        if not isinstance(other, (UT, Fraction, int)):
+            raise ValueError('Invalid Operand')
+        elif isinstance(other, UT):
+            new_tempus = self.__tempus * other.__tempus            
+        else:
             new_tempus = self.__tempus * other
-            return UT(tempus   = new_tempus,
-                      prolatio = 'd',
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        raise ValueError('Invalid Operand')
+        return UT(tempus   = new_tempus,
+                    prolatio = 'd',
+                    tempo    = self.__tempo,
+                    beat     = self.__beat)
     
     def __truediv__(self, other:Union['UT', Fraction, int]):
         if isinstance(other, UT):
