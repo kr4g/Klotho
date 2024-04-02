@@ -80,7 +80,7 @@ class UT:
     
     @beat.setter
     def beat(self, beat:Union[str,Fraction]):
-        self.__beat = Fraction(beat)
+        self.__beat = Fraction(beat)    
 
     def __set_prolationis(self, prolatio):
         if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
@@ -209,6 +209,10 @@ class UTSeq:
     def __init__(self, ut_seq:tuple[UT]):
         self.__seq = ut_seq
     
+    @property
+    def T(self):
+        return TB((UTSeq((ut,)) for ut in self.__seq))
+
     def __and__(self, other:Union[UT, 'UTSeq']):
         if isinstance(other, UT):
             return TB((self.__seq, (other,)))
@@ -216,10 +220,19 @@ class UTSeq:
             return TB((self.__seq, other.__seq))
         raise ValueError('Invalid Operand')
 
+    def __iter__(self):
+        return zip(
+            (onset for ut in self.__seq for onset in ut.onsets),
+            (dur for ut in self.__seq for dur in ut.durations),
+        )
+
 # Time Block
 class TB:
     def __init__(self, tb:tuple[UTSeq]):
         self.__tb = np.array(tb)
+        
+    def __iter__(self):
+        return iter(self.__tb)
 
 if __name__ == '__main__':  
     pass
