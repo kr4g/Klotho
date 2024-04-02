@@ -210,6 +210,18 @@ class UTSeq:
         self.__seq = ut_seq
     
     @property
+    def onsets(self):
+        return calc_onsets(self.durations)
+    
+    @property    
+    def durations(self):
+        return tuple(ut.duration for ut in self.__seq)
+    
+    @property
+    def duration(self):
+        return sum(self.durations)
+
+    @property
     def T(self):
         return TB((UTSeq((ut,)) for ut in self.__seq))
 
@@ -229,7 +241,7 @@ class UTSeq:
 # Time Block
 class TB:
     def __init__(self, tb:tuple[UTSeq]):
-        self.__tb = np.array(tb)
+        self.__tb = tb
         
     def __iter__(self):
         return iter(self.__tb)
