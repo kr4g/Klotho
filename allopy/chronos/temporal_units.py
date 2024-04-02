@@ -230,7 +230,10 @@ class UTSeq:
         raise ValueError('Invalid Operand')
 
     def __iter__(self):
-        return iter(self.__seq)
+        return zip(
+            self.onsets,
+            self.durations,
+        )
 
 # Time Block
 class TB:
