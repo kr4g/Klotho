@@ -234,8 +234,8 @@ class UTSeq:
 
     def __iter__(self):
         return zip(
-            (onset for ut in self.__seq for onset in ut.onsets),
-            (dur for ut in self.__seq for dur in ut.durations),
+            self.onsets,
+            self.durations,
         )
 
 # Time Block
