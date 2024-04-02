@@ -26,7 +26,7 @@ class UT:
         return cls(tempus   = meas,
                    prolatio = s,
                    tempo    = None,
-                   beat     = '1/1')
+                   beat     = Fraction(1, meas.denominator))
 
     @property
     def tempus(self):
@@ -219,7 +219,7 @@ class UTSeq:
 # Time Block
 class TB:
     def __init__(self, tb:tuple[UTSeq]):
-        self.__tb = tb
+        self.__tb = np.array(tb)
 
 if __name__ == '__main__':  
     pass
