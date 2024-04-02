@@ -166,9 +166,9 @@ class UT:
         else:
             new_tempus = self.__tempus * other
         return UT(tempus   = new_tempus,
-                    prolatio = 'd',
-                    tempo    = self.__tempo,
-                    beat     = self.__beat)
+                  prolatio = 'd',
+                  tempo    = self.__tempo,
+                  beat     = self.__beat)
     
     def __truediv__(self, other:Union['UT', Fraction, int]):
         if isinstance(other, UT):
