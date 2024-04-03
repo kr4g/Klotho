@@ -320,7 +320,7 @@ def get_group_subdivision(G:tuple):
     
     if bin(n).count('1') == 1:     # n is binary
         m = symbolic_approx(n)
-    elif n % 3 == 0: # n is ternary
+    elif n % 3 == 0 and (n * 3 / 2).is_integer(): # n is ternary
     # elif (n * 3 / 2).is_integer(): # n is ternary
         m = int(symbolic_approx(n) * 3 / 2)
     else:
