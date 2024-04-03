@@ -51,21 +51,25 @@ If you want to use AlloPy with AlloLib Playground, first install AlloLib Playgro
 
     Once the interpreter loads, import from `allopy` as needed.
 
-## Introduction to the World of AlloPy
+## Feature Overview
 
-Lo there, friend.  *Friður sé með þér!*  
+AlloPy extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with standard notation softwares.  
 
-Welcome to the world of `AlloPy`.
+The ethos of AlloPy draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/) (which also influenced [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) for Max).
 
-Whether you know the path in which you seek or if you are but a curious wanderer, the five spirits of AlloPy will guide you in your journey.
+AlloPy seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of AlloPy's core features, particularly in the implementation of Rhythm Trees, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of music in its symbolic representations.
 
-Know their names, know their powers.  Discover how, from their internal harmony, you can marshal the forces of computation and learn the ways of multimedia composition and metacomposition.
+Examples from each AlloPy module, here used in an 'on-the-fly' context via the Python interpreter:
 
-#### Five Modules, Five Dæmons
+### Rhythm Trees
 
-AlloPy is composed of five modules ruled by the five dæmons of music composition and synthesis:  *Chronos, Tonos, Topos, Aikous,* and *Skora*.
+### Microtonality
 
-Each of the five modules contains a base module named after itself as well as various other submodules that specialize in some aspect of their general domain.
+### Abstract tools for metacomposition:
+
+### Formal Grammars:
+
+---   
 
 ### `Chronos` 
 
@@ -113,7 +117,7 @@ Aikous contains basic tools for converting between *conceptual* units (e.g., mus
 
 ***The Scribe:***  *keeper of scores, numen of notation*
 
-Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.  That is to say, Skora is keeper of record for all musical events as they must be known and as they must be tublated for The Machines.
+Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.
 
 The `Gamma` synth instruments in `AlloLib` use a [standard numeric](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  Skora converts this tabular format into a data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computations available in the "data science" paradigm.
 
@@ -126,26 +130,6 @@ The Skora module also provides tools for managing and merging multiple separate 
 Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://lilypond.org/development.html) are presently in development.
 
 ---
-
-## Feature Overview
-
-AlloPy extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with conventional notation softwares.  
-
-The ethos of AlloPy draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/) (which also influenced [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) for Max), although without the patching.
-
-AlloPy seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of AlloPy's core features, particularly in the Topos module, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of Music in its *extemporal* representations.
-
-Examples from each AlloPy module, here used in an 'on-the-fly' context via the Python interpreter:
-
-### Rhythm Trees
-
-### Microtonality
-
-### Abstract tools for metacomposition:
-
-### Formal Grammars:
-
----   
 
 ## Integration with AlloLib Playground
 
