@@ -217,10 +217,10 @@ def autoref_rotmat(lst:tuple, mode:str='G'):
 def symbolic_unit(time_signature:Union[Fraction, str]):
     return Fraction(1, symbolic_approx(Fraction(time_signature).denominator))
 
-def symbolic_duration(time_signature:Union[Fraction, str], S:Tuple):
+def symbolic_duration(f, time_signature:Union[Fraction, str], S:Tuple):
     # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
     time_signature = Fraction(time_signature)
-    return Fraction(time_signature.numerator**2) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
+    return Fraction(f * time_signature.numerator) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
 
 # Algorithm 6: SymbolicApprox
 def symbolic_approx(n:int):
@@ -320,7 +320,7 @@ def get_group_subdivision(G:tuple):
     
     if bin(n).count('1') == 1:     # n is binary
         m = symbolic_approx(n)
-    elif n % 3 == 0 and (n * 3 / 2).is_integer(): # n is ternary
+    elif n % 3 == 0 and (subdiv / ds).is_integer(): # n is ternary
     # elif (n * 3 / 2).is_integer(): # n is ternary
         m = int(symbolic_approx(n) * 3 / 2)
     else:
