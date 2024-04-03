@@ -1,7 +1,7 @@
 
 from typing import Union, Tuple
 from fractions import Fraction
-from math import gcd, prod
+from math import gcd, prod, log2, ceil, floor
 from functools import reduce
 import numpy as np
 
@@ -250,8 +250,10 @@ def symbolic_approx(n:int):
     elif n in {15, 16}:
         return 16
     else:
-        pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
-        ps = 2 ** n.bit_length()        # first power of 2 >= n
+        # pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
+        # ps = 2 ** n.bit_length()        # first power of 2 >= n
+        pi = 2 ** floor(log2(n))  # first power of 2 <= n
+        ps = 2 ** ceil(log2(n))   # first power of 2 >= n
         return ps if abs(n - pi) > abs(n - ps) else pi
 
 # Algorithm 10: GetGroupSubdivision
@@ -303,7 +305,6 @@ def get_group_subdivision(G:tuple):
     
     if subdiv == 1:
         n = ds
-    # elif (ds / subdiv).is_integer() and ((ds / subdiv) in {1, 2, 4, 8} or (subdiv / ds) in {1, 2, 4, 8}):
     elif (ds / subdiv).is_integer() and ((ds // subdiv).bit_length() == 1 or (subdiv // ds).bit_length() == 1):
         n = ds
     else:
@@ -321,13 +322,14 @@ def get_group_subdivision(G:tuple):
         elif num == ds:
             m = num
         elif num < ds:
-            # m = [num * 2, ds]
             return [num * 2, ds]
         elif num < (ds * 2) - 1:
             m = ds
         else:
-            pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
-            ps = 2 ** n.bit_length()        # first power of 2 > n
+            # pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
+            # ps = 2 ** n.bit_length()        # first power of 2 > n
+            pi = 2 ** floor(log2(n))    # first power of 2 <= n
+            ps = 2 ** ceil(log2(n + 1)) # first power of 2 > n
             m = ps if abs(n - pi) > abs(n - ps) else pi
     
     return [n, m]
