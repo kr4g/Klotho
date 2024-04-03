@@ -203,16 +203,24 @@ def autoref_rotmat(lst:tuple, mode:str='G'):
         for i in range(len(lst)):
             l = permut_list(lst, i)
             result.append(tuple((elem, l1[j][1]) for j, elem in enumerate(l)))
-    elif mode == 'C':
-        l1 = autoref(permut_list(lst, 0))
-        l2 = autoref(permut_list(lst, 2))
-        for i in range(len(lst)):
-            l = permut_list(lst, i)
-            lp = l1 if i % 2 == 0 else l2
-            result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))
+    # elif mode == 'C':
+    #     l1 = autoref(permut_list(lst, 0))
+    #     l2 = autoref(permut_list(lst, 2))
+    #     for i in range(len(lst)):
+    #         l = permut_list(lst, i)
+    #         lp = l1 if i % 2 == 0 else l2
+    #         result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))
     else:
         result = lst
     return tuple(result)
+
+def symbolic_unit(time_signature:Union[Fraction, str]):
+    return Fraction(1, symbolic_approx(Fraction(time_signature).denominator))
+
+def symbolic_duration(time_signature:Union[Fraction, str], S:Tuple):
+    # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
+    time_signature = Fraction(time_signature)
+    return Fraction(time_signature.numerator**2) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
 
 # Algorithm 6: SymbolicApprox
 def symbolic_approx(n:int):
@@ -243,6 +251,8 @@ def symbolic_approx(n:int):
     '''
     if n == 1:
         return 1
+    elif n in {2, 3}:
+        return 2
     elif n in {4, 5, 6, 7}:
         return 4
     elif n in {8, 9, 10, 11, 12, 13, 14}:
@@ -250,10 +260,8 @@ def symbolic_approx(n:int):
     elif n in {15, 16}:
         return 16
     else:
-        # pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
-        # ps = 2 ** n.bit_length()        # first power of 2 >= n
-        pi = 2 ** floor(log2(n))  # first power of 2 <= n
-        ps = 2 ** ceil(log2(n))   # first power of 2 >= n
+        pi = 2 ** (n.bit_length() - 1) # first power of 2 <= n
+        ps = 2 ** n.bit_length()       # first power of 2 >= n
         return ps if abs(n - pi) > abs(n - ps) else pi
 
 # Algorithm 10: GetGroupSubdivision
@@ -299,9 +307,9 @@ def get_group_subdivision(G:tuple):
 
     return [n, m];
     '''
-    ds, S = G  # G is of form (DS) where D is the symbolic duration and S is the sum of elements
-    subdiv = sum(S)
-    # subdiv = sum_proportions(S)
+    D, S = G
+    ds = D
+    subdiv = sum_proportions(S)
     
     if subdiv == 1:
         n = ds
@@ -310,10 +318,10 @@ def get_group_subdivision(G:tuple):
     else:
         n = subdiv
     
-    if bin(n).count('1') == 1:      # n is binary
+    if bin(n).count('1') == 1:     # n is binary
         m = symbolic_approx(n)
-    elif (n * 3 / 2).is_integer():  # n is ternary
-    # elif n % 3 == 0:  # n is ternary
+    elif n % 3 == 0: # n is ternary
+    # elif (n * 3 / 2).is_integer(): # n is ternary
         m = int(symbolic_approx(n) * 3 / 2)
     else:
         num = n
@@ -326,10 +334,8 @@ def get_group_subdivision(G:tuple):
         elif num < (ds * 2) - 1:
             m = ds
         else:
-            # pi = 2 ** (n.bit_length() - 1)  # first power of 2 <= n
-            # ps = 2 ** n.bit_length()        # first power of 2 > n
-            pi = 2 ** floor(log2(n))    # first power of 2 <= n
-            ps = 2 ** ceil(log2(n + 1)) # first power of 2 > n
+            pi = 2 ** (n.bit_length() - 1) # first power of 2 <= n
+            ps = 2 ** n.bit_length()       # first power of 2 > n
             m = ps if abs(n - pi) > abs(n - ps) else pi
     
     return [n, m]
