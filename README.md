@@ -121,8 +121,6 @@ Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just a
 
 The `Gamma` synth instruments in `AlloLib` use a [standard numeric](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  Skora converts this tabular format into a data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computations available in the "data science" paradigm.
 
-(*A short tutorial note list basics, including pfields, can be found [here]()*)
-
 Skora then also leverages the power of `Numpy` to perform complex computations on any slice of the *Score DataFrame*.  This allows for a more fluid approach to editing and, most interesting, *generating*  note lists dynamically.  AlloPy can then function as both a computational composition aid or a data sonification tool—and everything in between.
 
 The Skora module also provides tools for managing and merging multiple separate parts, making larger-scale arrangements easier to maintain.
