@@ -266,7 +266,7 @@ def get_group_subdivision(G:tuple):
     '''
     Algorithm 10: GetGroupSubdivision
 
-    Data: G is a group in the form (DS)
+    Data: G is a group in the form (D S)
     Result: Provides the value of the "irrational" composition of the prolationis of a complex Temporal Unit
     ds = symbolic duration of G;
     subdiv = sum of the elements of S;

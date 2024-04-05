@@ -22,7 +22,7 @@ class CPS:
   def __init__(self, factors:tuple[int] = (1, 3, 5, 7), r:int = 2, equave:Union[Fraction, float] = 2, n_equaves:int = 1):
     self.__equave = equave
     self.__n_equaves = n_equaves
-    
+
     self.__factors = tuple(sorted(factors))
     self.__r = r
     self.__combos, self.__products, self.__ratios = self._calculate()
@@ -132,6 +132,17 @@ class _nany(CPS, ABC):
   def tetrads(self):
     return self.__tetrads
   
+  def nands(self, n:int):
+    if n < 2:
+      raise ValueError('n must be greater than 1.')
+    elif n == 2:
+      return self.dyads
+    elif n == 3:
+      return self.triads
+    elif n == 4:
+      return self.tetrads
+    return self._find_cliques(n)
+  
 class Hexany(_nany):
   '''
   Calculate a Hexany scale from a list of prime factors and a rank value.
@@ -149,7 +160,7 @@ class Hexany(_nany):
     - The first list contains the products of combinations of prime factors.
     - The second list is the sorted Hexany scale after octave reduction.
   '''  
-  def __init__(self, factors: tuple[int] = (1, 3, 5, 7)):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7)):
     # Hexany must be 4 factors with rank 2
     if len(factors) != 4:
       raise ValueError('Hexany must have exactly 4 factors.')
@@ -172,7 +183,7 @@ class Eikosany(_nany):
     - The first list contains the products of combinations of prime factors.
     - The second list is the sorted Eikosany scale after octave reduction.
   '''
-  def __init__(self, factors: tuple[int] = (1, 3, 5, 7, 9, 11)):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11)):
     # Eikosany must be exactly 6 factors with rank 3
     if len(factors) != 6:
       raise ValueError('Eikosany must have exactly 6 factors.')
