@@ -130,10 +130,7 @@ class UT:
                             'd', 'duration', 'dur',
                             'r', 'rest', 'silence'} and self.__beat is None:
                 return Fraction(1, self.__tempus.denominator)
-            else:
-                return Fraction(beat)
-        else:
-            return Fraction(beat)
+        return Fraction(beat)
     
     def __add__(self, other:Union['UT', Fraction]):
         if isinstance(other, UT):
