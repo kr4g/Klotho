@@ -58,7 +58,7 @@ def pre_compositional_materials(G:tuple = (3, 5, 7, 11, 13)) -> dict:
     ]
     materials['autoref_rotmat_S'] = autoref_rotmat_S
 
-    hx = tonos.combination_product_sets.CPS(S, 2)
+    hx = tonos.JI.combination_product_sets.CPS(S, 2)
     materials['hexany'] = hx
     materials['hx_ratio_cycle'] = cycle(np.random.permutation(hx.ratios))
     materials['hx_prods_cycle'] = cycle(np.random.permutation(hx.products))

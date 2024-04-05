@@ -23,7 +23,7 @@ def materials(rhythm_tree: rt.RT) -> list:
     '''
     return [rhythm_tree.rotate(i) for i in range(len(rhythm_tree.factors))]
 
-def example(r_trees: list, hexany: tonos.combination_product_sets.CPS = tonos.combination_product_sets.CPS((1, 3, 5, 13), 2), use_hex=False, inv_freq_range=True, init_bpm: float = 66, start_offset: float = 0.0):
+def example(r_trees: list, hexany: tonos.JI.combination_product_sets.CPS = tonos.JI.combination_product_sets.CPS((1, 3, 5, 13), 2), use_hex=False, inv_freq_range=True, init_bpm: float = 66, start_offset: float = 0.0):
     '''
     '''
     tempo = init_bpm
@@ -73,7 +73,7 @@ def example(r_trees: list, hexany: tonos.combination_product_sets.CPS = tonos.co
         pan *= -1.0
     return rows_list
 
-def composition(r_trees: list, hexany: tonos.combination_product_sets.CPS = tonos.combination_product_sets.CPS((1, 3, 5, 13), 2), equaves: list = [0, 1, 2, 3], dyn_range: list = [aikous.DYNAMICS.pp, aikous.DYNAMICS.mp], init_bpm: float = 60, start_offset: float = 0.0):    
+def composition(r_trees: list, hexany: tonos.JI.combination_product_sets.CPS = tonos.JI.combination_product_sets.CPS((1, 3, 5, 13), 2), equaves: list = [0, 1, 2, 3], dyn_range: list = [aikous.DYNAMICS.pp, aikous.DYNAMICS.mp], init_bpm: float = 60, start_offset: float = 0.0):
     '''
     '''
     tempo = init_bpm
@@ -214,7 +214,7 @@ def composition(r_trees: list, hexany: tonos.combination_product_sets.CPS = tono
             start_time += duration
     return rows_list
 
-def composition_ii(r_trees: list, hexany: tonos.combination_product_sets.CPS = tonos.combination_product_sets.CPS((1, 3, 5, 13), 2), equaves: list = [0.125, 0.25, 0.5, 0, 1], dyn_range: list = [aikous.DYNAMICS.ppp, aikous.DYNAMICS.p], init_bpm: float = 60, start_offset: float = 0.0):
+def composition_ii(r_trees: list, hexany: AlloPy.allopy.tonos.JI.combination_product_sets.CPS = AlloPy.allopy.tonos.JI.combination_product_sets.CPS((1, 3, 5, 13), 2), equaves: list = [0.125, 0.25, 0.5, 0, 1], dyn_range: list = [aikous.DYNAMICS.ppp, aikous.DYNAMICS.p], init_bpm: float = 60, start_offset: float = 0.0):
     '''
     '''
     tempo = init_bpm
@@ -343,10 +343,10 @@ def compositions():
     # Merge Examples 00, 01, 02 w/ Different Rhythm Trees
     # ----------------------------------------------------------------------------------------------------------------
 
-    hex                 = tonos.combination_product_sets.CPS((1, 3, 5, 9, 11), 3)
-    hex_i               = tonos.combination_product_sets.CPS((1, 5, 9), 2)
+    hex                 = AlloPy.allopy.tonos.JI.combination_product_sets.CPS((1, 3, 5, 9, 11), 3)
+    hex_i               = AlloPy.allopy.tonos.JI.combination_product_sets.CPS((1, 5, 9), 2)
     # hex_ii              = tonos.scales.CPS((1, 3, 5, 7, 13, 21), 3)
-    hex_ii              = tonos.combination_product_sets.CPS((1, 13, 23, 31, 47, 51, 53), 4)
+    hex_ii              = AlloPy.allopy.tonos.JI.combination_product_sets.CPS((1, 13, 23, 31, 47, 51, 53), 4)
     max_rotations       = 9
 
     subdivisions        = ((3, (9, 3, 3)), 1, (6, (6, 9, 9, 3)), 1, (9, (9, 3, 9, 6, 9, 3, 1, 1)))

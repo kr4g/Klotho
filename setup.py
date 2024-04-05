@@ -23,6 +23,8 @@ setup(
         'IPython',
         'tabulate',
         'PySide6',
+        'sympy',
+        'networkx',
     ],
     # tests_require=[
     #     'pytest',

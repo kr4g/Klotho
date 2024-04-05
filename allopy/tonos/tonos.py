@@ -212,7 +212,7 @@ def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A
   frequency = A4_Hz * (2 ** (midi / 12))
   return frequency
 
-def octave_reduce(interval: float, octave: int = 1) -> float:
+def octave_reduce(interval:float, equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> float:
   '''
   Reduce an interval to within the span of a specified octave.
   
@@ -223,25 +223,25 @@ def octave_reduce(interval: float, octave: int = 1) -> float:
   Returns:
     The octave-reduced interval as a float.
   '''
-  while interval >= 2**octave:
-    interval /= 2
+  while interval >= equave**n_equaves:
+    interval /= equave
   return interval
 
-def fold_interval(interval: Union[Fraction, float], equave: Union[Fraction, float] = 2, equaves: int = 1) -> float:
+def fold_interval(interval:Union[Fraction, float], equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> float:
   '''
   Fold an interval to within a specified range.
 
   Args:
     interval: The interval to be wrapped.
     equave: The equave value, default is 2.
-    equaves: The number of equaves, default is 1.
+    n_equaves: The number of equaves, default is 1.
 
   Returns:
     The folded interval as a float.
   '''
-  while interval < 1/equave**equaves:
+  while interval < 1/equave**n_equaves:
     interval *= equave
-  while interval > equave**equaves:
+  while interval > equave**n_equaves:
     interval /= equave
   return interval
 

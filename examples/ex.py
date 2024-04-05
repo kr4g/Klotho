@@ -28,7 +28,7 @@ def materials():
     for div in prolationis:
         r_trees.append(rt.RT(duration=div, subdivisions=subdivisions))
     material['r_trees'] = r_trees
-    hx = tonos.combination_product_sets.CPS((3,5,7,11,13),3)
+    hx = tonos.JI.combination_product_sets.CPS((3,5,7,11,13),3)
     material['hexany'] = hx
     material['set'] = []
     return material

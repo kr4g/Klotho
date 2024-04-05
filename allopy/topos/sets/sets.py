@@ -41,15 +41,3 @@ class Sets:
                     interval = modulus - interval
                 intervals[interval - 1] += 1
         return tuple(intervals)
-
-
-# # Example usage
-# setA = [0, 4, 7]
-# setB = [4, 7, 9]
-
-# print("Union: ", Sets.union(setA, setB))
-# print("Intersection: ", Sets.intersection(setA, setB))
-# print("Difference A-B: ", Sets.difference(setA, setB))
-# print("Symmetric Difference: ", Sets.symmetric_difference(setA, setB))
-# print("Is setA a subset of setB? ", Sets.is_subset(setA, setB))
-# print("Is setA a superset of setB? ", Sets.is_superset(setA, setB))

@@ -15,9 +15,9 @@ class UT:
         
         self.__type        = None
         self.__tempus      = Fraction(tempus)
-        self.__prolationis = self.__set_prolationis(prolatio) # RT object
+        self.__prolationis = self._set_prolationis(prolatio) # RT object
         self.__tempo       = tempo
-        self.__beat        = self.__set_beat(beat, prolatio)
+        self.__beat        = self._set_beat(beat, prolatio)
     
     @classmethod
     def from_tree(cls, tree:Union[RT, tuple]):
@@ -82,7 +82,7 @@ class UT:
     def beat(self, beat:Union[str,Fraction]):
         self.__beat = Fraction(beat)    
 
-    def __set_prolationis(self, prolatio):
+    def _set_prolationis(self, prolatio):
         if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
             prolatio = RT(duration       = prolatio.duration,
                           time_signature = self.__tempus,  # ...the UT wins
@@ -118,7 +118,7 @@ class UT:
             raise ValueError(f'Invalid prolationis: {prolatio}')
         return prolatio
     
-    def __set_beat(self, beat, prolatio):
+    def _set_beat(self, beat, prolatio):
         if isinstance(prolatio, str):
             prolatio = prolatio.lower()
             if prolatio in {'p', 'pulse', 'phase',

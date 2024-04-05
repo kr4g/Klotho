@@ -1,7 +1,7 @@
 
 from typing import Union, Tuple
 from fractions import Fraction
-from math import gcd, prod, log2, ceil, floor
+from math import gcd, prod
 from functools import reduce
 import numpy as np
 
@@ -17,7 +17,7 @@ import numpy as np
 # ------------------------------------------------------------------------------------
 
 # Algorithm 1: MeasureRatios
-def measure_ratios(subdivisions:Tuple):
+def measure_ratios(subdivisions:tuple):
     '''
     Algorithm 1: MeasureRatios
 
@@ -150,10 +150,7 @@ def autoref(lst:tuple):
     :param lst: List of finite elements to be doubly circularly permuted.
     :return: List containing the original element and its permutations.
     '''
-    result = []
-    for n, elt in enumerate(lst):
-        result.append((elt, permut_list(lst, n + 1)))
-    return tuple(result)
+    return tuple((elt, permut_list(lst, n + 1)) for n, elt in enumerate(lst))
 
 # AutoRef Matrices
 def autoref_rotmat(lst:tuple, mode:str='G'):
@@ -217,7 +214,7 @@ def autoref_rotmat(lst:tuple, mode:str='G'):
 def symbolic_unit(time_signature:Union[Fraction, str]):
     return Fraction(1, symbolic_approx(Fraction(time_signature).denominator))
 
-def symbolic_duration(f, time_signature:Union[Fraction, str], S:Tuple):
+def symbolic_duration(f:int, time_signature:Union[Fraction, str], S:tuple):
     # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
     time_signature = Fraction(time_signature)
     return Fraction(f * time_signature.numerator) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
@@ -251,7 +248,7 @@ def symbolic_approx(n:int):
     '''
     if n == 1:
         return 1
-    elif n in {2, 3}:
+    elif n in {2, 3}: # absent in the original pseudocode
         return 2
     elif n in {4, 5, 6, 7}:
         return 4

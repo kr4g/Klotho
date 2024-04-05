@@ -67,8 +67,8 @@ class RT:
         self.__time_signature = Fraction(time_signature)
         self.__subdivisions   = subdivisions
         self.__decomp         = decomp
-        self.__ratios         = self.__set_ratios()
-        self.__type           = self.__set_complexity()
+        self.__ratios         = self._set_ratios()
+        self.__type           = self._set_complexity()
 
     @classmethod
     def from_tuple(cls, tup:Tuple):
@@ -126,7 +126,7 @@ class RT:
                       decomp         = self.__decomp)
         raise ValueError('Invalid Rhythm Tree')
 
-    def __set_ratios(self):
+    def _set_ratios(self):
         ratios = tuple(self.__duration * r for r in measure_ratios(self.__subdivisions))
         if self.__decomp == 'reduced':
             ratios = reduced_decomposition(ratios, self.__time_signature)
@@ -134,7 +134,7 @@ class RT:
             ratios = strict_decomposition(ratios, self.__time_signature)
         return ratios
     
-    def __set_complexity(self):
+    def _set_complexity(self):
         div = sum_proportions(self.__subdivisions)
         if bin(div).count('1') != 1 and div != self.__time_signature.numerator:
             return True
@@ -152,7 +152,6 @@ class RT:
             f'Ratios: {ratios}\n'
         )
 
-
 # ------------------------------------------------------------------------------------
 # EXPERIMENTAL
 # ------------------------------------------------------------------------------------
@@ -165,8 +164,8 @@ def notate(tree, level=0):
     # print(f'tree: {tree}, level: {level}')
     if level == 1:
         tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
-        m, n = get_group_subdivision(tup)
-        return f'\\tuplet {m}/{n} ' + '{{' + notate(tree.subdivisions, level + 1) + '}}'
+        n, m = get_group_subdivision(tup)
+        return f'\\tuplet {n}/{m} ' + '{{' + notate(tree.subdivisions, level + 1) + '}}'
     else:
         result = ""
         for element in tree:
@@ -179,8 +178,8 @@ def notate(tree, level=0):
                 D, S = element
                 # print(f'D: {D}, S: {S}')
                 tup = D, (sum_proportions(S),)
-                m, n = get_group_subdivision(tup)
-                result += f' \\tuplet {m}/{n} {{{notate(S, level + 1)}}}'
+                n, m = get_group_subdivision(tup)
+                result += f' \\tuplet {n}/{m} {{{notate(S, level + 1)}}}'
             if level == 0:
                 result = result.strip() + ' '
         return result.strip()
