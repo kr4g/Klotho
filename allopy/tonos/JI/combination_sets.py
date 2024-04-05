@@ -60,12 +60,12 @@ class CPS:
   def n_equaves(self):
     return self.__n_equaves
   
-  @property.setter
+  @equave.setter
   def equave(self, equave:Union[Fraction, float]):
     self.__equave = equave
     self.__combos, self.__products, self.__ratios = self._calculate()
   
-  @property.setter
+  @n_equaves.setter
   def n_equaves(self, n_equaves:int):
     self.__n_equaves = n_equaves
     self.__combos, self.__products, self.__ratios = self._calculate()

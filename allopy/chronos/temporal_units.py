@@ -1,6 +1,5 @@
 from fractions import Fraction
 from typing import Union
-import numpy as np
 
 from .rhythm_trees import RT
 from utils.algorithms.algorithms import measure_ratios
@@ -80,7 +79,13 @@ class UT:
     
     @beat.setter
     def beat(self, beat:Union[str,Fraction]):
-        self.__beat = Fraction(beat)    
+        self.__beat = Fraction(beat)
+        
+    def decompose(self, prolatio:Union[RT,tuple,str] = 'd') -> 'UTSeq':
+        return UTSeq(UT(tempus   = ratio,
+                        prolatio = prolatio,
+                        tempo    = self.__tempo,
+                        beat     = self.__beat) for ratio in self.__prolationis.ratios)
 
     def _set_prolationis(self, prolatio):
         if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
@@ -123,8 +128,10 @@ class UT:
             prolatio = prolatio.lower()
             if prolatio in {'p', 'pulse', 'phase',
                             'd', 'duration', 'dur',
-                            'r', 'rest', 'silence'}:
+                            'r', 'rest', 'silence'} and self.__beat is None:
                 return Fraction(1, self.__tempus.denominator)
+            else:
+                return Fraction(beat)
         else:
             return Fraction(beat)
     
@@ -166,7 +173,7 @@ class UT:
         else:
             new_tempus = self.__tempus * other
         return UT(tempus   = new_tempus,
-                  prolatio = 'd',
+                  prolatio = self.__prolationis.subdivisions,
                   tempo    = self.__tempo,
                   beat     = self.__beat)
     
@@ -174,13 +181,13 @@ class UT:
         if isinstance(other, UT):
             new_tempus = self.__tempus / other.__tempus
             return UT(tempus   = new_tempus,
-                      prolatio = 'd',
+                      prolatio = self.__prolationis.subdivisions,
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         elif isinstance(other, (Fraction, int)):
             new_tempus = self.__tempus / other
             return UT(tempus   = new_tempus,
-                      prolatio = 'd',
+                      prolatio = self.__prolationis.subdivisions,
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
@@ -199,7 +206,10 @@ class UT:
     def __repr__(self):
         return (
             f'Tempus: {self.__tempus}\n'
-            f'Prolationis: {self.__prolationis.subdivisions}\n'            
+            f'Tempo: {self.__tempo}\n' if self.__tempo else ''
+            f'Beat: {self.__beat}\n' 
+            f'Prolationis: {self.__prolationis.subdivisions}\n'
+            f'Type: {self.__type}\n'     
         )
 
 class UTSeq:
@@ -237,11 +247,25 @@ class UTSeq:
 
 # Time Block
 class TB:
-    def __init__(self, tb:tuple[UTSeq]):
+    def __init__(self, tb:tuple[UTSeq], axis:float=0.0):
         self.__tb = tb
+        self.__axis = axis
         
     def __iter__(self):
-        return iter(self.__tb)
+        return iter(self.__tb)    
+
+    @property
+    def duration(self):
+        return max(ut_seq.duration for ut_seq in self.__tb)
+    
+    @property
+    def axis(self):
+        return self.__axis
+
+    @axis.setter
+    def axis(self, axis):
+        self.__axis = axis
+        pass
 
 if __name__ == '__main__':  
     pass
