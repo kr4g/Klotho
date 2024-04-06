@@ -1,19 +1,19 @@
 from fractions import Fraction
 from typing import Union
 
-from .rhythm_trees import RT
+from .rhythm_trees import RT, Meas
 from utils.algorithms.algorithms import measure_ratios
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
 class UT:
     def __init__(self,
-                 tempus:Union[str,Fraction]   = '1/1',
+                 tempus:Union[Meas,str]       = '1/1',
                  prolatio:Union[RT,tuple,str] = 'd',
                  tempo:Union[None,float]      = None,
-                 beat:Union[str,Fraction]     = '1/1'):
+                 beat:Union[str,Fraction]     = None):
         
         self.__type        = None
-        self.__tempus      = Fraction(tempus)
+        self.__tempus      = Meas(tempus)
         self.__prolationis = self._set_prolationis(prolatio) # RT object
         self.__tempo       = tempo
         self.__beat        = self._set_beat(beat, prolatio)

@@ -96,10 +96,10 @@ def strict_decomposition(frac, meas):
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of proportions with a common denominator.
     '''
-    pgcd = reduce(gcd, (ratio.numerator for ratio in frac))
+    # lcm = lambda a, b: abs(a*b) // gcd(a, b)
+    pgcd = reduce(gcd, (ratio.denominator for ratio in frac))
     pgcd_denom = meas.denominator
-    return tuple(Fraction((Fraction(ratio.numerator, pgcd) * meas.numerator),
-                                    pgcd_denom) for ratio in frac)
+    return tuple(Fraction((Fraction(ratio, pgcd) * meas.numerator), pgcd_denom) for ratio in frac)
 
 # Algorithm 4: PermutList
 def permut_list(lst:tuple, pt:int):
@@ -330,7 +330,7 @@ def get_group_subdivision(G:tuple):
             return [num * 2, ds]
         elif num < (ds * 2) - 1:
             m = ds
-        else:
+        else:            
             pi = 2 ** (n.bit_length() - 1) # first power of 2 <= n
             ps = 2 ** n.bit_length()       # first power of 2 > n
             m = ps if abs(n - pi) > abs(n - ps) else pi

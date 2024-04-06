@@ -19,7 +19,8 @@ class CPS:
     - The first list contains the products of combinations of prime factors.
     - The second list is the sorted CPS scale after octave reduction.
   '''
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7), r:int = 2, equave:Union[Fraction, float] = 2, n_equaves:int = 1):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7), r:int = 2, 
+               equave:Union[Fraction, float] = 2, n_equaves:int = 1):
     self.__equave = equave
     self.__n_equaves = n_equaves
 

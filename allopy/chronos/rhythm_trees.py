@@ -23,6 +23,53 @@ from math import gcd
 
 from utils.algorithms.algorithms import *
 
+class Meas:    
+    '''
+    Time signature class that accepts a Fraction, string, or tuple
+    and stores the numerator and denominator separately.
+    '''
+    def __init__(self, signature: Union[Fraction, str, tuple] = '1/1'):
+        if isinstance(signature, Fraction):
+            self._numerator, self._denominator = signature.numerator, signature.denominator
+        elif isinstance(signature, tuple):
+            self._numerator, self._denominator = signature
+        elif isinstance(signature, str):
+            parts = signature.replace('//', '/').split('/')
+            if len(parts) == 2:
+                self._numerator, self._denominator = map(int, parts)
+            else:
+                raise ValueError('Invalid time signature format')
+        else:
+            raise ValueError('Invalid time signature type')
+
+        if self._denominator == 0:
+            raise ValueError('Time signature denominator cannot be zero')
+
+    @property
+    def numerator(self):
+        return self._numerator
+
+    @property
+    def denominator(self):
+        return self._denominator
+    
+    def __eq__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            return (self.numerator, self.denominator) == (other.numerator, other.denominator)
+        elif isinstance(other, tuple) and len(other) == 2:
+            return (self.numerator, self.denominator) == tuple(map(int, other))
+        elif isinstance(other, str):
+            try:
+                other_numerator, other_denominator = map(int, other.replace('//', '/').split('/'))
+                return (self.numerator, self.denominator) == (other_numerator, other_denominator)
+            except ValueError:
+                return False
+        return NotImplemented
+
+    def __str__(self):
+        return f'{self._numerator}/{self._denominator}'
+
+
 class RT:
     '''
     A rhythm tree is a list representing a rhythmic structure. This list is organized 
@@ -59,12 +106,12 @@ class RT:
     '''
     def __init__(self, 
                  duration:int                        = 1,
-                 time_signature:Union[Fraction, str] = '1/1',
+                 time_signature:Union[Meas, str]     = '1/1',
                  subdivisions:Tuple                  = (1,),
                  decomp:str                          = 'reduced'):
         
         self.__duration       = duration
-        self.__time_signature = Fraction(time_signature)
+        self.__time_signature = Meas(time_signature)
         self.__subdivisions   = subdivisions
         self.__decomp         = decomp
         self.__ratios         = self._set_ratios()
