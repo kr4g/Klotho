@@ -51,7 +51,7 @@ class CPS:
 
   @property
   def graph(self):
-    return self.__graph()
+    return self.__graph
 
   @property
   def equave(self):
