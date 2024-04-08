@@ -82,6 +82,7 @@ class UT:
         self.__beat = Fraction(beat)
         
     def decompose(self, prolatio:Union[RT,tuple,str] = 'd') -> 'UTSeq':
+        if prolatio.lower() in {'s'}: prolatio = self.__prolationis.subdivisions
         return UTSeq(UT(tempus   = ratio,
                         prolatio = prolatio,
                         tempo    = self.__tempo,
@@ -214,6 +215,10 @@ class UTSeq:
         self.__seq = ut_seq
     
     @property
+    def uts(self):
+        return self.__seq
+
+    @property
     def onsets(self):
         return calc_onsets(self.durations)
     
@@ -247,9 +252,10 @@ class TB:
     def __init__(self, tb:tuple[UTSeq], axis:float=0.0):
         self.__tb = tb
         self.__axis = axis
-        
-    def __iter__(self):
-        return iter(self.__tb)    
+
+    @property
+    def utseqs(self):
+        return self.__tb    
 
     @property
     def duration(self):
@@ -263,6 +269,10 @@ class TB:
     def axis(self, axis):
         self.__axis = axis
         pass
+
+    def __iter__(self):
+        return iter(self.__tb)
+    
 
 if __name__ == '__main__':  
     pass
