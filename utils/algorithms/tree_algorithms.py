@@ -411,6 +411,14 @@ def graph_tree(root, S):
 def graph_depth(G):
     return max(nx.single_source_shortest_path_length(G, 0).values())
 
+def prune_tree(tree, depth):
+    if depth == 0:
+        return 0 # ignore for now
+    if depth == 1:
+        return tuple(el if isinstance(el, int) else el[0] for el in tree)
+    else:
+        pass
+
 # EXPERIMENTAL
 def notate(tree, level=0):
     # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
