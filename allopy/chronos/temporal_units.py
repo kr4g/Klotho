@@ -5,7 +5,7 @@ from .rhythm_trees import RT, Meas
 from utils.algorithms.tree_algorithms import measure_ratios
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
-class UT:
+class UT:    
     def __init__(self,
                  tempus:Union[Meas,str]       = '1/1',
                  prolatio:Union[RT,tuple,str] = 'd',

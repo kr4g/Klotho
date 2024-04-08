@@ -55,7 +55,7 @@ def measure_ratios(subdivisions:tuple):
     return tuple(result)
 
 # Algorithm 2: ReducedDecomposition
-def reduced_decomposition(frac, meas):
+def reduced_decomposition(lst, meas):
     '''
     Algorithm 2: ReducedDecomposition
     
@@ -73,10 +73,10 @@ def reduced_decomposition(frac, meas):
     :return: List of reduced proportions.
     '''
     return tuple(Fraction(f.numerator * meas.numerator,
-                          f.denominator * meas.denominator) for f in frac)
+                          f.denominator * meas.denominator) for f in lst)
 
 # Algorithm 3: StrictDecomposition
-def strict_decomposition(frac, meas):
+def strict_decomposition(lst, meas):
     '''
     Algorithm 3: StrictDecomposition
     
@@ -98,9 +98,9 @@ def strict_decomposition(frac, meas):
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of proportions with a common denominator.
     '''
-    pgcd = reduce(gcd, (ratio.numerator for ratio in frac))
-    # pgcd_denom = reduce(lcm, (ratio.denominator for ratio in frac))
-    return tuple(Fraction((f / pgcd) * meas.numerator, meas.denominator) for f in frac)
+    pgcd = reduce(gcd, (ratio.numerator for ratio in lst))
+    pgcd_denom = reduce(lcm, (ratio.denominator for ratio in lst))
+    return tuple(Fraction((f / pgcd) * meas.numerator, pgcd_denom) for f in lst)
 
 # Algorithm 4: PermutList
 def permut_list(lst:tuple, pt:int):
