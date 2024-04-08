@@ -99,8 +99,7 @@ def strict_decomposition(frac, meas):
     :return: List of proportions with a common denominator.
     '''
     pgcd = reduce(gcd, (ratio.numerator for ratio in frac))
-    pgcd_denom = reduce(lcm, (ratio.denominator for ratio in frac))
-    # numers = [ratio.numerator * (pgcd_denom // ratio.denominator) for ratio in frac]
+    # pgcd_denom = reduce(lcm, (ratio.denominator for ratio in frac))
     return tuple(Fraction((f / pgcd) * meas.numerator, meas.denominator) for f in frac)
 
 # Algorithm 4: PermutList
