@@ -337,8 +337,6 @@ def get_group_subdivision(G:tuple):
     
     return [n, m]
 
-
-
 def factor_tree(subdivs:tuple):
     def _factor(subdivs, acc):
         for element in subdivs:
