@@ -1,7 +1,7 @@
 
 from typing import Union, Tuple
 from fractions import Fraction
-from math import gcd, lcm, prod
+from math import gcd, lcm, prod, log
 from functools import reduce
 from itertools import count
 import numpy as np
@@ -316,10 +316,9 @@ def get_group_subdivision(G:tuple):
     else:
         n = subdiv
     
-    if bin(n).count('1') == 1:     # n is binary
+    if bin(n).count('1') == 1:   # n is binary
         m = symbolic_approx(n)
-    elif n % 3 == 0 and (n * 3 / 2).is_integer(): # n is ternary
-    # elif (n * 3 / 2).is_integer(): # n is ternary
+    elif log(n, 3).is_integer(): # n is ternary
         m = int(symbolic_approx(n) * 3 / 2)
     else:
         num = n
@@ -337,6 +336,8 @@ def get_group_subdivision(G:tuple):
             m = ps if abs(n - pi) > abs(n - ps) else pi
     
     return [n, m]
+
+
 
 def factor_tree(subdivs:tuple):
     def _factor(subdivs, acc):
