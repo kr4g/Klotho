@@ -22,8 +22,8 @@ class CPS:
   '''
   def __init__(self, factors:tuple[int] = (1, 3, 5, 7), r:int = 2, 
                equave:Union[Fraction, float] = 2, n_equaves:int = 1):
-    self.__equave = equave
-    self.__n_equaves = n_equaves
+    self._equave = equave
+    self._n_equaves = n_equaves
 
     self.__factors = tuple(sorted(factors))
     self.__r = r
@@ -58,28 +58,28 @@ class CPS:
 
   @property
   def equave(self):
-    return self.__equave
+    return self._equave
   
   @property
   def n_equaves(self):
-    return self.__n_equaves
+    return self._n_equaves
   
   @equave.setter
   def equave(self, equave:Union[Fraction, float]):
-    self.__equave = equave
+    self._equave = equave
     self.__combos, self.__products, self.__ratios = self._calculate()
   
   @n_equaves.setter
   def n_equaves(self, n_equaves:int):
-    self.__n_equaves = n_equaves
+    self._n_equaves = n_equaves
     self.__combos, self.__products, self.__ratios = self._calculate()
   
   def _calculate(self):
     combos   = tuple(combinations(self.__factors, self.__r))
     products = tuple(prod(comb) for comb in combos)
     ratios   = tuple(sorted(octave_reduce(interval  = Fraction(product),
-                                          equave    = self.__equave,
-                                          n_equaves = self.__n_equaves) for product in products))
+                                          equave    = self._equave,
+                                          n_equaves = self._n_equaves) for product in products))
     return combos, products, ratios
   
   def __repr__(self):
@@ -112,11 +112,9 @@ class _nany(CPS, ABC):
     if self.__dyads is None:
       dyad_combos = find_cliques(self.graph, 2)
       self.__dyads = tuple(
-        tuple(sorted(
-          octave_reduce(interval  = Fraction(prod(combo)),
-                        equave    = self.equave,
-                        n_equaves = self.n_equaves) for combo in dyad
-        )) for dyad in dyad_combos
+        combo_clique_to_ratios(clique    = dyad,
+                               equave    = self._equave,
+                               n_equaves = self._n_equaves) for dyad in dyad_combos
       )
     return self.__dyads
   
@@ -125,11 +123,9 @@ class _nany(CPS, ABC):
     if self.__triads is None:
       triad_combos = find_cliques(self.graph, 3)
       self.__triads = tuple(
-        tuple(sorted(
-          octave_reduce(interval  = Fraction(prod(combo)),
-                        equave    = self.equave,
-                        n_equaves = self.n_equaves) for combo in triad
-        )) for triad in triad_combos
+        combo_clique_to_ratios(clique    = triad,
+                               equave    = self._equave,
+                               n_equaves = self._n_equaves) for triad in triad_combos
       )
     return self.__triads
   
@@ -138,15 +134,13 @@ class _nany(CPS, ABC):
     if self.__tetrads is None:
       tetrad_combos = find_cliques(self.graph, 4)
       self.__tetrads = tuple(
-        tuple(sorted(
-          octave_reduce(interval  = Fraction(prod(combo)),
-                        equave    = self.equave,
-                        n_equaves = self.n_equaves) for combo in tetrad
-        )) for tetrad in tetrad_combos
+        combo_clique_to_ratios(clique    = tetrad,
+                               equave    = self._equave,
+                               n_equaves = self._n_equaves) for tetrad in tetrad_combos
       )
     return self.__tetrads
   
-  def nands(self, n:int):
+  def nads(self, n:int):
     if n < 2:
       raise ValueError('n must be greater than 1.')
     elif n == 2:
@@ -156,15 +150,29 @@ class _nany(CPS, ABC):
     elif n == 4:
       return self.tetrads
     else:
-      nand_combos = find_cliques(self.graph, n)
+      nad_combos = find_cliques(self.graph, n)
       return tuple(
-        tuple(sorted(
-          octave_reduce(interval  = Fraction(prod(combo)),
-                        equave    = self.equave,
-                        n_equaves = self.n_equaves) for combo in nand
-        )) for nand in nand_combos
+        combo_clique_to_ratios(clique    = nad,
+                               equave    = self._equave,
+                               n_equaves = self._n_equaves) for nad in nad_combos
       )
+
+  def _reset_nads(self):
+    self.__dyads   = None
+    self.__triads  = None
+    self.__tetrads = None
   
+  @CPS.equave.setter
+  def equave(self, equave:Union[Fraction, float]):
+    super(_nany, _nany).equave.fset(self, equave)
+    self._reset_nads()
+
+  @CPS.n_equaves.setter
+  def n_equaves(self, n_equaves:int):
+    super(_nany, _nany).n_equaves.fset(self, n_equaves)
+    self._reset_nads()
+
+
 class Hexany(_nany):
   '''
   Calculate a Hexany scale from a list of prime factors and a rank value.

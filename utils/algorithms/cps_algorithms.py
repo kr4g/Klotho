@@ -1,4 +1,8 @@
 import networkx as nx
+from math import prod
+from fractions import Fraction
+
+from allopy.tonos.tonos import octave_reduce
 
 def graph_cps(combos:tuple):
     G = nx.Graph()    
@@ -16,3 +20,8 @@ def graph_cps(combos:tuple):
 def find_cliques(G:nx.Graph, n:int):
     cliques = nx.enumerate_all_cliques(G)
     return tuple(tuple(clique) for clique in cliques if len(clique) == n)
+
+def combo_clique_to_ratios(clique:tuple, equave:int=2, n_equaves:int=1):
+    return tuple(sorted(octave_reduce(interval  = Fraction(prod(combo)),
+                                      equave    = equave,
+                                      n_equaves = n_equaves) for combo in clique))
