@@ -126,10 +126,10 @@ class RT:
     see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
     '''
     def __init__(self, 
-                 duration:int                        = 1,
-                 time_signature:Union[Meas, str]     = '1/1',
-                 subdivisions:Tuple                  = (1,),
-                 decomp:str                          = 'reduced'):
+                 duration:int                    = 1,
+                 time_signature:Union[Meas, str] = '1/1',
+                 subdivisions:Tuple              = (1,),
+                 decomp:str                      = 'reduced'):
         
         self.__duration       = duration
         self.__time_signature = Meas(time_signature)
