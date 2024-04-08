@@ -2,7 +2,7 @@ from fractions import Fraction
 from typing import Union
 
 from .rhythm_trees import RT, Meas
-from utils.algorithms.algorithms import measure_ratios
+from utils.algorithms.tree_algorithms import measure_ratios
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
 class UT:

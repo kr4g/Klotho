@@ -21,7 +21,7 @@ from fractions import Fraction
 from typing import Union, Tuple
 from math import gcd
 
-from utils.algorithms.algorithms import *
+from utils.algorithms.tree_algorithms import *
 
 class Meas:    
     '''
@@ -66,6 +66,9 @@ class Meas:
                 return False
         return NotImplemented
 
+    def __repr__(self) -> str:
+        return f'{self._numerator}/{self._denominator}'
+    
     def __str__(self):
         return f'{self._numerator}/{self._denominator}'
 
@@ -116,7 +119,9 @@ class RT:
         self.__decomp         = decomp
         self.__ratios         = self._set_ratios()
         self.__type           = self._set_complexity()
-
+        self.__graph          = None
+        self.__factors        = None
+        
     @classmethod
     def from_tuple(cls, tup:Tuple):
         return cls(duration       = 1,
@@ -142,7 +147,9 @@ class RT:
 
     @property
     def factors(self):
-        return factor_tree(self.__subdivisions)
+        if self.__factors is None:
+            self.__factors = factor_tree(self.__subdivisions)
+        return self.__factors
     
     @property
     def ratios(self):
@@ -151,6 +158,12 @@ class RT:
     @property
     def type(self):
         return self.__type
+    
+    @property
+    def graph(self):
+        if self.__graph is None:
+            self.__graph = graph_tree(self.time_signature, self.__subdivisions)
+        return self.__graph
 
     def rotate(self, n=1):
         refactored = rotate_tree(self.__subdivisions, n)
@@ -200,38 +213,6 @@ class RT:
         )
 
 # ------------------------------------------------------------------------------------
-# EXPERIMENTAL
-# ------------------------------------------------------------------------------------
-
-def notate(tree, level=0):
-    # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
-    if level == 0:
-        return f'\\time {tree.time_signature}\n' + notate(tree, level + 1)
-    
-    # print(f'tree: {tree}, level: {level}')
-    if level == 1:
-        tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
-        n, m = get_group_subdivision(tup)
-        return f'\\tuplet {n}/{m} ' + '{{' + notate(tree.subdivisions, level + 1) + '}}'
-    else:
-        result = ""
-        for element in tree:
-            if isinstance(element, int):      # Rest or single note
-                if element < 0:  # Rest
-                    result += f" -{abs(element)}"
-                else:  # Single note
-                    result += f" {element}"
-            elif isinstance(element, tuple):  # Subdivision                
-                D, S = element
-                # print(f'D: {D}, S: {S}')
-                tup = D, (sum_proportions(S),)
-                n, m = get_group_subdivision(tup)
-                result += f' \\tuplet {n}/{m} {{{notate(S, level + 1)}}}'
-            if level == 0:
-                result = result.strip() + ' '
-        return result.strip()
-
-# ------------------------------------------------------------------------------------
 
 
 if __name__ == '__main__':    
@@ -242,4 +223,3 @@ if __name__ == '__main__':
     s = ((4, (3, (8, (3, 4)))), -3)
     rt = RT(time_signature='4/3', subdivisions=s)
     print(rt)
-    print(notate(rt))

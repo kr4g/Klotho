@@ -14,7 +14,7 @@ from allopy import tonos
 from allopy.aikous import DYNAMICS, amp_freq_scale
 from allopy import skora
 
-from utils.algorithms import algorithms as alg
+from AlloPy.utils.algorithms import tree_algorithms as alg
 
 import numpy as np
 import random

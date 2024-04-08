@@ -3,7 +3,8 @@ from typing import Union
 from math import prod
 from itertools import combinations
 from fractions import Fraction
-import networkx as nx
+
+from utils.algorithms.cps_algorithms import *
 from allopy.tonos.tonos import octave_reduce
 
 class CPS:
@@ -27,7 +28,7 @@ class CPS:
     self.__factors = tuple(sorted(factors))
     self.__r = r
     self.__combos, self.__products, self.__ratios = self._calculate()
-    self.__graph = self._graph_cps()
+    self.__graph = None
 
   @property
   def factors(self):
@@ -51,6 +52,8 @@ class CPS:
 
   @property
   def graph(self):
+    if self.__graph is None:
+      self.__graph = graph_cps(self.__combos)
     return self.__graph
 
   @property
@@ -79,25 +82,8 @@ class CPS:
                                           n_equaves = self.__n_equaves) for product in products))
     return combos, products, ratios
   
-  def _graph_cps(self):
-    G = nx.Graph()
-    # each combination is a node (vertex) in the graph
-    for combo in self.combos:
-      G.add_node(combo)
-
-    # edges are between nodes that share at least one common factor
-    for combo1 in self.combos:
-      for combo2 in self.combos:
-        if combo1 != combo2 and set(combo1).intersection(combo2):
-          G.add_edge(combo1, combo2)
-    return G
-  
-  def _find_cliques(self, n):
-    cliques = nx.enumerate_all_cliques(self.__graph)
-    return tuple(tuple(clique) for clique in cliques if len(clique) == n)
-  
   def __repr__(self):
-    r_str = tuple(str(r) for r in self.__ratios)
+    r_str = ', '.join(str(ratio) for ratio in self.__ratios)
     return (
       f'Rank:     {self.__r}\n'
       f'Factors:  {self.__factors}\n'
@@ -117,20 +103,47 @@ class _nany(CPS, ABC):
   
   def __init__(self, factors:tuple[int], r:int):
     super().__init__(factors, r)
-    self.__dyads   = self._find_cliques(2)
-    self.__triads  = self._find_cliques(3)
-    self.__tetrads = self._find_cliques(4)
+    self.__dyads   = None
+    self.__triads  = None
+    self.__tetrads = None
   
   @property
   def dyads(self):
+    if self.__dyads is None:
+      dyad_combos = find_cliques(self.graph, 2)
+      self.__dyads = tuple(
+        tuple(sorted(
+          octave_reduce(interval  = Fraction(prod(combo)),
+                        equave    = self.equave,
+                        n_equaves = self.n_equaves) for combo in dyad
+        )) for dyad in dyad_combos
+      )
     return self.__dyads
   
   @property
   def triads(self):
+    if self.__triads is None:
+      triad_combos = find_cliques(self.graph, 3)
+      self.__triads = tuple(
+        tuple(sorted(
+          octave_reduce(interval  = Fraction(prod(combo)),
+                        equave    = self.equave,
+                        n_equaves = self.n_equaves) for combo in triad
+        )) for triad in triad_combos
+      )
     return self.__triads
   
   @property
   def tetrads(self):
+    if self.__tetrads is None:
+      tetrad_combos = find_cliques(self.graph, 4)
+      self.__tetrads = tuple(
+        tuple(sorted(
+          octave_reduce(interval  = Fraction(prod(combo)),
+                        equave    = self.equave,
+                        n_equaves = self.n_equaves) for combo in tetrad
+        )) for tetrad in tetrad_combos
+      )
     return self.__tetrads
   
   def nands(self, n:int):
@@ -142,7 +155,15 @@ class _nany(CPS, ABC):
       return self.triads
     elif n == 4:
       return self.tetrads
-    return self._find_cliques(n)
+    else:
+      nand_combos = find_cliques(self.graph, n)
+      return tuple(
+        tuple(sorted(
+          octave_reduce(interval  = Fraction(prod(combo)),
+                        equave    = self.equave,
+                        n_equaves = self.n_equaves) for combo in nand
+        )) for nand in nand_combos
+      )
   
 class Hexany(_nany):
   '''

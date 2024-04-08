@@ -408,6 +408,37 @@ def graph_tree(root, S):
     add_nodes(G, root_id, S)
     return G
 
+def graph_depth(G):
+    return max(nx.single_source_shortest_path_length(G, 0).values())
+
+# EXPERIMENTAL
+def notate(tree, level=0):
+    # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
+    if level == 0:
+        return f'\\time {tree.time_signature}\n' + notate(tree, level + 1)
+    
+    # print(f'tree: {tree}, level: {level}')
+    if level == 1:
+        tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
+        n, m = get_group_subdivision(tup)
+        return f'\\tuplet {n}/{m} ' + '{{' + notate(tree.subdivisions, level + 1) + '}}'
+    else:
+        result = ""
+        for element in tree:
+            if isinstance(element, int):      # Rest or single note
+                if element < 0:  # Rest
+                    result += f" -{abs(element)}"
+                else:  # Single note
+                    result += f" {element}"
+            elif isinstance(element, tuple):  # Subdivision                
+                D, S = element
+                # print(f'D: {D}, S: {S}')
+                tup = D, (sum_proportions(S),)
+                n, m = get_group_subdivision(tup)
+                result += f' \\tuplet {n}/{m} {{{notate(S, level + 1)}}}'
+            if level == 0:
+                result = result.strip() + ' '
+        return result.strip()
 # ------------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------------
