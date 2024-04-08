@@ -1,9 +1,11 @@
 
 from typing import Union, Tuple
 from fractions import Fraction
-from math import gcd, prod
+from math import gcd, lcm, prod
 from functools import reduce
+from itertools import count
 import numpy as np
+import networkx as nx
 
 # ------------------------------------------------------------------------------------
 # TREE ALGORITHMS
@@ -91,15 +93,15 @@ def strict_decomposition(frac, meas):
             [ ((i/pgcd) * num) , pgcd_denom ];
         end foreach
     end
-        
+
     :param ratios: List of Fraction objects representing proportions.
     :param meas: A tuple representing the Tempus (numerator, denominator).
     :return: List of proportions with a common denominator.
     '''
-    # lcm = lambda a, b: abs(a*b) // gcd(a, b)
-    pgcd = reduce(gcd, (ratio.denominator for ratio in frac))
-    pgcd_denom = meas.denominator
-    return tuple(Fraction((Fraction(ratio, pgcd) * meas.numerator), pgcd_denom) for ratio in frac)
+    pgcd = reduce(gcd, (ratio.numerator for ratio in frac))
+    pgcd_denom = reduce(lcm, (ratio.denominator for ratio in frac))
+    # numers = [ratio.numerator * (pgcd_denom // ratio.denominator) for ratio in frac]
+    return tuple(Fraction((f / pgcd) * meas.numerator, meas.denominator) for f in frac)
 
 # Algorithm 4: PermutList
 def permut_list(lst:tuple, pt:int):
@@ -386,6 +388,26 @@ def measure_complexity(tree:tuple):
             else:
                 return measure_complexity(S)
     return False
+
+def graph_tree(root, S):
+    def add_nodes(graph, parent_id, children_list):        
+        for child in children_list:
+            if isinstance(child, int):
+                child_id = next(unique_id)
+                graph.add_node(child_id, label=child)
+                graph.add_edge(parent_id, child_id)
+            elif isinstance(child, tuple):
+                duration, subdivisions = child
+                duration_id = next(unique_id)
+                graph.add_node(duration_id, label=duration)
+                graph.add_edge(parent_id, duration_id)
+                add_nodes(graph, duration_id, subdivisions)
+    unique_id = count()
+    G = nx.DiGraph()
+    root_id = next(unique_id)
+    G.add_node(root_id, label=root)
+    add_nodes(G, root_id, S)
+    return G
 
 # ------------------------------------------------------------------------------------
 
