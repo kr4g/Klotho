@@ -71,9 +71,11 @@ class UT:
         if self.__tempo is None:
             return None
         if self.__durations is None:
-            self.__durations = tuple(beat_duration(ratio      = r,
-                                                   bpm        = self.__tempo,
-                                                   beat_ratio = self.__beat) for r in self.__prolationis.ratios)
+            self.__durations = tuple(
+                beat_duration(ratio      = r,
+                              bpm        = self.__tempo,
+                              beat_ratio = self.__beat) for r in self.__prolationis.ratios
+                )
         return self.__durations
 
     @property
