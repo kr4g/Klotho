@@ -53,6 +53,24 @@ class Meas:
     def denominator(self):
         return self._denominator
     
+    def __add__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            # if the denominator is the same, add the numerators
+            if self.denominator == other.denominator:
+                return Meas((self.numerator + other.numerator, self.denominator))
+            # if the denominators are different, cast to fractions and add
+            return Meas(Fraction(self.numerator, self.denominator) + Fraction(other.numerator, other.denominator))
+        raise ValueError('Invalid time signature')
+
+    def __sub__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            # if the denominator is the same, subtract the numerators
+            if self.denominator == other.denominator:
+                return Meas((self.numerator - other.numerator, self.denominator))
+            # if the denominators are different, cast to fractions and subtract
+            return Meas(Fraction(self.numerator, self.denominator) - Fraction(other.numerator, other.denominator))
+        raise ValueError('Invalid time signature')            
+    
     def __eq__(self, other):
         if isinstance(other, (Meas, Fraction)):
             return (self.numerator, self.denominator) == (other.numerator, other.denominator)
@@ -180,8 +198,14 @@ class RT:
             d1 = numer_1 * (lcm_denom // denom_1)
             d2 = numer_2 * (lcm_denom // denom_2)
             subdivs = ((d1, self.__subdivisions), (d2, other.__subdivisions))
-            return RT(duration       = 1,
-                      time_signature = self.__time_signature + other.__time_signature,
+            if self.__time_signature == other.__time_signature:
+                duration = self.__duration + other.__duration
+                time_signature = self.__time_signature
+            else:
+                duration = 1
+                time_signature = self.__time_signature + other.__time_signature
+            return RT(duration       = duration,
+                      time_signature = time_signature,
                       subdivisions   = subdivs,
                       decomp         = self.__decomp)
         raise ValueError('Invalid Rhythm Tree')
