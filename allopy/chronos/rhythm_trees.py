@@ -136,7 +136,7 @@ class RT:
         self.__subdivisions   = subdivisions
         self.__decomp         = decomp
         self.__ratios         = self._set_ratios()
-        self.__type           = self._set_complexity()
+        self.__type           = self._set_type()
         self.__graph          = None
         self.__factors        = None
         
@@ -218,21 +218,20 @@ class RT:
             ratios = strict_decomposition(ratios, self.__time_signature)
         return ratios
     
-    def _set_complexity(self):
+    def _set_type(self):
         div = sum_proportions(self.__subdivisions)
         if bin(div).count('1') != 1 and div != self.__time_signature.numerator:
-            return True
-        return measure_complexity(self.__subdivisions)
+            return 'complex'
+        return 'complex' if measure_complexity(self.__subdivisions) else 'simple'
 
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
-        rt_type = 'complex' if self.__type else 'simple'
         return (
             f'Duration: {self.__duration}\n'
             f'Time Signature: {self.__time_signature}\n'
             f'Subdivisions: {self.__subdivisions}\n'
             f'Decomposition: {self.__decomp}\n'
-            f'Type: {rt_type}\n'
+            f'Type: {self.__type}\n'
             f'Ratios: {ratios}\n'
         )
 
