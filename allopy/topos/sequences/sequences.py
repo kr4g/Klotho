@@ -60,5 +60,6 @@ class Norg():
     def lake():
         '''
         see: https://web.archive.org/web/20071010093955/http://www.pernoergaard.dk/eng/strukturer/toneso/tkonstruktion.html
+
         '''
         pass
