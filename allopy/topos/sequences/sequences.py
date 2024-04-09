@@ -59,21 +59,25 @@ class Norg():
         return _infinity_digits(filtered_digits)
 
     @staticmethod
-    def trip(seed:list = [0,-2,-1], size:int = 128):
+    def trip(seed:list = [0,-2,-1], size:int = 128, inv_pat:list = [-1, 1, 1]):
         '''
         from: https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
 
         '''
+        if len(seed) != 3 or len(inv_pat) != 3:
+            raise ValueError('seed and inv_pat must be lists of length 3')
+                
         p = np.empty(size, dtype=int)
-        p[0] = seed[0]
-        p[1] = seed[1]
-        p[2] = seed[2]
+        # p[0] = seed[0]
+        # p[1] = seed[1]
+        # p[2] = seed[2]
+        p[:3] = seed
         for i in range(1, (size - 1) // 3 + 1):
             delta = p[i] - p[i - 1]
             if 3 * i < size:
-                p[3 * i] = p[3 * i - 3] - delta
+                p[3 * i] = p[3 * i - 3] + inv_pat[(3 * i) % 3] * delta
             if 3 * i + 1 < size:
-                p[3 * i + 1] = p[3 * i - 2] + delta
+                p[3 * i + 1] = p[3 * i - 2] + inv_pat[(3 * i + 1) % 3] * delta
             if 3 * i + 2 < size:
-                p[3 * i + 2] = p[3 * i - 1] + delta            
+                p[3 * i + 2] = p[3 * i - 1] + inv_pat[(3 * i + 2) % 3] * delta
         return p
