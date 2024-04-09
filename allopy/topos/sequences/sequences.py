@@ -37,23 +37,49 @@ class Norg():
             return -Norg.inf_num(n // 2)
         return Norg.inf_num((n - 1) // 2) + 1
 
+    # @staticmethod
+    # def trip(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1, 1, 1]):
+    #     '''
+    #     from: https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
+
+    #     '''
+    #     if len(seed) != 3 or len(inv_pat) != 3:
+    #         raise ValueError('seed and inv_pat must be lists of length 3')
+                
+    #     p = np.empty(size, dtype=int)
+    #     p[:3] = seed
+    #     for i in range(1, (size - 1) // 3 + 1):
+    #         delta = p[i] - p[i - 1]
+    #         if 3 * i < size:
+    #             p[3 * i] = p[3 * i - 3] + inv_pat[(3 * i) % 3] * delta
+    #         if 3 * i + 1 < size:
+    #             p[3 * i + 1] = p[3 * i - 2] + inv_pat[(3 * i + 1) % 3] * delta
+    #         if 3 * i + 2 < size:
+    #             p[3 * i + 2] = p[3 * i - 1] + inv_pat[(3 * i + 2) % 3] * delta
+    #     return p
+
     @staticmethod
-    def trip(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1, 1, 1]):
+    def n_partite(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1, 1, 1]):
         '''
+        Generalized form of the tripartite series for any arbitrary length seed and inv_pat.
+
         from: https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
 
         '''
-        if len(seed) != 3 or len(inv_pat) != 3:
-            raise ValueError('seed and inv_pat must be lists of length 3')
-                
+        if (seed_len := len(seed)) != len(inv_pat):
+            raise ValueError('seed and inv_pat must be lists of the same length')             
         p = np.empty(size, dtype=int)
-        p[:3] = seed
-        for i in range(1, (size - 1) // 3 + 1):
+        p[:seed_len] = seed
+        for i in range(1, (size - 1) // seed_len + 1):
             delta = p[i] - p[i - 1]
-            if 3 * i < size:
-                p[3 * i] = p[3 * i - 3] + inv_pat[(3 * i) % 3] * delta
-            if 3 * i + 1 < size:
-                p[3 * i + 1] = p[3 * i - 2] + inv_pat[(3 * i + 1) % 3] * delta
-            if 3 * i + 2 < size:
-                p[3 * i + 2] = p[3 * i - 1] + inv_pat[(3 * i + 2) % 3] * delta
+            for j in range(seed_len):
+                if seed_len * i + j < size:
+                    p[seed_len * i + j] = p[seed_len * i + j - seed_len] + inv_pat[j] * delta
         return p
+    
+    @staticmethod
+    def lake():
+        '''
+        see: https://web.archive.org/web/20071010093955/http://www.pernoergaard.dk/eng/strukturer/toneso/tkonstruktion.html
+        '''
+        pass
