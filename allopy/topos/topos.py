@@ -148,7 +148,7 @@ def autoref_rotmat(lst1:tuple, lst2:tuple = None, mode:str='G'):
         lst2 = lst1
     result = []
     mode = mode.upper()
-    if mode == 'G':        
+    if mode == 'G':
         for i in range(len(lst1)):
             l1 = permut_list(lst1, i)
             l2 = permut_list(lst2, i)
