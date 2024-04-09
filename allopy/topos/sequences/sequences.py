@@ -16,7 +16,7 @@ class Norg():
         if start == 0 and step == 1:
             p = np.empty(size, dtype=int)
             p[0] = 0
-            p[1] = 1        
+            p[1] = 1
             for i in range(1, (size - 1) // 2 + 1):
                 delta = p[i] - p[i - 1]
                 if 2 * i < size:
@@ -29,37 +29,16 @@ class Norg():
     @staticmethod
     def inf_num(n):
         '''
-        Computes the infinite number for a given integer `n` by converting it to binary,
-        filtering left zeros, and then applying the infinity digits transformation.
-
-        based on: https://github.com/smoge/InfinitySeries.git
+        see: https://arxiv.org/pdf/1402.3091.pdf
 
         '''
-        def _infinity_digits(s):
-            '''
-            Applies the infinity digits transformation to a string `s` of binary digits.
-            '''
-            output = 0
-            for char in s:
-                if char == '0':
-                    output *= -1
-                elif char == '1':
-                    output += 1
-            return output
-                
-        def _filter_left_zeros(binary_str):
-            '''
-            Filters out leading zeros from a binary string `binary_str`.
-            '''            
-            return binary_str.lstrip('0') # remove leading zeros
-       
-        binary_str = bin(n)[2:] # remove the '0b' prefix
-        filtered_binary_str = _filter_left_zeros(binary_str)
-        filtered_digits = list(filtered_binary_str)
-        return _infinity_digits(filtered_digits)
+        if n == 0: return 0
+        if n % 2 == 0:
+            return -Norg.inf_num(n // 2)
+        return Norg.inf_num((n - 1) // 2) + 1
 
     @staticmethod
-    def trip(seed:list = [0,-2,-1], size:int = 128, inv_pat:list = [-1, 1, 1]):
+    def trip(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1, 1, 1]):
         '''
         from: https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
 
@@ -68,9 +47,6 @@ class Norg():
             raise ValueError('seed and inv_pat must be lists of length 3')
                 
         p = np.empty(size, dtype=int)
-        # p[0] = seed[0]
-        # p[1] = seed[1]
-        # p[2] = seed[2]
         p[:3] = seed
         for i in range(1, (size - 1) // 3 + 1):
             delta = p[i] - p[i - 1]
