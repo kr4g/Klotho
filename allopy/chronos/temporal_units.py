@@ -5,6 +5,12 @@ from .rhythm_trees import RT, Meas
 from utils.algorithms.tree_algorithms import measure_ratios
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
+# Prolationis Types
+PULSTYPES = {'p', 'pulse', 'phase'}
+DURTYPES  = {'d', 'duration', 'dur'}
+RESTYPES  = {'r', 'rest', 'silence'}
+ALLTYPES  = PULSTYPES | DURTYPES | RESTYPES
+
 class UT:    
     def __init__(self,
                  tempus:Union[Meas,str]       = '1/1',
@@ -118,17 +124,17 @@ class UT:
             self.__type = f'Ensemble ({comp})'            
         elif isinstance(prolatio, str):
             prolatio = prolatio.lower()
-            if prolatio in {'p', 'pulse', 'phase'}:
+            if prolatio in PULSTYPES:
                 self.__type = 'Pulse'
                 prolatio = RT(duration       = 1,
                               time_signature = self.__tempus,
                               subdivisions   = (1,) * self.__tempus.numerator)
-            elif prolatio in {'d', 'duration', 'dur'}:
+            elif prolatio in DURTYPES:
                 self.__type = 'Duration'
                 prolatio = RT(duration       = 1,
                               time_signature = self.__tempus,
                               subdivisions   = (1,))
-            elif prolatio in {'r', 'rest', 'silence'}:
+            elif prolatio in RESTYPES:
                 self.__type = 'Silence'
                 prolatio = RT(duration       = 1,
                               time_signature = self.__tempus,
@@ -141,10 +147,7 @@ class UT:
     
     def _set_beat(self, beat, prolatio):
         if isinstance(prolatio, str):
-            prolatio = prolatio.lower()
-            if prolatio in {'p', 'pulse', 'phase',
-                            'd', 'duration', 'dur',
-                            'r', 'rest', 'silence'} and self.__beat is None:
+            if prolatio.lower() in ALLTYPES and self.__beat is None:
                 return Fraction(1, self.__tempus.denominator)
         return Fraction(beat)
     
