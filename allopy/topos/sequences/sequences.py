@@ -3,9 +3,16 @@ import numpy as np
 class Norg():
     '''
     Class for Per Nørgård's sequences.
+
+    see: https://web.archive.org/web/20071010091253/http://www.pernoergaard.dk/eng/strukturer/uendelig/uindhold.html
+
     '''
     @staticmethod
     def inf(start: int = 0, size: int = 128, step:int = 1):
+        '''
+        from: https://web.archive.org/web/20071010092334/http://www.pernoergaard.dk/eng/strukturer/uendelig/ukonstruktion05.html
+
+        '''
         if start == 0 and step == 1:
             p = np.empty(size, dtype=int)
             p[0] = 0
@@ -24,6 +31,9 @@ class Norg():
         '''
         Computes the infinite number for a given integer `n` by converting it to binary,
         filtering left zeros, and then applying the infinity digits transformation.
+
+        based on: https://github.com/smoge/InfinitySeries.git
+
         '''
         def _infinity_digits(s):
             '''
@@ -47,3 +57,23 @@ class Norg():
         filtered_binary_str = _filter_left_zeros(binary_str)
         filtered_digits = list(filtered_binary_str)
         return _infinity_digits(filtered_digits)
+
+    @staticmethod
+    def trip(seed:list = [0,-2,-1], size:int = 128):
+        '''
+        from: https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
+
+        '''
+        p = np.empty(size, dtype=int)
+        p[0] = seed[0]
+        p[1] = seed[1]
+        p[2] = seed[2]
+        for i in range(1, (size - 1) // 3 + 1):
+            delta = p[i] - p[i - 1]
+            if 3 * i < size:
+                p[3 * i] = p[3 * i - 3] - delta
+            if 3 * i + 1 < size:
+                p[3 * i + 1] = p[3 * i - 2] + delta
+            if 3 * i + 2 < size:
+                p[3 * i + 2] = p[3 * i - 1] + delta            
+        return p
