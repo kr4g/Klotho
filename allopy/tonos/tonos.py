@@ -287,9 +287,3 @@ def ratios_n_tet(divisions=12, equave=2):
   :return: A list of the frequency ratios of the divisions
   '''
   return [n_tet(divisions, equave, nth_division) for nth_division in range(divisions)]
-
-# def norgard(n = 0):
-#   '''
-#   Per Norgard "Infinity Series" (1972)
-#   '''
-#   pass

@@ -2,7 +2,7 @@ import numpy as np
 
 class Norg():
     '''
-    Class for Per Nørgård's sequences.
+    Class for Per Nørgård's "infinity" sequences.
 
     see: https://web.archive.org/web/20071010091253/http://www.pernoergaard.dk/eng/strukturer/uendelig/uindhold.html
 
