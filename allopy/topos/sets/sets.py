@@ -1,6 +1,10 @@
 import numpy as np
 from itertools import combinations
 
+# ------------------------------------------------------------------------------
+# Set Operations
+# --------------
+
 def union(set1: set, set2: set) -> set:        
     '''Return the union of two sets.'''
     return set1 | set2
@@ -33,6 +37,27 @@ def transpose(set1: set, transposition_interval: int, modulus: int = 12) -> set:
     '''Transpose a set by a given interval using modular arithmetic.'''
     return {(pitch + transposition_interval) % modulus for pitch in set1}
 
+def complement(S: set, modulus: int = 12) -> set:
+    '''Return the complement of a set within a given modulus.'''
+    return {s for s in range(modulus) if s not in S}
+
+def congruent(S: set, modulus: int, residue: int) -> set:
+    '''Return the set of all values in set1 that are congruent modulo the given modulus and residue.'''
+    return {s for s in S if s % modulus == residue}
+
+def intervals(S: set) -> set:
+    '''
+    Calculate the set of intervals between successive numbers in a sorted sequence.
+
+    Args:
+        numbers (set): A set of numbers.
+
+    Returns:
+        set: A set of intervals between the successive numbers.
+    '''
+    S = sorted(S)
+    return set(np.diff(S))
+
 def interval_vector(set1: set, modulus: int = 12) -> np.ndarray:        
     '''
     Compute the interval vector of a set of pitches.
@@ -57,3 +82,40 @@ def interval_vector(set1: set, modulus: int = 12) -> np.ndarray:
 
     return intervals
 
+# ------------------------------------------------------------------------------
+# Sieves
+# ------
+
+class Sieve():
+    def __init__(self, modulus: int = 1, residue: int = 0, N: int = 255):
+        self.__S = set(np.arange(residue, N + 1, modulus))
+    
+    @property
+    def S(self):
+        return self.__S
+    
+    @property
+    def N(self):
+        return self.__N
+    
+    @property
+    def period(self):
+        return self.__modulus
+    
+    @property
+    def r(self):
+        return self.__residue
+    
+    @N.setter
+    def N(self, N):
+        self.__N = N
+        self.__S = set(np.arange(self.__residue, self.__N + 1, self.__modulus))
+    
+    @property
+    def congr(self):
+        return congruent(self.__S, self.__modulus, self.__residue)
+    
+    @property
+    def compl(self):
+        return complement(self.__S, self.__N)
+    
