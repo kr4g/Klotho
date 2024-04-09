@@ -270,6 +270,7 @@ class TB:
     def __init__(self, tb:tuple[UTSeq], axis:float=0.0):
         self.__tb = tb
         self.__axis = axis
+        self.__duration = max(ut_seq.duration for ut_seq in self.__tb)
 
     @property
     def utseqs(self):
@@ -277,12 +278,13 @@ class TB:
 
     @property
     def duration(self):
-        return max(ut_seq.duration for ut_seq in self.__tb)
+        return self.__duration
     
     @property
     def axis(self):
         return self.__axis
 
+    # XXX - TO DO:
     @axis.setter
     def axis(self, axis):
         self.__axis = axis
