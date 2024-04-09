@@ -4,8 +4,7 @@
 '''
 The `topos` base module.
 '''
-from allopy.chronos import chronos
-from allopy.aikous import aikous
+from utils.algorithms.tree_algorithms import permut_list
 
 from sympy.utilities.iterables import cartes
 import numpy as np
@@ -114,3 +113,62 @@ def homotopic_map(l1: tuple, l2: tuple) -> tuple:
             if input('Do you wish to proceed? (y/n) ').lower() not in ('y', 'yes'):
                 return
     return tuple((l1[i], tuple(l2[i % len(l2):] + l2[:i % len(l2)])) for i in range(len(l1)))
+
+# Algorithm 5b: AutoRef
+def autoref(lst1:tuple, lst2:tuple = None):
+    '''
+    Algorithm 5: AutoRef
+
+    Data: lst est une liste à n éléments finis
+    Result: Liste doublement permuteé circulairement.
+
+    begin
+        n = 0;
+        lgt = nombre d'éléments dans la liste;
+        foreach elt in lst do
+            while n ≠ (lgt + 1) do
+                return [elt, (PermutList(lst, n))];
+                n = n + 1;
+            end while
+        end foreach
+    end
+    
+    :param lst: List of finite elements to be doubly circularly permuted.
+    :return: List containing the original element and its permutations.
+    '''
+    if lst2 is None:
+        lst2 = lst1
+    return tuple((elt, permut_list(lst2, n + 1)) for n, elt in enumerate(lst1))
+
+# AutoRef Matrices
+def autoref_rotmat(lst1:tuple, lst2:tuple = None, mode:str='G'):
+    '''
+    '''
+    if lst2 is None:
+        lst2 = lst1
+    result = []
+    mode = mode.upper()
+    if mode == 'G':        
+        for i in range(len(lst1)):
+            l1 = permut_list(lst1, i)
+            l2 = permut_list(lst2, i)
+            result.append(autoref(l1, l2))
+    elif mode == 'S':
+        for i in range(len(lst1)):
+            l = tuple((lst1[j], permut_list(lst2, i + j + 1)) for j in range(len(lst1)))
+            result.append(l)
+    elif mode == 'D':
+        l2 = autoref(lst2)
+        for i in range(len(lst1)):
+            l = permut_list(lst1, i)
+            result.append(tuple((elem, l2[j][1]) for j, elem in enumerate(l)))
+    # elif mode == 'C':
+    #     l1 = autoref(permut_list(lst1, 0))
+    #     l2 = autoref(permut_list(lst1, 2))
+    #     for i in range(len(lst1)):
+    #         l = permut_list(lst1, i)
+    #         lp = l1 if i % 2 == 0 else l2
+    #         result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))
+    else:
+        return None
+    return tuple(result)
