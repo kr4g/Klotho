@@ -37,21 +37,13 @@ class Norg():
                     output += 1
             return output
                 
-        def _filter_left_zeros(digits):
+        def _filter_left_zeros(binary_str):
             '''
-            Filters out leading zeros from a list of binary digits.
-            '''
-            # Find the index of the first 1 and slice from there, if no 1 found return empty list
-            try:
-                first_one_index = digits.index(1)
-                return digits[first_one_index:]
-            except ValueError:
-                return []
-
-        # Convert to binary, remove the '0b' prefix, and convert to a list of integers
-        binary_digits = list(map(int, bin(n)[2:]))
-        filtered_digits = _filter_left_zeros(binary_digits)
+            Filters out leading zeros from a binary string `binary_str`.
+            '''            
+            return binary_str.lstrip('0') # remove leading zeros
+       
+        binary_str = bin(n)[2:] # remove the '0b' prefix
+        filtered_binary_str = _filter_left_zeros(binary_str)
+        filtered_digits = list(filtered_binary_str)
         return _infinity_digits(filtered_digits)
-
-
-
