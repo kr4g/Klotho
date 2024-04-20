@@ -1,7 +1,7 @@
 
 from typing import Union, Tuple
 from fractions import Fraction
-from math import gcd, lcm, prod, log
+from math import gcd, lcm, prod, floor, log
 from functools import reduce
 from itertools import count
 import numpy as np
@@ -212,6 +212,18 @@ def autoref_rotmat(lst:tuple, mode:str='G'):
         result = lst
     return tuple(result)
 
+def add_ties(n):
+    p = 1
+    while p * 2 <= n:
+        p *= 2
+    
+    if p == n or p * 1.5 == n or p * 1.75 == n:
+        return n
+    elif n > p * 1.5:
+        return (p + p//2, add_ties(n - (p * 1.5)))
+    else:
+        return (p, float(add_ties(n - p)))
+
 def symbolic_unit(time_signature:Union[Fraction, str]):
     return Fraction(1, symbolic_approx(Fraction(time_signature).denominator))
 
@@ -219,6 +231,44 @@ def symbolic_duration(f:int, time_signature:Union[Fraction, str], S:tuple):
     # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
     time_signature = Fraction(time_signature)
     return Fraction(f * time_signature.numerator) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
+
+def get_denom(n:int, n_type:str = 'bin'):
+    if n_type == 'bin':
+        return symbolic_approx(n)
+    elif n_type == 'tern':
+        if n == 1:
+            return 1
+        elif n in {2, 3, 4}:
+            return 3
+        elif n in {5, 6, 7, 8, 9}:
+            return 6
+        elif n in {10, 11, 12, 13, 14, 15, 16, 17}:
+            return 12
+        else:
+            pi, ps = pow_n_bounds(n, 3)
+            return ps if abs(n - pi) > abs(n - ps) else pi
+
+def pow_n_bounds(n, pow=2):
+    if n < 1:
+        return (None, pow)
+    k = floor(log(n, pow))
+    pi = pow ** k
+    ps = pow ** (k + 1)
+    return pi, ps
+
+def is_binary(durtot):
+    if durtot.numerator != 1:
+        return False    
+    denom = durtot.denominator
+    exp = 0
+    while (1 << exp) < denom:  # (1 << exp) -> (2 ** exp)
+        exp += 1
+    return (1 << exp) == denom
+
+def is_ternary(durtot):
+    if durtot.numerator == 3 and is_binary(Fraction(1, durtot.denominator)):
+        return True
+    return False
 
 # Algorithm 6: SymbolicApprox
 def symbolic_approx(n:int):
@@ -258,8 +308,7 @@ def symbolic_approx(n:int):
     elif n in {15, 16}:
         return 16
     else:
-        pi = 2 ** (n.bit_length() - 1) # first power of 2 <= n
-        ps = 2 ** n.bit_length()       # first power of 2 >= n
+        pi, ps = pow_n_bounds(n, 2)
         return ps if abs(n - pi) > abs(n - ps) else pi
 
 # Algorithm 10: GetGroupSubdivision
@@ -316,13 +365,13 @@ def get_group_subdivision(G:tuple):
     else:
         n = subdiv
     
-    if bin(n).count('1') == 1:   # n is binary
+    if isinstance(n, Fraction) and is_binary(n):
         m = symbolic_approx(n)
-    elif log(n, 3).is_integer(): # n is ternary
+    elif isinstance(n, Fraction) and is_ternary(n):
         m = int(symbolic_approx(n) * 3 / 2)
     else:
         num = n
-        if num + 1 == ds:# or num == ds:
+        if num + 1 == ds:
             m = ds
         elif num == ds:
             m = num
@@ -330,11 +379,9 @@ def get_group_subdivision(G:tuple):
             return [num * 2, ds]
         elif num < (ds * 2) - 1:
             m = ds
-        else:            
-            pi = 2 ** (n.bit_length() - 1) # first power of 2 <= n
-            ps = 2 ** n.bit_length()       # first power of 2 > n
+        else:
+            pi, ps = pow_n_bounds(n, 2)
             m = ps if abs(n - pi) > abs(n - ps) else pi
-    
     return [n, m]
 
 def factor_tree(subdivs:tuple):
@@ -420,7 +467,6 @@ def prune_tree(tree, depth):
 
 # EXPERIMENTAL
 def notate(tree, level=0):
-    # from utils.algorithms.algorithms import symbolic_approx, get_group_subdivision
     if level == 0:
         return f'\\time {tree.time_signature}\n' + notate(tree, level + 1)
     
@@ -439,7 +485,6 @@ def notate(tree, level=0):
                     result += f" {element}"
             elif isinstance(element, tuple):  # Subdivision                
                 D, S = element
-                # print(f'D: {D}, S: {S}')
                 tup = D, (sum_proportions(S),)
                 n, m = get_group_subdivision(tup)
                 result += f' \\tuplet {n}/{m} {{{notate(S, level + 1)}}}'

@@ -38,7 +38,7 @@ class Norg():
         return Norg.inf_num((n - 1) // 2) + 1
 
     @staticmethod
-    def n_partite(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1, 1, 1]):
+    def n_partite(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1,1,1]):
         '''
         Generalized form of the tripartite series for any arbitrary length seed and inv_pat.
 

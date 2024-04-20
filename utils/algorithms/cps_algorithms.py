@@ -9,7 +9,6 @@ def graph_cps(combos:tuple):
     # each combination is a node (vertex) in the graph
     for combo in combos:
         G.add_node(combo)
-
     # edges are between nodes that share at least one common factor
     for combo1 in combos:
         for combo2 in combos:
