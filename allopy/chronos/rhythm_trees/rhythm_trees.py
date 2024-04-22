@@ -236,18 +236,14 @@ class RT:
         ratios = tuple(self.__duration * r for r in measure_ratios(self._concat_ties()))
         ratios = reduced_decomposition(ratios, self.__time_signature)
         if self.__decomp == 'reduced':
-            # ratios = reduced_decomposition(ratios, self.__time_signature)
             return ratios
         elif self.__decomp == 'strict':
             def _lcm(a, b):
                 return abs(a*b) // gcd(a, b)
-            # pgcd = reduce(gcd, (ratio.numerator for ratio in ratios))
             pgcd_denom = reduce(_lcm, (ratio.denominator for ratio in ratios))
             self.__subdivisions = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in ratios)
             self.__time_signature = Meas((sum_proportions(self.__subdivisions), pgcd_denom))
-            print(self.__subdivisions, pgcd_denom)
             ratios = reduced_decomposition(ratios, self.__time_signature)
-            # ratios = strict_decomposition(ratios, self.__time_signature)
         return ratios
     
     def _set_type(self):
