@@ -4,7 +4,7 @@
 '''
 The `topos` base module.
 '''
-from utils.algorithms.tree_algorithms import permut_list
+from ..chronos.rhythm_trees.rt_algorithms import permut_list
 
 from sympy.utilities.iterables import cartes
 import numpy as np

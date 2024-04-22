@@ -21,7 +21,7 @@ from fractions import Fraction
 from typing import Union, Tuple
 from math import gcd
 
-from utils.algorithms.tree_algorithms import *
+from .rt_algorithms import *
 
 class Meas:    
     '''
@@ -163,11 +163,11 @@ class RT:
     def decomp(self):
         return self.__decomp
 
-    @property
-    def factors(self):
-        if self.__factors is None:
-            self.__factors = factor_tree(self.__subdivisions)
-        return self.__factors
+    # @property
+    # def factors(self):
+    #     if self.__factors is None:
+    #         self.__factors = factor_tree(self.__subdivisions)
+    #     return self.__factors
     
     @property
     def ratios(self):
@@ -210,12 +210,44 @@ class RT:
                       decomp         = self.__decomp)
         raise ValueError('Invalid Rhythm Tree')
 
+    def _concat_ties(self):
+        def process_tuple(t):
+            result = []
+            previous = 0
+            for value in t:
+                if isinstance(value, tuple):
+                    processed_tuple = process_tuple(value)
+                    if previous != 0:
+                        result.append(previous)
+                        previous = 0
+                    result.append(processed_tuple)
+                elif isinstance(value, int):
+                    if previous != 0:
+                        result.append(previous)
+                    previous = value
+                elif isinstance(value, float):
+                    previous += int(value)
+            if previous != 0:
+                result.append(previous)
+            return tuple(result)        
+        return process_tuple(self.__subdivisions)
+
     def _set_ratios(self):
-        ratios = tuple(self.__duration * r for r in measure_ratios(self.__subdivisions))
+        ratios = tuple(self.__duration * r for r in measure_ratios(self._concat_ties()))
+        ratios = reduced_decomposition(ratios, self.__time_signature)
         if self.__decomp == 'reduced':
-            ratios = reduced_decomposition(ratios, self.__time_signature)
+            # ratios = reduced_decomposition(ratios, self.__time_signature)
+            return ratios
         elif self.__decomp == 'strict':
-            ratios = strict_decomposition(ratios, self.__time_signature)
+            def _lcm(a, b):
+                return abs(a*b) // gcd(a, b)
+            # pgcd = reduce(gcd, (ratio.numerator for ratio in ratios))
+            pgcd_denom = reduce(_lcm, (ratio.denominator for ratio in ratios))
+            self.__subdivisions = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in ratios)
+            self.__time_signature = Meas((sum_proportions(self.__subdivisions), pgcd_denom))
+            print(self.__subdivisions, pgcd_denom)
+            ratios = reduced_decomposition(ratios, self.__time_signature)
+            # ratios = strict_decomposition(ratios, self.__time_signature)
         return ratios
     
     def _set_type(self):

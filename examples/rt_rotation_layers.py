@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from allopy.chronos import chronos
 from allopy.chronos import rhythm_trees as rt
-from allopy.chronos import temporal_units as ut
+from AlloPy.allopy.chronos.temporal_units import temporal_units as ut
 # from allopy import tonos
 # from allopy.topos import topos
 from allopy.topos import formal_grammars as fg

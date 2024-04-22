@@ -8,7 +8,7 @@ sys.path.append(str(root_path))
 
 from allopy import chronos
 from allopy.chronos import rhythm_trees as rt
-from allopy.chronos import temporal_units as ut
+from AlloPy.allopy.chronos.temporal_units import temporal_units as ut
 from allopy import tonos
 from allopy import topos
 from allopy import aikous

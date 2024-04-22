@@ -4,7 +4,7 @@ from pathlib import Path
 root_path = Path(__file__).parent.parent
 sys.path.append(str(root_path))
 
-from utils.algorithms.tree_algorithms import *
+from AlloPy.allopy.chronos.rhythm_trees.rt_algorithms import *
 
 _G = {
     (4, (3,)): [3, 4],

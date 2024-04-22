@@ -8,13 +8,13 @@ sys.path.append(str(root_path))
 
 # from allopy import chronos
 from allopy.chronos.rhythm_trees import RT
-from allopy.chronos.temporal_units import UT
+from AlloPy.allopy.chronos.temporal_units.temporal_units import UT
 from allopy import tonos
 # from allopy import topos
 from allopy.aikous import DYNAMICS, amp_freq_scale
 from allopy import skora
 
-from AlloPy.utils.algorithms import tree_algorithms as alg
+from AlloPy.allopy.chronos.rhythm_trees import rt_algorithms as alg
 
 import numpy as np
 import random
