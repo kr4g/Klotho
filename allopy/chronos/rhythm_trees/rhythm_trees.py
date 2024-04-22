@@ -19,9 +19,10 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-from math import gcd
+from math import gcd, lcm
+from functools import reduce
 
-from .rt_algorithms import *
+from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, remove_ties, rotate_tree, graph_tree
 
 class Meas:    
     '''
@@ -138,7 +139,7 @@ class RT:
         self.__ratios         = self._set_ratios()
         self.__type           = self._set_type()
         self.__graph          = None
-        self.__factors        = None
+        # self.__factors        = None
         
     @classmethod
     def from_tuple(cls, tup:Tuple):
@@ -210,37 +211,13 @@ class RT:
                       decomp         = self.__decomp)
         raise ValueError('Invalid Rhythm Tree')
 
-    def _concat_ties(self):
-        def process_tuple(t):
-            result = []
-            previous = 0
-            for value in t:
-                if isinstance(value, tuple):
-                    processed_tuple = process_tuple(value)
-                    if previous != 0:
-                        result.append(previous)
-                        previous = 0
-                    result.append(processed_tuple)
-                elif isinstance(value, int):
-                    if previous != 0:
-                        result.append(previous)
-                    previous = value
-                elif isinstance(value, float):
-                    previous += int(value)
-            if previous != 0:
-                result.append(previous)
-            return tuple(result)        
-        return process_tuple(self.__subdivisions)
-
     def _set_ratios(self):
-        ratios = tuple(self.__duration * r for r in measure_ratios(self._concat_ties()))
+        ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__subdivisions)))
         ratios = reduced_decomposition(ratios, self.__time_signature)
         if self.__decomp == 'reduced':
             return ratios
         elif self.__decomp == 'strict':
-            def _lcm(a, b):
-                return abs(a*b) // gcd(a, b)
-            pgcd_denom = reduce(_lcm, (ratio.denominator for ratio in ratios))
+            pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in ratios))
             self.__subdivisions = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in ratios)
             self.__time_signature = Meas((sum_proportions(self.__subdivisions), pgcd_denom))
             ratios = reduced_decomposition(ratios, self.__time_signature)
@@ -271,6 +248,6 @@ if __name__ == '__main__':
     # Rhythm Tree Examples
     # ------------------------------------------------------------------------------------
     print('Rhythm Tree Examples')
-    s = ((4, (3, (8, (3, 4)))), -3)
-    rt = RT(time_signature='4/3', subdivisions=s)
+    S = ((4, (3, (8, (3, 4)))), -3)
+    rt = RT(time_signature='4/3', subdivisions=S)
     print(rt)

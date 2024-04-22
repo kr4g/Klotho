@@ -1,5 +1,4 @@
-
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 from fractions import Fraction
 from math import gcd, lcm, prod, floor, log
 from functools import reduce
@@ -19,7 +18,7 @@ import networkx as nx
 # ------------------------------------------------------------------------------------
 
 # Algorithm 1: MeasureRatios
-def measure_ratios(subdivisions:tuple):
+def measure_ratios(S:tuple[int]) -> Tuple[Fraction]:
     '''
     Algorithm 1: MeasureRatios
 
@@ -43,9 +42,9 @@ def measure_ratios(subdivisions:tuple):
         end for all
     end
     '''
-    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivisions)
+    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
     result = []
-    for s in subdivisions:  
+    for s in S:  
         if isinstance(s, tuple):
             D, S = s
             ratio = Fraction(abs(D), div)
@@ -55,7 +54,7 @@ def measure_ratios(subdivisions:tuple):
     return tuple(result)
 
 # Algorithm 2: ReducedDecomposition
-def reduced_decomposition(lst, meas):
+def reduced_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
     '''
     Algorithm 2: ReducedDecomposition
     
@@ -76,7 +75,7 @@ def reduced_decomposition(lst, meas):
                           f.denominator * meas.denominator) for f in lst)
 
 # Algorithm 3: StrictDecomposition
-def strict_decomposition(lst, meas):
+def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
     '''
     Algorithm 3: StrictDecomposition
     
@@ -100,10 +99,13 @@ def strict_decomposition(lst, meas):
     '''
     pgcd = reduce(gcd, (ratio.numerator for ratio in lst))
     pgcd_denom = reduce(lcm, (ratio.denominator for ratio in lst))
+    print(f'pgcd: {pgcd}, pgcd_denom: {pgcd_denom}')
     return tuple(Fraction((f / pgcd) * meas.numerator, pgcd_denom) for f in lst)
 
+# ------------------------------------------------------------------------------------
+
 # Algorithm 4: PermutList
-def permut_list(lst:tuple, pt:int):
+def permut_list(lst:tuple, pt:int) -> Tuple:
     '''
     Algorithm 4: PermutList
     
@@ -130,7 +132,7 @@ def permut_list(lst:tuple, pt:int):
     return lst[pt:] + lst[:pt]
 
 # Algorithm 5: AutoRef
-def autoref(lst:tuple):
+def autoref(lst:tuple) -> Tuple[Tuple]:
     '''
     Algorithm 5: AutoRef
 
@@ -154,7 +156,7 @@ def autoref(lst:tuple):
     return tuple((elt, permut_list(lst, n + 1)) for n, elt in enumerate(lst))
 
 # AutoRef Matrices
-def autoref_rotmat(lst:tuple, mode:str='G'):
+def autoref_rotmat(lst:tuple, mode:str='G') -> Tuple[Tuple[Tuple]]:
     '''
     Matrices for lst = (3,4,5,7):
 
@@ -212,27 +214,65 @@ def autoref_rotmat(lst:tuple, mode:str='G'):
         result = lst
     return tuple(result)
 
-def add_ties(n):
+# ------------------------------------------------------------------------------------
+# NOTATION
+
+def add_tie(n) -> Union[int, Tuple[int]]:
     p = 1
     while p * 2 <= n:
-        p *= 2
-    
+        p *= 2    
     if p == n or p * 1.5 == n or p * 1.75 == n:
         return n
     elif n > p * 1.5:
-        return (p + p//2, add_ties(n - (p * 1.5)))
+        return (p + p//2, add_tie(n - (p * 1.5)))
     else:
-        return (p, float(add_ties(n - p)))
+        return (p, float(add_tie(n - p)))
+    
+def add_ties(S:Tuple) -> Tuple:
+    S = remove_ties(S)
+    def process_tuple(t):
+        result = []
+        for value in t:
+            if isinstance(value, tuple):
+                processed_tuple = process_tuple(value)
+                result.append(processed_tuple)
+            elif isinstance(value, int):
+                v = add_tie(value)
+                result.extend(v if isinstance(v, tuple) else (v,))
+        return tuple(result)
+    return process_tuple(S)
 
-def symbolic_unit(time_signature:Union[Fraction, str]):
+def remove_ties(S:Tuple) -> Tuple:
+    def process_tuple(t):
+        result = []
+        previous = 0
+        for value in t:
+            if isinstance(value, tuple):
+                processed_tuple = process_tuple(value)
+                if previous != 0:
+                    result.append(previous)
+                    previous = 0
+                result.append(processed_tuple)
+            elif isinstance(value, int):
+                if previous != 0:
+                    result.append(previous)
+                previous = abs(value)
+            elif isinstance(value, float):
+                previous += int(abs(value))
+        if previous != 0:
+            result.append(previous)
+        return tuple(result)        
+    return process_tuple(S)
+
+def symbolic_unit(time_signature:Union[Fraction, str]) -> Fraction:
     return Fraction(1, symbolic_approx(Fraction(time_signature).denominator))
 
-def symbolic_duration(f:int, time_signature:Union[Fraction, str], S:tuple):
+def symbolic_duration(f:int, time_signature:Union[Fraction, str], S:tuple) -> Fraction:
     # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
     time_signature = Fraction(time_signature)
     return Fraction(f * time_signature.numerator) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
 
-def get_denom(n:int, n_type:str = 'bin'):
+def get_denom(n:int, n_type:str = 'bin') -> int:
     if n_type == 'bin':
         return symbolic_approx(n)
     elif n_type == 'tern':
@@ -248,7 +288,7 @@ def get_denom(n:int, n_type:str = 'bin'):
             pi, ps = pow_n_bounds(n, 3)
             return ps if abs(n - pi) > abs(n - ps) else pi
 
-def pow_n_bounds(n, pow=2):
+def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     if n < 1:
         return (None, pow)
     k = floor(log(n, pow))
@@ -256,22 +296,24 @@ def pow_n_bounds(n, pow=2):
     ps = pow ** (k + 1)
     return pi, ps
 
-def is_binary(durtot):
+def is_binary(durtot:Fraction) -> bool:
+    durtot = Fraction(durtot)
     if durtot.numerator != 1:
         return False    
     denom = durtot.denominator
     exp = 0
-    while (1 << exp) < denom:  # (1 << exp) -> (2 ** exp)
+    while (1 << exp) < denom:  # (1 << exp) == (2 ** exp)
         exp += 1
     return (1 << exp) == denom
 
-def is_ternary(durtot):
+def is_ternary(durtot:Fraction) -> bool:
+    durtot = Fraction(durtot)
     if durtot.numerator == 3 and is_binary(Fraction(1, durtot.denominator)):
         return True
     return False
 
 # Algorithm 6: SymbolicApprox
-def symbolic_approx(n:int):
+def symbolic_approx(n:int) -> int:
     '''
     Algorithm 6: SymbolicApprox
 
@@ -312,7 +354,7 @@ def symbolic_approx(n:int):
         return ps if abs(n - pi) > abs(n - ps) else pi
 
 # Algorithm 10: GetGroupSubdivision
-def get_group_subdivision(G:tuple):
+def get_group_subdivision(G:tuple) -> List[int]:
     '''
     Algorithm 10: GetGroupSubdivision
 
@@ -365,9 +407,10 @@ def get_group_subdivision(G:tuple):
     else:
         n = subdiv
     
-    if isinstance(n, Fraction) and is_binary(n):
+    ratio = Fraction(ds, subdiv)
+    if is_binary(ratio):
         m = symbolic_approx(n)
-    elif isinstance(n, Fraction) and is_ternary(n):
+    elif is_ternary(ratio):
         m = int(symbolic_approx(n) * 3 / 2)
     else:
         num = n
@@ -384,7 +427,9 @@ def get_group_subdivision(G:tuple):
             m = ps if abs(n - pi) > abs(n - ps) else pi
     return [n, m]
 
-def factor_tree(subdivs:tuple):
+# ------------------------------------------------------------------------------------
+
+def factor_tree(subdivs:tuple) -> tuple:
     def _factor(subdivs, acc):
         for element in subdivs:
             if isinstance(element, tuple):
@@ -394,7 +439,7 @@ def factor_tree(subdivs:tuple):
         return acc
     return tuple(_factor(subdivs, []))
 
-def refactor_tree(subdivs:tuple, factors:tuple):
+def refactor_tree(subdivs:tuple, factors:tuple[int]) -> tuple:
     def _refactor(subdivs, index):
         result = []
         for element in subdivs:
@@ -407,16 +452,16 @@ def refactor_tree(subdivs:tuple, factors:tuple):
         return tuple(result), index
     return _refactor(subdivs, 0)[0]
 
-def rotate_tree(subdivs:tuple, n=1):
+def rotate_tree(subdivs:tuple, n:int=1) -> tuple:
     factors = factor_tree(subdivs)
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
     return refactor_tree(subdivs, factors)
 
-def sum_proportions(subdivisions:tuple):
-    return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivisions)
+def sum_proportions(S:tuple) -> int:
+    return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
 
-def measure_complexity(tree:tuple):
+def measure_complexity(tree:tuple) -> bool:
     '''
     Assumes a tree in the form (D S) where D represents a duration and S represents a list
     of subdivisions.  S can be also be in the form (D S).
@@ -434,7 +479,7 @@ def measure_complexity(tree:tuple):
                 return measure_complexity(S)
     return False
 
-def graph_tree(root, S):
+def graph_tree(root, S:Tuple) -> nx.DiGraph:
     def add_nodes(graph, parent_id, children_list):        
         for child in children_list:
             if isinstance(child, int):
@@ -454,7 +499,7 @@ def graph_tree(root, S):
     add_nodes(G, root_id, S)
     return G
 
-def graph_depth(G):
+def graph_depth(G:nx.DiGraph) -> int:
     return max(nx.single_source_shortest_path_length(G, 0).values())
 
 def prune_tree(tree, depth):
@@ -500,7 +545,7 @@ def notate(tree, level=0):
 # 
 # ------------------------------------------------------------------------------------
 
-def rhythm_pair(lst, is_MM=True):
+def rhythm_pair(lst:Tuple, is_MM:bool=True) -> Tuple:
     total_product = prod(lst)
     if is_MM:
         sequences = [np.arange(0, total_product + 1, total_product // x) for x in lst]
