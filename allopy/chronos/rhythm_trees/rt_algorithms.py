@@ -296,6 +296,44 @@ def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     ps = pow ** (k + 1)
     return pi, ps
 
+def heads_beams_dots(n:Fraction) -> List:
+    num, denom = n.numerator, n.denominator
+    p, _ = pow_n_bounds(n, 2)
+    if p == num:
+        return [
+            get_note_head(n),
+            0,
+            get_note_beams(n)
+        ]
+    elif p * 1.5 == num:
+        return [
+            get_note_head(Fraction(p, denom)),
+            1,
+            get_note_beams(Fraction(p, denom))
+        ]
+    elif p * 1.75 == num:
+        return [
+            get_note_head(Fraction(p, denom)),
+            2,
+            get_note_beams(Fraction(p, denom))
+        ]
+
+def get_note_head(r:Fraction):
+    if r > 2:
+        return 'square'
+    elif r == 1:
+        return 'whole'
+    elif r == 1/2:
+        return 'half'
+    else:
+        return 'quarter'
+
+def get_note_beams(r:Fraction):
+    if r > 2 or r == 1/4 or r == 1/2 or r == 1:
+        return 0
+    else:
+        return log(r.denominator, 2) - 2
+
 def is_binary(durtot:Fraction) -> bool:
     durtot = Fraction(durtot)
     if durtot.numerator != 1:
