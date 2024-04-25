@@ -423,7 +423,9 @@ def get_group_subdivision(G:tuple) -> List[int]:
         elif num < (ds * 2) - 1:
             m = ds
         else:
+            print(f'num: {num}, ds: {ds}')
             pi, ps = pow_n_bounds(n, 2)
+            print(f'pi: {pi}, ps: {ps}')
             m = ps if abs(n - pi) > abs(n - ps) else pi
     return [n, m]
 

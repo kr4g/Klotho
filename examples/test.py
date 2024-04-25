@@ -23,4 +23,4 @@ _G = {
 }
 for k, v in _G.items():
     r = get_group_subdivision(k)
-    print(f'G: {k}, out: {r}, expected: {v}\n')
+    print(f'G: {k}, out: {r}\n')#, expected: {v}\n')
