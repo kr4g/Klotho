@@ -284,9 +284,9 @@ def get_denom(n:int, n_type:str = 'bin') -> int:
             return 6
         elif n in {10, 11, 12, 13, 14, 15, 16, 17}:
             return 12
-        else:
-            pi, ps = pow_n_bounds(n, 3)
-            return ps if abs(n - pi) > abs(n - ps) else pi
+        # else:
+        #     pi, ps = pow_n_bounds(n, 3)
+        #     return ps if abs(n - pi) > abs(n - ps) else pi
 
 def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     if n < 1:
@@ -421,7 +421,7 @@ def get_group_subdivision(G:tuple) -> List[int]:
                 return ds;
             else if num = ds then return num;
             else if num < ds then return [n = num * 2, m = ds];
-            else if num < ((ds * 2) / 1) then return ds;
+            else if num < ((ds * 2) - 1) then return ds;
             else
                 pi = first power of 2 <= n; ps = first power of 2 > n;  if |n - pi| > |n - ps| then
                     return ps;
@@ -551,31 +551,33 @@ def prune_tree(tree, depth):
         pass
 
 # EXPERIMENTAL
-def notate(tree, level=0):
-    if level == 0:
-        return f'\\time {tree.time_signature}\n' + notate(tree, level + 1)
-    
-    # print(f'tree: {tree}, level: {level}')
-    if level == 1:
-        tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
-        n, m = get_group_subdivision(tup)
-        return f'\\tuplet {n}/{m} ' + '{{' + notate(tree.subdivisions, level + 1) + '}}'
-    else:
-        result = ""
-        for element in tree:
-            if isinstance(element, int):      # Rest or single note
-                if element < 0:  # Rest
-                    result += f" -{abs(element)}"
-                else:  # Single note
-                    result += f" {element}"
-            elif isinstance(element, tuple):  # Subdivision                
-                D, S = element
-                tup = D, (sum_proportions(S),)
-                n, m = get_group_subdivision(tup)
-                result += f' \\tuplet {n}/{m} {{{notate(S, level + 1)}}}'
-            if level == 0:
-                result = result.strip() + ' '
-        return result.strip()
+def notate(tree):
+    def _notate(tree, level=0):
+        if level == 0:
+            return f'\\time {tree.time_signature}\n' + _notate(tree, level + 1)
+        
+        # print(f'tree: {tree}, level: {level}')
+        if level == 1:
+            tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
+            n, m = get_group_subdivision(tup)
+            return f'\\tuplet {n}/{m} ' + '{{' + _notate(tree.subdivisions, level + 1) + '}}'
+        else:
+            result = ""
+            for element in tree:
+                if isinstance(element, int):      # Rest or single note
+                    if element < 0:  # Rest
+                        result += f" -{abs(element)}"
+                    else:  # Single note
+                        result += f" {element}"
+                elif isinstance(element, tuple):  # Subdivision                
+                    D, S = element
+                    tup = D, (sum_proportions(S),)
+                    n, m = get_group_subdivision(tup)
+                    result += f' \\tuplet {n}/{m} {{{_notate(S, level + 1)}}}'
+                if level == 0:
+                    result = result.strip() + ' '
+            return result.strip()
+    return _notate(tree)
 # ------------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------------
