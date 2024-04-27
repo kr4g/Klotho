@@ -99,7 +99,7 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
     '''
     pgcd = reduce(gcd, (ratio.numerator for ratio in lst))
     pgcd_denom = reduce(lcm, (ratio.denominator for ratio in lst))
-    print(f'pgcd: {pgcd}, pgcd_denom: {pgcd_denom}')
+    # print(f'pgcd: {pgcd}, pgcd_denom: {pgcd_denom}')
     return tuple(Fraction((f / pgcd) * meas.numerator, pgcd_denom) for f in lst)
 
 # ------------------------------------------------------------------------------------
@@ -296,9 +296,9 @@ def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     ps = pow ** (k + 1)
     return pi, ps
 
-def heads_beams_dots(n:Fraction) -> List:
+def head_dots_beams(n:Fraction) -> List:
     num, denom = n.numerator, n.denominator
-    p, _ = pow_n_bounds(n, 2)
+    p, _ = pow_n_bounds(num, 2)
     if p == num:
         return [
             get_note_head(n),
@@ -451,7 +451,7 @@ def get_group_subdivision(G:tuple) -> List[int]:
     elif is_ternary(ratio):
         m = int(symbolic_approx(n) * 3 / 2)
     else:
-        num = n
+        num = n.numerator if isinstance(n, Fraction) else n
         if num + 1 == ds:
             m = ds
         elif num == ds:
@@ -461,9 +461,9 @@ def get_group_subdivision(G:tuple) -> List[int]:
         elif num < (ds * 2) - 1:
             m = ds
         else:
-            print(f'num: {num}, ds: {ds}')
+            # print(f'num: {num}, ds: {ds}')
             pi, ps = pow_n_bounds(n, 2)
-            print(f'pi: {pi}, ps: {ps}')
+            # print(f'pi: {pi}, ps: {ps}')
             m = ps if abs(n - pi) > abs(n - ps) else pi
     return [n, m]
 
