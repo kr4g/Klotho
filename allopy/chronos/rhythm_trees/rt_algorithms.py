@@ -643,18 +643,18 @@ def notate(tree):
         
         # print(f'tree: {tree}, level: {level}')
         if level == 1:
-            subs = add_ties(tree.subdivisions)
+            S = add_ties(tree.subdivisions)
             tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
             n, m = get_group_subdivision(tup)
             if n == m: # no tuplet
-                return '{{' + _notate(subs, level + 1) + '}}'
-            return f'\\tuplet {n}/{m} ' + '{{' + _notate(subs, level + 1) + '}}'
+                return _notate(S, level + 1)
+            return f'\\tuplet {n}/{m} ' + '{' + _notate(S, level + 1) + '}'
         else:
             result = ""
             for element in tree:
                 if isinstance(element, (int, float)):      # Rest or single note
                     if element < 0:  # Rest
-                        result += f" -{abs(element)}"
+                        result += f" r{abs(element)}"
                     else:  # Single note
                         result += f" {element}"
                 elif isinstance(element, tuple):  # Subdivision                
@@ -662,9 +662,9 @@ def notate(tree):
                     tup = D, (sum_proportions(S),)
                     n, m = get_group_subdivision(tup)
                     if n == m:
-                        result += f' {{{_notate(S, level + 1)}}}'
+                        result += f' {_notate(S, level + 1)}'
                     else:
-                        result += f' \\tuplet {n}/{m} {{{_notate(S, level + 1)}}}'
+                        result += f' \\tuplet {n}/{m} ' + '{' + _notate(S, level + 1) + '}'
                 if level == 0:
                     result = result.strip() + ' '
             return result.strip()
