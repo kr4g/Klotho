@@ -5,6 +5,7 @@ from functools import reduce
 from itertools import count
 import numpy as np
 import networkx as nx
+import matplotlib.pyplot as plt
 
 # ------------------------------------------------------------------------------------
 # TREE ALGORITHMS
@@ -219,17 +220,28 @@ def autoref_rotmat(lst:tuple, mode:str='G') -> Tuple[Tuple[Tuple]]:
 
 def add_tie(n) -> Union[int, Tuple[int]]:
     p = 1
-    while p * 2 <= n:
-        p *= 2    
-    if p == n or p * 1.5 == n or p * 1.75 == n:
-        return n
-    elif n > p * 1.5:
-        return (p + p//2, add_tie(n - (p * 1.5)))
+    if n > 0:
+        while p * 2 <= n:
+            p *= 2    
+        if p == n or p * 1.5 == n or p * 1.75 == n:
+            return n
+        elif n > p * 1.5:
+            return (p + p//2, add_tie(n - (p * 1.5)))
+        else:
+            return (p, float(add_tie(n - p)))
     else:
-        return (p, float(add_tie(n - p)))
+        n = abs(n)
+        while p * 2 <= n:
+            p *= 2    
+        if p == n or p * 1.5 == n or p * 1.75 == n:
+            return -n
+        elif n > p * 1.5:
+            return (-(p + p//2), -add_tie(n - (p * 1.5)))
+        else:
+            return (-p, -add_tie(n - p))
     
 def add_ties(S:Tuple) -> Tuple:
-    S = remove_ties(S)
+    # S = remove_ties(S)
     def process_tuple(t):
         result = []
         for value in t:
@@ -296,6 +308,17 @@ def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     ps = pow ** (k + 1)
     return pi, ps
 
+def mult_n_bounds(n:int, mult:int=2) -> Tuple[int]:
+    # the first multiple of mult*n < n
+    # and the first multiple of mult*n > than n
+    # eg: n=8, mult=2 -> 4, 16
+    # eg: n=9, mult=3 -> 6, 12
+    # eg: n=10, mult=2 -> 5, 20
+    # eg: n=2, mult=2 -> 2, 4
+    if n < 1:
+        return (None, mult)
+    pass
+    
 def head_dots_beams(n:Fraction) -> List:
     num, denom = n.numerator, n.denominator
     p, _ = pow_n_bounds(num, 2)
@@ -349,6 +372,36 @@ def is_ternary(durtot:Fraction) -> bool:
     if durtot.numerator == 3 and is_binary(Fraction(1, durtot.denominator)):
         return True
     return False
+
+def create_tuplet(G):
+    D, S = G
+    div = sum_proportions(S)
+    n, m = div, D
+    # form div:D -> n:m (n in the space of m)
+    # if n is a multiple of 2 and greater than m, divide by 2 while it's still greater than m
+    # eg:  8:3 -> 4:3
+    # if less than m, multiply while still less than
+    # 4:10 -> 8:10
+    # similar for denominators
+    # eg: 7:2 -> 7:4, 5:16 -> 5:8, 5:12 -> 5:6
+
+    
+    if n > m and n % 2 == 0:
+        while (new_n := n // 2) > m and new_n % 2 == 0:
+            n = new_n
+    elif n < m and n % 2 == 0:
+        while (new_n := n * 2) < m and new_n % 2 == 0:
+            n = new_n
+    
+    if m > n and m % 2 == 0:
+        while (new_m := m // 2) >= n and new_m % 2 == 0:
+            m = new_m
+    elif m < n and m % 2 == 0:
+        while (new_m := m * 2) <= n and new_m % 2 == 0:
+            m = new_m
+    
+    return [n, m]
+
 
 # Algorithm 6: SymbolicApprox
 def symbolic_approx(n:int) -> int:
@@ -445,26 +498,25 @@ def get_group_subdivision(G:tuple) -> List[int]:
     else:
         n = subdiv
     
-    ratio = Fraction(ds, subdiv)
-    if is_binary(ratio):
-        m = symbolic_approx(n)
-    elif is_ternary(ratio):
-        m = int(symbolic_approx(n) * 3 / 2)
+    # ratio = Fraction(ds, subdiv)
+    # if is_binary(ratio):
+    #     m = symbolic_approx(n)
+    # elif is_ternary(ratio):
+    #     m = int(symbolic_approx(n) * 3 / 2)
+    # else:
+    num = n.numerator if isinstance(n, Fraction) else n
+    if num + 1 == ds:
+        m = ds
+    elif num == ds:
+        m = num
+    elif num < ds:
+        return [num * 2, ds]
+    elif num < (ds * 2) - 1:
+        m = ds
     else:
-        num = n.numerator if isinstance(n, Fraction) else n
-        if num + 1 == ds:
-            m = ds
-        elif num == ds:
-            m = num
-        elif num < ds:
-            return [num * 2, ds]
-        elif num < (ds * 2) - 1:
-            m = ds
-        else:
-            # print(f'num: {num}, ds: {ds}')
-            pi, ps = pow_n_bounds(n, 2)
-            # print(f'pi: {pi}, ps: {ps}')
-            m = ps if abs(n - pi) > abs(n - ps) else pi
+        # pi, ps = pow_n_bounds(n, 2)
+        # m = ps if abs(n - pi) > abs(n - ps) else pi
+        return create_tuplet(G)
     return [n, m]
 
 # ------------------------------------------------------------------------------------
@@ -542,6 +594,39 @@ def graph_tree(root, S:Tuple) -> nx.DiGraph:
 def graph_depth(G:nx.DiGraph) -> int:
     return max(nx.single_source_shortest_path_length(G, 0).values())
 
+def plot_graph(G):
+    root = [n for n, d in G.in_degree() if d == 0][0]
+    pos = _hierarchy_pos(G, root)
+    labels = nx.get_node_attributes(G, 'label')
+    
+    plt.figure(figsize=(10, 5))
+    ax = plt.gca()
+    for node, (x, y) in pos.items():
+        ax.text(x, y, labels[node], ha='center', va='center', zorder=5,
+                bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="black"))
+    
+    nx.draw_networkx_edges(G, pos, arrows=False, width=2.0)
+    plt.axis('off')
+    plt.show()
+
+def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
+    if pos is None:
+        pos = {root:(xcenter, 1)}
+        parsed = [root]
+    else:
+        y = 1 - (depth * vert_gap)
+        pos[root] = (xcenter, y)
+    children = list(G.neighbors(root))
+    if not isinstance(G, nx.DiGraph) and parent is not None:
+        children.remove(parent)
+    if len(children) != 0:
+        dx = width / len(children)
+        nextx = xcenter - width / 2 - dx / 2
+        for child in children:
+            nextx += dx
+            _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
+    return pos
+
 def prune_tree(tree, depth):
     if depth == 0:
         return 0 # ignore for now
@@ -558,13 +643,16 @@ def notate(tree):
         
         # print(f'tree: {tree}, level: {level}')
         if level == 1:
+            subs = add_ties(tree.subdivisions)
             tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
             n, m = get_group_subdivision(tup)
-            return f'\\tuplet {n}/{m} ' + '{{' + _notate(tree.subdivisions, level + 1) + '}}'
+            if n == m: # no tuplet
+                return '{{' + _notate(subs, level + 1) + '}}'
+            return f'\\tuplet {n}/{m} ' + '{{' + _notate(subs, level + 1) + '}}'
         else:
             result = ""
             for element in tree:
-                if isinstance(element, int):      # Rest or single note
+                if isinstance(element, (int, float)):      # Rest or single note
                     if element < 0:  # Rest
                         result += f" -{abs(element)}"
                     else:  # Single note
@@ -573,7 +661,10 @@ def notate(tree):
                     D, S = element
                     tup = D, (sum_proportions(S),)
                     n, m = get_group_subdivision(tup)
-                    result += f' \\tuplet {n}/{m} {{{_notate(S, level + 1)}}}'
+                    if n == m:
+                        result += f' {{{_notate(S, level + 1)}}}'
+                    else:
+                        result += f' \\tuplet {n}/{m} {{{_notate(S, level + 1)}}}'
                 if level == 0:
                     result = result.strip() + ' '
             return result.strip()
