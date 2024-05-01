@@ -242,7 +242,7 @@ def add_tie(n) -> Union[int, Tuple[int]]:
             return (-p, -add_tie(n - p))
     
 def add_ties(S:Tuple) -> Tuple:
-    # S = remove_ties(S)
+    S = remove_ties(S)
     def process_tuple(t):
         result = []
         for value in t:
@@ -255,6 +255,7 @@ def add_ties(S:Tuple) -> Tuple:
         return tuple(result)
     return process_tuple(S)
 
+# XXX - this removes rests!!! Wrong.
 def remove_ties(S:Tuple) -> Tuple:
     def process_tuple(t):
         result = []
@@ -308,17 +309,6 @@ def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     pi = pow ** k
     ps = pow ** (k + 1)
     return pi, ps
-
-def mult_n_bounds(n:int, mult:int=2) -> Tuple[int]:
-    # the first multiple of mult*n < n
-    # and the first multiple of mult*n > than n
-    # eg: n=8, mult=2 -> 4, 16
-    # eg: n=9, mult=3 -> 6, 12
-    # eg: n=10, mult=2 -> 5, 20
-    # eg: n=2, mult=2 -> 2, 4
-    if n < 1:
-        return (None, mult)
-    pass
     
 def head_dots_beams(n:Fraction) -> List:
     num, denom = n.numerator, n.denominator
@@ -378,14 +368,6 @@ def create_tuplet(G):
     D, S = G
     div = sum_proportions(S)
     n, m = div, D
-    # form div:D -> n:m (n in the space of m)
-    # if n is a multiple of 2 and greater than m, divide by 2 while it's still greater than m
-    # eg:  8:3 -> 4:3
-    # if less than m, multiply while still less than
-    # 4:10 -> 8:10
-    # similar for denominators
-    # eg: 7:2 -> 7:4, 5:16 -> 5:8, 5:12 -> 5:6
-
     
     if n > m and n % 2 == 0:
         while (new_n := n // 2) > m and new_n % 2 == 0:
@@ -499,25 +481,25 @@ def get_group_subdivision(G:tuple) -> List[int]:
     else:
         n = subdiv
     
-    # ratio = Fraction(ds, subdiv)
-    # if is_binary(ratio):
-    #     m = symbolic_approx(n)
-    # elif is_ternary(ratio):
-    #     m = int(symbolic_approx(n) * 3 / 2)
-    # else:
-    num = n.numerator if isinstance(n, Fraction) else n
-    if num + 1 == ds:
-        m = ds
-    elif num == ds:
-        m = num
-    elif num < ds:
-        return [num * 2, ds]
-    elif num < (ds * 2) - 1:
-        m = ds
+    ratio = Fraction(ds, subdiv)
+    if is_binary(ratio):
+        m = symbolic_approx(n)
+    elif is_ternary(ratio):
+        m = int(symbolic_approx(n) * 3 / 2)
     else:
-        # pi, ps = pow_n_bounds(n, 2)
-        # m = ps if abs(n - pi) > abs(n - ps) else pi
-        return create_tuplet(G)
+        num = n.numerator if isinstance(n, Fraction) else n
+        if num + 1 == ds:
+            m = ds
+        elif num == ds:
+            m = num
+        elif num < ds:
+            return [num * 2, ds]
+        elif num < (ds * 2) - 1:
+            m = ds
+        else:
+            pi, ps = pow_n_bounds(n, 2)
+            m = ps if abs(n - pi) > abs(n - ps) else pi
+            # return create_tuplet(G)
     return [n, m]
 
 # ------------------------------------------------------------------------------------

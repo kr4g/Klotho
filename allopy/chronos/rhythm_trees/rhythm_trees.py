@@ -146,7 +146,7 @@ class RT:
     @classmethod
     def from_tuple(cls, tup:Tuple):
         return cls(duration       = 1,
-                   time_signature = sum(measure_ratios(tup)),
+                   time_signature = sum(abs(r) for r in measure_ratios(tup)),
                    subdivisions   = tup,
                    decomp         = 'reduced')
 
@@ -214,7 +214,8 @@ class RT:
         raise ValueError('Invalid Rhythm Tree')
 
     def _set_ratios(self):
-        ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__subdivisions)))
+        # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__subdivisions)))
+        ratios = tuple(self.__duration * r for r in measure_ratios(self.__subdivisions))
         ratios = reduced_decomposition(ratios, self.__time_signature)
         if self.__decomp == 'reduced':
             return ratios
