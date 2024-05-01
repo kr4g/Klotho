@@ -104,6 +104,12 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
     # print(f'pgcd: {pgcd}, pgcd_denom: {pgcd_denom}')
     return tuple(Fraction((f / pgcd) * meas.numerator, pgcd_denom) for f in lst)
 
+def decompose_tree(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
+    pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
+    S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
+    meas = f'{sum_proportions(S)}/{pgcd_denom}'
+    return meas, S
+
 # ------------------------------------------------------------------------------------
 
 # Algorithm 4: PermutList

@@ -27,9 +27,9 @@ rts = [
 
 # u_t = ut.UT(tempus='7/5', prolatio=((4,(1,1,1)),(3,(1,)*8),-5), tempo=60, beat='1/5')
 i = -1
-u_t = ut.UT.from_tree(rts[i])
-u_t.tempo = 36
-u_t.beat = f'1/{u_t.tempus.denominator}'
+bpm = 36
+beat = f'1/{rts[i].time_signature.denominator}'
+u_t = ut.UT.from_tree(rts[i], tempo=bpm, beat=beat)
 hx = cps.Eikosany()
 freqs = cycle([fold_freq(1.0 * 333.0 * np.random.choice([r, 1/r])) for r in hx.ratios])
 amps = cycle([np.random.uniform(0.05, 0.25) for _ in range(5)])
@@ -46,7 +46,7 @@ for start, duration in u_t:
     # print(start, duration)
     freq = next(freqs)
     amp = next(amps)
-    events.append(('syn', start, 'dur', duration*3.33, 'freq', freq, 'amp', amp))
+    events.append(('syn', start, 'dur', duration, 'freq', freq, 'amp', amp))
 
 for event in events:
     structured_event = [event[0], event[1]] + list(event[2:])
