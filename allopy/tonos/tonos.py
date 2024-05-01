@@ -245,7 +245,7 @@ def fold_interval(interval:Union[Fraction, float], equave:Union[Fraction, float]
     interval /= equave
   return interval
 
-def fold_freq(freq: float, lower: float = 100, upper: float = 5000, equave: float = 2.0) -> float:
+def fold_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: float = 2.0) -> float:
   '''
   Fold a frequency value to within a specified range.
   

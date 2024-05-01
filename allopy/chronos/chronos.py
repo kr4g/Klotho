@@ -12,6 +12,7 @@ computations related to time and rhythm in music.
 from typing import Union
 import numpy as np
 from fractions import Fraction
+from itertools import accumulate
 from utils.data_structures.enums import MinMaxEnum
 
 class TEMPO(MinMaxEnum):
@@ -112,7 +113,8 @@ def beat_duration(ratio:Union[Fraction, str], bpm:float, beat_ratio:Union[Fracti
   return tempo_factor * ratio_value * (beat_ratio.denominator / beat_ratio.numerator)
 
 def calc_onsets(durations:tuple):
-   return tuple(np.cumsum([abs(r) for r in durations]) - durations[0])
+#    return tuple(np.cumsum([abs(r) for r in durations]) - abs(durations[0]))
+    return tuple(accumulate([0] + list(durations)))
 
 def quantize(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominator: float = 16) -> Fraction:
   '''

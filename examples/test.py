@@ -35,4 +35,5 @@ rts = [
 ]
 
 for rt in rts:
-    print(notate(rt), end='\n\n')
+    # print(notate(rt), end='\n\n')
+    print(rt, end='\n\n')

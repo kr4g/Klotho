@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 # ------------------------------------------------------------------------------------
 
 # Algorithm 1: MeasureRatios
-def measure_ratios(S:tuple[int]) -> Tuple[Fraction]:
+def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
     '''
     Algorithm 1: MeasureRatios
 
@@ -43,12 +43,13 @@ def measure_ratios(S:tuple[int]) -> Tuple[Fraction]:
         end for all
     end
     '''
-    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
+    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivs)
     result = []
-    for s in S:  
+    for s in subdivs:  
         if isinstance(s, tuple):
             D, S = s
-            ratio = Fraction(abs(D), div)
+            ratio = Fraction(D, div)
+            # ratio = Fraction(abs(D), div)
             result.extend([ratio * el for el in measure_ratios(S)])
         else:
             result.append(Fraction(s, div))

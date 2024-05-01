@@ -30,7 +30,9 @@ class Meas:
     and stores the numerator and denominator separately.
     '''
     def __init__(self, signature: Union[Fraction, str, tuple] = '1/1'):
-        if isinstance(signature, Fraction):
+        if isinstance(signature, Meas):
+            self._numerator, self._denominator = signature.numerator, signature.denominator        
+        elif isinstance(signature, Fraction):
             self._numerator, self._denominator = signature.numerator, signature.denominator
         elif isinstance(signature, tuple):
             self._numerator, self._denominator = signature
