@@ -41,6 +41,12 @@ events = [
     # ('bassDrum', 0.0, 'dur', 0.4)
 ]
 
+def as_pairs(d:dict):
+    out = []
+    for k, v in d.items():
+        out.extend([k, v])
+    return out
+
 for start, duration in u_t:
     if duration < 0: continue
     # print(start, duration)

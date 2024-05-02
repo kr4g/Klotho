@@ -58,19 +58,15 @@ class Meas:
     
     def __add__(self, other):
         if isinstance(other, (Meas, Fraction)):
-            # if the denominator is the same, add the numerators
             if self.denominator == other.denominator:
                 return Meas((self.numerator + other.numerator, self.denominator))
-            # if the denominators are different, cast to fractions and add
             return Meas(Fraction(self.numerator, self.denominator) + Fraction(other.numerator, other.denominator))
         raise ValueError('Invalid time signature')
 
     def __sub__(self, other):
         if isinstance(other, (Meas, Fraction)):
-            # if the denominator is the same, subtract the numerators
             if self.denominator == other.denominator:
                 return Meas((self.numerator - other.numerator, self.denominator))
-            # if the denominators are different, cast to fractions and subtract
             return Meas(Fraction(self.numerator, self.denominator) - Fraction(other.numerator, other.denominator))
         raise ValueError('Invalid time signature')            
     

@@ -134,7 +134,6 @@ def layer2(material: dict, bpm: float = 120, rubato=True):
         start_time += dur
     
     return row_list
-   
 
 if __name__ == '__main__':    
     mats = materials()
