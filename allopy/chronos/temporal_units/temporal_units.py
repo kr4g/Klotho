@@ -28,13 +28,13 @@ class UT:
         self.__durations   = None
     
     @classmethod
-    def from_tree(cls, tree:Union[RT, tuple]):
-        meas = sum(measure_ratios(tree)) if isinstance(tree, tuple) else tree.time_signature
+    def from_tree(cls, tree:Union[RT, tuple], tempo=None, beat=None):
+        meas = sum(abs(r) for r in measure_ratios(tree)) if isinstance(tree, tuple) else tree.time_signature
         s = tree if isinstance(tree, tuple) else tree.subdivisions
         return cls(tempus   = meas,
                    prolatio = s,
-                   tempo    = None,
-                   beat     = Fraction(1, meas.denominator))
+                   tempo    = tempo,
+                   beat     = beat)
 
     @property
     def tempus(self):
