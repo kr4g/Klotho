@@ -19,45 +19,40 @@ from allopy.aikous import amp_freq_scale
 
 client = udp_client.SimpleUDPClient('127.0.0.1', 57120)
 
-bpm = 36
-duration = 36
-tempus = '13/1'
-beat = '1/16'
+rts = [
+    r_trees.RT(time_signature='4/4', subdivisions=(3,(1,(2,1)),2,1,(1,(1,1,1)))),
+    r_trees.RT(time_signature='15/16', subdivisions=(3,2,1,3,1,2,3)),
+    r_trees.RT(time_signature='4/3', subdivisions=((4,(3,(8,(3,4)))),-3)),
+    r_trees.RT(time_signature='7/5', subdivisions=((4,(1,1,1)),(3,(1,)*8),-5)),
+    r_trees.RT(time_signature='21/12', subdivisions=(11,7,5,3)),
+]
 
-p_mat = rt_alg.autoref_rotmat((5,17,7,13,3,11), 'G')
-rts = [r_trees.RT(duration=duration, time_signature=tempus, subdivisions=row) for row in p_mat]
+# u_t = ut.UT(tempus='7/5', prolatio=((4,(1,1,1)),(3,(1,)*8),-5), tempo=60, beat='1/5')
+i = -1
+u_t = ut.UT.from_tree(rts[i])
+u_t.tempo = 36
+u_t.beat = f'1/{u_t.tempus.denominator}'
+hx = cps.Eikosany()
+freqs = cycle([fold_freq(1.0 * 333.0 * np.random.choice([r, 1/r])) for r in hx.ratios])
+amps = cycle([np.random.uniform(0.05, 0.25) for _ in range(5)])
 
-hx = cps.Pentadekany()
-factors = cycle(hx.factors)
-events = []
-synths = cycle(['vibraphone', 'celeste', 'glockenspiel', 'syn'])
-for i, rt in enumerate(rts):
-    amps = cycle([np.random.uniform(0.005, 0.07) for _ in range(np.random.randint(3, 7))])
-    for j, (start, duration) in enumerate(ut.UT.from_tree(rt, tempo=bpm, beat=beat)):
-        # if duration < 0: continue
-        if j == 0:
-            # if i == 0: 
-            #     events.append(('bassDrum', start, 'amp', 0.05))
-            continue
-        # idx = Norg.inf_num(j - 1) % len(hx.ratios)
-        # ratio = fold_interval(hx.ratios[idx] if idx >= 0 else 1/hx.ratios[abs(idx)], equave=2.0, n_equaves=1)
-        partial = Norg.inf_num((j - 1) * 3 + 7)
-        partial += 1 if partial >= 0 else -1
-        ratio = fold_interval(partial if partial > 0 else 1/abs(partial), equave=2.0, n_equaves=1)
-        f = next(factors)
-        freq = fold_freq(f * 166.5 * ratio, lower=83.25, upper=5328)
-        amp = next(amps) * amp_freq_scale(freq) * np.interp(freq, [83.25, 5328], [1.0, 0.35])
-        synth = next(synths)
-        events.append((synth, start, 'dur', duration*1.33, 'freq', freq, 'amp', amp))
+print(u_t.tree)
+events = [
+    # ('syn', 0.2, 'dur', 1, 'freq', 500, 'amp', 0.7),
+    # ('saw', 0.5, 'dur', 1.5, 'freq', 440, 'amp', 0.6),
+    # ('bassDrum', 0.0, 'dur', 0.4)
+]
 
-# m_freq = cycle([fold_freq(666.0 * hx.ratios[Norg.inf_num(i) % len(hx.ratios)], lower=166.5, upper=999.0) for i in range(11)])
-# for i, (start, duration) in enumerate(ut.UT.from_tree(rt_mel, tempo=36, beat='1/16')):
-#     if duration < 0 or i < 5: continue
-#     freq = next(m_freq)
-#     events.append(('theremin', start, 'dur', duration, 'freq', freq, 'amp', 0.03))
+for start, duration in u_t:
+    if duration < 0: continue
+    # print(start, duration)
+    freq = next(freqs)
+    amp = next(amps)
+    events.append(('syn', start, 'dur', duration*3.33, 'freq', freq, 'amp', amp))
 
 for event in events:
     structured_event = [event[0], event[1]] + list(event[2:])
-    client.send_message("/storeEvent", structured_event)
+    client.send_message('/storeEvent', structured_event)
 
-print("Events have been sent.")
+print('Events have been sent.')
+

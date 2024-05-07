@@ -22,7 +22,7 @@ class UT:
         self.__tempus      = Meas(tempus)
         self.__prolationis = self._set_prolationis(prolatio) # RT object
         self.__tempo       = tempo
-        self.__beat        = self._set_beat(beat, prolatio)
+        self.__beat        = self._set_beat(beat)
 
         self.__onsets      = None
         self.__durations   = None
@@ -33,6 +33,8 @@ class UT:
         s = tree if isinstance(tree, tuple) else tree.subdivisions
         return cls(tempus   = meas,
                    prolatio = s,
+                   tempo    = tempo,
+                   beat     = beat)
                    tempo    = tempo,
                    beat     = beat)
 
@@ -87,7 +89,7 @@ class UT:
     @property
     def duration(self):
         if self.__tempo is None:
-            return 0
+            raise ValueError('Tempo is not set')
         return sum(self.durations)
     
     @tempo.setter
@@ -114,14 +116,12 @@ class UT:
             prolatio = RT(duration       = prolatio.duration,
                           time_signature = self.__tempus,  # ...the UT wins
                           subdivisions   = prolatio.subdivisions)
-            comp = 'Complex' if prolatio.type else 'Simple'
-            self.__type = f'Ensemble ({comp})'
+            self.__type = f'Ensemble ({prolatio.type})'
         elif isinstance(prolatio, tuple):
             prolatio = RT(duration       = 1,
                           time_signature = self.__tempus,
                           subdivisions   = prolatio)
-            comp = 'Complex' if prolatio.type else 'Simple'
-            self.__type = f'Ensemble ({comp})'            
+            self.__type = f'Ensemble ({prolatio.type})'
         elif isinstance(prolatio, str):
             prolatio = prolatio.lower()
             if prolatio in PULSTYPES:
@@ -145,10 +145,9 @@ class UT:
             raise ValueError(f'Invalid prolationis: {prolatio}')
         return prolatio
     
-    def _set_beat(self, beat, prolatio):
-        if isinstance(prolatio, str):
-            if prolatio.lower() in ALLTYPES and self.__beat is None:
-                return Fraction(1, self.__tempus.denominator)
+    def _set_beat(self, beat):
+        if beat is None:
+            return Fraction(1, self.__tempus.denominator)
         return Fraction(beat)
     
     def __add__(self, other:Union['UT', Fraction]):
@@ -218,14 +217,14 @@ class UT:
             self.onsets,
             self.durations,
         )
-    
+
     def __repr__(self):
         return (
             f'Tempus: {self.__tempus}\n'
-            f'Tempo: {self.__tempo}\n' if self.__tempo else ''
-            f'Beat: {self.__beat}\n' 
+            f'Tempo: {self.__tempo}\n'
+            f'Beat: {self.__beat}\n'
             f'Prolationis: {self.__prolationis.subdivisions}\n'
-            f'Type: {self.__type}\n'     
+            f'Type: {self.__type}\n'
         )
 
 class UTSeq:
@@ -292,7 +291,3 @@ class TB:
 
     def __iter__(self):
         return iter(self.__tb)
-    
-
-if __name__ == '__main__':  
-    pass

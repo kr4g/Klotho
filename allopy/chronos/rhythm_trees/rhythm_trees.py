@@ -22,7 +22,7 @@ from typing import Union, Tuple
 from math import gcd, lcm
 from functools import reduce
 
-from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, remove_ties, rotate_tree, graph_tree
+from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition, remove_ties, rotate_tree, graph_tree
 
 class Meas:    
     '''
@@ -58,19 +58,15 @@ class Meas:
     
     def __add__(self, other):
         if isinstance(other, (Meas, Fraction)):
-            # if the denominator is the same, add the numerators
             if self.denominator == other.denominator:
                 return Meas((self.numerator + other.numerator, self.denominator))
-            # if the denominators are different, cast to fractions and add
             return Meas(Fraction(self.numerator, self.denominator) + Fraction(other.numerator, other.denominator))
         raise ValueError('Invalid time signature')
 
     def __sub__(self, other):
         if isinstance(other, (Meas, Fraction)):
-            # if the denominator is the same, subtract the numerators
             if self.denominator == other.denominator:
                 return Meas((self.numerator - other.numerator, self.denominator))
-            # if the denominators are different, cast to fractions and subtract
             return Meas(Fraction(self.numerator, self.denominator) - Fraction(other.numerator, other.denominator))
         raise ValueError('Invalid time signature')            
     
@@ -216,14 +212,10 @@ class RT:
     def _set_ratios(self):
         # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__subdivisions)))
         ratios = tuple(self.__duration * r for r in measure_ratios(self.__subdivisions))
-        ratios = reduced_decomposition(ratios, self.__time_signature)
         if self.__decomp == 'reduced':
-            return ratios
+            return reduced_decomposition(ratios, self.__time_signature)
         elif self.__decomp == 'strict':
-            pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in ratios))
-            self.__subdivisions = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in ratios)
-            self.__time_signature = Meas((sum_proportions(self.__subdivisions), pgcd_denom))
-            ratios = reduced_decomposition(ratios, self.__time_signature)
+            return strict_decomposition(ratios, self.__time_signature)
         return ratios
     
     def _set_type(self):
