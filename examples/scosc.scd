@@ -1,9 +1,8 @@
 ServerOptions.devices;
-s.options.outDevice;
 
 (
-s.options.device = "External Headphones";
-// s.options.device = "ZoomAudioD";
+// s.options.device = "External Headphones";
+s.options.device = "MacBook Pro Speakers";
 s.options.sampleRate = 48000;
 s.options.memSize = 131072;
 s.boot;
@@ -22,7 +21,7 @@ SynthDef(\bassDrum, {
 	snd = snd.tanh;
 	snd = snd * Env.linen(0, 5.0, 1.0, curve: -4).ar(Done.freeSelf);
 	// snd = snd * -12.dbamp;
-	snd = snd * \amp.kr(0.001);
+	snd = snd * \amp.kr(0.05);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -36,7 +35,6 @@ SynthDef(\saw, { |freq=440, dur=1, amp=0.5, lagTime=0|
 	var freqControl = Lag.kr(freq, lagTime);
 	Out.ar(0, Saw.ar(freqControl) * env);
 }).add;
-
 
 SynthDef(\feedback, {
 	var snd, duration, env, rate;
@@ -62,7 +60,6 @@ SynthDef(\feedback, {
 	snd = snd * -15.dbamp;
 	Out.ar(\out.kr(0), snd);
 }).add;
-
 
 SynthDef(\feedback2, {
 	var snd, duration, env, rate;
@@ -176,8 +173,13 @@ SynthDef(\vibraphone, {
 }).add;
 )
 
-~synth = Synth(\syn);
-~synth.set(\freq, 880);
+Synth(\celeste, [\freq, 999]);
+Synth(\glockenspiel, [\freq, 999]);
+Synth(\vibraphone, [\freq, 999]);
+
+~synth = Synth(\theremin, [\dur, 30, \freq, 220]);
+~synth.set(\freq, 999, \freqLag, 1);
+
 ~events = Array.new;
 
 (

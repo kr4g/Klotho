@@ -19,40 +19,31 @@ from allopy.aikous import amp_freq_scale
 
 client = udp_client.SimpleUDPClient('127.0.0.1', 57120)
 
-rts = [
-    r_trees.RT(time_signature='4/4', subdivisions=(3,(1,(2,1)),2,1,(1,(1,1,1)))),
-    r_trees.RT(time_signature='15/16', subdivisions=(3,2,1,3,1,2,3)),
-    r_trees.RT(time_signature='4/3', subdivisions=((4,(3,(8,(3,4)))),-3)),
-    r_trees.RT(time_signature='7/5', subdivisions=((4,(1,1,1)),(3,(1,)*8),-5)),
-    r_trees.RT(time_signature='21/12', subdivisions=(11,7,5,3)),
-]
-
-# u_t = ut.UT(tempus='7/5', prolatio=((4,(1,1,1)),(3,(1,)*8),-5), tempo=60, beat='1/5')
-i = -1
-u_t = ut.UT.from_tree(rts[i])
-u_t.tempo = 36
-u_t.beat = f'1/{u_t.tempus.denominator}'
-hx = cps.Eikosany()
-freqs = cycle([fold_freq(1.0 * 333.0 * np.random.choice([r, 1/r])) for r in hx.ratios])
-amps = cycle([np.random.uniform(0.05, 0.25) for _ in range(5)])
-
-print(u_t.tree)
-events = [
-    # ('syn', 0.2, 'dur', 1, 'freq', 500, 'amp', 0.7),
-    # ('saw', 0.5, 'dur', 1.5, 'freq', 440, 'amp', 0.6),
-    # ('bassDrum', 0.0, 'dur', 0.4)
-]
-
-for start, duration in u_t:
-    if duration < 0: continue
-    # print(start, duration)
-    freq = next(freqs)
-    amp = next(amps)
-    events.append(('syn', start, 'dur', duration*3.33, 'freq', freq, 'amp', amp))
+tempus = '10/1'
+duration = 1
+bpm = 36
+beat = '1/16'
+hx = cps.Pentadekany()
+factors = cycle(hx.factors)
+rts = [r_trees.RT(duration=duration, time_signature=tempus, subdivisions=row) for row in rt_alg.autoref_rotmat((11,7,17,5,3,19))]
+synths = cycle(['celeste', 'glockenspiel', 'vibraphone', 'syn'])
+events = []
+for i, rt in enumerate(rts):
+    amps = cycle([np.random.uniform(0.005, 0.05) for _ in range(np.random.randint(3, 7))])
+    f = next(factors)
+    synth = next(synths)
+    for j, (start, duration) in enumerate(ut.UT.from_tree(rt, tempo=bpm, beat=beat)):
+        if duration < 0: continue
+        if j == 0: continue
+        partial = Norg.inf_num((j - 1) * 7 + 5)
+        partial += 1 if partial >= 0 else -1
+        ratio = fold_interval(partial if partial > 0 else 1/abs(partial), equave=2.0, n_equaves=1)
+        freq = fold_freq(f * ratio * 166.5, lower=83.25, upper=2664.0)
+        amp = next(amps) * amp_freq_scale(freq) * np.interp(freq, [83.25, 2664.0], [1.0, 0.3])
+        events.append((synth, start, 'dur', duration*1.33, 'freq', freq, 'amp', amp))
 
 for event in events:
     structured_event = [event[0], event[1]] + list(event[2:])
     client.send_message('/storeEvent', structured_event)
 
 print('Events have been sent.')
-

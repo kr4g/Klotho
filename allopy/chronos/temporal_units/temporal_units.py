@@ -35,8 +35,6 @@ class UT:
                    prolatio = s,
                    tempo    = tempo,
                    beat     = beat)
-                   tempo    = tempo,
-                   beat     = beat)
 
     @property
     def tempus(self):

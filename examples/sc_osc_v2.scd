@@ -1,5 +1,8 @@
+s.boot;
+ServerOptions.devices;
 (
 s.options.device = "External Headphones";
+// s.options.device = "MacBook Pro Speakers";
 // s.options.device = "ZoomAudioD";
 s.options.sampleRate = 48000;
 s.options.memSize = 131072;
@@ -164,6 +167,10 @@ SynthDef(\vibraphone, {
 }).add;
 )
 
+Synth(\celeste, [\freq, 2999]);
+Synth(\glockenspiel, [\freq, 2999]);
+Synth(\vibraphone, [\freq, 166.5]);
+
 ~events = Array.new;
 ~synths = Dictionary.new;
 
@@ -192,15 +199,16 @@ OSCdef(\storeEvent, { |msg, time, addr, recvPort|
     "Starting composition...".postln;
     ~events.do { |item|
         var type = item[0];
-        var args = item[1..];
+        var args = item[1];
         switch(type,
             'new', {
                 var synthName = args[0];
                 var start = args[1].asFloat;
                 var argsDict = args[2..];
+				argsDict.postln;
                 SystemClock.schedAbs(thisThread.seconds + start, {
                     s.bind {
-                        Synth(synthName, *argsDict);
+                        Synth(synthName, argsDict);
                     };
                 });
             },
@@ -231,5 +239,6 @@ OSCdef(\storeEvent, { |msg, time, addr, recvPort|
     };
 };
 )
-
+~synths.value;
+~events.value;
 ~startComposition.value;
