@@ -505,7 +505,6 @@ def get_group_subdivision(G:tuple) -> List[int]:
         else:
             pi, ps = pow_n_bounds(n, 2)
             m = ps if abs(n - pi) > abs(n - ps) else pi
-            # return create_tuplet(G)
     return [n, m]
 
 # ------------------------------------------------------------------------------------

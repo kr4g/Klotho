@@ -49,13 +49,12 @@ def as_pairs(d:dict):
 
 for start, duration in u_t:
     if duration < 0: continue
-    # print(start, duration)
     freq = next(freqs)
     amp = next(amps)
     events.append(('syn', start, 'dur', duration, 'freq', freq, 'amp', amp))
 
 for event in events:
     structured_event = [event[0], event[1]] + list(event[2:])
-    client.send_message("/storeEvent", structured_event)
+    client.send_message('/storeEvent', structured_event)
 
-print("Events have been sent.")
+print('Events have been sent.')
