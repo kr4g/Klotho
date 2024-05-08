@@ -4,12 +4,11 @@ from pathlib import Path
 root_path = Path(__file__).parent.parent
 sys.path.append(str(root_path))
 
-from pythonosc import udp_client, osc_message_builder
-from uuid import uuid4
-
 from itertools import cycle
 import numpy as np
 from sympy import prime
+
+from utils.data_structures import scheduler as sch
 
 from allopy.chronos import rhythm_trees as r_trees
 from allopy.chronos.rhythm_trees import rt_algorithms as rt_alg
@@ -19,34 +18,7 @@ from allopy.tonos import fold_freq, fold_interval
 from allopy.topos.sequences import Norg
 from allopy.aikous import amp_freq_scale
 
-client = udp_client.SimpleUDPClient('127.0.0.1', 57120)
-
-events = []
-
-def add_new_synth(synth_name, start, **params):
-    args = [synth_name, start] + [item for sublist in params.items() for item in sublist]
-    events.append(('new', args))
-
-def add_new_synth_with_id(synth_name, start, **params):
-    uid = str(uuid4()).replace('-', '')
-    # uid = np.random.randint(0, 1000000)
-    args = [uid, synth_name, start] + [item for sublist in params.items() for item in sublist]
-    events.append(('new_id', args))
-    return uid
-
-def add_set_event(uid, start, **params):
-    args = [uid, start] + [item for sublist in params.items() for item in sublist]
-    events.append(('set', args))
-
-def send_all_events():
-    for event_type, content in events:
-        msg = osc_message_builder.OscMessageBuilder(address='/storeEvent')
-        msg.add_arg(event_type)
-        for item in content:
-            msg.add_arg(item)
-        client.send(msg.build())
-    events.clear()
-    print('Events have been sent.')
+scheduler = sch.Scheduler()
 
 tempus = '13/1'
 duration = 5
@@ -75,7 +47,7 @@ for i, rt in enumerate(rts):
         freq = fold_freq(f * ratio * 166.5, lower=83.25, upper=2664.0)
         amp = next(amps) * amp_freq_scale(freq) * np.interp(freq, [83.25, 2664.0], [1.0, 0.45])
         dur_scale = np.interp(amp, [0.005*0.35, 0.05], [1.833, 1.167])
-        add_new_synth(synth, start, dur=duration*dur_scale, freq=freq, amp=amp)
+        scheduler.add_new_synth(synth, start, dur=duration*dur_scale, freq=freq, amp=amp)
 
 cp_set = cps.Hexany()
 r_pair = rt_alg.rhythm_pair(S)
@@ -95,11 +67,11 @@ for i, (start, duration) in enumerate(ut):
         root = next(roots)
     freq = fold_freq(ratio * root, lower=166.5, upper=2664.0)
     if uid is None:
-        uid = add_new_synth_with_id('theremin', start, dur=ut.duration, freq=freq, amp=0.05, ampLag=0, atk=duration*0.667)
+        uid = scheduler.add_new_synth_with_id('theremin', start, dur=ut.duration, freq=freq, amp=0.05, ampLag=0, atk=duration*0.667)
     else:
         lag_scale = np.interp(duration, [min_dur, max_dur], [0.33, 0.833])
         amp = np.random.uniform(0.02, 0.35) * amp_freq_scale(freq) * np.interp(freq, [166.5, 2664.0], [1.0, 0.25])
-        add_set_event(uid, start, freq=freq, freqLag=duration*lag_scale, amp=amp**1.25, ampLag=duration*(lag_scale**0.5))
+        scheduler.add_set_event(uid, start, freq=freq, freqLag=duration*lag_scale, amp=amp**1.25, ampLag=duration*(lag_scale**0.5))
     if i == len(ut.durations) - 1:
-        add_set_event(uid, start, amp=0.0, ampLag=duration*0.833)
-send_all_events()
+        scheduler.add_set_event(uid, start, amp=0.0, ampLag=duration*0.833)
+scheduler.send_all_events()

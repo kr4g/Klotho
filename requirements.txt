@@ -9,3 +9,4 @@ tabulate
 PySide6
 sympy
 networkx
+python-osc

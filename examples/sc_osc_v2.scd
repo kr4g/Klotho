@@ -96,7 +96,7 @@ SynthDef(\theremin, {
 	// snd = snd * -20.dbamp;
 	// snd = snd * Env.asr(1, 1, 1, curve: \sin).ar(Done.freeSelf, \gate.kr(1));
 	snd = snd * Env.linen(\atk.kr(0.1), \dur.kr(1.0), 0.1, curve: -4).ar(Done.freeSelf);
-	snd = snd * \amp.kr(0.5).lag(\ampLag.kr(0.5));
+	snd = snd * \amp.kr(0.5).lag(\ampLag.kr(0));
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -184,6 +184,7 @@ Synth(\feedback2, [\duration, 30, \freq, 666]);
 ~synth = Synth(\theremin, [\freq, 440, \amp, 0.5, \dur, 30]);
 ~synth.set(\freq, 333, \amp, 0.5);
 
+// ...SynthDefs defined elsewhere...
 ~events = Array.new;
 ~synths = Dictionary.new;
 
