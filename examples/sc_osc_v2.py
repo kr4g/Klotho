@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from itertools import cycle
 import numpy as np
+from sympy import prime
 
 from allopy.chronos import rhythm_trees as r_trees
 from allopy.chronos.rhythm_trees import rt_algorithms as rt_alg
@@ -27,7 +28,8 @@ def add_new_synth(synth_name, start, **params):
     events.append(('new', args))
 
 def add_new_synth_with_id(synth_name, start, **params):
-    uid = '\\' + str(uuid4())
+    # uid = str(uuid4()).replace('-', '')
+    uid = np.random.randint(0, 1000000)
     args = [uid, synth_name, start] + [item for sublist in params.items() for item in sublist]
     events.append(('new_id', args))
     return uid
@@ -46,38 +48,58 @@ def send_all_events():
     events.clear()
     print('Events have been sent.')
 
-# tempus = '10/1'
-# duration = 3
-# bpm = 36
-# beat = '1/16'
-# hx = cps.Pentadekany()
-# factors = cycle(hx.factors)
-# rts = [
-#     r_trees.RT(duration       = duration,
-#                time_signature = tempus,
-#                subdivisions   = row) for row in rt_alg.autoref_rotmat((11,7,17,5,3,19))
-# ]
-# synths = cycle(['celeste', 'glockenspiel', 'syn'])
-# for i, rt in enumerate(rts):
-#     amps = cycle([np.random.uniform(0.005, 0.05) for _ in range(np.random.randint(3, 7))])
-#     f = next(factors)
-#     synth = next(synths)
-#     ut = u_temp.UT.from_tree(rt, tempo=bpm, beat=beat)
-#     min_dur, max_dur = min(ut.durations), max(ut.durations)
-#     for j, (start, duration) in enumerate(ut):
-#         if duration < 0: continue
-#         if j == 0: continue
-#         partial = Norg.inf_num(j - 1)
-#         partial += 1 if partial >= 0 else -1
-#         ratio = fold_interval(partial if partial > 0 else 1/abs(partial), equave=2.0, n_equaves=1)
-#         freq = fold_freq(f * ratio * 166.5, lower=83.25, upper=2664.0)
-#         amp = next(amps) * amp_freq_scale(freq) * np.interp(freq, [83.25, 2664.0], [1.0, 0.35])
-#         dur_scale = np.interp(amp, [0.005*0.35, 0.05], [1.333, 0.667])
-#         add_new_synth(synth, start, dur=duration*dur_scale, freq=freq, amp=amp)
+tempus = '13/1'
+duration = 5
+bpm = 36
+beat = '1/16'
+S = (5,17,7,11,3,13)
+rts = [
+    r_trees.RT(duration       = duration,
+               time_signature = tempus,
+               subdivisions   = row) for row in rt_alg.autoref_rotmat(S)
+]
 
+factors = cycle([1] + [prime(n + 2) for n in range(len(rts) - 1)])
+synths = cycle(['celeste', 'glockenspiel', 'vibraphone', 'syn'])
+for i, rt in enumerate(rts):
+    amps = cycle([np.random.uniform(0.009, 0.07) for _ in range(np.random.randint(3, 7))])
+    f = next(factors)
+    synth = next(synths)
+    ut = u_temp.UT.from_tree(rt, tempo=bpm, beat=beat)
+    min_dur, max_dur = min(ut.durations), max(ut.durations)
+    for j, (start, duration) in enumerate(ut):
+        if duration < 0 or j == 0: continue
+        partial = Norg.inf_num(j - 1)
+        partial += 1 if partial >= 0 else -1
+        ratio = fold_interval(partial if partial > 0 else 1/abs(partial), equave=2.0, n_equaves=1)
+        freq = fold_freq(f * ratio * 166.5, lower=83.25, upper=2664.0)
+        amp = next(amps) * amp_freq_scale(freq) * np.interp(freq, [83.25, 2664.0], [1.0, 0.45])
+        dur_scale = np.interp(amp, [0.005*0.35, 0.05], [1.833, 1.167])
+        add_new_synth(synth, start, dur=duration*dur_scale, freq=freq, amp=amp)
 
-uid = add_new_synth_with_id('theremin', 0, dur=15, freq=220, amp=0.05)
-add_set_event(uid, 5, freq=880)
-add_set_event(uid, 10, freq=440)
+cp_set = cps.Eikosany()
+r_pair = rt_alg.rhythm_pair(S)
+prolat = tuple((s, S) for s in r_pair)
+ut = u_temp.UT(tempus   = tempus,
+               prolatio = prolat,
+               tempo    = bpm,
+               beat     = beat)
+uid = None
+min_dur, max_dur = min(ut.durations), max(ut.durations)
+roots = cycle(333.0 * fold_interval(r, n_equaves=1) for r in cp_set.factors)
+for i, (start, duration) in enumerate(ut):
+    if i < len(S): continue
+    idx = Norg.inf_num(i * 7 + 13) % len(cp_set.ratios)
+    ratio = fold_interval(cp_set.ratios[idx] if idx > 0 else 1/cp_set.ratios[abs(idx)], n_equaves=1)
+    if i % len(S) == 0:
+        root = next(roots)
+    freq = fold_freq(ratio * root, lower=83.25, upper=2664.0)
+    if uid is None:
+        uid = add_new_synth_with_id('theremin', start, dur=ut.duration, freq=freq, amp=0.05, ampLag=0)
+        add_set_event(uid, start, amp=0.15, ampLag=duration*0.5)
+    else:
+        lag_scale = np.interp(duration, [min_dur, max_dur], [0.33, 0.833])
+        amp = np.random.uniform(0.05, 0.3) * amp_freq_scale(freq) * np.interp(freq, [83.25, 2664.0], [1.0, 0.25])
+        add_set_event(uid, start, freq=freq, freqLag=duration*lag_scale, amp=amp**1.5, ampLag=duration*(lag_scale**0.5))
 
 send_all_events()

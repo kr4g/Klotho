@@ -1,13 +1,20 @@
+s = Server.local;
+// ServerOptions.devices;
+s.options.outDevice_(
+	// "MacBook Pro Speakers"
+	"External Headphones"
+	// "Scarlett 4i4 USB"
+);
+s.options.inDevice_("Built-in Microph");
+s.options.numOutputBusChannels_(2);
+s.options.numInputBusChannels_(2);
+s.options.sampleRate_(48000);
+s.options.memSize_(2.pow(20));
+/*s.newBusAllocators;
+ServerBoot.removeAll;
+ServerTree.removeAll;
+ServerQuit.removeAll;*/
 s.boot;
-ServerOptions.devices;
-(
-s.options.device = "External Headphones";
-// s.options.device = "MacBook Pro Speakers";
-// s.options.device = "ZoomAudioD";
-s.options.sampleRate = 48000;
-s.options.memSize = 131072;
-s.boot;
-)
 
 (
 SynthDef(\bassDrum, {
@@ -30,12 +37,12 @@ SynthDef(\syn, {
 	Out.ar(0, SinOsc.ar(\freq.kr(440)) * env);
 }).add;
 
-SynthDef(\feedback, {
+SynthDef(\feedback1, {
 	var snd, duration, env, rate;
 	rate = \rate.kr(1.0);
 	duration = \duration.kr(10.0);
 	env = Env([0, 1, 0], [1, 1].normalizeSum * duration, curve: -4).ar(Done.freeSelf);
-	snd = SinOsc.ar(520) * Env.perc(0.1, 0.2).ar;
+	snd = SinOsc.ar(\freq.kr(520)) * Env.perc(0.1, 0.2).ar;
 
 	snd = snd + LocalIn.ar(2);
 	snd = (snd * 5.dbamp).tanh;
@@ -60,7 +67,7 @@ SynthDef(\feedback2, {
 	rate = \rate.kr(1.0);
 	duration = \duration.kr(10.0);
 	env = Env([0, 1, 0], [1, 1].normalizeSum * duration, curve: -4).ar(Done.freeSelf);
-	snd = Saw.ar(60) * Env.perc(0.1, 0.2).ar;
+	snd = Saw.ar(\freq.kr(60)) * Env.perc(0.1, 0.2).ar;
 
 	snd = snd + LocalIn.ar(2);
 	snd = (snd * 5.dbamp).tanh;
@@ -86,9 +93,10 @@ SynthDef(\theremin, {
 	snd = SinOsc.ar(\freq.kr(440).cpsmidi.lag(\freqLag.kr(2.0)).midicps * ((SinOsc.ar(5) + LFNoise2.kr(3)) * 0.2).midiratio);
 	snd = LeakDC.ar((snd + 0.1).tanh);
 	snd = snd ! 2;
-	snd = snd * -20.dbamp;
+	// snd = snd * -20.dbamp;
 	// snd = snd * Env.asr(1, 1, 1, curve: \sin).ar(Done.freeSelf, \gate.kr(1));
 	snd = snd * Env.linen(\atk.kr(0.1), \dur.kr(1.0), 0.1, curve: -4).ar(Done.freeSelf);
+	snd = snd * \amp.kr(0.5).lag(\ampLag.kr(0.5));
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -171,6 +179,11 @@ Synth(\celeste, [\freq, 2999]);
 Synth(\glockenspiel, [\freq, 2999]);
 Synth(\vibraphone, [\freq, 166.5]);
 
+Synth(\feedback2, [\duration, 30, \freq, 666]);
+
+~synth = Synth(\theremin, [\freq, 440, \amp, 0.5, \dur, 30]);
+~synth.set(\freq, 333, \amp, 0.5);
+
 ~events = Array.new;
 ~synths = Dictionary.new;
 
@@ -199,13 +212,13 @@ OSCdef(\storeEvent, { |msg, time, addr, recvPort|
     "Starting composition...".postln;
     ~events.do { |item|
         var type = item[0];
-        var args = item[1];
         switch(type,
             'new', {
+				var args = item[1];
                 var synthName = args[0];
                 var start = args[1].asFloat;
                 var argsDict = args[2..];
-				argsDict.postln;
+				// argsDict.postln;
                 SystemClock.schedAbs(thisThread.seconds + start, {
                     s.bind {
                         Synth(synthName, argsDict);
@@ -213,32 +226,36 @@ OSCdef(\storeEvent, { |msg, time, addr, recvPort|
                 });
             },
             'new_id', {
-                var id = args[0];
-                var synthName = args[1];
-                var start = args[2].asFloat;
-                var argsDict = args[3..];
-                SystemClock.schedAbs(thisThread.seconds + start, {
-                    s.bind {
-                        var synth = Synth(synthName, *argsDict);
-                        ~synths.put(id, synth);
-                    };
-                });
+				var args = item[2];
+				var id = item[1];
+				var synthName = args[0];
+				var start = args[1].asFloat;
+				var argsDict = args[2..];
+				// argsDict.postln;
+				SystemClock.schedAbs(thisThread.seconds + start, {
+					s.bind {
+						var synth = Synth(synthName, argsDict);
+						~synths.put(id, synth);
+					};
+				});
             },
             'set', {
-                var id = args[0];
-                var start = args[1].asFloat;
-                var setArgs = args[2..];
-                SystemClock.schedAbs(thisThread.seconds + start, {
-                    s.bind {
-                        var synth = ~synths.at(id);
-                        if (synth.notNil) { synth.set(*setArgs); }
-                    };
-                });
+				var args = item[2];
+				var id = item[1];
+				var start = args[0].asFloat;
+				var argsDict = args[1..];
+				SystemClock.schedAbs(thisThread.seconds + start, {
+					s.bind {
+						var synth = ~synths.at(id);
+						if (synth.notNil) { synth.set(*argsDict); }
+					};
+				});
             }
         );
     };
 };
 )
+
 ~synths.value;
 ~events.value;
 ~startComposition.value;
