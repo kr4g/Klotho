@@ -203,15 +203,15 @@ SynthDef(\delaySnap, {
 }).add;
 
 SynthDef(\choir, {
-	var snd, duration, env;
+	var snd, freq, duration, env;
+	freq = \freq.kr(70).lag(\freqLag.kr(0.02));
 	duration = \duration.kr(10.0);
-	env = Env([0, 1, 1, 0], [0.1, duration, 0.1], curve: -4).ar(Done.freeSelf);
-
+	env = Env([0, 1, 1, 0], [\atk.kr(0.1), duration, \rel.kr(0.1)], curve: -4).ar(Done.freeSelf);
 	snd = 8.collect {
 		var formants, snd;
 		formants = [800, 1200, 2420, 4420];
 		snd = BPF.ar(
-			Pulse.ar(70 * (LFNoise2.kr(8) * 0.3).midiratio * (SinOsc.kr(ExpRand(3, 6)) * 0.3).midiratio, 0.2),
+			Pulse.ar(freq * (LFNoise2.kr(8) * 0.3).midiratio * (SinOsc.kr(ExpRand(3, 6)) * 0.3).midiratio, 0.2),
 			formants * formants.size.collect { (LFNoise2.kr(3) * 1).midiratio * ExpRand(0.9, 1.2) },
 			[0.05, 0.05, 0.05, 0.05],
 		);
@@ -224,11 +224,11 @@ SynthDef(\choir, {
 		snd = BLowShelf.ar(snd, 500, 0.3, 5);
 	};
 	snd = Splay.ar(snd);
-	snd = snd + ((SinOsc.ar(70 / 2)).tanh * -5.dbamp);
-	snd = snd + ((SinOsc.ar(70)).tanh * -5.dbamp);
+	snd = snd + ((SinOsc.ar(freq / 2)).tanh * -5.dbamp);
+	snd = snd + ((SinOsc.ar(freq)).tanh * -5.dbamp);
 
 	snd = snd * env;
-	snd = snd * -10.dbamp;
+	snd = snd * \amp.kr(-10.dbamp).lag(\ampLag.kr(0.02));
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -406,9 +406,10 @@ SynthDef(\organ, {
 }).add;
 
 SynthDef(\lead, {
-	var snd, freq, n, intensity;
-	freq = \freq.kr(440).lag(0.02);
-	intensity = LFNoise2.kr(3).linlin(-1, 1, 0, 1) * Line.kr(0, 1, 10);
+	var snd, freq, amp, n, intensity;
+	freq = \freq.kr(440).lag(\freqLag.kr(0.02));
+	amp = \amp.kr(-25.dbamp).lag(\ampLag.kr(0.02));
+	intensity = LFNoise2.kr(\intenseRate.kr(3).lag(\intenseLag.kr(0.02))).linlin(-1, 1, 0, 1) * Line.kr(0, 1, 10);
 	n = (1..32);
 	snd = SinOsc.ar(freq * n * (LFNoise2.kr(8 * (1 + intensity)) * 0.5 * intensity).midiratio);
 	snd = snd * (n.pow(1.3) * (LFNoise2.kr(1).linexp(-1, 1, 1, 1.1)) + (3 * LFNoise2.ar(intensity.linexp(0, 1, 1, 2)))).cos.pow(10);
@@ -422,8 +423,8 @@ SynthDef(\lead, {
 	snd = snd.tanh;
 	snd = PitchShift.ar(snd, 0.3, 0.5) * 10.dbamp;
 	snd = snd + GVerb.ar(snd * -10.dbamp, 10, 3, damping: 0.2);
-	snd = snd * Env.asr(0.5, 1.0, 3.0, curve: -4).ar(Done.freeSelf, \gate.kr(1));
-	snd = snd * -25.dbamp;
+	snd = snd * Env.asr(\atk.kr(0.5), 1.0, \rel.kr(3.0), curve: -4).ar(Done.freeSelf, \gate.kr(1));
+	snd = snd * amp;
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -875,7 +876,4 @@ SynthDef(\reverseTwang3, {
 	snd = snd * \amp.kr(1);
 	Out.ar(\out.kr(0), snd);
 }).add;
-
-
-
 )

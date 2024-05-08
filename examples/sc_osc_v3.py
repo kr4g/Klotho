@@ -16,7 +16,7 @@ from allopy.chronos import temporal_units as u_temp
 from allopy.tonos.JI import combination_sets as cps
 from allopy.tonos import fold_freq, fold_interval
 from allopy.topos.sequences import Norg
-from allopy.aikous import amp_freq_scale
+from allopy.aikous import amp_freq_scale, db_amp
 
 scheduler = sch.Scheduler()
 
