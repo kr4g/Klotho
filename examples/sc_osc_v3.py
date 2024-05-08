@@ -47,7 +47,7 @@ for i, rt in enumerate(rts):
         freq = fold_freq(f * ratio * 166.5, lower=83.25, upper=2664.0)
         amp = next(amps) * amp_freq_scale(freq) * np.interp(freq, [83.25, 2664.0], [1.0, 0.45])
         dur_scale = np.interp(amp, [0.005*0.35, 0.05], [1.833, 1.167])
-        scheduler.add_new_synth(synth, start, dur=duration*dur_scale, freq=freq, amp=amp)
+        scheduler.add_new_event(synth, start, dur=duration*dur_scale, freq=freq, amp=amp)
 
 cp_set = cps.Hexany()
 r_pair = rt_alg.rhythm_pair(S)
@@ -67,7 +67,7 @@ for i, (start, duration) in enumerate(ut):
         root = next(roots)
     freq = fold_freq(ratio * root, lower=166.5, upper=2664.0)
     if uid is None:
-        uid = scheduler.add_new_synth_with_id('theremin', start, dur=ut.duration, freq=freq, amp=0.05, ampLag=0, atk=duration*0.667)
+        uid = scheduler.add_new_event_with_id('theremin', start, dur=ut.duration, freq=freq, amp=0.05, ampLag=0, atk=duration*0.667)
     else:
         lag_scale = np.interp(duration, [min_dur, max_dur], [0.33, 0.833])
         amp = np.random.uniform(0.02, 0.35) * amp_freq_scale(freq) * np.interp(freq, [166.5, 2664.0], [1.0, 0.25])
