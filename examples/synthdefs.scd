@@ -347,7 +347,7 @@ SynthDef(\feedback1, {
 	snd = LPF.ar(snd, env.linexp(0, 1, 2000, 8000));
 
 	snd = snd * env;
-	snd = snd * -15.dbamp;
+	snd = snd * \amp.kr(-15.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -373,7 +373,7 @@ SynthDef(\feedback2, {
 	snd = LPF.ar(snd, env.linexp(0, 1, 2000, 8000));
 
 	snd = snd * env;
-	snd = snd * -15.dbamp;
+	snd = snd * \amp.kr(-15.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -408,7 +408,7 @@ SynthDef(\organ, {
 SynthDef(\lead, {
 	var snd, freq, amp, n, intensity;
 	freq = \freq.kr(440).lag(\freqLag.kr(0.02));
-	amp = \amp.kr(-25.dbamp).lag(\ampLag.kr(0.02));
+	amp = \amp.kr(-25.dbamp).lag(\ampLag.kr(0));
 	intensity = LFNoise2.kr(\intenseRate.kr(3).lag(\intenseLag.kr(0.02))).linlin(-1, 1, 0, 1) * Line.kr(0, 1, 10);
 	n = (1..32);
 	snd = SinOsc.ar(freq * n * (LFNoise2.kr(8 * (1 + intensity)) * 0.5 * intensity).midiratio);

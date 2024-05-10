@@ -20,7 +20,7 @@ s.boot;
 
 "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 
-x = Synth(\preScrape, [\duration, 1, \freq, 880, \amp, -15.dbamp]);
+x = Synth(\feedback1, [\duration, 10, \freq, 666, \amp, -15.dbamp]);
 
 ~scheduler = EventScheduler.new(s);
 ~scheduler.startOSCListening();
