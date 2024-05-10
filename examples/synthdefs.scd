@@ -18,7 +18,7 @@ SynthDef(\a1, {
 	snd = snd * (1 + (5 * Env.perc(0, 0.07).ar));
 	snd = (snd * -5.dbamp).clip2;
 	snd = snd * Env.linen(0, duration, 0.01, curve: -4).ar(Done.freeSelf);
-	snd = snd * -17.dbamp;
+	snd = snd * \amp.kr(-17.dbamp).lag(\ampTime.kr(0));
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -58,7 +58,7 @@ SynthDef(\a3, {
 SynthDef(\a4, {
 	var snd, duration, trigger, wash;
 	duration = \duration.kr(1.5);
-	trigger = Impulse.ar(0) + Dust.ar(4);
+	trigger = Impulse.ar(0) + Dust.ar(\dustRate.kr(4));
 	snd = SinOsc.ar(Env.perc(0.0, 0.3, curve: -4).ar(Done.none, gate: trigger).linexp(0, 1, 40, TExpRand.ar(100, 4000, trigger))) * Env.perc(0.001, 0.3).ar(Done.none, gate: trigger);
 	snd = (snd * 2).fold2;
 	snd = BPF.ar(snd, [60, 83, 92, 312, 230], 0.5).sum;
@@ -166,11 +166,11 @@ SynthDef(\preScrape, {
 	duration = \duration.kr(1.0);
 	snd = Hasher.ar(Sweep.ar);
 	snd = CombC.ar(snd, 0.2, 1 / 120) * -8.dbamp;
-	snd = FreqShift.ar(snd, 2234);
+	snd = FreqShift.ar(snd, \freq.kr(2234));
 	snd = HPF.ar(snd, XLine.ar(8e3, 100, duration));
 	snd = LPF.ar(snd, XLine.ar(1e3, 16e3, duration));
 	snd = snd ! 2;
-	snd = snd * -23.dbamp;
+	snd = snd * \amp.kr(-23.dbamp);
 	snd = snd * Env.perc(duration, 0.01, curve: 8).ar(Done.freeSelf);
 	Out.ar(\out.kr(0), snd);
 }).add;
@@ -228,7 +228,7 @@ SynthDef(\choir, {
 	snd = snd + ((SinOsc.ar(freq)).tanh * -5.dbamp);
 
 	snd = snd * env;
-	snd = snd * \amp.kr(-10.dbamp).lag(\ampLag.kr(0.02));
+	snd = snd * \amp.kr(-10.dbamp).lag(\ampTime.kr(0));
 	Out.ar(\out.kr(0), snd);
 }).add;
 

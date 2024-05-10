@@ -20,16 +20,7 @@ s.boot;
 
 "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 
-~synth = Synth(\lead, [\freq, 166.5, \amp, 0.05, \intenseRate, 3]);
-~synth.set(\freq, 166.5, \freqLag, 25.0);
-~synth.set(\amp, 0.05, \ampLag, 25.0);
-~synth.set(\intenseRate, 3, \intenseLag, 10);
-~synth.set(\gate, 1);
-
-~synth = Synth(\choir, [\duration, 30, \freq, 83.25, \atk, 0.5, \rel, 3, \amp, 0.05]);
-~synth.set(\freq, 83.25*(7/5), \freqLag, 10);
-~synth.set(\amp, 0.25, \ampLag, 15);
-
+x = Synth(\preScrape, [\duration, 1, \freq, 880, \amp, -15.dbamp]);
 
 ~scheduler = EventScheduler.new(s);
 ~scheduler.startOSCListening();
