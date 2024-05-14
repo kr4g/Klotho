@@ -32,24 +32,30 @@ tb = u_temp.TB()
 for i, row in enumerate(auto_mat):
     seq = u_temp.UTSeq()
     for e in row:
-        seq += u_temp.UT(tempus   = r_trees.Meas((e[0], meas_denom)),
-                         prolatio = (-e[1][0],) + e[1][1:],
+        D, S = e[0], (-e[1][0],) + e[1][1:]
+        seq += u_temp.UT(tempus   = r_trees.Meas((D, meas_denom)),
+                         prolatio = S,
                          tempo    = bpm,
                          beat     = beat)
     tb += seq
 
+offset = anacrus.duration
+scheduler.add_new_event('preScrape', 0, duration=offset)
+scheduler.add_new_event('swordReverse', 0, duration=offset)
+scheduler.add_new_event('reverseCymbal', 0, duration=offset)
 hx = cps.Hexany()
+factors = cycle(hx.factors)
 for i, utseq in enumerate(tb): # for each UTSeq in the TB
     ratios = cycle(hx.ratios)
+    f = fold_interval(next(factors), n_equaves=4)
     for j, (onset, _) in enumerate(utseq): # for each UT in the UTSeq
-        scheduler.add_new_event('bassDrum', onset, amp=0.2)
+        onset += offset
+        scheduler.add_new_event('bassDrum', onset, amp=0.15)
         for k, (start, duration) in enumerate(utseq.uts[j]): # for each event in the UT
+            start += onset
             if duration < 0: continue
             ratio = next(ratios)
-            freq = fold_freq(333.0 * ratio * fold_interval(prime(i + j + 1), n_equaves=4), lower=333.0, upper=1332.0)
-            scheduler.add_new_event('chime', start + onset,
-                                    duration=duration,
-                                    freq=freq,
-                                    amp=0.2)
+            freq = fold_freq(333.0 * ratio * f, lower=333.0, upper=1332.0)
+            scheduler.add_new_event('chime', start, duration=duration, freq=freq, amp=0.2)
 
 scheduler.send_all_events()
