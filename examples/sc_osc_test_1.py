@@ -67,9 +67,20 @@ for i, (start, duration) in enumerate(uts['bd']):
             r = next(ratios)
             scheduler.add_new_event('choir', start, freq=83.25 * r, duration=duration)
 
-# for i, (start, duration) in enumerate(uts['layer_0']):
-#     if i % len(prolat) == 0:
-#         duration = -duration
-#     print(f'{i}, start: {start}, duration: {duration}')
+cp_set = cps.Hexany()
+root_ratios = cycle([float(fold_interval(f, n_equaves=3)) for f in cp_set.factors])
+for i, (k, v) in enumerate(uts.items()):
+    if k == 'bd': continue
+    ratios = cycle([float(fold_interval(r)) for r in cp_set.ratios])
+    r = next(root_ratios)
+    for j, (start, duration) in enumerate(uts[k]):
+        start = start + offset
+        ratio = next(ratios)
+        if j % len(prolat) == 0: continue
+        if uts[k].onsets[3 * len(prolat)] + offset < start < uts[k].onsets[4 * len(prolat)] + offset:
+            synth = 'sword'
+        else:
+            synth = 'chime'
+        scheduler.add_new_event(synth, start, duration=duration, freq=166.5 * r * ratio, amp=0.25)
 
 scheduler.send_all_events()

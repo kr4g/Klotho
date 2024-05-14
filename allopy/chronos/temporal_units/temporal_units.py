@@ -150,13 +150,15 @@ class UT:
             return Fraction(1, self.__tempus.denominator)
         return Fraction(beat)
     
-    def __add__(self, other:Union['UT', Fraction]):
+    def __add__(self, other:Union['UT', 'UTSeq', Fraction]):
         if isinstance(other, UT):
             new_tempus = self.__tempus + other.__tempus
             return UT(tempus   = new_tempus,
                       prolatio = 'd',
                       tempo    = self.__tempo,
                       beat     = self.__beat)
+        elif isinstance(other, UTSeq):
+            return UTSeq((self,) + other.uts)
         elif isinstance(other, Fraction):
             new_tempus = self.__tempus + other
             return UT(tempus   = new_tempus,
@@ -228,7 +230,7 @@ class UT:
         )
 
 class UTSeq:
-    def __init__(self, ut_seq:tuple[UT]):
+    def __init__(self, ut_seq:tuple[UT]=()):
         self.__seq = ut_seq
     
     @property
@@ -251,6 +253,13 @@ class UTSeq:
     def T(self):
         return TB((UTSeq((ut,)) for ut in self.__seq))
 
+    def __add__(self, other:Union[UT, 'UTSeq']):
+        if isinstance(other, UT):
+            return UTSeq(self.__seq + (other,))
+        elif isinstance(other, UTSeq):
+            return UTSeq(self.__seq + other.__seq)
+        raise ValueError('Invalid Operand')
+
     def __and__(self, other:Union[UT, 'UTSeq']):
         if isinstance(other, UT):
             return TB((self.__seq, (other,)))
@@ -266,10 +275,10 @@ class UTSeq:
 
 # Time Block
 class TB:
-    def __init__(self, tb:tuple[UTSeq], axis:float=0.0):
+    def __init__(self, tb:tuple[UTSeq]=(), axis:float=0.0):
         self.__tb = tb
         self.__axis = axis
-        self.__duration = max(ut_seq.duration for ut_seq in self.__tb)
+        self.__duration = max(ut_seq.duration for ut_seq in self.__tb) if self.__tb else 0.0
 
     @property
     def utseqs(self):
@@ -288,6 +297,13 @@ class TB:
     def axis(self, axis):
         self.__axis = axis
         pass
+
+    def __add__(self, other:Union[UTSeq, 'TB']):
+        if isinstance(other, UTSeq):
+            return TB(self.__tb + (other,))
+        # elif isinstance(other, TB):
+        #     return TB(self.__tb + other.__tb)
+        raise ValueError('Invalid Operand')
 
     def __iter__(self):
         return iter(self.__tb)

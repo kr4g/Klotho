@@ -288,6 +288,8 @@ SynthDef(\chime, {
 
 	snd = snd * Env.perc(0, 10.4).ar(Done.freeSelf);
 
+	snd = snd * \amp.kr(-5.dbamp);
+
 	Out.ar(\out.kr(0), snd);
 }).add;
 
