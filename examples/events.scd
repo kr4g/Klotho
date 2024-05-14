@@ -2,8 +2,8 @@
 s = Server.local;
 // ServerOptions.devices;
 s.options.outDevice_(
-	// "MacBook Pro Speakers"
-	"External Headphones"
+	"MacBook Pro Speakers"
+	// "External Headphones"
 	// "Scarlett 4i4 USB"
 );
 s.options.inDevice_("Built-in Microph");
@@ -18,9 +18,8 @@ ServerQuit.removeAll;*/
 s.boot;
 )
 
-"/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
-
-x = Synth(\feedback1, [\duration, 10, \freq, 666, \amp, -15.dbamp]);
+// "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
+"/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 
 ~scheduler = EventScheduler.new(s);
 ~scheduler.startOSCListening();

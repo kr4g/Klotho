@@ -13,12 +13,14 @@ ALLTYPES  = PULSTYPES | DURTYPES | RESTYPES
 
 class UT:    
     def __init__(self,
+                 duration:int                 = 1,
                  tempus:Union[Meas,str]       = '1/1',
                  prolatio:Union[RT,tuple,str] = 'd',
                  tempo:Union[None,float]      = None,
                  beat:Union[str,Fraction]     = None):
         
         self.__type        = None
+        self.__duration    = duration
         self.__tempus      = Meas(tempus)
         self.__prolationis = self._set_prolationis(prolatio) # RT object
         self.__tempo       = tempo
@@ -75,7 +77,7 @@ class UT:
     @property
     def durations(self):
         if self.__tempo is None:
-            return None
+            raise ValueError('Tempo is not set')
         if self.__durations is None:
             self.__durations = tuple(
                 beat_duration(ratio      = r,
@@ -88,7 +90,7 @@ class UT:
     def duration(self):
         if self.__tempo is None:
             raise ValueError('Tempo is not set')
-        return sum(self.durations)
+        return sum(abs(d) for d in self.durations)
     
     @tempo.setter
     def tempo(self, tempo:Union[None,float,int]):
@@ -116,7 +118,7 @@ class UT:
                           subdivisions   = prolatio.subdivisions)
             self.__type = f'Ensemble ({prolatio.type})'
         elif isinstance(prolatio, tuple):
-            prolatio = RT(duration       = 1,
+            prolatio = RT(duration       = self.__duration,
                           time_signature = self.__tempus,
                           subdivisions   = prolatio)
             self.__type = f'Ensemble ({prolatio.type})'
@@ -124,17 +126,17 @@ class UT:
             prolatio = prolatio.lower()
             if prolatio in PULSTYPES:
                 self.__type = 'Pulse'
-                prolatio = RT(duration       = 1,
+                prolatio = RT(duration       = self.__duration,
                               time_signature = self.__tempus,
                               subdivisions   = (1,) * self.__tempus.numerator)
             elif prolatio in DURTYPES:
                 self.__type = 'Duration'
-                prolatio = RT(duration       = 1,
+                prolatio = RT(duration       = self.__duration,
                               time_signature = self.__tempus,
                               subdivisions   = (1,))
             elif prolatio in RESTYPES:
                 self.__type = 'Silence'
-                prolatio = RT(duration       = 1,
+                prolatio = RT(duration       = self.__duration,
                               time_signature = self.__tempus,
                               subdivisions   = (-1,))
             else:

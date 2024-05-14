@@ -32,7 +32,7 @@ rts = [
 ]
 
 factors = cycle([1] + [prime(n + 2) for n in range(len(rts) - 1)])
-synths = cycle(['celeste', 'glockenspiel', 'vibraphone', 'syn'])
+synths = cycle(['celeste', 'glockenspiel', 'vibraphone', 'chime', 'syn'])
 for i, rt in enumerate(rts):
     amps = cycle([np.random.uniform(0.009, 0.07) for _ in range(np.random.randint(3, 7))])
     f = next(factors)

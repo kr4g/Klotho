@@ -114,7 +114,7 @@ def beat_duration(ratio:Union[Fraction, str], bpm:float, beat_ratio:Union[Fracti
 
 def calc_onsets(durations:tuple):
 #    return tuple(np.cumsum([abs(r) for r in durations]) - abs(durations[0]))
-    return tuple(accumulate([0] + list(durations)))
+    return tuple(accumulate([0] + list(abs(r) for r in durations)))
 
 def quantize(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominator: float = 16) -> Fraction:
   '''
