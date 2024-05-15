@@ -11,15 +11,17 @@ s.options.numOutputBusChannels_(2);
 s.options.numInputBusChannels_(2);
 s.options.sampleRate_(48000);
 s.options.memSize_(2.pow(20));
-/*s.newBusAllocators;
-ServerBoot.removeAll;
-ServerTree.removeAll;
-ServerQuit.removeAll;*/
+// s.newBusAllocators;
+// ServerBoot.removeAll;
+// ServerTree.removeAll;
+// ServerQuit.removeAll;
 s.boot;
 )
 
-"/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
-// "/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
+// "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
+"/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
+
+Synth(\squiggle, [\duration, 0.1, \freq, 133.0]);
 
 ~scheduler = EventScheduler.new(s);
 ~scheduler.startOSCListening();

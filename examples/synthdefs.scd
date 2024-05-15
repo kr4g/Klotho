@@ -18,7 +18,7 @@ SynthDef(\a1, {
 	snd = snd * (1 + (5 * Env.perc(0, 0.07).ar));
 	snd = (snd * -5.dbamp).clip2;
 	snd = snd * Env.linen(0, duration, 0.01, curve: -4).ar(Done.freeSelf);
-	snd = snd * \amp.kr(-17.dbamp).lag(\ampTime.kr(0));
+	snd = snd * \amp.kr(-17.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -38,20 +38,20 @@ SynthDef(\a2, {
 	snd = snd + DelayC.ar(snd, 0.2, SinOsc.ar(1 / 3, [0, pi]).linlin(-1, 1, 0, 1) * 1e-3);
 	snd = Limiter.ar(snd * 40.dbamp, 1.0, 0.01);
 	snd = snd * Env.linen(0, duration, 0.01, curve: -4).ar(Done.freeSelf);
-	snd = snd * 3.dbamp;
+	snd = snd * \amp.kr(3.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
 SynthDef(\a3, {
 	var snd, duration;
 	duration = \duration.kr(1.5);
-	snd = 3.collect { SinOsc.ar(LFNoise2.ar(400).linexp(-1, 1, 100, 16e3)) * LFNoise2.ar(300).pow(3) };
+	snd = 3.collect { SinOsc.ar(LFNoise2.ar(\freq.kr(400)).linexp(-1, 1, 100, 16e3)) * LFNoise2.ar(300).pow(3) };
 	snd = Splay.ar(snd);
 	snd = (snd * 3).tanh;
 	snd = snd * LFPulse.ar(XLine.kr(3, 16, duration), width: 0.7);
 	snd = snd + CombC.ar(({ WhiteNoise.ar * (1 + lfo1.(62)) } ! 2) * -15.dbamp * XLine.kr(-10.dbamp, 0.dbamp, duration), 0.1, 1 / 60, 0.3);
 	snd = snd * Env.linen(0, duration, 0.01, curve: -4).ar(Done.freeSelf);
-	snd = snd * -10.dbamp;
+	snd = snd * \amp.kr(-10.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -78,7 +78,7 @@ SynthDef(\a4, {
 	snd = snd + wash;
 
 	snd = snd * Env.linen(0, duration, 0.01, curve: -4).ar(Done.freeSelf);
-	snd = snd * -2.dbamp;
+	snd = snd * \amp.kr(-2.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -94,7 +94,7 @@ SynthDef(\a5, {
 	snd = snd * -10.dbamp + (snd * 10.dbamp).clip2;
 
 	snd = snd * Env.linen(0, duration, 0.01, curve: -4).ar(Done.freeSelf);
-	snd = snd * -17.dbamp;
+	snd = snd * \amp.kr(-17.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 
@@ -529,7 +529,7 @@ Exponential FM with two sine wave operators. Some EQ, distortion, frequency shif
 */
 SynthDef(\squiggle, {
 	var snd;
-	snd = SinOsc.ar(SinOsc.ar(43).linexp(-1, 1, [100, 300], 16000)) * -8.dbamp;
+	snd = SinOsc.ar(SinOsc.ar(\freq.kr(43)).linexp(-1, 1, [100, 300], 16000)) * -8.dbamp;
 	snd = snd.sum;
 	snd = RHPF.ar(snd, 720, 0.9);
 	snd = snd.tanh;
@@ -538,7 +538,7 @@ SynthDef(\squiggle, {
 	snd = BPF.ar(snd, (0..16).normalize.linexp(0, 1, 100, 8000), 0.07).sum;
 	snd = snd * Env.linen(0.001, \duration.kr(1), 0.03, curve: -4).ar(Done.freeSelf);
 	snd = Pan2.ar(snd, 0);
-	snd = snd * -10.dbamp;
+	snd = snd * \amp.kr(-10.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 

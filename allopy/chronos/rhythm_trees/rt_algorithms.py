@@ -222,6 +222,15 @@ def autoref_rotmat(lst:tuple, mode:str='G') -> Tuple[Tuple[Tuple]]:
         result = lst
     return tuple(result)
 
+def subdivide_tree(lst: tuple, n: int = 1) -> tuple:
+    def _recurse(idx: int) -> tuple:
+        if idx == len(lst):
+            return ()
+        elt = lst[idx]
+        next_elt = (elt, (1,) * lst[(idx + n) % len(lst)])
+        return (next_elt,) + _recurse(idx + 1)
+    return _recurse(0)
+
 # ------------------------------------------------------------------------------------
 # NOTATION
 

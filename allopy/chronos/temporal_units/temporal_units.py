@@ -268,16 +268,15 @@ class UTSeq:
         raise ValueError('Invalid Operand')
 
     def __iter__(self):
-        out = []
-        # for onset, dur in zip(self.onsets, self.durations):
-        for i, ut in enumerate(self.__seq):
-            for start, duration in ut:
-                out.append((i, start + self.onsets[i], duration))
-        return iter(out)
-        # return zip(
-        #     self.onsets,
-        #     self.durations,
-        # )
+        # out = []
+        # for i, ut in enumerate(self.__seq):
+        #     for start, duration in ut:
+        #         out.append((i, start + self.onsets[i], duration))
+        # return iter(out)
+        return zip(
+            self.onsets,
+            self.durations,
+        )
 
 # Time Block
 class TB:
