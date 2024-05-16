@@ -19,10 +19,9 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-from math import gcd, lcm
-from functools import reduce
+from math import gcd
 
-from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition, remove_ties, rotate_tree, graph_tree
+from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition, rotate_tree, graph_tree
 
 class Meas:    
     '''
@@ -236,13 +235,3 @@ class RT:
         )
 
 # ------------------------------------------------------------------------------------
-
-
-if __name__ == '__main__':    
-    # ------------------------------------------------------------------------------------
-    # Rhythm Tree Examples
-    # ------------------------------------------------------------------------------------
-    print('Rhythm Tree Examples')
-    S = ((4, (3, (8, (3, 4)))), -3)
-    rt = RT(time_signature='4/3', subdivisions=S)
-    print(rt)

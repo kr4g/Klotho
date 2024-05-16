@@ -18,14 +18,9 @@ s.options.memSize_(2.pow(20));
 s.boot;
 )
 
-// "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
-"/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
-
-Synth(\squiggle, [\duration, 0.1, \freq, 133.0]);
+"/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
+// "/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 
 ~scheduler = EventScheduler.new(s);
-~scheduler.startOSCListening();
 
 ~scheduler.scheduleEvents;
-
-// ~scheduler.clearAll;

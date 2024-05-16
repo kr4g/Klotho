@@ -258,7 +258,7 @@ SynthDef(\crash, {
 	snd = snd + PitchShift.ar(snd, 0.23, 2.45);
 	snd = snd + PitchShift.ar(snd, 0.13, 3.45);
 	snd = snd + GVerb.ar(snd.sum * -10.dbamp, 23, 10);
-	snd = snd * -10.dbamp;
+	snd = snd * \amp.kr(-10.dbamp);
 
 	snd = snd * Env.linen(0, \duration.kr(10), 0.1, curve: -4).ar(Done.freeSelf);
 
@@ -723,7 +723,7 @@ SynthDef(\swordReverse, {
 	var snd, ratios, duration;
 	duration = \duration.kr(0.05);
 	ratios = [1.0, 2.3, 4.6, 9.3, 7.4];
-	snd = SinOsc.ar(4320 * ratios);
+	snd = SinOsc.ar(\freq.kr(4320) * ratios);
 	snd = snd.sum;
 	snd = (snd * 20.dbamp).tanh;
 	snd = FreqShift.ar(snd, -30);

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # TREE ALGORITHMS
 # ----------------------
 # 
-# All Pseudocode by Karim Haddad unless otherwise noted.
+# Pseudocode for numbered algorithms by Karim Haddad unless otherwise noted.
 # 
 # "Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
 # composed of (DS), that is its part constituting the proportions which can also 
@@ -104,11 +104,20 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
     # print(f'pgcd: {pgcd}, pgcd_denom: {pgcd_denom}')
     return tuple(Fraction((f / pgcd) * meas.numerator, pgcd_denom) for f in lst)
 
-def decompose_tree(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
+def simplify_tree(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
     pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
     S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
     meas = f'{sum_proportions(S)}/{pgcd_denom}'
     return meas, S
+
+def subdivide_tree(lst:tuple[int], n:int=1) -> tuple[tuple[int]]:
+    def _recurse(idx:int) -> tuple:
+        if idx == len(lst):
+            return ()
+        elt = lst[idx]
+        next_elt = (elt, (1,) * lst[(idx + n) % len(lst)])
+        return (next_elt,) + _recurse(idx + 1)
+    return _recurse(0)
 
 # ------------------------------------------------------------------------------------
 
@@ -221,15 +230,6 @@ def autoref_rotmat(lst:tuple, mode:str='G') -> Tuple[Tuple[Tuple]]:
     else:
         result = lst
     return tuple(result)
-
-def subdivide_tree(lst: tuple, n: int = 1) -> tuple:
-    def _recurse(idx: int) -> tuple:
-        if idx == len(lst):
-            return ()
-        elt = lst[idx]
-        next_elt = (elt, (1,) * lst[(idx + n) % len(lst)])
-        return (next_elt,) + _recurse(idx + 1)
-    return _recurse(0)
 
 # ------------------------------------------------------------------------------------
 # NOTATION
@@ -624,13 +624,38 @@ def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, pare
             _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
     return pos
 
-def prune_tree(tree, depth):
-    if depth == 0:
-        return 0 # ignore for now
-    if depth == 1:
-        return tuple(el if isinstance(el, int) else el[0] for el in tree)
-    else:
-        pass
+def prune_graph(G:nx.DiGraph, max_depth:int) -> nx.DiGraph:
+    pruned_graph = nx.DiGraph()
+    root = [n for n, d in G.in_degree() if d == 0][0]
+    queue = [(root, 0)]  # (node, depth)
+    
+    while queue:
+        node, depth = queue.pop(0)
+        if depth <= max_depth:
+            pruned_graph.add_node(node, label=G.nodes[node]['label'])
+            if depth < max_depth:
+                for neighbor in G.neighbors(node):
+                    pruned_graph.add_edge(node, neighbor)
+                    queue.append((neighbor, depth + 1))
+    
+    return pruned_graph
+
+def plot_pruned_graph(G, max_depth):
+    pruned_graph = prune_graph(G, max_depth)
+    root = [n for n, d in pruned_graph.in_degree() if d == 0][0]
+    pos = _hierarchy_pos(pruned_graph, root)
+    labels = nx.get_node_attributes(pruned_graph, 'label')
+    
+    plt.figure(figsize=(10, 5))
+    ax = plt.gca()
+    for node, (x, y) in pos.items():
+        ax.text(x, y, labels[node], ha='center', va='center', zorder=5,
+                bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="black"))
+    
+    nx.draw_networkx_edges(pruned_graph, pos, arrows=False, width=2.0)
+    plt.axis('off')
+    plt.show()
+
 
 # EXPERIMENTAL
 def notate(tree):

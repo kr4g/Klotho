@@ -2,7 +2,7 @@ from fractions import Fraction
 from typing import Union
 
 from ..rhythm_trees import RT, Meas
-from allopy.chronos.rhythm_trees.rt_algorithms import measure_ratios
+from allopy.chronos.rhythm_trees.rt_algorithms import measure_ratios, subdivide_tree
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
 # Prolationis Types
@@ -11,6 +11,7 @@ DURTYPES  = {'d', 'duration', 'dur'}
 RESTYPES  = {'r', 'rest', 'silence'}
 ALLTYPES  = PULSTYPES | DURTYPES | RESTYPES
 
+# Temporal Unit
 class UT:    
     def __init__(self,
                  duration:int                 = 1,
@@ -28,6 +29,8 @@ class UT:
 
         self.__onsets      = None
         self.__durations   = None
+
+        self.__offset      = 0.0
     
     @classmethod
     def from_tree(cls, tree:Union[RT, tuple], tempo=None, beat=None):
@@ -67,11 +70,15 @@ class UT:
         return self.__type
     
     @property
+    def offset(self):
+        return self.__offset
+    
+    @property
     def onsets(self):
         if self.__tempo is None:
             return None
         if self.__onsets is None:
-            self.__onsets = calc_onsets(self.durations)
+            self.__onsets = tuple(onset + self.__offset for onset in calc_onsets(self.durations))
         return self.__onsets
 
     @property
@@ -103,6 +110,11 @@ class UT:
         self.__beat = Fraction(beat)
         self.__onsets = None
         self.__durations = None
+    
+    @offset.setter
+    def offset(self, offset:float):
+        self.__offset = offset
+        self.__onsets = None
         
     def decompose(self, prolatio:Union[RT,tuple,str] = 'd') -> 'UTSeq':
         if prolatio.lower() in {'s'}: prolatio = self.__prolationis.subdivisions
@@ -215,10 +227,7 @@ class UT:
         raise ValueError('Invalid Operand')
     
     def __iter__(self):
-        return zip(
-            self.onsets,
-            self.durations,
-        )
+        return zip(self.onsets, self.durations)
 
     def __repr__(self):
         return (
@@ -229,10 +238,13 @@ class UT:
             f'Type: {self.__type}\n'
         )
 
+# Temporal Unit Sequence
 class UTSeq:
-    def __init__(self, ut_seq:tuple[UT]=()):
+    def __init__(self, ut_seq:tuple[UT]=(), offset:float=0.0):
         self.__seq = ut_seq
-    
+        self.__offset = offset
+        self.offset = offset
+
     @property
     def uts(self):
         return self.__seq
@@ -252,6 +264,16 @@ class UTSeq:
     @property
     def T(self):
         return TB((UTSeq((ut,)) for ut in self.__seq))
+    
+    @property
+    def offset(self):
+        return self.__offset
+    
+    @offset.setter
+    def offset(self, offset:float):
+        self.__offset = offset
+        for i, ut in enumerate(self.__seq):
+            ut.offset = offset + sum(self.durations[j] for j in range(i))
 
     def __add__(self, other:Union[UT, 'UTSeq']):
         if isinstance(other, UT):
@@ -273,26 +295,41 @@ class UTSeq:
         #     for start, duration in ut:
         #         out.append((i, start + self.onsets[i], duration))
         # return iter(out)
-        return zip(
-            self.onsets,
-            self.durations,
-        )
+        return zip(self.onsets, self.durations)
 
 # Time Block
 class TB:
-    def __init__(self, tb:tuple[UTSeq]=(), axis:float=0.0):
+    def __init__(self, tb:tuple[UTSeq]=(), offset:float=0.0, axis:float=0.0):
         self.__tb = tb
         self.__axis = axis
         self.__duration = max(ut_seq.duration for ut_seq in self.__tb) if self.__tb else 0.0
 
+    @classmethod
+    def from_tree_mat(cls, matrix, meas_denom:int=1, subdiv:bool=False,
+                      rotation_offset:int=1, tempo=None, beat=None):
+        tb = []
+        for i, row in enumerate(matrix):
+            seq = []
+            for e in row:
+                if subdiv:
+                    D, S = e[0], subdivide_tree(e[1][::-1], i + rotation_offset)
+                else:
+                    D, S = e[0], e[1]
+                seq.append(UT(tempus   = Meas((D, meas_denom)),
+                              prolatio = S,
+                              tempo    = tempo,
+                              beat     = beat))
+            tb.append(UTSeq(seq))
+        return cls(tuple(tb))
+
     @property
     def utseqs(self):
-        return self.__tb    
+        return self.__tb
 
     @property
     def duration(self):
         return self.__duration
-    
+
     @property
     def axis(self):
         return self.__axis
@@ -303,6 +340,16 @@ class TB:
         self.__axis = axis
         pass
 
+    def tempo(self, tempo):
+        for utseq in self.__tb:
+            for ut in utseq:
+                ut.tempo = tempo
+
+    def beat(self, beat):
+        for utseq in self.__tb:
+            for ut in utseq:
+                ut.beat = beat
+
     def __add__(self, other:Union[UTSeq, 'TB']):
         if isinstance(other, UTSeq):
             return TB(self.__tb + (other,))
@@ -312,3 +359,44 @@ class TB:
 
     def __iter__(self):
         return iter(self.__tb)
+
+# Temporal Block Sequence
+class TBSeq:
+    pass
+    # def __init__(self, tb_seq:tuple[TB]=(), offset:float=0.0):
+    #     self.__seq = tb_seq
+    #     for i, tb in enumerate(self.__seq):
+    #         tb.offset = offset + sum(tb_seq[j].duration for j in range(i))
+
+    # @property
+    # def tbs(self):
+    #     return self.__seq
+
+    # @property
+    # def onsets(self):
+    #     return calc_onsets(self.durations)
+    
+    # @property    
+    # def durations(self):
+    #     return tuple(tb.duration for tb in self.__seq)
+    
+    # @property
+    # def duration(self):
+    #     return sum(self.durations)
+
+    # def __add__(self, other:Union[TB, 'TBSeq']):
+    #     if isinstance(other, TB):
+    #         return TBSeq(self.__seq + (other,))
+    #     elif isinstance(other, TBSeq):
+    #         return TBSeq(self.__seq + other.__seq)
+    #     raise ValueError('Invalid Operand')
+
+    # def __and__(self, other:Union[TB, 'TBSeq']):
+    #     if isinstance(other, TB):
+    #         return TBSeq((self.__seq, (other,)))
+    #     elif isinstance(other, TBSeq):
+    #         return TBSeq((self.__seq, other.__seq))
+    #     raise ValueError('Invalid Operand')
+
+    # def __iter__(self):
+    #     return zip(self.onsets, self.durations)
