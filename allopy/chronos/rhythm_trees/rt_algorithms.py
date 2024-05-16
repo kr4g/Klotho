@@ -326,6 +326,7 @@ def pow_n_bounds(n:int, pow:int=2) -> Tuple[int]:
     return pi, ps
     
 def head_dots_beams(n:Fraction) -> List:
+    n = abs(n)
     num, denom = n.numerator, n.denominator
     p, _ = pow_n_bounds(num, 2)
     if p == num:
@@ -348,6 +349,7 @@ def head_dots_beams(n:Fraction) -> List:
         ]
 
 def get_note_head(r:Fraction):
+    r = abs(r)
     if r > 2:
         return 'square'
     elif r == 1:
@@ -358,6 +360,7 @@ def get_note_head(r:Fraction):
         return 'quarter'
 
 def get_note_beams(r:Fraction):
+    r = abs(r)
     if r > 2 or r == 1/4 or r == 1/2 or r == 1:
         return 0
     else:
@@ -399,7 +402,6 @@ def create_tuplet(G):
             m = new_m
     
     return [n, m]
-
 
 # Algorithm 6: SymbolicApprox
 def symbolic_approx(n:int) -> int:
@@ -591,61 +593,9 @@ def graph_tree(root, S:Tuple) -> nx.DiGraph:
 def graph_depth(G:nx.DiGraph) -> int:
     return max(nx.single_source_shortest_path_length(G, 0).values())
 
-# def plot_graph(G):
-#     root = [n for n, d in G.in_degree() if d == 0][0]
-#     pos = _hierarchy_pos(G, root)
-#     labels = nx.get_node_attributes(G, 'label')
-    
-#     plt.figure(figsize=(10, 5))
-#     ax = plt.gca()
-#     for node, (x, y) in pos.items():
-#         ax.text(x, y, labels[node], ha='center', va='center', zorder=5,
-#                 bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="black"))
-    
-#     nx.draw_networkx_edges(G, pos, arrows=False, width=2.0)
-#     plt.axis('off')
-#     plt.show()
-
-# def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
-#     if pos is None:
-#         pos = {root:(xcenter, 1)}
-#         parsed = [root]
-#     else:
-#         y = 1 - (depth * vert_gap)
-#         pos[root] = (xcenter, y)
-#     children = list(G.neighbors(root))
-#     if not isinstance(G, nx.DiGraph) and parent is not None:
-#         children.remove(parent)
-#     if len(children) != 0:
-#         dx = width / len(children)
-#         nextx = xcenter - width / 2 - dx / 2
-#         for child in children:
-#             nextx += dx
-#             _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
-#     return pos
-
-def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, depth=0):
-    if pos is None:
-        pos = {root: (xcenter, 1)}
-    else:
-        pos[root] = (xcenter, 1 - depth * vert_gap)
-    
-    children = list(G.neighbors(root))
-    if not isinstance(G, nx.DiGraph) and parent is not None:
-        children.remove(parent)
-    
-    if len(children) != 0:
-        dx = width / len(children)
-        nextx = xcenter - width / 2 - dx / 2
-        for child in children:
-            nextx += dx
-            _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, depth=depth + 1)
-    
-    return pos
-
-def plot_graph(G, vert_gap=0.1):
+def plot_graph(G):
     root = [n for n, d in G.in_degree() if d == 0][0]
-    pos = _hierarchy_pos(G, root, vert_gap=vert_gap)
+    pos = _hierarchy_pos(G, root)
     labels = nx.get_node_attributes(G, 'label')
     
     plt.figure(figsize=(10, 5))
@@ -657,6 +607,24 @@ def plot_graph(G, vert_gap=0.1):
     nx.draw_networkx_edges(G, pos, arrows=False, width=2.0)
     plt.axis('off')
     plt.show()
+
+def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
+    if pos is None:
+        pos = {root:(xcenter, 1)}
+        parsed = [root]
+    else:
+        y = 1 - (depth * vert_gap)
+        pos[root] = (xcenter, y)
+    children = list(G.neighbors(root))
+    if not isinstance(G, nx.DiGraph) and parent is not None:
+        children.remove(parent)
+    if len(children) != 0:
+        dx = width / len(children)
+        nextx = xcenter - width / 2 - dx / 2
+        for child in children:
+            nextx += dx
+            _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
+    return pos
 
 def prune_graph(G:nx.DiGraph, max_depth:int) -> nx.DiGraph:
     pruned_graph = nx.DiGraph()
@@ -673,7 +641,6 @@ def prune_graph(G:nx.DiGraph, max_depth:int) -> nx.DiGraph:
                     queue.append((neighbor, depth + 1))
     
     return pruned_graph
-
 
 # EXPERIMENTAL
 def notate(tree):
