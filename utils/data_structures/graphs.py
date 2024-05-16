@@ -37,17 +37,15 @@ class Graph:
         children = list(self.G.successors(node))
         if not children:
             hdb = rt_alg.head_dots_beams(abs(self.G.nodes[node]['label']))
-            print(f"Node {self.G.nodes[node]['label']} {hdb}")
             return
         child_sum = sum(abs(self.G.nodes[child]['label']) for child in children)
-        # print(f"Node {self.G.nodes[node]['label']}, Sum of its direct children: {child_sum}")
         for child in children:
             meas = str(self.G.nodes[node]['label']).replace('-', '')
+            meas = Fraction(meas)
+            meas = str(Fraction(meas.numerator, rt_alg.symbolic_approx(meas.denominator)))
             d = abs(self.G.nodes[child]['label'])
-            # print(d)
             new_label = rt_alg.symbolic_duration(d, meas, (child_sum,))
             new_label = Fraction(abs(new_label.numerator), rt_alg.symbolic_approx(abs(new_label.denominator)))
-            # print(f"{hdb}")
             self.G.nodes[child]['label'] = new_label
         for child in children:
             self.sum_children(child)

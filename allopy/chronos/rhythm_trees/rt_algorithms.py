@@ -350,7 +350,7 @@ def head_dots_beams(n:Fraction) -> List:
 
 def get_note_head(r:Fraction):
     r = abs(r)
-    if r > 2:
+    if r >= 2:
         return 'square'
     elif r == 1:
         return 'whole'
@@ -361,7 +361,7 @@ def get_note_head(r:Fraction):
 
 def get_note_beams(r:Fraction):
     r = abs(r)
-    if r > 2 or r == 1/4 or r == 1/2 or r == 1:
+    if r >= 2 or r == 1/4 or r == 1/2 or r == 1:
         return 0
     else:
         return log(r.denominator, 2) - 2
