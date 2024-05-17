@@ -37,6 +37,7 @@ class Graph:
         children = list(self.G.successors(node))
         if not children:
             hdb = rt_alg.head_dots_beams(abs(self.G.nodes[node]['label']))
+            print(f"Node {node} has {hdb[0]} head(s), {hdb[1]} dot(s), and {hdb[2]} beam(s)")
             return
         child_sum = sum(abs(self.G.nodes[child]['label']) for child in children)
         for child in children:
