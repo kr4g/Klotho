@@ -33,26 +33,28 @@ class Graph:
         add_nodes(self.G, root_id, S)
         return self.G
     
-    def sum_children(self, node: int):
+    def sum_children(self, node: int, level: int = 0):
         children = list(self.G.successors(node))
         if not children:
             hdb = rt_alg.head_dots_beams(abs(self.G.nodes[node]['label']))
-            print(f"Node {node} has {hdb[0]} head(s), {hdb[1]} dot(s), and {hdb[2]} beam(s)")
+            print(f"{hdb[0]}, {hdb[1]} dot(s), and {hdb[2]} beam(s)")
             return
         child_sum = sum(abs(self.G.nodes[child]['label']) for child in children)
         for child in children:
             meas = str(self.G.nodes[node]['label']).replace('-', '')
             meas = Fraction(meas)
-            # n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
-            # if n != m:
-            #     meas = Fraction(child_sum, meas.denominator)
+            if level == 0:
+                n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
+                # print(f'n: {n}, m: {m}')
+                if n != m:
+                    meas = Fraction(child_sum, meas.denominator)
             meas = str(Fraction(meas.numerator, rt_alg.symbolic_approx(meas.denominator)))
             d = abs(self.G.nodes[child]['label'])
             new_label = rt_alg.symbolic_duration(d, meas, (child_sum,))
             new_label = Fraction(abs(new_label.numerator), rt_alg.symbolic_approx(abs(new_label.denominator)))
             self.G.nodes[child]['label'] = new_label
         for child in children:
-            self.sum_children(child)
+            self.sum_children(child, level + 1)
 
     def notate_tree(self, node: int, level: int = 0):
         if level == 0:

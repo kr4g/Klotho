@@ -19,3 +19,5 @@ rts = [
 g = Graph(rts[0].time_signature, rts[0].subdivisions)
 g.sum_children(list(g.G.in_degree())[0][0])
 
+
+
