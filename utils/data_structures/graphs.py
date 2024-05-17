@@ -43,9 +43,9 @@ class Graph:
         for child in children:
             meas = str(self.G.nodes[node]['label']).replace('-', '')
             meas = Fraction(meas)
-            n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
-            if n != m:
-                meas = Fraction(child_sum, meas.denominator)
+            # n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
+            # if n != m:
+            #     meas = Fraction(child_sum, meas.denominator)
             meas = str(Fraction(meas.numerator, rt_alg.symbolic_approx(meas.denominator)))
             d = abs(self.G.nodes[child]['label'])
             new_label = rt_alg.symbolic_duration(d, meas, (child_sum,))
