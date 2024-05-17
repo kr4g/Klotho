@@ -42,6 +42,9 @@ class Graph:
         for child in children:
             meas = str(self.G.nodes[node]['label']).replace('-', '')
             meas = Fraction(meas)
+            n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
+            if n != m:
+                meas = Fraction(child_sum, meas.denominator)
             meas = str(Fraction(meas.numerator, rt_alg.symbolic_approx(meas.denominator)))
             d = abs(self.G.nodes[child]['label'])
             new_label = rt_alg.symbolic_duration(d, meas, (child_sum,))
@@ -49,6 +52,11 @@ class Graph:
             self.G.nodes[child]['label'] = new_label
         for child in children:
             self.sum_children(child)
+
+    def notate_tree(self, node: int, level: int = 0):
+        if level == 0:
+            return f"\\time {self.G.nodes[node]['label']}\n{self.notate_tree(node, level + 1)}"
+        
 
     def graph_depth(self) -> int:
         return max(nx.single_source_shortest_path_length(self.G, 0).values())

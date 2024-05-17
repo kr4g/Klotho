@@ -21,6 +21,8 @@ s.boot;
 "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 // "/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 
+Synth(\choir, [\duration, 1, \atk, 1, \rel, 0]);
+
 ~scheduler = EventScheduler.new(s);
 
 ~scheduler.scheduleEvents;

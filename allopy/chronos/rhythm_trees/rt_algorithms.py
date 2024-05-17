@@ -660,11 +660,11 @@ def notate(tree):
             result = ""
             for element in tree:
                 if isinstance(element, (int, float)):      # Rest or single note
-                    if element < 0:  # Rest
+                    if element < 0:     # Rest
                         result += f" r{abs(element)}"
-                    else:  # Single note
+                    else:       # Single note
                         result += f" {element}"
-                elif isinstance(element, tuple):  # Subdivision                
+                elif isinstance(element, tuple):           # Subdivision                
                     D, S = element
                     tup = D, (sum_proportions(S),)
                     n, m = get_group_subdivision(tup)
