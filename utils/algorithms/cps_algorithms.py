@@ -27,12 +27,10 @@ def combo_clique_to_ratios(clique:tuple, min_prod:int, equave:int=2, n_equaves:i
                                       n_equaves = n_equaves) for combo in clique))
 
 def hyper_graph_cps(G:nx.Graph, n):
-    if not isinstance(n, list):
-        n = [n] 
+    n = [n] if not isinstance(n, list) else n
     cliques = nx.enumerate_all_cliques(G)
     edges = {}
     for i, clique in enumerate(cliques):
-        # if 2 > (n := len(clique)) > 3: continue
         if n_ad := len(clique) in n:
             edges[f'{n_ad}-ad_{i}'] = clique
     H = hnx.Hypergraph(edges)

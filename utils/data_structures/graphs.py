@@ -14,7 +14,7 @@ class Graph:
     def _graph_tree(self, root: int, S: Tuple):
         def add_nodes(graph, parent_id, children_list):
             for child in children_list:
-                if isinstance(child, int):
+                if isinstance(child, (int, float)):
                     child_id = next(unique_id)
                     graph.add_node(child_id, label=child)
                     self.node_info[child_id] = {}
@@ -60,7 +60,6 @@ class Graph:
         if level == 0:
             return f"\\time {self.G.nodes[node]['label']}\n{self.notate_tree(node, level + 1)}"
         
-
     def graph_depth(self) -> int:
         return max(nx.single_source_shortest_path_length(self.G, 0).values())
 
@@ -81,7 +80,7 @@ class Graph:
                             pruned_graph.node_info[neighbor] = self.node_info[neighbor]
                         pruned_graph.G.add_edge(node, neighbor)
                         queue.append((neighbor, depth + 1))
-        
+
         return pruned_graph
 
     def plot_graph(self):
