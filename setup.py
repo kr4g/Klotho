@@ -25,6 +25,7 @@ setup(
         'PySide6',
         'sympy',
         'networkx',
+        'hypernetx',
         'python-osc',
     ],
     # tests_require=[

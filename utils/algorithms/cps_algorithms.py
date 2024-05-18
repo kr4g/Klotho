@@ -1,4 +1,5 @@
 import networkx as nx
+import hypernetx as hnx
 from math import prod
 from fractions import Fraction
 
@@ -24,3 +25,12 @@ def combo_clique_to_ratios(clique:tuple, min_prod:int, equave:int=2, n_equaves:i
     return tuple(sorted(octave_reduce(interval  = Fraction(prod(combo), min_prod),
                                       equave    = equave,
                                       n_equaves = n_equaves) for combo in clique))
+
+def hyper_graph_cps(G:nx.Graph):
+    cliques = nx.enumerate_all_cliques(G)
+    edges = {}
+    for i, clique in enumerate(cliques):
+        n = len(clique)
+        edges[f'{n}-ad_{i}'] = clique
+    H = hnx.Hypergraph(edges)
+    return H
