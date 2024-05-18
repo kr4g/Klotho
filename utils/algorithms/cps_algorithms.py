@@ -31,7 +31,7 @@ def hyper_graph_cps(G:nx.Graph, n:int):
     edges = {}
     for i, clique in enumerate(cliques):
         # if 2 > (n := len(clique)) > 3: continue
-        if len(clique) != n: continue
-        edges[f'{n}-ad'] = clique
+        if len(clique) == n:
+            edges[f'{n}-ad'] = clique
     H = hnx.Hypergraph(edges)
     return H
