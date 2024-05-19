@@ -400,7 +400,8 @@ def create_tuplet(G):
     elif m < n and m % 2 == 0:
         while (new_m := m * 2) <= n and new_m % 2 == 0:
             m = new_m
-    
+    if n == m:
+        return None
     return [n, m]
 
 # Algorithm 6: SymbolicApprox

@@ -32,21 +32,23 @@ class Graph:
         self.node_info[root_id] = {}
         add_nodes(self.G, root_id, S)
         return self.G
-    
-    def sum_children(self, node: int, level: int = 0):
+
+    def sum_children(self, node: int = 0, level: int = 0):
         children = list(self.G.successors(node))
-        if not children:
+        if not children: # leaf node means it's a note event
             hdb = rt_alg.head_dots_beams(abs(self.G.nodes[node]['label']))
             print(f"{hdb[0]}, {hdb[1]} dot(s), and {hdb[2]} beam(s)")
             return
-        child_sum = sum(abs(self.G.nodes[child]['label']) for child in children)
+        child_sum = int(sum(abs(self.G.nodes[child]['label']) for child in children))
         for child in children:
             meas = str(self.G.nodes[node]['label']).replace('-', '')
             meas = Fraction(meas)
+            # if level == 0:
+            #     n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
+            #     if n != m:
+            #         meas = Fraction(child_sum, meas.denominator)
             if level == 0:
-                n, m = rt_alg.get_group_subdivision((meas.numerator, (child_sum,)))
-                # print(f'n: {n}, m: {m}')
-                if n != m:
+                if not (meas.numerator / child_sum).is_integer() and not (child_sum / meas.numerator).is_integer():
                     meas = Fraction(child_sum, meas.denominator)
             meas = str(Fraction(meas.numerator, rt_alg.symbolic_approx(meas.denominator)))
             d = abs(self.G.nodes[child]['label'])
@@ -56,10 +58,49 @@ class Graph:
         for child in children:
             self.sum_children(child, level + 1)
 
-    def notate_tree(self, node: int, level: int = 0):
+    def calc_children(self, node: int = 0, level: int = 0):
+        children = list(self.G.successors(node))
+        if not children: # leaf node means it's a note event
+            hdb = rt_alg.head_dots_beams(abs(self.G.nodes[node]['label']))
+            print(f"{hdb[0]}, {hdb[1]} dot(s), and {hdb[2]} beam(s)")
+            return
+        child_sum = int(sum(abs(self.G.nodes[child]['label']) for child in children))
+        # print(f'level {level}, n: {self.G.nodes[node]["label"]}, sum: {child_sum}')
+        # print(self.G.nodes[node]['label'], type(self.G.nodes[node]['label']))
+        numer = self.G.nodes[node]['label'].numerator
+        if (tup := rt_alg.create_tuplet((numer, (child_sum,)))) is not None:
+            self.node_info[level + 1] = tup
+        for child in children:
+            meas = str(self.G.nodes[node]['label']).replace('-', '')
+            meas = Fraction(meas)
+            if level == 0:
+                if not (meas.numerator / child_sum).is_integer() and not (child_sum / meas.numerator).is_integer():
+                    meas = Fraction(child_sum, meas.denominator)
+            meas = Fraction(meas.numerator, rt_alg.symbolic_approx(meas.denominator))
+            d = abs(self.G.nodes[child]['label'])
+            new_label = rt_alg.symbolic_duration(d, meas, (child_sum,))
+            new_label = Fraction(abs(new_label.numerator), rt_alg.symbolic_approx(abs(new_label.denominator)))
+            self.G.nodes[child]['label'] = new_label
+        for child in children:
+            self.calc_children(child, level + 1)
+
+    def notate_tree(self, node: int = 0, level: int = 0):
         if level == 0:
             return f"\\time {self.G.nodes[node]['label']}\n{self.notate_tree(node, level + 1)}"
-        
+        result = ""
+        children = list(self.G.successors(node))
+        tup = None
+        if not children:
+            result += f"{self.G.nodes[node]['label']} "
+        else:
+            if (tup := self.node_info[level]):
+                result += f"\\tuplet {tup[0]}/{tup[1]} " + "{ "
+            for child in children:
+                result += self.notate_tree(child, level + 1)
+        if tup:
+            result += "} "
+        return result
+
     def graph_depth(self) -> int:
         return max(nx.single_source_shortest_path_length(self.G, 0).values())
 
