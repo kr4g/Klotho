@@ -2,8 +2,8 @@
 s = Server.local;
 // ServerOptions.devices;
 s.options.outDevice_(
-	// "MacBook Pro Speakers"
-	"External Headphones"
+	"MacBook Pro Speakers"
+	// "External Headphones"
 	// "Scarlett 4i4 USB"
 );
 s.options.inDevice_("Built-in Microph");
@@ -18,10 +18,8 @@ s.options.memSize_(2.pow(20));
 s.boot;
 )
 
-"/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
-// "/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
-
-Synth(\choir, [\duration, 1, \atk, 1, \rel, 0]);
+// "/Users/ryanmillett/allolib_playground/AlloPy/examples/synthdefs.scd".load;
+"/Users/ryanmillett/MAT276IA/allolib_playground/AlloPy/examples/synthdefs.scd".load;
 
 ~scheduler = EventScheduler.new(s);
 

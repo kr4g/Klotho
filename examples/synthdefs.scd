@@ -157,7 +157,7 @@ SynthDef(\glitchRandom2, {
 	snd = snd + PitchShift.ar(snd, ExpRand(0.005, 0.05), ExpRand(1.5, 3));
 	snd = Pan2.ar(snd, \pan.kr(0));
 	snd = snd * Env.linen(0, duration, 0.005, curve: -4).ar(Done.freeSelf);
-	snd = snd * -10.dbamp;
+	snd = snd * \amp.kr(-10.dbamp);
 	Out.ar(\out.kr(0), snd);
 }).add;
 

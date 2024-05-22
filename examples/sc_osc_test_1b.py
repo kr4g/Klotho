@@ -23,7 +23,7 @@ scheduler = sch.Scheduler()
 # PRE-COMPOSITIONAL MATERIAL ----------------------------------------------------------
 meas_denom = 2
 beat = '1/8'
-bpm = 76
+bpm = 82
 prolat = (11, 7, 3, 5, 2)
 anacrus = u_temp.UT(tempus=f'1/{meas_denom}', prolatio='r', tempo=bpm, beat=beat)
 auto_mat = rt_alg.autoref_rotmat(lst=prolat, mode='S')
@@ -38,7 +38,7 @@ factors = cycle(hx.factors)
 # ------------------------------------------------------------------------------------
 # COMPOSITIONAL MATERIAL -------------------------------------------------------------
 perc_synths = cycle([
-    cycle(['a1', 'a3', 'a5', 'a2', 'hiss2']),
+    cycle(['a1', 'a2', 'a3', 'a5', 'glitchRandom2']),
     cycle(['reverseTwang', 'reverseTwang2', 'glitch1', 'glitch2', 'glitch3'])
 ])
 impacts = cycle(['bassDrum', 'impact'])
@@ -61,8 +61,8 @@ for i, utseq in enumerate(tb): # for each UTSeq in the TB
         if i == 0:
             scheduler.add_new_event('reverseCymbal', ut_onset, duration=ut_dur)
             scheduler.add_new_event('preScrape', ut_onset, duration=ut_dur)
-            scheduler.add_new_event(next(sweeps), ut_onset, duration=ut_dur, amp=0.35)
-            scheduler.add_new_event(impact, ut_onset, amp=0.4)
+            scheduler.add_new_event(next(sweeps), ut_onset, duration=ut_dur, amp=db_amp(-19))
+            scheduler.add_new_event(impact, ut_onset, amp=db_amp(-8))
         chime = next(chimes)
         for k, (start, duration) in enumerate(utseq.uts[j]): # for each event in the UT
             start += offset
@@ -70,15 +70,15 @@ for i, utseq in enumerate(tb): # for each UTSeq in the TB
             ratio = next(ratios)
             freq = fold_freq(333.0 * ratio * f, lower=333.0, upper=1332.0)
             if j == 0:
-                scheduler.add_new_event('glitchRandom2', start, duration=0.05, freq=freq, amp=0.2)
+                scheduler.add_new_event('glitchRandom2', start, duration=0.05, freq=freq, amp=db_amp(-20))
             elif j in {1,3}:
                 chime = 'chime' if j == 1 else chime
-                scheduler.add_new_event(chime, start, duration=duration, freq=freq, amp=0.1)
+                scheduler.add_new_event(chime, start, duration=duration, freq=freq, amp=db_amp(-19))
             else:
                 freq = np.interp(freq, [333.0, 1332.0], [10.406, 41.625])
                 perc_synth = 'sonar' if i == 4 else perc_synth
-                dur = duration if i == 4 else 0.05
-                scheduler.add_new_event(perc_synth, start, duration=0.09, freq=freq, amp=0.2)
+                dur = duration if i == 4 else 0.08
+                scheduler.add_new_event(perc_synth, start, duration=dur, freq=freq, amp=db_amp(-24))
 
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------
