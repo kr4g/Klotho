@@ -1,13 +1,5 @@
 # AlloPy
-`AlloPy` is an open source Python package designed to work as both a stand-alone software and in tandem with external synthesis applications as a computer-assisted composition toolkit, work environment, notation editor, and general educational resource for the methods, models, works, and frameworks associated with the art and craft of multimedia composition and metacomposition.
-
-Developed and maintained by MAT graduate student [Ryan Millett](https://www.mat.ucsb.edu/students/#rmillett) as part of the AlloSphere Research Group, under the supervision of Dr. Kuchera-Morin, at the University of California, Santa Barbara.
-
-[The AlloSphere Research Group](https://github.com/AlloSphere-Research-Group)
-
-AlloPy [integrates](https://github.com/kr4g/AlloPy/tree/main#integration-with-allolib-playground) with AlloLib Playground, a C++ application development space for working with `AlloLib` and `Gamma`, audiovisual and sound synthesis libraries developed by The AlloSphere Research Group.
-
-Download AlloLib Playground here: https://github.com/AlloSphere-Research-Group/allolib_playground
+`AlloPy` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general educational resource for the methods, models, works, and frameworks associated with the art and craft of music composition and multimedia metacomposition.
 
 ---
 
@@ -15,11 +7,9 @@ Download AlloLib Playground here: https://github.com/AlloSphere-Research-Group/a
 
 AlloPy works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
 
-If you want to use AlloPy with AlloLib Playground, first install AlloLib Playground [here](https://github.com/AlloSphere-Research-Group/allolib_playground).
-
 1. **Clone the Repository**:
 
-   First, clone the AlloPy repository (into the `allolib_playground/` directory of your system if you want to work with AlloLib/Gamma) by running the following command in your terminal or command prompt:
+   First, clone the AlloPy repository by running the following command in your terminal or command prompt:
    
    ```
    git clone https://github.com/kr4g/AlloPy.git
@@ -77,7 +67,7 @@ Examples from each AlloPy module, here used in an 'on-the-fly' context via the P
 
 Cognitor of the clock, `Chronos` contains calculations and computations for both [conceptual (i.e., *chronometric*) and perceptual (i.e., *psychological*) time](https://www.scribd.com/document/45643859/Grisey-Tempus-ex-machina).
 
-The `chronos.py` base module contains basic calculation tools for converting between musical time units and chronometric units (e.g., beat durations in seconds) as well as other time-based utilities.  The submodules contain materials oriented around more abstract representations and interpretations of musical time deeply inspired by the [ancient practices](https://en.wikipedia.org/wiki/Canon_(music)) of temporal counterpoint through, and beyond, the [*New Complexity*](https://en.wikipedia.org/wiki/New_Complexity).
+The `chronos.py` base module contains basic calculation tools for converting between musical time units and chronometric units (e.g., beat durations in seconds) as well as other time-based utilities.  The submodules contain materials oriented around more abstract representations and interpretations of musical time deeply inspired by the [ancient practices](https://en.wikipedia.org/wiki/Canon_(music)) of counterpoint through, and beyond, the [*New Complexity*](https://en.wikipedia.org/wiki/New_Complexity).
 
 For example, Chronos fully supports the use of [Rhythm Trees](https://support.ircam.fr/docs/om/om6-manual/co/RT1.html) (`rhythm_trees.py`) as featured in the [OpenMusic](https://openmusic-project.github.io/) computer-assisted composition software as well as modules for working with [*L’Unité Temporelle*](https://hal.science/hal-03961183/document) (`temporal_units.py`), an algebraic formalization of temporal proportion and a generalization of rhythm trees, posited by Karim Haddad.
 
@@ -119,21 +109,11 @@ Aikous contains basic tools for converting between *conceptual* units (e.g., mus
 
 Silent and often sullen, `Skora` the scribe sombers in sanctuary situated just above the substratum of synthesis.
 
-The `Gamma` synth instruments in `AlloLib` use a [standard numeric](https://www.csounds.com/manual/html/ScoreTop.html) notation [system](https://flossmanual.csound.com/miscellanea/methods-of-writing-csound-scores) similar to [`Csound`](https://csound.com/).  These "note lists" consist of discrete commands organized by *pfields*.  Skora converts this tabular format into a data structure known as a [`DataFrame`](https://pandas.pydata.org/).  When abstracted into this format, AlloLib score files can be exposed to the higher-order computations available in the "data science" paradigm.
-
-Skora then also leverages the power of `Numpy` to perform complex computations on any slice of the *Score DataFrame*.  This allows for a more fluid approach to editing and, most interesting, *generating*  note lists dynamically.  AlloPy can then function as both a computational composition aid or a data sonification tool—and everything in between.
-
 The Skora module also provides tools for managing and merging multiple separate parts, making larger-scale arrangements easier to maintain.
 
 Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://lilypond.org/development.html) are presently in development.
 
 ---
-
-## Integration with AlloLib Playground
-
-AlloPy is designed to integrate directly with the AlloLib Playground in any IDE of choice.  This means that, for example, note lists can be generated, edited, and merged freely with changes appearing in realtime from within your running AlloLib app—*no need to close and re-run the application when making changes to your scores.*
-
----   
 
 ## License
 
