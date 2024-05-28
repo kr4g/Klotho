@@ -77,8 +77,8 @@ for i, utseq in enumerate(tb): # for each UTSeq in the TB
             else:
                 freq = np.interp(freq, [333.0, 1332.0], [10.406, 41.625])
                 perc_synth = 'sonar' if i == 4 else perc_synth
-                dur = duration if i == 4 else 0.08
-                scheduler.add_new_event(perc_synth, start, duration=dur, freq=freq, amp=db_amp(-24))
+                dur = duration if i == 4 else 0.1
+                scheduler.add_new_event(perc_synth, start, duration=dur, amp=db_amp(-24))
 
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

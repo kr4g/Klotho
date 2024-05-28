@@ -2,8 +2,8 @@
 s = Server.local;
 // ServerOptions.devices;
 s.options.outDevice_(
-	"MacBook Pro Speakers"
-	// "External Headphones"
+	// "MacBook Pro Speakers"
+	"External Headphones"
 	// "Scarlett 4i4 USB"
 );
 s.options.inDevice_("Built-in Microph");
@@ -24,3 +24,13 @@ s.boot;
 ~scheduler = EventScheduler.new(s);
 
 ~scheduler.scheduleEvents;
+
+(
+x = Array.newClear;
+x = x.add(5);
+x = x.add(3);
+x = x.add(7);
+// x.postln;
+x = x.clear;
+x.postln;
+)
