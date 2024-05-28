@@ -9,5 +9,5 @@ tabulate
 PySide6
 sympy
 networkx
-# hypernetx
+hypernetx
 python-osc
