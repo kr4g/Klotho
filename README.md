@@ -1,5 +1,5 @@
 # AlloPy
-`AlloPy` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general educational resource for the methods, models, works, and frameworks associated with the art and craft of music composition and multimedia metacomposition.
+`AlloPy` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general resource for the methods, models, works, and frameworks associated with the art and craft of music composition and multimedia metacomposition.
 
 ---
 
@@ -61,7 +61,7 @@ Examples from each AlloPy module, here used in an 'on-the-fly' context via the P
 
 ---   
 
-### `Chronos` 
+<!-- ### `Chronos` 
 
 ***Lord of Time:***  *knower of all things temporal*
 
@@ -113,7 +113,7 @@ The Skora module also provides tools for managing and merging multiple separate 
 
 Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://lilypond.org/development.html) are presently in development.
 
----
+--- -->
 
 ## License
 
