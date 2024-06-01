@@ -223,7 +223,7 @@ def octave_reduce(interval:float, equave:Union[Fraction, float] = 2, n_equaves:i
   Returns:
     The octave-reduced interval as a float.
   '''
-  while interval >= equave**n_equaves:
+  while interval > equave**n_equaves:
     interval /= equave
   return interval
 
