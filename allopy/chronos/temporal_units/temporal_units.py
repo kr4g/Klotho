@@ -1,7 +1,8 @@
 from fractions import Fraction
 from typing import Union
 
-from ..rhythm_trees import RT, Meas
+from allopy.topos.graphs import Tree
+from ..rhythm_trees import Meas, RhythmTree
 from allopy.chronos.rhythm_trees.rt_algorithms import measure_ratios, subdivide_tree
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
@@ -14,18 +15,16 @@ ALLTYPES  = PULSTYPES | DURTYPES | RESTYPES
 # Temporal Unit
 class UT:    
     def __init__(self,
-                 duration:int                 = 1,
-                 tempus:Union[Meas,str]       = '1/1',
-                 prolatio:Union[RT,tuple,str] = 'd',
-                 tempo:Union[None,float]      = None,
-                 beat:Union[str,Fraction]     = None):
+                 duration:int                    = 1,
+                 tempus:Union[Meas,Fraction,str] = '1/1',
+                 prolatio:Union[tuple,str]       = 'd',
+                 tempo:Union[None,float]         = None,
+                 beat:Union[str,Fraction]        = None):
         
         self.__type        = None
-        self.__duration    = duration
-        self.__tempus      = Meas(tempus)
-        self.__prolationis = self._set_prolationis(prolatio) # RT object
+        self.__rtree       = self._set_rtree(duration, Meas(tempus), prolatio) # RhythmTree object
         self.__tempo       = tempo
-        self.__beat        = self._set_beat(beat)
+        self.__beat        = self._set_beat(beat) # Fraction object
 
         self.__onsets      = None
         self.__durations   = None
@@ -33,29 +32,43 @@ class UT:
         self.__offset      = 0.0
     
     @classmethod
-    def from_tree(cls, tree:Union[RT, tuple], tempo=None, beat=None):
-        meas = sum(abs(r) for r in measure_ratios(tree)) if isinstance(tree, tuple) else tree.time_signature
-        s = tree if isinstance(tree, tuple) else tree.subdivisions
-        return cls(tempus   = meas,
-                   prolatio = s,
+    def from_tree(cls, tree:Union[Tree, RhythmTree], tempo=None, beat=None):
+        return cls(duration = tree.__duration if isinstance(tree, RhythmTree) else 1,
+                   tempus   = tree.__root,
+                   prolatio = tree.__children,
+                   tempo    = tempo,
+                   beat     = beat)
+
+    @classmethod
+    def from_subdivs(cls, subdivisions:tuple, duration:int = 1, meas = None, tempo = None, beat = None):
+        return cls(tempus   = meas if meas else Meas(sum(abs(r) * duration for r in measure_ratios(subdivisions))),
+                   prolatio = subdivisions,
                    tempo    = tempo,
                    beat     = beat)
 
     @property
+    def length(self):
+        return self.__rtree.__duration
+
+    @property
     def tempus(self):
-        return self.__tempus
+        return self.__rtree.__root
     
     @property
     def prolationis(self):        
-        return self.__prolationis.subdivisions
+        return self.__rtree.__children
     
     @property
     def ratios(self):
-        return self.__prolationis.ratios
+        return self.__rtree.__ratios
+    
+    @property
+    def rtree(self):
+        return self.__rtree
     
     @property
     def tree(self):
-        return self.__prolationis
+        return self.__rtree.tree
 
     @property
     def tempo(self):
@@ -89,7 +102,7 @@ class UT:
             self.__durations = tuple(
                 beat_duration(ratio      = r,
                               bpm        = self.__tempo,
-                              beat_ratio = self.__beat) for r in self.__prolationis.ratios
+                              beat_ratio = self.__beat) for r in self.__rtree.ratios
                 )
         return self.__durations
 
@@ -116,50 +129,37 @@ class UT:
         self.__offset = offset
         self.__onsets = None
         
-    def decompose(self, prolatio:Union[RT,tuple,str] = 'd') -> 'UTSeq':
-        if prolatio.lower() in {'s'}: prolatio = self.__prolationis.subdivisions
+    def decompose(self, prolatio:Union[RhythmTree,tuple,str] = 'd') -> 'UTSeq':
+        if prolatio.lower() in {'s'}: prolatio = self.__rtree.subdivisions
         return UTSeq(UT(tempus   = ratio,
                         prolatio = prolatio,
                         tempo    = self.__tempo,
-                        beat     = self.__beat) for ratio in self.__prolationis.ratios)
+                        beat     = self.__beat) for ratio in self.__rtree.ratios)
 
-    def _set_prolationis(self, prolatio):
-        if isinstance(prolatio, RT) and self.__tempus != prolatio.time_signature: # if there's a difference...            
-            prolatio = RT(duration       = prolatio.duration,
-                          time_signature = self.__tempus,  # ...the UT wins
-                          subdivisions   = prolatio.subdivisions)
-            self.__type = f'Ensemble ({prolatio.type})'
-        elif isinstance(prolatio, tuple):
-            prolatio = RT(duration       = self.__duration,
-                          time_signature = self.__tempus,
-                          subdivisions   = prolatio)
-            self.__type = f'Ensemble ({prolatio.type})'
+    def _set_rtree(self, duration:int, tempus:Meas, prolatio:Union[tuple,str]) -> RhythmTree:
+        if isinstance(prolatio, tuple):
+            r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = prolatio)
+            self.__type = f'Ensemble ({r_tree.type})'
         elif isinstance(prolatio, str):
             prolatio = prolatio.lower()
             if prolatio in PULSTYPES:
                 self.__type = 'Pulse'
-                prolatio = RT(duration       = self.__duration,
-                              time_signature = self.__tempus,
-                              subdivisions   = (1,) * self.__tempus.numerator)
+                r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = (1,) * tempus.numerator)
             elif prolatio in DURTYPES:
                 self.__type = 'Duration'
-                prolatio = RT(duration       = self.__duration,
-                              time_signature = self.__tempus,
-                              subdivisions   = (1,))
+                r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = (1,))
             elif prolatio in RESTYPES:
                 self.__type = 'Silence'
-                prolatio = RT(duration       = self.__duration,
-                              time_signature = self.__tempus,
-                              subdivisions   = (-1,))
+                r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = (-1,))
             else:
                 raise ValueError(f'Invalid string: {prolatio}')
         else:
             raise ValueError(f'Invalid prolationis: {prolatio}')
-        return prolatio
+        return r_tree
     
-    def _set_beat(self, beat):
+    def _set_beat(self, beat:Union[None,str,Fraction]) -> Fraction:
         if beat is None:
-            return Fraction(1, self.__tempus.denominator)
+            return Fraction(1, self.__rtree.meas._denominator)
         return Fraction(beat)
     
     def __add__(self, other:Union['UT', 'UTSeq', Fraction]):
@@ -202,7 +202,7 @@ class UT:
         else:
             new_tempus = self.__tempus * other
         return UT(tempus   = new_tempus,
-                  prolatio = self.__prolationis.subdivisions,
+                  prolatio = self.__rtree.subdivisions,
                   tempo    = self.__tempo,
                   beat     = self.__beat)
     
@@ -210,13 +210,13 @@ class UT:
         if isinstance(other, UT):
             new_tempus = self.__tempus / other.__tempus
             return UT(tempus   = new_tempus,
-                      prolatio = self.__prolationis.subdivisions,
+                      prolatio = self.__rtree.subdivisions,
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         elif isinstance(other, (Fraction, int)):
             new_tempus = self.__tempus / other
             return UT(tempus   = new_tempus,
-                      prolatio = self.__prolationis.subdivisions,
+                      prolatio = self.__rtree.subdivisions,
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
@@ -234,7 +234,7 @@ class UT:
             f'Tempus: {self.__tempus}\n'
             f'Tempo: {self.__tempo}\n'
             f'Beat: {self.__beat}\n'
-            f'Prolationis: {self.__prolationis.subdivisions}\n'
+            f'Prolationis: {self.__rtree.subdivisions}\n'
             f'Type: {self.__type}\n'
         )
 
