@@ -1,13 +1,13 @@
 
 class Tree:
     def __init__(self, root, children:tuple):
-        self.__root = root
-        self.__children = children
+        self._root = root
+        self._children = children
     
     @property
     def root(self):
-        return self.__root
+        return self._root
     
     @property
     def children(self):
-        return self.__children
+        return self._children

@@ -150,13 +150,13 @@ class RhythmTree(Tree):
     @classmethod
     def from_tree(cls, tree:Tree, duration:int = 1, decomp:str = 'reduced'):
         return cls(duration     = duration,
-                   meas         = Meas(tree.__root),
-                   subdivisions = tree.__children,
+                   meas         = Meas(tree._root),
+                   subdivisions = tree._children,
                    decomp       = decomp)
 
     @property
     def tree(self):
-        return Tree(self.__root, self.__children)
+        return Tree(self._root, self._children)
     
     @property
     def duration(self):
@@ -164,11 +164,11 @@ class RhythmTree(Tree):
 
     @property
     def meas(self):
-        return self.__root
+        return self._root
 
     @property
     def subdivisions(self):
-        return self.__children
+        return self._children
 
     @property
     def decomp(self):
@@ -211,25 +211,25 @@ class RhythmTree(Tree):
 
     def _evaluate(self):
         # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__children)))
-        ratios = tuple(self.__duration * r for r in measure_ratios(self.__children))
+        ratios = tuple(self.__duration * r for r in measure_ratios(self._children))
         if self.__decomp == 'reduced':
-            return reduced_decomposition(ratios, self.__root)
+            return reduced_decomposition(ratios, self._root)
         elif self.__decomp == 'strict':
-            return strict_decomposition(ratios, self.__root)
+            return strict_decomposition(ratios, self._root)
         return ratios
     
     def _set_type(self):
-        div = sum_proportions(self.__children)
-        if bin(div).count('1') != 1 and div != self.__root.numerator:
+        div = sum_proportions(self._children)
+        if bin(div).count('1') != 1 and div != self._root.numerator:
             return 'complex'
-        return 'complex' if measure_complexity(self.__children) else 'simple'
+        return 'complex' if measure_complexity(self._children) else 'simple'
 
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
         return (
             f'Duration: {self.__duration}\n'
-            f'Time Signature: {self.__root}\n'
-            f'Subdivisions: {self.__children}\n'
+            f'Time Signature: {self._root}\n'
+            f'Subdivisions: {self._children}\n'
             f'Decomposition: {self.__decomp}\n'
             f'Type: {self.__type}\n'
             f'Ratios: {ratios}\n'
