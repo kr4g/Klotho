@@ -101,12 +101,12 @@ class Graph:
 
         return pruned_graph
 
-    def plot_graph(self):
+    def plot_graph(self, figsize=(10, 5)):
         root = [n for n, d in self.G.in_degree() if d == 0][0]
         pos = self._hierarchy_pos(root)
         labels = nx.get_node_attributes(self.G, 'label')
         
-        plt.figure(figsize=(10, 5))
+        plt.figure(figsize=figsize)
         ax = plt.gca()
         for node, (x, y) in pos.items():
             ax.text(x, y, labels[node], ha='center', va='center', zorder=5,

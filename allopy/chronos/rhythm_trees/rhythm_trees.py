@@ -25,7 +25,6 @@ from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, 
 
 from allopy.topos.graphs import Tree
     
-
 class Meas:    
     '''
     Time signature class that accepts a Fraction, string, or tuple
