@@ -114,7 +114,7 @@ def homotopic_map(l1: tuple, l2: tuple) -> tuple:
                 return
     return tuple((l1[i], tuple(l2[i % len(l2):] + l2[:i % len(l2)])) for i in range(len(l1)))
 
-# Algorithm 5b: AutoRef
+# Algorithm 5: AutoRef
 def autoref(*args):    
     '''
     Algorithm 5: AutoRef
@@ -137,40 +137,37 @@ def autoref(*args):
     :return: List containing the original element and its permutations.
     '''
     if len(args) == 1:
-        lst1 = lst2 = list(args[0])
+        lst1 = lst2 = tuple(args[0])
     elif len(args) == 2:
-        lst1, lst2 = map(list, args)
+        lst1, lst2 = map(tuple, args)
     else:
         raise ValueError('Function expects either one or two iterable arguments.')
 
     if len(lst1) != len(lst2):
-        raise ValueError('The lists must be of equal length.')
+        raise ValueError('The tuples must be of equal length.')
 
     return tuple((elt, permut_list(lst2, n + 1)) for n, elt in enumerate(lst1))
 
 # AutoRef Matrices
 def autoref_rotmat(*args, mode='G'):
     if len(args) == 1:
-        lst1 = lst2 = list(args[0])
+        lst1 = lst2 = tuple(args[0])
     elif len(args) == 2:
-        lst1, lst2 = map(list, args)
+        lst1, lst2 = map(tuple, args)
     else:
         raise ValueError('Function expects either one or two iterable arguments.')
 
     if len(lst1) != len(lst2):
-        raise ValueError('The lists must be of equal length.')
+        raise ValueError('The tuples must be of equal length.')
 
-    result = []
-    mode = mode.upper()
-
-    if mode == 'G':
-        result = [autoref(permut_list(lst1, i), permut_list(lst2, i)) for i in range(len(lst1))]
-    elif mode == 'S':
-        result = [tuple((lst1[j], permut_list(lst2, i + j + 1)) for j in range(len(lst1))) for i in range(len(lst1))]
-    elif mode == 'D':
-        l2 = autoref(lst2)
-        result = [tuple((elem, l2[j][1]) for j, elem in enumerate(permut_list(lst1, i))) for i in range(len(lst1))]
-    else:
-        return None
-
-    return tuple(result)
+    match mode.upper():
+        case 'G':
+            return tuple(autoref(permut_list(lst1, i), permut_list(lst2, i)) for i in range(len(lst1)))
+        case 'S':
+            return tuple(tuple((lst1[j], permut_list(lst2, i + j + 1)) for j in range(len(lst1))) for i in range(len(lst1)))
+        case 'D':
+            return tuple(tuple((elem, autoref(lst2)[j][1]) for j, elem in enumerate(permut_list(lst1, i))) for i in range(len(lst1)))
+        case 'C':
+            return None
+        case _:
+            raise ValueError('Invalid mode. Choose from G, S, D, or C.')
