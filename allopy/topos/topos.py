@@ -115,7 +115,7 @@ def homotopic_map(l1: tuple, l2: tuple) -> tuple:
     return tuple((l1[i], tuple(l2[i % len(l2):] + l2[:i % len(l2)])) for i in range(len(l1)))
 
 # Algorithm 5b: AutoRef
-def autoref(lst1:tuple, lst2:tuple = None):
+def autoref(*args):    
     '''
     Algorithm 5: AutoRef
 
@@ -136,39 +136,41 @@ def autoref(lst1:tuple, lst2:tuple = None):
     :param lst: List of finite elements to be doubly circularly permuted.
     :return: List containing the original element and its permutations.
     '''
-    if lst2 is None:
-        lst2 = lst1
+    if len(args) == 1:
+        lst1 = lst2 = list(args[0])
+    elif len(args) == 2:
+        lst1, lst2 = map(list, args)
+    else:
+        raise ValueError('Function expects either one or two iterable arguments.')
+
+    if len(lst1) != len(lst2):
+        raise ValueError('The lists must be of equal length.')
+
     return tuple((elt, permut_list(lst2, n + 1)) for n, elt in enumerate(lst1))
 
 # AutoRef Matrices
-def autoref_rotmat(lst1:tuple, lst2:tuple = None, mode:str='G'):
-    '''
-    '''
-    if lst2 is None:
-        lst2 = lst1
+def autoref_rotmat(*args, mode='G'):
+    if len(args) == 1:
+        lst1 = lst2 = list(args[0])
+    elif len(args) == 2:
+        lst1, lst2 = map(list, args)
+    else:
+        raise ValueError('Function expects either one or two iterable arguments.')
+
+    if len(lst1) != len(lst2):
+        raise ValueError('The lists must be of equal length.')
+
     result = []
     mode = mode.upper()
+
     if mode == 'G':
-        for i in range(len(lst1)):
-            l1 = permut_list(lst1, i)
-            l2 = permut_list(lst2, i)
-            result.append(autoref(l1, l2))
+        result = [autoref(permut_list(lst1, i), permut_list(lst2, i)) for i in range(len(lst1))]
     elif mode == 'S':
-        for i in range(len(lst1)):
-            l = tuple((lst1[j], permut_list(lst2, i + j + 1)) for j in range(len(lst1)))
-            result.append(l)
+        result = [tuple((lst1[j], permut_list(lst2, i + j + 1)) for j in range(len(lst1))) for i in range(len(lst1))]
     elif mode == 'D':
         l2 = autoref(lst2)
-        for i in range(len(lst1)):
-            l = permut_list(lst1, i)
-            result.append(tuple((elem, l2[j][1]) for j, elem in enumerate(l)))
-    # elif mode == 'C':
-    #     l1 = autoref(permut_list(lst1, 0))
-    #     l2 = autoref(permut_list(lst1, 2))
-    #     for i in range(len(lst1)):
-    #         l = permut_list(lst1, i)
-    #         lp = l1 if i % 2 == 0 else l2
-    #         result.append(tuple((elem, lp[j][1]) for j, elem in enumerate(l)))
+        result = [tuple((elem, l2[j][1]) for j, elem in enumerate(permut_list(lst1, i))) for i in range(len(lst1))]
     else:
         return None
+
     return tuple(result)
