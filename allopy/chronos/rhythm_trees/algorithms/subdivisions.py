@@ -89,3 +89,52 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
 
 # ------------------------------------------------------------------------------------
 
+def factor_tree(subdivs:tuple) -> tuple:
+    def _factor(subdivs, acc):
+        for element in subdivs:
+            if isinstance(element, tuple):
+                _factor(element, acc)
+            else:
+                acc.append(element)
+        return acc
+    return tuple(_factor(subdivs, []))
+
+def refactor_tree(subdivs:tuple, factors:tuple[int]) -> tuple:
+    def _refactor(subdivs, index):
+        result = []
+        for element in subdivs:
+            if isinstance(element, tuple):
+                nested_result, index = _refactor(element, index)
+                result.append(nested_result)
+            else:
+                result.append(factors[index])
+                index += 1
+        return tuple(result), index
+    return _refactor(subdivs, 0)[0]
+
+def rotate_tree(subdivs:tuple, n:int=1) -> tuple:
+    factors = factor_tree(subdivs)
+    n = n % len(factors)
+    factors = factors[n:] + factors[:n]
+    return refactor_tree(subdivs, factors)
+
+def sum_proportions(S:tuple) -> int:
+    return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
+
+def measure_complexity(tree:tuple) -> bool:
+    '''
+    Assumes a tree in the form (D S) where D represents a duration and S represents a list
+    of subdivisions.  S can be also be in the form (D S).
+
+    Recursively traverses the tree.  For any element, if the sum of S != D, return True.
+    '''    
+    for s in tree:
+        if isinstance(s, tuple):
+            D, S = s
+            div = sum_proportions(S)
+            # XXX - this only works for duple meters!!!!!
+            if bin(div).count("1") != 1 and div != D:
+                return True
+            else:
+                return measure_complexity(S)
+    return False

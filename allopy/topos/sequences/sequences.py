@@ -1,11 +1,10 @@
 import numpy as np
 
-class Norg():
+class Norg:
     '''
     Class for Per Nørgård's "infinity" sequences.
 
     see: https://web.archive.org/web/20071010091253/http://www.pernoergaard.dk/eng/strukturer/uendelig/uindhold.html
-
     '''
     @staticmethod
     def inf(start: int = 0, size: int = 128, step:int = 1):

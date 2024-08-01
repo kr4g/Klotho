@@ -4,7 +4,7 @@ from math import prod
 from itertools import combinations
 from fractions import Fraction
 
-from allopy.topos.sets import CPS
+from allopy.topos.sets import CombinationProductSet as CPS
 # from utils.algorithms.cps_algorithms import *
 from allopy.tonos.tonos import fold_interval
 

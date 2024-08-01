@@ -19,9 +19,10 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-from math import gcd
+# from math import gcd
 
-from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition, rotate_tree
+# from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition
+from .algorithms.subdivisions import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition
 
 from allopy.topos.graphs import Tree
     
@@ -226,12 +227,12 @@ class RhythmTree(Tree):
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
         return (
-            f'Duration: {self.__duration}\n'
+            f'Duration:       {self.__duration}\n'
             f'Time Signature: {self._root}\n'
-            f'Subdivisions: {self._children}\n'
-            f'Decomposition: {self.__decomp}\n'
-            f'Type: {self.__type}\n'
-            f'Ratios: {ratios}\n'
+            f'Subdivisions:   {self._children}\n'
+            f'Decomposition:  {self.__decomp}\n'
+            f'Type:           {self.__type}\n'
+            f'Ratios:         {ratios}\n'
         )
 
 # ------------------------------------------------------------------------------------
