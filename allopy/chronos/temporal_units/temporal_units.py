@@ -2,8 +2,10 @@ from fractions import Fraction
 from typing import Union
 
 from allopy.topos.graphs import Tree
+# from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees import Meas, RhythmTree
-from allopy.chronos.rhythm_trees.rt_algorithms import measure_ratios, subdivide_tree
+from ..rhythm_trees.algorithms.subdivisions import measure_ratios, auto_subdiv
+# from allopy.chronos.rhythm_trees.rt_algorithms import measure_ratios, auto_subdiv
 from allopy.chronos.chronos import beat_duration, calc_onsets
 
 # Prolationis Types
@@ -13,7 +15,7 @@ RESTYPES  = {'r', 'rest', 'silence'}
 ALLTYPES  = PULSTYPES | DURTYPES | RESTYPES
 
 # Temporal Unit
-class UT:    
+class TemporalUnit:
     def __init__(self,
                  duration:int                    = 1,
                  tempus:Union[Meas,Fraction,str] = '1/1',
@@ -21,21 +23,19 @@ class UT:
                  tempo:Union[None,float]         = None,
                  beat:Union[str,Fraction]        = None):
         
-        self.__type        = None
-        self.__rtree       = self._set_rtree(duration, Meas(tempus), prolatio) # RhythmTree object
-        self.__tempo       = tempo
-        self.__beat        = self._set_beat(beat) # Fraction object
-
-        self.__onsets      = None
-        self.__durations   = None
-
-        self.__offset      = 0.0
+        self.__type      = None
+        self.__rtree     = self._set_rtree(duration, Meas(tempus), prolatio) # RhythmTree object
+        self.__tempo     = tempo
+        self.__beat      = self._set_beat(beat) # Fraction object
+        self.__onsets    = None
+        self.__durations = None
+        self.__offset    = 0.0
     
     @classmethod
     def from_tree(cls, tree:Union[Tree, RhythmTree], tempo=None, beat=None):
         return cls(duration = tree.__duration if isinstance(tree, RhythmTree) else 1,
-                   tempus   = tree.__root,
-                   prolatio = tree.__children,
+                   tempus   = tree._root,
+                   prolatio = tree._children,
                    tempo    = tempo,
                    beat     = beat)
 
@@ -52,11 +52,11 @@ class UT:
 
     @property
     def tempus(self):
-        return self.__rtree.__root
+        return self.__rtree._root
     
     @property
     def prolationis(self):        
-        return self.__rtree.__children
+        return self.__rtree._children
     
     @property
     def ratios(self):
@@ -114,14 +114,14 @@ class UT:
     
     @tempo.setter
     def tempo(self, tempo:Union[None,float,int]):
-        self.__tempo = tempo
-        self.__onsets = None
+        self.__tempo     = tempo
+        self.__onsets    = None
         self.__durations = None
     
     @beat.setter
     def beat(self, beat:Union[str,Fraction]):
-        self.__beat = Fraction(beat)
-        self.__onsets = None
+        self.__beat      = Fraction(beat)
+        self.__onsets    = None
         self.__durations = None
     
     @offset.setter
@@ -131,7 +131,7 @@ class UT:
         
     def decompose(self, prolatio:Union[RhythmTree,tuple,str] = 'd') -> 'UTSeq':
         if prolatio.lower() in {'s'}: prolatio = self.__rtree.subdivisions
-        return UTSeq(UT(tempus   = ratio,
+        return UTSeq(TemporalUnit(tempus   = ratio,
                         prolatio = prolatio,
                         tempo    = self.__tempo,
                         beat     = self.__beat) for ratio in self.__rtree.ratios)
@@ -162,67 +162,67 @@ class UT:
             return Fraction(1, self.__rtree.meas._denominator)
         return Fraction(beat)
     
-    def __add__(self, other:Union['UT', 'UTSeq', Fraction]):
-        if isinstance(other, UT):
-            new_tempus = self.__tempus + other.__tempus
-            return UT(tempus   = new_tempus,
+    def __add__(self, other:Union['TemporalUnit', 'UTSeq', Fraction]):
+        if isinstance(other, TemporalUnit):
+            new_tempus = self.__rtree._root + other.__rtree._root
+            return TemporalUnit(tempus   = new_tempus,
                       prolatio = 'd',
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         elif isinstance(other, UTSeq):
             return UTSeq((self,) + other.uts)
         elif isinstance(other, Fraction):
-            new_tempus = self.__tempus + other
-            return UT(tempus   = new_tempus,
+            new_tempus = self.__rtree._root + other
+            return TemporalUnit(tempus   = new_tempus,
                       prolatio = 'd',
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
 
-    def __sub__(self, other:Union['UT', Fraction]):
-        if isinstance(other, UT):
-            new_tempus = abs(self.__tempus - other.__tempus)
-            return UT(tempus   = new_tempus,
+    def __sub__(self, other:Union['TemporalUnit', Fraction]):
+        if isinstance(other, TemporalUnit):
+            new_tempus = abs(self.__rtree._root - other.__rtree._root)
+            return TemporalUnit(tempus   = new_tempus,
                       prolatio = 'd',
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         elif isinstance(other, Fraction):
-            new_tempus = abs(self.__tempus - other)
-            return UT(tempus   = new_tempus,
+            new_tempus = abs(self.__rtree._root - other)
+            return TemporalUnit(tempus   = new_tempus,
                       prolatio = 'd',
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
 
-    def __mul__(self, other:Union['UT', Fraction, int]):
-        if not isinstance(other, (UT, Fraction, int)):
+    def __mul__(self, other:Union['TemporalUnit', Fraction, int]):
+        if not isinstance(other, (TemporalUnit, Fraction, int)):
             raise ValueError('Invalid Operand')
-        elif isinstance(other, UT):
-            new_tempus = self.__tempus * other.__tempus            
+        elif isinstance(other, TemporalUnit):
+            new_tempus = self.__rtree._root * other.__rtree._root            
         else:
-            new_tempus = self.__tempus * other
-        return UT(tempus   = new_tempus,
+            new_tempus = self.__rtree._root * other
+        return TemporalUnit(tempus   = new_tempus,
                   prolatio = self.__rtree.subdivisions,
                   tempo    = self.__tempo,
                   beat     = self.__beat)
     
-    def __truediv__(self, other:Union['UT', Fraction, int]):
-        if isinstance(other, UT):
-            new_tempus = self.__tempus / other.__tempus
-            return UT(tempus   = new_tempus,
+    def __truediv__(self, other:Union['TemporalUnit', Fraction, int]):
+        if isinstance(other, TemporalUnit):
+            new_tempus = self.__rtree._root / other.__rtree._root
+            return TemporalUnit(tempus   = new_tempus,
                       prolatio = self.__rtree.subdivisions,
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         elif isinstance(other, (Fraction, int)):
-            new_tempus = self.__tempus / other
-            return UT(tempus   = new_tempus,
+            new_tempus = self.__rtree._root / other
+            return TemporalUnit(tempus   = new_tempus,
                       prolatio = self.__rtree.subdivisions,
                       tempo    = self.__tempo,
                       beat     = self.__beat)
         raise ValueError('Invalid Operand')
     
-    def __and__(self, other:'UT'):
-        if isinstance(other, UT):
+    def __and__(self, other:'TemporalUnit'):
+        if isinstance(other, TemporalUnit):
             return UTSeq((self, other))
         raise ValueError('Invalid Operand')
     
@@ -231,19 +231,20 @@ class UT:
 
     def __repr__(self):
         return (
-            f'Tempus: {self.__tempus}\n'
-            f'Tempo: {self.__tempo}\n'
-            f'Beat: {self.__beat}\n'
+            f'Type:        {self.__type}\n'
+            f'Tempus:      {self.__rtree._root}\n'
+            f'Tempo:       {self.__tempo}\n'
+            f'Beat:        {self.__beat}\n'
             f'Prolationis: {self.__rtree.subdivisions}\n'
-            f'Type: {self.__type}\n'
         )
 
 # Temporal Unit Sequence
 class UTSeq:
-    def __init__(self, ut_seq:tuple[UT]=(), offset:float=0.0):
-        self.__seq = ut_seq
+    def __init__(self, ut_seq:tuple[TemporalUnit]=(), offset:float=0.0):
+        self.__seq    = ut_seq
         self.__offset = offset
-        self.offset = offset
+        self.offset   = offset
+        self._set_offsets()
 
     @property
     def uts(self):
@@ -274,16 +275,20 @@ class UTSeq:
         self.__offset = offset
         for i, ut in enumerate(self.__seq):
             ut.offset = offset + sum(self.durations[j] for j in range(i))
+            
+    def _set_offsets(self):
+        for i, ut in enumerate(self.__seq):
+            ut.offset = self.__offset + sum(self.durations[j] for j in range(i))
 
-    def __add__(self, other:Union[UT, 'UTSeq']):
-        if isinstance(other, UT):
+    def __add__(self, other:Union[TemporalUnit, 'UTSeq']):
+        if isinstance(other, TemporalUnit):
             return UTSeq(self.__seq + (other,))
         elif isinstance(other, UTSeq):
             return UTSeq(self.__seq + other.__seq)
         raise ValueError('Invalid Operand')
 
-    def __and__(self, other:Union[UT, 'UTSeq']):
-        if isinstance(other, UT):
+    def __and__(self, other:Union[TemporalUnit, 'UTSeq']):
+        if isinstance(other, TemporalUnit):
             return TB((self.__seq, (other,)))
         elif isinstance(other, UTSeq):
             return TB((self.__seq, other.__seq))
@@ -312,10 +317,10 @@ class TB:
             seq = []
             for e in row:
                 if subdiv:
-                    D, S = e[0], subdivide_tree(e[1][::-1], i + rotation_offset)
+                    D, S = e[0], auto_subdiv(e[1][::-1], i + rotation_offset)
                 else:
                     D, S = e[0], e[1]
-                seq.append(UT(tempus   = Meas((D, meas_denom)),
+                seq.append(TemporalUnit(tempus   = Meas((D, meas_denom)),
                               prolatio = S,
                               tempo    = tempo,
                               beat     = beat))

@@ -4,115 +4,73 @@
 '''
 The `topos` base module.
 '''
-from ..chronos.rhythm_trees.rt_algorithms import permut_list
-
-from sympy.utilities.iterables import cartes
-import numpy as np
-import regex
 from math import prod
-from fractions import Fraction
 
 class config:
     TOPOS_WARNINGS = True
     TOPOS_SUGGESTIONS = True
 
-def iso_pairs(l1: list, l2: list) -> tuple:
+# Algorithm 4: PermutList
+def permut_list(lst:tuple, pt:int) -> tuple:
     '''
-    Generates pairs of elements from two lists, l1 and l2, in a cyclic manner. 
-
-    Creates a list of tuples where each element from l1 is paired with each 
-    element from l2. The pairing continues cyclically until the length
-    of the generated list equals the product of the lengths of l1 and l2. 
-    Specifically, when the end of either list is reached, the iteration 
-    continues from the beginning of that list, effectively cycling through 
-    the shorter list until all pairings are created.
+    Algorithm 4: PermutList
     
+    Data: lst is a list with n finite elements; pt is the position of the element where circular permutation of list lst begins
+    Result: List circularly permuted starting from position pt
+    
+    begin
+        n = 0;
+        while n ≠ (pt + 1) do
+            lst = ([car of lst] [cdr of lst]);
+            n = n + 1;
+        end while
+        return lst;
+    end
+    
+    /* car = returns the first element of lst  */
+    /* cdr = returns lst without its first element  */
+    
+    :param lst: List of elements to be permuted.
+    :param pt: Starting position for the permutation.
+    :return: Circularly permuted list.
+    '''
+    pt = pt % len(lst)
+    return lst[pt:] + lst[:pt]
+
+def iso_pairs(*lists):
+    '''
+    Generates tuples of elements from any number of input lists in a cyclic manner.
+
+    Creates a list of tuples where each tuple contains one element from each input list.
+    The pairing continues cyclically until the length of the generated list equals
+    the product of the lengths of all input lists. When the end of any list is reached, 
+    the iteration continues from the beginning of that list, effectively cycling through 
+    the shorter lists until all combinations are created.
+
     This is a form of "cyclic pairing" or "modulo-based pairing" and is 
     different from computing the Cartesian product.
 
     Args:
-        l1 (list): The first list, consisting of Type 1.
-        l2 (list): The second list, consisting of Type 2.
-    
-    Returns:
-        list: A list of tuples where each element from l1 is paired with each 
-        element from l2.
-
-    Example:
-    >>> iso_pairs(('⚛', '∿'), ('Ξ', '≈'))
-    (('⚛', 'Ξ'), ('∿', '≈'), ('⚛', '≈'), ('∿', 'Ξ'))
-    '''
-    if config.TOPOS_WARNINGS and (Fraction(len(l1), len(l2)).denominator == 1 or Fraction(len(l2), len(l1)).denominator == 1):
-        print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\nThe lengths of the lists should not evenly divide.  ' + 
-            'Otherwise, the cyclic pairing will be equivalent to a simple element-wise pairing.  If ' + 
-            'this is your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
-            'The Topos suggests you pass lists of indivisible lengths.\n\n  The Topos has spoken.\n')
-        if input('Do you wish to proceed? (y/n): ').lower() in ('y', 'yes'):
-            pass
-        elif config.TOPOS_SUGGESTIONS:
-            print('\nThe Topos suggests you pass lists of indivisible lengths.\n\n')
-            return
-            
-    return tuple((l1[i % len(l1)], l2[i % len(l2)]) for i in range(len(l1) * len(l2)))
-
-def cartesian_iso_pairs(l1: list, l2: list) -> tuple:
-    '''
-    Generates a sequence of pairs by first creating a Cartesian product of list l1 with itself,
-    and then cycling through these pairs while pairing them with elements from list l2.
-    Each pair from the Cartesian product of l1 is combined with an element from l2, 
-    cycling through l2 as necessary.
-
-    Args:
-        l1 (list): The first list, consisting of Type 1.
-        l2 (list): The second list, consisting of Type 2.
-    
-    Returns:
-        list: A list of tuples, each containing a pair from the Cartesian product of l1 and an element from l2.
-
-    Example:
-    >>> cartesian_iso_pairs(['Ψ', '⧭', 'Ω'], ('¤', '〄'))
-    (('Ψ', 'Ψ'), '¤'), (('Ψ', '⧭'), '〄'), (('Ψ', 'Ω'), '¤'),
-    (('⧭', 'Ψ'), '〄'), (('⧭', '⧭'), '¤'), (('⧭', 'Ω'), '〄'),
-    (('Ω', 'Ψ'), '¤'), (('Ω', '⧭'), '〄'), (('Ω', 'Ω'), '¤')
-    '''
-    return iso_pairs(tuple(cartes(l1, l1)), l2)
-
-def homotopic_map(l1: tuple, l2: tuple) -> tuple:
-    '''
-    Maps each element of tuple l1 to a unique "path" (sub-tuple) in tuple l2. 
-    Each element from l1 is paired with a shifted version of l2, ensuring 
-    that each pair is unique and resembles a distinct "path".
-    Warns if l1 is longer than l2, as this would disrupt the creation of distinct paths.
-
-    Args:
-        l1 (tuple): The first tuple of elements.
-        l2 (tuple): The second tuple of elements to form paths.
+        *lists: Any number of input lists.
 
     Returns:
-        tuple: A tuple of pairs, each pair consists of an element from l1 and a unique path in l2.
+        tuple: A tuple of tuples where each inner tuple contains one element 
+        from each input list.
+
+    Raises:
+        ValueError: If no lists are provided.
 
     Example:
-    >>> homotopic_map(('Δ', 'Θ'), ('λ', 'μ', 'ν'))
-    (('Δ', ('λ', 'μ', 'ν')), ('Θ', ('μ', 'ν', 'λ')))
+        >> iso_pairs([1, 2], ['a', 'b', 'c'])
+        ((1, 'a'), (2, 'b'), (1, 'c'), (2, 'a'), (1, 'b'), (2, 'c'))
+
     '''
-    if config.TOPOS_WARNINGS:
-        if len(l1) > len(l2):
-            print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\nThe first list is longer than the second. ' +
-                  'This will result in non-unique paths for each element in the first list. If this is ' +
-                  'your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
-                  'The Topos suggests you adjust their lengths accordingly. Know that passing lists of ' + 
-                  'equal lengths will yeild the maximum combinatoric diversity. The Topos has spoken.')
-            if input('Do you wish to proceed? (y/n) ').lower() not in ('y', 'yes'):
-                return
-        elif len(l1) < len(l2):
-            print('PAY HEED! THE TOPOS CAUTIONS YOU:\n\nThe first list is shorter than the second. ' +
-                  'This means that not all possible paths through the second list will be used. If this is ' +
-                  'your intention, The Topos bids you to proceed.  If this is not your intention, ' + 
-                  'The Topos suggests you adjust their lengths accordingly. Know that passing lists of ' +
-                  'equal lengths will yeild the maximum combinatoric diversity. The Topos has spoken.')
-            if input('Do you wish to proceed? (y/n) ').lower() not in ('y', 'yes'):
-                return
-    return tuple((l1[i], tuple(l2[i % len(l2):] + l2[:i % len(l2)])) for i in range(len(l1)))
+    if not lists:
+        raise ValueError("At least one list must be provided")
+
+    total_length = prod(len(lst) for lst in lists)
+
+    return tuple(tuple(lst[i % len(lst)] for lst in lists) for i in range(total_length))
 
 # Algorithm 5: AutoRef
 def autoref(*args):    
@@ -150,6 +108,37 @@ def autoref(*args):
 
 # AutoRef Matrices
 def autoref_rotmat(*args, mode='G'):
+    '''
+    Matrices for lst = (3,4,5,7):
+
+    Mode G (Group Rotation):
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)))
+    ((5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)))
+    ((7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)))
+
+    Mode S:
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)))
+    ((3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)), (5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)))
+    ((3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)))
+
+    Mode D:
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)))
+    ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)))
+    ((7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)))
+
+    Mode C (Circular Rotation):
+
+    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
+    ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)))
+    ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)))
+    ((7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)))
+    '''
     if len(args) == 1:
         lst1 = lst2 = tuple(args[0])
     elif len(args) == 2:

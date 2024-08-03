@@ -22,29 +22,30 @@ from typing import Union, Tuple
 # from math import gcd
 
 # from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition
-from .algorithms.subdivisions import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition
+from .algorithms.subdivisions import *
 
 from allopy.topos.graphs import Tree
     
-class Meas:    
+class Meas:
     '''
-    Time signature class that accepts a Fraction, string, or tuple
-    and stores the numerator and denominator separately.
+    Time signature class that preserves unreduced fractions.
     '''
-    def __init__(self, signature: Union[Fraction, str, tuple] = '1/1'):
-        if isinstance(signature, Meas):
-            self._numerator, self._denominator = signature.numerator, signature.denominator        
-        elif isinstance(signature, Fraction):
+    def __init__(self, signature: Union[str, tuple, int, float] = '1/1'):
+        if isinstance(signature, (Meas, Fraction)):
             self._numerator, self._denominator = signature.numerator, signature.denominator
         elif isinstance(signature, tuple):
             self._numerator, self._denominator = signature
         elif isinstance(signature, (int, float)):
-            self._numerator, self._denominator = Fraction(signature).numerator, Fraction(signature).denominator
+            self._numerator = int(signature)
+            self._denominator = 1
         elif isinstance(signature, str):
-            parts = signature.replace('//', '/').split('/')
-            if len(parts) == 2:
-                self._numerator, self._denominator = map(int, parts)
-            else:
+            try:
+                parts = signature.replace('//', '/').split('/')
+                if len(parts) != 2:
+                    raise ValueError
+                self._numerator = int(parts[0])
+                self._denominator = int(parts[1])
+            except ValueError:
                 raise ValueError('Invalid time signature format')
         else:
             raise ValueError('Invalid time signature type')
@@ -212,11 +213,13 @@ class RhythmTree(Tree):
     def _evaluate(self):
         # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__children)))
         ratios = tuple(self.__duration * r for r in measure_ratios(self._children))
-        if self.__decomp == 'reduced':
-            return reduced_decomposition(ratios, self._root)
-        elif self.__decomp == 'strict':
-            return strict_decomposition(ratios, self._root)
-        return ratios
+        match self.__decomp:
+            case 'reduced':
+                return reduced_decomposition(ratios, self._root)
+            case 'strict':
+                return strict_decomposition(ratios, self._root)
+            case _:
+                return ratios
     
     def _set_type(self):
         div = sum_proportions(self._children)

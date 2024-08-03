@@ -1,7 +1,21 @@
-from typing import Union, Tuple, List
+from typing import Tuple
 from fractions import Fraction
 from math import gcd, lcm
 from functools import reduce
+
+# ------------------------------------------------------------------------------------
+# TREE ALGORITHMS
+# ----------------------
+# 
+# Algorithms that operate on either the S part of a rhythmic tree or its corresponding 
+# proportions.
+# 
+# Pseudocode for numbered algorithms by Karim Haddad unless otherwise noted.
+# 
+# "Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
+# composed of (DS), that is its part constituting the proportions which can also 
+# encompass other tree structures."  —- Karim Haddad
+# ------------------------------------------------------------------------------------
 
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
@@ -89,7 +103,16 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
 
 # ------------------------------------------------------------------------------------
 
-def factor_tree(subdivs:tuple) -> tuple:
+def auto_subdiv(lst:tuple[int], n:int=1) -> tuple[tuple[int]]:
+    def _recurse(idx:int) -> tuple:
+        if idx == len(lst):
+            return ()
+        elt = lst[idx]
+        next_elt = (elt, (1,) * lst[(idx + n) % len(lst)])
+        return (next_elt,) + _recurse(idx + 1)
+    return _recurse(0)
+
+def factor_subdivs(subdivs:tuple) -> tuple:
     def _factor(subdivs, acc):
         for element in subdivs:
             if isinstance(element, tuple):
@@ -99,7 +122,7 @@ def factor_tree(subdivs:tuple) -> tuple:
         return acc
     return tuple(_factor(subdivs, []))
 
-def refactor_tree(subdivs:tuple, factors:tuple[int]) -> tuple:
+def refactor_subdivs(subdivs:tuple, factors:tuple) -> tuple:
     def _refactor(subdivs, index):
         result = []
         for element in subdivs:
@@ -112,11 +135,11 @@ def refactor_tree(subdivs:tuple, factors:tuple[int]) -> tuple:
         return tuple(result), index
     return _refactor(subdivs, 0)[0]
 
-def rotate_tree(subdivs:tuple, n:int=1) -> tuple:
-    factors = factor_tree(subdivs)
+def rotate_subdivs(subdivs:tuple, n:int=1) -> tuple:
+    factors = factor_subdivs(subdivs)
     n = n % len(factors)
     factors = factors[n:] + factors[:n]
-    return refactor_tree(subdivs, factors)
+    return refactor_subdivs(subdivs, factors)
 
 def sum_proportions(S:tuple) -> int:
     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
