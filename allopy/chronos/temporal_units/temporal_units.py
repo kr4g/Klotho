@@ -32,7 +32,7 @@ class TemporalUnit:
         self.__offset    = 0.0
     
     @classmethod
-    def from_tree(cls, tree:Union[Tree, RhythmTree], tempo=None, beat=None):
+    def from_tree(cls, tree:Union[Tree, RhythmTree], tempo = None, beat = None):
         return cls(duration = tree.__duration if isinstance(tree, RhythmTree) else 1,
                    tempus   = tree._root,
                    prolatio = tree._children,
@@ -40,15 +40,15 @@ class TemporalUnit:
                    beat     = beat)
 
     @classmethod
-    def from_subdivs(cls, subdivisions:tuple, duration:int = 1, meas = None, tempo = None, beat = None):
-        return cls(tempus   = meas if meas else Meas(sum(abs(r) * duration for r in measure_ratios(subdivisions))),
+    def from_subdivs(cls, subdivisions:tuple, duration:int = 1, tempo = None, beat = None):
+        return cls(tempus   = Meas(sum(abs(r) * duration for r in measure_ratios(subdivisions))),
                    prolatio = subdivisions,
                    tempo    = tempo,
                    beat     = beat)
 
     @property
     def length(self):
-        return self.__rtree.__duration
+        return self.__rtree.duration
 
     @property
     def tempus(self):
@@ -60,7 +60,7 @@ class TemporalUnit:
     
     @property
     def ratios(self):
-        return self.__rtree.__ratios
+        return self.__rtree.ratios
     
     @property
     def rtree(self):

@@ -23,23 +23,30 @@ class _nkany(CPS, ABC):
   
   def __init__(self, factors:tuple[int], r:int, normalized:bool = False):
     super().__init__(factors, r)
-    self.__products, self.__ratios = self._calculate(normalized)
+    self._products, self._ratios = self._calculate(normalized)
 
   @property
   def products(self):
-    return self.__products
+    return self._products
   
   @property
   def ratios(self):
-    return self.__ratios
+    return self._ratios
 
   def _calculate(self, normalize:bool):
-    products = tuple(prod(comb) for comb in self.__combos)
+    products = tuple(prod(comb) for comb in self._combos)
     norm_prod = min(products) if normalize else 1
     ratios = tuple(sorted(fold_interval(Fraction(product, norm_prod)) for product in products))
     if normalize:
       ratios = ratios[1:] + (Fraction(2),)
     return products, ratios
+  
+  def __str__(self):
+    ratios = ', '.join(str(ratio) for ratio in self._ratios)
+    return super().__str__() + (
+      f'Products: {self._products}\n'
+      f'Ratios:   {ratios}\n'
+    )
 
 class Hexany(_nkany):
   '''

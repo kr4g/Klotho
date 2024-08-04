@@ -21,10 +21,9 @@ from fractions import Fraction
 from typing import Union, Tuple
 # from math import gcd
 
-# from .rt_algorithms import measure_ratios, sum_proportions, measure_complexity, reduced_decomposition, strict_decomposition
+from allopy.topos.graphs import Tree
 from .algorithms.subdivisions import *
 
-from allopy.topos.graphs import Tree
     
 class Meas:
     '''

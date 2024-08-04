@@ -108,7 +108,7 @@ class Sieve:
         self.__S = set(np.arange(residue, N + 1, modulus))
         self.__N = N
         self.__modulus = modulus
-        self.__residue = residue
+        self._residue = residue
     
     @property
     def S(self):
@@ -124,11 +124,11 @@ class Sieve:
     
     @property
     def r(self):
-        return self.__residue
+        return self._residue
 
     @property
     def congr(self):
-        return Operations.congruent(self.__S, self.__modulus, self.__residue)
+        return Operations.congruent(self.__S, self.__modulus, self._residue)
     
     @property
     def compl(self):
@@ -141,12 +141,12 @@ class Sieve:
             sieve = list(self.__S)
         return (
             f'Period:  {self.__modulus}\n'
-            f'Residue: {self.__residue}\n'
+            f'Residue: {self._residue}\n'
             f'N:       {self.__N}\n'
             f'Sieve:   {sieve}\n'
         )
 
-    def __repr__(self) -> str:        
+    def _repr__(self) -> str:        
         return self.__str__()
     
 
@@ -177,28 +177,28 @@ class CombinationProductSet:
   
   '''
   def __init__(self, factors:tuple[int] = ('A', 'B', 'C', 'D'), r:int = 2):
-    self.__factors = tuple(sorted(factors))
-    self.__r = r
-    self.__combos = set(combinations(self.__factors, self.__r))
+    self._factors = tuple(sorted(factors))
+    self._r = r
+    self._combos = set(combinations(self._factors, self._r))
 
   @property
   def factors(self):
-    return self.__factors
+    return self._factors
   
   @property
   def rank(self):
-    return self.__r
+    return self._r
   
   @property
   def combos(self):
-    return self.__combos
+    return self._combos
   
   def __str__(self):    
     return (        
-        f'Factors: {self.__factors}\n'
-        f'Rank:    {self.__r}\n'
-        f'Combos:  {self.__combos}\n'
+        f'Factors: {self._factors}\n'
+        f'Rank:    {self._r}\n'
+        f'Combos:  {self._combos}\n'
     )
   
-  def __repr__(self) -> str:
+  def _repr__(self) -> str:
     return self.__str__()

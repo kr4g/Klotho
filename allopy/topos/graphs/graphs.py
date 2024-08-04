@@ -1,4 +1,3 @@
-
 class Tree:
     def __init__(self, root, children:tuple):
         self._root = root

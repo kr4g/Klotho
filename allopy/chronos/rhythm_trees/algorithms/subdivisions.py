@@ -112,34 +112,34 @@ def auto_subdiv(lst:tuple[int], n:int=1) -> tuple[tuple[int]]:
         return (next_elt,) + _recurse(idx + 1)
     return _recurse(0)
 
-def factor_subdivs(subdivs:tuple) -> tuple:
-    def _factor(subdivs, acc):
-        for element in subdivs:
-            if isinstance(element, tuple):
-                _factor(element, acc)
-            else:
-                acc.append(element)
-        return acc
-    return tuple(_factor(subdivs, []))
+# def factor_subdivs(subdivs:tuple) -> tuple:
+#     def _factor(subdivs, acc):
+#         for element in subdivs:
+#             if isinstance(element, tuple):
+#                 _factor(element, acc)
+#             else:
+#                 acc.append(element)
+#         return acc
+#     return tuple(_factor(subdivs, []))
 
-def refactor_subdivs(subdivs:tuple, factors:tuple) -> tuple:
-    def _refactor(subdivs, index):
-        result = []
-        for element in subdivs:
-            if isinstance(element, tuple):
-                nested_result, index = _refactor(element, index)
-                result.append(nested_result)
-            else:
-                result.append(factors[index])
-                index += 1
-        return tuple(result), index
-    return _refactor(subdivs, 0)[0]
+# def refactor_subdivs(subdivs:tuple, factors:tuple) -> tuple:
+#     def _refactor(subdivs, index):
+#         result = []
+#         for element in subdivs:
+#             if isinstance(element, tuple):
+#                 nested_result, index = _refactor(element, index)
+#                 result.append(nested_result)
+#             else:
+#                 result.append(factors[index])
+#                 index += 1
+#         return tuple(result), index
+#     return _refactor(subdivs, 0)[0]
 
-def rotate_subdivs(subdivs:tuple, n:int=1) -> tuple:
-    factors = factor_subdivs(subdivs)
-    n = n % len(factors)
-    factors = factors[n:] + factors[:n]
-    return refactor_subdivs(subdivs, factors)
+# def rotate_subdivs(subdivs:tuple, n:int=1) -> tuple:
+#     factors = factor_subdivs(subdivs)
+#     n = n % len(factors)
+#     factors = factors[n:] + factors[:n]
+#     return refactor_subdivs(subdivs, factors)
 
 def sum_proportions(S:tuple) -> int:
     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
