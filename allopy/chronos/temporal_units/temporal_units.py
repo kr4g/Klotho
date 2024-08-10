@@ -227,9 +227,12 @@ class TemporalUnit:
         raise ValueError('Invalid Operand')
     
     def __iter__(self):
-        return zip(self.onsets, self.durations)
-
-    def __repr__(self):
+        return iter([{'start': onset, 'duration': duration} for onset, duration in zip(self.onsets, self.durations)])
+    
+    def __len__(self):
+        return len(self.__rtree.ratios)
+    
+    def __str__(self):
         return (
             f'Type:        {self.__type}\n'
             f'Tempus:      {self.__rtree._root}\n'
@@ -237,6 +240,9 @@ class TemporalUnit:
             f'Beat:        {self.__beat}\n'
             f'Prolationis: {self.__rtree.subdivisions}\n'
         )
+
+    def __repr__(self):
+        return self.__str__()
 
 # Temporal Unit Sequence
 class UTSeq:
@@ -295,12 +301,10 @@ class UTSeq:
         raise ValueError('Invalid Operand')
 
     def __iter__(self):
-        # out = []
-        # for i, ut in enumerate(self.__seq):
-        #     for start, duration in ut:
-        #         out.append((i, start + self.onsets[i], duration))
-        # return iter(out)
-        return zip(self.onsets, self.durations)
+        return iter(self.__seq)
+    
+    def __len__(self):
+        return sum(len(ut) for ut in self.__seq)
 
 # Time Block
 class TB:

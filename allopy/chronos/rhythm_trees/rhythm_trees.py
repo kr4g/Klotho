@@ -226,6 +226,9 @@ class RhythmTree(Tree):
             return 'complex'
         return 'complex' if measure_complexity(self._children) else 'simple'
 
+    def __len__(self):
+        return len(self.__ratios)
+
     def __repr__(self):
         ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
         return (
