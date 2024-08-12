@@ -89,7 +89,7 @@ class TemporalUnit:
     @property
     def onsets(self):
         if self.__tempo is None:
-            return None
+            raise ValueError('Tempo is not set')
         if self.__onsets is None:
             self.__onsets = tuple(onset + self.__offset for onset in calc_onsets(self.durations))
         return self.__onsets
@@ -110,7 +110,13 @@ class TemporalUnit:
     def duration(self):
         if self.__tempo is None:
             raise ValueError('Tempo is not set')
-        return sum(abs(d) for d in self.durations)
+        return sum(abs(d) for d in self.__durations)
+    
+    @prolationis.setter
+    def prolationis(self, prolatio:Union[tuple,str]):
+        self.__rtree     = self._set_rtree(self.__rtree.duration, self.__rtree._root, prolatio)
+        self.__onsets    = None
+        self.__durations = None
     
     @tempo.setter
     def tempo(self, tempo:Union[None,float,int]):
@@ -129,6 +135,7 @@ class TemporalUnit:
         self.__offset = offset
         self.__onsets = None
         
+    # TODO: make free method in UT algos
     def decompose(self, prolatio:Union[RhythmTree,tuple,str] = 'd') -> 'UTSeq':
         if prolatio.lower() in {'s'}: prolatio = self.__rtree.subdivisions
         return UTSeq(TemporalUnit(tempus   = ratio,
@@ -275,6 +282,10 @@ class UTSeq:
     @property
     def offset(self):
         return self.__offset
+    
+    @property
+    def size(self):
+        return len(self.__seq)
     
     @offset.setter
     def offset(self, offset:float):

@@ -24,7 +24,6 @@ from typing import Union, Tuple
 from allopy.topos.graphs import Tree
 from .algorithms.subdivisions import *
 
-    
 class Meas:
     '''
     Time signature class that preserves unreduced fractions.

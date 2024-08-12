@@ -155,7 +155,7 @@ def measure_complexity(tree:tuple) -> bool:
         if isinstance(s, tuple):
             D, S = s
             div = sum_proportions(S)
-            # XXX - this only works for duple meters!!!!!
+            # XXX - only works for binary meters!!!
             if bin(div).count("1") != 1 and div != D:
                 return True
             else:
