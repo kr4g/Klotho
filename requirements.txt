@@ -11,3 +11,4 @@ sympy
 networkx
 hypernetx
 python-osc
+opencv-python

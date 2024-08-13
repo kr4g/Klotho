@@ -81,40 +81,40 @@ ek = CPS.Pentadekany()
 
 # ------------------------------------------------------------------------------------
 # COMPOSITIONAL PROCESS --------------------------------------------------------------
-# print(utseq.duration)
-# for j, ut in enumerate(utseq):
-#     # min_dur = min(ut.durations)
-#     # max_dur = max(ut.durations)
-#     dur_scale = np.interp(j, [0, utseq.size], [0.167, 0.667])
-#     for i, event in enumerate(ut):
-#         if event['duration'] < 0: continue
-#         duration = event['duration'] * dur_scale
-#         scheduler.add_new_event('glitchRandom2', event['start'], duration=duration)
-#         # scheduler.add_new_event('bassDrum', event['start'])
+print(utseq.duration)
+for j, ut in enumerate(utseq):
+    # min_dur = min(ut.durations)
+    # max_dur = max(ut.durations)
+    dur_scale = np.interp(j, [0, utseq.size], [0.167, 0.667])
+    for i, event in enumerate(ut):
+        if event['duration'] < 0: continue
+        duration = event['duration'] * dur_scale
+        scheduler.add_new_event('random', event['start'], duration=duration, seed=np.random.randint(1000))
+        # scheduler.add_new_event('bassDrum', event['start'])
 
 # ------------
 
-ut_0 = UT(tempus=tempus, duration=16, prolatio=autoref(rp((3,5,7,11), True)), tempo=28, beat='1/8')
-print(ut_0.duration)
-ratios = list(ek.ratios)
-np.random.shuffle(ratios)
-rat_seq = cycle(ratios)
-synth_cycle = cycle(['glockenspiel', 'vibraphone', 'celeste', 'chime'])
-for i, event in enumerate(ut_0):
-    r = next(rat_seq)
-    synth = next(synth_cycle)
-    root = 666.0 * 2.0
-    root = root * 2.0 if synth == 'chime' else root
-    amp_scale = 0.5
-    if np.random.uniform() < 0.5:
-        r = 1 / r
-        synth = 'syn'
-        root = 666.0 * np.random.choice([0.5, 1.0, 1.0, 2.0, 4.0])
-        amp_scale = np.interp(root, [333.0, 1332.0], [1.167, 0.83])
-    freq = root * r
-    amp = np.random.uniform(0.005, 0.1)
-    dur_scale = np.interp(amp, [0.005, 0.1], [13.0, 3.0])
-    scheduler.add_new_event(synth, event['start'], duration=event['duration']*dur_scale, freq=freq, amp=amp*amp_scale)
+# ut_0 = UT(tempus=tempus, duration=16, prolatio=autoref(rp((3,5,7,11), True)), tempo=28, beat='1/8')
+# print(ut_0.duration)
+# ratios = list(ek.ratios)
+# np.random.shuffle(ratios)
+# rat_seq = cycle(ratios)
+# synth_cycle = cycle(['glockenspiel', 'vibraphone', 'celeste', 'chime'])
+# for i, event in enumerate(ut_0):
+#     r = next(rat_seq)
+#     synth = next(synth_cycle)
+#     root = 666.0 * 2.0
+#     root = root * 2.0 if synth == 'chime' else root
+#     amp_scale = 0.5
+#     if np.random.uniform() < 0.5:
+#         r = 1 / r
+#         synth = 'syn'
+#         root = 666.0 * np.random.choice([0.5, 1.0, 1.0, 2.0, 4.0])
+#         amp_scale = np.interp(root, [333.0, 1332.0], [1.167, 0.83])
+#     freq = root * r
+#     amp = np.random.uniform(0.005, 0.1)
+#     dur_scale = np.interp(amp, [0.005, 0.1], [13.0, 3.0])
+#     scheduler.add_new_event(synth, event['start'], duration=event['duration']*dur_scale, freq=freq, amp=amp*amp_scale)
 
 # # ------------------------------------------------------------------------------------
 # # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

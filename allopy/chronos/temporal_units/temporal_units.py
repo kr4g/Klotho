@@ -33,7 +33,7 @@ class TemporalUnit:
     
     @classmethod
     def from_tree(cls, tree:Union[Tree, RhythmTree], tempo = None, beat = None):
-        return cls(duration = tree.__duration if isinstance(tree, RhythmTree) else 1,
+        return cls(duration = tree.duration if isinstance(tree, RhythmTree) else 1,
                    tempus   = tree._root,
                    prolatio = tree._children,
                    tempo    = tempo,
@@ -110,7 +110,7 @@ class TemporalUnit:
     def duration(self):
         if self.__tempo is None:
             raise ValueError('Tempo is not set')
-        return sum(abs(d) for d in self.__durations)
+        return sum(abs(d) for d in self.durations)
     
     @prolationis.setter
     def prolationis(self, prolatio:Union[tuple,str]):
@@ -273,7 +273,7 @@ class UTSeq:
     
     @property
     def duration(self):
-        return sum(self.durations)
+        return sum(abs(d) for d in self.durations)
 
     @property
     def T(self):
@@ -353,6 +353,10 @@ class TB:
     @property
     def axis(self):
         return self.__axis
+    
+    @property
+    def size(self):
+        return len(self.__tb)
 
     # XXX - TO DO:
     @axis.setter
