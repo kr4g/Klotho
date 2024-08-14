@@ -47,7 +47,7 @@ SynthDef(\freeverb, {
 	var sig;
 	sig = In.ar(0, 2);
 	sig = LPF.ar(sig, 2500);
-	sig = FreeVerb.ar(sig, mix: 0.8, room: 0.96, damp: 0.05);
+	sig = FreeVerb.ar(sig, mix: 0.33, room: 0.6, damp: 0.15);
 	Out.ar(\out.kr(0), sig);
 }).add;
 
@@ -61,7 +61,7 @@ SynthDef(\hall, {
 ~fx = Synth.tail(nil, \freeverb);
 
 ~scheduler = EventScheduler.new(s);
-~scheduler.events;
+~scheduler.events.size;
 ~scheduler.scheduleEvents;
 
-~rec.("rt_ex4", ~scheduler, 130);
+~rec.("1_cps_ex1", ~scheduler, 130);

@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Union
 from math import prod
-from itertools import combinations
+# from itertools import combinations
 from fractions import Fraction
 
 from allopy.topos.sets import CombinationProductSet as CPS
@@ -23,7 +23,7 @@ class _nkany(CPS, ABC):
   
   def __init__(self, factors:tuple[int], r:int, normalized:bool = False):
     super().__init__(factors, r)
-    self._products, self._ratios = self._calculate(normalized)
+    self._products, self._ratios, self._combo_to_ratio = self._calculate(normalized)
 
   @property
   def products(self):
@@ -32,14 +32,44 @@ class _nkany(CPS, ABC):
   @property
   def ratios(self):
     return self._ratios
-
+  
+  def combo_ratio(self, combo:tuple[int]):
+    return self._combo_to_ratio[combo]
+  
+  # def _calculate(self, normalize:bool):
+  #   products = tuple(sorted(prod(comb) for comb in self._combos))
+  #   norm_prod = min(products) if normalize else 1
+  #   ratios = tuple(sorted(fold_interval(Fraction(product, norm_prod)) for product in products))
+    
+  #   if normalize:
+  #     ratios = ratios[1:] + (Fraction(2),)
+  #   return products, ratios
+  
   def _calculate(self, normalize:bool):
-    products = tuple(prod(comb) for comb in self._combos)
-    norm_prod = min(products) if normalize else 1
-    ratios = tuple(sorted(fold_interval(Fraction(product, norm_prod)) for product in products))
-    if normalize:
-      ratios = ratios[1:] + (Fraction(2),)
-    return products, ratios
+        products = []
+        ratios = []
+        combo_to_ratio = {}
+        
+        for combo in self._combos:
+            product = prod(combo)
+            products.append(product)
+        
+        norm_prod = min(products) if normalize else 1
+        
+        for combo, product in zip(self._combos, products):
+            ratio = fold_interval(Fraction(product, norm_prod))
+            ratios.append(ratio)
+            combo_to_ratio[combo] = ratio
+        
+        # Sort products and ratios
+        sorted_products = tuple(sorted(products))
+        sorted_ratios = tuple(sorted(ratios))
+        
+        if normalize:
+            sorted_ratios = sorted_ratios[1:] + (Fraction(2),)
+        
+        return sorted_products, sorted_ratios, combo_to_ratio
+
   
   def __str__(self):
     ratios = ', '.join(str(ratio) for ratio in self._ratios)
@@ -59,11 +89,11 @@ class Hexany(_nkany):
         https://en.xen.wiki/w/Hexany
   
   '''  
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7)):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7), normalized:bool = False):
     # Hexany must be 4 factors with rank 2
     if len(factors) != 4:
       raise ValueError('Hexany must have exactly 4 factors.')
-    super().__init__(factors, r=2)
+    super().__init__(factors, r=2, normalized=normalized)
 
 class Dekany(_nkany):
   '''
@@ -74,12 +104,12 @@ class Dekany(_nkany):
   see: https://en.xen.wiki/w/Dekany
   
   '''
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 11), r:int = 2):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 11), r:int = 2, normalized:bool = False):
     if len(factors) != 5:
       raise ValueError('Dekany must have exactly 5 factors.')
     if not r in (2, 3):
       raise ValueError('Dekany rank must be 2 or 3.')
-    super().__init__(factors, r)
+    super().__init__(factors, r, normalized)
     
 class Pentadekany(_nkany):
   '''
@@ -92,12 +122,12 @@ class Pentadekany(_nkany):
   see: https://en.xen.wiki/w/Pentadekany
   
   '''
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 11, 13), r:int = 2):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 11, 13), r:int = 2, normalized:bool = False):
     if len(factors) != 6:
       raise ValueError('Pentadekany must have exactly 6 factors.')
     if not r in (2, 4):
       raise ValueError('Pentadekany rank must be 2 or 4.')
-    super().__init__(factors, r)
+    super().__init__(factors, r, normalized)
 
 class Eikosany(_nkany):
   '''
@@ -108,11 +138,11 @@ class Eikosany(_nkany):
   see:  https://en.xen.wiki/w/Eikosany
   
   '''
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11)):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11), normalized:bool = False):
     # Eikosany must be exactly 6 factors with rank 3
     if len(factors) != 6:
       raise ValueError('Eikosany must have exactly 6 factors.')
-    super().__init__(factors, r=3)
+    super().__init__(factors, r=3, normalized=normalized)
 
 class Diamond:
   '''
