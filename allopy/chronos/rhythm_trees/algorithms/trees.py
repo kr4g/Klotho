@@ -1,7 +1,7 @@
 from typing import Tuple
 
 from allopy.topos.graphs.graph_algorithms import rotate_tree as _rotate_tree
-from ..rhythm_trees import RhythmTree, Fraction
+from ..rhythm_tree import RhythmTree, Fraction
 from .subdivisions import sum_proportions, reduce, lcm
 
 def ratios_to_tree(lst:Tuple[Fraction]) -> RhythmTree:

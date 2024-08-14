@@ -1,4 +1,6 @@
 import numpy as np
+from collections.abc import Iterable
+from itertools import cycle
 
 class Norg:
     '''
@@ -62,3 +64,25 @@ class Norg:
 
         '''
         pass
+
+
+class NestedCycle:
+    def __init__(self, iterable):
+        self.cycles = self._create_cycles(iterable)
+
+    def _create_cycles(self, item):
+        if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
+            return cycle([self._create_cycles(subitem) for subitem in item])
+        return item
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self._get_next(self.cycles)
+
+    def _get_next(self, cyc):
+        item = next(cyc)
+        while isinstance(item, cycle):
+            item = self._get_next(item)
+        return item

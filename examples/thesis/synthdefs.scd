@@ -160,79 +160,18 @@ SynthDef(\honk, {
 	Out.ar(\out.kr(0), snd);
 }).add;
 
-// SynthDef(\flute, {
-// 	var snd, freq;
-// 	freq = \freq.kr(1000).lag(\freqLag.kr(0.01)).cpsmidi.lag(0.04).midicps * (LFNoise2.kr(3) * 0.1).midiratio;
-// 	freq = freq * (Env([0, 0, -1, -1], [3, 1, 3], \sine).ar * \bend.kr(0)).midiratio;
-// 	snd = SinOsc.ar(freq) * (1 + (LFNoise2.ar(60) * 0.5)) * -15.dbamp;
-// 	snd = snd + DelayC.ar(snd * Line.kr(0, 1, 0.01), 0.3, LFNoise2.kr(3 ! 2).linlin(-1, 1, 0, 1) * 5e-3);
-// 	snd = snd.tanh;
-// 	snd = snd * Env.asr(0.01, 1.0, \decay.kr(0.3)).ar(Done.freeSelf, \gate.kr(1));
-// 	snd = snd * -12.dbamp;
-// 	snd = Pan2.ar(snd, \pan.kr(0));
-// 	snd = snd * \amp.kr(1).lag(\ampLag.kr(0.1));
-// 	Out.ar(\out.kr(0), snd);
-// }).add;
-//
-// // Oboe SynthDef
-// SynthDef(\oboe, {
-// 	var snd, freq, env;
-// 	freq = \freq.kr(440).lag(\freqLag.kr(0.05));
-// 	freq = freq * (Env([0, 0, -0.5, -0.5], [2, 0.5, 2], \sine).ar * \bend.kr(0)).midiratio;
-// 	snd = Saw.ar(freq) + Pulse.ar(freq * 2, 0.5) * 0.3;
-// 	snd = RLPF.ar(snd, freq * 8, 0.6);
-// 	snd = snd * -12.dbamp;
-// 	env = Env.asr(0.05, 1, \decay.kr(0.2)).ar(Done.freeSelf, \gate.kr(1));
-// 	snd = snd * env;
-// 	snd = Pan2.ar(snd, \pan.kr(0));
-// 	snd = snd * \amp.kr(1).lag(\ampLag.kr(0.1));
-// 	Out.ar(\out.kr(0), snd);
-// }).add;
-//
-// // Clarinet SynthDef
-// SynthDef(\clarinet, {
-// 	var snd, freq, env;
-// 	freq = \freq.kr(220).lag(\freqLag.kr(0.06));
-// 	freq = freq * (Env([0, 0, -0.7, -0.7], [2.5, 0.7, 2.5], \sine).ar * \bend.kr(0)).midiratio;
-// 	snd = Pulse.ar(freq, 0.5) * 0.6 + Pulse.ar(freq * 3, 0.5) * 0.1;
-// 	snd = LPF.ar(snd, freq * 6);
-// 	snd = snd * -10.dbamp;
-// 	env = Env.asr(0.08, 1, \decay.kr(0.3)).ar(Done.freeSelf, \gate.kr(1));
-// 	snd = snd * env;
-// 	snd = Pan2.ar(snd, \pan.kr(0));
-// 	snd = snd * \amp.kr(1).lag(\ampLag.kr(0.1));
-// 	Out.ar(\out.kr(0), snd);
-// }).add;
-//
-// // Bassoon SynthDef
-// SynthDef(\bassoon, {
-// 	var snd, freq, env;
-// 	freq = \freq.kr(110).lag(\freqLag.kr(0.08));
-// 	freq = freq * (Env([0, 0, -0.3, -0.3], [3, 1, 3], \sine).ar * \bend.kr(0)).midiratio;
-// 	snd = Saw.ar(freq) * 0.5 + Saw.ar(freq * 2) * 0.2;
-// 	snd = RLPF.ar(snd, freq * 4, 0.7);
-// 	snd = snd * -8.dbamp;
-// 	env = Env.asr(0.1, 1, \decay.kr(0.4)).ar(Done.freeSelf, \gate.kr(1));
-// 	snd = snd * env;
-// 	snd = Pan2.ar(snd, \pan.kr(0));
-// 	snd = snd * \amp.kr(1).lag(\ampLag.kr(0.1));
-// 	Out.ar(\out.kr(0), snd);
-// }).add;
-//
-// // French Horn SynthDef
-// SynthDef(\frenchhorn, {
-// 	var snd, freq, env;
-// 	freq = \freq.kr(165).lag(\freqLag.kr(0.07));
-// 	freq = freq * (Env([0, 0, -0.8, -0.8], [2.2, 0.8, 2.2], \sine).ar * \bend.kr(0)).midiratio;
-// 	snd = Saw.ar(freq) * 0.7 + SinOsc.ar(freq) * 0.3;
-// 	snd = BPF.ar(snd, freq * 2, 0.8);
-// 	snd = snd * -9.dbamp;
-// 	env = Env.asr(0.06, 1, \decay.kr(0.25)).ar(Done.freeSelf, \gate.kr(1));
-// 	snd = snd * env;
-// 	snd = Pan2.ar(snd, \pan.kr(0));
-// 	snd = snd * \amp.kr(1).lag(\ampLag.kr(0.1));
-// 	Out.ar(\out.kr(0), snd);
-// }).add;
+SynthDef(\ping, {
+	var snd;
+	snd = SinOsc.ar(\freq.kr(440));
+	snd = snd * Env.perc(0.001, 1.0).ar;
+	snd = snd * (1 + Env.perc(0.0, 0.1).ar);
+	snd = Latch.ar(snd, Impulse.ar(3000));
+	snd = LPF.ar(snd, 3000);
+	snd = snd + GVerb.ar(DelayC.ar(snd, 0.2, LFNoise2.ar(3).linlin(-1, 1, 0, 1) * 5e-3) * -5.dbamp, 30, 10);
+	snd = snd * Env.perc(0.0, 15.0).ar(Done.freeSelf);
+	snd = snd * \amp.kr(-35.dbamp);
+	Out.ar(\out.kr(0), snd);
+}).add;
 
 // Flute SynthDef (updated)
 SynthDef(\flute, {

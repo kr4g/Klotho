@@ -6,9 +6,9 @@ sys.path.append(str(root_path))
 
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
-from allopy.chronos.temporal_units import UTSeq, TemporalUnit as UT
+from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
 from allopy.chronos import seconds_to_hmsms
-from allopy.aikous import db_amp
+from allopy.aikous.dynamics import db_amp
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
@@ -22,7 +22,7 @@ tempus_rest = '1/4'
 beat = '1/4'
 bpm = 92
 
-utseq = UTSeq(
+utseq = TemporalUnitSequence(
     (
         UT(tempus=tempus, prolatio=(3,2,7,5), tempo=bpm, beat=beat),
         UT(tempus=tempus_rest, prolatio='r', tempo=bpm, beat=beat),

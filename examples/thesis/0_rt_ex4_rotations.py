@@ -8,8 +8,8 @@ sys.path.append(str(root_path))
 # IMPORTS -----------------------------------------------------------------------------
 from allopy.topos import autoref
 from allopy.topos.graphs.graph_algorithms import factor_children
-from allopy.chronos.temporal_units import UTSeq, TB, TemporalUnit as UT
-from allopy.chronos.rhythm_trees.rhythm_trees import *
+from allopy.chronos.temporal_units import TemporalUnitSequence, TB, TemporalUnit as UT
+from allopy.chronos.rhythm_trees.rhythm_tree import *
 from allopy.chronos.rhythm_trees.algorithms.trees import flatten_tree, ratios_to_tree, rotate_tree
 from allopy.chronos.rhythm_trees.algorithms.subdivisions import auto_subdiv
 from allopy.chronos import seconds_to_hmsms, beat_duration
@@ -27,7 +27,7 @@ from itertools import cycle
 def ut_dur(ut:UT):
     return beat_duration(str(ut.tempus), bpm=ut.tempo, beat_ratio=ut.beat)
 
-def ut_seq_dur(utseq:UTSeq):
+def ut_seq_dur(utseq:TemporalUnitSequence):
     return sum(ut_dur(ut) for ut in utseq)
 
 def swell(n, min_val=0.0, max_val=1.0):
@@ -53,10 +53,10 @@ rots = []
 for i in range(len(factor_children(rt_prime.subdivisions))):
 # for i in range(5):
     # print(rotate_tree(rt_prime, i))
-    rots.append(UTSeq((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
+    rots.append(TemporalUnitSequence((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
 
 tb = TB(tuple(rots))
-# utseq = UTSeq(rots)
+# utseq = TemporalUnitSequence(rots)
 # print(f'{ut_seq_dur(utseq)} ({seconds_to_hmsms(ut_seq_dur(utseq))})')
 
 for i, utseq in enumerate(tb):

@@ -1,3 +1,3 @@
-from .temporal_units import *
+from .temporal_unit import *
 
 __all__ = []

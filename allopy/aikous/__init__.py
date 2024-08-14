@@ -15,7 +15,8 @@ humans, into algebraic musical representations.
 --------------------------------------------------------------------------------------
 '''
 
-from .aikous import *
+from .dynamics import *
+from .enevelopes import *
 
 __all__ = [
     # 'Dynamics',

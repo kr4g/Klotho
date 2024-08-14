@@ -7,8 +7,8 @@ sys.path.append(str(root_path))
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
 from allopy.topos import autoref
-from allopy.chronos.temporal_units import UTSeq, TemporalUnit as UT
-from allopy.tonos.JI import combination_sets as CPS
+from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
+from allopy.tonos.combination_product_sets import nkany as NKany
 from allopy.chronos.rhythm_trees import rhythm_pair as rp
 
 from allopy.skora import animate
@@ -40,7 +40,7 @@ bpm = 132
 # ut = UT(tempus=tempus, prolatio=(3,1,2,1), tempo=bpm, beat=beat)
 # print(ut)
 
-utseq = UTSeq(
+utseq = TemporalUnitSequence(
     (
         UT(tempus=tempus, prolatio=(1,1,1,1), tempo=bpm, beat=beat),
         UT(tempus=tempus, prolatio='r', tempo=bpm, beat=beat),
@@ -54,7 +54,7 @@ utseq = UTSeq(
         UT(tempus=tempus, prolatio='r', tempo=bpm, beat=beat),
     )
 )
-# utseq = UTSeq(
+# utseq = TemporalUnitSequence(
 #     (
 #         UT(tempus=tempus, prolatio=(3,2,7,5), tempo=bpm, beat=beat),
 #         UT(tempus=tempus, prolatio='r', tempo=bpm, beat=beat),
@@ -73,7 +73,7 @@ utseq = UTSeq(
 #     )
 # )
 
-ek = CPS.Pentadekany()
+ek = NKany.Pentadekany()
 # print(ek)
 
 # ------------------------------------------------------------------------------------

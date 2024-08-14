@@ -7,8 +7,8 @@ sys.path.append(str(root_path))
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
 from allopy.topos import autoref
-from allopy.chronos.temporal_units import UTSeq, TemporalUnit as UT
-from allopy.chronos.rhythm_trees.rhythm_trees import *
+from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
+from allopy.chronos.rhythm_trees.rhythm_tree import *
 from allopy.chronos.rhythm_trees.algorithms.trees import flatten_tree, ratios_to_tree
 from allopy.chronos.rhythm_trees.algorithms.subdivisions import auto_subdiv
 from allopy.chronos import seconds_to_hmsms, beat_duration
@@ -80,7 +80,7 @@ seq_rev = seq_rev[::-1]
 full_seq = [val for pair in zip(seq, seq_rev) for val in pair]
 # print(full_seq)
 
-utseq = UTSeq(full_seq)
+utseq = TemporalUnitSequence(full_seq)
 # print(utseq.duration)
 glitch = cycle(['random', 'glitch1', 'random', 'random'])
 dnb = cycle(['kick2', 'kick2', 'snare', 'kick2', 'kick2', 'perc', 'kick2', 'hat', 'perc2'])

@@ -18,10 +18,10 @@ s.options.memSize_(2.pow(20));
 // ServerQuit.removeAll;
 s.reboot;
 )
+Synth(\default)
 
 "/Users/ryanmillett/allolib_playground/AlloPy/examples/thesis/synthdefs.scd".load;
 
-Synth(\default)
 Synth(\random, [\seed, 435])
 Synth(\hat)
 
@@ -30,7 +30,6 @@ Synth(\glitch1, [\freqShift, rand(3800)]);
 x = Synth(\flute, [\gate, 0]);
 x.set(\gate, 1, \freq, 440, \freqLag, exprand(0.01, 0.5), \amp, rand(0.1, 1.0), \ampLag, 1);
 x.set(\freq, exprand(200, 1000));
-
 
 (
 ~rec = { |name, schdlr, dur|
@@ -64,4 +63,4 @@ SynthDef(\hall, {
 ~scheduler.events.size;
 ~scheduler.scheduleEvents;
 
-~rec.("1_cps_ex1", ~scheduler, 130);
+~rec.("1_cps_ex1bb_navigations", ~scheduler, 36);
