@@ -39,7 +39,7 @@ Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python in
 
     Once the interpreter loads, import from `klotho` as needed.
 
-## Feature Overview
+## About
 
 Klotho extends from a lineage of CAC-oriented theories and softwares.  This means that, while Klotho provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with standard notation softwares.  
 
