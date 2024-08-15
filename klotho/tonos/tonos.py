@@ -116,7 +116,7 @@ def midicents_to_pitchclass(midicents: float) -> str:
   cents_diff = (midi - midi_round) * 100
   return f'{pitch_label}{octave}', round(cents_diff, 4)
 
-def ratio_to_cents(ratio: Union[str, float, Fraction], round_to: int = 4) -> float:
+def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -> float:
   '''
   Convert a musical interval ratio to cents, a logarithmic unit of measure.
   
@@ -126,10 +126,17 @@ def ratio_to_cents(ratio: Union[str, float, Fraction], round_to: int = 4) -> flo
   Returns:
     The interval in cents as a float.
   '''
+  # bad...
+  # if isinstance(ratio, str):
+  #   numerator, denominator = map(float, ratio.split('/'))
+  # else:  # assuming ratio is already a float
+  #   numerator, denominator = ratio, 1.0
   if isinstance(ratio, str):
-    numerator, denominator = map(float, ratio.split('/'))
-  else:  # assuming ratio is already a float
-    numerator, denominator = ratio, 1.0
+    ratio = Fraction(ratio)
+    numerator, denominator = ratio.numerator, ratio.denominator
+  else:  # assuming ratio is already a float/int
+    ratio = Fraction(ratio)
+    numerator, denominator = ratio.numerator, ratio.denominator
   return round(1200 * np.log2(numerator / denominator), round_to)
 
 def cents_to_ratio(cents: float) -> str:
