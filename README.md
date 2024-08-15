@@ -1,5 +1,5 @@
 # Klotho
-`Klotho` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general resource for the methods, models, works, and frameworks associated with the art and craft of music composition and multimedia metacomposition.
+`Klotho` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general resource for the methods, models, works, and frameworks associated with the art and craft of music composition and metacomposition.
 
 ---
 
@@ -47,7 +47,7 @@ The ethos of Klotho draws heavily from the concepts and computations possible wi
 
 Klotho seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of Klotho's core features, particularly in the implementation of Rhythm Trees, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of music in its symbolic representations.
 
-Examples from each Klotho module, here used in an 'on-the-fly' context via the Python interpreter:
+<!-- Examples from each Klotho module, here used in an 'on-the-fly' context via the Python interpreter:
 
 ### Rhythm Trees
 
@@ -55,7 +55,7 @@ Examples from each Klotho module, here used in an 'on-the-fly' context via the P
 
 ### Abstract tools for metacomposition:
 
-### Formal Grammars:
+### Formal Grammars: -->
 
 ---   
 
