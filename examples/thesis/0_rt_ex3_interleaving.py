@@ -6,13 +6,13 @@ sys.path.append(str(root_path))
 
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
-from allopy.topos import autoref
-from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
-from allopy.chronos.rhythm_trees.rt import *
-from allopy.chronos.rhythm_trees.algorithms.rts import flatten_tree, ratios_to_tree
-from allopy.chronos.rhythm_trees.algorithms.subdivs import auto_subdiv
-from allopy.chronos import seconds_to_hmsms, beat_duration
-from allopy.aikous import db_amp
+from klotho.topos import autoref
+from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
+from klotho.chronos.rhythm_trees.rt import *
+from klotho.chronos.rhythm_trees.algorithms.rts import flatten_tree, ratios_to_tree
+from klotho.chronos.rhythm_trees.algorithms.subdivs import auto_subdiv
+from klotho.chronos import seconds_to_hmsms, beat_duration
+from klotho.aikous import db_amp
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()

@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 import cv2
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from allopy.chronos.temporal_units import TemporalUnit
+from klotho.chronos.temporal_units import TemporalUnit
 
 # def animate_proportions(proportions, durations):
 #     if len(proportions) != len(durations):

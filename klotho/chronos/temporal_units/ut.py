@@ -1,10 +1,10 @@
 from fractions import Fraction
 from typing import Union
 
-from allopy.topos.graphs import Tree
+from klotho.topos.graphs import Tree
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms.subdivs import measure_ratios, auto_subdiv
-from allopy.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
+from klotho.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
 
 import numpy as np
 

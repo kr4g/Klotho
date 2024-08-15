@@ -6,9 +6,9 @@ sys.path.append(str(root_path))
 
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
-from allopy.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq
-from allopy.chronos import seconds_to_hmsms
-from allopy.aikous.dynamics import db_amp
+from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq
+from klotho.chronos import seconds_to_hmsms
+from klotho.aikous.dynamics import db_amp
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()

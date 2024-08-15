@@ -3,7 +3,7 @@ import hypernetx as hnx
 from math import prod
 from fractions import Fraction
 
-from allopy.tonos.tonos import octave_reduce
+from klotho.tonos.tonos import octave_reduce
 
 def graph_cps(combos:tuple):
     G = nx.Graph()    

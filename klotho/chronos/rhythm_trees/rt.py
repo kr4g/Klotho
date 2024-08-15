@@ -20,8 +20,8 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 from fractions import Fraction
 from typing import Union, Tuple
 
-from allopy.topos.graphs import Tree
-from allopy.topos.graphs.graph_algorithms import rotate_tree
+from klotho.topos.graphs import Tree
+from klotho.topos.graphs.graph_algorithms import rotate_tree
 from .algorithms.subdivs import *
 
 class Meas:

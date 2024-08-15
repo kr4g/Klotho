@@ -3,8 +3,8 @@ from typing import Union, Dict, Tuple
 from math import prod
 from fractions import Fraction
 
-from allopy.topos.sets import CombinationSet as CS
-from allopy.tonos.tonos import fold_interval
+from klotho.topos.sets import CombinationSet as CS
+from klotho.tonos.tonos import fold_interval
 
 class NKany(CS, ABC):
   '''

@@ -6,12 +6,12 @@ sys.path.append(str(root_path))
 
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
-from allopy.topos import autoref
-from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
-from allopy.tonos.combination_product_sets import nkany as NKany
-from allopy.chronos.rhythm_trees import rhythm_pair as rp
+from klotho.topos import autoref
+from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
+from klotho.tonos.combination_product_sets import nkany as NKany
+from klotho.chronos.rhythm_trees import rhythm_pair as rp
 
-from allopy.skora import animate
+from klotho.skora import animate
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()

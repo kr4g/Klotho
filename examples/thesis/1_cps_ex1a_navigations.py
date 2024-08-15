@@ -7,15 +7,15 @@ sys.path.append(str(root_path))
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
 # -------
-from allopy.topos.sets import CombinationSet as CPS
-from allopy.topos.graphs import ComboNet
-from allopy.tonos.combination_product_sets import nkany as NKany
-from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnitMatrix, TemporalUnit as UT
+from klotho.topos.sets import CombinationSet as CPS
+from klotho.topos.graphs import ComboNet
+from klotho.tonos.combination_product_sets import nkany as NKany
+from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnitMatrix, TemporalUnit as UT
 
-from allopy.chronos import seconds_to_hmsms, beat_duration
-from allopy.tonos import fold_interval, fold_freq
-from allopy.aikous import db_amp
-from allopy.aikous import enevelopes as envs
+from klotho.chronos import seconds_to_hmsms, beat_duration
+from klotho.tonos import fold_interval, fold_freq
+from klotho.aikous import db_amp
+from klotho.aikous import enevelopes as envs
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
@@ -41,7 +41,7 @@ def nth_odd(n:int):
 
 import random
 from collections import defaultdict
-from allopy.topos.graphs import ComboNet
+from klotho.topos.graphs import ComboNet
 
 class ComboNetTraversal:
     def __init__(self, combnet: ComboNet):
