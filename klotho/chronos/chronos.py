@@ -1,12 +1,9 @@
 # ------------------------------------------------------------------------------------
-# AlloPy/allopy/chronos/chronos.py
+# Klotho/klotho/chronos/chronos.py
 # ------------------------------------------------------------------------------------
 '''
 --------------------------------------------------------------------------------------
-
-The `chronos` base module provides general functions for performing calculations and
-computations related to time and rhythm in music.
-
+General functions for performing calculations and computations related to time.
 --------------------------------------------------------------------------------------
 '''
 from typing import Union
@@ -50,7 +47,7 @@ class TEMPO(MinMaxEnum):
   Example use:
   `>>> Tempo.Adagio.min`
   '''  
-  Larghissimo                  = (11, 24)
+  Larghissimo                  = (12, 24)
   Adagissimo_Grave             = (24, 40)
   Largo                        = (40, 66)
   Larghetto                    = (44, 66)
@@ -69,7 +66,7 @@ class TEMPO(MinMaxEnum):
   Vivace                       = (156, 176)
   Vivacissimo_Allegrissimo     = (172, 176)
   Presto                       = (168, 200)
-  Prestissimo                  = (200, 305)
+  Prestissimo                  = (200, 300)
 
 def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     '''
@@ -92,7 +89,7 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     ms = int((seconds - s) * 1000)    
     return f'{h}:{m:02}:{s:02}:{ms:03}' if as_string else (h, m, s, ms)
 
-def beat_duration(ratio:Union[Fraction, str], bpm:float, beat_ratio:Union[Fraction, str] = '1/4') -> float:
+def beat_duration(ratio:Union[int, float, Fraction, str], bpm:Union[int, float], beat_ratio:Union[int, float, Fraction, str] = '1/4') -> float:
   '''
   Calculate the duration in seconds of a musical beat given a ratio and tempo.
 
@@ -113,7 +110,6 @@ def beat_duration(ratio:Union[Fraction, str], bpm:float, beat_ratio:Union[Fracti
   return tempo_factor * ratio_value * (beat_ratio.denominator / beat_ratio.numerator)
 
 def calc_onsets(durations:tuple):
-#    return tuple(np.cumsum([abs(r) for r in durations]) - abs(durations[0]))
     return tuple(accumulate([0] + list(abs(r) for r in durations)))
 
 def quantize(duration: float, bpm: float, beat_ratio: str = '1/4', max_denominator: float = 16) -> Fraction:
@@ -183,7 +179,7 @@ def rubato(durations, accelerando=True, intensity=0.5):
     increments = increments * intensity + (1 - intensity)
     increments_scaled = increments / increments.sum() * total_duration
     
-    # Apply correction by scaling
+    # correction by scaling
     corrected_total = increments_scaled.sum()
     scaling_factor = total_duration / corrected_total
     corrected_durations = increments_scaled * scaling_factor

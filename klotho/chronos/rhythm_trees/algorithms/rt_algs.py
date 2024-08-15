@@ -1,22 +1,25 @@
+# ------------------------------------------------------------------------
+# Klotho/klotho/chronos/rhythm_trees/algorithms/subdivs.py
+# ------------------------------------------------------------------------
+'''
+------------------------------------------------------------------------------------
+TREE ALGORITHMS
+---------------
+
+Algorithms that operate on either the S part of a rhythmic tree or its corresponding 
+proportions.
+
+Pseudocode for numbered algorithms by Karim Haddad unless otherwise noted.
+
+"Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
+composed of (DS), that is its part constituting the proportions which can also 
+encompass other tree structures."  —- Karim Haddad
+------------------------------------------------------------------------------------
+'''
 from typing import Tuple
 from fractions import Fraction
 from math import gcd, lcm
 from functools import reduce
-
-# ------------------------------------------------------------------------------------
-# TREE ALGORITHMS
-# ----------------------
-# 
-# Algorithms that operate on either the S part of a rhythmic tree or its corresponding 
-# proportions.
-# 
-# Pseudocode for numbered algorithms by Karim Haddad unless otherwise noted.
-# 
-# "Let us recall that the mentioned part corresponds to the S part of a rhythmic tree 
-# composed of (DS), that is its part constituting the proportions which can also 
-# encompass other tree structures."  —- Karim Haddad
-# ------------------------------------------------------------------------------------
-
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
     '''
@@ -104,6 +107,14 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
 # ------------------------------------------------------------------------------------
 
 def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
+    '''
+    Algorithm: AutoSubdiv
+    
+    Data: S is the part of a RT; n is the number of rotations
+    Result: Automatic subdivision of S
+    
+    TODO: pseudocode
+    '''
     def _recurse(idx:int) -> tuple:
         if idx == len(subdivs):
             return ()
@@ -115,6 +126,8 @@ def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
 # ------------------------------------------------------------------------------------
 
 def sum_proportions(S:tuple) -> int:
+    '''
+    '''
     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
 
 def measure_complexity(subdivs:tuple) -> bool:

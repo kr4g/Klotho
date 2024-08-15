@@ -1,7 +1,3 @@
-'''
-`skora.py`
-'''
-
 from .skora import *
 from .animate import *
 

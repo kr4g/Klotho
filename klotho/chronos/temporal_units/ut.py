@@ -1,9 +1,17 @@
+# ------------------------------------------------------------------------
+# Klotho/klotho/chronos/temporal_units/ut.py
+# ------------------------------------------------------------------------
+'''
+--------------------------------------------------------------------------------------
+Temporal Units
+--------------------------------------------------------------------------------------
+'''
 from fractions import Fraction
 from typing import Union
 
 from klotho.topos.graphs import Tree
 from ..rhythm_trees import Meas, RhythmTree
-from ..rhythm_trees.algorithms.subdivs import measure_ratios, auto_subdiv
+from ..rhythm_trees.algorithms.rt_algs import measure_ratios, auto_subdiv
 from klotho.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
 
 import numpy as np

@@ -10,7 +10,7 @@ from klotho.topos import autoref
 from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
 from klotho.chronos.rhythm_trees.rt import *
 from klotho.chronos.rhythm_trees.algorithms.rts import flatten_tree, ratios_to_tree
-from klotho.chronos.rhythm_trees.algorithms.subdivs import auto_subdiv
+from klotho.chronos.rhythm_trees.algorithms.rt_algs import auto_subdiv
 from klotho.chronos import seconds_to_hmsms, beat_duration
 from klotho.aikous import db_amp
 

@@ -1,12 +1,10 @@
 # ------------------------------------------------------------------------------------
-# AlloPy/allopy/tonos/tonos.py
+# Klotho/klotho/tonos/tonos.py
 # ------------------------------------------------------------------------------------
 '''
 --------------------------------------------------------------------------------------
-
-The `tonos` base module provides general functions for performing calculations and
-computations related to pitch and frequency in music.
-
+General functions for performing calculations and computations related to pitch and 
+frequency.
 --------------------------------------------------------------------------------------
 '''
 from typing import Union, List, Tuple, Dict, Set
@@ -118,7 +116,7 @@ def midicents_to_pitchclass(midicents: float) -> str:
   cents_diff = (midi - midi_round) * 100
   return f'{pitch_label}{octave}', round(cents_diff, 4)
 
-def ratio_to_cents(ratio: Union[str, float], round_to: int = 4) -> float:
+def ratio_to_cents(ratio: Union[str, float, Fraction], round_to: int = 4) -> float:
   '''
   Convert a musical interval ratio to cents, a logarithmic unit of measure.
   
