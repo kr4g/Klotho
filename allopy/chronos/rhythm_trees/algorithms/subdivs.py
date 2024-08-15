@@ -103,55 +103,28 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
 
 # ------------------------------------------------------------------------------------
 
-def auto_subdiv(lst:tuple[int], n:int=1) -> tuple[tuple[int]]:
+def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
     def _recurse(idx:int) -> tuple:
-        if idx == len(lst):
+        if idx == len(subdivs):
             return ()
-        elt = lst[idx]
-        next_elt = (elt, (1,) * lst[(idx + n) % len(lst)])
+        elt = subdivs[idx]
+        next_elt = (elt, (1,) * subdivs[(idx + n) % len(subdivs)])
         return (next_elt,) + _recurse(idx + 1)
     return _recurse(0)
 
-# def factor_subdivs(subdivs:tuple) -> tuple:
-#     def _factor(subdivs, acc):
-#         for element in subdivs:
-#             if isinstance(element, tuple):
-#                 _factor(element, acc)
-#             else:
-#                 acc.append(element)
-#         return acc
-#     return tuple(_factor(subdivs, []))
-
-# def refactor_subdivs(subdivs:tuple, factors:tuple) -> tuple:
-#     def _refactor(subdivs, index):
-#         result = []
-#         for element in subdivs:
-#             if isinstance(element, tuple):
-#                 nested_result, index = _refactor(element, index)
-#                 result.append(nested_result)
-#             else:
-#                 result.append(factors[index])
-#                 index += 1
-#         return tuple(result), index
-#     return _refactor(subdivs, 0)[0]
-
-# def rotate_subdivs(subdivs:tuple, n:int=1) -> tuple:
-#     factors = factor_subdivs(subdivs)
-#     n = n % len(factors)
-#     factors = factors[n:] + factors[:n]
-#     return refactor_subdivs(subdivs, factors)
+# ------------------------------------------------------------------------------------
 
 def sum_proportions(S:tuple) -> int:
     return sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in S)
 
-def measure_complexity(tree:tuple) -> bool:
+def measure_complexity(subdivs:tuple) -> bool:
     '''
     Assumes a tree in the form (D S) where D represents a duration and S represents a list
     of subdivisions.  S can be also be in the form (D S).
 
     Recursively traverses the tree.  For any element, if the sum of S != D, return True.
     '''    
-    for s in tree:
+    for s in subdivs:
         if isinstance(s, tuple):
             D, S = s
             div = sum_proportions(S)

@@ -8,9 +8,9 @@ sys.path.append(str(root_path))
 # IMPORTS -----------------------------------------------------------------------------
 from allopy.topos import autoref
 from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as UT
-from allopy.chronos.rhythm_trees.rhythm_tree import *
-from allopy.chronos.rhythm_trees.algorithms.trees import flatten_tree, ratios_to_tree
-from allopy.chronos.rhythm_trees.algorithms.subdivisions import auto_subdiv
+from allopy.chronos.rhythm_trees.rt import *
+from allopy.chronos.rhythm_trees.algorithms.rts import flatten_tree, ratios_to_tree
+from allopy.chronos.rhythm_trees.algorithms.subdivs import auto_subdiv
 from allopy.chronos import seconds_to_hmsms, beat_duration
 from allopy.aikous import db_amp
 

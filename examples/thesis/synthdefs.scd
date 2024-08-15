@@ -70,6 +70,37 @@ SynthDef(\hat, {
 	Out.ar(\out.kr(0), snd);
 }).add;
 
+SynthDef(\hatOpen, {
+	var snd;
+	snd = BPF.ar(Hasher.ar(Sweep.ar), [8312, 12.3e3], 0.05);
+	snd = snd * [0, -3].dbamp;
+	snd = snd.sum * 6.dbamp;
+	snd = snd * Env.linen(0.003, 0.04, 0.001, curve: -4).ar(Done.freeSelf);
+	snd = snd * -6.dbamp;
+	snd = Pan2.ar(snd, \pan.kr(0));
+	Out.ar(\out.kr(0), snd);
+}).add;
+
+SynthDef(\crash, {
+	var snd, fb;
+	snd = Hasher.ar(Sweep.ar) * Env.perc(0.001, 1.0).ar;
+	snd = BPF.ar(snd, XLine.ar([3120, 6340], [1200, 920], 0.02), 0.3).sum;
+	snd = snd + (BPF.ar(Hasher.ar(Sweep.ar), 8120, 0.1) * Env([0, 1, 0, 1, 0], [0.001, 0.01, 0.001, 0.01], curve: -4).ar * 5.dbamp);
+	snd = snd.tanh;
+
+	snd = snd + GVerb.ar(snd * -10.dbamp, 10, 10);
+	snd = snd * (1 + (0.5 * LFNoise2.ar(20 ! 2)));
+	snd = snd * (1 + (0.5 * LFNoise2.ar(60 ! 2)));
+	snd = snd + PitchShift.ar(snd, 0.23, 2.45);
+	snd = snd + PitchShift.ar(snd, 0.13, 3.45);
+	snd = snd + GVerb.ar(snd.sum * -10.dbamp, 23, 10);
+	snd = snd * -10.dbamp;
+
+	snd = snd * Env.linen(0, \duration.kr(10), 0.1, curve: -4).ar(Done.freeSelf);
+
+	Out.ar(\out.kr(0), snd);
+}).add;
+
 SynthDef(\perc, {
 	var snd;
 	snd = SinOsc.ar(\freq.kr(920) * (1.5 ** [0, 1, 2])).sum;
@@ -120,6 +151,17 @@ SynthDef(\glitch2, {
 	snd = snd * \amp.kr(1);
 	snd = snd * -8.dbamp;
 	Out.ar(\out.kr, snd);
+}).add;
+
+SynthDef(\ping, {
+	var snd, duration;
+	duration = \duration.kr(1.0);
+	snd = SinOsc.ar(\freq.kr(1000));
+	snd = snd * (1 + Env.perc(0, 0.01).ar);
+	snd = snd * Env.perc(0, 0.1).ar ! 2;
+	snd = snd * Env.linen(0, duration, 0.005, curve: -4).ar(Done.freeSelf);
+	snd = snd * -10.dbamp;
+	Out.ar(\out.kr(0), snd);
 }).add;
 
 SynthDef(\fx, {
@@ -249,8 +291,6 @@ SynthDef(\frenchhorn, {
     Out.ar(\out.kr(0), snd);
 }).add;
 
-
-
 SynthDef(\random, {
 	var snd, random, randomState;
 	randomState = \seed.kr(0);
@@ -266,6 +306,4 @@ SynthDef(\random, {
 	snd = snd * \amp.kr(1) * -10.dbamp;
 	Out.ar(\out.kr(0), snd);
 }).add;
-
-
 )

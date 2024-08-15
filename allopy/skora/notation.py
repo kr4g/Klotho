@@ -289,3 +289,37 @@
 #             pi, ps = pow_n_bounds(n, 2)
 #             m = ps if abs(n - pi) > abs(n - ps) else pi
 #     return [n, m]
+
+# def notate(tree):
+#     def _notate(tree, level=0):
+#         if level == 0:
+#             return f'\\time {tree.time_signature}\n' + _notate(tree, level + 1)
+        
+#         # print(f'tree: {tree}, level: {level}')
+#         if level == 1:
+#             S = add_ties(tree.subdivisions)
+#             tup = tree.time_signature.numerator, (sum_proportions(tree.subdivisions),)
+#             n, m = get_group_subdivision(tup)
+#             if n == m: # no tuplet
+#                 return _notate(S, level + 1)
+#             return f'\\tuplet {n}/{m} ' + '{' + _notate(S, level + 1) + '}'
+#         else:
+#             result = ""
+#             for element in tree:
+#                 if isinstance(element, (int, float)):      # Rest or single note
+#                     if element < 0:     # Rest
+#                         result += f" r{abs(element)}"
+#                     else:       # Single note
+#                         result += f" {element}"
+#                 elif isinstance(element, tuple):           # Subdivision                
+#                     D, S = element
+#                     tup = D, (sum_proportions(S),)
+#                     n, m = get_group_subdivision(tup)
+#                     if n == m:
+#                         result += f' {_notate(S, level + 1)}'
+#                     else:
+#                         result += f' \\tuplet {n}/{m} ' + '{' + _notate(S, level + 1) + '}'
+#                 if level == 0:
+#                     result = result.strip() + ' '
+#             return result.strip()
+#     return _notate(tree)

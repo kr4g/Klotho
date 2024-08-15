@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Dict, Tuple
+from typing import Union, Dict, Tuple
 from math import prod
 from fractions import Fraction
 

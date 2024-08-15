@@ -10,11 +10,11 @@ sys.path.append(str(root_path))
 from allopy.topos.sets import CombinationSet as CPS
 from allopy.topos.graphs import ComboNet
 from allopy.tonos.combination_product_sets import nkany as NKany
-from allopy.chronos.temporal_units import TemporalUnitSequence, TB, TemporalUnit as UT
+from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnitMatrix, TemporalUnit as UT
 
 from allopy.chronos import seconds_to_hmsms, beat_duration
 from allopy.tonos import fold_interval, fold_freq
-from allopy.aikous.dynamics import db_amp, DynamicRange, DYNAMICS
+from allopy.aikous.dynamics import db_amp, DynamicRange, DYNAMIC_MARKINGS
 from allopy.aikous import enevelopes as envs
 
 from utils.data_structures import scheduler as sch
@@ -106,7 +106,7 @@ for combo in cps.combos:
 partials = tuple(nth_odd(i + 1) for i in range(len(variables)))
 aliases = {
     'partials': { k: v for k, v in zip(variables, partials) },
-    'dynamics': { k: v for k, v in zip(variables, np.random.choice(DYNAMICS, len(variables), False)) },
+    'dynamics': { k: v for k, v in zip(variables, np.random.choice(DYNAMIC_MARKINGS, len(variables), False)) },
 }
 
 hx = NKany.Hexany(partials)
@@ -128,7 +128,7 @@ seen = set()
 ratios = []
 for i, combo in enumerate(path):
     # seen.add(combo)
-    ratio = hx.combo_ratio(vtp(aliases['partials'], combo))
+    ratio = hx.combo_to_ratio[vtp(aliases['partials'], combo)]
     ratios.append(ratio)
     if combo in seen:
         ratio = 1/ratio
@@ -142,7 +142,7 @@ utseq = TemporalUnitSequence(seq)
 # ------------------------------------------------------------------------------------
 # COMPOSITIONAL PROCESS --------------------------------------------------------------
 # ----------------------
-dynamic_db_ranges = DynamicRange(-60, 0, DYNAMICS).ranges
+dynamic_db_ranges = DynamicRange(-60, 0, DYNAMIC_MARKINGS).ranges
 print(dynamic_db_ranges)
 seen = set()
 seed = np.random.uniform(1000)
@@ -151,7 +151,7 @@ for i, (ut, combo) in enumerate(zip(utseq, path)):
     amp_1 = get_amp(combo)
     amp_2 = 1 - amp_1
     amp_range = (amp_1, amp_2)
-    ratio = hx.combo_ratio(vtp(aliases['partials'], combo))
+    ratio = hx.combo_to_ratio[vtp(aliases['partials'], combo)]
     if combo in seen:
         ratio = 1/ratio
         amp_range = amp_range[::-1]

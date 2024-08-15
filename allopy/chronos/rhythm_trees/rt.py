@@ -19,10 +19,10 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-# from math import gcd
 
 from allopy.topos.graphs import Tree
-from .algorithms.subdivisions import *
+from allopy.topos.graphs.graph_algorithms import rotate_tree
+from .algorithms.subdivs import *
 
 class Meas:
     '''
@@ -128,10 +128,10 @@ class RhythmTree(Tree):
     see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
     '''
     def __init__(self, 
-                 duration:int          = 1,
-                 meas:Union[Meas, str] = '1/1',
-                 subdivisions:Tuple    = (1,),
-                 decomp:str            = 'reduced'):
+                 duration:int                  = 1,
+                 meas:Union[Meas,Fraction,str] = '1/1',
+                 subdivisions:Tuple            = (1,),
+                 decomp:str                    = 'reduced'):
         
         super().__init__(Meas(meas), subdivisions)
         self.__duration = duration
@@ -151,6 +151,16 @@ class RhythmTree(Tree):
         return cls(duration     = duration,
                    meas         = Meas(tree._root),
                    subdivisions = tree._children,
+                   decomp       = decomp)
+    
+    @classmethod
+    def from_ratios(cls, lst:Tuple[Fraction], duration:int = 1, decomp:str = 'reduced'):
+        pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
+        S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
+        meas = (sum_proportions(S), pgcd_denom)
+        return cls(duration     = duration,
+                   meas         = meas,
+                   subdivisions = S,
                    decomp       = decomp)
 
     @property
@@ -180,36 +190,35 @@ class RhythmTree(Tree):
     @property
     def type(self):
         return self.__type
-
-    # def rotate(self, n=1):
-    #     refactored = rotate_tree(self.__children, n)
-    #     return RhythmTree(duration       = self.__duration,
-    #               meas = self.__root,
-    #               subdivisions   = refactored,
-    #               decomp         = self.__decomp)
     
-    # def concat(self, other):
-    #     if isinstance(other, RhythmTree):
-    #         numer_1, denom_1 = self.__root.numerator, self.__root.denominator
-    #         numer_2, denom_2 = other.__root.numerator, other.__root.denominator
-    #         lcm_denom = (denom_1 * denom_2) // gcd(denom_1, denom_2)
-    #         d1 = numer_1 * (lcm_denom // denom_1)
-    #         d2 = numer_2 * (lcm_denom // denom_2)
-    #         subdivs = ((d1, self.__children), (d2, other.__children))
-    #         if self.__root == other.__root:
-    #             duration = self.__duration + other.__duration
-    #             meas = self.__root
-    #         else:
-    #             duration = 1
-    #             meas = self.__root + other.__root
-    #         return RhythmTree(duration       = duration,
-    #                   meas = meas,
-    #                   subdivisions   = subdivs,
-    #                   decomp         = self.__decomp)
-    #     raise ValueError('Invalid Rhythm Tree')
+    def flatten(self):
+        return RhythmTree.from_ratios(self.__ratios, self.__duration, self.__decomp)
+    
+    def rotate(self, n:int = 1):
+        return RhythmTree.from_tree(rotate_tree(self, n), self.__duration, self.__decomp)
+    
+    def concat(self, other):
+        if isinstance(other, RhythmTree):
+            numer_1, denom_1 = self._root.numerator, self._root.denominator
+            numer_2, denom_2 = other._root.numerator, other._root.denominator
+            lcm_denom = (denom_1 * denom_2) // gcd(denom_1, denom_2)
+            d1 = numer_1 * (lcm_denom // denom_1)
+            d2 = numer_2 * (lcm_denom // denom_2)
+            subdivs = ((d1, self._children), (d2, other._children))
+            if self._root == other._root:
+                duration = self.__duration + other.__duration
+                meas = self._root
+            else:
+                duration = 1
+                meas = self._root + other._root
+            return RhythmTree(duration       = duration,
+                    meas = meas,
+                    subdivisions   = subdivs,
+                    decomp         = self.__decomp)
+        raise ValueError('Invalid Rhythm Tree')
 
     def _evaluate(self):
-        # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self.__children)))
+        # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self._children)))
         ratios = tuple(self.__duration * r for r in measure_ratios(self._children))
         match self.__decomp:
             case 'reduced':

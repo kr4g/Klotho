@@ -8,10 +8,10 @@ sys.path.append(str(root_path))
 # IMPORTS -----------------------------------------------------------------------------
 from allopy.topos import autoref
 from allopy.topos.graphs.graph_algorithms import factor_children
-from allopy.chronos.temporal_units import TemporalUnitSequence, TB, TemporalUnit as UT
-from allopy.chronos.rhythm_trees.rhythm_tree import *
-from allopy.chronos.rhythm_trees.algorithms.trees import flatten_tree, ratios_to_tree, rotate_tree
-from allopy.chronos.rhythm_trees.algorithms.subdivisions import auto_subdiv
+from allopy.chronos.temporal_units import TemporalUnitSequence, TemporalUnitMatrix, TemporalUnit as UT
+from allopy.chronos.rhythm_trees.rt import *
+from allopy.chronos.rhythm_trees.algorithms.rts import flatten_tree, ratios_to_tree, rotate_tree
+from allopy.chronos.rhythm_trees.algorithms.subdivs import auto_subdiv
 from allopy.chronos import seconds_to_hmsms, beat_duration
 from allopy.tonos import fold_interval, fold_freq
 from allopy.aikous import db_amp
@@ -55,7 +55,7 @@ for i in range(len(factor_children(rt_prime.subdivisions))):
     # print(rotate_tree(rt_prime, i))
     rots.append(TemporalUnitSequence((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
 
-tb = TB(tuple(rots))
+tb = TemporalUnitMatrix(tuple(rots))
 # utseq = TemporalUnitSequence(rots)
 # print(f'{ut_seq_dur(utseq)} ({seconds_to_hmsms(ut_seq_dur(utseq))})')
 

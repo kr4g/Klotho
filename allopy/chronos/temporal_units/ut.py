@@ -3,8 +3,10 @@ from typing import Union
 
 from allopy.topos.graphs import Tree
 from ..rhythm_trees import Meas, RhythmTree
-from ..rhythm_trees.algorithms.subdivisions import measure_ratios, auto_subdiv
-from allopy.chronos.chronos import beat_duration, calc_onsets
+from ..rhythm_trees.algorithms.subdivs import measure_ratios, auto_subdiv
+from allopy.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
+
+import numpy as np
 
 # Prolationis Types
 PULSTYPES = {'p', 'pulse', 'phase'}
@@ -12,13 +14,13 @@ DURTYPES  = {'d', 'duration', 'dur'}
 RESTYPES  = {'r', 'rest', 'silence'}
 ALLTYPES  = PULSTYPES | DURTYPES | RESTYPES
 
-# Temporal Unit
+
 class TemporalUnit:
     def __init__(self,
                  duration:int                    = 1,
                  tempus:Union[Meas,Fraction,str] = '1/1',
                  prolatio:Union[tuple,str]       = 'd',
-                 tempo:Union[None,float]         = None,
+                 tempo:Union[None,float]         = 60,
                  beat:Union[str,Fraction]        = None):
         
         self.__type      = None
@@ -86,16 +88,12 @@ class TemporalUnit:
     
     @property
     def onsets(self):
-        if self.__tempo is None:
-            raise ValueError('Tempo is not set')
         if self.__onsets is None:
             self.__onsets = tuple(onset + self.__offset for onset in calc_onsets(self.durations))
         return self.__onsets
 
     @property
     def durations(self):
-        if self.__tempo is None:
-            raise ValueError('Tempo is not set')
         if self.__durations is None:
             self.__durations = tuple(
                 beat_duration(ratio      = r,
@@ -106,9 +104,13 @@ class TemporalUnit:
 
     @property
     def duration(self):
-        if self.__tempo is None:
-            raise ValueError('Tempo is not set')
         return sum(abs(d) for d in self.durations)
+    
+    @property
+    def time(self):
+        return beat_duration(ratio      = str(self.__rtree._root),
+                             bpm        = self.__tempo,
+                             beat_ratio = self.__beat)
     
     @prolationis.setter
     def prolationis(self, prolatio:Union[tuple,str]):
@@ -123,7 +125,7 @@ class TemporalUnit:
         self.__durations = None
     
     @beat.setter
-    def beat(self, beat:Union[str,Fraction]):
+    def beat(self, beat:Union[Fraction,str]):
         self.__beat      = Fraction(beat)
         self.__onsets    = None
         self.__durations = None
@@ -141,7 +143,7 @@ class TemporalUnit:
                         tempo    = self.__tempo,
                         beat     = self.__beat) for ratio in self.__rtree.ratios)
 
-    def _set_rtree(self, duration:int, tempus:Meas, prolatio:Union[tuple,str]) -> RhythmTree:
+    def _set_rtree(self, duration:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         if isinstance(prolatio, tuple):
             r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = prolatio)
             self.__type = f'Ensemble ({r_tree.type})'
@@ -158,13 +160,12 @@ class TemporalUnit:
                 r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = (-1,))
             else:
                 raise ValueError(f'Invalid string: {prolatio}')
-        else:
-            raise ValueError(f'Invalid prolationis: {prolatio}')
+            
         return r_tree
     
     def _set_beat(self, beat:Union[None,str,Fraction]) -> Fraction:
         if beat is None:
-            return Fraction(1, self.__rtree.meas._denominator)
+            return Fraction(1, self.__rtree.meas.denominator)
         return Fraction(beat)
     
     def __add__(self, other:Union['TemporalUnit', 'TemporalUnitSequence', Fraction]):
@@ -241,20 +242,21 @@ class TemporalUnit:
         return (
             f'Type:        {self.__type}\n'
             f'Tempus:      {self.__rtree._root}\n'
+            f'Duration:    {self.__rtree.duration}\n'
             f'Tempo:       {self.__tempo}\n'
             f'Beat:        {self.__beat}\n'
             f'Prolationis: {self.__rtree.subdivisions}\n'
+            f'Time:        {seconds_to_hmsms(self.time)}\n'
         )
 
     def __repr__(self):
         return self.__str__()
 
-# Temporal Unit Sequence
+
 class TemporalUnitSequence:
-    def __init__(self, ut_seq:tuple[TemporalUnit]=(), offset:float=0.0):
+    def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0.0):
         self.__seq    = ut_seq
         self.__offset = offset
-        self.offset   = offset
         self._set_offsets()
 
     @property
@@ -275,7 +277,7 @@ class TemporalUnitSequence:
 
     @property
     def T(self):
-        return TB((TemporalUnitSequence((ut,)) for ut in self.__seq))
+        return TemporalUnitMatrix((TemporalUnitSequence([ut]) for ut in self.__seq))
     
     @property
     def offset(self):
@@ -285,28 +287,41 @@ class TemporalUnitSequence:
     def size(self):
         return len(self.__seq)
     
+    @property
+    def time(self):
+        return sum(ut.time for ut in self.__seq)
+    
     @offset.setter
     def offset(self, offset:float):
         self.__offset = offset
         for i, ut in enumerate(self.__seq):
             ut.offset = offset + sum(self.durations[j] for j in range(i))
-            
+    
+    def append(self, ut:TemporalUnit):
+        self.__seq.append(ut)
+        self._set_offsets()
+    
+    def extend(self, uts:list[TemporalUnit]):
+        self.__seq.extend(uts)
+        self._set_offsets()
+    
     def _set_offsets(self):
         for i, ut in enumerate(self.__seq):
             ut.offset = self.__offset + sum(self.durations[j] for j in range(i))
 
-    def __add__(self, other:Union[TemporalUnit, 'TemporalUnitSequence']):
+    # TODO: implement cases for int, float, Fraction (affects the Tempus of each UT)
+    def __add__(self, other:Union[TemporalUnit,'TemporalUnitSequence']):
         if isinstance(other, TemporalUnit):
-            return TemporalUnitSequence(self.__seq + (other,))
+            self.append(other)
         elif isinstance(other, TemporalUnitSequence):
-            return TemporalUnitSequence(self.__seq + other.__seq)
+            self.extend(other.__seq)
         raise ValueError('Invalid Operand')
 
     def __and__(self, other:Union[TemporalUnit, 'TemporalUnitSequence']):
         if isinstance(other, TemporalUnit):
-            return TB((self.__seq, (other,)))
+            return TemporalUnitMatrix((self.__seq, (other,)))
         elif isinstance(other, TemporalUnitSequence):
-            return TB((self.__seq, other.__seq))
+            return TemporalUnitMatrix((self.__seq, other.__seq))
         raise ValueError('Invalid Operand')
 
     def __iter__(self):
@@ -316,7 +331,7 @@ class TemporalUnitSequence:
         return sum(len(ut) for ut in self.__seq)
 
 # Time Block
-class TB:
+class TemporalUnitMatrix:
     def __init__(self, tb:tuple[TemporalUnitSequence]=(), offset:float=0.0, axis:float=0.0):
         self.__tb = tb
         self.__axis = axis
@@ -334,9 +349,9 @@ class TB:
                 else:
                     D, S = e[0], e[1]
                 seq.append(TemporalUnit(tempus   = Meas((D, meas_denom)),
-                              prolatio = S,
-                              tempo    = tempo,
-                              beat     = beat))
+                                        prolatio = S,
+                                        tempo    = tempo,
+                                        beat     = beat))
             tb.append(TemporalUnitSequence(seq))
         return cls(tuple(tb))
 
@@ -372,11 +387,11 @@ class TB:
             for ut in utseq:
                 ut.beat = beat
 
-    def __add__(self, other:Union[TemporalUnitSequence, 'TB']):
+    def __add__(self, other:Union[TemporalUnitSequence, 'TemporalUnitMatrix']):
         if isinstance(other, TemporalUnitSequence):
-            return TB(self.__tb + (other,))
-        # elif isinstance(other, TB):
-        #     return TB(self.__tb + other.__tb)
+            return TemporalUnitMatrix(self.__tb + (other,))
+        # elif isinstance(other, TemporalUnitMatrix):
+        #     return TemporalUnitMatrix(self.__tb + other.__tb)
         raise ValueError('Invalid Operand')
 
     def __iter__(self):
@@ -385,7 +400,7 @@ class TB:
 # Temporal Block Sequence
 class TBSeq:
     pass
-    # def __init__(self, tb_seq:tuple[TB]=(), offset:float=0.0):
+    # def __init__(self, tb_seq:tuple[TemporalUnitMatrix]=(), offset:float=0.0):
     #     self.__seq = tb_seq
     #     for i, tb in enumerate(self.__seq):
     #         tb.offset = offset + sum(tb_seq[j].duration for j in range(i))
@@ -406,15 +421,15 @@ class TBSeq:
     # def duration(self):
     #     return sum(self.durations)
 
-    # def __add__(self, other:Union[TB, 'TBSeq']):
-    #     if isinstance(other, TB):
+    # def __add__(self, other:Union[TemporalUnitMatrix, 'TBSeq']):
+    #     if isinstance(other, TemporalUnitMatrix):
     #         return TBSeq(self.__seq + (other,))
     #     elif isinstance(other, TBSeq):
     #         return TBSeq(self.__seq + other.__seq)
     #     raise ValueError('Invalid Operand')
 
-    # def __and__(self, other:Union[TB, 'TBSeq']):
-    #     if isinstance(other, TB):
+    # def __and__(self, other:Union[TemporalUnitMatrix, 'TBSeq']):
+    #     if isinstance(other, TemporalUnitMatrix):
     #         return TBSeq((self.__seq, (other,)))
     #     elif isinstance(other, TBSeq):
     #         return TBSeq((self.__seq, other.__seq))

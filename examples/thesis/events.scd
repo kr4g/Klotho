@@ -24,6 +24,9 @@ Synth(\default)
 
 Synth(\random, [\seed, 435])
 Synth(\hat)
+Synth(\hatOpen)
+Synth(\crash)
+Synth(\perc, [\freq, exprand(220, 880)])
 
 Synth(\glitch1, [\freqShift, rand(3800)]);
 
@@ -34,7 +37,15 @@ x.set(\freq, exprand(200, 1000));
 (
 ~rec = { |name, schdlr, dur|
 	Routine({
-		s.record("/Users/ryanmillett/Downloads/presentation_examples/audio/" ++ name ++ ".wav", numChannels: 2, duration: dur);
+		var path = "/Users/ryanmillett/Downloads/presentation_examples/audio/";
+		var fileName = path ++ name ++ ".wav";
+		var i = 1;
+		while ({File.exists(fileName)}) {
+			// name = name ++ "_" ++ i;
+			fileName = path ++ name ++ "_" ++ i ++ ".wav";
+			i = i + 1;
+		};
+		s.record(fileName, numChannels: 2, duration: dur);
 		wait(0.02);
 		schdlr.scheduleEvents;
 	}).play;
@@ -46,7 +57,7 @@ SynthDef(\freeverb, {
 	var sig;
 	sig = In.ar(0, 2);
 	sig = LPF.ar(sig, 2500);
-	sig = FreeVerb.ar(sig, mix: 0.33, room: 0.6, damp: 0.15);
+	sig = FreeVerb.ar(sig, mix: 0.33, room: 0.25, damp: 0.5);
 	Out.ar(\out.kr(0), sig);
 }).add;
 
@@ -63,4 +74,4 @@ SynthDef(\hall, {
 ~scheduler.events.size;
 ~scheduler.scheduleEvents;
 
-~rec.("1_cps_ex1bb_navigations", ~scheduler, 36);
+~rec.("0_rt_ex2_nesting", ~scheduler, 21);
