@@ -1,24 +1,24 @@
-# AlloPy
-`AlloPy` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general resource for the methods, models, works, and frameworks associated with the art and craft of music composition and multimedia metacomposition.
+# Klotho
+`Klotho` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general resource for the methods, models, works, and frameworks associated with the art and craft of music composition and multimedia metacomposition.
 
 ---
 
 ## Installation
 
-AlloPy works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
+Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
 
 1. **Clone the Repository**:
 
-   First, clone the AlloPy repository by running the following command in your terminal or command prompt:
+   First, clone the Klotho repository by running the following command in your terminal or command prompt:
    
    ```
-   git clone https://github.com/kr4g/AlloPy.git
+   git clone https://github.com/kr4g/Klotho.git
    ```
 
-2. **Navigate to the `AlloPy/` Directory**:
+2. **Navigate to the `Klotho/` Directory**:
    
     ```
-    cd AlloPy/
+    cd Klotho/
     ```
 
 3. **Install Dependencies**:
@@ -31,25 +31,23 @@ AlloPy works as both a Python scripting toolkit and 'on-the-fly' via a Python in
 
 4. **Play**:
 
-    To work with AlloPy in a scripting context, create a directory within the `AlloPy/` directory and save your scripts there.  [`AlloPy/examples/`](https://github.com/kr4g/AlloPy/tree/main/examples) contains examples of how to use the modules in this manner.
-
-    To work with AlloPy as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `AlloPy/` directory by running the command:
+    To work with Klotho as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `Klotho/` directory by running the command:
 
     ```
     Python
     ```
 
-    Once the interpreter loads, import from `allopy` as needed.
+    Once the interpreter loads, import from `klotho` as needed.
 
 ## Feature Overview
 
-AlloPy extends from a lineage of CAC-oriented theories and softwares.  This means that, while AlloPy provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with standard notation softwares.  
+Klotho extends from a lineage of CAC-oriented theories and softwares.  This means that, while Klotho provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with standard notation softwares.  
 
-The ethos of AlloPy draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/) (which also influenced [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) for Max).
+The ethos of Klotho draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/) (which also influenced [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) for Max).
 
-AlloPy seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of AlloPy's core features, particularly in the implementation of Rhythm Trees, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of music in its symbolic representations.
+Klotho seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of Klotho's core features, particularly in the implementation of Rhythm Trees, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of music in its symbolic representations.
 
-Examples from each AlloPy module, here used in an 'on-the-fly' context via the Python interpreter:
+Examples from each Klotho module, here used in an 'on-the-fly' context via the Python interpreter:
 
 ### Rhythm Trees
 
@@ -79,19 +77,19 @@ Though structured as discrete modules, Chronos and `Tonos` are deeply entwined (
 
 As with his chronometric companion, the `tonos.py` base module consists of a toolkit for general pitch- and frequency-based calculations and conversions.  Specialized modules emphasize more conceptual tone-based abstractions such as [*Hexany*](https://en.wikipedia.org/wiki/Hexany) as well as other [n-EDO](https://en.xen.wiki/w/EDO) and [Just](https://en.xen.wiki/w/Just_intonation) microtonal paradigms.
 
-Tonos also supports the use of `Scala` (.scl) tuning files as implemented in the [Scala](https://www.huygens-fokker.org/scala/) microtonality software.  Any scale from the [Scala archive](https://www.huygens-fokker.org/scala/downloads.html) (consisting of more than **5,200** unique scales) can be imported into AlloPy as well as support for generating and saving your own, custom .scl scale and tuning files.
+Tonos also supports the use of `Scala` (.scl) tuning files as implemented in the [Scala](https://www.huygens-fokker.org/scala/) microtonality software.  Any scale from the [Scala archive](https://www.huygens-fokker.org/scala/downloads.html) (consisting of more than **5,200** unique scales) can be imported into Klotho as well as support for generating and saving your own, custom .scl scale and tuning files.
 
 ### `Topos`
 
 ***Master of Music Mysterium:***  *mentor in musimathics*
 
-The `Topos` is the most abstract and, thus, most mysterious of the AlloPy modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The Topos deals with the abstract topology, the [`Topos`](https://link.springer.com/book/10.1007/978-3-0348-8141-8) of Music.
+The `Topos` is the most abstract and, thus, most mysterious of the Klotho modules and is the only one that does not work with music or sound synthesis materials directly—that is, if you so desire.  Instead, The Topos deals with the abstract topology, the [`Topos`](https://link.springer.com/book/10.1007/978-3-0348-8141-8) of Music.
 
 The `topos.py` base module contains a multitude of abstract "puzzle" functions deeply inspired by Category Theory, Topology, and abstract algebra in general.  These functions are data-type agnostic and work entirely in a functional, LISP-like paradigm inspired by the [OpenMusic](https://openmusic-project.github.io/) software, implemented in Common LISP.
 
 Every `topos.py` function is inherently recursive and all work with the same input and output type—the tuple.  This means that outputs can feedback into inputs and/or pipe into the inputs of other functions, etc., allowing for the construction of highly complex abstract structures from the interweaving of very simple base operations.
 
-The Topos module, like the other AlloPy modules, also contains specialized submodules such as formal grammars, including basic rewrite rule generation and a library of ancient [graphemes](https://en.wikipedia.org/wiki/Grapheme)—useful when working with categorical, algebraic abstractions.
+The Topos module, like the other Klotho modules, also contains specialized submodules such as formal grammars, including basic rewrite rule generation and a library of ancient [graphemes](https://en.wikipedia.org/wiki/Grapheme)—useful when working with categorical, algebraic abstractions.
 
 Consult The Topos for guidance and you will receive it, but know that The Topos speaks and answers only in riddle.  Though, in solving the riddle, will you ultimately attain the answer to your question.
 
@@ -117,12 +115,12 @@ Integration with [`abjad`](https://abjad.github.io/) and [`LilyPond`](https://li
 
 ## License
 
-[AlloPy](https://github.com/kr4g/AlloPy) by Ryan Millett is licensed under [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1).
+[Klotho](https://github.com/kr4g/Klotho) by Ryan Millett is licensed under [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1).
 
 ![CC Icon](https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1)
 ![BY Icon](https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1)
 ![SA Icon](https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1)
 
-AlloPy © 2023 by Ryan Millett is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+Klotho © 2023 by Ryan Millett is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
 
 ---
