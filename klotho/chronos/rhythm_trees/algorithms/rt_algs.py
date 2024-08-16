@@ -20,6 +20,7 @@ from typing import Tuple
 from fractions import Fraction
 from math import gcd, lcm
 from functools import reduce
+
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
     '''

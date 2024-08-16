@@ -3,7 +3,6 @@
 # ------------------------------------------------------------------------------------
 '''
 --------------------------------------------------------------------------------------
-
 A rhythm tree (RT) is a list representing a rhythmic structure. This list is organized 
 hierarchically in sub lists , just as time is organized in measures, time signatures, 
 pulses and rhythmic elements in the traditional notation.
@@ -14,7 +13,6 @@ view : rhythm trees can be long, with a great number of parenthesis and sub list
 within each others.
 
 see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
-
 --------------------------------------------------------------------------------------
 '''
 from fractions import Fraction

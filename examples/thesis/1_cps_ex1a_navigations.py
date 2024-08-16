@@ -10,7 +10,7 @@ sys.path.append(str(root_path))
 from klotho.topos.sets import CombinationSet as CPS
 from klotho.topos.graphs import ComboNet
 from klotho.tonos.combination_product_sets import nkany as NKany
-from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnitMatrix, TemporalUnit as UT
+from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq
 
 from klotho.chronos import seconds_to_hmsms, beat_duration
 from klotho.tonos import fold_interval, fold_freq
@@ -30,12 +30,6 @@ import random
 # -------------------------------------------------------------------------------------
 # HELPER FUNCTIONS --------------------------------------------------------------------
 # -----------------
-def ut_dur(ut:UT):
-    return beat_duration(str(ut.tempus), bpm=ut.tempo, beat_ratio=ut.beat)
-
-def ut_seq_dur(utseq:TemporalUnitSequence):
-    return sum(ut_dur(ut) for ut in utseq)
-
 def nth_odd(n:int):
     return 2*n - 1
 
@@ -152,7 +146,7 @@ for i, combo in enumerate(path):
     print(f'{combo} -> {ratio}')
     seq.append(UT(tempus=ratio, prolatio='d', tempo=bpm, beat=beat))
 
-utseq = TemporalUnitSequence(seq)
+utseq = UTSeq(seq)
 
 # ------------------------------------------------------------------------------------
 # COMPOSITIONAL PROCESS --------------------------------------------------------------
@@ -173,7 +167,7 @@ for i, (ut, combo) in enumerate(zip(utseq, path)):
                                 freq=333.0 * Fraction(ratio),
                                 amp=amp)
 
-comp_dur = ut_seq_dur(utseq)
+comp_dur = utseq.time
 print(f'{round(comp_dur, 2)}, {seconds_to_hmsms(comp_dur)}.')
 
 # ------------------------------------------------------------------------------------

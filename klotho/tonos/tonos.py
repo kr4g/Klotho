@@ -9,9 +9,7 @@ frequency.
 '''
 from typing import Union, List, Tuple, Dict, Set
 from fractions import Fraction
-# from math import prod
 import numpy as np
-# import itertools
 
 A4_Hz   = 440.0
 A4_MIDI = 69
