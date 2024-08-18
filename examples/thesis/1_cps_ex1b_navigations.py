@@ -127,7 +127,6 @@ seq = []
 seen = set()
 ratios = []
 for i, combo in enumerate(path):
-    # seen.add(combo)
     ratio = hx.combo_to_ratio[vtp(aliases['partials'], combo)]
     ratios.append(ratio)
     if combo in seen:

@@ -62,14 +62,13 @@ class ComboNetTraversal:
         neighbors = self.combnet.graph[current_node]
         if not neighbors:
             return None
-
-        # Group neighbors by weight and visit count
+        
         candidates = defaultdict(lambda: defaultdict(list))
+        
         for neighbor, weight in neighbors.items():
             visit_count = self.visited_edges[self.edge_key(current_node, neighbor)]
             candidates[weight][visit_count].append(neighbor)
 
-        # Sort weights in descending order
         sorted_weights = sorted(candidates.keys(), reverse=True)
 
         for weight in sorted_weights:
@@ -129,9 +128,11 @@ path = cg.play(start_node, n)
 
 vtp = lambda v, p: (v[p[0]], v[p[1]])
 
-bpm = 154
 beat = '1/4'
+bpm = 132
 seq = []
+
+root_freq = 333.0
 
 seen = set()
 ratios = []
@@ -152,7 +153,8 @@ utseq = UTSeq(seq)
 # COMPOSITIONAL PROCESS --------------------------------------------------------------
 # ----------------------
 seen = set()
-amp = db_amp(-30)
+# amp = db_amp(-13)
+uid_pad = None
 for i, (ut, combo) in enumerate(zip(utseq, path)): 
     ratio = hx.combo_to_ratio[vtp(aliases['partials'], combo)]
     if combo in seen:
@@ -163,9 +165,9 @@ for i, (ut, combo) in enumerate(zip(utseq, path)):
     for j, event in enumerate(ut):
         if event['duration'] < 0:
             continue
-        scheduler.add_new_event('ping', event['start'],
-                                freq=333.0 * Fraction(ratio),
-                                amp=amp)
+        scheduler.add_new_event('ping2', event['start'],
+                                freq=root_freq * Fraction(ratio) * 2.0**2,
+                                amp=db_amp(-18))
 
 comp_dur = utseq.time
 print(f'{round(comp_dur, 2)}, {seconds_to_hmsms(comp_dur)}.')

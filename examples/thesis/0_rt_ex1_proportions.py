@@ -11,6 +11,8 @@ from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequen
 from klotho.chronos import seconds_to_hmsms
 from klotho.tonos import fold_interval
 from klotho.aikous.dynamics import db_amp
+from klotho.skora.graphs import *
+from klotho.skora.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
@@ -39,7 +41,13 @@ utseq = UTSeq(
     )
 )
 
+# for i, ut in enumerate(utseq):
+#     if len(ut.ratios) == 1: continue
+#     ut.offset = 0
+#     animate_temporal_unit(ut, True, False, file_name=f'ut_{i}c')
+# animate_temporal_units(utseq.uts, True, False, file_name='utblock')
 # print(seconds_to_hmsms(utseq.time))
+# plot_graph(graph_tree(utseq.uts[-2].tempus, utseq.uts[-2].prolationis))
 
 synths = {
     1: 'kick',
@@ -58,7 +66,7 @@ for j, ut in enumerate(utseq):
     dur_scale = np.interp(j, [0, utseq.size], [0.167, 0.667])
     for i, event in enumerate(ut):
         if event['duration'] < 0: continue
-        synth = 'ping' #synths[ut.prolationis[i]]
+        # synth = 'ping' #synths[ut.prolationis[i]]
         duration = event['duration'] * dur_scale
         freq = 333.0 * ut.prolationis[i] * 2**0 #fold_interval(1/ut.prolationis[i], n_equaves=1)
         scheduler.add_new_event('perc', event['start'], freq=freq, amp=db_amp(-8))

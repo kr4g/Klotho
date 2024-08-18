@@ -6,16 +6,21 @@ sys.path.append(str(root_path))
 
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
+# --------
 from klotho.topos import autoref
 from klotho.chronos.temporal_units import TemporalUnitSequence as UTSeq, TemporalUnit as UT
 from klotho.chronos.rhythm_trees.rt import *
 from klotho.chronos.rhythm_trees.algorithms.rt_algs import auto_subdiv
 from klotho.topos.sequences import NestedCycle
 from klotho.chronos import seconds_to_hmsms, beat_duration
-from klotho.aikous import db_amp
+from klotho.aikous.expression import db_amp
+from klotho.skora.graphs import *
+from klotho.skora.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
+
+import os
 
 import numpy as np
 from math import gcd, lcm
@@ -49,6 +54,8 @@ print('-'*50)
 rts = {}
 rts['prime'] = RhythmTree(meas=tempus, subdivisions=(mS))
 print(f"rt_prime:\n{rts['prime']}")
+# plot_graph(graph_tree(rts['prime'].meas, rts['prime'].subdivisions))
+# animate_temporal_unit(UT.from_tree(rts['prime'], tempo=bpm*1.1, beat=beat), save_mp4=True, file_name='rt_prime')
 print('-'*50)
 rts['prime_flat'] = rts['prime'].flatten()
 print(f"rt_prime_flat:\n{rts['prime_flat']}")
@@ -65,6 +72,9 @@ seqs['prime_rev'].append(UT.from_tree(rts['prime_flat_rev'], tempo=bpm, beat=bea
 print(f"rt_prime_flat_rev:\n{rts['prime_flat_rev']}")
 print('-'*50)
 
+output_dir = "/Users/ryanmillett/Klotho/examples"
+os.makedirs(output_dir, exist_ok=True)
+
 r = rts['prime_flat'].ratios
 while len(r) > 1:
     r = r[1:]
@@ -72,18 +82,41 @@ while len(r) > 1:
     mUt = UT.from_tree(mRt, tempo=bpm, beat=beat)
     seqs['prime'].append(mUt)
 
+image_files = []
+for i, ut in enumerate(seqs['prime']):
+    output_file = os.path.join(output_dir, f"graph_{i}a.png")
+    plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
+    image_files.append(output_file)
+
+gif_file = os.path.join(output_dir, 'graph_animation_A.gif')
+duration_per_frame = 100
+create_gif(image_files, gif_file, duration_per_frame)
+
 r_rev = rts['prime_flat_rev'].ratios
 while len(r_rev) > 1:
     r_rev = r_rev[1:]
     mRt_rev = RhythmTree.from_ratios(r_rev)
     mUt_rev = UT.from_tree(mRt_rev, tempo=bpm, beat=beat)
     seqs['prime_rev'].append(mUt_rev)
+    # plot_graph(graph_tree(mUt.tempus, mUt.prolationis))
 
 seqs['prime_rev'] = seqs['prime_rev'][::-1]
+
+image_files = []
+for i, ut in enumerate(seqs['prime_rev']):
+    output_file = os.path.join(output_dir, f"graph_{i}b.png")
+    plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
+    image_files.append(output_file)
+
+gif_file = os.path.join(output_dir, 'graph_animation_B.gif')
+create_gif(image_files, gif_file, duration_per_frame)
+
+
 
 # interleave seq and seq_rev
 seqs['full'] = [val for pair in zip(seqs['prime'], seqs['prime_rev']) for val in pair]
 print(seqs['full'])
+
 
 utseq = UTSeq(seqs['full'])
 print(utseq.duration)
@@ -91,6 +124,7 @@ glitch = NestedCycle(['random', 'glitch1', 'random', 'random'])
 dnb = NestedCycle([['kick2', ['kick2', 'snare2'], 'ghostKick'], ['kick2', ['hat', 'hat2']], ['snare', ['perc', ['perc2', 'hatSoft']]]])
 for i in range(30):
     print(next(dnb))
+
 # ------------------------------------------------------------------------------------
 # COMPOSITIONAL PROCESS --------------------------------------------------------------
 # ----------------------
@@ -115,7 +149,7 @@ for i, ut in enumerate(utseq):
         else:
             synth = 'glitch2' if i % 2 == 0 else 'kick'
             amp = db_amp(-4) if i % 2 == 0 else db_amp(-8)
-        if j == len(ut) - 1 and i == utseq.size - 1:
+        if j == len(ut) - 1 and i == len(utseq) - 1:
             synth = 'crash'
             amp = db_amp(-4)
         scheduler.add_new_event(synth, event['start'],

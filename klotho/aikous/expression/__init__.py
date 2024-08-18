@@ -14,7 +14,6 @@ The `aikous` module contains tools for translating physics phenomena, as perceiv
 humans, into algebraic musical representations.
 --------------------------------------------------------------------------------------
 '''
-
 from .dynamics import *
 from .enevelopes import *
 

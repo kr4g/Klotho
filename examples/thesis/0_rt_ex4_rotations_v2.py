@@ -14,7 +14,10 @@ from klotho.chronos.rhythm_trees.algorithms.rt_algs import auto_subdiv
 from klotho.chronos import seconds_to_hmsms, beat_duration
 from klotho.tonos import fold_interval, fold_freq
 from klotho.tonos.harmonic_trees.algorithms import measure_partials
-from klotho.aikous import db_amp
+from klotho.aikous.expression import db_amp
+
+from klotho.skora.graphs import *
+from klotho.skora.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
@@ -23,6 +26,7 @@ import numpy as np
 from math import gcd, lcm
 from functools import reduce
 from itertools import cycle
+import os
 
 def ut_dur(ut:UT):
     return beat_duration(str(ut.tempus), bpm=ut.tempo, beat_ratio=ut.beat)
@@ -36,10 +40,32 @@ def swell(n, min_val=0.0, max_val=1.0):
     result = np.concatenate([up, down])
     return result
 
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
+
+def save_tuple_as_image(t, output_file, font_size=100):
+    # Convert the tuple to a string with commas replaced by spaces
+    text = str(t).replace(',', ' ')
+    
+    # Create a Matplotlib figure
+    plt.figure(figsize=(len(text) * 0.1, 2))  # Width depends on text length; adjust as needed
+    plt.text(0.5, 0.5, text, fontsize=font_size, ha='center', va='center')
+    
+    # Remove axes and padding
+    plt.axis('off')
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    
+    # Save the image
+    plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+
+
 # -------------------------------------------------------------------------------------
 # PRE-COMPOSITIONAL MATERIAL ----------------------------------------------------------
 # ---------------------------
-tempus = '11/1'
+# tempus = '11/1'
+tempus = '1/1'
 beat = '1/8'
 bpm = 54
 
@@ -51,17 +77,42 @@ rt_prime = RhythmTree(meas=tempus, subdivisions=S)
 # print('-' * 80)
 
 rots = []
+ani = []
 for i in range(len(factor_children(rt_prime.subdivisions))):
 # for i in range(5):
-    # print(rotate_tree(rt_prime, i))
-    rots.append(TemporalUnitSequence((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
+    print(rotate_tree(rt_prime, i))
+    # rots.append(TemporalUnitSequence((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
+    # ani.append(UT.from_tree(rotate_tree(rt_prime, i), tempo=92, beat='1/8'))
+    # t = ani[-1].prolationis
+    # save_tuple_as_image(t, f'/Users/ryanmillett/Klotho/examples/thesis/S_rot_{i}.png')
 
+# create_gif([f'/Users/ryanmillett/Klotho/examples/thesis/S_rot_{i}.png' for i in range(len(rots))], '/Users/ryanmillett/Klotho/examples/thesis/S_rotations.gif', 500)
+
+# animate_temporal_units(ani, save_mp4=True, file_name='rt_prime_rotations_stack')
 tb = TemporalUnitMatrix(tuple(rots))
 # utseq = TemporalUnitSequence(rots)
 # print(f'{ut_seq_dur(utseq)} ({seconds_to_hmsms(ut_seq_dur(utseq))})')
 
-for i, utseq in enumerate(tb):
-    print(i, utseq.uts[0])
+# output_dir = "/Users/ryanmillett/Klotho/examples"
+# os.makedirs(output_dir, exist_ok=True)
+# image_files = []
+# image_files2 = []
+# for i, utseq in enumerate(tb):
+#     ut = utseq.uts[0]
+#     # print(i, utseq.uts[0])
+#     output_file = os.path.join(output_dir, f"graph_rot_{i}.png")
+#     plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
+#     image_files.append(output_file)
+    
+#     prop_file = os.path.join(output_dir, f"prop_rot_{i}")
+#     animate_temporal_unit(ut, save_mp4=False, save_png=True, file_name=prop_file) # this saves a png file in the same dir
+#     image_files2.append(f"{prop_file}.png")
+
+# duration_per_frame = 500
+# gif_file = os.path.join(output_dir, 'graph_rot_animation.gif')
+# create_gif(image_files, gif_file, duration_per_frame)
+# gif_file = os.path.join(output_dir, 'graph_rot__props_animation.gif')
+# create_gif(image_files2, gif_file, duration_per_frame)
     
 # freqs = cycle([np.random.uniform(333.0, 666.0)*0.2 for _ in range(len(rt_prime))])
 # freqs = cycle([333.0 * 0.167 * fold_interval(Fraction(p)) for p in measure_partials(S)])

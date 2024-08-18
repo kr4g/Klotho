@@ -293,7 +293,7 @@ class TemporalUnitSequence:
     
     @property
     def size(self):
-        return len(self.__seq)
+        return sum(len(ut) for ut in self.__seq)
     
     @property
     def time(self):
@@ -336,7 +336,7 @@ class TemporalUnitSequence:
         return iter(self.__seq)
     
     def __len__(self):
-        return sum(len(ut) for ut in self.__seq)
+        return len(self.__seq)
 
 # Time Block
 class TemporalUnitMatrix:

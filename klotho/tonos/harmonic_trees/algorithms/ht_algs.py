@@ -1,10 +1,11 @@
+from typing import Union, Tuple
 
-def measure_partials(T, p=1):
+def measure_partials(partials:Tuple[int], f:Union[int,float]=1):
     result = []
-    for s in T:
+    for s in partials:
         if isinstance(s, tuple):
-            D, S = s
-            result.extend(measure_partials(S, p * D))
+            F, P = s
+            result.extend(measure_partials(P, f * F))
         else:
-            result.append(p * s)
+            result.append(f * s)
     return tuple(result)

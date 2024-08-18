@@ -8,7 +8,9 @@ sys.path.append(str(root_path))
 # IMPORTS -----------------------------------------------------------------------------
 from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq
 from klotho.chronos import seconds_to_hmsms
-from klotho.aikous.dynamics import db_amp
+from klotho.aikous.expression import db_amp
+from klotho.skora.graphs import *
+from klotho.skora.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
@@ -39,6 +41,11 @@ utseq = UTSeq(
 
 # print(f'{utseq.size} UTs, {len(utseq)} events\nDur: {seconds_to_hmsms(utseq.duration)}')
 print(utseq.time)
+plot_graph(graph_tree(utseq.uts[-2].tempus, utseq.uts[-2].prolationis))
+# _ut = utseq.uts[-2]
+# _ut.tempo = bpm*0.8
+# _ut.offset = 0
+# animate_temporal_unit(_ut, save_mp4=True, file_name='ut3')
 # ------------------------------------------------------------------------------------
 # COMPOSITIONAL PROCESS --------------------------------------------------------------
 seed = np.random.randint(1000)
