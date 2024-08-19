@@ -15,7 +15,7 @@ from klotho.topos.sequences import NestedCycle
 from klotho.chronos import seconds_to_hmsms, beat_duration
 from klotho.aikous.expression import db_amp
 from klotho.skora.graphs import *
-from klotho.skora.animate import *
+from klotho.skora.animation.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()

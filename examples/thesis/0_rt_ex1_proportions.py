@@ -12,7 +12,7 @@ from klotho.chronos import seconds_to_hmsms
 from klotho.tonos import fold_interval
 from klotho.aikous.dynamics import db_amp
 from klotho.skora.graphs import *
-from klotho.skora.animate import *
+from klotho.skora.animation.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()

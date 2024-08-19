@@ -11,7 +11,7 @@ from klotho.topos.graphs.graph_algorithms import factor_children, refactor_child
 from klotho.chronos.rhythm_trees import RhythmTree as RT
 from klotho.chronos.rhythm_trees.algorithms import auto_subdiv
 from klotho.skora.graphs import *
-from klotho.skora.animate import *
+from klotho.skora.animation.animate import *
 
 import os
 import networkx as nx

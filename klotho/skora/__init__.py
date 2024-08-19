@@ -1,5 +1,5 @@
 from .skora import *
 from .graphs import *
-from .animate import *
+from .animation.animate import *
 
 __all__ = []

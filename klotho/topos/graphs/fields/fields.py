@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple, Callable, Iterator
 import math
+import numpy as np
 
 class Field(ABC):
     def __init__(self, 
@@ -24,6 +25,7 @@ class Field(ABC):
         self.edge_criteria = edge_criteria or self._default_edge_criteria
         self.value_difference = value_difference or self._default_value_difference
         self.interaction_mechanism = interaction_mechanism or self._default_interaction_mechanism
+        self.continuous_field_function = field_function
 
         for point, attrs in space_points.items():
             self.add_point(point, attrs)
@@ -60,6 +62,16 @@ class Field(ABC):
                                       point2, 
                                       self.nodes[point2]['field_value']):
                     self.add_edge(point1, point2)
+    
+    def _update_edges_for_point(self, new_point: Any):
+        '''Update edges for a newly added point.'''
+        for existing_point in self.nodes:
+            if existing_point != new_point:
+                if self.edge_criteria(new_point, 
+                                      self.nodes[new_point]['field_value'],
+                                      existing_point, 
+                                      self.nodes[existing_point]['field_value']):
+                    self.add_edge(new_point, existing_point)
 
     def add_point(self, point: Any, attributes: Dict[str, Any]):
         '''Add a new point to the field.'''
@@ -91,7 +103,10 @@ class Field(ABC):
 
     def get_field_value(self, point: Any) -> Any:
         '''Get the field value at a specific point.'''
-        return self.nodes[point]['field_value']
+        if point in self.nodes:
+            return self.nodes[point]['field_value']
+        else:
+            return self.continuous_field_function(point)
 
     def set_field_value(self, point: Any, value: Any):
         '''Set the field value at a specific point.'''
@@ -134,7 +149,6 @@ class Field(ABC):
         for point in self.nodes:
             self.set_field_value(point, operation(self.get_field_value(point)))
 
-    @abstractmethod
     def combine_fields(self, other_field: 'Field', combination_function: Callable[[Any, Any], Any], 
                        domain: Any = None, metadata_combination: Callable[[Dict, Dict], Dict] = None) -> 'Field':
         '''
@@ -180,14 +194,13 @@ class Field(ABC):
         :param other_field: The field to interact with
         :return: A new Field representing the result of the interaction
         '''
-        interaction_points = {}
-        all_points = set(self.nodes.keys()) | set(other_field.nodes.keys())
+        def new_field_function(points):
+            if isinstance(points, np.ndarray):
+                return np.array([self.interaction_mechanism(self, other_field, tuple(p)) for p in points])
+            else:
+                return self.interaction_mechanism(self, other_field, points)
         
-        for point in all_points:
-            interaction_value = self.interaction_mechanism(self, other_field, point)
-            interaction_points[point] = {'field_value': interaction_value}
-        
-        return type(self)(interaction_points, lambda p: interaction_points[p]['field_value'], 
+        return type(self)(self.nodes, new_field_function, 
                           self.edge_criteria, self.value_difference, self.interaction_mechanism)
 
     def propagate_interaction(self, other_field: 'Field', steps: int = 1):
@@ -210,7 +223,6 @@ class Field(ABC):
         '''
         self.interaction_mechanism = mechanism
 
-    @abstractmethod
     def interpolate(self, point: Any) -> Any:
         '''Interpolate the field value at a given point (which may not be a node).'''
         # Simple nearest neighbor interpolation
@@ -223,50 +235,50 @@ class Field(ABC):
         nearest_point = min(self.nodes.keys(), key=lambda p: self._distance(p, point))
         return self.get_field_value(nearest_point)
 
-    @abstractmethod
-    def get_boundary(self) -> List[Any]:
-        '''Get the boundary points of the field.'''
-        pass
+    # @abstractmethod
+    # def get_boundary(self) -> List[Any]:
+    #     '''Get the boundary points of the field.'''
+    #     pass
 
-    @abstractmethod
-    def get_interior(self) -> List[Any]:
-        '''Get the interior points of the field.'''
-        pass
+    # @abstractmethod
+    # def get_interior(self) -> List[Any]:
+    #     '''Get the interior points of the field.'''
+    #     pass
 
-    def apply_boundary_condition(self, condition: Callable[[Any], Any]):
-        '''Apply a boundary condition to the field.'''
-        for point in self.get_boundary():
-            self.set_field_value(point, condition(point))
+    # def apply_boundary_condition(self, condition: Callable[[Any], Any]):
+    #     '''Apply a boundary condition to the field.'''
+    #     for point in self.get_boundary():
+    #         self.set_field_value(point, condition(point))
 
-    @abstractmethod
-    def get_divergence(self, point: Any) -> Any:
-        '''Calculate the divergence of the field at a given point.'''
-        pass
+    # @abstractmethod
+    # def get_divergence(self, point: Any) -> Any:
+    #     '''Calculate the divergence of the field at a given point.'''
+    #     pass
 
-    @abstractmethod
-    def get_curl(self, point: Any) -> Any:
-        '''Calculate the curl of the field at a given point.'''
-        pass
+    # @abstractmethod
+    # def get_curl(self, point: Any) -> Any:
+    #     '''Calculate the curl of the field at a given point.'''
+    #     pass
 
     def iterate_points(self) -> Iterator[Tuple[Any, Any]]:
         '''Iterate over all points and their field values.'''
         for point, data in self.nodes.items():
             yield point, data['field_value']
 
-    @abstractmethod
-    def normalize(self):
-        '''Normalize the field values.'''
-        pass
+    # @abstractmethod
+    # def normalize(self):
+    #     '''Normalize the field values.'''
+    #     pass
 
-    @abstractmethod
-    def get_energy(self) -> float:
-        '''Calculate the total energy of the field.'''
-        pass
+    # @abstractmethod
+    # def get_energy(self) -> float:
+    #     '''Calculate the total energy of the field.'''
+    #     pass
 
-    @abstractmethod
-    def get_flux(self, surface: List[Any]) -> Any:
-        '''Calculate the flux of the field through a given surface.'''
-        pass
+    # @abstractmethod
+    # def get_flux(self, surface: List[Any]) -> Any:
+    #     '''Calculate the flux of the field through a given surface.'''
+    #     pass
 
     def apply_differential_operator(self, operator: Callable[[Dict[Any, Any]], Any]) -> 'Field':
         '''Apply a differential operator to the field.'''

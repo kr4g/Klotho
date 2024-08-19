@@ -73,18 +73,3 @@ def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, pare
             _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
     return pos
 
-def prune_graph(G:nx.DiGraph, max_depth:int) -> nx.DiGraph:
-    pruned_graph = nx.DiGraph()
-    root = [n for n, d in G.in_degree() if d == 0][0]
-    queue = [(root, 0)]  # (node, depth)
-    
-    while queue:
-        node, depth = queue.pop(0)
-        if depth <= max_depth:
-            pruned_graph.add_node(node, label=G.nodes[node]['label'])
-            if depth < max_depth:
-                for neighbor in G.neighbors(node):
-                    pruned_graph.add_edge(node, neighbor)
-                    queue.append((neighbor, depth + 1))
-    
-    return pruned_graph

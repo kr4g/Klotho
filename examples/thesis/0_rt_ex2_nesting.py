@@ -10,7 +10,7 @@ from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequen
 from klotho.chronos import seconds_to_hmsms
 from klotho.aikous.expression import db_amp
 from klotho.skora.graphs import *
-from klotho.skora.animate import *
+from klotho.skora.animation.animate import *
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()

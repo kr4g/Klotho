@@ -11,7 +11,7 @@ from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnit as 
 from klotho.tonos.combination_product_sets import nkany as NKany
 from klotho.chronos.rhythm_trees import rhythm_pair as rp
 
-from klotho.skora import animate
+from klotho.skora.animation import animate
 
 from utils.data_structures import scheduler as sch
 scheduler = sch.Scheduler()
