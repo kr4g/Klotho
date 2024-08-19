@@ -57,7 +57,7 @@ print(f'{len(comb_net.graph)} nodes in the network.\n')
 # PRE-COMPOSITIONAL MATERIAL ----------------------------------------------------------
 # ---------------------------
 partials = tuple(nth_odd(i + 1) for i in range(len(variables)))
-insts = ['perc', 'drone', 'horn', 'glitch']
+insts = ['perc', 'drone', 'horn', 'ping']
 aliases = {
     'partials': { k: v for k, v in zip(variables, partials) },
     'dynamics': { k: v for k, v in zip(variables, np.random.choice(DYNAMIC_MARKINGS, len(variables), False)) },
@@ -105,7 +105,7 @@ for i, (combo, ut) in enumerate(zip(path, utseq)):
         seen_partials.add(root_partial)
     
     # list of the synths that are not perc or glitch
-    for drone in [synth for synth in synths if synth not in ['perc', 'glitch']]:
+    for drone in [synth for synth in synths if synth not in ['perc', 'ping']]:
         dur = sum(ut.durations)
         atk = np.random.uniform(0.167, 0.833) * dur
         f_scale = np.random.choice([0.5, 1.0]) if drone == 'drone' else np.random.choice([2.0, 1.0, 0.5])
@@ -114,16 +114,16 @@ for i, (combo, ut) in enumerate(zip(path, utseq)):
                         atk = atk,
                         rel = dur * np.interp(atk, [dur*0.167, dur*0.833], [0.33, 1.33]),
                         freq = f_scale * root_freq * fold_interval(root_partial),
-                        amp = db_amp(-12) if drone == 'drone' else np.random.uniform(0.005,0.2 ))
+                        amp = db_amp(-16) if drone == 'drone' else np.random.uniform(0.002,0.2))
     # list of the synths that are perc or glitch
     short_insts = {
         'perc': ['zerpPerc', 'pitchPerc', 'kick', 'snare', 'perc', 'perc2'],
-        'glitch': ['chip1', 'chip2', 'chip3']
+        'ping': ['ping2']
     }
-    for short in [synth for synth in synths if synth in ['perc', 'glitch']]:
+    for short in [synth for synth in synths if synth in ['perc', 'ping']]:
         sub_path = ComboNetTraversal(comb_net).play(combo, ut.tempus.numerator)
         ratios = cycle([hx.combo_to_ratio[vtp(aliases['partials'], cp)] for cp in sub_path])
-        amps = cycle(envs.line(len(ut), -23, 0))
+        amps = cycle(envs.line(len(ut), -11, 0))
         seen_ratios = set()
         synth_cyc = cycle(np.random.choice(short_insts[short], len(ut), True))
         for j, event in enumerate(ut):
@@ -135,13 +135,15 @@ for i, (combo, ut) in enumerate(zip(path, utseq)):
             else:
                 seen_ratios.add(ratio)
             freq = root_freq * fold_interval(root_partial) * ratio
+            if short == 'ping':
+                freq = fold_freq(freq, 333.0)
             syn = next(synth_cyc)
             sch.add_new_event(syn, event['start'],
                             duration = event['duration'] * 0.25,
                             freq = freq,
                             ratio = float(fold_interval(root_partial) * ratio),
                             seed = np.random.randint(0, 1000) * float(ratio),
-                            amp = db_amp(next(amps)) * (0.667 if short == 'perc' else 0.833))
+                            amp = db_amp(next(amps)) * (0.08 if short == 'perc' else 1.0))
 
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

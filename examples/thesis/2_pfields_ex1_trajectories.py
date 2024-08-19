@@ -88,10 +88,20 @@ n_points = 50
 x = np.linspace(-1, 1, n_points)
 y = np.linspace(-1, 1, n_points)
 X, Y = np.meshgrid(x, y)
-space_points = {(float(x), float(y)): {} for x, y in zip(X.flatten(), Y.flatten())}
+points = np.stack((X.flatten(), Y.flatten()), axis=-1)
+
+values = quantum_fluid_field_function(points)
+
+space_points = {tuple(point): {'field_value': value} for point, value in zip(points, values)}
+
+# space_points = {(float(x), float(y)): {} for x, y in zip(X.flatten(), Y.flatten())}
 
 quantum_field = Field(space_points, quantum_field_function)
-hybrid_field = Field(space_points, quantum_fluid_field_function)
+quantum_fluid_field = Field(space_points, quantum_fluid_field_function)
+
+# THIS DOESNT WORK
+for point in points:
+    print(point, quantum_fluid_field[tuple(point)]) # always -0.9640275800758169
 
 class BrainWaveField(FieldFunction):
     def __init__(self):
@@ -126,7 +136,7 @@ neural_fluid_field_function = FieldFunction.compose(fluid_field_function, BrainW
 brain_wave_field = Field(space_points, BrainWaveField())
 brain_wave_fluid_field = Field(space_points, neural_fluid_field_function)
 
-def plot_1d_fluid_function(fluid_field_function, resolution: int = 400, title='1D Fluid Dynamics Field'):
+def plot_1d_fluid_function(fluid_field_function, resolution: int = 400, title=''):
     # Generate input values
     x = np.linspace(-1, 1, resolution)
     
@@ -159,12 +169,6 @@ def plot_1d_fluid_function(fluid_field_function, resolution: int = 400, title='1
     plt.tight_layout()
     plt.show()
 
-# Usage
-# plot_1d_fluid_function(fluid_field_function, title='1D Fluid Dynamics Field')
-
-
-
-
 # Function to plot the field as a 2D heatmap
 def plot_field_heatmap(field: Field, x_range: tuple, y_range: tuple, resolution: int = 400, title=''):
     x = np.linspace(x_range[0], x_range[1], resolution)
@@ -192,6 +196,7 @@ def plot_field_heatmap(field: Field, x_range: tuple, y_range: tuple, resolution:
     plt.show()
 
 # Plot the field
-plot_field_heatmap(quantum_field, (-1, 1), (-1, 1), title='Quantum Field')
-# plot_field_heatmap(hybrid_field, (-1, 1), (-1, 1), title='Quantum-Fluid Field')
-plot_field_heatmap(brain_wave_field, (-1, 1), (-1, 1), title='Neural Field')
+# plot_field_heatmap(quantum_field, (-1, 1), (-1, 1), title='')
+# plot_field_heatmap(quantum_fluid_field, (-1, 1), (-1, 1), title='')
+# plot_field_heatmap(brain_wave_field, (-1, 1), (-1, 1), title='')
+# plot_field_heatmap(brain_wave_fluid_field, (-1, 1), (-1, 1), title='')
