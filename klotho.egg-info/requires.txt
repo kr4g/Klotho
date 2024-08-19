@@ -1,0 +1,12 @@
+pandas
+numpy
+regex
+matplotlib
+ipywidgets
+IPython
+tabulate
+PySide6
+sympy
+networkx
+hypernetx
+python-osc

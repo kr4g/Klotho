@@ -1,4 +1,4 @@
-from .trees import *
+from ..trees import *
 
 def factor_children(subdivs:tuple) -> tuple:
     def _factor(subdivs, acc):

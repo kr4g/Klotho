@@ -247,13 +247,14 @@ class TemporalUnit:
         return len(self.__rtree.ratios)
     
     def __str__(self):
+        prolat = self.__rtree.subdivisions if self.__type.lower() not in PULSTYPES else self.__type
         return (
             f'Type:        {self.__type}\n'
             f'Tempus:      {self.__rtree._root}\n'
             f'Duration:    {self.__rtree.duration}\n'
             f'Tempo:       {self.__tempo}\n'
             f'Beat:        {self.__beat}\n'
-            f'Prolationis: {self.__rtree.subdivisions}\n'
+            f'Prolationis: {prolat}\n'
             f'Time:        {seconds_to_hmsms(self.time)}\n'
         )
 

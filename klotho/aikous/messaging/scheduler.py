@@ -19,7 +19,7 @@ class Scheduler:
         self.dispatcher.map("/event_processed", self.event_processed_handler)
         self.server = osc_server.ThreadingOSCUDPServer((ip, receive_port), self.dispatcher)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
-        self.server_thread.start()
+        # self.server_thread.start()
     
     def pause_handler(self, address, *args):
         if not self.paused:
@@ -66,6 +66,10 @@ class Scheduler:
             # if self.events_sent % self.batch_size == 0:
             #     print(f"Sent {self.events_sent} of {self.total_events} events")
             time.sleep(0.01)
+        # Send end of transmission signal
+        eot_msg = osc_message_builder.OscMessageBuilder(address='/storeEvent')
+        eot_msg.add_arg('end_of_transmission')
+        self.client.send(eot_msg.build())
         print('All events have been sent.')
 
     def stop_server(self):
@@ -74,16 +78,8 @@ class Scheduler:
         exit(0)
 
     def run(self):
+        self.server_thread.start()
         self.send_events()
         # Wait for SuperCollider to process all events
-        while self.events_processed < self.total_events:
-            time.sleep(0.1)
-
-if __name__ == "__main__":
-    scheduler = Scheduler()
-    
-    # Add your events here
-    for i in range(30):
-        scheduler.add_new_event('kick', i*0.5)
-    
-    scheduler.run()
+        # while self.events_processed < self.total_events:
+        #     time.sleep(0.1)

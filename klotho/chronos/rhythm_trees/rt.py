@@ -20,7 +20,7 @@ from typing import Union, Tuple
 from math import gcd
 
 from klotho.topos.graphs import Tree
-from klotho.topos.graphs.graph_algorithms import rotate_tree
+from klotho.topos.graphs.trees.algorithms import rotate_tree
 from .algorithms.rt_algs import *
 
 class Meas:
