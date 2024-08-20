@@ -23,154 +23,6 @@ from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import rotate_tree
 from .algorithms.rt_algs import *
 
-class Meas:
-    '''
-    Time signature class that preserves unreduced fractions.
-    '''
-    def __init__(self, signature: Union[str, tuple, int, float] = '1/1'):
-        if isinstance(signature, Meas):
-            self._numerator, self._denominator = signature.numerator, signature.denominator
-        elif isinstance(signature, Fraction):
-            self._numerator = signature.numerator
-            self._denominator = signature.denominator
-        elif isinstance(signature, tuple):
-            if len(signature) != 2:
-                raise ValueError("Tuple must have exactly two elements")
-            self._numerator, self._denominator = signature
-        elif isinstance(signature, int):
-            self._numerator = signature
-            self._denominator = 1
-        elif isinstance(signature, float):
-            frac = Fraction(signature).limit_denominator()
-            self._numerator = frac.numerator
-            self._denominator = frac.denominator
-        elif isinstance(signature, str):
-            try:
-                parts = signature.replace('//', '/').split('/')
-                if len(parts) != 2:
-                    raise ValueError('Invalid time signature format')
-                self._numerator = int(parts[0])
-                self._denominator = int(parts[1])
-            except ValueError:
-                raise ValueError('Invalid time signature format')
-        else:
-            raise ValueError('Invalid time signature type')
-
-        if self._denominator == 0:
-            raise ValueError('Time signature denominator cannot be zero')
-
-    @property
-    def numerator(self):
-        return self._numerator
-
-    @property
-    def denominator(self):
-        return self._denominator
-    
-    def __add__(self, other):
-        if isinstance(other, (Meas, Fraction)):
-            common_denominator = self._denominator * other.denominator
-            new_numerator = (self._numerator * other.denominator) + (other.numerator * self._denominator)
-            divisor = gcd(self._denominator, other.denominator)
-            new_numerator = new_numerator // divisor
-            common_denominator = common_denominator // divisor
-            return Meas((new_numerator, common_denominator))
-        raise ValueError('Invalid type for addition')
-
-    def __sub__(self, other):
-        if isinstance(other, (Meas, Fraction)):
-            common_denominator = self._denominator * other.denominator
-            new_numerator = (self._numerator * other.denominator) - (other.numerator * self._denominator)
-            divisor = gcd(self._denominator, other.denominator)
-            new_numerator = new_numerator // divisor
-            common_denominator = common_denominator // divisor
-            return Meas((new_numerator, common_denominator))
-        raise ValueError('Invalid type for subtraction')
-
-    def __mul__(self, other):
-        if isinstance(other, (Meas, Fraction)):
-            new_numerator = self._numerator * other.numerator
-            new_denominator = self._denominator * other.denominator
-            return Meas((new_numerator, new_denominator))
-        raise ValueError('Invalid type for multiplication')
-
-    def __truediv__(self, other):
-        if isinstance(other, (Meas, Fraction)):
-            new_numerator = self._numerator * other.denominator
-            new_denominator = self._denominator * other.numerator
-            return Meas((new_numerator, new_denominator))
-        raise ValueError('Invalid type for division')
-
-    def __eq__(self, other):
-        if isinstance(other, (Meas, Fraction)):
-            return (self._numerator, self._denominator) == (other.numerator, other.denominator)
-        elif isinstance(other, tuple) and len(other) == 2:
-            return (self._numerator, self._denominator) == tuple(map(int, other))
-        elif isinstance(other, str):
-            try:
-                other_numerator, other_denominator = map(int, other.replace('//', '/').split('/'))
-                return (self._numerator, self._denominator) == (other_numerator, other_denominator)
-            except ValueError:
-                return False
-        return NotImplemented
-
-    def __str__(self):
-        return f'{self._numerator}/{self._denominator}'
-
-    def __repr__(self) -> str:
-        return self.__str__()
-    
-    def __float__(self):
-        return self._numerator / self._denominator
-    
-    def to_fraction(self):
-        return Fraction(self._numerator, self._denominator)
-    
-    def type(self):
-        '''
-        Determines the type of time signature: "simple duple", "simple triple", 
-        "compound duple", "compound triple", "complex", "additive", or "irregular".
-        '''
-        if self._denominator in [2, 4, 8, 16]:
-            if self._numerator in [2, 3, 4]:
-                if self._numerator == 2:
-                    return "simple duple"
-                elif self._numerator == 3:
-                    return "simple triple"
-                elif self._numerator == 4:
-                    return "simple quadruple"
-            elif self._numerator in [6, 9, 12]:
-                if self._numerator == 6:
-                    return "compound duple"
-                elif self._numerator == 9:
-                    return "compound triple"
-                elif self._numerator == 12:
-                    return "compound quadruple"
-            elif self._numerator in [5, 7, 10, 11]:
-                return "complex"
-            elif self._numerator > 12:
-                if all(x in [2, 3, 4] for x in self._numerator_digits()):
-                    return "additive"
-                else:
-                    return "complex"
-            else:
-                return "irregular"
-        else:
-            return "irregular"
-
-    def _numerator_digits(self):
-        '''
-        Helper function to break down the numerator into its component parts.
-        Useful for additive meters like 5/8 (2+3/8).
-        '''
-        digits = []
-        n = self._numerator
-        while n > 0:
-            digits.append(n % 10)
-            n //= 10
-        return digits[::-1]
-
-
 class RhythmTree(Tree):
     '''
     A rhythm tree is a list representing a rhythmic structure. This list is organized 
@@ -327,3 +179,150 @@ class RhythmTree(Tree):
         )
 
 # ------------------------------------------------------------------------------------
+
+class Meas:
+    '''
+    Time signature class that preserves unreduced fractions.
+    '''
+    def __init__(self, signature: Union[str, tuple, int, float] = '1/1'):
+        if isinstance(signature, Meas):
+            self._numerator, self._denominator = signature.numerator, signature.denominator
+        elif isinstance(signature, Fraction):
+            self._numerator = signature.numerator
+            self._denominator = signature.denominator
+        elif isinstance(signature, tuple):
+            if len(signature) != 2:
+                raise ValueError("Tuple must have exactly two elements")
+            self._numerator, self._denominator = signature
+        elif isinstance(signature, int):
+            self._numerator = signature
+            self._denominator = 1
+        elif isinstance(signature, float):
+            frac = Fraction(signature).limit_denominator()
+            self._numerator = frac.numerator
+            self._denominator = frac.denominator
+        elif isinstance(signature, str):
+            try:
+                parts = signature.replace('//', '/').split('/')
+                if len(parts) != 2:
+                    raise ValueError('Invalid time signature format')
+                self._numerator = int(parts[0])
+                self._denominator = int(parts[1])
+            except ValueError:
+                raise ValueError('Invalid time signature format')
+        else:
+            raise ValueError('Invalid time signature type')
+
+        if self._denominator == 0:
+            raise ValueError('Time signature denominator cannot be zero')
+
+    @property
+    def numerator(self):
+        return self._numerator
+
+    @property
+    def denominator(self):
+        return self._denominator
+    
+    def __add__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            common_denominator = self._denominator * other.denominator
+            new_numerator = (self._numerator * other.denominator) + (other.numerator * self._denominator)
+            divisor = gcd(self._denominator, other.denominator)
+            new_numerator = new_numerator // divisor
+            common_denominator = common_denominator // divisor
+            return Meas((new_numerator, common_denominator))
+        raise ValueError('Invalid type for addition')
+
+    def __sub__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            common_denominator = self._denominator * other.denominator
+            new_numerator = (self._numerator * other.denominator) - (other.numerator * self._denominator)
+            divisor = gcd(self._denominator, other.denominator)
+            new_numerator = new_numerator // divisor
+            common_denominator = common_denominator // divisor
+            return Meas((new_numerator, common_denominator))
+        raise ValueError('Invalid type for subtraction')
+
+    def __mul__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            new_numerator = self._numerator * other.numerator
+            new_denominator = self._denominator * other.denominator
+            return Meas((new_numerator, new_denominator))
+        raise ValueError('Invalid type for multiplication')
+
+    def __truediv__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            new_numerator = self._numerator * other.denominator
+            new_denominator = self._denominator * other.numerator
+            return Meas((new_numerator, new_denominator))
+        raise ValueError('Invalid type for division')
+
+    def __eq__(self, other):
+        if isinstance(other, (Meas, Fraction)):
+            return (self._numerator, self._denominator) == (other.numerator, other.denominator)
+        elif isinstance(other, tuple) and len(other) == 2:
+            return (self._numerator, self._denominator) == tuple(map(int, other))
+        elif isinstance(other, str):
+            try:
+                other_numerator, other_denominator = map(int, other.replace('//', '/').split('/'))
+                return (self._numerator, self._denominator) == (other_numerator, other_denominator)
+            except ValueError:
+                return False
+        return NotImplemented
+
+    def __str__(self):
+        return f'{self._numerator}/{self._denominator}'
+
+    def __repr__(self) -> str:
+        return self.__str__()
+    
+    def __float__(self):
+        return self._numerator / self._denominator
+    
+    def to_fraction(self):
+        return Fraction(self._numerator, self._denominator)
+    
+    def type(self):
+        '''
+        Determines the type of time signature: "simple duple", "simple triple", 
+        "compound duple", "compound triple", "complex", "additive", or "irregular".
+        '''
+        if self._denominator in [2, 4, 8, 16]:
+            if self._numerator in [2, 3, 4]:
+                if self._numerator == 2:
+                    return "simple duple"
+                elif self._numerator == 3:
+                    return "simple triple"
+                elif self._numerator == 4:
+                    return "simple quadruple"
+            elif self._numerator in [6, 9, 12]:
+                if self._numerator == 6:
+                    return "compound duple"
+                elif self._numerator == 9:
+                    return "compound triple"
+                elif self._numerator == 12:
+                    return "compound quadruple"
+            elif self._numerator in [5, 7, 10, 11]:
+                return "complex"
+            elif self._numerator > 12:
+                if all(x in [2, 3, 4] for x in self._numerator_digits()):
+                    return "additive"
+                else:
+                    return "complex"
+            else:
+                return "irregular"
+        else:
+            return "irregular"
+
+    def _numerator_digits(self):
+        '''
+        Helper function to break down the numerator into its component parts.
+        Useful for additive meters like 5/8 (2+3/8).
+        '''
+        digits = []
+        n = self._numerator
+        while n > 0:
+            digits.append(n % 10)
+            n //= 10
+        return digits[::-1]
