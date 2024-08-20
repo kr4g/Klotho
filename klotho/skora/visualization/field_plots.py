@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Tuple
 
-def plot_field_heatmap(field: Field, title: str = '', path: List[Tuple[Tuple[float, float], float]] = None):
+def plot_field_heatmap(field: Field, title: str = '', path: List[Tuple[Tuple[float, float], float]] = None, save_path: str = None):
     """
     Plot the field as a heatmap with an optional navigation path overlaid.
     
@@ -47,6 +47,10 @@ def plot_field_heatmap(field: Field, title: str = '', path: List[Tuple[Tuple[flo
         plt.scatter(path_x[0], path_y[0], color='lime', s=100, label='Start')
         plt.scatter(path_x[-1], path_y[-1], color='red', s=100, label='End')
         plt.legend(loc='upper right', facecolor='black', edgecolor='white', labelcolor='white')
+
+    # Save the plot if a path is provided
+    if save_path:
+        plt.savefig(save_path)
 
     plt.tight_layout()
     plt.show()

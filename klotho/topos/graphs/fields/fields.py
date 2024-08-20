@@ -111,3 +111,32 @@ class Field:
 
     def __repr__(self) -> str:
         return self.__str__()
+    
+import pickle
+
+def save_field(field: Field, filename: str):
+    """
+    Save a Field instance to a file using pickle.
+    
+    Args:
+    field (Field): The Field instance to save.
+    filename (str): The name of the file to save the field to.
+    """
+    with open(filename, 'wb') as f:
+        pickle.dump(field, f)
+    print(f"Field saved to {filename}")
+
+def load_field(filename: str) -> Field:
+    """
+    Load a Field instance from a file using pickle.
+    
+    Args:
+    filename (str): The name of the file to load the field from.
+    
+    Returns:
+    Field: The loaded Field instance.
+    """
+    with open(filename, 'rb') as f:
+        field = pickle.load(f)
+    print(f"Field loaded from {filename}")
+    return field
