@@ -8,6 +8,8 @@ klotho.egg-info/requires.txt
 klotho.egg-info/top_level.txt
 klotho/chronos/__init__.py
 klotho/chronos/chronos.py
+klotho/chronos/rhythm_pairs/__init__.py
+klotho/chronos/rhythm_pairs/rp.py
 klotho/chronos/rhythm_trees/__init__.py
 klotho/chronos/rhythm_trees/rt.py
 klotho/chronos/rhythm_trees/algorithms/__init__.py
