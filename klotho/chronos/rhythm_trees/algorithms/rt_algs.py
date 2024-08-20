@@ -18,8 +18,9 @@ encompass other tree structures."  —- Karim Haddad
 '''
 from typing import Tuple
 from fractions import Fraction
-from math import gcd, lcm
+from math import gcd, lcm, prod
 from functools import reduce
+import numpy as np
 
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
@@ -123,6 +124,16 @@ def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
         next_elt = (elt, (1,) * subdivs[(idx + n) % len(subdivs)])
         return (next_elt,) + _recurse(idx + 1)
     return _recurse(0)
+
+def rhythm_pair(lst:Tuple, MM:bool=True) -> Tuple:
+    total_product = prod(lst)
+    if MM:
+        sequences = [np.arange(0, total_product + 1, total_product // x) for x in lst]
+    else:
+        sequences = [np.arange(0, total_product + 1, x) for x in lst]
+    combined_sequence = np.unique(np.concatenate(sequences))
+    deltas = np.diff(combined_sequence)
+    return tuple(deltas)
 
 # ------------------------------------------------------------------------------------
 

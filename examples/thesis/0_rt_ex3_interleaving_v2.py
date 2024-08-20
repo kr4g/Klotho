@@ -11,7 +11,7 @@ from klotho.topos import autoref
 from klotho.chronos.temporal_units import TemporalUnitSequence as UTSeq, TemporalUnit as UT
 from klotho.chronos.rhythm_trees.rt import *
 from klotho.chronos.rhythm_trees.algorithms.rt_algs import auto_subdiv
-from klotho.topos.sequences import NestedCycle
+from klotho.topos.sequences import Pattern
 from klotho.chronos import seconds_to_hmsms, beat_duration
 from klotho.aikous.expression import db_amp
 from klotho.skora.graphs import *
@@ -120,8 +120,8 @@ print(seqs['full'])
 
 utseq = UTSeq(seqs['full'])
 print(utseq.duration)
-glitch = NestedCycle(['random', 'glitch1', 'random', 'random'])
-dnb = NestedCycle([['kick2', ['kick2', 'snare2'], 'ghostKick'], ['kick2', ['hat', 'hat2']], ['snare', ['perc', ['perc2', 'hatSoft']]]])
+glitch = Pattern(['random', 'glitch1', 'random', 'random'])
+dnb = Pattern([['kick2', ['kick2', 'snare2'], 'ghostKick'], ['kick2', ['hat', 'hat2']], ['snare', ['perc', ['perc2', 'hatSoft']]]])
 for i in range(30):
     print(next(dnb))
 

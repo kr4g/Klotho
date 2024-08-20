@@ -66,7 +66,7 @@ class Norg:
         pass
 
 
-class NestedCycle:
+class Pattern:
     def __init__(self, iterable):
         self.cycles = self._create_cycles(iterable)
 

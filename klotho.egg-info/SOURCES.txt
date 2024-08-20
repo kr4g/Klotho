@@ -17,11 +17,14 @@ klotho/chronos/temporal_units/ut.py
 klotho/chronos/temporal_units/algorithms/__init__.py
 klotho/chronos/temporal_units/algorithms/ut_algs.py
 klotho/skora/__init__.py
-klotho/skora/animate.py
 klotho/skora/graphs.py
-klotho/skora/instruments.py
-klotho/skora/notation.py
 klotho/skora/skora.py
+klotho/skora/animation/__init__.py
+klotho/skora/animation/animate.py
+klotho/skora/notation/__init__.py
+klotho/skora/notation/notation.py
+klotho/skora/visualization/__init__.py
+klotho/skora/visualization/field_plots.py
 klotho/tonos/__init__.py
 klotho/tonos/tonos.py
 klotho/tonos/combination_product_sets/__init__.py
@@ -39,6 +42,8 @@ klotho/topos/formal_grammars/grammars.py
 klotho/topos/graphs/__init__.py
 klotho/topos/graphs/fields/__init__.py
 klotho/topos/graphs/fields/fields.py
+klotho/topos/graphs/fields/algorithms/__init__.py
+klotho/topos/graphs/fields/algorithms/field_algs.py
 klotho/topos/graphs/fields/functions/__init__.py
 klotho/topos/graphs/fields/functions/field_funcs.py
 klotho/topos/graphs/networks/__init__.py
