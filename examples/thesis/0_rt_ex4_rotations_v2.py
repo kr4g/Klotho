@@ -130,7 +130,7 @@ for i, utseq in enumerate(tb):
     synth = next(synths)
     seed = np.random.randint(0, 1000)
     pan = np.interp(i, [0, tb.size], [-1, 1])
-    u_ids[i] = scheduler.add_new_event_with_id(synth, 0, gate=0, amp=db_amp(-80), pan=pan)
+    u_ids[i] = scheduler.add_event_with_id(synth, 0, gate=0, amp=db_amp(-80), pan=pan)
     for j, ut in enumerate(utseq):
         freqs = cycle([13.0 * fold_interval(Fraction(p), n_equaves=3) for p in measure_partials(ut.prolationis)])
         vibDepth_seq = swell(len(ut), 0.0, np.interp(i, [0, tb.size], [0.001, 0.008]))
@@ -145,7 +145,7 @@ for i, utseq in enumerate(tb):
             freq = next(freqs) * fold_interval((i + 1), n_equaves=4)
             freq = fold_freq(freq, min_freqs[synth], max_freqs[synth])
             
-            scheduler.add_set_event(u_ids[i], event['start'], gate=1,
+            scheduler.set_event(u_ids[i], event['start'], gate=1,
                                     freq=freq, freqLag=np.interp(i, [0, tb.size], [0.0, min_dur*0.4]),
                                     amp=db_amp(max_amps[synth] - i*0.2)*0.75, ampLag=duration,
                                     vibDepth=np.random.uniform(0.0, vibDepth_seq[k]), vibRate=np.random.uniform(0.0, vibRate_seq[k]),
@@ -153,11 +153,11 @@ for i, utseq in enumerate(tb):
                                     breathiness=breathiness[k])
             
             alpha = np.interp(i, [0, tb.size], [0.667, 0.969])
-            scheduler.add_set_event(u_ids[i], event['start'] + duration*alpha, gate=1,
+            scheduler.set_event(u_ids[i], event['start'] + duration*alpha, gate=1,
                                     amp=db_amp(-80), ampLag=duration*(1-alpha))
             
             if k == len(ut) - 1:
-                scheduler.add_set_event(u_ids[i], event['start'] + duration, gate=0)
+                scheduler.set_event(u_ids[i], event['start'] + duration, gate=0)
 
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

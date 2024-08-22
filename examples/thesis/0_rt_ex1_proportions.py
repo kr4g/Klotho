@@ -69,8 +69,8 @@ for j, ut in enumerate(utseq):
         # synth = 'ping' #synths[ut.prolationis[i]]
         duration = event['duration'] * dur_scale
         freq = 333.0 * ut.prolationis[i] * 2**0 #fold_interval(1/ut.prolationis[i], n_equaves=1)
-        scheduler.add_new_event('perc', event['start'], freq=freq, amp=db_amp(-8))
-        scheduler.add_new_event('kick', event['start'], amp=db_amp(-7))
+        scheduler.add_event('perc', event['start'], freq=freq, amp=db_amp(-8))
+        scheduler.add_event('kick', event['start'], amp=db_amp(-7))
 
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

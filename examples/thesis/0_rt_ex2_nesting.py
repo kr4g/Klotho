@@ -56,8 +56,8 @@ for j, ut in enumerate(utseq):
         if event['duration'] < 0: continue
         # dur_scale = np.interp(event['duration'], [min_dur, max_dur], [1.0, 0.667])
         duration = min_dur#np.interp(event['duration'], [min_dur, max_dur], [min_dur, min_dur*3])
-        scheduler.add_new_event('random', event['start'], duration=duration, amp=db_amp(-6), seed=seed*event['duration'])
-        # scheduler.add_new_event('kick', event['start'], amp=db_amp(-8))
+        scheduler.add_event('random', event['start'], duration=duration, amp=db_amp(-6), seed=seed*event['duration'])
+        # scheduler.add_event('kick', event['start'], amp=db_amp(-8))
 
 # # ------------------------------------------------------------------------------------
 # # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------
