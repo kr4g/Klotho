@@ -1,7 +1,7 @@
 from klotho.topos.graphs.fields import Field
 import random
 
-def find_navigation_path(field: Field, steps: int = 2000):
+def find_navigation_path(field: Field, steps: int = 2000, seed: int = 42):
     """
     Generate a navigation path through the field.
     
@@ -9,6 +9,7 @@ def find_navigation_path(field: Field, steps: int = 2000):
     :param steps: Number of steps to take in the navigation
     :return: List of (point, value) tuples representing the path
     """
+    random.seed(seed)
     start_point = random.choice(list(field.nodes.keys()))
     path = [(start_point, field[start_point])]
     visited = set([start_point])
