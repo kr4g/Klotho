@@ -17,8 +17,10 @@ from klotho.aikous.expression import db_amp
 from klotho.skora.graphs import *
 from klotho.skora.animation.animate import *
 
-from utils.data_structures import scheduler as sch
-scheduler = sch.Scheduler()
+# from utils.data_structures import scheduler as sch
+# scheduler = sch.Scheduler()
+from klotho.aikous.messaging import Scheduler
+scheduler = Scheduler()
 
 import os
 
@@ -33,9 +35,11 @@ def ut_dur(ut:UT):
 # -------------------------------------------------------------------------------------
 # PRE-COMPOSITIONAL MATERIAL ----------------------------------------------------------
 # ---------------------------
-tempus = '2/4'
+# tempus = '2/4'
+tempus = '1/1'
 beat = '1/8'
-bpm = 84
+# bpm = 84
+bpm = 84*2
 
 # S = autoref((3, 1, 2))
 S = autoref((5, 2, 3))
@@ -85,12 +89,12 @@ while len(r) > 1:
 image_files = []
 for i, ut in enumerate(seqs['prime']):
     output_file = os.path.join(output_dir, f"graph_{i}a.png")
-    plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
+    # plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
     image_files.append(output_file)
 
 gif_file = os.path.join(output_dir, 'graph_animation_A.gif')
 duration_per_frame = 100
-create_gif(image_files, gif_file, duration_per_frame)
+# create_gif(image_files, gif_file, duration_per_frame)
 
 r_rev = rts['prime_flat_rev'].ratios
 while len(r_rev) > 1:
@@ -105,11 +109,11 @@ seqs['prime_rev'] = seqs['prime_rev'][::-1]
 image_files = []
 for i, ut in enumerate(seqs['prime_rev']):
     output_file = os.path.join(output_dir, f"graph_{i}b.png")
-    plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
+    # plot_graph(graph_tree(ut.tempus, ut.prolationis), output_file)
     image_files.append(output_file)
 
 gif_file = os.path.join(output_dir, 'graph_animation_B.gif')
-create_gif(image_files, gif_file, duration_per_frame)
+# create_gif(image_files, gif_file, duration_per_frame)
 
 
 
@@ -130,42 +134,47 @@ for i in range(30):
 # ----------------------
 seed = np.random.randint(1000)
 for i, ut in enumerate(utseq):
-    min_dur = min(ut.durations)
-    if i % 2 == 0:
-        synth_cycle = glitch
-        pan = -1
-        ampMin = db_amp(-20)
-        ampMax = db_amp(np.interp(i, [0, len(utseq)], [-8, -12]))
-    else:
-        synth_cycle = dnb
-        pan = 1
-        ampMin = db_amp(-7)
-        ampMax = db_amp(np.interp(i, [0, len(utseq)], [-4, 1]))
+    bias = 'r' if i % 2 == 0 else 'b'
+    _ut = ut
+    _ut.offset = 0
+    animate_temporal_unit(_ut, save_mp4=True,file_name=f'interleave_animation_{i}', bias=bias)
+#     min_dur = min(ut.durations)
+#     if i % 2 == 0:
+#         synth_cycle = glitch
+#         pan = -1
+#         ampMin = db_amp(-20)
+#         ampMax = db_amp(np.interp(i, [0, len(utseq)], [-8, -12]))
+#     else:
+#         synth_cycle = dnb
+#         pan = 1
+#         ampMin = db_amp(-7)
+#         ampMax = db_amp(np.interp(i, [0, len(utseq)], [-4, 1]))
     
-    for j, event in enumerate(ut):
-        if len(ut) > 1:
-            synth = next(synth_cycle)
-            amp = np.interp(j, [0, len(ut) - 1], [ampMin, ampMax])
-        else:
-            synth = 'glitch2' if i % 2 == 0 else 'kick'
-            amp = db_amp(-4) if i % 2 == 0 else db_amp(-8)
-        if j == len(ut) - 1 and i == len(utseq) - 1:
-            synth = 'crash'
-            amp = db_amp(-4)
-        scheduler.add_event(synth, event['start'],
-                                duration=min_dur*0.43,
-                                seed=seed*i+j,
-                                amp=amp,
-                                freq=np.random.uniform(300,1000),
-                                brushFreq=np.random.uniform(0,1),
-                                isGhost=np.random.uniform(0,1),
-                                freqShift=np.random.uniform(50,3800),
-                                pan=pan,)
-# TODO: end with "crash"
+#     for j, event in enumerate(ut):
+#         if len(ut) > 1:
+#             synth = next(synth_cycle)
+#             amp = np.interp(j, [0, len(ut) - 1], [ampMin, ampMax])
+#         else:
+#             synth = 'glitch2' if i % 2 == 0 else 'kick'
+#             amp = db_amp(-4) if i % 2 == 0 else db_amp(-8)
+#         if j == len(ut) - 1 and i == len(utseq) - 1:
+#             synth = 'crash'
+#             amp = db_amp(-4)
+#         scheduler.new_event(synth, event['start'],
+#                             duration=min_dur*0.43,
+#                             seed=seed*i+j,
+#                             amp=amp,
+#                             freq=np.random.uniform(300,1000),
+#                             brushFreq=np.random.uniform(0,1),
+#                             isGhost=np.random.uniform(0,1),
+#                             freqShift=np.random.uniform(50,3800),
+#                             pan=pan,)
+# # TODO: end with "crash"
 
-# print(utseq.size)
-print(seconds_to_hmsms(sum([ut_dur(ut) for ut in utseq])))
-# ------------------------------------------------------------------------------------
-# SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------
-# --------------------------------
-scheduler.send_all_events()
+# # print(utseq.size)
+# print(seconds_to_hmsms(sum([ut_dur(ut) for ut in utseq])))
+# # ------------------------------------------------------------------------------------
+# # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------
+# # --------------------------------
+# # scheduler.send_all_events()
+# scheduler.run()

@@ -92,6 +92,10 @@ class Meas:
             new_numerator = self._numerator * other.numerator
             new_denominator = self._denominator * other.denominator
             return Meas((new_numerator, new_denominator))
+        elif isinstance(other, int):
+            new_numerator = self._numerator * other
+            new_denominator = self._denominator
+            return Meas((new_numerator, new_denominator))
         raise ValueError('Invalid type for multiplication')
 
     def __truediv__(self, other):

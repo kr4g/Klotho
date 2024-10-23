@@ -109,7 +109,7 @@ for i, (combo, ut) in enumerate(zip(path, utseq)):
         dur = sum(ut.durations)
         atk = np.random.uniform(0.167, 0.833) * dur
         f_scale = np.random.choice([0.5, 1.0]) if drone == 'drone' else np.random.choice([2.0, 1.0, 0.5])
-        sch.add_event(drone, ut.onsets[0],
+        sch.new_event(drone, ut.onsets[0],
                         duration = dur,
                         atk = atk,
                         rel = dur * np.interp(atk, [dur*0.167, dur*0.833], [0.33, 1.33]),
@@ -138,7 +138,7 @@ for i, (combo, ut) in enumerate(zip(path, utseq)):
             if short == 'ping':
                 freq = fold_freq(freq, 333.0)
             syn = next(synth_cyc)
-            sch.add_event(syn, event['start'],
+            sch.new_event(syn, event['start'],
                             duration = event['duration'] * 0.25,
                             freq = freq,
                             ratio = float(fold_interval(root_partial) * ratio),

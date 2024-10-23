@@ -15,12 +15,10 @@ class Field:
         self.nodes = {}
         self.edges = {}
 
-        # Grid
         axes = [np.linspace(-1, 1, resolution) for _ in range(dimensionality)]
         grid = np.meshgrid(*axes)
         points = np.stack([ax.flatten() for ax in grid], axis=-1)
 
-        # Evaluate at each point
         if function is not None:
             values = function(points)
         else:

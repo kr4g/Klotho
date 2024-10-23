@@ -55,12 +55,30 @@ def plot_graph(G, output_file=None):
     else:
         plt.show()
 
+# def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
+#     if pos is None:
+#         pos = {root:(xcenter, 1)}
+#         parsed = [root]
+#     else:
+#         y = 1 - (depth * vert_gap)
+#         pos[root] = (xcenter, y)
+#     children = list(G.neighbors(root))
+#     if not isinstance(G, nx.DiGraph) and parent is not None:
+#         children.remove(parent)
+#     if len(children) != 0:
+#         dx = width / len(children)
+#         nextx = xcenter - width / 2 - dx / 2
+#         for child in children:
+#             nextx += dx
+#             _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
+#     return pos
+
 def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
     if pos is None:
-        pos = {root:(xcenter, 1)}
+        pos = {root: (xcenter, 0)}  # Root now starts at y=0
         parsed = [root]
     else:
-        y = 1 - (depth * vert_gap)
+        y = depth * vert_gap  # Increase y as depth increases
         pos[root] = (xcenter, y)
     children = list(G.neighbors(root))
     if not isinstance(G, nx.DiGraph) and parent is not None:
@@ -72,4 +90,3 @@ def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, pare
             nextx += dx
             _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
     return pos
-

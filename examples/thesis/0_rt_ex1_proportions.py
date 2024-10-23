@@ -10,12 +10,13 @@ sys.path.append(str(root_path))
 from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq
 from klotho.chronos import seconds_to_hmsms
 from klotho.tonos import fold_interval
-from klotho.aikous.dynamics import db_amp
+from klotho.aikous.expression import db_amp
 from klotho.skora.graphs import *
 from klotho.skora.animation.animate import *
 
-from utils.data_structures import scheduler as sch
-scheduler = sch.Scheduler()
+# from utils.data_structures import scheduler as sch
+from klotho.aikous.messaging import Scheduler
+scheduler = Scheduler()
 
 import numpy as np
 
@@ -28,15 +29,17 @@ bpm = 92
 
 utseq = UTSeq(
     (
-        UT(tempus=tempus, prolatio=(1,1,1,1), tempo=bpm, beat=beat),
-        UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
-        UT(tempus=tempus, prolatio=(1,2,1,1), tempo=bpm, beat=beat),
-        UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
-        UT(tempus=tempus, prolatio=(1,2,1,5), tempo=bpm, beat=beat),
-        UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
-        UT(tempus=tempus, prolatio=(3,2,1,5), tempo=bpm, beat=beat),
-        UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
-        UT(tempus=tempus, prolatio=(3,2,7,5), tempo=bpm, beat=beat),
+        # UT(tempus=tempus, prolatio=(1,1,1,1), tempo=bpm, beat=beat),
+        # UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
+        # UT(tempus=tempus, prolatio=(1,2,1,1), tempo=bpm, beat=beat),
+        # UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
+        # UT(tempus=tempus, prolatio=(1,2,1,5), tempo=bpm, beat=beat),
+        # UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
+        # UT(tempus=tempus, prolatio=(3,2,1,5), tempo=bpm, beat=beat),
+        # UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
+        # UT(tempus=tempus, prolatio=(3,2,7,5), tempo=bpm, beat=beat),
+        # UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
+        UT(tempus=tempus, prolatio=(3,2,(7,(3,1,1)),5), tempo=bpm, beat=beat),
         UT(tempus=beat, prolatio='r', tempo=bpm, beat=beat),
     )
 )
@@ -48,6 +51,9 @@ utseq = UTSeq(
 # animate_temporal_units(utseq.uts, True, False, file_name='utblock')
 # print(seconds_to_hmsms(utseq.time))
 # plot_graph(graph_tree(utseq.uts[-2].tempus, utseq.uts[-2].prolationis))
+
+_ut = UT(tempus=tempus, prolatio=(3,2,(7,(3,1,1)),5), tempo=bpm, beat=beat)
+animate_temporal_unit(_ut, True, False, file_name='ut6')
 
 synths = {
     1: 'kick',
@@ -68,11 +74,12 @@ for j, ut in enumerate(utseq):
         if event['duration'] < 0: continue
         # synth = 'ping' #synths[ut.prolationis[i]]
         duration = event['duration'] * dur_scale
-        freq = 333.0 * ut.prolationis[i] * 2**0 #fold_interval(1/ut.prolationis[i], n_equaves=1)
-        scheduler.add_event('perc', event['start'], freq=freq, amp=db_amp(-8))
-        scheduler.add_event('kick', event['start'], amp=db_amp(-7))
+        # freq = 333.0 * ut.prolationis[i] * 2**0 #fold_interval(1/ut.prolationis[i], n_equaves=1)
+        freq = 333.0 * event['duration'] * 2**2 #fold_interval(1/ut.prolationis[i], n_equaves=1)
+        scheduler.new_event('perc', event['start'], freq=freq, amp=db_amp(-8))
+        scheduler.new_event('kick', event['start'], amp=db_amp(-7))
 
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------
 # --------------------------------
-scheduler.send_all_events()
+# scheduler.run()

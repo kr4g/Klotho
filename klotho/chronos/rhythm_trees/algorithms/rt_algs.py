@@ -133,7 +133,7 @@ def rhythm_pair(lst:Tuple, MM:bool=True) -> Tuple:
         sequences = [np.arange(0, total_product + 1, x) for x in lst]
     combined_sequence = np.unique(np.concatenate(sequences))
     deltas = np.diff(combined_sequence)
-    return tuple(deltas)
+    return tuple(int(x) for x in deltas)
 
 # ------------------------------------------------------------------------------------
 

@@ -116,7 +116,7 @@ class TemporalUnit:
     
     @property
     def time(self):
-        return beat_duration(ratio      = str(self.__rtree._root),
+        return beat_duration(ratio      = str(self.__rtree._root * self.__rtree.duration),
                              bpm        = self.__tempo,
                              beat_ratio = self.__beat)
     
@@ -152,7 +152,9 @@ class TemporalUnit:
                         beat     = self.__beat) for ratio in self.__rtree.ratios)
 
     def _set_rtree(self, duration:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
-        if isinstance(prolatio, tuple):
+        if isinstance(prolatio, RhythmTree):
+            r_tree = prolatio
+        elif isinstance(prolatio, tuple):
             r_tree = RhythmTree(duration = duration, meas = tempus, subdivisions = prolatio)
             self.__type = f'Ensemble ({r_tree.type})'
         elif isinstance(prolatio, str):

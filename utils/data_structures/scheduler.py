@@ -6,11 +6,11 @@ class Scheduler:
         self.client = udp_client.SimpleUDPClient(ip, port)
         self.events = []
     
-    def add_event(self, synth_name:str, start:float, **params):
+    def new_event(self, synth_name:str, start:float, **params):
         args = [synth_name, start] + [item for sublist in params.items() for item in sublist]
         self.events.append(('new', args))
     
-    def add_event_with_id(self, synth_name:str, start:float, **params):
+    def new_event_with_id(self, synth_name:str, start:float, **params):
         uid = str(uuid4()).replace('-', '')
         args = [uid, synth_name, start] + [item for sublist in params.items() for item in sublist]
         self.events.append(('new_id', args))

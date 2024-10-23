@@ -10,7 +10,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from klotho.chronos.temporal_units import TemporalUnit
 
-def hash_fraction_to_color(fraction):
+def hash_fraction_to_color(fraction, bias=None):
     # Create a unique hash for each fraction
     fraction_hash = hashlib.md5(str(fraction).encode('utf-8')).hexdigest()
     # Convert the hash to an integer and then to a color
@@ -18,9 +18,20 @@ def hash_fraction_to_color(fraction):
     r = (color_int >> 16) & 255
     g = (color_int >> 8) & 255
     b = color_int & 255
+    if bias:
+        match bias:
+            case 'r':
+                r = 255
+                g = g // 2
+                b = b // 2
+            case 'b':
+                r = r // 2
+                g = g // 2
+                b = 255
+            
     return (r / 255.0, g / 255.0, b / 255.0)
 
-def animate_temporal_unit(ut:TemporalUnit, save_mp4=False, save_png=False, file_name='proportion_animation', fps=60):
+def animate_temporal_unit(ut:TemporalUnit, save_mp4=False, save_png=False, file_name='proportion_animation', fps=60, bias=None):
     proportions = [Fraction(int(f.numerator), int(f.denominator)) for f in ut.ratios]
     durations = ut.durations
     
@@ -28,7 +39,7 @@ def animate_temporal_unit(ut:TemporalUnit, save_mp4=False, save_png=False, file_
     
     unique_fractions = list(set(proportions))
     # colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_fractions)))
-    colors = [hash_fraction_to_color(fraction) for fraction in unique_fractions]
+    colors = [hash_fraction_to_color(fraction, bias=bias) for fraction in unique_fractions]
     color_map = dict(zip(unique_fractions, colors))
     
     fig, ax = plt.subplots(figsize=(18, 1))
@@ -72,12 +83,13 @@ def animate_temporal_unit(ut:TemporalUnit, save_mp4=False, save_png=False, file_
                 # patch.set_linewidth(1)
             else:
                 patch.set_alpha(0.25)
+                # patch.set_alpha(0.05)
         return patches
     
     anim = FuncAnimation(fig, animate, frames=len(frames), interval=1000/fps, blit=True)
 
     if save_mp4:
-        ext = 'gif' #'mp4' if save_mp4 else 'gif'
+        ext = 'mp4' #'mp4' if save_mp4 else 'gif'
         plt.tight_layout(pad=0)
         writer = FFMpegWriter(fps=fps, codec='libx264')
         anim.save(f"{file_name}.{ext}", writer=writer, dpi=fig.dpi)
@@ -151,6 +163,7 @@ def animate_temporal_units(units: list[TemporalUnit], save_mp4=False, save_png=F
                     patch.set_alpha(1.0)
                 else:
                     patch.set_alpha(0.25)
+                    # patch.set_alpha(0.05)
         return [patch for sublist in all_patches for patch in sublist]
     
     total_frames = max(len(frames) for frames in all_frames if frames)
@@ -158,7 +171,7 @@ def animate_temporal_units(units: list[TemporalUnit], save_mp4=False, save_png=F
 
     if save_mp4:
         writer = FFMpegWriter(fps=fps, codec='libx264')
-        anim.save(f"{file_name}.gif", writer=writer, dpi=fig.dpi)
+        anim.save(f"{file_name}.mp4", writer=writer, dpi=fig.dpi)
         print(f"MP4 file saved as '{file_name}.mp4'")
     
     if not save_mp4 and not save_png:

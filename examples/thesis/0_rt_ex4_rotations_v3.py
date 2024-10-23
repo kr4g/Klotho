@@ -68,7 +68,8 @@ def save_tuple_as_image(t, output_file, font_size=100):
 tempus = '11/1'
 # tempus = '1/1'
 beat = '1/8'
-bpm = 48#54
+# bpm = 48/11
+bpm = 48
 
 S = ((17, ((15, ((13, (13, 9, 5, 2)), 7)), (13, (7, 5, 2)))), (13, (6, 9)))
 
@@ -81,15 +82,15 @@ rots = []
 ani = []
 for i in range(len(factor_children(rt_prime.subdivisions))):
 # for i in range(5):
-    print(rotate_tree(rt_prime, i))
+    # print(rotate_tree(rt_prime, i))
     rots.append(TemporalUnitSequence((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
-    # ani.append(UT.from_tree(rotate_tree(rt_prime, i), tempo=92, beat='1/8'))
+    # ani.append(UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat))
     # t = ani[-1].prolationis
     # save_tuple_as_image(t, f'/Users/ryanmillett/Klotho/examples/thesis/S_rot_{i}.png')
 
 # create_gif([f'/Users/ryanmillett/Klotho/examples/thesis/S_rot_{i}.png' for i in range(len(rots))], '/Users/ryanmillett/Klotho/examples/thesis/S_rotations.gif', 500)
 
-# animate_temporal_units(ani, save_mp4=True, file_name='rt_prime_rotations_stack')
+animate_temporal_units(ani, save_mp4=True, file_name='rt_prime_rotations_stack_real')
 tb = TemporalUnitMatrix(tuple(rots))
 # utseq = TemporalUnitSequence(rots)
 # print(f'{ut_seq_dur(utseq)} ({seconds_to_hmsms(ut_seq_dur(utseq))})')
@@ -134,7 +135,7 @@ for i, utseq in enumerate(tb):
     u_ids[i] = scheduler.new_event_with_id(synth, -0.1, gate=0, amp=db_amp(-80), pan=pan)
     for j, ut in enumerate(utseq):
         freqs = cycle([13.0 * fold_interval(Fraction(p), n_equaves=3) for p in measure_partials(ut.prolationis)])
-        vibDepth_seq = swell(len(ut), 0.0, np.interp(i, [0, tb.size], [0.001, 0.008]))
+        vibDepth_seq = swell(len(ut), 0.0, np.interp(i, [0, tb.size], [0.001, 0.01]))
         vibRate_seq = swell(len(ut), 5.0, np.interp(i, [0, tb.size], [8.0, 11.0]))
         brightness = swell(len(ut), 1.0, 10.0)
         breathiness = swell(len(ut), 0.8, 0.1)
@@ -148,7 +149,7 @@ for i, utseq in enumerate(tb):
             
             scheduler.set_event(u_ids[i], event['start'], gate=1,
                                 freq=freq, freqLag=np.interp(i, [0, tb.size], [0.0, min_dur*0.4]),
-                                amp=db_amp(max_amps[synth] - i*0.2)*0.75, ampLag=duration,
+                                amp=db_amp(max_amps[synth] - i*0.33)*1.067, ampLag=duration,
                                 vibDepth=np.random.uniform(0.0, vibDepth_seq[k]), vibRate=np.random.uniform(0.0, vibRate_seq[k]),
                                 brightness=brightness[k],
                                 breathiness=breathiness[k])
@@ -163,5 +164,4 @@ for i, utseq in enumerate(tb):
 # ------------------------------------------------------------------------------------
 # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------
 # --------------------------------
-# scheduler.send_all_events()
 scheduler.run()

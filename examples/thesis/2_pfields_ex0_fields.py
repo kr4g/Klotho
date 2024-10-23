@@ -205,16 +205,16 @@ class AtmosphericCurrentsFieldFunction(FieldFunction):
         return field
 
 
-res = 50
+res = 100
 dim = 2
 
 # quantum_field = Field(dim, res, DynamicQuantumFieldFunction())
 quantum_fluid_field = Field(dim, res, FieldFunction.compose(FluidDynamicsFieldFunction(), DynamicQuantumFieldFunction()))
-save_field(quantum_fluid_field, 'examples/thesis/quantum_fluid_field.pkl')
+# save_field(quantum_fluid_field, 'examples/thesis/quantum_fluid_field.pkl')
 
 # brain_wave_field = Field(dim, res, BrainWaveField())
 brain_wave_fluid_field = Field(dim, res, FieldFunction.compose(FluidDynamicsFieldFunction(), BrainWaveField()))
-save_field(brain_wave_fluid_field, 'examples/thesis/brain_wave_fluid_field.pkl')
+# save_field(brain_wave_fluid_field, 'examples/thesis/brain_wave_fluid_field.pkl')
 
 # weather_field = Field(dim, res, WeatherPatternFieldFunction())
 # weather_currents_field = Field(dim, res, FieldFunction.compose(AtmosphericCurrentsFieldFunction(), WeatherPatternFieldFunction()))
@@ -222,7 +222,7 @@ save_field(brain_wave_fluid_field, 'examples/thesis/brain_wave_fluid_field.pkl')
 # gravitational_field = Field(dim, res, GravitationalFieldFunction())
 # gravitational_distortion_field = Field(dim, res, FieldFunction.compose(AtmosphericCurrentsFieldFunction(), SpaceTimeDistortionFieldFunction(), GravitationalFieldFunction()))
 gravitational_distortion_field = Field(dim, res, FieldFunction.compose(SpaceTimeDistortionFieldFunction(), GravitationalFieldFunction()))
-save_field(gravitational_distortion_field, 'examples/thesis/gravitational_distortion_field.pkl')
+# save_field(gravitational_distortion_field, 'examples/thesis/gravitational_distortion_field.pkl')
 
 # plot_field_heatmap(quantum_field, title='Field A')
 # plot_field_heatmap(quantum_fluid_field, title='Field A', save_path='examples/thesis/field_A.png')
@@ -233,50 +233,56 @@ save_field(gravitational_distortion_field, 'examples/thesis/gravitational_distor
 # plot_field_heatmap(gravitational_field, title='Field C')
 # plot_field_heatmap(gravitational_distortion_field, title='Field C', save_path='examples/thesis/field_C.png')
 
-# FIELD INTERACTION
+for node in quantum_fluid_field.nodes:
+    if quantum_fluid_field[node] > 0: # NOTHING!!!!!
+        print(node, quantum_fluid_field[node])
 
-from opensimplex import OpenSimplex
 
 
-def get_neighbors_average_with_noise(field: Field, point: Tuple[float, float], seed: int = 42) -> Tuple[float, float]:
-    simplex = OpenSimplex(seed=seed)
-    neighbors = list(field.get_neighbors(point).items())
-    if not neighbors:
-        return 0.0, 0.0  
-    
-    neighbor_values = [value for _, value in neighbors]
-    avg_value = np.mean(neighbor_values)
-    
-    noise = simplex.noise2(point[0], point[1])
-    
-    return avg_value, noise
+# # FIELD INTERACTION
 
-def interaction_function(field1: Field, field2: Field, point: Tuple[float, float]) -> float:
-    v1 = field1[point]
-    v2 = field2[point]
-    
-    avg1, noise1 = get_neighbors_average_with_noise(field1, point, seed=42)
-    avg2, noise2 = get_neighbors_average_with_noise(field2, point, seed=42)
-    
-    combined_value = np.tanh((v1 * avg2 + noise2) + (v2 * avg1 + noise1))
-    
-    final_result = (0.5 * np.sin(2 * np.pi * combined_value) + 0.5)
-    
-    return final_result
+# from opensimplex import OpenSimplex
 
-from klotho.topos.sets import CombinationSet as CS
 
-aliases = {
-    'A': quantum_fluid_field,
-    'B': brain_wave_fluid_field,
-    # 'C': weather_currents_field,
-    'C': gravitational_distortion_field
-}
+# def get_neighbors_average_with_noise(field: Field, point: Tuple[float, float], seed: int = 42) -> Tuple[float, float]:
+#     simplex = OpenSimplex(seed=seed)
+#     neighbors = list(field.get_neighbors(point).items())
+#     if not neighbors:
+#         return 0.0, 0.0  
+    
+#     neighbor_values = [value for _, value in neighbors]
+#     avg_value = np.mean(neighbor_values)
+    
+#     noise = simplex.noise2(point[0], point[1])
+    
+#     return avg_value, noise
 
-field_cs = CS(aliases.keys(), 2)
-for combo in field_cs.combos:
-    simplex = OpenSimplex(seed=hash(combo))
-    combined_field = Field.interact(aliases[combo[0]], aliases[combo[1]], interaction_function)
-    save_field(combined_field, f'examples/thesis/field_{combo[0]}_{combo[1]}_interaction.pkl')
-    # plot_field_heatmap(combined_field, title=f'Field {combo[0]} and Field {combo[1]} Interaction', save_path=f'examples/thesis/field_{combo[0]}_{combo[1]}_interaction.png')
-    # plot_field_heatmap(combined_field, title=f'Field {combo[0]} and Field {combo[1]} Interaction')
+# def interaction_function(field1: Field, field2: Field, point: Tuple[float, float]) -> float:
+#     v1 = field1[point]
+#     v2 = field2[point]
+    
+#     avg1, noise1 = get_neighbors_average_with_noise(field1, point, seed=42)
+#     avg2, noise2 = get_neighbors_average_with_noise(field2, point, seed=42)
+    
+#     combined_value = np.tanh((v1 * avg2 + noise2) + (v2 * avg1 + noise1))
+    
+#     final_result = (0.5 * np.sin(2 * np.pi * combined_value) + 0.5)
+    
+#     return final_result
+
+# from klotho.topos.sets import CombinationSet as CS
+
+# aliases = {
+#     'A': quantum_fluid_field,
+#     'B': brain_wave_fluid_field,
+#     # 'C': weather_currents_field,
+#     'C': gravitational_distortion_field
+# }
+
+# field_cs = CS(aliases.keys(), 2)
+# for combo in field_cs.combos:
+#     simplex = OpenSimplex(seed=hash(combo))
+#     combined_field = Field.interact(aliases[combo[0]], aliases[combo[1]], interaction_function)
+#     # save_field(combined_field, f'examples/thesis/field_{combo[0]}_{combo[1]}_interaction.pkl')
+#     # plot_field_heatmap(combined_field, title=f'Field {combo[0]} and Field {combo[1]} Interaction', save_path=f'examples/thesis/field_{combo[0]}_{combo[1]}_interaction.png')
+#     # plot_field_heatmap(combined_field, title=f'Field {combo[0]} and Field {combo[1]} Interaction')

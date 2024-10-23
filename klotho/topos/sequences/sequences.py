@@ -68,6 +68,7 @@ class Norg:
 
 class Pattern:
     def __init__(self, iterable):
+        self.iterable = iterable
         self.cycles = self._create_cycles(iterable)
 
     def _create_cycles(self, item):
@@ -86,3 +87,9 @@ class Pattern:
         while isinstance(item, cycle):
             item = self._get_next(item)
         return item
+    
+    def __str__(self):
+        return str(list(self.iterable))
+
+    def __repr__(self):
+        return self.__str__()

@@ -11,23 +11,18 @@ def plot_field_heatmap(field: Field, title: str = '', path: List[Tuple[Tuple[flo
     :param title: Title for the plot
     :param path: Optional list of (point, value) tuples representing the navigation path
     """
-    # Extract field data
     points = np.array(list(field.nodes.keys()))
     values = np.array(list(field.nodes.values()))
 
-    # Determine the shape of the grid
     grid_shape = (field.resolution,) * field.dimensionality
 
-    # Reshape the values into a grid
     Z = values.reshape(grid_shape)
 
-    # Create the plot
     plt.figure(figsize=(12, 10), facecolor='black')
     plt.gcf().set_facecolor('black')
     plt.gca().set_facecolor('black')
 
-    # Plot the heatmap
-    extent = [-1, 1, -1, 1]  # Assuming the field is always defined on [-1, 1] range
+    extent = [-1, 1, -1, 1] 
     plt.imshow(Z, extent=extent, origin='lower', cmap='plasma')
     
     cbar = plt.colorbar(label='Field Value')
@@ -39,7 +34,6 @@ def plot_field_heatmap(field: Field, title: str = '', path: List[Tuple[Tuple[flo
     plt.ylabel('Y', color='white')
     plt.tick_params(colors='white')
 
-    # Plot navigation path if provided
     if path:
         path_points, path_values = zip(*path)
         path_x, path_y = zip(*path_points)
@@ -48,7 +42,6 @@ def plot_field_heatmap(field: Field, title: str = '', path: List[Tuple[Tuple[flo
         plt.scatter(path_x[-1], path_y[-1], color='red', s=100, label='End')
         plt.legend(loc='upper right', facecolor='black', edgecolor='white', labelcolor='white')
 
-    # Save the plot if a path is provided
     if save_path:
         plt.savefig(save_path)
 
@@ -69,16 +62,13 @@ def plot_path_color_bar(path, title=''):
     plt.gcf().set_facecolor('black')
     plt.gca().set_facecolor('black')
     
-    # Plot the horizontal bar
     img = plt.imshow(values, aspect='auto', cmap='plasma', extent=[0, len(path_values), 0, 1])
     
-    # Customize the plot
     plt.title(f"{title}", color='white', fontsize=16)
     plt.xlabel('Navigation Steps', color='white')
     plt.yticks([])  # Remove y-axis ticks
     plt.tick_params(colors='white')
     
-    # Add colorbar
     # cbar = plt.colorbar(img, orientation='horizontal', pad=0.2)
     # cbar.ax.xaxis.label.set_color('white')
     # cbar.ax.tick_params(color='white')

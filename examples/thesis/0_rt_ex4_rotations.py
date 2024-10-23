@@ -76,7 +76,7 @@ for i, utseq in enumerate(tb):
     synth = next(synths)
     seed = np.random.randint(0, 1000)
     pan = np.interp(i, [0, tb.size], [-1, 1])
-    u_ids[i] = scheduler.add_event_with_id(synth, 0, gate=0, amp=db_amp(-80), pan=pan)
+    u_ids[i] = scheduler.new_event_with_id(synth, 0, gate=0, amp=db_amp(-80), pan=pan)
     for j, ut in enumerate(utseq):
         vibDepth_seq = swell(len(ut), 0.0, np.interp(i, [0, tb.size], [0.001, 0.005]))
         vibRate_seq = swell(len(ut), 5.0, np.interp(i, [0, tb.size], [8.0, 13.0]))

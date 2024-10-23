@@ -35,14 +35,15 @@ class Scheduler:
             print("All events processed by SuperCollider. Terminating program.")
             self.stop_server()
 
-    def add_event(self, synth_name:str, start:float, **params):
-        # uid = str(uuid4()).replace('-', '')
-        args = [synth_name, start] + [item for sublist in params.items() for item in sublist]
+    def new_event(self, synth_name:str, start:float, **params):
+        uid = str(uuid4()).replace('-', '')
+        args = [uid, synth_name, start] + [item for sublist in params.items() for item in sublist]
+        # args = [synth_name, start] + [item for sublist in params.items() for item in sublist]
         self.events.append(('new', args))
         self.total_events += 1
-        # return uid
-    
-    def add_event_with_id(self, synth_name:str, start:float, **params):
+        return uid
+
+    def new_event_with_id(self, synth_name:str, start:float, **params):
         uid = str(uuid4()).replace('-', '')
         args = [uid, synth_name, start] + [item for sublist in params.items() for item in sublist]
         self.events.append(('new_id', args))
