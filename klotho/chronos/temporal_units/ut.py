@@ -146,10 +146,14 @@ class TemporalUnit:
     # TODO: make free method in UT algos
     def decompose(self, prolatio:Union[RhythmTree,tuple,str] = 'd') -> 'TemporalUnitSequence':
         if prolatio.lower() in {'s'}: prolatio = self.__rtree.subdivisions
-        return TemporalUnitSequence(TemporalUnit(tempus   = ratio,
-                        prolatio = prolatio,
-                        tempo    = self.__tempo,
-                        beat     = self.__beat) for ratio in self.__rtree.ratios)
+        return TemporalUnitSequence(
+            TemporalUnit(
+                tempus   = ratio,
+                prolatio = prolatio,
+                tempo    = self.__tempo,
+                beat     = self.__beat
+            ) for ratio in self.__rtree.ratios
+        )
 
     def _set_rtree(self, duration:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         if isinstance(prolatio, RhythmTree):
@@ -243,7 +247,10 @@ class TemporalUnit:
         raise ValueError('Invalid Operand')
     
     def __iter__(self):
-        return iter([{'start': onset, 'duration': duration} for onset, duration in zip(self.onsets, self.durations)])
+        return iter([{
+            'start': onset,
+            'duration': duration
+            } for onset, duration in zip(self.onsets, self.durations)])
     
     def __len__(self):
         return len(self.__rtree.ratios)
@@ -409,42 +416,41 @@ class TemporalUnitMatrix:
         return iter(self.__tb)
 
 # Temporal Block Sequence
-class TBSeq:
-    pass
-    # def __init__(self, tb_seq:tuple[TemporalUnitMatrix]=(), offset:float=0.0):
-    #     self.__seq = tb_seq
-    #     for i, tb in enumerate(self.__seq):
-    #         tb.offset = offset + sum(tb_seq[j].duration for j in range(i))
+# class TBSeq:
+#     def __init__(self, tb_seq:tuple[TemporalUnitMatrix]=(), offset:float=0.0):
+#         self.__seq = tb_seq
+#         for i, tb in enumerate(self.__seq):
+#             tb.offset = offset + sum(tb_seq[j].duration for j in range(i))
 
-    # @property
-    # def tbs(self):
-    #     return self.__seq
+#     @property
+#     def tbs(self):
+#         return self.__seq
 
-    # @property
-    # def onsets(self):
-    #     return calc_onsets(self.durations)
+#     @property
+#     def onsets(self):
+#         return calc_onsets(self.durations)
     
-    # @property    
-    # def durations(self):
-    #     return tuple(tb.duration for tb in self.__seq)
+#     @property    
+#     def durations(self):
+#         return tuple(tb.duration for tb in self.__seq)
     
-    # @property
-    # def duration(self):
-    #     return sum(self.durations)
+#     @property
+#     def duration(self):
+#         return sum(self.durations)
 
-    # def __add__(self, other:Union[TemporalUnitMatrix, 'TBSeq']):
-    #     if isinstance(other, TemporalUnitMatrix):
-    #         return TBSeq(self.__seq + (other,))
-    #     elif isinstance(other, TBSeq):
-    #         return TBSeq(self.__seq + other.__seq)
-    #     raise ValueError('Invalid Operand')
+#     def __add__(self, other:Union[TemporalUnitMatrix, 'TBSeq']):
+#         if isinstance(other, TemporalUnitMatrix):
+#             return TBSeq(self.__seq + (other,))
+#         elif isinstance(other, TBSeq):
+#             return TBSeq(self.__seq + other.__seq)
+#         raise ValueError('Invalid Operand')
 
-    # def __and__(self, other:Union[TemporalUnitMatrix, 'TBSeq']):
-    #     if isinstance(other, TemporalUnitMatrix):
-    #         return TBSeq((self.__seq, (other,)))
-    #     elif isinstance(other, TBSeq):
-    #         return TBSeq((self.__seq, other.__seq))
-    #     raise ValueError('Invalid Operand')
+#     def __and__(self, other:Union[TemporalUnitMatrix, 'TBSeq']):
+#         if isinstance(other, TemporalUnitMatrix):
+#             return TBSeq((self.__seq, (other,)))
+#         elif isinstance(other, TBSeq):
+#             return TBSeq((self.__seq, other.__seq))
+#         raise ValueError('Invalid Operand')
 
-    # def __iter__(self):
-    #     return zip(self.onsets, self.durations)
+#     def __iter__(self):
+#         return zip(self.onsets, self.durations)
