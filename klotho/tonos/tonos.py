@@ -230,7 +230,7 @@ def octave_reduce(interval:float, equave:Union[Fraction, float] = 2, n_equaves:i
     interval /= equave
   return interval
 
-def fold_interval(interval:Union[Fraction, float], equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> float:
+def fold_interval(interval:Union[Fraction, float, str], equave:Union[Fraction, float, str] = 2, n_equaves:int = 1) -> float:
   '''
   Fold an interval to within a specified range.
 
@@ -242,6 +242,10 @@ def fold_interval(interval:Union[Fraction, float], equave:Union[Fraction, float]
   Returns:
     The folded interval as a float.
   '''
+  if isinstance(interval, str):
+    interval = Fraction(interval)
+  if isinstance(equave, str):
+    equave = Fraction(equave)
   while interval < 1/equave**n_equaves:
     interval *= equave
   while interval > equave**n_equaves:
