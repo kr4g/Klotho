@@ -78,7 +78,6 @@ class Scheduler:
         eot_msg.add_arg('end_of_transmission')
         self.client.send(eot_msg.build())
         print('All events have been sent.')
-        self.stop_server() # <-- maybe not here?
 
     def stop_server(self):
         self.server.shutdown()

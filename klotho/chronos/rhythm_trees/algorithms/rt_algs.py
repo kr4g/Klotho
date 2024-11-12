@@ -47,14 +47,13 @@ def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
         end for all
     end
     '''
-    div = sum_proportions(subdivs)
-    # div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivs)
-    # div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s.duration) if isinstance(s, RhythmTree) else abs(s)
+    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivs)
     result = []
     for s in subdivs:  
         if isinstance(s, tuple):
             D, S = s
             ratio = Fraction(D, div)
+            # ratio = Fraction(abs(D), div)
             result.extend([ratio * el for el in measure_ratios(S)])
         else:
             result.append(Fraction(s, div))
@@ -134,7 +133,6 @@ def rhythm_pair(lst:Tuple, MM:bool=True) -> Tuple:
         sequences = [np.arange(0, total_product + 1, x) for x in lst]
     combined_sequence = np.unique(np.concatenate(sequences))
     deltas = np.diff(combined_sequence)
-    # return tuple(deltas)
     return tuple(int(x) for x in deltas)
 
 # ------------------------------------------------------------------------------------
