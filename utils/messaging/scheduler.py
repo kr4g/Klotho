@@ -5,26 +5,27 @@ import time
 from tqdm import tqdm
 
 class EventBuilder:
-    def __init__(self, scheduler, synth_name, start, params):
+    def __init__(self, scheduler: 'Scheduler', event_type: str, uid: str, synth_name: str, start: float, params: dict):
         self.scheduler = scheduler
+        self.event_type = event_type
+        self.uid = str(uuid4()).replace('-', '') if uid is None else uid
         self.synth_name = synth_name
         self.start = start
         self.params = params
-        self._add_event()  # Add regular event by default
-        
-    def _add_event(self, with_id=False):
-        uid = str(uuid4()).replace('-', '') if with_id else None
-        args = [uid, self.synth_name, self.start] + [item for sublist in self.params.items() for item in sublist]
-        event_type = 'new_id' if with_id else 'new'
+        self._add_event()
+            
+    def _add_event(self):
+        args = [str(self), self.synth_name, self.start] + [item for sublist in self.params.items() for item in sublist]
+        event_type = self.event_type
         new_event = (event_type, args)
         self.scheduler.events.append(new_event)
         self.scheduler.total_events += 1
-        self.scheduler.events.sort(key=lambda x: (x[1][2], x[0] != event_type))
-        if with_id:
-            return uid
+    
+    def __str__(self):
+        return self.uid
         
-    def with_id(self):
-        return self._add_event(with_id=True)
+    def __repr__(self):
+        return self.uid
 
 class Scheduler:
     def __init__(self, ip:str='127.0.0.1', send_port:int=57121, receive_port:int=9000):
@@ -41,13 +42,42 @@ class Scheduler:
         self.dispatcher.map("/resume", self.resume_handler)
         self.dispatcher.map("/event_processed", self.event_processed_handler)
         self.dispatcher.map("/reset", self.reset_handler)
+        self.dispatcher.map("/start", self.send_events)
         
         self.server = osc_server.ThreadingOSCUDPServer((ip, receive_port), self.dispatcher)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         # self.server_thread.start()
         self.send_progress = None
         self.process_progress = None
+        
+    def init_progress_bars(self):
+        # Initialize sending progress bar
+        self.send_progress = tqdm(total=self.total_events, 
+                                desc="Sending", 
+                                unit="events",
+                                position=0,
+                                leave=True)
+        
+        # Initialize processing progress bar (initially with total=0 since no events sent yet)
+        self.process_progress = tqdm(total=0,
+                                   desc="Processing",
+                                   unit="events",
+                                   position=1,
+                                   leave=True)
     
+    def reset_progress_bars(self):
+        if self.send_progress:
+            self.send_progress.clear()
+            self.send_progress.reset(total=self.total_events)
+            self.send_progress.set_description("Paused")
+            # self.send_progress.total = self.total_events
+        if self.process_progress:
+            self.process_progress.clear()
+            self.process_progress.reset(total=0)
+            self.process_progress.set_description("Processing")
+            # self.process_progress.total = 0
+            self.process_progress.refresh()
+            
     def pause_handler(self, address, *args):
         if not self.paused:
             self.paused = True
@@ -73,31 +103,18 @@ class Scheduler:
                 # self.process_progress.close()
 
     def reset_handler(self, address, *args):
-        # Reset all counters
         self.events_processed = 0
         self.events_sent = 0
-        self.paused = True
-        
-        # Reset progress bars if they exist
-        if self.send_progress:
-            self.send_progress.reset()
-            self.send_progress.set_description("Paused")
-        if self.process_progress:
-            self.process_progress.reset()
-            self.process_progress.total = 0  # Reset to initial state
-            self.process_progress.refresh()
+        self.paused = False
+        self.reset_progress_bars()
 
     def new_event(self, synth_name:str = None, start:float = 0, **params):
-        return EventBuilder(self, synth_name, start, params)
+        return EventBuilder(self, 'new', None, synth_name, start, params).uid
 
     def set_event(self, uid:str, start:float, **params):
-        args = [uid, start] + [item for sublist in params.items() for item in sublist]
-        set_event = ('set', args)
-        self.events.append(set_event)
-        self.total_events += 1
-        self.events.sort(key=lambda x: (x[1][2] if x[0] in ['new', 'new_id'] else x[1][1], x[0] == 'set'))
+        EventBuilder(self, 'set', uid, None, start, params)
 
-    def send_events(self):
+    def send_events(self, address, *args):
         for event_type, content in self.events:
             while self.paused:
                 time.sleep(0.01)
@@ -108,7 +125,6 @@ class Scheduler:
             self.client.send(msg.build())
             self.events_sent += 1
             self.send_progress.update(1)
-            # Update the total of the process progress bar to match sent events
             self.process_progress.total = self.events_sent
             self.process_progress.refresh()
             time.sleep(0.01)
@@ -125,18 +141,6 @@ class Scheduler:
 
     def run(self):
         self.server_thread.start()
-        # Initialize sending progress bar
-        self.send_progress = tqdm(total=self.total_events, 
-                                desc="Sending", 
-                                unit="events",
-                                position=0,
-                                leave=True)
-        
-        # Initialize processing progress bar (initially with total=0 since no events sent yet)
-        self.process_progress = tqdm(total=0,
-                                   desc="Processing",
-                                   unit="events",
-                                   position=1,
-                                   leave=True)
-        self.send_events()
+        self.init_progress_bars()
+        # self.send_events()
         # self.stop_server()

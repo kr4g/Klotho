@@ -53,7 +53,6 @@ def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
         if isinstance(s, tuple):
             D, S = s
             ratio = Fraction(D, div)
-            # ratio = Fraction(abs(D), div)
             result.extend([ratio * el for el in measure_ratios(S)])
         else:
             result.append(Fraction(s, div))
@@ -159,3 +158,6 @@ def measure_complexity(subdivs:tuple) -> bool:
             else:
                 return measure_complexity(S)
     return False
+
+def clean_subdivs(subdivs:tuple) -> tuple:
+    pass

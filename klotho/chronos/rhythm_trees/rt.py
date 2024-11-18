@@ -17,11 +17,12 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-from math import gcd
+from math import gcd, lcm
+from functools import reduce
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import rotate_tree
-from .algorithms.rt_algs import *
+from .algorithms.rt_algs import measure_ratios, reduced_decomposition, strict_decomposition, sum_proportions, measure_complexity
 
 class Meas:
     '''

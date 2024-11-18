@@ -8,7 +8,7 @@ Temporal Units
 '''
 from fractions import Fraction
 from typing import Union
-
+from itertools import cycle
 from klotho.topos.graphs import Tree
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms.rt_algs import measure_ratios, auto_subdiv
@@ -145,11 +145,17 @@ class TemporalUnit:
         
     # TODO: make free method in UT algos
     def decompose(self, prolatio:Union[RhythmTree,tuple,str] = 'd') -> 'TemporalUnitSequence':
-        if prolatio.lower() in {'s'}: prolatio = self.__rtree.subdivisions
-        return TemporalUnitSequence(TemporalUnit(tempus   = ratio,
-                        prolatio = prolatio,
-                        tempo    = self.__tempo,
-                        beat     = self.__beat) for ratio in self.__rtree.ratios)
+        if isinstance(prolatio, tuple):
+            prolatio = [prolatio]
+        elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
+            prolatio = [self.__rtree.subdivisions]
+        # print(prolatio)
+        prolatio = cycle(prolatio)
+        return TemporalUnitSequence([
+            TemporalUnit(tempus   = ratio,
+                         prolatio = next(prolatio),
+                         tempo    = self.__tempo,
+                         beat     = self.__beat) for ratio in self.__rtree.ratios])
 
     def _set_rtree(self, duration:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         if isinstance(prolatio, RhythmTree):
@@ -251,7 +257,7 @@ class TemporalUnit:
     def __str__(self):
         prolat = self.__rtree.subdivisions if self.__type.lower() not in PULSTYPES else self.__type
         return (
-            f'Type:        {self.__type}\n'
+            # f'Type:        {self.__type}\n'
             f'Tempus:      {self.__rtree._root}\n'
             f'Duration:    {self.__rtree.duration}\n'
             f'Tempo:       {self.__tempo}\n'
@@ -265,9 +271,9 @@ class TemporalUnit:
 
 
 class TemporalUnitSequence:
-    def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0.0):
+    def __init__(self, ut_seq:list[TemporalUnit]=[]):
         self.__seq    = ut_seq
-        self.__offset = offset
+        self.__offset = 0.0
         self._set_offsets()
 
     @property
@@ -343,9 +349,10 @@ class TemporalUnitSequence:
 
 # Time Block
 class TemporalUnitMatrix:
-    def __init__(self, tb:tuple[TemporalUnitSequence]=(), offset:float=0.0, axis:float=0.0):
-        self.__tb = tb
+    def __init__(self, tb:list[TemporalUnitSequence]=[], offset:float=0.0, axis:float=0.0):
+        self.__tb = tb# if isinstance(tb, list[TemporalUnitSequence]) else list(tb)
         self.__axis = axis
+        self.__offset = offset
         self.__duration = max(ut_seq.duration for ut_seq in self.__tb) if self.__tb else 0.0
 
     @classmethod
@@ -354,9 +361,9 @@ class TemporalUnitMatrix:
         tb = []
         for i, row in enumerate(matrix):
             seq = []
-            for e in row:
+            for j, e in enumerate(row):
                 if subdiv:
-                    D, S = e[0], auto_subdiv(e[1][::-1], i + rotation_offset)
+                    D, S = e[0], auto_subdiv(e[1][::-1], i + j + rotation_offset)
                 else:
                     D, S = e[0], e[1]
                 seq.append(TemporalUnit(tempus   = Meas((D, meas_denom)),
@@ -387,6 +394,12 @@ class TemporalUnitMatrix:
     def axis(self, axis):
         self.__axis = axis
         pass
+    
+    # @offset.setter
+    # def offset(self, offset):
+    #     self.__offset = offset
+    #     for i, utseq in enumerate(self.__tb):
+    #         utseq.offset = offset + sum(self.durations[j] for j in range(i))
 
     def tempo(self, tempo):
         for utseq in self.__tb:

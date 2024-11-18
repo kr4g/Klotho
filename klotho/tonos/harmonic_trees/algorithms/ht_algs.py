@@ -7,5 +7,6 @@ def measure_partials(partials:Tuple[int], f:Union[int,float]=1):
             F, P = s
             result.extend(measure_partials(P, f * F))
         else:
+            s = s if s > 0 else 1 / s
             result.append(f * s)
     return tuple(result)

@@ -246,9 +246,9 @@ def fold_interval(interval:Union[Fraction, float, str], equave:Union[Fraction, f
     interval = Fraction(interval)
   if isinstance(equave, str):
     equave = Fraction(equave)
-  while interval < 1/equave**n_equaves:
+  while interval < 1/(equave**n_equaves):
     interval *= equave
-  while interval > equave**n_equaves:
+  while interval > (equave**n_equaves):
     interval /= equave
   return interval
 
