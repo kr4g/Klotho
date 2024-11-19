@@ -10,6 +10,7 @@ from fractions import Fraction
 from typing import Union
 from itertools import cycle
 from klotho.topos.graphs import Tree
+from klotho.topos.graphs.trees.algorithms import print_subdivisons
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms.rt_algs import measure_ratios, auto_subdiv
 from klotho.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
@@ -159,7 +160,6 @@ class TemporalUnit:
             prolatio = [prolatio]
         elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
             prolatio = [self.__rtree.subdivisions]
-        # print(prolatio)
         prolatio = cycle(prolatio)
         return TemporalUnitSequence([
             TemporalUnit(tempus   = ratio,
@@ -195,71 +195,7 @@ class TemporalUnit:
         if beat is None:
             return Fraction(1, self.__rtree.meas.denominator)
         return Fraction(beat)
-    
-    def __add__(self, other:Union['TemporalUnit', 'TemporalUnitSequence', Fraction]):
-        if isinstance(other, TemporalUnit):
-            new_tempus = self.__rtree._root + other.__rtree._root
-            return TemporalUnit(tempus   = new_tempus,
-                      prolatio = 'd',
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        elif isinstance(other, TemporalUnitSequence):
-            return TemporalUnitSequence((self,) + other.uts)
-        elif isinstance(other, Fraction):
-            new_tempus = self.__rtree._root + other
-            return TemporalUnit(tempus   = new_tempus,
-                      prolatio = 'd',
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        raise ValueError('Invalid Operand')
 
-    def __sub__(self, other:Union['TemporalUnit', Fraction]):
-        if isinstance(other, TemporalUnit):
-            new_tempus = abs(self.__rtree._root - other.__rtree._root)
-            return TemporalUnit(tempus   = new_tempus,
-                      prolatio = 'd',
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        elif isinstance(other, Fraction):
-            new_tempus = abs(self.__rtree._root - other)
-            return TemporalUnit(tempus   = new_tempus,
-                      prolatio = 'd',
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        raise ValueError('Invalid Operand')
-
-    def __mul__(self, other:Union['TemporalUnit', Fraction, int]):
-        if not isinstance(other, (TemporalUnit, Fraction, int)):
-            raise ValueError('Invalid Operand')
-        elif isinstance(other, TemporalUnit):
-            new_tempus = self.__rtree._root * other.__rtree._root            
-        else:
-            new_tempus = self.__rtree._root * other
-        return TemporalUnit(tempus   = new_tempus,
-                  prolatio = self.__rtree.subdivisions,
-                  tempo    = self.__tempo,
-                  beat     = self.__beat)
-    
-    def __truediv__(self, other:Union['TemporalUnit', Fraction, int]):
-        if isinstance(other, TemporalUnit):
-            new_tempus = self.__rtree._root / other.__rtree._root
-            return TemporalUnit(tempus   = new_tempus,
-                      prolatio = self.__rtree.subdivisions,
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        elif isinstance(other, (Fraction, int)):
-            new_tempus = self.__rtree._root / other
-            return TemporalUnit(tempus   = new_tempus,
-                      prolatio = self.__rtree.subdivisions,
-                      tempo    = self.__tempo,
-                      beat     = self.__beat)
-        raise ValueError('Invalid Operand')
-    
-    def __and__(self, other:'TemporalUnit'):
-        if isinstance(other, TemporalUnit):
-            return TemporalUnitSequence((self, other))
-        raise ValueError('Invalid Operand')
-    
     def __iter__(self):
         return iter(
             [
@@ -275,16 +211,9 @@ class TemporalUnit:
     
     def __len__(self):
         return len(self.__rtree.ratios)
-    
-    def _format_prolatio(self, prolatio):
-        """Format nested tuple structure removing commas."""
-        if isinstance(prolatio, (tuple, list)):
-            inner = ' '.join(str(self._format_prolatio(x)) for x in prolatio)
-            return f"({inner})"
-        return str(prolatio)
 
     def __str__(self):
-        prolat = self._format_prolatio(self.__rtree.subdivisions) if self.__type.lower() in SUBTYPES else self.__type
+        prolat = print_subdivisons(self.__rtree.subdivisions) if self.__type.lower() in SUBTYPES else self.__type
         return (
             f'Tempus:   {self.__rtree._root}\n'
             f'Span:     {self.__rtree.duration}\n'

@@ -33,6 +33,13 @@ def rotate_children(subdivs:tuple, n:int=1) -> tuple:
 def rotate_tree(tree:Tree, n:int=1) -> Tree:
     return Tree(tree._root, rotate_children(tree._children, n))
 
+def print_subdivisons(subdivs):
+    """Format nested tuple structure removing commas."""
+    if isinstance(subdivs, (tuple, list)):
+        inner = ' '.join(str(print_subdivisons(x)) for x in subdivs)
+        return f"({inner})"
+    return str(subdivs)
+
 def prune_graph(G:nx.DiGraph, max_depth:int) -> nx.DiGraph:
     pruned_graph = nx.DiGraph()
     root = [n for n, d in G.in_degree() if d == 0][0]

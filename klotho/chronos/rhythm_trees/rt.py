@@ -21,7 +21,7 @@ from math import gcd, lcm
 from functools import reduce
 
 from klotho.topos.graphs import Tree
-from klotho.topos.graphs.trees.algorithms import rotate_tree
+from klotho.topos.graphs.trees.algorithms import rotate_tree, print_subdivisons
 from .algorithms.rt_algs import measure_ratios, reduced_decomposition, strict_decomposition, sum_proportions, measure_complexity
 
 class Meas:
@@ -325,7 +325,7 @@ class RhythmTree(Tree):
         return (
             f'Duration:       {self.__duration}\n'
             f'Time Signature: {self._root}\n'
-            f'Subdivisions:   {self._children}\n'
+            f'Subdivisions:   {print_subdivisons(self._children)}\n'
             f'Decomposition:  {self.__decomp}\n'
             f'Type:           {self.__type}\n'
             f'Ratios:         {ratios}\n'
