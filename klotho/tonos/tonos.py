@@ -215,6 +215,24 @@ def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A
   frequency = A4_Hz * (2 ** (midi / 12))
   return frequency
 
+def find_first_octave(harmonic: Union[int, float, Fraction], max_octave=None):
+  '''
+  Returns the first octave in which a harmonic first appears.
+  
+  Args:
+    harmonic: A harmonic.
+    max_octave: The maximum octave to search, default is None.
+    
+  Returns:
+    The first octave in which the harmonic first appears as an integer.
+  '''
+  octave = 0
+  while max_octave is None or octave <= max_octave:
+    if harmonic <= 2 ** octave:
+      return octave
+    octave += 1
+  return None
+
 def octave_reduce(interval:float, equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> float:
   '''
   Reduce an interval to within the span of a specified octave.

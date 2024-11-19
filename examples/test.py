@@ -9,6 +9,6 @@ for i in range(10):
     # event with uid
     uid = scheduler.new_event('default', start=start, freq=440, amp=0.5)
     # set event using uid
-    scheduler.set_event(uid, start=start + 0.5, gate=0)
+    scheduler.set_event(uid, start=start + 0.25, gate=0)
 
 scheduler.run()

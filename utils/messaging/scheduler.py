@@ -3,6 +3,7 @@ from uuid import uuid4
 import threading
 import time
 from tqdm import tqdm
+import heapq
 
 class EventBuilder:
     def __init__(self, scheduler: 'Scheduler', event_type: str, uid: str, synth_name: str, start: float, params: dict):
@@ -17,8 +18,7 @@ class EventBuilder:
     def _add_event(self):
         args = [str(self), self.synth_name, self.start] + [item for sublist in self.params.items() for item in sublist]
         event_type = self.event_type
-        new_event = (event_type, args)
-        self.scheduler.events.append(new_event)
+        heapq.heappush(self.scheduler.events, (self.start, (event_type, args)))
         self.scheduler.total_events += 1
     
     def __str__(self):
@@ -56,28 +56,30 @@ class Scheduler:
                                 desc="Sending", 
                                 unit="events",
                                 position=0,
-                                leave=True)
+                                leave=False)
         
         # Initialize processing progress bar (initially with total=0 since no events sent yet)
-        self.process_progress = tqdm(total=0,
+        self.process_progress = tqdm(total=1,
                                    desc="Processing",
                                    unit="events",
                                    position=1,
-                                   leave=True)
+                                   leave=False)
     
     def reset_progress_bars(self):
         if self.send_progress:
-            self.send_progress.clear()
+            # self.send_progress.clear()
+            self.send_progress.close()
             self.send_progress.reset(total=self.total_events)
             self.send_progress.set_description("Paused")
-            # self.send_progress.total = self.total_events
+            self.send_progress.total = self.total_events
         if self.process_progress:
-            self.process_progress.clear()
-            self.process_progress.reset(total=0)
+            # self.process_progress.clear()
+            self.process_progress.close()
+            self.process_progress.reset(total=1)
             self.process_progress.set_description("Processing")
-            # self.process_progress.total = 0
+            self.process_progress.total = 0
             self.process_progress.refresh()
-            
+        self.init_progress_bars()
     def pause_handler(self, address, *args):
         if not self.paused:
             self.paused = True
@@ -105,7 +107,7 @@ class Scheduler:
     def reset_handler(self, address, *args):
         self.events_processed = 0
         self.events_sent = 0
-        self.paused = False
+        self.paused = True
         self.reset_progress_bars()
 
     def new_event(self, synth_name:str = None, start:float = 0, **params):
@@ -115,9 +117,13 @@ class Scheduler:
         EventBuilder(self, 'set', uid, None, start, params)
 
     def send_events(self, address, *args):
-        for event_type, content in self.events:
+        self.paused = False
+        events = self.events.copy()
+        while events:
             while self.paused:
                 time.sleep(0.01)
+            _, (event_type, content) = heapq.heappop(events)
+            
             msg = osc_message_builder.OscMessageBuilder(address='/storeEvent')
             msg.add_arg(event_type)
             for item in content:

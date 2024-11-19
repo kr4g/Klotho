@@ -7,7 +7,7 @@
 # -------------------------------------------------------------------------------------
 # IMPORTS -----------------------------------------------------------------------------
 # --------
-from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq, TemporalUnitMatrix as UTBlock
+from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq, TemporalSequenceBlock as UTBlock
 from klotho.chronos import seconds_to_hmsms
 from klotho.tonos import fold_interval
 from klotho.aikous.expression import db_amp

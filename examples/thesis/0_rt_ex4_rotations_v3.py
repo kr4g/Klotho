@@ -8,7 +8,7 @@ sys.path.append(str(root_path))
 # IMPORTS -----------------------------------------------------------------------------
 from klotho.topos import autoref
 from klotho.topos.graphs.trees.algorithms import factor_children
-from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnitMatrix, TemporalUnit as UT
+from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalSequenceBlock, TemporalUnit as UT
 from klotho.chronos.rhythm_trees.rt import *
 from klotho.chronos.rhythm_trees.algorithms.rt_algs import auto_subdiv
 from klotho.chronos import seconds_to_hmsms, beat_duration
@@ -91,7 +91,7 @@ for i in range(len(factor_children(rt_prime.subdivisions))):
 # create_gif([f'/Users/ryanmillett/Klotho/examples/thesis/S_rot_{i}.png' for i in range(len(rots))], '/Users/ryanmillett/Klotho/examples/thesis/S_rotations.gif', 500)
 
 animate_temporal_units(ani, save_mp4=True, file_name='rt_prime_rotations_stack_real')
-tb = TemporalUnitMatrix(tuple(rots))
+tb = TemporalSequenceBlock(tuple(rots))
 # utseq = TemporalUnitSequence(rots)
 # print(f'{ut_seq_dur(utseq)} ({seconds_to_hmsms(ut_seq_dur(utseq))})')
 

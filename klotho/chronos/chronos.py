@@ -71,6 +71,7 @@ class TEMPO(MinMaxEnum):
 def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     '''
     Convert a duration from seconds to a formatted string in hours, minutes, seconds, and milliseconds.
+    Only shows non-zero units, starting from the largest unit.
 
     Args:
     seconds (float): The duration in seconds.
@@ -78,7 +79,7 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     Defaults to True.
 
     Returns:
-    str: The formatted duration string in the form 'hours:minutes:seconds:milliseconds'.
+    str: The formatted duration string, showing only non-zero units (e.g., '1h:30m:45s:500ms' or '45s:500ms').
     tuple: The formatted duration as a tuple of integers in the form (hours, minutes, seconds, milliseconds).
     '''    
     h = int(seconds // 3600)
@@ -86,8 +87,21 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     m = int(seconds // 60)
     seconds %= 60
     s = int(seconds)
-    ms = int((seconds - s) * 1000)    
-    return f'{h}:{m:02}:{s:02}:{ms:03}' if as_string else (h, m, s, ms)
+    ms = int((seconds - s) * 1000)
+    
+    if not as_string:
+        return (h, m, s, ms)
+    
+    parts = []
+    if h > 0:
+        parts.append(f'{h}h')
+    if h > 0 or m > 0:
+        parts.append(f'{m:02}m')
+    # if h > 0 or m > 0 or s > 0:
+    parts.append(f'{s:02}s')
+    parts.append(f'{ms:03}ms')
+    
+    return ':'.join(parts)
 
 def beat_duration(ratio:Union[int, float, Fraction, str], bpm:Union[int, float], beat_ratio:Union[int, float, Fraction, str] = '1/4') -> float:
   '''
