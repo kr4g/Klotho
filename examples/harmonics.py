@@ -199,7 +199,7 @@ fund = 66.0
 
 print('=' * 40, end='\n\n')
 for n, utseq in enumerate(utmat):
-    print(f'Row {n} UTSeq:\n')
+    print(f'Row {n} UTSeq: {seconds_to_hmsms(utseq.time[0])} - {seconds_to_hmsms(utseq.time[1])} ({seconds_to_hmsms(utseq.duration)})\n')
     for m, ut in enumerate(utseq):
         print(f'UT{m}:\n{ut}', end='')
     print()
