@@ -21,8 +21,8 @@ from math import gcd, lcm
 from functools import reduce
 
 from klotho.topos.graphs import Tree
-from klotho.topos.graphs.trees.algorithms import rotate_tree, print_subdivisons
-from .algorithms.rt_algs import measure_ratios, reduced_decomposition, strict_decomposition, sum_proportions, measure_complexity
+from klotho.topos.graphs.trees.algorithms import print_subdivisons
+from .algorithms.rt_algs import sum_proportions, measure_complexity
 
 class Meas:
     '''
@@ -279,48 +279,30 @@ class RhythmTree(Tree):
     def __init__(self, 
                  span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '1/1',
-                 subdivisions:Tuple            = (1,1),
-                 decomp:str                    = 'reduced'):
+                 subdivisions:Tuple            = (1,1)):
         
         super().__init__(Meas(meas), subdivisions)
         self._span = span
-        self._tree = Tree(self._root, self._children)
-        self._decomp = decomp
         self._ratios = self._evaluate()
         self._type = self._set_type()
     
     @classmethod
-    def from_tuple(cls, subdivisions:Tuple, span:int = 1, decomp:str = 'reduced'):
-        return cls(span        = span,
-                  meas         = Meas(sum(abs(r) for r in measure_ratios(subdivisions))),
-                  subdivisions = subdivisions,
-                  decomp       = decomp)
+    def from_tree(cls, tree:Tree, span:int = 1):
+        return cls(span         = span,
+                   meas         = Meas(tree._root),
+                   subdivisions = tree._children
+                )
     
     @classmethod
-    def from_tree(cls, tree:Tree, span:int = 1, decomp:str = 'reduced'):
-        return cls(span        = span,
-                  meas         = Meas(tree._root),
-                  subdivisions = tree._children,
-                  decomp       = decomp)
-    
-    @classmethod
-    def from_ratios(cls, lst:Tuple[Fraction], span:int = 1, decomp:str = 'reduced'):
+    def from_ratios(cls, lst:Tuple[Fraction], span:int = 1):
         pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
         S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
         meas = (sum_proportions(S), pgcd_denom)
-        return cls(span        = span,
-                  meas         = meas,
-                  subdivisions = S,
-                  decomp       = decomp)
+        return cls(span         = span,
+                   meas         = meas,
+                   subdivisions = S
+                )
 
-    @property
-    def tree(self):
-        return self._tree
-    
-    @property
-    def graph(self):
-        return self._tree.graph
-    
     @property
     def span(self):
         return self._span
@@ -338,69 +320,30 @@ class RhythmTree(Tree):
         return self._ratios
     
     @property
-    def decomp(self):
-        return self._decomp
-
-    @property
     def type(self):
         return self._type
-    
-    def flatten(self):
-        return RhythmTree.from_ratios(self._ratios, self._span, self._decomp)
-    
-    def rotate(self, n:int = 1):
-        return RhythmTree.from_tree(rotate_tree(self, n), self._span, self._decomp)
-    
-    def concat(self, other):
-        if isinstance(other, RhythmTree):
-            numer_1, denom_1 = self._root.numerator, self._root.denominator
-            numer_2, denom_2 = other._root.numerator, other._root.denominator
-            lcm_denom = (denom_1 * denom_2) // gcd(denom_1, denom_2)
-            d1 = numer_1 * (lcm_denom // denom_1)
-            d2 = numer_2 * (lcm_denom // denom_2)
-            subdivs = ((d1, self._children), (d2, other._children))
-            if self._root == other._root:
-                span = self._span + other._span
-                meas = self._root
-            else:
-                span = 1
-                meas = self._root + other._root
-            return RhythmTree(span = span,
-                    meas = meas,
-                    subdivisions = subdivs,
-                    decomp = self._decomp)
-        raise ValueError('Invalid Rhythm Tree')
 
-    # def _evaluate(self):
-    #     ratios = tuple(self._span * r for r in measure_ratios(self._children))
-    #     match self._decomp:
-    #         case 'reduced':
-    #             return reduced_decomposition(ratios, self._root)
-    #         case 'strict':
-    #             return strict_decomposition(ratios, self._root)
-    #         case _:
-    #             return ratios
-    
     def _evaluate(self):
+        self.graph.nodes[0]['span'] = self._span
         def process_subtree(node, parent_ratio=Fraction(1)):
-            self._tree.graph.nodes[node]['proportion'] = self._tree.graph.nodes[node]['label']
-            children = list(self._tree.graph.successors(node))
+            self.graph.nodes[node]['proportion'] = self.graph.nodes[node]['label']
+            children = list(self.graph.successors(node))
             
             if not children:
-                ratio = Fraction(self._tree.graph.nodes[node]['label']) * parent_ratio
-                self._tree.graph.nodes[node]['ratio'] = ratio
+                ratio = Fraction(self.graph.nodes[node]['label']) * parent_ratio
+                self.graph.nodes[node]['ratio'] = ratio
                 return
             
-            div = sum(abs(self._tree.graph.nodes[c]['label']) for c in children)
+            div = sum(abs(self.graph.nodes[c]['label']) for c in children)
             
             for child in children:
-                s = self._tree.graph.nodes[child]['label']
+                s = self.graph.nodes[child]['label']
                 ratio = Fraction(s, div) * parent_ratio
-                self._tree.graph.nodes[child]['ratio'] = ratio
+                self.graph.nodes[child]['ratio'] = ratio
                 process_subtree(child, ratio)
         
         process_subtree(0, self._span * self._root.to_fraction())
-        return tuple(self._tree.graph.nodes[n]['ratio'] for n in self._tree.leaf_nodes)
+        return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
     
     def _set_type(self):
         div = sum_proportions(self._children)
@@ -420,7 +363,6 @@ class RhythmTree(Tree):
             f'Subdivisions: {subdivs}\n'
             f'Ratios:       {ratios}\n'
             # f'Type:          {self._type}\n'
-            # f'Decomposition: {self._decomp}\n'
         )
 
 # ------------------------------------------------------------------------------------

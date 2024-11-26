@@ -4,34 +4,18 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-def graph_tree(root, S:Tuple) -> nx.DiGraph:
-    def add_nodes(graph, parent_id, children_list):        
-        for child in children_list:
-            if isinstance(child, int):
-                child_id = next(unique_id)
-                graph.add_node(child_id, label=child)
-                graph.add_edge(parent_id, child_id)
-            elif isinstance(child, tuple):
-                duration, subdivisions = child
-                duration_id = next(unique_id)
-                graph.add_node(duration_id, label=duration)
-                graph.add_edge(parent_id, duration_id)
-                add_nodes(graph, duration_id, subdivisions)
-    unique_id = count()
-    G = nx.DiGraph()
-    root_id = next(unique_id)
-    G.add_node(root_id, label=root)
-    add_nodes(G, root_id, S)
-    return G
-
-def graph_depth(G:nx.DiGraph) -> int:
-    return max(nx.single_source_shortest_path_length(G, 0).values())
-
-def plot_graph(G, output_file=None):
+def plot_graph(G, attributes=None, invert=True, output_file=None):
+    """
+    Plot graph with node labels and optional attributes.
+    
+    Args:
+        G: NetworkX graph
+        output_file: Path to save the plot (if None, displays plot)
+        attributes: List of node attributes to display below the label
+    """
     root = [n for n, d in G.in_degree() if d == 0][0]
-    pos = _hierarchy_pos(G, root)
+    pos = _hierarchy_pos(G, root, inverted=invert)
     labels = nx.get_node_attributes(G, 'label')
-    ratios = nx.get_node_attributes(G, 'ratio')
     
     plt.figure(figsize=(20, 3))
     ax = plt.gca()
@@ -40,7 +24,15 @@ def plot_graph(G, output_file=None):
     plt.gcf().set_facecolor('white')
     
     for node, (x, y) in pos.items():
-        label_text = f"{labels[node]}\n{ratios[node]}" if node in ratios else str(labels[node])
+        label_parts = [str(labels[node])]
+        
+        if attributes:
+            for attr in attributes:
+                attr_dict = nx.get_node_attributes(G, attr)
+                if node in attr_dict:
+                    label_parts.append(f"{attr_dict[node]}")
+        
+        label_text = "\n".join(label_parts)
         ax.text(x, y, label_text, ha='center', va='center', zorder=5,
                 bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="black"))
     
@@ -55,12 +47,25 @@ def plot_graph(G, output_file=None):
     else:
         plt.show()
 
-def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
+def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0, inverted=True):
+    """
+    Args:
+        G: NetworkX graph
+        root: Root node
+        width: Width of each level of the tree
+        vert_gap: Vertical gap between levels of the tree
+        xcenter: X-coordinate of the root node
+        pos: Dictionary to store node positions
+        parent: Parent node
+        parsed: List to keep track of visited nodes
+        depth: Depth of the current node
+        inverted: If True, y decreases with depth (top-down). If False, y increases with depth (bottom-up)
+    """
     if pos is None:
-        pos = {root:(xcenter, 1)}
+        pos = {root:(xcenter, 1 if inverted else 0)}
         parsed = [root]
     else:
-        y = 1 - (depth * vert_gap)
+        y = (1 - (depth * vert_gap)) if inverted else (depth * vert_gap)
         pos[root] = (xcenter, y)
     children = list(G.neighbors(root))
     if not isinstance(G, nx.DiGraph) and parent is not None:
@@ -70,23 +75,5 @@ def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, pare
         nextx = xcenter - width / 2 - dx / 2
         for child in children:
             nextx += dx
-            _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
+            _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1, inverted=inverted)
     return pos
-
-# def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0):
-#     if pos is None:
-#         pos = {root: (xcenter, 0)}  # Root now starts at y=0
-#         parsed = [root]
-#     else:
-#         y = depth * vert_gap  # Increase y as depth increases
-#         pos[root] = (xcenter, y)
-#     children = list(G.neighbors(root))
-#     if not isinstance(G, nx.DiGraph) and parent is not None:
-#         children.remove(parent)
-#     if len(children) != 0:
-#         dx = width / len(children)
-#         nextx = xcenter - width / 2 - dx / 2
-#         for child in children:
-#             nextx += dx
-#             _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1)
-#     return pos

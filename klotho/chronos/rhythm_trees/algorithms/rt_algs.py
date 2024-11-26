@@ -162,3 +162,10 @@ def measure_complexity(subdivs:tuple) -> bool:
 
 def clean_subdivs(subdivs:tuple) -> tuple:
     pass
+
+
+# def flatten(self):
+#     return RhythmTree.from_ratios(self._ratios, self._span, self._decomp)
+
+# def rotate(self, n:int = 1):
+#     return RhythmTree.from_tree(rotate_tree(self, n), self._span, self._decomp)

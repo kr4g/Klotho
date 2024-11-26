@@ -5,8 +5,8 @@ class Tree:
     def __init__(self, root, children:tuple):
         self._root = root
         self._children = children
-        self._graph = self._graph_tree()
-        self._depth = self._calculate_depth()
+        self._graph = None
+        self._depth = None
         self._leaf_nodes = None
     
     @property
@@ -27,10 +27,14 @@ class Tree:
     
     @property
     def graph(self):
+        if self._graph is None:
+            self._graph = self._graph_tree()
         return self._graph
     
     @property
     def depth(self):
+        if self._depth is None:
+            self._depth = self._calculate_depth()
         return self._depth
     
     def _graph_tree(self) -> nx.DiGraph:
@@ -54,7 +58,9 @@ class Tree:
         return G
     
     def _calculate_depth(self) -> int:
-        return max(nx.single_source_shortest_path_length(self._graph, 0).values())
+        if self._depth is None:
+            self._depth = max(nx.single_source_shortest_path_length(self._graph, 0).values())
+        return self._depth
     
     @classmethod
     def from_graph(cls, G):
