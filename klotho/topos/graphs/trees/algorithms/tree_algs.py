@@ -1,5 +1,7 @@
 from ..trees import *
 import networkx as nx
+from typing import Tuple
+from itertools import count
 
 def factor_children(subdivs:tuple) -> tuple:
     def _factor(subdivs, acc):

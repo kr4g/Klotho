@@ -102,6 +102,23 @@ def seconds_to_hmsms(seconds: float, as_string=True) -> str:
     parts.append(f'{ms:03}ms')
     
     return ':'.join(parts)
+  
+def cycles_to_frequency(cycles: Union[int, float], duration: float) -> float:
+    '''
+    Calculate the frequency (in Hz) needed to produce a specific number of cycles within a given duration.
+
+    Args:
+    cycles (Union[int, float]): The desired number of complete cycles
+    duration (float): The time duration in seconds
+
+    Returns:
+    float: The frequency in Hertz (Hz) that will produce the specified number of cycles in the given duration
+
+    Example:
+    >>> cycles_to_frequency(4, 2)  # 4 cycles in 2 seconds = 2 Hz
+    2.0
+    '''
+    return cycles / duration
 
 def beat_duration(ratio:Union[int, float, Fraction, str], bpm:Union[int, float], beat_ratio:Union[int, float, Fraction, str] = '1/4') -> float:
   '''

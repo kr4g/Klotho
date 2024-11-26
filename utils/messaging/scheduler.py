@@ -42,7 +42,7 @@ class Scheduler:
         self.dispatcher.map("/resume", self.resume_handler)
         self.dispatcher.map("/event_processed", self.event_processed_handler)
         self.dispatcher.map("/reset", self.reset_handler)
-        self.dispatcher.map("/start", self.send_events)
+        self.dispatcher.map("/start", self.start)
         
         self.server = osc_server.ThreadingOSCUDPServer((ip, receive_port), self.dispatcher)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
@@ -51,40 +51,33 @@ class Scheduler:
         self.process_progress = None
         
     def init_progress_bars(self):
-        # Initialize sending progress bar
         self.send_progress = tqdm(total=self.total_events, 
-                                desc="Sending", 
+                                desc="Ready to send", 
                                 unit="events",
                                 position=0,
                                 leave=False)
         
-        # Initialize processing progress bar (initially with total=0 since no events sent yet)
-        self.process_progress = tqdm(total=1,
-                                   desc="Processing",
+        self.process_progress = tqdm(total=self.total_events,
+                                   desc="Ready to process",
                                    unit="events",
                                    position=1,
                                    leave=False)
     
     def reset_progress_bars(self):
         if self.send_progress:
-            # self.send_progress.clear()
-            self.send_progress.close()
+            self.send_progress.clear()
             self.send_progress.reset(total=self.total_events)
-            self.send_progress.set_description("Paused")
-            self.send_progress.total = self.total_events
+            self.send_progress.set_description("Ready to send")
         if self.process_progress:
-            # self.process_progress.clear()
-            self.process_progress.close()
-            self.process_progress.reset(total=1)
-            self.process_progress.set_description("Processing")
-            self.process_progress.total = 0
-            self.process_progress.refresh()
-        self.init_progress_bars()
+            self.process_progress.clear()
+            self.process_progress.reset(total=self.total_events)
+            self.process_progress.set_description("Ready to process")
+        
     def pause_handler(self, address, *args):
         if not self.paused:
             self.paused = True
             if self.send_progress:
-                self.send_progress.set_description("Paused")
+                self.send_progress.set_description("Paused sending")
 
     def resume_handler(self, address, *args):
         self.paused = False
@@ -98,11 +91,9 @@ class Scheduler:
         if self.events_sent == self.total_events:
             if self.send_progress:
                 self.send_progress.set_description("All Events Sent")
-                # self.send_progress.close()
         if self.events_processed == self.total_events:
             if self.process_progress:
                 self.process_progress.set_description("All Events Processed")
-                # self.process_progress.close()
 
     def reset_handler(self, address, *args):
         self.events_processed = 0
@@ -116,8 +107,17 @@ class Scheduler:
     def set_event(self, uid:str, start:float, **params):
         EventBuilder(self, 'set', uid, None, start, params)
 
-    def send_events(self, address, *args):
+    def start(self, address, *args):
+        if self.events_sent == self.total_events:
+            self.events_processed = 0
+            self.events_sent = 0
+            self.reset_progress_bars()
         self.paused = False
+        self.send_progress.set_description("Sending")
+        self.process_progress.set_description("Processing")
+        self.send_events()
+
+    def send_events(self):
         events = self.events.copy()
         while events:
             while self.paused:
@@ -131,8 +131,8 @@ class Scheduler:
             self.client.send(msg.build())
             self.events_sent += 1
             self.send_progress.update(1)
-            self.process_progress.total = self.events_sent
-            self.process_progress.refresh()
+            # self.process_progress.total = self.events_sent
+            # self.process_progress.refresh()
             time.sleep(0.01)
 
         eot_msg = osc_message_builder.OscMessageBuilder(address='/storeEvent')

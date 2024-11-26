@@ -7,7 +7,7 @@ from klotho import topos
 from klotho.aikous.expression import amp_freq_scale, db_amp
 from klotho.topos.sequences import Pattern
 from klotho.chronos.rhythm_trees import auto_subdiv
-from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq, TemporalSequenceBlock as UTMat
+from klotho.chronos.temporal_units import TemporalUnit as UT, TemporalUnitSequence as UTSeq, TemporalUnitSequenceBlock as UTMat
 
 mat = topos.autoref_rotmat((3,5,7,11,13), mode='G')
 

@@ -8,7 +8,7 @@ sys.path.append(str(root_path))
 # IMPORTS -----------------------------------------------------------------------------
 from klotho.topos import autoref
 from klotho.topos.graphs.graph_algorithms import factor_children
-from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalSequenceBlock, TemporalUnit as UT
+from klotho.chronos.temporal_units import TemporalUnitSequence, TemporalUnitSequenceBlock, TemporalUnit as UT
 from klotho.chronos.rhythm_trees.rt import *
 from klotho.chronos.rhythm_trees.algorithms.rts import flatten_tree, ratios_to_tree, rotate_tree
 from klotho.chronos.rhythm_trees.algorithms.rt_algs import auto_subdiv
@@ -55,7 +55,7 @@ for i in range(len(factor_children(rt_prime.subdivisions))):
     # print(rotate_tree(rt_prime, i))
     rots.append(TemporalUnitSequence((UT.from_tree(rotate_tree(rt_prime, i), tempo=bpm, beat=beat),)))
 
-tb = TemporalSequenceBlock(tuple(rots))
+tb = TemporalUnitSequenceBlock(tuple(rots))
 # utseq = TemporalUnitSequence(rots)
 # print(f'{ut_seq_dur(utseq)} ({seconds_to_hmsms(ut_seq_dur(utseq))})')
 

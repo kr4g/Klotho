@@ -277,48 +277,53 @@ class RhythmTree(Tree):
     see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
     '''
     def __init__(self, 
-                 duration:int                  = 1,
+                 span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '1/1',
-                 subdivisions:Tuple            = (1,),
+                 subdivisions:Tuple            = (1,1),
                  decomp:str                    = 'reduced'):
         
         super().__init__(Meas(meas), subdivisions)
-        self.__duration = duration
-        self.__decomp   = decomp
-        self.__ratios   = self._evaluate()
-        self.__type     = self._set_type()
+        self._span = span
+        self._decomp = decomp
+        self._ratios = self._evaluate()
+        self._tree = Tree(self._root, self._children)
+        self._type = self._set_type()
     
     @classmethod
-    def from_tuple(cls, subdivisions:Tuple, duration:int = 1, decomp:str = 'reduced'):
-        return cls(duration     = duration,
-                   meas         = Meas(sum(abs(r) for r in measure_ratios(subdivisions))),
-                   subdivisions = subdivisions,
-                   decomp       = decomp)
+    def from_tuple(cls, subdivisions:Tuple, span:int = 1, decomp:str = 'reduced'):
+        return cls(span        = span,
+                  meas         = Meas(sum(abs(r) for r in measure_ratios(subdivisions))),
+                  subdivisions = subdivisions,
+                  decomp       = decomp)
     
     @classmethod
-    def from_tree(cls, tree:Tree, duration:int = 1, decomp:str = 'reduced'):
-        return cls(duration     = duration,
-                   meas         = Meas(tree._root),
-                   subdivisions = tree._children,
-                   decomp       = decomp)
+    def from_tree(cls, tree:Tree, span:int = 1, decomp:str = 'reduced'):
+        return cls(span        = span,
+                  meas         = Meas(tree._root),
+                  subdivisions = tree._children,
+                  decomp       = decomp)
     
     @classmethod
-    def from_ratios(cls, lst:Tuple[Fraction], duration:int = 1, decomp:str = 'reduced'):
+    def from_ratios(cls, lst:Tuple[Fraction], span:int = 1, decomp:str = 'reduced'):
         pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
         S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
         meas = (sum_proportions(S), pgcd_denom)
-        return cls(duration     = duration,
-                   meas         = meas,
-                   subdivisions = S,
-                   decomp       = decomp)
+        return cls(span        = span,
+                  meas         = meas,
+                  subdivisions = S,
+                  decomp       = decomp)
 
     @property
     def tree(self):
-        return Tree(self._root, self._children)
+        return self._tree
     
     @property
-    def duration(self):
-        return self.__duration
+    def graph(self):
+        return self._tree.graph
+    
+    @property
+    def span(self):
+        return self._span
 
     @property
     def meas(self):
@@ -330,21 +335,21 @@ class RhythmTree(Tree):
 
     @property
     def decomp(self):
-        return self.__decomp
+        return self._decomp
 
     @property
     def ratios(self):
-        return self.__ratios
+        return self._ratios
     
     @property
     def type(self):
-        return self.__type
+        return self._type
     
     def flatten(self):
-        return RhythmTree.from_ratios(self.__ratios, self.__duration, self.__decomp)
+        return RhythmTree.from_ratios(self._ratios, self._span, self._decomp)
     
     def rotate(self, n:int = 1):
-        return RhythmTree.from_tree(rotate_tree(self, n), self.__duration, self.__decomp)
+        return RhythmTree.from_tree(rotate_tree(self, n), self._span, self._decomp)
     
     def concat(self, other):
         if isinstance(other, RhythmTree):
@@ -355,21 +360,20 @@ class RhythmTree(Tree):
             d2 = numer_2 * (lcm_denom // denom_2)
             subdivs = ((d1, self._children), (d2, other._children))
             if self._root == other._root:
-                duration = self.__duration + other.__duration
+                span = self._span + other._span
                 meas = self._root
             else:
-                duration = 1
+                span = 1
                 meas = self._root + other._root
-            return RhythmTree(duration       = duration,
+            return RhythmTree(span = span,
                     meas = meas,
-                    subdivisions   = subdivs,
-                    decomp         = self.__decomp)
+                    subdivisions = subdivs,
+                    decomp = self._decomp)
         raise ValueError('Invalid Rhythm Tree')
 
     def _evaluate(self):
-        # ratios = tuple(self.__duration * r for r in measure_ratios(remove_ties(self._children)))
-        ratios = tuple(self.__duration * r for r in measure_ratios(self._children))
-        match self.__decomp:
+        ratios = tuple(self._span * r for r in measure_ratios(self._children))
+        match self._decomp:
             case 'reduced':
                 return reduced_decomposition(ratios, self._root)
             case 'strict':
@@ -384,17 +388,18 @@ class RhythmTree(Tree):
         return 'complex' if measure_complexity(self._children) else 'simple'
 
     def __len__(self):
-        return len(self.__ratios)
+        return len(self._ratios)
 
     def __repr__(self):
-        ratios = ', '.join(tuple([str(r) for r in self.__ratios]))
+        ratios = ', '.join(tuple([str(r) for r in self._ratios]))
+        subdivs = print_subdivisons(self._children)
         return (
-            f'Duration:       {self.__duration}\n'
-            f'Time Signature: {self._root}\n'
-            f'Subdivisions:   {print_subdivisons(self._children)}\n'
-            f'Decomposition:  {self.__decomp}\n'
-            f'Type:           {self.__type}\n'
-            f'Ratios:         {ratios}\n'
+            f'Span:         {self._span}\n'
+            f'Meas:         {self._root}\n'
+            f'Subdivisions: {subdivs}\n'
+            f'Ratios:       {ratios}\n'
+            # f'Type:          {self._type}\n'
+            # f'Decomposition: {self._decomp}\n'
         )
 
 # ------------------------------------------------------------------------------------

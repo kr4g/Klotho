@@ -98,7 +98,7 @@ def db_amp(db: float) -> float:
 
 def amp_freq_scale(freq: float,
     freqs: list = [20,  100, 250, 500, 1000, 2000, 3000, 4000, 6000, 10000, 20000],
-    amps: list  = [0.2, 0.4, 0.5, 0.7, 0.85, 0.9,  0.8,  0.7,  0.6,  0.5,   0.3],
+    amps: list  = [0.3, 0.5, 0.7, 0.8, 0.7,  0.6,  0.5,  0.6,  0.7,  0.5,   0.3],
     deg: int = 4) -> float:
   frequencies_sample = np.array(freqs, dtype=float)
   loudness_sample    = np.array(amps, dtype=float)

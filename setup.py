@@ -27,6 +27,7 @@ setup(
         'networkx',
         'hypernetx',
         'python-osc',
+        'tqdm',
     ],
     # tests_require=[
     #     'pytest',
