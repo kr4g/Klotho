@@ -340,7 +340,8 @@ class RhythmTree(Tree):
                 s = self.graph.nodes[child]['label']
                 ratio = Fraction(s, div) * parent_ratio
                 self.graph.nodes[child]['ratio'] = ratio
-                process_subtree(child, ratio)
+                if self.graph.out_degree(child) > 0:
+                    process_subtree(child, ratio)
         
         process_subtree(0, self._span * self._root.to_fraction())
         return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
