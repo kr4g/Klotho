@@ -305,6 +305,19 @@ class TemporalUnit:
     def __repr__(self):
         return self.__str__()
 
+    def to_dict(self):
+        """Serializes the TemporalUnit into a dictionary for visualization."""
+        return {
+            'events': [{
+                'start': event['start'],
+                'duration': event['duration'],
+                'metric_ratio': str(event['metric_ratio']),  # Convert Fraction to string
+            } for event in self.events],
+            'tempo': self.tempo,
+            'beat': str(self.beat),  # Convert Fraction to string
+            'time': self.time
+        }
+
 
 class TemporalUnitMatrix:
     pass

@@ -1,58 +1,75 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from klotho.chronos.temporal_units.ut import TemporalUnit
+from klotho.topos.graphs.trees.algorithms import factor_children,rotate_children
 
-def plot_temporal_units(uts: list[TemporalUnit], figsize=None):
+def plot_temporal_units(uts: list[TemporalUnit], figsize=(12, 8)):
     """Creates a timeline visualization of multiple TemporalUnits, stacked vertically.
     
     Args:
         uts: List of TemporalUnit instances to visualize
-        figsize: Optional tuple of (width, height). If None, scales with number of UTs
+        figsize: Figure size (width, height). Default maintains readable size with scrolling
     """
-    if figsize is None:
-        figsize = (12, 2 + len(uts))
-        
-    # Setup the figure with dark background
+    # Calculate the required width based on the actual time span
+    global_start = min(ut.time[0] for ut in uts)
+    global_end = max(ut.time[1] for ut in uts)
+    time_span = global_end - global_start
+    
+    # Create figure with fixed display size and minimal margins
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=figsize)
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(111)
+    
+    # Adjust the margins to maximize plotting area
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.02, right=0.98, top=0.9, bottom=0.02)
+    
     fig.patch.set_facecolor('#1C1C1C')
     ax.set_facecolor('#1C1C1C')
 
     # Calculate positions
-    bar_height = 0.4
-    spacing = 1.0  # Vertical space between UTs
+    bar_height = 0.1
+    spacing = 0.15
     
-    # Get all unique metric ratios across all UTs and create color mapping
+    # Get all unique metric ratios and create pastel color mapping
     all_ratios = set()
     for ut in uts:
         all_ratios.update(event['metric_ratio'] for event in ut)
     unique_ratios = sorted(all_ratios)
-    color_map = dict(zip(unique_ratios, plt.cm.Set3(np.linspace(0, 1, len(unique_ratios)))))
     
-    # Find global time limits
-    global_start = min(ut.time[0] for ut in uts)
-    global_end = max(ut.time[1] for ut in uts)
+    # Create lighter, more pastel colors
+    n_colors = len(unique_ratios)
+    colors = []
+    base_colors = plt.cm.Pastel1(np.linspace(0, 1, 9))
+    
+    for i in range(n_colors):
+        if i < 9:
+            color = base_colors[i]
+        else:
+            hue = (i * 0.618033988749895) % 1
+            color = plt.cm.hsv(hue)
+            color = np.array(color) * 0.6 + 0.4
+            color[3] = 1.0
+        colors.append(color)
+    
+    color_map = dict(zip(unique_ratios, colors))
     
     # Plot each UT
     for i, ut in enumerate(uts):
-        bar_y = spacing * (len(uts) - 1 - i)  # Stack from top to bottom
+        bar_y = spacing * (len(uts) - 1 - i)
         
-        # Plot each event in the UT
         for event in ut:
-            # Get color based on metric ratio
             color = color_map[event['metric_ratio']]
             
-            # Draw the segment
             ax.add_patch(plt.Rectangle(
                 (event['start'], bar_y),
                 event['duration'],
                 bar_height,
                 facecolor=color,
                 edgecolor='white',
-                linewidth=0.5
+                linewidth=0.75
             ))
             
-            # Add metric ratio label in center of segment
             ax.text(
                 event['start'] + event['duration']/2,
                 bar_y + bar_height/2,
@@ -63,9 +80,8 @@ def plot_temporal_units(uts: list[TemporalUnit], figsize=None):
                 fontsize=8
             )
         
-        # Add UT info on the right
         ax.text(
-            global_end + 0.2,
+            event['start'] + event['duration'] + 0.2,
             bar_y + bar_height/2,
             f"T:{ut.tempo}, B:{ut.beat}",
             va='center',
@@ -73,8 +89,14 @@ def plot_temporal_units(uts: list[TemporalUnit], figsize=None):
             fontsize=8
         )
 
-    # Set axis limits
-    ax.set_xlim(global_start - 0.1, global_end + 1.0)  # Extra space on right for UT info
+    # Configure axes for scrolling
+    window_size = 8.0  # Show 8 seconds at a time
+    
+    # Set the full data range that can be scrolled
+    ax.set_xbound(global_start - 0.5, global_end + 0.5)
+    
+    # Set the initial view window to first 8 seconds of the actual data
+    ax.set_xlim(0, window_size)
     ax.set_ylim(-0.1, spacing * (len(uts)) + 0.1)
 
     # Configure time ruler at top
@@ -85,38 +107,26 @@ def plot_temporal_units(uts: list[TemporalUnit], figsize=None):
 
     # Add title
     ax.set_title("TemporalUnit Timeline", pad=20, color='white')
-
-    plt.tight_layout()
+    
+    # Make sure the plot doesn't auto-adjust
+    plt.autoscale(enable=False)
+    
     return fig, ax
 
 def test_visualization():
     # Create several test UTs with different parameters
-    ut1 = TemporalUnit(
-        span=1,
-        tempus='4/4',
-        prolatio=(2, 1, 1),
-        tempo=60,
-        beat='1/4'
-    )
+    S = ((2, (5, (4, (5, 3, 2)))), (3, (5, 4, 3, 2)), 3)
     
-    ut2 = TemporalUnit(
-        span=1,
+    uts = [TemporalUnit(
+        span=2,
         tempus='4/4',
-        prolatio=(1, 1, 1),
+        prolatio=rotate_children(S, i),
         tempo=60,
         beat='1/4'
-    )
-    
-    ut3 = TemporalUnit(
-        span=1,
-        tempus='4/4',
-        prolatio=(3, 2, 2, 1),
-        tempo=60,
-        beat='1/4'
-    )
+    ) for i in range(len(factor_children(S)))]
     
     # Plot all UTs
-    fig, ax = plot_temporal_units([ut1, ut2, ut3])
+    fig, ax = plot_temporal_units(uts)
     plt.show()
 
 if __name__ == "__main__":
