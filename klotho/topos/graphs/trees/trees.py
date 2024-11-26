@@ -45,7 +45,7 @@ class Tree:
         return G
     
     def _calculate_depth(self) -> int:
-        return max(attr['depth'] for _, attr in self._graph.nodes(data=True))
+        return max(nx.single_source_shortest_path_length(self._graph, 0).values())
     
     @classmethod
     def from_graph(cls, G):

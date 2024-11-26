@@ -47,7 +47,8 @@ def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
         end for all
     end
     '''
-    div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivs)
+    # div = sum(abs(s[0]) if isinstance(s, tuple) else abs(s) for s in subdivs)
+    div = sum_proportions(subdivs)
     result = []
     for s in subdivs:  
         if isinstance(s, tuple):

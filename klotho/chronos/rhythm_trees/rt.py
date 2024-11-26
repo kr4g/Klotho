@@ -334,13 +334,13 @@ class RhythmTree(Tree):
         return self._children
 
     @property
-    def decomp(self):
-        return self._decomp
-
-    @property
     def ratios(self):
         return self._ratios
     
+    @property
+    def decomp(self):
+        return self._decomp
+
     @property
     def type(self):
         return self._type
