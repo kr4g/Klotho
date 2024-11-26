@@ -7,6 +7,7 @@ class Tree:
         self._children = children
         self._graph = self._graph_tree()
         self._depth = self._calculate_depth()
+        self._leaf_nodes = None
     
     @property
     def root(self):
@@ -15,6 +16,14 @@ class Tree:
     @property
     def children(self):
         return self._children
+    
+    @property
+    def leaf_nodes(self):
+        """Returns leaf nodes in depth-first order"""
+        if self._leaf_nodes is None:
+            self._leaf_nodes = [n for n in nx.dfs_preorder_nodes(self._graph) 
+                if self._graph.out_degree(n) == 0]
+        return self._leaf_nodes
     
     @property
     def graph(self):

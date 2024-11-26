@@ -284,9 +284,9 @@ class RhythmTree(Tree):
         
         super().__init__(Meas(meas), subdivisions)
         self._span = span
+        self._tree = Tree(self._root, self._children)
         self._decomp = decomp
         self._ratios = self._evaluate()
-        self._tree = Tree(self._root, self._children)
         self._type = self._set_type()
     
     @classmethod
@@ -371,15 +371,36 @@ class RhythmTree(Tree):
                     decomp = self._decomp)
         raise ValueError('Invalid Rhythm Tree')
 
+    # def _evaluate(self):
+    #     ratios = tuple(self._span * r for r in measure_ratios(self._children))
+    #     match self._decomp:
+    #         case 'reduced':
+    #             return reduced_decomposition(ratios, self._root)
+    #         case 'strict':
+    #             return strict_decomposition(ratios, self._root)
+    #         case _:
+    #             return ratios
+    
     def _evaluate(self):
-        ratios = tuple(self._span * r for r in measure_ratios(self._children))
-        match self._decomp:
-            case 'reduced':
-                return reduced_decomposition(ratios, self._root)
-            case 'strict':
-                return strict_decomposition(ratios, self._root)
-            case _:
-                return ratios
+        def process_subtree(node, parent_ratio=Fraction(1)):
+            self._tree.graph.nodes[node]['proportion'] = self._tree.graph.nodes[node]['label']
+            children = list(self._tree.graph.successors(node))
+            
+            if not children:
+                ratio = Fraction(self._tree.graph.nodes[node]['label']) * parent_ratio
+                self._tree.graph.nodes[node]['ratio'] = ratio
+                return
+            
+            div = sum(abs(self._tree.graph.nodes[c]['label']) for c in children)
+            
+            for child in children:
+                s = self._tree.graph.nodes[child]['label']
+                ratio = Fraction(s, div) * parent_ratio
+                self._tree.graph.nodes[child]['ratio'] = ratio
+                process_subtree(child, ratio)
+        
+        process_subtree(0, self._span * self._root.to_fraction())
+        return tuple(self._tree.graph.nodes[n]['ratio'] for n in self._tree.leaf_nodes)
     
     def _set_type(self):
         div = sum_proportions(self._children)

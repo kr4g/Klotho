@@ -137,7 +137,7 @@ def process_ut_ping(ut, **kwargs):
             pan         = np.sin(event['start'] * kwargs['root'])
         )
 
-s_mat = autoref_rotmat((13,11,7,5,3))
+s_mat = autoref_rotmat((11,9,7,5,4))
 utmat = UTMat.from_tree_mat(s_mat, subdiv=True, tempo=66, beat='1/4')
 equave = fold_interval(63)
 registers = [equave**i for i in range(utmat.size)]
@@ -146,13 +146,13 @@ fund = 166.5
 from itertools import cycle
 path = cycle(ComboNetTraversal(combnet).play(list(hx.combos)[0], utmat.utseqs[0].size))
 
-# print('=' * 40, end='\n\n')
-# for n, utseq in enumerate(utmat):
-#     print(f'Row {n} UTSeq: {seconds_to_hmsms(utseq.time[0])} - {seconds_to_hmsms(utseq.time[1])} ({seconds_to_hmsms(utseq.duration)})\n')
-#     for m, ut in enumerate(utseq):
-#         print(f'UT{m}:\n{ut}', end='')
-#     print()
-#     print('=' * 40, end='\n\n')
+print('=' * 40, end='\n\n')
+for n, utseq in enumerate(utmat):
+    print(f'Row {n} UTSeq: {seconds_to_hmsms(utseq.time[0])} - {seconds_to_hmsms(utseq.time[1])} ({seconds_to_hmsms(utseq.duration)})\n')
+    for m, ut in enumerate(utseq):
+        print(f'UT{m}:\n{ut}', end='')
+    print()
+    print('=' * 40, end='\n\n')
 
 process_utmat(utmat, fund=fund, equave=equave, registers=registers, path=path)
 

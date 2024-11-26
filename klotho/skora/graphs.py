@@ -31,17 +31,17 @@ def plot_graph(G, output_file=None):
     root = [n for n, d in G.in_degree() if d == 0][0]
     pos = _hierarchy_pos(G, root)
     labels = nx.get_node_attributes(G, 'label')
+    ratios = nx.get_node_attributes(G, 'ratio')
     
     plt.figure(figsize=(20, 3))
     ax = plt.gca()
     
     ax.set_facecolor('white')
     plt.gcf().set_facecolor('white')
-    # ax.set_facecolor('none')
-    # plt.gcf().set_facecolor('none')
     
     for node, (x, y) in pos.items():
-        ax.text(x, y, labels[node], ha='center', va='center', zorder=5,
+        label_text = f"{labels[node]}\n{ratios[node]}" if node in ratios else str(labels[node])
+        ax.text(x, y, label_text, ha='center', va='center', zorder=5,
                 bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="black"))
     
     nx.draw_networkx_edges(G, pos, arrows=False, width=2.0)

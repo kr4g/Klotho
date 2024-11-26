@@ -175,10 +175,10 @@ class TemporalUnit:
     @property
     def duration(self):
         """The total duration (in seconds) of the TemporalUnit."""
-        # return sum(abs(d) for d in self.durations)
-        return beat_duration(ratio      = str(self._rtree._root * self._rtree.span),
-                             bpm        = self._tempo,
-                             beat_ratio = self._beat)
+        return sum(abs(d) for d in self.durations)
+        # return beat_duration(ratio      = str(self._rtree._root * self._rtree.span),
+        #                      bpm        = self._tempo,
+        #                      beat_ratio = self._beat)
     
     @property
     def time(self):
