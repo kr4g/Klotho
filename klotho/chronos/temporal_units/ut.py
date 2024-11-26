@@ -8,14 +8,13 @@ Temporal Units
 '''
 from fractions import Fraction
 from typing import Union, Protocol, runtime_checkable, Tuple, Iterator
-from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
 from ..rhythm_trees import Meas, RhythmTree
-from ..rhythm_trees.algorithms.rt_algs import measure_ratios, auto_subdiv
+from ..rhythm_trees.algorithms.rt_algs import auto_subdiv
 from klotho.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
 
 import numpy as np
-from enum import Enum, auto
+from enum import Enum
 
 # Prolationis Types
 DURTYPES  = {'d', 'duration', 'dur'}
@@ -40,13 +39,13 @@ class TemporalStructure(Protocol):
     """
     
     @property
-    def duration(self) -> float:
-        """The total duration (in seconds) of the temporal structure."""
+    def offset(self) -> float:
+        """The offset (or absolute start time) in seconds of the structure."""
         ...
     
     @property
-    def offset(self) -> float:
-        """The offset (or absolute start time) in seconds of the structure."""
+    def duration(self) -> float:
+        """The total duration (in seconds) of the temporal structure."""
         ...
     
     @property
@@ -73,36 +72,30 @@ class TemporalUnit:
                  tempus:Union[Meas,Fraction,int,float,str] = '1/1',
                  prolatio:Union[RhythmTree,tuple,str]      = 'd',
                  tempo:Union[None,int,float]               = 60,
-                 beat:Union[Fraction,int,float,str]        = '1/4'):
+                 beat:Union[None,Fraction,int,float,str]   = None):
         
         self._type = None
         self._rtree = self._set_rtree(span, Meas(tempus), prolatio)
         self._tempo = tempo
-        self._beat = self._set_beat(beat)
+        self._beat = beat
         self._onsets = None
         self._durations = None
         self._offset = 0.0
-        self._events = None
+        self._events = [dict() for _ in range(len(self))]
+        self._set_events()
     
     @classmethod
-    def from_tree(cls, tree:Union[Tree, RhythmTree], tempo = None, beat = None):
-        return cls(span = tree.span if isinstance(tree, RhythmTree) else 1,
-                  tempus = tree._root,
-                  prolatio = tree._children,
-                  tempo = tempo,
-                  beat = beat)
+    def from_tree(cls, tree:RhythmTree, tempo = 60, beat = '1/4'):
+        return cls(span     = tree.span,
+                   tempus   = tree._root,
+                   prolatio = tree._children,
+                   tempo    = tempo,
+                   beat     = beat)
 
-    @classmethod
-    def from_subdivs(cls, subdivisions:tuple, span:int = 1, tempo = None, beat = None):
-        return cls(tempus = Meas(sum(abs(r) * span for r in measure_ratios(subdivisions))),
-                  prolatio = subdivisions,
-                  tempo = tempo,
-                  beat = beat)
-
-    @property
-    def size(self):
-        """The number of events in the TemporalUnit."""
-        return len(self._rtree.ratios)
+    # @property
+    # def size(self):
+    #     """The number of events in the TemporalUnit."""
+    #     return len(self._rtree.ratios)
     
     @property
     def span(self):
@@ -120,20 +113,15 @@ class TemporalUnit:
         return self._rtree._children
     
     @property
+    def rtree(self):
+        """The RhythmTree of the TemporalUnit."""
+        return self._rtree
+
+    @property
     def ratios(self):
         """The ratios of a RhythmTree which describe the proportional durations of the TemporalUnit."""
         return self._rtree.ratios
     
-    @property
-    def rtree(self):
-        """The RhythmTree of the TemporalUnit."""
-        return self._rtree
-    
-    @property
-    def tree(self):
-        """The Tree of the RhythmTree."""
-        return self._rtree.tree
-
     @property
     def tempo(self):
         """The tempo in beats per minute of the TemporalUnit."""
@@ -142,6 +130,8 @@ class TemporalUnit:
     @property
     def beat(self):
         """The rhythmic ratio that describes the beat of the TemporalUnit."""
+        if self._beat is None:
+            self._beat = Fraction(1, self._rtree.meas.denominator)
         return self._beat
     
     @property
@@ -162,6 +152,14 @@ class TemporalUnit:
         return self._onsets
 
     @property
+    def duration(self):
+        """The total duration (in seconds) of the TemporalUnit."""
+        # return sum(abs(d) for d in self.durations)
+        return beat_duration(ratio      = str(self._rtree._root * self._rtree.span),
+                             bpm        = self._tempo,
+                             beat_ratio = self._beat)
+    
+    @property
     def durations(self):
         """A tuple of durations (in seconds) for each event in the TemporalUnit."""
         if self._durations is None:
@@ -173,14 +171,6 @@ class TemporalUnit:
         return self._durations
 
     @property
-    def duration(self):
-        """The total duration (in seconds) of the TemporalUnit."""
-        return sum(abs(d) for d in self.durations)
-        # return beat_duration(ratio      = str(self._rtree._root * self._rtree.span),
-        #                      bpm        = self._tempo,
-        #                      beat_ratio = self._beat)
-    
-    @property
     def time(self):
         """The absolute start and end times (in seconds) of the TemporalUnit."""
         return self._offset, self._offset + self.duration
@@ -188,8 +178,6 @@ class TemporalUnit:
     @property
     def events(self):
         """A list of events (dicts) for each event in the TemporalUnit."""
-        if self._events is None:
-            self._events = self._set_events()
         return self._events
     
     @tempo.setter
@@ -198,6 +186,7 @@ class TemporalUnit:
         self._tempo     = tempo
         self._onsets    = None
         self._durations = None
+        self._set_events()
         
     @beat.setter
     def beat(self, beat:Union[Fraction,str]):
@@ -205,14 +194,16 @@ class TemporalUnit:
         self._beat      = Fraction(beat)
         self._onsets    = None
         self._durations = None
+        self._set_events()
         
     @offset.setter
     def offset(self, offset:float):
         """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
         self._offset = offset
         self._onsets = None
+        self._set_events()
 
-    def _set_rtree(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
+    def _set_rtree(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[RhythmTree,tuple,str]) -> RhythmTree:
         match prolatio:
             case RhythmTree():
                 self._type = ProlatioTypes.SUBDIVISION
@@ -227,44 +218,57 @@ class TemporalUnit:
                 match prolatio:
                     case p if p in PULSTYPES:
                         self._type = ProlatioTypes.PULSE
-                        return RhythmTree(span = span, meas = tempus, subdivisions = (1,) * tempus.numerator)
+                        return RhythmTree(span = span,
+                                          meas = tempus,
+                                          subdivisions = (1,) * tempus.numerator)
                     
                     case d if d in DURTYPES:
                         self._type = ProlatioTypes.DURATION
-                        return RhythmTree(span = span, meas = tempus, subdivisions = (1,))
+                        return RhythmTree(span = span,
+                                          meas = tempus,
+                                          subdivisions = (1,))
                     
                     case r if r in RESTYPES:
                         self._type = ProlatioTypes.REST
-                        return RhythmTree(span = span, meas = tempus, subdivisions = (-1,))
+                        return RhythmTree(span = span,
+                                          meas = tempus,
+                                          subdivisions = (-1,))
                     
                     case _:
                         raise ValueError(f'Invalid string: {prolatio}')
                     
             case _:
                 raise ValueError(f'Invalid prolatio type: {type(prolatio)}')
-    
-    def _set_beat(self, beat:Union[None,str,Fraction]) -> Fraction:
-        if beat is None:
-            return Fraction(1, self._rtree.meas.denominator)
-        return Fraction(beat)
 
     def _set_events(self):
-        return [
-            {
-                'start'    : onset,
-                'duration' : duration,
-                'end'      : onset + duration,
-                'ratio'    : ratio,
-            }
-            for onset, duration, ratio in zip(self.onsets, self.durations, self._rtree.ratios)
-        ]
-
+        for i, (onset, duration, ratio) in enumerate(zip(self.onsets, self.durations, self._rtree.ratios)):
+            match self._events[i]:
+                case dict():
+                    self._events[i]['start']        = onset
+                    self._events[i]['duration']     = duration
+                    self._events[i]['end']          = onset + duration
+                    self._events[i]['metric_ratio'] = ratio
+                    self._events[i]['beat']         = self._beat
+                    self._events[i]['bpm']          = self._tempo
+                    # self._events[i] = {
+                    #     'start'        : onset,
+                    #     'duration'     : duration,
+                    #     'end'          : onset + duration,
+                    #     'metric_ratio' : ratio,
+                    #     'beat'         : self._beat,
+                    #     'bpm'          : self._tempo,
+                    # }
+                case TemporalStructure():
+                    self._events[i].offset = onset
+                    self._events[i].beat   = self._beat
+                    self._events[i].tempo  = self._tempo
+                    
     def __mul__(self, other:Union[int,float,Fraction]):
-        return TemporalUnit(span = self.span * other,
-                             tempus = self._rtree._root,
-                             prolatio = self._rtree._children,
-                             tempo = self._tempo,
-                             beat = self._beat)
+        return TemporalUnit(span     = self.span * other,
+                            tempus   = self._rtree._root,
+                            prolatio = self._rtree._children,
+                            tempo    = self._tempo,
+                            beat     = self._beat)
 
     def __iter__(self):
         return iter(self.events)
@@ -276,7 +280,7 @@ class TemporalUnit:
             idx: The index of the event to retrieve
             
         Returns:
-            dict: The event at the specified index
+            dict: A copy of the event at the specified index
             
         Raises:
             IndexError: If the index is out of range
@@ -289,10 +293,10 @@ class TemporalUnit:
     def __str__(self):
         prolat = print_subdivisons(self._rtree.subdivisions) if self._type == ProlatioTypes.SUBDIVISION else self._type.value
         return (
-            f'Tempus:   {self._rtree._root}\n'
             f'Span:     {self._rtree.span}\n'
-            f'Events:   {len(self)}\n'
+            f'Tempus:   {self._rtree._root}\n'
             f'Prolatio: {prolat}\n'
+            f'Events:   {len(self)}\n'
             f'Tempo:    {self._beat} = {self._tempo}\n'
             f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n'
             f'-----------------------------------\n'
