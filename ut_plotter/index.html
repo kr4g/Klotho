@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Temporal Unit Visualization</title>
+    <title>Temporal Units</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="timeline_base.js"></script>
     <script src="ut_visualizer.js"></script>
@@ -28,13 +28,13 @@
         .timeline-axis line {
             stroke: #666;
         }
-        .timeline-axis text {
+        .timeline-axis text:not(.time-marker text) {
             fill: #666;
         }
     </style>
 </head>
 <body>
-    <h1>Temporal Unit Visualization</h1>
+    <h1>Temporal Units</h1>
     <div id="visualization"></div>
     <div id="debug"></div>
     <script>
@@ -49,11 +49,11 @@
                 const response = await fetch('http://localhost:8000/data');
                 const result = await response.json();
                 
-                if (result.data && result.data.length > 0) {
+                if (result.data && Object.keys(result.data).length > 0) {
                     // Only visualize if we don't already have data or if the data has changed
-                    if (!window.currentUT || JSON.stringify(window.currentUT) !== JSON.stringify(result.data[0])) {
-                        window.currentUT = result.data[0];
-                        utVisualizer.visualize(result.data[0]);
+                    if (!window.currentUT || JSON.stringify(window.currentUT) !== JSON.stringify(result.data)) {
+                        window.currentUT = result.data;
+                        utVisualizer.visualize(result.data);
                         debugDiv.textContent = "UT placed on timeline\n";
                     }
                 }
