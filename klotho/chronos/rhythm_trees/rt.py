@@ -288,20 +288,14 @@ class RhythmTree(Tree):
     
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
-        return cls(span         = span,
-                   meas         = Meas(tree._root),
-                   subdivisions = tree._children
-                )
+        return cls(span = span, meas = Meas(tree._root), subdivisions = tree._children)
     
     @classmethod
     def from_ratios(cls, lst:Tuple[Fraction], span:int = 1):
         pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
         S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
         meas = (sum_proportions(S), pgcd_denom)
-        return cls(span         = span,
-                   meas         = meas,
-                   subdivisions = S
-                )
+        return cls(span = span, meas = meas, subdivisions = S)
 
     @property
     def span(self):
@@ -325,7 +319,7 @@ class RhythmTree(Tree):
 
     def _evaluate(self):
         self.graph.nodes[0]['span'] = self._span
-        def process_subtree(node, parent_ratio=Fraction(1)):
+        def process_subtree(node=0, parent_ratio=self._span * self._root.to_fraction()):
             self.graph.nodes[node]['proportion'] = self.graph.nodes[node]['label']
             children = list(self.graph.successors(node))
             
@@ -343,7 +337,7 @@ class RhythmTree(Tree):
                 if self.graph.out_degree(child) > 0:
                     process_subtree(child, ratio)
         
-        process_subtree(0, self._span * self._root.to_fraction())
+        process_subtree()
         return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
     
     def _set_type(self):
@@ -356,8 +350,8 @@ class RhythmTree(Tree):
         return len(self._ratios)
 
     def __repr__(self):
-        ratios = ', '.join(tuple([str(r) for r in self._ratios]))
         subdivs = print_subdivisons(self._children)
+        ratios = ', '.join(tuple([str(r) for r in self._ratios]))
         return (
             f'Span:         {self._span}\n'
             f'Meas:         {self._root}\n'

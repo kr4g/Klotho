@@ -21,7 +21,7 @@ class Tree:
     def leaf_nodes(self):
         """Returns leaf nodes in depth-first order"""
         if self._leaf_nodes is None:
-            self._leaf_nodes = [n for n in nx.dfs_preorder_nodes(self._graph) 
+            self._leaf_nodes = [n for n in nx.dfs_preorder_nodes(self.graph) 
                 if self._graph.out_degree(n) == 0]
         return self._leaf_nodes
     

@@ -115,7 +115,7 @@ def process_ut_ping(ut, **kwargs):
         base_amp = map_curve(kwargs['ut_index'], (0, kwargs['utseq_len']-1), (0.65, 0.95), 0)
         amp_swell = map_curve(k, (0, len(ut)-1), (0.5, 1), -2)
         amp_freq = map_curve(freq_scale, (0, 1), (1, 0.25), -2)
-        amp_dur = map_curve(dur_scale, (0, 1), (1, 0.5), 0)
+        amp_dur = map_curve(dur_scale, (0, 1), (1.15, 0.35), 0)
         amp = base_amp * amp_swell * amp_freq * amp_dur
         amp = np.clip(amp, 0, 1) * amp_freq_scale(freq)
         
@@ -138,7 +138,7 @@ def process_ut_ping(ut, **kwargs):
         )
 
 s_mat = autoref_rotmat((11,9,7,5,4))
-utmat = UTMat.from_tree_mat(s_mat, subdiv=True, tempo=66, beat='1/4')
+utmat = UTMat.from_tree_mat(s_mat, subdiv=True, tempo=84, beat='1/4')
 equave = fold_interval(63)
 registers = [equave**i for i in range(utmat.size)]
 fund = 166.5
@@ -146,13 +146,13 @@ fund = 166.5
 from itertools import cycle
 path = cycle(ComboNetTraversal(combnet).play(list(hx.combos)[0], utmat.utseqs[0].size))
 
-print('=' * 40, end='\n\n')
-for n, utseq in enumerate(utmat):
-    print(f'Row {n} UTSeq: {seconds_to_hmsms(utseq.time[0])} - {seconds_to_hmsms(utseq.time[1])} ({seconds_to_hmsms(utseq.duration)})\n')
-    for m, ut in enumerate(utseq):
-        print(f'UT{m}:\n{ut}', end='')
-    print()
-    print('=' * 40, end='\n\n')
+# print('=' * 40, end='\n\n')
+# for n, utseq in enumerate(utmat):
+#     print(f'Row {n} UTSeq: {seconds_to_hmsms(utseq.time[0])} - {seconds_to_hmsms(utseq.time[1])} ({seconds_to_hmsms(utseq.duration)})\n')
+#     for m, ut in enumerate(utseq):
+#         print(f'UT{m}:\n{ut}', end='')
+#     print()
+#     print('=' * 40, end='\n\n')
 
 process_utmat(utmat, fund=fund, equave=equave, registers=registers, path=path)
 

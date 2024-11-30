@@ -176,8 +176,8 @@ class CombinationSet:
   
   def __str__(self):    
     return (        
-        f'Factors: {self._factors}\n'
         f'Rank:    {self._r}\n'
+        f'Factors: {self._factors}\n'
         f'Combos:  {self._combos}\n'
     )
   

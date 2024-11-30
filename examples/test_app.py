@@ -17,7 +17,7 @@ if __name__ == "__main__":
     ut1 = UT(
         span=8,
         tempus='4/4',
-        prolatio=rotate_children(S, 0),
+        prolatio=rotate_children(S, 1),
         tempo=60,
         beat='1/4'
     )
