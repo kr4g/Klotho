@@ -35,7 +35,7 @@ for i in range(len(tree.leaf_nodes)):
         # seen_ratios.add(ratio)
         freq = fold_freq(fund * ratio * 2**i, fund, 12_000)
         base_amp = np.interp(i, [0, len(tree.leaf_nodes) - 1], [db_amp(-15), db_amp(-80)])
-        scheduler.new_event(
+        scheduler.new_synth(
             synth_name='pingSine',
             start=elem['start'],
             attackTime=elem['duration'] * 0.033,

@@ -57,8 +57,8 @@ animate_temporal_unit(utseq.uts[-2], save_mp4=True, file_name='ut_complex')
 #         if event['duration'] < 0: continue
 #         # dur_scale = np.interp(event['duration'], [min_dur, max_dur], [1.0, 0.667])
 #         duration = min_dur#np.interp(event['duration'], [min_dur, max_dur], [min_dur, min_dur*3])
-#         scheduler.new_event('random', event['start'], duration=duration, amp=db_amp(-6), seed=seed*event['duration'])
-#         # scheduler.new_event('kick', event['start'], amp=db_amp(-8))
+#         scheduler.new_synth('random', event['start'], duration=duration, amp=db_amp(-6), seed=seed*event['duration'])
+#         # scheduler.new_synth('kick', event['start'], amp=db_amp(-8))
 
 # # # ------------------------------------------------------------------------------------
 # # # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

@@ -130,12 +130,12 @@ tb = TemporalUnitSequenceBlock(tuple(rots))
 # # ----------------------
 # for i, event in enumerate(UT.from_tree(rt_prime, tempo=92, beat='1/2')):
 #     freq = 166.5 * 2**-1 * rats[0][i]
-#     scheduler.new_event('plucker', event['start'],
+#     scheduler.new_synth('plucker', event['start'],
 #                         duration = 15,
 #                         amp = 1,
 #                         freq = freq,
 #                         coef = 0.1)
-#     scheduler.new_event('plucker', event['start'],
+#     scheduler.new_synth('plucker', event['start'],
 #                         duration = 25,
 #                         amp = 0.833,
 #                         freq = freq * 2,

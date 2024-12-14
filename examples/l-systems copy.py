@@ -80,7 +80,7 @@ for i, ut in enumerate(utseq):
         freq = fund * ratio
         duration = event['duration']
         atk = duration / 2
-        scheduler.set_event(uid         = uid,
+        scheduler.set_synth(uid         = uid,
                             start       = event['start'],
                             lag         = duration * 0.25,
                             trigFreq    = fund / 2,

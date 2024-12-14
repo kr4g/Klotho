@@ -126,7 +126,7 @@ rt = RT(meas='1/1', subdivisions=S)
 #         dyns = vtp(aliases['dynamics'], combo)
 #         freq = np.random.choice([0.5, 2]) * root_freq * fold_interval(root_partial)
 #         amp = 0.5 * (db_amp(dyn_ranges['drone'][dyns[0]]) + db_amp(dyn_ranges['drone'][dyns[1]]))
-#         sch.new_event('drone', ut.onsets[0],
+#         sch.new_synth('drone', ut.onsets[0],
 #                       duration = dur,
 #                       amp = amp * np.interp(freq, [0.5*root_freq, 2*root_freq], [1, db_amp(-16)]),
 #                       atk = atk,
@@ -178,7 +178,7 @@ rt = RT(meas='1/1', subdivisions=S)
 #                         'freq': 0.5 * fold_freq(root_freq * fold_interval(root_partial) * ratio, 250.0, 1500.0)
 #                     }
             
-#             sch.new_event(synth, event['start'], **pfields)
+#             sch.new_synth(synth, event['start'], **pfields)
 
 # # ------------------------------------------------------------------------------------
 # # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

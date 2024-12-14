@@ -89,8 +89,8 @@ for j, ut in enumerate(utseq):
     for i, event in enumerate(ut):
         if event['duration'] < 0: continue
         duration = event['duration'] * dur_scale
-        scheduler.new_event('random', event['start'], duration=duration, seed=np.random.randint(1000))
-        # scheduler.new_event('bassDrum', event['start'])
+        scheduler.new_synth('random', event['start'], duration=duration, seed=np.random.randint(1000))
+        # scheduler.new_synth('bassDrum', event['start'])
 
 # ------------
 
@@ -114,7 +114,7 @@ for j, ut in enumerate(utseq):
 #     freq = root * r
 #     amp = np.random.uniform(0.005, 0.1)
 #     dur_scale = np.interp(amp, [0.005, 0.1], [13.0, 3.0])
-#     scheduler.new_event(synth, event['start'], duration=event['duration']*dur_scale, freq=freq, amp=amp*amp_scale)
+#     scheduler.new_synth(synth, event['start'], duration=event['duration']*dur_scale, freq=freq, amp=amp*amp_scale)
 
 # # ------------------------------------------------------------------------------------
 # # SEND COMPOSITION TO SYNTHESIZER ----------------------------------------------------

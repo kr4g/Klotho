@@ -27,6 +27,40 @@ class EventBuilder:
     def __repr__(self):
         return self.uid
 
+class SchedulerClient:
+    def __init__(self, ip:str='127.0.0.1', send_port:int=9000):
+        self.client = udp_client.SimpleUDPClient(ip, send_port)
+        
+    def new_synth(self, synth_name:str = None, start:float = 0, **params):
+        uid = str(uuid4()).replace('-', '')
+        msg = osc_message_builder.OscMessageBuilder(address='/new_synth')
+        msg.add_arg(uid)
+        msg.add_arg(synth_name)
+        msg.add_arg(start)
+        for key, value in params.items():
+            msg.add_arg(key)
+            msg.add_arg(value)
+        self.client.send(msg.build())
+        return uid
+
+    def set_synth(self, uid:str, start:float, **params):
+        msg = osc_message_builder.OscMessageBuilder(address='/set_synth')
+        msg.add_arg(uid)
+        msg.add_arg(start)
+        for key, value in params.items():
+            msg.add_arg(key)
+            msg.add_arg(value)
+        self.client.send(msg.build())
+    
+    def clear_events(self):
+        self.client.send(osc_message_builder.OscMessageBuilder(address='/clear_events').build())
+    
+    def start(self):
+        self.client.send(osc_message_builder.OscMessageBuilder(address='/start').build())
+        
+    def reset(self):
+        self.client.send(osc_message_builder.OscMessageBuilder(address='/reset').build())
+
 class Scheduler:
     def __init__(self, ip:str='127.0.0.1', send_port:int=57121, receive_port:int=9000):
         self.client = udp_client.SimpleUDPClient(ip, send_port)
@@ -43,6 +77,9 @@ class Scheduler:
         self.dispatcher.map("/event_processed", self.event_processed_handler)
         self.dispatcher.map("/reset", self.reset_handler)
         self.dispatcher.map("/start", self.start)
+        self.dispatcher.map("/new_synth", self.new_synth_handler)
+        self.dispatcher.map("/set_synth", self.set_synth_handler)
+        self.dispatcher.map("/clear_events", self.clear_events)
         
         self.server = osc_server.ThreadingOSCUDPServer((ip, receive_port), self.dispatcher)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
@@ -101,12 +138,22 @@ class Scheduler:
         self.paused = True
         self.reset_progress_bars()
 
-    def new_event(self, synth_name:str = None, start:float = 0, **params):
+    def new_synth(self, synth_name:str = None, start:float = 0, **params):
         return EventBuilder(self, 'new', None, synth_name, start, params).uid
 
-    def set_event(self, uid:str, start:float, **params):
+    def set_synth(self, uid:str, start:float, **params):
         EventBuilder(self, 'set', uid, None, start, params)
 
+    def new_synth_handler(self, address, uid, synth_name, start, *params):
+        param_dict = {params[i]: params[i+1] for i in range(0, len(params), 2)}
+        EventBuilder(self, 'new', uid, synth_name, float(start), param_dict)
+        self.reset_progress_bars()
+        
+    def set_synth_handler(self, address, uid, start, *params):
+        param_dict = {params[i]: params[i+1] for i in range(0, len(params), 2)}
+        EventBuilder(self, 'set', uid, None, float(start), param_dict)
+        self.reset_progress_bars()
+        
     def start(self, address, *args):
         if self.events_sent == self.total_events:
             self.events_processed = 0
@@ -140,6 +187,11 @@ class Scheduler:
         self.client.send(eot_msg.build())
         self.send_progress.set_description("All Events Sent")
 
+    def clear_events(self, address, *args):
+        self.events = []
+        self.total_events = 0
+        self.reset_handler(address, args)
+
     def stop_server(self):
         self.server.shutdown()
         self.server_thread.join()
@@ -150,3 +202,16 @@ class Scheduler:
         self.init_progress_bars()
         # self.send_events()
         # self.stop_server()
+
+if __name__ == '__main__':
+    print('Scheduler server initialized and running...')
+    scheduler = Scheduler()
+    scheduler.run()
+    # scheduler.init_progress_bars()
+    # scheduler.server_thread.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nShutting down scheduler server...")
+        scheduler.stop_server()

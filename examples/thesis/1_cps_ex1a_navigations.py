@@ -165,7 +165,7 @@ for i, (ut, combo) in enumerate(zip(utseq, path)):
     for j, event in enumerate(ut):
         if event['duration'] < 0:
             continue
-        scheduler.new_event('ping2', event['start'],
+        scheduler.new_synth('ping2', event['start'],
                                 freq=root_freq * Fraction(ratio) * 2.0**2,
                                 amp=db_amp(-18))
 

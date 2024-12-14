@@ -65,5 +65,5 @@ for i, utseq in enumerate(utmat):
             pan_mult = np.interp(dur, [min_dur, max_dur], [6.667, 1.333])
             pan = np.sin(np.pi * start * pan_mult)
             
-            scheduler.new_event('test', start=start, freq=freq, amp=amp, attackTime=atk, releaseTime=rel, pan=pan)
+            scheduler.new_synth('test', start=start, freq=freq, amp=amp, attackTime=atk, releaseTime=rel, pan=pan)
 scheduler.run()

@@ -62,7 +62,7 @@ for event in ut:
     else:
         fund = 166.5
         equave = (np.random.randint(0,4))
-    sch.new_event(
+    sch.new_synth(
         synth_name = synth,
         start      = event['start'],
         duration   = event['duration'],

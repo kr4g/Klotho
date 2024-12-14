@@ -185,9 +185,9 @@ with open('pfields.txt', 'w') as f:
         # sleep for a second
         # sleep(0.16)
         # f.write(line)
-        sch.set_event(uid, start=(i + 1) * t_scale, **pfields)
+        sch.set_synth(uid, start=(i + 1) * t_scale, **pfields)
 
-    sch.set_event(uid, start=(len(path[::step]) + 1) * t_scale, gate=0)
+    sch.set_synth(uid, start=(len(path[::step]) + 1) * t_scale, gate=0)
 f.close()
 # ------------------------------
 
@@ -294,9 +294,9 @@ f.close()
 #         'pan': pan
 #     }
     
-#     sch.set_event(uid, start=(i + 1) * t_scale, **pfields)
+#     sch.set_synth(uid, start=(i + 1) * t_scale, **pfields)
     
-# sch.set_event(uid, start=(len(path[::step]) + 1) * t_scale, gate=0)
+# sch.set_synth(uid, start=(len(path[::step]) + 1) * t_scale, gate=0)
 
 # --------------------
 # '''
@@ -357,8 +357,8 @@ f.close()
 #         'panRate': pan
 #     }
     
-#     sch.set_event(uid, start=(i + 1) * t_scale, **pfields)
+#     sch.set_synth(uid, start=(i + 1) * t_scale, **pfields)
 
-# sch.set_event(uid, start=(len(path[::step]) + 1) * t_scale, gate=0)
+# sch.set_synth(uid, start=(len(path[::step]) + 1) * t_scale, gate=0)
 
 # sch.run()

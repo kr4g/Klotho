@@ -75,8 +75,8 @@ def process_ut(ut, ht):
         duration = event['duration']
         freq1 = 333.0 * ht.partials[j]
         freq2 = 5 * 333.0 * (1 / ht.partials[j])
-        scheduler.new_event('test', event['start'], freq=freq1, amp=db_amp(-8))
-        scheduler.new_event('test', event['start'], freq=freq2, amp=db_amp(-16))
+        scheduler.new_synth('test', event['start'], freq=freq1, amp=db_amp(-8))
+        scheduler.new_synth('test', event['start'], freq=freq2, amp=db_amp(-16))
 
 def process_utseq(utseq, h_trees):
     for i, ut in enumerate(utseq):

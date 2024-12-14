@@ -160,7 +160,7 @@ for i, ut in enumerate(utseq):
 #         if j == len(ut) - 1 and i == len(utseq) - 1:
 #             synth = 'crash'
 #             amp = db_amp(-4)
-#         scheduler.new_event(synth, event['start'],
+#         scheduler.new_synth(synth, event['start'],
 #                             duration=min_dur*0.43,
 #                             seed=seed*i+j,
 #                             amp=amp,

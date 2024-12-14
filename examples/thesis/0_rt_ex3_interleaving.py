@@ -107,7 +107,7 @@ for i, ut in enumerate(utseq):
         else:
             synth = 'glitch2' if i % 2 == 0 else 'kick'
             amp = db_amp(-4) if i % 2 == 0 else db_amp(0)
-        scheduler.new_event(synth, event['start'],
+        scheduler.new_synth(synth, event['start'],
                                 duration=min_dur*0.43,
                                 seed=seed*i+j,
                                 amp=amp,

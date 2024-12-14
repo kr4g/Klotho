@@ -14,7 +14,7 @@ print(ut)
 uid = None
 for k, event in enumerate(ut):
     if uid is None:
-        uid = scheduler.new_event(
+        uid = scheduler.new_synth(
             synth_name  = 'triTher',
             start       = event['start'],
             freq        = 220,
@@ -22,13 +22,13 @@ for k, event in enumerate(ut):
             lag         = event['duration'] * 0.333,
         )
     else:
-        scheduler.set_event(
+        scheduler.set_synth(
             uid         = uid,
             start       = event['start'],
             freq        = 220 * np.random.uniform(0.9, 1.5),
             lag         = event['duration'] * 0.333,
         )
-scheduler.set_event(
+scheduler.set_synth(
     uid         = uid,
     start       = ut.time[1],
     gate        = 0,
