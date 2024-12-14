@@ -1,4 +1,3 @@
-
 from setuptools import setup, find_packages
 import re
 
@@ -27,24 +26,23 @@ setup(
         'networkx',
         'hypernetx',
         'python-osc',
+        'opencv-python',
         'tqdm',
     ],
     # tests_require=[
     #     'pytest',
     # ],
-    description='Klotho.',
+    description='An open source computer-assisted composition toolkit implemented in Python',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/kr4g/Klotho',
-    license='MIT',
+    license='CC-BY-SA-4.0',
     classifiers=[
         'Development Status :: 3 - Alpha',
-        # 'Intended Audience :: Developers',
-        'License :: CC BY-SA 4.0',
-        # 'Programming Language :: Python :: 3',
-        # 'Programming Language :: Python :: 3.7',
-        # 'Programming Language :: Python :: 3.8',
-        # 'Programming Language :: Python :: 3.9',
+        'License :: OSI Approved :: Creative Commons License',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3 :: Only',
     ],
+    python_requires='>=3.10',
 )

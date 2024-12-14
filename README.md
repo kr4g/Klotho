@@ -29,7 +29,15 @@ Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python in
     pip install -r requirements.txt
     ```
 
-4. **Play**:
+4. **Install Klotho (Development Mode)**:
+
+    To install Klotho in development mode, which allows you to modify the source code and have the changes reflected immediately:
+
+    ```
+    pip install -e .
+    ```
+
+5. **Play**:
 
     To work with Klotho as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `Klotho/` directory by running the command:
 
