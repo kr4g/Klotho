@@ -13,3 +13,4 @@ klotho.egg-info
 **/__pycache__/
 *.py[cod]
 *.json
+ut_plotter/
