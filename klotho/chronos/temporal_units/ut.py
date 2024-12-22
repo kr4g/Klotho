@@ -7,7 +7,7 @@ Temporal Units
 --------------------------------------------------------------------------------------
 '''
 from fractions import Fraction
-from typing import Union, Protocol, runtime_checkable, Tuple, Iterator
+from typing import Union, Protocol, runtime_checkable, Tuple
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms.rt_algs import auto_subdiv
@@ -72,12 +72,12 @@ class Chronon:
                  bpm:Union[None,int,float]=None):
         
         self._data = {
-            'start':        start,
-            'duration':     duration,
-            'end':          end,
-            'metric_ratio': metric_ratio,
-            'beat':         beat,
-            'bpm':          bpm
+            'start'        : start,
+            'duration'     : duration,
+            'end'          : end,
+            'metric_ratio' : metric_ratio,
+            'beat'         : beat,
+            'bpm'          : bpm
         }
     
     @property
@@ -127,6 +127,7 @@ class TemporalUnit:
         self._durations = None
         self._offset    = 0.0
         self._elements  = [Chronon() for _ in range(len(self._rtree._ratios))]
+        
         self._set_elements()
     
     @classmethod
@@ -266,23 +267,29 @@ class TemporalUnit:
             case str():
                 prolatio = prolatio.lower()
                 match prolatio:
-                    case p if p in ProlatioTypes.PULSTYPES.value:
+                    case p if p.lower() in ProlatioTypes.PULSTYPES.value:
                         self._type = ProlatioTypes.PULSE
-                        return RhythmTree(span = span,
-                                          meas = tempus,
-                                          subdivisions = (1,) * tempus._numerator)
+                        return RhythmTree(
+                            span = span,
+                            meas = tempus,
+                            subdivisions = (1,) * tempus._numerator
+                        )
                     
-                    case d if d in ProlatioTypes.DURTYPES.value:
+                    case d if d.lower() in ProlatioTypes.DURTYPES.value:
                         self._type = ProlatioTypes.DURATION
-                        return RhythmTree(span = span,
-                                          meas = tempus,
-                                          subdivisions = (1,))
+                        return RhythmTree(
+                            span = span,
+                            meas = tempus,
+                            subdivisions = (1,)
+                        )
                     
-                    case r if r in ProlatioTypes.RESTYPES.value:
+                    case r if r.lower() in ProlatioTypes.RESTYPES.value:
                         self._type = ProlatioTypes.REST
-                        return RhythmTree(span = span,
-                                          meas = tempus,
-                                          subdivisions = (-1,))
+                        return RhythmTree(
+                            span = span,
+                            meas = tempus,
+                            subdivisions = (-1,)
+                        )
                     
                     case _:
                         raise ValueError(f'Invalid string: {prolatio}')
@@ -300,10 +307,10 @@ class TemporalUnit:
                     self._elements[i]['metric_ratio'] = ratio
                     self._elements[i]['beat']         = self._beat
                     self._elements[i]['bpm']          = self._bpm
-                case TemporalStructure():
-                    self._elements[i].offset = onset
-                    self._elements[i].beat   = self._beat
-                    self._elements[i].bpm    = self._bpm
+                # case TemporalStructure():
+                #     self._elements[i].offset = onset
+                #     self._elements[i].beat   = self._beat
+                #     self._elements[i].bpm    = self._bpm
                     
     def __getitem__(self, idx: int) -> dict:
         """
@@ -353,14 +360,6 @@ class TemporalUnit:
     
     def __len__(self):
         return len(self._elements)
-    
-    # def __mul__(self, other:Union[int,float,Fraction]):
-    #     return TemporalUnit(span     = self.span * other,
-    #                         tempus   = self._rtree._root,
-    #                         prolatio = self._rtree._children,
-    #                         beat     = self._beat,
-    #                         bpm      = self._bpm
-    #             )
         
     def __str__(self):
         result = (
@@ -372,7 +371,7 @@ class TemporalUnit:
             f'Events:   {len(self)}\n'
             f'Tempo:    {self._beat} = {self._bpm}\n'
             f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n'
-            f'{self.display()}\n'
+            # f'{self.display()}\n'
             f'{"-" * 40}\n'
         )
         return result
@@ -384,17 +383,18 @@ class TemporalUnit:
         """Serializes the TemporalUnit into a dictionary for visualization."""
         return {
             'events': [{
-                'start': event['start'],
-                'duration': event['duration'],
-                'metric_ratio': str(event['metric_ratio']),
+                'start'        : event['start'],
+                'duration'     : event['duration'],
+                'metric_ratio' : str(event['metric_ratio']),
             } for event in self.events],
-            'bpm': self.bpm,
-            'beat': str(self.beat),
-            'time': self.time
+            'bpm'  : self.bpm,
+            'beat' : str(self.beat),
+            'time' : self.time
         }
 
     def display(self) -> str:
-        """Returns a string representation of the TemporalUnit as blocks.
+        """
+        Returns a string representation of the TemporalUnit as blocks.
         
         Returns:
             str: Visual representation of the temporal unit using block characters
@@ -405,12 +405,65 @@ class TemporalUnit:
         blocks = []
         
         for duration, ratio in zip(self.durations, self._rtree._ratios):
-            rel_width = int((abs(duration) / total_duration) * total_width)
+            rel_width = round((abs(duration) / total_duration) * total_width, 0)
             char = "█" if duration > 0 else "░"
-            block = char * max(rel_width, 1)
+            block = char * int(max(rel_width, 1))
             blocks.append(block)
         
         return " ".join(blocks)
+
+    def save_image(self, filename: str, width: int = 500, height: int = 25) -> None:
+        """
+        Saves the temporal unit visualization as a PDF image.
+        
+        Args:
+            filename: Path where to save the image (should end in .pdf)
+            width: Width in points (1/72 inch)
+            height: Height in points
+        """
+        import cairo
+        
+        # Colors (RGB values from 0 to 1)
+        BLACK = (0, 0, 0)
+        GRAY = (0.5, 0.5, 0.5)
+        WHITE = (1, 1, 1)
+        BORDER = 1
+        
+        # Create PDF surface
+        surface = cairo.PDFSurface(filename, width, height)
+        ctx = cairo.Context(surface)
+        
+        # Calculate total duration and positions
+        total_duration = sum(abs(d) for d in self.durations)
+        current_x = 0
+        
+        for duration in self.durations:
+            # Calculate width for this segment
+            block_width = (abs(duration) / total_duration) * width
+            if block_width == 0:
+                continue
+            
+            # Set fill color and draw rectangle
+            if duration < 0:
+                ctx.set_source_rgb(*GRAY)
+            else:
+                ctx.set_source_rgb(*BLACK)
+            
+            ctx.rectangle(current_x, 0, block_width, height)
+            ctx.fill()
+            
+            # Draw white border
+            if current_x > 0:  # Draw left border if not first segment
+                ctx.set_source_rgb(*WHITE)
+                ctx.set_line_width(BORDER)
+                ctx.move_to(current_x, 0)
+                ctx.line_to(current_x, height)
+                ctx.stroke()
+            
+            current_x += block_width
+        
+        # Clean up
+        surface.finish()
 
 
 class TemporalUnitMatrix:

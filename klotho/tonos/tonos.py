@@ -215,34 +215,35 @@ def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A
   frequency = A4_Hz * (2 ** (midi / 12))
   return frequency
 
-def find_first_octave(harmonic: Union[int, float, Fraction], max_octave=None):
+def find_first_equave(harmonic: Union[int, float, Fraction], equave=2, max_equave=None):
   '''
-  Returns the first octave in which a harmonic first appears.
+  Returns the first equave in which a harmonic first appears.
   
   Args:
     harmonic: A harmonic.
-    max_octave: The maximum octave to search, default is None.
+    max_equave: The maximum equave to search, default is None.
     
   Returns:
-    The first octave in which the harmonic first appears as an integer.
+    The first equave in which the harmonic first appears as an integer.
   '''
-  octave = 0
-  while max_octave is None or octave <= max_octave:
-    if harmonic <= 2 ** octave:
-      return octave
-    octave += 1
+  n_equave = 0
+  while max_equave is None or n_equave <= max_equave:
+    if harmonic <= equave ** n_equave:
+      return n_equave
+    n_equave += 1
   return None
 
-def octave_reduce(interval:float, equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> float:
+def equave_reduce(interval:Union[int, float, Fraction], equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:
   '''
   Reduce an interval to within the span of a specified octave.
   
   Args:
     interval: The musical interval to be octave-reduced.
-    octave: The span of the octave for reduction, default is 1 octave.
+    equave: The span of the octave for reduction, default is 2.
+    n_equaves: The number of equaves, default is 1.
     
   Returns:
-    The octave-reduced interval as a float.
+    The equave-reduced interval as a float.
   '''
   while interval > equave**n_equaves:
     interval /= equave

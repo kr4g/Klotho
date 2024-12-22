@@ -3,7 +3,7 @@ import hypernetx as hnx
 from math import prod
 from fractions import Fraction
 
-from klotho.tonos.tonos import octave_reduce
+from klotho.tonos.tonos import equave_reduce
 
 def graph_cps(combos:tuple):
     G = nx.Graph()    
@@ -22,7 +22,7 @@ def find_cliques(G:nx.Graph, n:int):
     return tuple(tuple(clique) for clique in cliques if len(clique) == n)
 
 def combo_clique_to_ratios(clique:tuple, min_prod:int, equave:int=2, n_equaves:int=1):
-    return tuple(sorted(octave_reduce(interval  = Fraction(prod(combo), min_prod),
+    return tuple(sorted(equave_reduce(interval  = Fraction(prod(combo), min_prod),
                                       equave    = equave,
                                       n_equaves = n_equaves) for combo in clique))
 

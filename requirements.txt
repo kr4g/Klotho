@@ -12,3 +12,4 @@ hypernetx
 python-osc
 opencv-python
 tqdm
+requests

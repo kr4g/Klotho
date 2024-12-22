@@ -187,15 +187,18 @@ class Scheduler:
         self.client.send(eot_msg.build())
         self.send_progress.set_description("All Events Sent")
 
-    def clear_events(self, address, *args):
+    def clear_events(self):
         self.events = []
         self.total_events = 0
-        self.reset_handler(address, args)
+        self.events_processed = 0
+        self.events_sent = 0
+        self.paused = True
+        self.reset_progress_bars()
 
     def stop_server(self):
         self.server.shutdown()
         self.server_thread.join()
-        exit(0)
+        # exit(0)
 
     def run(self):
         self.server_thread.start()

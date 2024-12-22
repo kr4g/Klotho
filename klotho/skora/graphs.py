@@ -17,7 +17,7 @@ def plot_graph(G, attributes=None, invert=True, output_file=None):
     pos = _hierarchy_pos(G, root, inverted=invert)
     labels = nx.get_node_attributes(G, 'label')
     
-    plt.figure(figsize=(20, 3))
+    plt.figure(figsize=(20, 5))
     ax = plt.gca()
     
     ax.set_facecolor('white')
@@ -33,12 +33,20 @@ def plot_graph(G, attributes=None, invert=True, output_file=None):
                     label_parts.append(f"{attr_dict[node]}")
         
         label_text = "\n".join(label_parts)
-        ax.text(x, y, label_text, ha='center', va='center', zorder=5,
-                bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="black"))
+        
+        # Determine if node is a leaf
+        is_leaf = len(list(G.neighbors(node))) == 0
+        box_style = "circle,pad=0.3" if is_leaf else "square,pad=0.3"
+        
+        # Increased text size with fontsize=12
+        ax.text(x, y, label_text, ha='center', va='center', zorder=5, fontsize=16,
+                bbox=dict(boxstyle=box_style, fc="white", ec="black", linewidth=2))
     
     nx.draw_networkx_edges(G, pos, arrows=False, width=2.0)
     plt.axis('off')
     
+    # Remove padding by setting margins to 0
+    plt.margins(x=0)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     if output_file:
@@ -47,33 +55,31 @@ def plot_graph(G, attributes=None, invert=True, output_file=None):
     else:
         plt.show()
 
-def _hierarchy_pos(G, root, width=1.0, vert_gap=0.1, xcenter=0.5, pos=None, parent=None, parsed=None, depth=0, inverted=True):
+def _hierarchy_pos(G, root, width=1.5, vert_gap=0.2, xcenter=0.5, pos=None, parent=None, depth=0, inverted=True):
     """
-    Args:
-        G: NetworkX graph
-        root: Root node
-        width: Width of each level of the tree
-        vert_gap: Vertical gap between levels of the tree
-        xcenter: X-coordinate of the root node
-        pos: Dictionary to store node positions
-        parent: Parent node
-        parsed: List to keep track of visited nodes
-        depth: Depth of the current node
-        inverted: If True, y decreases with depth (top-down). If False, y increases with depth (bottom-up)
+    Simple hierarchical layout with consistent sibling spacing.
     """
     if pos is None:
-        pos = {root:(xcenter, 1 if inverted else 0)}
-        parsed = [root]
+        pos = {root: (xcenter, 1 if inverted else 0)}
     else:
         y = (1 - (depth * vert_gap)) if inverted else (depth * vert_gap)
         pos[root] = (xcenter, y)
+    
     children = list(G.neighbors(root))
     if not isinstance(G, nx.DiGraph) and parent is not None:
         children.remove(parent)
-    if len(children) != 0:
+    
+    if children:
         dx = width / len(children)
-        nextx = xcenter - width / 2 - dx / 2
+        nextx = xcenter - width/2 + dx/2
         for child in children:
+            _hierarchy_pos(G, child,
+                         width=dx,
+                         vert_gap=vert_gap,
+                         xcenter=nextx,
+                         pos=pos,
+                         parent=root,
+                         depth=depth+1,
+                         inverted=inverted)
             nextx += dx
-            _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed, depth=depth+1, inverted=inverted)
     return pos

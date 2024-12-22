@@ -16,3 +16,7 @@ klotho.egg-info
 *.py[cod]
 *.json
 ut_plotter/
+*.ipynb
+.ipynb_checkpoints/
+*.pdf
+*.zip

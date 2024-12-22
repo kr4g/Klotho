@@ -32,6 +32,41 @@ def rotate_children(subdivs:tuple, n:int=1) -> tuple:
     factors = factors[n:] + factors[:n]
     return refactor_children(subdivs, factors)
 
+def rotate_children_preserve_signs(subdivs: tuple, n: int = 1) -> tuple:
+    """Rotates the absolute values of the elements while preserving their original signs."""
+    # Get original signs
+    def get_signs(subdivs):
+        signs = []
+        for element in subdivs:
+            if isinstance(element, tuple):
+                signs.extend(get_signs(element))
+            else:
+                signs.append(1 if element >= 0 else -1)
+        return signs
+    
+    # Get absolute values
+    def get_abs(subdivs):
+        result = []
+        for element in subdivs:
+            if isinstance(element, tuple):
+                result.extend(get_abs(element))
+            else:
+                result.append(abs(element))
+        return result
+    
+    signs = get_signs(subdivs)
+    abs_values = get_abs(subdivs)
+    
+    # Rotate absolute values
+    n = n % len(abs_values)
+    rotated_values = abs_values[n:] + abs_values[:n]
+    
+    # Reapply signs
+    signed_values = [val * sign for val, sign in zip(rotated_values, signs)]
+    
+    # Reconstruct the nested structure
+    return refactor_children(subdivs, tuple(signed_values))
+
 def rotate_tree(tree:Tree, n:int=1) -> Tree:
     return Tree(tree._root, rotate_children(tree._children, n))
 

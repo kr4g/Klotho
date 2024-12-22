@@ -1,0 +1,662 @@
+==List==
+{| class="wikitable" style="font-size:90%; float:right; clear:right; margin: 0 0 1em 1em;"
+|-
+! Column || Legend
+|-
+| TET || bgcolor="#EFCFCF" | '''X'''-tone equal temperament (12-tet, etc.).
+|-
+| rowspan="8" | Limit || bgcolor="#EFEFCF" | '''3'''-limit intonation, or ''Pythagorean''.
+|-
+| bgcolor="#CFEFCF" | '''5'''-limit "just" intonation, or ''just''.
+|-
+| bgcolor="#CFEFEF" | '''7'''-limit intonation, or ''septimal''.
+|-
+| bgcolor="#CFCFEF" | '''11'''-limit intonation, or ''undecimal''.
+|-
+| bgcolor="#DFCFEF" | '''13'''-limit intonation, or ''tridecimal''.
+|-
+| bgcolor="#DFDFDF" | '''17'''-limit intonation, or ''septendecimal''.
+|-
+| bgcolor="#CFCFCF" | '''19'''-limit intonation, or ''novendecimal''.
+|-
+| bgcolor="#BC8F8F" | '''H'''igher limits<!--23 and greater-->.
+|-
+| M || bgcolor="#CFFFAF" | '''M'''eantone temperament or tuning.
+|-
+| S || '''S'''uperparticular ratio (no separate color code).
+|}
+
+{| class="wikitable sortable" style="font-size:100%;text-align:center;"
+|+ List of musical intervals
+! Cents || Note (from C) || Freq. ratio || Prime factors || Interval name || TET || Limit || M || S
+|-
+| {{right|0.00}} || C<ref name="Fonville">[[John Fonville|Fonville, John]]. 1991. "[[Ben Johnston (composer)|Ben Johnston]]'s Extended Just Intonation: A Guide for Interpreters". ''[[Perspectives of New Music]]'' 29, no. 2 (Summer): 106–137.</ref> || 1 : 1 || 1 : 1 || bgcolor="#EFCFCF" |{{splitspan|[[Unison]],<ref name="HF">[http://www.huygens-fokker.org/docs/intervals.html "List of intervals"], ''[[Huygens-Fokker Foundation]]''. The Foundation uses "classic" to indicate "just" or leaves off any adjective, as in "major sixth".</ref> monophony,<ref name="Partch">{{cite book|last=Partch|first=Harry|author-link=Harry Partch|year=1979|title=[[Genesis of a Music]]|pages=68–69|isbn=978-0-306-80106-8}}</ref> perfect prime,<ref name="HF"/> [[tonic (music)|tonic]],<ref name="Gann">"[http://www.kylegann.com/Octave.html Anatomy of an Octave]", [[Kyle Gann]] (1998). Gann leaves off "just" but includes "5-limit". He uses "median" for "neutral".</ref> or [[fundamental frequency|fundamental]]|{{audio|help=no|Unison on C.mid|play}} }} || 1, 12 || 3 || M || <!--S-->
+|-
+| {{right|0.03 }}|| <!--letter--> || 65537 : 65536 || 65537 : 2<sup>16</sup>||{{splitspan|Sixty-five-thousand-five-hundred-thirty-seventh harmonic |{{audio|help=no|Jot on C.mid|play}} }} || <!--TET--> || 65537 || <!--M--> || S
+|-
+| {{right|0.40}} || C{{music|7}}{{music|#}}− || 4375 : 4374 ||{{nowrap|5<sup>4</sup>×7 : 2×3<sup>7</sup>}} || bgcolor="#CFEFEF" | {{splitspan|[[Ragisma]]<ref name="HF"/><ref name="Haluska">Haluška, Ján (2003). ''The Mathematical Theory of Tone Systems'', pp. xxv–xxix. {{ISBN|978-0-8247-4714-5}}.</ref>|{{audio|help=no|Ragisma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|0.72}} || E{{music|7}}{{music|7}}{{music|7}}{{music|7}}{{music|bbb}}+ || 2401 : 2400 ||{{nowrap|7<sup>4</sup> : 2<sup>5</sup>×3×5<sup>2</sup>}} || bgcolor="#CFEFEF" | {{splitspan|[[Breedsma]]<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Breedsma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|1.00 }} || <!--letter--> || 2<sup>1/1200</sup> || 2<sup>1/1200</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Cent (music)|Cent]]<ref>{{Cite journal|last1=Ellis|first1=Alexander J.|author1-link=Alexander John Ellis|first2=Alfred J.|last2=Hipkins|author2-link=Alfred James Hipkins|year=1884|title=Tonometrical Observations on Some Existing Non-Harmonic Musical Scales|journal=[[Proceedings of the Royal Society of London]]|volume=37|pages=368–385|doi=10.1098/rspl.1884.0041|jstor=114325|issue=232–234|s2cid=122407786|url=https://zenodo.org/record/1432077|doi-access=free}}</ref>|{{audio|help=no|Cent on C.mid|play}} }} || 1200 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1.20 }} || <!--letter--> || 2<sup>1/1000</sup> || 2<sup>1/1000</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Millioctave]]|{{audio|help=no|Millioctave on C.mid|play}} }} || 1000 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1.95 }} || B{{music|#}}++ || {{nowrap|32805 : 32768}} || 3<sup>8</sup>×5 : 2<sup>15</sup>|| bgcolor="#CFEFCF" |{{splitspan|[[Schisma]]<ref name="HF"/><ref name="Gann"/>|{{audio|help=no|Schisma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1.96 }} || <!--letter--> || {{nowrap|3:2÷(2<sup>7/12</sup>)}} || 3 : 2<sup>19/12</sup>|| align="left" |{{splitspan|[[Schisma|Grad]], Werckmeister<ref>"[https://www.huygens-fokker.org/docs/measures.html Logarithmic Interval Measures]", [[Huygens-Fokker Foundation]]. Accessed 2015-06-06.</ref>}} || <!--TET--> || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|3.99 }} || <!--letter--> || 10<sup>1/1000</sup> || 2<sup>1/1000</sup>×5<sup>1/1000</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Savart]] or ''eptaméride''|{{audio|help=no|Savart on C.mid|play}} }} || 301.03 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|7.71 }} || B{{music|L}}{{music|#}} || 225 : 224 ||{{nowrap|3<sup>2</sup>×5<sup>2</sup> : 2<sup>5</sup>×7}} || bgcolor="#CFEFEF" | {{splitspan|[[Septimal kleisma]],<ref name="HF"/><ref name="Haluska"/> marvel comma|{{audio|help=no|Septimal kleisma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|8.11 }} || B{{music|##}}− || 15625 : 15552 || 5<sup>6</sup> : 2<sup>6</sup>×3<sup>5</sup> || bgcolor="#CFEFCF" | {{splitspan|[[Kleisma]] or semicomma majeur<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Kleisma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|10.06 }} || A{{music|x}}{{music|x}}++ || 2109375 : 2097152 || 3<sup>3</sup>×5<sup>7</sup> : 2<sup>21</sup> || bgcolor="#CFEFCF" | {{splitspan|[[Semicomma]],<ref name="HF"/><ref name="Haluska"/> Fokker's comma<ref name="HF"/>|{{audio|help=no|Semicomma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|10.85 }}|| C{{music|53U}} || 160 : 159 || 2<sup>5</sup>×5 : 3×53 ||{{splitspan|Difference between 5:3 & 53:32|{{audio|help=no|Johnston U53 on C.mid|play}} }} || <!--TET--> || 53 || <!--M--> || S
+|-
+| {{right|11.98}} || C{{music|29}} || 145 : 144 ||{{nowrap|5×29 : 2<sup>4</sup>×3<sup>2</sup>}} || bgcolor="#BC8F8F" | {{splitspan|Difference between 29:16 & 9:5|{{audio|help=no|Johnston 29 on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || S
+|-
+| {{right|12.50 }} || <!--letter--> || 2<sup>1/96</sup> || 2<sup>1/96</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Sixteenth tone]]|{{audio|help=no|Sixteenth-tone on C.mid|play}} }} || 96 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|13.07}} || B{{music|L}}{{music|L}}{{music|L}}− || 1728 : 1715 || 2<sup>6</sup>×3<sup>3</sup> : 5×7<sup>3</sup> || bgcolor="#CFEFEF" | {{splitspan|[[Orwell comma]]<ref name="HF"/><ref>[http://lumma.org/tuning/gws/orwell.html "Orwell Temperaments"], ''Xenharmony.org''.</ref>|{{audio|help=no|Orwell comma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|13.47}} || C{{music|43}} || 129 : 128 || 3×43 : 2<sup>7</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-twenty-ninth harmonic|{{audio|help=no|129th harmonic on C.mid|play}} }} || <!--TET--> || 43 || <!--M--> || S
+|-
+| {{right|13.79 }} || D{{music|bb}}{{music|7}} || 126 : 125 || 2×3<sup>2</sup>×7 : 5<sup>3</sup>|| bgcolor="#CFEFEF" |{{splitspan|Small [[septimal semicomma]],<ref name="Haluska"/> small septimal comma,<ref name="HF"/> starling comma|{{audio|help=no|Septimal semicomma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|14.37 }} || C{{music|b}}{{music|up}}{{music|up}}− || 121 : 120 || 11<sup>2</sup> : 2<sup>3</sup>×3×5 || bgcolor="#CFCFEF" | {{splitspan|Undecimal [[neutral second|seconds]] comma<ref name="HF"/>|{{audio|help=no|Undecimal neutral second comma on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|16.67 }} || C{{music|up}}{{efn|name=MSN|[[Maneri-Sims notation]]}} || 2<sup>1/72</sup> || 2<sup>1/72</sup> || bgcolor="#EFCFCF" | {{splitspan|1 step in [[72 equal temperament]]|{{audio|help=no|1 step in 72-et on C.mid|play}} }} || 72 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|18.13 }} || C{{music|19 upside down}} || 96 : 95 || 2<sup>5</sup>×3 : 5×19 || bgcolor="#CFCFCF" |{{splitspan|Difference between 19:16 & 6:5|{{audio|help=no|Johnston U19 on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || S
+|-
+| {{right|19.55 }} || D{{music|bb}}--<ref name="Fonville"/> || 2048 : 2025 ||{{nowrap|2<sup>11</sup> : 3<sup>4</sup>×5<sup>2</sup>}} || bgcolor="#CFEFCF" | {{splitspan|[[Diaschisma]],<ref name="HF"/><ref name="Haluska"/> minor comma|{{audio|help=no|Diaschisma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|21.51 }} || C+<ref name="Fonville"/> || 81 : 80 || 3<sup>4</sup> : 2<sup>4</sup>×5 || bgcolor="#CFEFCF" | {{splitspan|[[Syntonic comma]],<ref name="HF"/><ref name="Gann"/><ref name="Haluska"/> major comma, komma, chromatic diesis, or comma of Didymus<ref name="HF"/><ref name="Haluska"/><ref name="Partch 70">{{harvnb|Partch|1979|p=70}}</ref><ref name="Ellis">[[Alexander John Ellis]] (March 1885). ''[https://books.google.com/books?id=sNtDAAAAYAAJ&dq=musical+interval+%22pythagorean+major+third%22&pg=PT10 On the musical scales of various nations]'', p. 488. ''[[Journal of the Society of Arts]]'', vol. XXXII, no. 1688</ref>|{{audio|help=no|Syntonic comma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || S
+|-
+| {{right|22.64 }} || <!--letter--> || 2<sup>1/53</sup> || 2<sup>1/53</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Holdrian comma]], Holder's comma, 1 step in [[53 equal temperament]]|{{audio|help=no|Holdrian comma on C.mid|play}} }} || 53 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|23.46 }} || B{{music|#}}+++ || 531441 : 524288 || 3<sup>12</sup> : 2<sup>19</sup> || bgcolor="#EFEFCF" | {{splitspan|[[Pythagorean comma]],<ref name="HF"/><ref name="Gann"/><ref name="Haluska"/><ref name="Partch 70"/><ref name="Ellis"/> ditonic comma<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Pythagorean comma on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|25.00 }} || <!--letter--> || 2<sup>1/48</sup> || 2<sup>1/48</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Eighth tone]]|{{audio|help=no|Eighth-tone on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|26.84 }} || C{{music|13}} || 65 : 64 || 5×13 : 2<sup>6</sup>|| bgcolor="#DFCFEF" |{{splitspan|Sixty-fifth harmonic,<ref name="Gann"/> 13th-partial chroma<ref name="HF"/>|{{audio|help=no|Sixty-fifth harmonic on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || S
+|-
+| {{right|27.26 }} || C{{music|L}}− || 64 : 63 || 2<sup>6</sup> : 3<sup>2</sup>×7 || bgcolor="#CFEFEF" | {{splitspan|[[Septimal comma]],<ref name="HF"/><ref name="Haluska"/><ref name="Ellis"/> Archytas' comma,<ref name="HF"/> 63rd subharmonic|{{audio|help=no|Septimal comma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|29.27}} || <!--letter--> || 2<sup>1/41</sup> || 2<sup>1/41</sup> || bgcolor="#EFCFCF" | {{splitspan|1 step in [[41 equal temperament]]|{{audio|help=no|1 step in 41-et on C.mid|play}} }} || 41 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|31.19 }} || D{{music|7}}{{music|b}}{{music|down}} || 56 : 55 || 2<sup>3</sup>×7 : 5×11 || bgcolor="#CFCFEF" |{{splitspan| Undecimal diesis,<ref name="HF"/> Ptolemy's enharmonic:<ref name="Gann"/> difference between (11 : 8) and (7 : 5) tritone|{{Audio|help=no|Ptolemy's enharmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|33.33}} || C{{music|half check up}}/D{{music|b}}{{music|half check}}{{music|half check}}{{efn|name=MSN}} || 2<sup>1/36</sup> || 2<sup>1/36</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Sixth tone]]|{{audio|help=no|Sixth-tone on C.mid|play}} }} || 36, 72 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|34.28 }} || C{{music|17}} || 51 : 50 ||{{nowrap|3×17 : 2×5<sup>2</sup>}} || bgcolor="#DFDFDF" | {{splitspan|Difference between 17:16 & 25:24|{{audio|help=no|Johnston 17 on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || S
+|-
+| {{right|34.98 }} || B{{music|L}}{{music|L}}{{music|#}}- || 50 : 49 || 2×5<sup>2</sup> : 7<sup>2</sup> || bgcolor="#CFEFEF" | {{splitspan|[[Septimal sixth tone]] or jubilisma, Erlich's decatonic comma or tritonic diesis<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Septimal sixth-tone on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|35.70 }} || D{{music|7}}{{music|7}}{{music|b}} || 49 : 48 || 7<sup>2</sup> : 2<sup>4</sup>×3 || bgcolor="#CFEFEF" | {{splitspan|[[Septimal diesis]], slendro diesis or septimal 1/6-tone<ref name="HF"/>|{{audio|help=no|Septimal diesis on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|38.05 }} || C{{music|23}} || 46 : 45 || 2×23 : 3<sup>2</sup>×5 || bgcolor="#BC8F8F" |{{splitspan|Inferior quarter tone,<ref name="Gann"/> difference between 23:16 & 45:32|{{audio|help=no|Johnston 23 on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || S
+|-
+| {{right|38.71 }} || <!--letter--> || 2<sup>1/31</sup> || 2<sup>1/31</sup> || bgcolor="#EFCFCF" | {{splitspan|1 step in [[31 equal temperament]] or Normal [[Diesis]]|{{audio|help=no|1 step in 31-et on C.mid|play}} }}|| 31 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|38.91 }} || C{{music|down}}{{music|#}}{{music|plus}} || 45 : 44 || 3<sup>2</sup>×5 : 4×11 || bgcolor="#CFCFEF" |{{splitspan|[[Undecimal diesis]] or undecimal fifth tone |{{Audio|help=no|Undecimal diesis on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|40.00 }} || <!--letter--> || 2<sup>1/30</sup> || 2<sup>1/30</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Fifth tone]]|{{audio|help=no|Fifth-tone on C.mid|play}} }} || 30 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|41.06 }} || D{{music|bb}}− || 128 : 125 || 2<sup>7</sup> : 5<sup>3</sup> || bgcolor="#CFEFCF" | {{splitspan|[[Enharmonic diesis]] or 5-limit limma, minor diesis,<ref name="Haluska"/> diminished second,<ref name="Gann"/><ref name="Haluska"/> minor diesis or diesis,<ref name="HF"/> 125th subharmonic|{{audio|help=no|5-limit limma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|41.72 }} || D{{music|41 upside down}}{{music|7}}{{music|b}} || 42 : 41 || 2×3×7 : 41 || bgcolor="#BC8F8F" |{{splitspan|Lesser 41-limit fifth tone|{{audio|help=no|Lesser 41-limit fifth tone on C.mid|play}} }} || <!--TET--> || 41 || <!--M--> || S
+|-
+| {{right|42.75 }} || C{{music|41}} || 41 : 40 || 41 : 2<sup>3</sup>×5 || bgcolor="#BC8F8F" |{{splitspan|Greater 41-limit fifth tone|{{audio|help=no|Greater 41-limit fifth tone on C.mid|play}} }} || <!--TET--> || 41 || <!--M--> || S
+|-
+| {{right|43.83 }} || C{{music|13 upside down}}{{music|sharp}} || 40 : 39 || 2<sup>3</sup>×5 : 3×13 || bgcolor="#DFCFEF" |{{splitspan|Tridecimal fifth tone|{{audio|help=no|Tridecimal fifth tone on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || S
+|-
+| {{right|44.97 }} || C{{music|19 upside down}}{{music|13}} || 39 : 38 || 3×13 : 2×19 || bgcolor="#CFCFCF" |{{splitspan|Superior quarter-tone,<ref name="Gann"/> novendecimal fifth tone|{{audio|help=no|Novendecimal fifth tone on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || S
+|-
+| {{right|46.17 }} || D{{music|37 upside down}}{{music|19}}{{music|bb}}{{music|minus}} || 38 : 37 || 2×19 : 37 || bgcolor="#BC8F8F" |{{splitspan|Lesser 37-limit quarter tone|{{audio|help=no|Lesser 37-limit quarter tone on C.mid|play}} }} || <!--TET--> || 37 || <!--M--> || S
+|-
+| {{right|47.43 }} || C{{music|37}}{{music|sharp}} || 37 : 36 || 37 : 2<sup>2</sup>×3<sup>2</sup>|| bgcolor="#BC8F8F" |{{splitspan|Greater 37-limit quarter tone|{{audio|help=no|Greater 37-limit quarter tone on C.mid|play}} }} || <!--TET--> || 37 || <!--M--> || S
+|-
+| {{right|48.77 }} || C{{music|L}} || 36 : 35 || 2<sup>2</sup>×3<sup>2</sup> : 5×7 || bgcolor="#CFEFEF" | {{splitspan|[[Septimal quarter tone]], septimal diesis,<ref name="HF"/><ref name="Haluska"/> septimal chroma,<ref name="Fonville"/> superior quarter tone<ref name="Gann"/>|{{audio|help=no|Septimal quarter tone on C.mid|play}} }}|| <!--TET-->|| 7 || <!--M--> || S
+|-
+| {{right|49.98 }} || || 246 : 239 || 3×41 : 239 || bgcolor="#BC8F8F" |{{splitspan|Just quarter tone<ref name="Ellis"/>|{{audio|help=no|Just quarter tone on C.mid|play}} }} || <!--TET--> || 239 || <!--M--> || <!--S-->
+|-
+| {{right|50.00 }} || C{{music|t}}/D{{music|db}} || 2<sup>1/24</sup> || 2<sup>1/24</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[quarter tone]]|{{audio|help=no|Quarter tone on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|50.18 }} || D{{music|17 upside down}}{{music|7}}{{music|b}} || 35 : 34 || 5×7 : 2×17 || bgcolor="#DFDFDF" |{{splitspan|ET quarter-tone approximation,<ref name="Gann"/> lesser 17-limit quarter tone|{{audio|help=no|Lesser septendecimal quarter tone on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || S
+|-
+| {{right|50.72 }} || B{{music|L}}{{music|#}}{{music|plus}}{{music|plus}} || 59049 : 57344 || 3<sup>10</sup> : 2<sup>13</sup>×7 || bgcolor="#CFEFEF" | {{splitspan|Harrison's comma (10 P5s – 1 H7)<ref name="HF"/>|{{audio|help=no|Harrison's comma on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|51.68 }} || C{{music|17}}{{music|down}}{{music|#}} || 34 : 33 || 2×17 : 3×11 || bgcolor="#DFDFDF" |{{splitspan|Greater 17-limit quarter tone|{{audio|help=no|Greater septendecimal quarter tone on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || S
+|-
+| {{right|53.27 }} || C{{music|up}} || 33 : 32 || 3×11 : 2<sup>5</sup>|| bgcolor="#CFCFEF" |{{splitspan|Thirty-third harmonic,<ref name="Gann"/> undecimal comma, undecimal quarter tone|{{audio|help=no|Thirty-third harmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|54.96 }} || D{{music|31 upside down}}{{music|b}}{{music|minus}} || 32 : 31 || 2<sup>5</sup> : 31 || bgcolor="#BC8F8F" | {{splitspan|Inferior quarter-tone,<ref name="Gann"/> thirty-first subharmonic|{{audio|help=no|Thirty-first subharmonic on C.mid|play}} }} || <!--TET--> || 31 || <!--M--> || S
+|-
+| {{right|56.55 }} || B{{music|23}}{{music|23}}{{music|sharp}}{{music|plus}} || 529 : 512 || 23<sup>2</sup> : 2<sup>9</sup> || bgcolor="#BC8F8F" | {{splitspan|Five-hundred-twenty-ninth harmonic|{{audio|help=no|Five-hundred-twenty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|56.77 }} || C{{music|31}} || 31 : 30 || 31 : 2×3×5 || bgcolor="#BC8F8F" |{{splitspan|Greater quarter-tone,<ref name="Gann"/> difference between 31:16 & 15:8|{{audio|help=no|Johnston 31 on C.mid|play}} }} || <!--TET--> || 31 || <!--M--> || S
+|-
+| {{right|58.69 }} || C{{music|29 upside down}}{{music|#}} || 30 : 29 || 2×3×5 : 29 || bgcolor="#BC8F8F" |{{splitspan|Lesser 29-limit quarter tone|{{audio|help=no|Lesser 29-limit quarter tone on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || S
+|-
+| {{right|60.75 }} || C{{music|29}}{{music|L}} || 29 : 28 || 29 : 2<sup>2</sup>×7 || bgcolor="#BC8F8F" |{{splitspan|Greater 29-limit quarter tone|{{audio|help=no|Greater 29-limit quarter tone on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || S
+|-
+| {{right|62.96 }} || D{{music|7}}{{music|b}}{{music|minus}} || 28 : 27 || 2<sup>2</sup>×7 : 3<sup>3</sup>|| bgcolor="#CFEFEF" |{{splitspan|Septimal minor second, small minor second, inferior quarter tone<ref name="Gann"/>|{{audio|help=no|Septimal minor second on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|63.81 }} || <!--letter--> || (3 : 2)<sup>1/11</sup>|| 3<sup>1/11</sup> : 2<sup>1/11</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Beta scale]] step|{{audio|help=no|Beta scale step on C.mid|play}} }} || 18.80 || <!--L--> || <!--M--> || <!--S-->
+|-
+|{{right|65.34 }} || C{{music|13 upside down}}{{music|#}}+ || 27 : 26 || 3<sup>3</sup> : 2×13 || bgcolor="#DFCFEF" | {{splitspan|[[Chromatic diesis]],<ref>William Smythe Babcock Mathews (1895). ''Pronouncing Dictionary and Condensed Encyclopedia of Musical Terms'', p. 13. {{ISBN|1-112-44188-3}}.</ref> tridecimal comma<ref name="HF"/>| {{audio|help=no|Chromatic diesis on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || S
+|-
+| {{right|66.34 }} || D{{music|19}}{{music|7}}{{music|b}} || 133 : 128 || 7×19 : 2<sup>7</sup>|| bgcolor="#CFCFCF" |{{splitspan|One-hundred-thirty-third harmonic|{{audio|help=no|Hundred-thirty-third harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|66.67 }} || C{{music|check}}{{music|up}}/C{{music|#}}{{music|half check}}{{efn|name=MSN}} || 2<sup>1/18</sup> || 2<sup>1/18</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Third tone]]|{{audio|help=no|Third-tone on C.mid|play}} }} || 18, 36, 72 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|67.90 }} || D{{music|13}}{{music|bb}}{{music|minus}} || 26 : 25 || 2×13 : 5<sup>2</sup>|| bgcolor="#DFCFEF" |{{splitspan|Tridecimal third tone, third tone<ref name="Gann"/>|{{audio|help=no|Tridecimal third tone on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || S
+|-
+| {{right|70.67 }} || C{{music|#}}<ref name="Fonville"/> || 25 : 24 || 5<sup>2</sup> : 2<sup>3</sup>×3 || bgcolor="#CFEFCF" | {{splitspan|[[Just chromatic semitone]] or minor chroma,<ref name="HF"/> lesser chromatic semitone, small (just) semitone<ref name="Ellis"/> or minor second,<ref name="Partch"/> minor chromatic semitone,<ref name="Anger"/> or minor <!--5-limit -->semitone,<ref name="Gann"/> {{frac|2|7}}-comma meantone chromatic semitone, augmented unison|{{audio|help=no|Just chromatic semitone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || S
+|-
+| {{right|73.68 }} || D{{music|23 upside down}}{{music|b}}{{music|minus}} || 24 : 23 || 2<sup>3</sup>×3 : 23 || bgcolor="#BC8F8F" |{{splitspan|Lesser 23-limit semitone|{{audio|help=no|Lesser 23-limit semitone on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || S
+|-
+| {{right|75.00 }} || <!--letter--> || 2<sup>1/16</sup> || 2<sup>3/48</sup> || bgcolor="#EFCFCF" | {{splitspan|1 step in 16 equal temperament, 3 steps in 48|{{audio|help=no|1 step in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|76.96 }} || C{{music|23}}{{music|down}}{{music|#}}{{music|plus}} || 23 : 22 || 23 : 2×11 || bgcolor="#BC8F8F" |{{splitspan|Greater 23-limit semitone|{{audio|help=no|Greater 23-limit semitone on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || S
+|-
+| {{right|78.00 }} || <!--letter--> || (3 : 2)<sup>1/9</sup>|| 3<sup>1/9</sup> : 2<sup>1/9</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Alpha scale]] step|{{audio|help=no|Alpha scale step on C.mid|play}} }} || 15.39 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|79.31 }} || <!--letter--> || 67 : 64 || 67 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Sixty-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Sixty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 67 || <!--M--> || <!--S-->
+|-
+| {{right|80.54 }} || C{{music|up}}{{music|L}}{{music|minus}} || 22 : 21 || 2×11 : 3×7 || bgcolor="#CFCFEF" |{{splitspan|Hard semitone,<ref name="Gann"/> two-fifth tone small semitone|{{audio|help=no|Undecimal two-fifth tone on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|84.47 }} || D{{music|7}}{{music|b}} || 21 : 20 || 3×7 : 2<sup>2</sup>×5 || bgcolor="#CFEFEF" |{{splitspan|[[Septimal chromatic semitone]], minor semitone<ref name="HF"/>|{{audio|help=no|Septimal chromatic semitone on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|88.80 }} || C{{music|19 upside down}}{{music|#}} || 20 : 19 || 2<sup>2</sup>×5 : 19 || bgcolor="#CFCFCF" |{{splitspan|Novendecimal augmented unison|{{audio|help=no|Novendecimal augmented unison on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || S
+|-
+| {{right|90.22 }} || D{{music|b}}−−<ref name="Fonville"/> || 256 : 243 || 2<sup>8</sup> : 3<sup>5</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[minor second]] or [[Pythagorean limma|limma]],<ref name="HF"/><ref name="Haluska"/><ref name="Ellis"/> Pythagorean diatonic semitone, Low Semitone<ref name="Helmholtz">[[Hermann Ludwig F. von Helmholtz]] ([[Alexander John Ellis]], trans.) (1875). "[https://books.google.com/books?id=Xy4DAAAAQAAJ&q=musical+interval+%22pythagorean+major+third%22 Additions by the translator", ''On the sensations of tone as a physiological basis for the theory of music''], p. 644. {{No ISBN}}</ref>|{{audio|help=no|Pythagorean minor semitone on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|92.18 }} || C{{music|#}}+<ref name="Fonville"/> || 135 : 128 || 3<sup>3</sup>×5 : 2<sup>7</sup>|| bgcolor="#CFEFCF" |{{splitspan|Greater chromatic semitone, chromatic semitone, semitone medius, major chroma or major limma,<ref name="HF"/> small limma,<ref name="Ellis"/> major chromatic semitone,<ref name="Anger"/> limma ascendant<ref name="Gann"/>|{{audio|help=no|Greater chromatic semitone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|93.60 }} || D{{music|19}}{{music|b}}{{music|minus}} || 19 : 18 || 19 : 2×3<sup>2</sup> || bgcolor="#CFCFCF" |{{splitspan|Novendecimal minor second{{audio|help=no|Novendecimal minor second on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || S
+|-
+| {{right|97.36 }} || D↓↓ || 128 : 121 || 2<sup>7</sup> : 11<sup>2</sup> || bgcolor="#CFCFEF" | {{splitspan|121st subharmonic,<ref name="Gann"/><ref name="Haluska"/> undecimal minor second|{{audio|help=no|121st subharmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|98.95 }} || D{{music|17 upside down}}{{music|b}} || 18 : 17 || 2×3<sup>2</sup> : 17 || bgcolor="#DFDFDF" | {{splitspan|Just minor semitone, Arabic lute index finger<ref name="HF"/>|{{audio|help=no|Just minor semitone on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || S
+|-
+| {{right|100.00 }} || C{{music|#}}/D{{music|b}} || 2<sup>1/12</sup> || 2<sup>1/12</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[minor second]] or [[semitone]]|{{audio|help=no|Minor second on C.mid|play}} }} || 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|104.96 }} || C{{music|17}}{{music|#}}<ref name="Fonville"/> || 17 : 16 || 17 : 2<sup>4</sup>|| bgcolor="#DFDFDF" |{{splitspan|[[Minor diatonic semitone]], just major semitone, overtone semitone,<ref name="Gann"/> 17th harmonic,<ref name="HF"/> limma{{Citation needed|date=July 2014}}|{{audio|help=no|Just major semitone on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || S
+|-
+| {{right|111.45 }} || || {{sqrt|5|25}} || (5 : 1)<sup>1/25</sup>|| bgcolor="#EFCFCF" |{{splitspan|''[[Studie II]]'' interval (compound just major third, 5:1, divided into 25 equal parts)|{{audio|help=no|Studie II interval on C.mid|play}} }} || 10.77 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|111.73 }} || D{{music|b}}{{music|minus}}<ref name="Fonville"/> || 16 : 15 || 2<sup>4</sup> : 3×5 || bgcolor="#CFEFCF" | {{splitspan|[[Just minor second]],<ref name="Meuss">{{cite book|url=https://books.google.com/books?id=7qCLS8urL1UC&q=%22just+minor+second%22&pg=PA15|title=Intervals, Scales, Tones and the Concert Pitch C|author=A. R. Meuss|page=15|isbn=1902636465|publisher=Temple Lodge Publishing|year=2004}}</ref> [[just diatonic semitone]], large just semitone or major second,<ref name="Partch"/> major<!-- 5-limit--> semitone,<ref name="Gann"/> limma, minor diatonic semitone,<ref name="HF"/> diatonic second<ref name="Paul"/> semitone,<ref name="Helmholtz"/> diatonic semitone,<ref name="Ellis"/> {{frac|1|6}}-comma meantone minor second|{{audio|help=no|Just diatonic semitone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || S
+|-
+| {{right|113.69 }} || C{{music|#}}++ || 2187 : 2048 || 3<sup>7</sup> : 2<sup>11</sup> || bgcolor="#EFEFCF" | {{splitspan|Apotome<ref name="HF"/><ref name="Ellis"/> or Pythagorean major semitone,<ref name="Haluska"/> Pythagorean [[augmented unison]], Pythagorean chromatic semitone, or [[Pythagorean apotome]]|{{audio|help=no|Pythagorean apotome on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|116.72 }} || <!--letter--> || (18 : 5)<sup>1/19</sup>|| 2<sup>1/19</sup>×3<sup>2/19</sup> : 5<sup>1/19</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Secor (interval)|Secor]]|{{audio|help=no|Secor on C.mid|play}} }} || 10.28 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|119.44 }} || C{{music|L}}{{music|#}} || 15 : 14 || 3×5 : 2×7 || bgcolor="#CFEFEF" |{{splitspan|[[Septimal diatonic semitone]], major diatonic semitone,<ref name="HF"/> Cowell semitone<ref name="Gann"/>|{{audio|help=no|Septimal diatonic semitone on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|125.00 }} || <!--letter--> || 2<sup>5/48</sup> || 2<sup>5/48</sup> || bgcolor="#EFCFCF" | {{splitspan|5 steps in 48 equal temperament|{{audio|help=no|5 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|128.30 }} || D{{music|13 upside down}}{{music|7}} || 14 : 13 || 2×7 : 13 || bgcolor="#DFCFEF" |{{splitspan|Lesser tridecimal 2/3-tone<ref name="31et.com">"[http://31et.com/page/13th-harmonic 13th-harmonic]", ''31et.com''.</ref>|{{audio|help=no|Lesser tridecimal two-third tone on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || S
+|-
+| {{right|130.23 }} || C{{music|23}}{{music|#}}+ || 69 : 64 || 3×23 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Sixty-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Sixty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|133.24 }} || D{{music|b}} || 27 : 25 || 3<sup>3</sup> : 5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|[[Semitone maximus]], minor second, large limma or Bohlen-Pierce small semitone,<ref name="HF"/> high semitone,<ref name="Helmholtz"/> alternate Renaissance half-step,<ref name="Gann"/> large limma, acute minor second{{Citation needed|date=July 2014}}|{{audio|help=no|Semitone Maximus on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|133.33 }} || C{{music|#}}{{music|half check up}}/D{{music|b}}{{music|half check up}}{{efn|name=MSN}} || 2<sup>1/9</sup> || 2<sup>2/18</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Two-third tone]]|{{audio|help=no|Two-third tone on C.mid|play}} }} || 9, 18, 36, 72 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|138.57 }} || D{{music|13}}{{music|b}}{{music|minus}} || 13 : 12 || 13 : 2<sup>2</sup>×3 || bgcolor="#DFCFEF" |{{splitspan|Greater tridecimal 2/3-tone,<ref name="31et.com"/> Three-quarter tone<ref name="Gann"/>|{{audio|help=no|Greater tridecimal two-third tone on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || S
+|-
+| {{right|150.00 }} || C{{music|#t}}/D{{music|d}} || 2<sup>3/24</sup> || 2<sup>1/8</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[neutral second]]|{{audio|help=no|Neutral second on C.mid|play}} }} || 8, 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|150.64 }} || D↓<ref name="Fonville"/> || 12 : 11 || 2<sup>2</sup>×3 : 11 || bgcolor="#CFCFEF" |{{splitspan|{{3/4}} tone or Undecimal [[neutral second]],<ref name="HF"/><ref name="Gann"/> trumpet three-quarter tone,<ref name="Ellis"/> middle finger [between frets]<ref name="Helmholtz"/>|{{audio|help=no|Lesser undecimal neutral second on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|155.14 }} || D{{music|7}} || 35 : 32 || 5×7 : 2<sup>5</sup>|| bgcolor="#CFEFEF" |{{splitspan|Thirty-fifth harmonic<ref name="Gann"/>|{{audio|help=no|Thirty-fifth harmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|160.90 }} || D−− || 800 : 729 || 2<sup>5</sup>×5<sup>2</sup> : 3<sup>6</sup> || bgcolor="#CFEFCF" | {{splitspan|Grave whole tone,<ref name="HF"/> neutral second, grave major second{{Citation needed|date=July 2014}}|{{audio|help=no|Grave whole tone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|165.00 }} || D{{music|up}}{{music|b}}−<ref name="Fonville"/> || 11 : 10 || 11 : 2×5 || bgcolor="#CFCFEF" |{{splitspan|Greater undecimal minor/major/[[neutral second]], 4/5-tone<ref name="Haluska"/> or Ptolemy's second<ref name="HF"/>|{{audio|help=no|Greater undecimal neutral second on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || S
+|-
+| {{right|171.43 }} || <!--letter--> || 2<sup>1/7</sup> || 2<sup>1/7</sup> || bgcolor="#EFCFCF" | {{splitspan|1 step in [[7 equal temperament]]|{{audio|help=no|1 step in 7-et on C.mid|play}} }} || 7 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|175.00 }} || <!--letter--> || 2<sup>7/48</sup> || 2<sup>7/48</sup> || bgcolor="#EFCFCF" | {{splitspan|7 steps in 48 equal temperament|{{audio|help=no|7 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|179.70 }} || <!--letter--> || 71 : 64 || 71 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Seventy-first harmonic<ref name="Gann"/>|{{audio|help=no|Seventy-first harmonic on C.mid|play}} }} || <!--TET--> || 71 || <!--M--> || <!--S-->
+|-
+| {{right|180.45 }} || E{{music|bb}}−−− || 65536 : 59049 || 2<sup>16</sup> : 3<sup>10</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[diminished third]],<ref name="HF"/><ref name="Haluska"/> Pythagorean minor tone|{{Audio|help=no|Pythagorean diminished third.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|182.40 }} || D−<ref name="Fonville"/> || 10 : 9 || 2×5 : 3<sup>2</sup>|| bgcolor="#CFEFCF" |{{splitspan|[[Just minor tone|Small just whole tone]] or major second,<ref name="Partch"/> minor whole tone,<ref name="HF"/><ref name="Gann"/> lesser whole tone,<ref name="Paul"/> minor tone,<ref name="Helmholtz"/> minor second,<ref name="Ellis"/> half-comma meantone major second|{{audio|help=no|Minor tone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || S
+|-
+| {{right|200.00 }} || D || 2<sup>2/12</sup> || 2<sup>1/6</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[major second]]|{{audio|help=no|Major second on C.mid|play}} }} || 6, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|203.91 }} || D<ref name="Fonville"/> || 9 : 8 || 3<sup>2</sup> : 2<sup>3</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[major second]], [[Just major tone|Large just whole tone]] or major second<ref name="Ellis"/> (sesquioctavan),<ref name="Partch"/> ''tonus'', major whole tone,<ref name="HF"/><ref name="Gann"/> greater whole tone,<ref name="Paul"/> major tone<ref name="Helmholtz"/>|{{audio|help=no|Major tone on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || S
+|-
+| {{right|215.89 }} || D{{music|29}} || 145 : 128 || 5×29 : 2<sup>7</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-forty-fifth harmonic|{{audio|help=no|Hundred-forty-fifth harmonic on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || <!--S-->
+|-
+| {{right|223.46 }} || E{{music|bb}}−<ref name="Fonville"/> || 256 : 225 || 2<sup>8</sup> : 3<sup>2</sup>×5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[diminished third]],<ref name="Paul"/> 225th subharmonic|{{audio|help=no|Just diminished third on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|225.00 }} || <!--letter--> || 2<sup>3/16</sup> || 2<sup>9/48</sup> || bgcolor="#EFCFCF" | {{splitspan|9 steps in 48 equal temperament|{{audio|help=no|3 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|227.79 }} || <!--letter--> || 73 : 64 || 73 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Seventy-third harmonic<ref name="Gann"/>|{{audio|help=no|Seventy-third harmonic on C.mid|play}} }} || <!--TET--> || 73 || <!--M--> || <!--S-->
+|-
+| {{right|231.17 }} || D{{music|L}}−<ref name="Fonville"/> || 8 : 7 || 2<sup>3</sup> : 7 || bgcolor="#CFEFEF" | {{splitspan|[[Septimal major second]],<ref name="Partch"/> septimal whole tone<ref name="HF"/><ref name="Gann"/>|{{audio|help=no|Septimal major second on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|240.00 }} || <!--letter--> || 2<sup>1/5</sup> || 2<sup>1/5</sup> || bgcolor="#EFCFCF" | {{splitspan|1 step in [[5 equal temperament]]|{{audio|help=no|1 step in 5-et on C.mid|play}} }} || 5 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|247.74 }} || D{{music|13U}}{{music|#}} || 15 : 13 || 3×5 : 13 || bgcolor="#DFCFEF" |{{splitspan|Tridecimal {{frac|5|4}} tone<ref name="HF"/>|{{audio|help=no|Tridecimal five-quarter tone on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|250.00 }} || D{{music|t}}/E{{music|db}} || 2<sup>5/24</sup> || 2<sup>5/24</sup> || bgcolor="#EFCFCF" | {{splitspan|5 steps in 24 equal temperament|{{audio|help=no|Five quarter tones on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|251.34 }} || D{{music|37}}{{music|#}} || 37 : 32 || 37 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Thirty-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Thirty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 37 || <!--M--> || <!--S-->
+|-
+| {{right|253.08 }} || D{{music|#}}− || 125 : 108 || 5<sup>3</sup> : 2<sup>2</sup>×3<sup>3</sup> || bgcolor="#CFEFCF" | {{splitspan|Semi-augmented whole tone,<ref name="HF"/> semi-augmented second{{Citation needed|date=July 2014}}|{{audio|help=no|Semi-augmented whole tone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|262.37 }} || E↓{{music|b}} || 64 : 55 || 2<sup>6</sup> : 5×11 || bgcolor="#CFCFEF" | {{splitspan|55th subharmonic<ref name="Gann"/><ref name="Haluska"/>|{{audio|help=no|55th subharmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|266.87 }} || E{{music|7}}{{music|b}}<ref name="Fonville"/> || 7 : 6 || 7 : 2×3 || bgcolor="#CFEFEF" |{{splitspan|[[Septimal minor third]]<ref name="HF"/><ref name="Partch"/><ref name="Ellis"/> or Sub minor third<ref name="Helmholtz"/>|{{audio|help=no|Septimal minor third on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || S
+|-
+| {{right|268.80 }} || D{{music|23}}{{music|13}} || 299 : 256 || 13×23 : 2<sup>8</sup>|| bgcolor="#BC8F8F" |{{splitspan|Two-hundred-ninety-ninth harmonic|{{audio|help=no|Two-hundred-ninety-ninth harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|274.58 }} || D{{music|#}}<ref name="Fonville"/> || 75 : 64 || 3×5<sup>2</sup> : 2<sup>6</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[augmented second]],<ref name="Paul"/> Augmented tone,<ref name="Helmholtz"/> augmented second<ref name="Gann"/><ref name="Anger"/>|{{audio|help=no|Just augmented second on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|275.00 }} || <!--letter--> || 2<sup>11/48</sup> || 2<sup>11/48</sup> || bgcolor="#EFCFCF" | {{splitspan|11 steps in 48 equal temperament|{{audio|help=no|11 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|289.21 }} || E{{music|13}}{{music|11U}}{{music|b}} || 13 : 11 || 13 : 11 || bgcolor="#DFCFEF" |{{splitspan|Tridecimal minor third<ref name="HF"/>|{{audio|help=no|Tridecimal minor third on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> ||
+|-
+| {{right|294.13 }} || E{{music|b}}−<ref name="Fonville"/> || 32 : 27 || 2<sup>5</sup> : 3<sup>3</sup> || bgcolor="#EFEFCF" | {{splitspan|[[minor third#Pythagorean minor third|Pythagorean minor third]]<ref name="HF"/><ref name="Gann"/><ref name="Haluska"/><ref name="Helmholtz"/><ref name="Paul"/> [[semiditone]], or 27th subharmonic|{{audio|help=no|Pythagorean minor third on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|297.51 }} || E{{music|19}}{{music|b}}<ref name="Fonville"/> || 19 : 16 || 19 : 2<sup>4</sup>|| bgcolor="#CFCFCF" |{{splitspan|19th harmonic,<ref name="HF"/> 19-limit minor third, overtone minor third<ref name="Gann"/>|{{audio|help=no|19th harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|300.00 }} || D{{music|#}}/E{{music|b}} || 2<sup>3/12</sup> || 2<sup>1/4</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[minor third]]|{{audio|help=no|Minor third on C.mid|play}} }} || 4, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|301.85 }} || D{{music|L}}{{music|sharp}}{{music|minus}} || 25 : 21<ref name="Gann"/>|| 5<sup>2</sup> : 3×7 || bgcolor="#CFEFEF" | {{splitspan|Quasi-equal-tempered minor third, 2nd 7-limit minor third, Bohlen-Pierce second<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Second septimal minor third on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|310.26 }} || <!--letter--> || 6:5÷(81:80)<sup>1/4</sup> || 2<sup>2</sup> : 5<sup>3/4</sup> || bgcolor="#CFFFAF" | {{splitspan|Quarter-comma meantone minor third|{{audio|help=no|Quarter-comma meantone minor third on C.mid|play}} }} || <!--L--> || <!--M--> || <!--S-->M ||
+|-
+| {{right|311.98 }} || <!--letter--> || (3 : 2)<sup>4/9</sup>|| 3<sup>4/9</sup> : 2<sup>4/9</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Alpha scale]] [[minor third]]|{{audio|help=no|Alpha scale minor third on C.mid|play}} }} || 15.39 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|315.64 }} || E{{music|b}}<ref name="Fonville"/> || 6 : 5 || 2×3 : 5 || bgcolor="#CFEFCF" |{{splitspan|[[Just minor third]],<ref name="HF"/><ref name="Partch"/><ref name="Gann"/><ref name="Ellis"/><ref name="Paul"/> minor third,<ref name="Helmholtz"/> {{1/3}}-comma meantone minor third|{{audio|help=no|Just minor third on C.mid|play}} }} || <!--TET--> || 5 || M || S
+|-
+| {{right|317.60 }} || D{{music|#}}++ || 19683 : 16384 || 3<sup>9</sup> : 2<sup>14</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[augmented second]]<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Pythagorean augmented second on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|320.14 }} || E{{music|7}}{{music|b}}{{music|up}} || 77 : 64 || 7×11 : 2<sup>6</sup>|| bgcolor="#CFCFEF" |{{splitspan|Seventy-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Seventy-seventh harmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|325.00 }} || <!--letter--> || 2<sup>13/48</sup> || 2<sup>13/48</sup> || bgcolor="#EFCFCF" | {{splitspan|13 steps in 48 equal temperament|{{audio|help=no|13 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|336.13 }} || D{{music|17}}{{music|L}}{{music|sharp}}{{music|minus}} || 17 : 14 || 17 : 2×7 || bgcolor="#DFDFDF" |{{splitspan|Superminor third<ref>Brabner, John H. F. (1884). ''[https://books.google.com/books?id=cy2P8q3RRI0C&pg=PA134 The National Encyclopaedia]'', vol. 13, p. 182. London. {{pre-ISBN}}</ref>|{{audio|help=no|Superminor third on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || <!--S-->
+|-
+| {{right|337.15 }} || E{{music|b}}+ || 243 : 200 || 3<sup>5</sup> : 2<sup>3</sup>×5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Acute minor third<ref name="HF"/>|{{audio|help=no|Acute minor third on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|342.48 }} || E{{music|13}}{{music|b}} || 39 : 32 || 3×13 : 2<sup>5</sup>|| bgcolor="#DFCFEF" |{{splitspan|Thirty-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Thirty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|342.86 }} || <!--letter--> || 2<sup>2/7</sup> || 2<sup>2/7</sup> || bgcolor="#EFCFCF" | {{splitspan|2 steps in [[7 equal temperament]]|{{audio|help=no|2 steps in 7-et on C.mid|play}} }} || 7 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|342.91 }} || E{{music|L}}{{music|b}}{{music|minus}} || 128 : 105 || 2<sup>7</sup> : 3×5×7 || bgcolor="#CFEFEF" | {{splitspan|105th subharmonic,<ref name="Gann"/> septimal neutral third<ref name="Haluska"/>|{{audio|help=no|105th subharmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|347.41 }} || E{{music|up}}{{music|b}}−<ref name="Fonville"/> || 11 : 9 || 11 : 3<sup>2</sup>|| bgcolor="#CFCFEF" |{{splitspan|Undecimal [[neutral third]]<ref name="HF"/><ref name="Gann"/>|{{audio|help=no|Undecimal neutral third on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|350.00 }} || D{{music|#t}}/E{{music|d}} || 2<sup>7/24</sup> || 2<sup>7/24</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[neutral third]]|{{audio|help=no|Neutral third on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|354.55 }} || E{{music|down}}{{music|plus}} || 27 : 22 || 3<sup>3</sup> : 2×11 || bgcolor="#CFCFEF" | {{splitspan|Zalzal's wosta<ref name="Haluska"/> 12:11 X 9:8<ref name="Helmholtz"/>|{{audio|help=no|Zalzal's wosta on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|359.47 }} || E{{music|13 upside down}}<ref name="Fonville"/> || 16 : 13 || 2<sup>4</sup> : 13 || bgcolor="#DFCFEF" | {{splitspan|Tridecimal [[neutral third]]<ref name="HF"/>|{{audio|help=no|Tridecimal neutral third on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|364.54 }} || <!--letter--> || 79 : 64 || 79 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Seventy-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Seventy-ninth harmonic on C.mid|play}} }} || <!--TET--> || 79 || <!--M--> || <!--S-->
+|-
+| {{right|364.81 }} || E− || 100 : 81 || 2<sup>2</sup>×5<sup>2</sup> : 3<sup>4</sup> || bgcolor="#CFEFCF" | {{splitspan|Grave major third<ref name="HF"/>|{{audio|help=no|Grave major third on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|375.00 }} || <!--letter--> || 2<sup>5/16</sup> || 2<sup>15/48</sup> || bgcolor="#EFCFCF" | {{splitspan|15 steps in 48 equal temperament|{{audio|help=no|5 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|384.36 }} || F{{music|b}}−− || 8192 : 6561 || 2<sup>13</sup> : 3<sup>8</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[diminished fourth]],<ref name="HF"/><ref name="Haluska"/> Pythagorean 'schismatic' third<ref name="Gann"/>|{{audio|help=no|Pythagorean diminished fourth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|386.31 }} || E<ref name="Fonville"/> || 5 : 4 || 5 : 2<sup>2</sup>|| bgcolor="#CFEFCF" |{{splitspan|[[Just major third]],<ref name="HF"/><ref name="Partch"/><ref name="Gann"/><ref name="Ellis"/><ref name="Paul">Paul, Oscar (1885). ''[https://archive.org/details/bub_gb_4WEJAQAAMAAJ <!-- quote=musical interval "pythagorean major third". --> A Manual of Harmony for Use in Music-schools and Seminaries and for Self-instruction]'', p. 165. Theodore Baker, trans. G. Schirmer. Paul uses "natural" for "just".</ref> major third,<ref name="Helmholtz"/> quarter-comma meantone major third|{{audio|help=no|Just major third on C.mid|play}} }} || <!--TET--> || 5 || M || S
+|-
+| {{right|397.10 }} || E{{music|23}}{{music|7}}{{music|plus}} || 161 : 128 || 7×23 : 2<sup>7</sup>|| bgcolor="#BC8F8F" |{{splitspan|One-hundred-sixty-first harmonic|{{audio|help=no|One-hundred-sixty-first harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|400.00 }} || E || 2<sup>4/12</sup> || 2<sup>1/3</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[major third]]|{{audio|help=no|Major third on C.mid|play}} }} || 3, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|402.47 }} || E{{music|19}}{{music|17}} || 323 : 256 || 17×19 : 2<sup>8</sup>|| bgcolor="#CFCFCF" |{{splitspan|Three-hundred-twenty-third harmonic|{{audio|help=no|323rd harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|407.82 }} || E+<ref name="Fonville"/> || 81 : 64 || 3<sup>4</sup> : 2<sup>6</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[major third]],<ref name="HF"/><ref name="Gann"/><ref name="Haluska"/><ref name="Helmholtz"/><ref name="Paul"/> [[ditone]]|{{audio|help=no|Pythagorean major third on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|417.51 }} || F{{music|7}}{{music|down}}+<ref name="Fonville"/> || 14 : 11 || 2×7 : 11 || bgcolor="#CFCFEF" |{{splitspan|Undecimal diminished fourth or major third<ref name="HF"/>|{{audio|help=no|Undecimal major third on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|425.00 }} || <!--letter--> || 2<sup>17/48</sup> || 2<sup>17/48</sup> || bgcolor="#EFCFCF" | {{splitspan|17 steps in 48 equal temperament|{{audio|help=no|17 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|427.37 }} || F{{music|b}}<ref name="Fonville"/> || 32 : 25 || 2<sup>5</sup> : 5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[diminished fourth]],<ref name="Paul"/> diminished fourth,<ref name="Gann"/><ref name="Anger"/> 25th subharmonic|{{audio|help=no|Just diminished fourth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|429.06 }} || E{{music|41}} || 41 : 32 || 41 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Forty-first harmonic<ref name="Gann"/>|{{audio|help=no|Forty-first harmonic on C.mid|play}} }} || <!--TET--> || 41 || <!--M--> || <!--S-->
+|-
+| {{right|435.08 }} || E{{music|L}}<ref name="Fonville"/> || 9 : 7 || 3<sup>2</sup> : 7 || bgcolor="#CFEFEF" | {{splitspan|[[Septimal major third]],<ref name="HF"/><ref name="Gann"/> Bohlen-Pierce third,<ref name="HF"/> Super major Third<ref name="Helmholtz"/>|{{audio|help=no|Septimal major third on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|444.77 }} || F↓ || 128 : 99 || 2<sup>7</sup> : 3<sup>2</sup>×11 || bgcolor="#CFCFEF" | {{splitspan|99th subharmonic<ref name="Gann"/><ref name="Haluska"/>|{{audio|help=no|99th subharmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|450.00 }} || E{{music|t}}/F{{music|d}} || 2<sup>9/24</sup> || 2<sup>9/24</sup> || bgcolor="#EFCFCF" | {{splitspan|9 steps in 24 equal temperament|{{audio|help=no|Nine quarter tones on C.mid|play}} }} || 8, 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|450.05 }} || <!--letter--> || 83 : 64 || 83 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Eighty-third harmonic<ref name="Gann"/>|{{audio|help=no|Eighty-third harmonic on C.mid|play}} }} || <!--TET--> || 83 || <!--M--> || <!--S-->
+|-
+| {{right|454.21 }} || F{{music|b}}{{music|13}} || 13 : 10 || 13 : 2×5 || bgcolor="#DFCFEF" |{{splitspan|Tridecimal major third or diminished fourth|{{audio|help=no|Tridecimal major third on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|456.99 }} || E{{music|#}}<ref name="Fonville"/> || 125 : 96 || 5<sup>3</sup> : 2<sup>5</sup>×3 || bgcolor="#CFEFCF" | {{splitspan|Just [[augmented third]], augmented third<ref name="Gann"/>|{{audio|help=no|Just augmented third on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|462.35 }} || E{{music|L}}{{music|L}}{{music|minus}} || 64 : 49 || 2<sup>6</sup> : 7<sup>2</sup> || bgcolor="#CFEFEF" | {{splitspan|49th subharmonic<ref name="Gann"/><ref name="Haluska"/>|{{audio|help=no|49th subharmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|470.78 }} || F{{music|7}}+<ref name="Fonville"/> || 21 : 16 || 3×7 : 2<sup>4</sup>|| bgcolor="#CFEFEF" |{{splitspan|Twenty-first harmonic, narrow fourth,<ref name="HF"/> septimal fourth,<ref name="Gann"/> wide augmented third,{{Citation needed|date=July 2014}} H7 on G|{{audio|help=no|Twenty-first harmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|475.00 }} || <!--letter--> || 2<sup>19/48</sup> || 2<sup>19/48</sup> || bgcolor="#EFCFCF" | {{splitspan|19 steps in 48 equal temperament|{{audio|help=no|19 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|478.49 }} || E{{music|#}}+ || 675 : 512 || 3<sup>3</sup>×5<sup>2</sup> : 2<sup>9</sup> || bgcolor="#CFEFCF" | {{splitspan|Six-hundred-seventy-fifth harmonic, wide augmented third<ref name="HF"/>|{{audio|help=no|Wide augmented third on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|480.00 }} || <!--letter--> || 2<sup>2/5</sup> || 2<sup>2/5</sup> || bgcolor="#EFCFCF" | {{splitspan|2 steps in [[5 equal temperament]]|{{audio|help=no|2 steps in 5-et on C.mid|play}} }} || 5 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|491.27 }} || E{{music|17}}{{music|#}} || 85 : 64 ||{{nowrap|5×17 : 2<sup>6</sup>}} || bgcolor="#DFDFDF" | {{splitspan|Eighty-fifth harmonic<ref name="Gann"/>|{{audio|help=no|Eighty-fifth harmonic on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || <!--S-->
+|-
+| {{right|498.04 }} || F<ref name="Fonville"/> || 4 : 3 || 2<sup>2</sup> : 3 || bgcolor="#EFEFCF" | {{splitspan|Perfect fourth,<ref name="HF"/><ref name="Gann"/><ref name="Paul"/> Pythagorean [[perfect fourth]], Just perfect fourth or ''diatessaron''<ref name="Partch"/>|{{audio|help=no|Just perfect fourth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || S
+|-
+| {{right|500.00 }} || F || 2<sup>5/12</sup> || 2<sup>5/12</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[perfect fourth]]|{{audio|help=no|Perfect fourth on C.mid|play}} }} || 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|501.42 }} || F{{music|19}}{{music|plus}} || 171 : 128 || 3<sup>2</sup>×19 : 2<sup>7</sup>|| bgcolor="#CFCFCF" |{{splitspan|One-hundred-seventy-first harmonic|{{audio|help=no|Hundred-seventy-first harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|510.51 }} || <!--letter--> || (3 : 2)<sup>8/11</sup>|| 3<sup>8/11</sup> : 2<sup>8/11</sup> || bgcolor="#EFCFCF" | {{splitspan|[[Beta scale]] [[perfect fourth]]|{{audio|help=no|Beta scale perfect fourth on C.mid|play}} }} || 18.80 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|511.52 }} || F{{music|43}} || 43 : 32 || 43 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Forty-third harmonic<ref name="Gann"/>|{{audio|help=no|Forty-third harmonic on C.mid|play}} }} || <!--TET--> || 43 || <!--M--> || <!--S-->
+|-
+| {{right|514.29 }} || <!--letter--> || 2<sup>3/7</sup> || 2<sup>3/7</sup> || bgcolor="#EFCFCF" | {{splitspan|3 steps in [[7 equal temperament]]|{{audio|help=no|3 steps in 7-et on C.mid|play}} }} || 7 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|519.55 }} || F+<ref name="Fonville"/> || 27 : 20 || 3<sup>3</sup> : 2<sup>2</sup>×5 || bgcolor="#CFEFCF" | {{splitspan|5-limit [[wolf interval|wolf fourth]], acute fourth,<ref name="HF"/> imperfect fourth<ref name="Paul"/>|{{audio|help=no|Wolf fourth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|521.51 }} || E{{music|#}}+++ || 177147 : 131072 || 3<sup>11</sup> : 2<sup>17</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[augmented third]]<ref name="HF"/><ref name="Haluska"/> ([[F+ (pitch)]])|{{audio|help=no|Pythagorean augmented third on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|525.00 }} || <!--letter--> || 2<sup>7/16</sup> || 2<sup>21/48</sup> || bgcolor="#EFCFCF" | {{splitspan|21 steps in 48 equal temperament|{{audio|help=no|7 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|531.53 }} || F{{music|29}}+ || 87 : 64 || 3×29 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Eighty-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Eighty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || <!--S-->
+|-
+| {{right|536.95 }} || F{{music|down}}{{music|#}}{{music|+}} || 15 : 11 || 3×5 : 11 || bgcolor="#CFCFEF" |{{splitspan|Undecimal augmented fourth<ref name="HF"/>|{{audio|help=no|Undecimal augmented fourth on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|550.00 }} || F{{music|t}}/G{{music|db}} || 2<sup>11/24</sup> || 2<sup>11/24</sup> || bgcolor="#EFCFCF" | {{splitspan|11 steps in 24 equal temperament|{{audio|help=no|Eleven quarter tones on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|551.32 }} || F{{music|up}}<ref name="Fonville"/> || 11 : 8 || 11 : 2<sup>3</sup>|| bgcolor="#CFCFEF" |{{splitspan|[[eleventh harmonic]],<ref name="Gann"/> undecimal tritone,<ref name="Gann"/> lesser undecimal tritone, undecimal semi-augmented fourth<ref name="HF"/>|{{audio|help=no|Eleventh harmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|563.38 }} || F{{music|13U}}{{music|#}}{{music|+}} || 18 : 13 || 2×9 : 13 || bgcolor="#DFCFEF" |{{splitspan|Tridecimal augmented fourth<ref name="HF"/>|{{audio|help=no|Tridecimal narrow tritone on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|568.72 }} || F{{music|#}}<ref name="Fonville"/> || 25 : 18 || 5<sup>2</sup> : 2×3<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Just augmented fourth<ref name="HF"/><ref name="Gann"/>|{{audio|help=no|Classic augmented fourth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|570.88 }} || <!--letter--> || 89 : 64 || 89 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Eighty-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Eighty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 89 || <!--M--> || <!--S-->
+|-
+| {{right|575.00 }} || <!--letter--> || 2<sup>23/48</sup> || 2<sup>23/48</sup> || bgcolor="#EFCFCF" | {{splitspan|23 steps in 48 equal temperament|{{audio|help=no|23 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|582.51 }} || G{{music|7}}{{music|b}}<ref name="Fonville"/> || 7 : 5 || 7 : 5 || bgcolor="#CFEFEF" |{{splitspan|Lesser [[septimal tritone]], septimal tritone<ref name="HF"/><ref name="Partch"/><ref name="Gann"/> Huygens' tritone or Bohlen-Pierce fourth,<ref name="HF"/> septimal fifth,<ref name="Ellis"/> septimal diminished fifth<ref name="NMB">[[Marc Sabat|Sabat, Marc]] and [[Wolfgang von Schweinitz|von Schweinitz, Wolfgang]] (2004). "[http://www.newmusicbox.org/assets/72/HelmholtzEllisLegend.pdf The Extended Helmholtz-Ellis JI Pitch Notation]" [PDF], ''[[NewMusicBox]]''. Accessed: 15 March 2014.</ref>|{{audio|help=no|Lesser septimal tritone on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|588.27 }} || G{{music|b}}−− || 1024 : 729 || 2<sup>10</sup> : 3<sup>6</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[diminished fifth]],<ref name="HF"/><ref name="Haluska"/> low Pythagorean tritone<ref name="Gann"/>|{{audio|help=no|Diminished fifth tritone on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|590.22 }} || F{{music|#}}+<ref name="Fonville"/> || 45 : 32 || 3<sup>2</sup>×5 : 2<sup>5</sup>|| bgcolor="#CFEFCF" |{{splitspan|Just augmented fourth, just tritone,<ref name="Partch"/><ref name="Ellis"/> tritone,<ref name="Haluska"/> diatonic tritone,<ref name="HF"/> 'augmented' or 'false' fourth,<ref name="Paul"/> high 5-limit tritone,<ref name="Gann"/> {{frac|1|6}}-comma meantone augmented fourth|{{audio|help=no|Just augmented fourth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|595.03 }} || G{{music|19}}{{music|19}}{{music|b}} || 361 : 256 || 19<sup>2</sup> : 2<sup>8</sup> || bgcolor="#CFCFCF" | {{splitspan|Three-hundred-sixty-first harmonic|{{audio|help=no|Three-hundred-sixty-first harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|600.00 }} || F{{music|#}}/G{{music|b}} || [[Square root of two|2<sup>6/12</sup>]] || 2<sup>1/2</sup>={{radic|2}} || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[tritone]]|{{audio|help=no|Tritone on C.mid|play}} }} || 2, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|609.35 }} || G{{music|13}}{{music|7}}{{music|b}} || 91 : 64 || 7×13 : 2<sup>6</sup>|| bgcolor="#DFCFEF" |{{splitspan|Ninety-first harmonic<ref name="Gann"/>|{{audio|help=no|Ninety-first harmonic on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|609.78 }} || G{{music|b}}−<ref name="Fonville"/> || 64 : 45 || 2<sup>6</sup> : 3<sup>2</sup>×5 || bgcolor="#CFEFCF" | {{splitspan|Just tritone,<ref name="Partch"/> 2nd tritone,<ref name="Haluska"/> 'false' fifth,<ref name="Paul"/> diminished fifth,<ref name="Anger">[[Humfrey Anger|Anger, Joseph Humfrey]] (1912). ''[https://archive.org/details/atreatiseonharm01unkngoog <!-- quote="minor diatonic semitone". --> A Treatise on Harmony, with Exercises, Volume 3]'', pp. xiv–xv. W. Tyrrell.</ref> low 5-limit tritone,<ref name="Gann"/> 45th subharmonic|{{audio|help=no|Just tritone on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|611.73 }} || F{{music|sharp}}++ || 729 : 512 || 3<sup>6</sup> : 2<sup>9</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[augmented fourth|tritone]],<ref name="HF"/><ref name="Haluska"/> Pythagorean augmented fourth, high Pythagorean tritone<ref name="Gann"/>|{{audio|help=no|Pythagorean augmented fourth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|617.49 }} || F{{music|#}}{{music|L}}<ref name="Fonville"/> || 10 : 7 || 2×5 : 7 || bgcolor="#CFEFEF" |{{splitspan|Greater [[septimal tritone]], septimal tritone,<ref name="Partch"/><ref name="Gann"/> Euler's tritone<ref name="HF"/>|{{audio|help=no|Greater septimal tritone on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|625.00 }} || <!--letter--> || 2<sup>25/48</sup> || 2<sup>25/48</sup> || bgcolor="#EFCFCF" | {{splitspan|25 steps in 48 equal temperament|{{audio|help=no|25 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|628.27 }} || F{{music|23}}{{music|#}}+ || 23 : 16 || 23 : 2<sup>4</sup>|| bgcolor="#BC8F8F" |{{splitspan|Twenty-third harmonic,<ref name="Gann"/> classic diminished fifth{{Citation needed|date=July 2014}}|{{audio|help=no|Twenty-third harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|631.28 }} || G{{music|b}}<ref name="Fonville"/> || 36 : 25 || 2<sup>2</sup>×3<sup>2</sup> : 5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[diminished fifth]]<ref name="Gann"/>|{{audio|help=no|Just diminished fifth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|646.99 }} || F{{music|31}}{{music|#}}+ || 93 : 64 || 3×31 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Ninety-third harmonic<ref name="Gann"/>|{{audio|help=no|Ninety-third harmonic on C.mid|play}} }} || <!--TET--> || 31 || <!--M--> || <!--S-->
+|-
+| {{right|648.68 }} || G↓<ref name="Fonville"/> || 16 : 11 || 2<sup>4</sup> : 11 || bgcolor="#CFCFEF" | {{splitspan|` undecimal semi-diminished fifth<ref name="HF"/>|{{audio|help=no|Eleventh harmonic inverse on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|650.00 }} || F{{music|#t}}/G{{music|d}} || 2<sup>13/24</sup> || 2<sup>13/24</sup> || bgcolor="#EFCFCF" | {{splitspan|13 steps in 24 equal temperament|{{audio|help=no|Thirteen quarter tones on C.mid|play}} }} || 24|| <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|665.51 }} || G{{music|47}} || 47 : 32 || 47 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Forty-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Forty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 47 || <!--M--> || <!--S-->
+|-
+| {{right|675.00 }} || <!--letter--> || 2<sup>9/16</sup> || 2<sup>27/48</sup> || bgcolor="#EFCFCF" | {{splitspan|27 steps in 48 equal temperament|{{audio|help=no|9 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|678.49 }} || A{{music|bb}}−−− || 262144 : 177147 || 2<sup>18</sup> : 3<sup>11</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[diminished sixth]]<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Pythagorean diminished sixth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|680.45 }} || G− || 40 : 27 || 2<sup>3</sup>×5 : 3<sup>3</sup>|| bgcolor="#CFEFCF" |{{splitspan|5-limit [[wolf interval|wolf fifth]],<ref name="Gann"/> or [[diminished sixth]], grave fifth,<ref name="HF"/><ref name="Haluska"/><ref name="Ellis"/> imperfect fifth,<ref name="Paul"/>|{{audio|help=no|Wolf fifth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|683.83 }} || G{{music|19}} || 95 : 64 || 5×19 : 2<sup>6</sup>|| bgcolor="#CFCFCF" |{{splitspan|Ninety-fifth harmonic<ref name="Gann"/>|{{audio|help=no|Ninety-fifth harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|684.82 }} || E{{music|23}}{{music|23}}{{music|23}}{{music|X}}{{music|plus}}{{music|plus}} || 12167 : 8192 || 23<sup>3</sup> : 2<sup>13</sup> || bgcolor="#BC8F8F" | {{splitspan|12167th harmonic|{{audio|help=no|12167th harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|685.71 }} || || 2<sup>4/7</sup> : 1 || || bgcolor="#EFCFCF" | {{splitspan|4 steps in 7 equal temperament|{{audio|help=no|4 steps in 7-et on C.mid|play}} }} || 7 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|691.20 }} || <!--letter--> || 3:2÷(81:80)<sup>1/2</sup> || 2×5<sup>1/2</sup> : 3 || bgcolor="#CFFFAF" | {{splitspan|Half-comma meantone perfect fifth|{{audio|help=no|Half-comma meantone perfect fifth on C.mid|play}} }} || <!--TET--> || <!--L--> || M || <!--S-->
+|-
+| {{right|694.79 }} || <!--letter--> || 3:2÷(81:80)<sup>1/3</sup> || 2<sup>1/3</sup>×5<sup>1/3</sup> : 3<sup>1/3</sup> || bgcolor="#CFFFAF" | {{splitspan|{{frac|1|3}}-comma meantone perfect fifth|{{audio|help=no|Third-comma meantone perfect fifth on C.mid|play}} }} || <!--TET--> || <!--L--> || M || <!--S-->
+|-
+| {{right|695.81 }} || <!--letter--> || 3:2÷(81:80)<sup>2/7</sup> || 2<sup>1/7</sup>×5<sup>2/7</sup> : 3<sup>1/7</sup> || bgcolor="#CFFFAF" | {{splitspan|{{frac|2|7}}-comma meantone perfect fifth|{{audio|help=no|Two seventh-comma meantone perfect fifth on C.mid|play}} }} || <!--TET--> || <!--L--> || M || <!--S-->
+|-
+| {{right|696.58 }} || <!--letter--> || 3:2÷(81:80)<sup>1/4</sup> || 5<sup>1/4</sup> || bgcolor="#CFFFAF" | {{splitspan|Quarter-comma meantone perfect fifth|{{audio|help=no|Quarter-comma meantone perfect fifth on C.mid|play}} }} || <!--TET--> || <!--L--> || M || <!--S-->
+|-
+| {{right|697.65 }} || <!--letter--> || 3:2÷(81:80)<sup>1/5</sup> || 3<sup>1/5</sup>×5<sup>1/5</sup> : 2<sup>1/5</sup> || bgcolor="#CFFFAF" | {{splitspan|{{frac|1|5}}-comma meantone perfect fifth|{{audio|help=no|Fifth-comma meantone perfect fifth on C.mid|play}} }} || <!--TET--> || <!--L--> || M || <!--S-->
+|-
+| {{right|698.37 }} || <!--letter--> || 3:2÷(81:80)<sup>1/6</sup> || 3<sup>1/3</sup>×5<sup>1/6</sup> : 2<sup>1/3</sup> || bgcolor="#CFFFAF" | {{splitspan|{{frac|1|6}}-comma meantone perfect fifth|{{audio|help=no|Sixth-comma meantone perfect fifth on C.mid|play}} }} || <!--TET--> || <!--L--> || M || <!--S-->
+|-
+| {{right|700.00 }} || G || 2<sup>7/12</sup> || 2<sup>7/12</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[perfect fifth]]|{{audio|help=no|Perfect fifth on C.mid|play}} }} || 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|701.89 }} || <!--letter--> || 2<sup>31/53</sup> || 2<sup>31/53</sup> || bgcolor="#EFCFCF" | {{splitspan|[[53-TET]] [[perfect fifth]]|{{audio|help=no|53-TET perfect fifth on C.mid|play}} }} || 53 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|701.96 }} || G<ref name="Fonville"/> || 3 : 2 || 3 : 2 || bgcolor="#EFEFCF" |{{splitspan|[[Perfect fifth]],<ref name="HF"/><ref name="Gann"/><ref name="Paul"/> Pythagorean perfect fifth, Just perfect fifth or ''diapente'',<ref name="Partch"/> fifth,<ref name="Helmholtz"/> Just fifth<ref name="Ellis"/>|{{audio|help=no|Just perfect fifth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || S
+|-
+| {{right|702.44 }} || <!--letter--> || 2<sup>24/41</sup> || 2<sup>24/41</sup> || bgcolor="#EFCFCF" | {{splitspan|[[41-TET]] [[perfect fifth]]|{{audio|help=no|41-TET perfect fifth on C.mid|play}} }} || 41 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|703.45 }} || <!--letter--> || 2<sup>17/29</sup> || 2<sup>17/29</sup> || bgcolor="#EFCFCF" | {{splitspan|[[29-TET]] [[perfect fifth]]|{{audio|help=no|29-TET perfect fifth on C.mid|play}} }} || 29 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|719.90 }} || <!--letter--> || 97 : 64 || 97 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Ninety-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Ninety-seventh harmonic on C.mid|play}} }} || <!--TET--> || 97 || <!--M--> || <!--S-->
+|-
+| {{right|720.00 }} || <!--letter--> || 2<sup>3/5</sup> : 1 || <!--factors--> || bgcolor="#EFCFCF" | {{splitspan|3 steps in 5 equal temperament|{{audio|help=no|3 steps in 5-et on C.mid|play}} }} || 5 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|721.51 }} || A{{music|bb}}− || 1024 : 675 || 2<sup>10</sup> : 3<sup>3</sup>×5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Narrow diminished sixth<ref name="HF"/>|{{audio|help=no|Narrow diminished sixth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|725.00 }} || <!--letter--> || 2<sup>29/48</sup> || 2<sup>29/48</sup> || bgcolor="#EFCFCF" | {{splitspan|29 steps in 48 equal temperament|{{audio|help=no|29 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|729.22 }} || G{{music|L}}{{music|minus}} || 32 : 21 || 2<sup>4</sup> : 3×7 || bgcolor="#CFEFEF" | {{splitspan|21st subharmonic,<ref name="Gann"/><ref name="Haluska"/> septimal [[diminished sixth]]|{{audio|help=no|21st subharmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|733.23 }} || F{{music|23}}{{music|17}}{{music|X}}{{music|plus}} || 391 : 256 || 17×23 : 2<sup>8</sup>|| bgcolor="#BC8F8F" |{{splitspan|Three-hundred-ninety-first harmonic|{{audio|help=no|Three-hundred-ninety-first harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|737.65 }} || A{{music|7}}{{music|7}}{{music|b}}+ || 49 : 32 || 7×7 : 2<sup>5</sup>|| bgcolor="#CFEFEF" |{{splitspan|Forty-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Forty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|743.01 }} || A{{music|bb}} || 192 : 125 || 2<sup>6</sup>×3 : 5<sup>3</sup>|| bgcolor="#CFEFCF" |{{splitspan|Classic [[diminished sixth]]<ref name="HF"/>|{{audio|help=no|Classic diminished sixth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|750.00 }} || G{{music|t}}/A{{music|db}} || 2<sup>15/24</sup> || 2<sup>15/24</sup> || bgcolor="#EFCFCF" | {{splitspan|15 steps in 24 equal temperament|{{audio|help=no|Subminor sixth on C.mid|play}} }} || 8, 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|755.23 }} || G{{music|up}} || 99 : 64 || 3<sup>2</sup>×11 : 2<sup>6</sup>|| bgcolor="#CFCFEF" |{{splitspan|Ninety-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Ninety-ninth harmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|764.92 }} || A{{music|7}}{{music|b}}<ref name="Fonville"/> || 14 : 9 || 2×7 : 3<sup>2</sup>|| bgcolor="#CFEFEF" |{{splitspan|[[Subminor sixth|Septimal minor sixth]]<ref name="HF"/><ref name="Gann"/>|{{audio|help=no|Septimal minor sixth on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|772.63 }} || G{{music|#}} || 25 : 16 || 5<sup>2</sup> : 2<sup>4</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[augmented fifth]]<ref name="Gann"/><ref name="Paul"/>|{{audio|help=no|Just augmented fifth on C.mid|play}} }} || <!--TET--> || 5<!----> ||<!--M-->|| <!--S-->
+|-
+| {{right|775.00 }} || <!--letter--> || 2<sup>31/48</sup> || 2<sup>31/48</sup> || bgcolor="#EFCFCF" | {{splitspan|31 steps in 48 equal temperament|{{audio|help=no|31 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|781.79 }} || <!--LETTER--> || [[pi|{{pi}}]] : 2 || <!--factors--> || bgcolor="#EFCFCF" | {{splitspan|[[Wallis product]]|{{audio|help=no|Wallis product (pi) on C.mid|play}} }} || || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|782.49 }} || G{{music|L}}{{music|up}}-<ref name="Fonville"/> || 11 : 7 || 11 : 7 || bgcolor="#CFCFEF" |{{splitspan|[[Undecimal minor sixth]],<ref name="Gann"/> undecimal augmented fifth,<ref name="HF"/> [[Fibonacci number]]s|{{audio|help=no|Undecimal minor sixth on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|789.85 }} || <!--letter--> || 101 : 64 || 101 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-first harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-first harmonic on C.mid|play}} }} || <!--TET--> || 101 || <!--M--> || <!--S-->
+|-
+| {{right|792.18 }} || A{{music|b}}−<ref name="Fonville"/> || 128 : 81 || 2<sup>7</sup> : 3<sup>4</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[minor sixth]],<ref name="HF"/><ref name="Gann"/><ref name="Haluska"/> 81st subharmonic|{{audio|help=no|Pythagorean minor sixth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|798.40 }} || A{{music|29}}{{music|7}}{{music|b}}{{music|plus}} || 203 : 128 || 7×29 : 2<sup>7</sup>|| bgcolor="#BC8F8F" |{{splitspan|Two-hundred-third harmonic|{{audio|help=no|Two-hundred-third harmonic on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || <!--S-->
+|-
+| {{right|800.00 }} || G{{music|#}}/A{{music|b}} || 2<sup>8/12</sup> || 2<sup>2/3</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[minor sixth]]|{{audio|help=no|Minor sixth on C.mid|play}} }} || 3, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|806.91 }} || G{{music|17}}{{music|#}} || 51 : 32 || 3×17 : 2<sup>5</sup>|| bgcolor="#DFDFDF" |{{splitspan|Fifty-first harmonic<ref name="Gann"/>|{{audio|help=no|Fifty-first harmonic on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || <!--S-->
+|-
+| {{right|813.69 }} || A{{music|b}}<ref name="Fonville"/> || 8 : 5 || 2<sup>3</sup> : 5 || bgcolor="#CFEFCF" | {{splitspan|Just [[minor sixth]]<ref name="HF"/><ref name="Partch"/><ref name="Ellis"/><ref name="Paul"/>|{{audio|help=no|Just minor sixth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|815.64 }} || G{{music|#}}++ || 6561 : 4096 || 3<sup>8</sup> : 2<sup>12</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[augmented fifth]],<ref name="HF"/><ref name="Haluska"/> Pythagorean 'schismatic' sixth<ref name="Gann"/>|{{audio|help=no|Pythagorean augmented fifth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|823.80 }} || <!--letter--> || 103 : 64 || 103 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-third harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-third harmonic on C.mid|play}} }} || <!--TET--> || 103 || <!--M--> || <!--S-->
+|-
+| {{right|825.00 }} || <!--letter--> || 2<sup>11/16</sup> || 2<sup>33/48</sup> || bgcolor="#EFCFCF" | {{splitspan|33 steps in 48 equal temperament|{{audio|help=no|11 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|832.18 }} || G{{music|23}}{{music|#}}{{music|plus}} || 207 : 128 || 3<sup>2</sup>×23 : 2<sup>7</sup>|| bgcolor="#BC8F8F" |{{splitspan|Two-hundred-seventh harmonic|{{audio|help=no|Two-hundred-seventh harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|833.09 }} || <!--letter--> || (5<sup>1/2</sup>+1)/2 ||{{mvar|[[Golden ratio|φ]]}} : 1 || | {{splitspan|[[Golden ratio]] ([[833 cents scale]]) |{{audio|help=no|Golden ratio on C.mid|play}} }} || <!--TET--> || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|835.19 }} || A{{music|b}}+ || 81 : 50 || 3<sup>4</sup> : 2×5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Acute minor sixth<ref name="HF"/>|{{audio|help=no|Acute minor sixth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|840.53 }} || A{{music|13}}{{music|b}}<ref name="Fonville"/> || 13 : 8 || 13 : 2<sup>3</sup>|| bgcolor="#DFCFEF" |{{splitspan|Tridecimal [[neutral sixth#Thirteenth harmonic|neutral sixth]],<ref name="HF"/> overtone sixth,<ref name="Gann"/> [[thirteenth harmonic]]|{{audio|help=no|Tridecimal neutral sixth on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|848.83 }} || A{{music|19}}{{music|b}}{{music|up}} || 209 : 128 || 11×19 : 2<sup>7</sup>|| bgcolor="#CFCFCF" |{{splitspan|Two-hundred-ninth harmonic|{{audio|help=no|Two-hundred-ninth harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|850.00 }} || G{{music|#t}}/A{{music|d}} || 2<sup>17/24</sup> || 2<sup>17/24</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[neutral sixth]]|{{audio|help=no|Neutral sixth on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|852.59 }} || A↓+<ref name="Fonville"/><!--p. 128 states that C- to A↓ is 18/11--> || 18 : 11 || 2×3<sup>2</sup> : 11 || bgcolor="#CFCFEF" | {{splitspan|Undecimal [[neutral sixth]],<ref name="HF"/><ref name="Gann"/> Zalzal's neutral sixth|{{audio|help=no|Undecimal neutral sixth on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|857.09 }} || A{{music|7}}+ || 105 : 64 || 3×5×7 : 2<sup>6</sup>|| bgcolor="#CFEFEF" |{{splitspan|Hundred-fifth harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-fifth harmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|857.14 }} || <!--letter--> || 2<sup>5/7</sup> || 2<sup>5/7</sup> || bgcolor="#EFCFCF" | {{splitspan|5 steps in [[7 equal temperament]]|{{audio|help=no|5 steps in 7-et on C.mid|play}} }} || 7 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|862.85 }} || A− || 400 : 243 || 2<sup>4</sup>×5<sup>2</sup> : 3<sup>5</sup> || bgcolor="#CFEFCF" | {{splitspan|Grave major sixth<ref name="HF"/>|{{audio|help=no|Grave major sixth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|873.50 }} || A{{music|fifty-three}} || 53 : 32 || 53 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Fifty-third harmonic<ref name="Gann"/>|{{audio|help=no|Fifty-third harmonic on C.mid|play}} }} || <!--TET--> || 53 || <!--M--> || <!--S-->
+|-
+| {{right|875.00 }} || <!--letter--> || 2<sup>35/48</sup> || 2<sup>35/48</sup> || bgcolor="#EFCFCF" | {{splitspan|35 steps in 48 equal temperament|{{audio|help=no|35 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|879.86 }} || A↓{{music|L}} || 128 : 77 || 2<sup>7</sup> : 7×11 || bgcolor="#CFCFEF" | {{splitspan|77th subharmonic<ref name="Gann"/><ref name="Haluska"/>|{{audio|help=no|77th subharmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|882.40 }} || B{{music|bb}}−−− || 32768 : 19683 || 2<sup>15</sup> : 3<sup>9</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[diminished seventh]]<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Pythagorean diminished seventh on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|884.36 }} || A<ref name="Fonville"/> || 5 : 3 || 5 : 3 || bgcolor="#CFEFCF" |{{splitspan|Just [[major sixth]],<ref name="HF"/><ref name="Partch"/><ref name="Gann"/><ref name="Ellis"/><ref name="Paul"/> Bohlen-Pierce sixth,<ref name="HF"/> {{1/3}}-comma meantone major sixth|{{audio|help=no|Just major sixth on C.mid|play}} }} || <!--TET--> || 5 || M || <!--S-->
+|-
+| {{right|889.76 }} || <!--letter--> || 107 : 64 || 107 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-seventh harmonic on C.mid|play}} }} || <!--TET--> || 107 || <!--M--> || <!--S-->
+|-
+| {{right|892.54 }} || B{{music|19}}{{music|19}}{{music|19}}{{music|bb}} || 6859 : 4096 || 19<sup>3</sup> : 2<sup>12</sup> || bgcolor="#CFCFCF" | {{splitspan|6859th harmonic|{{audio|help=no|6859th harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|900.00 }} || A || 2<sup>9/12</sup> || 2<sup>3/4</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[major sixth]]|{{audio|help=no|Dim seventh on C.mid|play}} }} || 4, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|902.49 }} || A{{music|U19}} || 32 : 19 || 2<sup>5</sup> : 19 || bgcolor="#CFCFCF" | {{splitspan|[[19th subharmonic]]<ref name="Gann"/><ref name="Haluska"/>|{{audio|help=no|19th subharmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|905.87 }} || A+<ref name="Fonville"/> || 27 : 16 || 3<sup>3</sup> : 2<sup>4</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[major sixth]]<ref name="HF"/><ref name="Gann"/><ref name="Ellis"/><ref name="Paul"/>|{{audio|help=no|Pythagorean major sixth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|921.82 }} || <!--letter--> || 109 : 64 || 109 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-ninth harmonic on C.mid|play}} }} || <!--TET--> || 109 || <!--M--> || <!--S-->
+|-
+| {{right|925.00 }} || <!--letter--> || 2<sup>37/48</sup> || 2<sup>37/48</sup> || bgcolor="#EFCFCF" | {{splitspan|37 steps in 48 equal temperament|{{audio|help=no|37 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|925.42 }} || B{{music|bb}}−<ref name="Fonville"/> || 128 : 75 || 2<sup>7</sup> : 3×5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[diminished seventh]],<ref name="Paul"/> diminished seventh,<ref name="Gann"/><ref name="Anger"/> 75th subharmonic|{{audio|help=no|Just diminished seventh on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|925.79 }} || A{{music|23}}{{music|19}}{{music|plus}} || 437 : 256 || 19×23 : 2<sup>8</sup>|| bgcolor="#BC8F8F" |{{splitspan|Four-hundred-thirty-seventh harmonic|{{audio|help=no|Four-hundred-thirty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|933.13 }} || A{{music|L}}<ref name="Fonville"/> || 12 : 7 || 2<sup>2</sup>×3 : 7 || bgcolor="#CFEFEF" |{{splitspan|[[Septimal major sixth]]<ref name="HF"/><ref name="Partch"/><ref name="Gann"/>|{{audio|help=no|Septimal major sixth on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|937.63 }} || A{{music|up}} || 55 : 32 || 5×11 : 2<sup>5</sup>|| bgcolor="#CFCFEF" |{{splitspan|Fifty-fifth harmonic<ref name="Gann"/><ref>[[Hermann von Helmholtz|Hermann L. F. von Helmholtz]] (2007). ''[[Sensations of Tone|On the Sensations of Tone]]'', p. 456. {{ISBN|978-1-60206-639-7}}.</ref>|{{audio|help=no|Fifty-fifth harmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|950.00 }} || A{{music|t}}/B{{music|db}} || 2<sup>19/24</sup> || 2<sup>19/24</sup> || bgcolor="#EFCFCF" | {{splitspan|19 steps in 24 equal temperament|{{audio|help=no|Subminor seventh on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|953.30 }} || A{{music|37}}{{music|#}}{{music|+}} || 111 : 64 || 3×37 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-eleventh harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-eleventh harmonic on C.mid|play}} }} || <!--TET--> || 37 || <!--M--> || <!--S-->
+|-
+| {{right|955.03 }} || A{{music|#}}<ref name="Fonville"/> || 125 : 72 || 5<sup>3</sup> : 2<sup>3</sup>×3<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[augmented sixth]]<ref name="Gann"/>|{{audio|help=no|Just augmented sixth on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|957.21 }} || <!--letter--> || (3 : 2)<sup>15/11</sup>|| 3<sup>15/11</sup> : 2<sup>15/11</sup> || bgcolor="#EFCFCF" | {{splitspan|15 steps in [[Beta scale]]|{{audio|help=no|Beta scale 15 steps on C.mid|play}} }} || 18.80 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|960.00 }} || <!--letter--> || 2<sup>4/5</sup> || 2<sup>4/5</sup> || bgcolor="#EFCFCF" | {{splitspan|4 steps in [[5 equal temperament]]|{{audio|help=no|12 steps in 15TET on C.mid|play}} }} || 5 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|968.83 }} || B{{music|7}}{{music|b}}<ref name="Fonville"/> || 7 : 4 || 7 : 2<sup>2</sup>|| bgcolor="#CFEFEF" |{{splitspan|[[Septimal minor seventh]],<ref name="Partch"/><ref name="Gann"/><ref name="Ellis"/> harmonic seventh,<ref name="HF"/><ref name="Ellis"/> augmented sixth{{Citation needed|date=July 2014}}|{{audio|help=no|Harmonic seventh on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|975.00 }} || <!--letter--> || 2<sup>13/16</sup> || 2<sup>39/48</sup> || bgcolor="#EFCFCF" | {{splitspan|39 steps in 48 equal temperament|{{audio|help=no|13 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|976.54 }} || A{{music|#}}+<ref name="Fonville"/> || 225 : 128 || 3<sup>2</sup>×5<sup>2</sup> : 2<sup>7</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[augmented sixth]]<ref name="Paul"/>|{{audio|help=no|Two-hundred-twenty-fith harmonic on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|984.21 }} || <!--letter--> || 113 : 64 || 113 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-thirteenth harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-thirteenth harmonic on C.mid|play}} }} || <!--TET--> || 113 || <!--M--> || <!--S-->
+|-
+| {{right|996.09}} || B{{music|b}}−<ref name="Fonville"/> || 16 : 9 || 2<sup>4</sup> : 3<sup>2</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[minor seventh]],<ref name="HF"/> Small just minor seventh,<ref name="Partch"/> lesser minor seventh,<ref name="Paul"/> just minor seventh,<ref name="Ellis"/> Pythagorean small minor seventh<ref name="Gann"/>|{{audio|help=no|Lesser just minor seventh on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|999.47 }} || B{{music|19}}{{music|b}} || 57 : 32 || 3×19 : 2<sup>5</sup>|| bgcolor="#CFCFCF" |{{splitspan|Fifty-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Fifty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|1000.00}} || A{{music|#}}/B{{music|b}} || 2<sup>10/12</sup> || 2<sup>5/6</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[minor seventh]]|{{audio|help=no|Minor seventh on C.mid|play}} }} || 6, 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|1014.59 }} || A{{music|23}}{{music|#}}+ || 115 : 64 || 5×23 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-fifteenth harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-fifteenth harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|1017.60}} || B{{music|b}}<ref name="Fonville"/> || 9 : 5 || 3<sup>2</sup> : 5 || bgcolor="#CFEFCF" | {{splitspan|Greater just [[minor seventh]],<ref name="Paul"/> large just minor seventh,<ref name="Partch"/><ref name="Gann"/> Bohlen-Pierce seventh<ref name="HF"/>|{{audio|help=no|Greater just minor seventh on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1019.55 }} || A{{music|#}}+++ || 59049 : 32768 || 3<sup>10</sup> : 2<sup>15</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[augmented sixth]]<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Pythagorean augmented sixth on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|1025.00 }} || <!--letter--> || 2<sup>41/48</sup> || 2<sup>41/48</sup> || bgcolor="#EFCFCF" | {{splitspan|41 steps in 48 equal temperament|{{audio|help=no|41 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1028.57 }} || <!--letter--> || 2<sup>6/7</sup> || 2<sup>6/7</sup> || bgcolor="#EFCFCF" | {{splitspan|6 steps in [[7 equal temperament]]|{{audio|help=no|6 steps in 7-et on C.mid|play}} }} || 7 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1029.58 }} || B{{music|29}}{{music|b}} || 29 : 16 || 29 : 2<sup>4</sup>|| bgcolor="#BC8F8F" |{{splitspan|Twenty-ninth harmonic,<ref name="Gann"/> minor seventh{{Citation needed|date=July 2014}}|{{audio|help=no|Twenty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 29 || <!--M--> || <!--S-->
+|-
+| {{right|1035.00}} || B↓<ref name="Fonville"/> || 20 : 11 || 2<sup>2</sup>×5 : 11 || bgcolor="#CFCFEF" |{{splitspan|Lesser undecimal [[neutral seventh]], large minor seventh<ref name="HF"/>|{{audio|help=no|Lesser undecimal neutral seventh on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|1039.10 }} || B{{music|b}}+ || 729 : 400 || 3<sup>6</sup> : 2<sup>4</sup>×5<sup>2</sup> || bgcolor="#CFEFCF" | {{splitspan|Acute minor seventh<ref name="HF"/>|{{audio|help=no|Acute minor seventh on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1044.44 }} || B{{music|13}}{{music|b}} || 117 : 64 || 3<sup>2</sup>×13 : 2<sup>6</sup>|| bgcolor="#DFCFEF" |{{splitspan|Hundred-seventeenth harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-seventeenth harmonic on C.mid|play}} }} || <!--tet--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|1044.86 }} || B{{music|L}}{{music|b}}{{music|minus}} || 64 : 35 || 2<sup>6</sup> : 5×7 || bgcolor="#CFEFEF" | {{splitspan|35th subharmonic,<ref name="Gann"/> septimal neutral seventh<ref name="Haluska"/>|{{audio|help=no|Septimal neutral seventh on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|1049.36}} || B{{music|up}}{{music|b}}−<ref name="Fonville"/> || 11 : 6 || 11 : 2×3 || bgcolor="#CFCFEF" |{{splitspan|{{frac|21|4}}-tone or Undecimal [[neutral seventh]],<ref name="HF"/> undecimal 'median' seventh<ref name="Gann"/>|{{audio|help=no|Undecimal neutral seventh on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|1050.00 }} || A{{music|#t}}/B{{music|d}} || 2<sup>21/24</sup> || 2<sup>7/8</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[neutral seventh]]|{{audio|help=no|Neutral seventh on C.mid|play}} }} || 8, 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1059.17 }} || <!--letter--> || 59 : 32 || 59 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Fifty-ninth harmonic<ref name="Gann"/>|{{audio|help=no|Fifty-ninth harmonic on C.mid|play}} }} || <!--TET--> || 59 || <!--M--> || <!--S-->
+|-
+| {{right|1066.76 }} || B− || 50 : 27 || 2×5<sup>2</sup> : 3<sup>3</sup> || bgcolor="#CFEFCF" | {{splitspan|Grave major seventh<ref name="HF"/>|{{audio|help=no|Grave major seventh on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1071.70 }} || B{{music|13}}{{music|L}}{{music|b}}{{music|minus}} || 13 : 7 || 13 : 7 || bgcolor="#DFCFEF" |{{splitspan|Tridecimal neutral seventh<ref>"[https://en.xen.wiki/w/Gallery_of_just_intervals Gallery of Just Intervals]", ''Xenharmonic Wiki''.</ref>|{{audio|help=no|Tridecimal neutral seventh on C.mid|play}} }} || <!--TET--> || 13 || <!--M--> || <!--S-->
+|-
+| {{right|1073.78 }} || B{{music|7}}{{music|17}} || 119 : 64 || 7×17 : 2<sup>6</sup>|| bgcolor="#DFDFDF" |{{splitspan|Hundred-nineteenth harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-nineteenth harmonic on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || <!--S-->
+|-
+| {{right|1075.00 }} || <!--letter--> || 2<sup>43/48</sup> || 2<sup>43/48</sup> || bgcolor="#EFCFCF" | {{splitspan|43 steps in 48 equal temperament|{{audio|help=no|43 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1086.31 }} || C′{{music|b}}−− || 4096 : 2187 || 2<sup>12</sup> : 3<sup>7</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[diminished octave]]<ref name="HF"/><ref name="Haluska"/>|{{audio|help=no|Pythagorean diminished octave on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|1088.27 }} || B<ref name="Fonville"/> || 15 : 8 || 3×5 : 2<sup>3</sup>|| bgcolor="#CFEFCF" |{{splitspan|Just [[major seventh]],<ref name="HF"/><ref name="Gann"/><ref name="Ellis"/><ref name="Paul"/> small just major seventh,<ref name="Partch"/> {{frac|1|6}}-comma meantone major seventh|{{audio|help=no|Just major seventh on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1095.04 }} || C{{music|17U}}{{music|b}} || 32 : 17 || 2<sup>5</sup> : 17 || bgcolor="#DFDFDF" | {{splitspan|17th subharmonic<ref name="Gann"/><ref name="Haluska"/>|{{audio|help=no|17th subharmonic on C.mid|play}} }} || <!--TET--> || 17 || <!--M--> || <!--S-->
+|-
+| {{right|1100.00 }} || B || 2<sup>11/12</sup> || 2<sup>11/12</sup> || bgcolor="#EFCFCF" | {{splitspan|Equal-tempered [[major seventh]]|{{audio|help=no|Major seventh on C.mid|play}} }} || 12 || <!--L--> || M || <!--S-->
+|-
+| {{right|1102.64 }} || B{{music|up}}{{music|up}}{{music|b}}- || 121 : 64 || 11<sup>2</sup> : 2<sup>6</sup> || bgcolor="#CFCFEF" | {{splitspan|Hundred-twenty-first harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-twenty-first harmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|1107.82 }} || C′{{music|b}}− || 256 : 135 || 2<sup>8</sup> : 3<sup>3</sup>×5 || bgcolor="#CFEFCF" | {{splitspan|Octave − major chroma,<ref name="HF"/> 135th subharmonic, narrow diminished octave{{Citation needed|date=July 2014}}|{{audio|help=no|Octave minus major chroma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1109.78 }} || B+<ref name="Fonville"/> || 243 : 128 || 3<sup>5</sup> : 2<sup>7</sup> || bgcolor="#EFEFCF" | {{splitspan|Pythagorean [[major seventh]]<ref name="HF"/><ref name="Gann"/><ref name="Haluska"/><ref name="Ellis"/>|{{audio|help=no|Pythagorean major seventh on C.mid|play}} }} || <!--TET--> || 3 || <!--M--> || <!--S-->
+|-
+| {{right|1116.88 }} || <!--letter--> || 61 : 32 || 61 : 2<sup>5</sup>|| bgcolor="#BC8F8F" |{{splitspan|Sixty-first harmonic<ref name="Gann"/>|{{audio|help=no|Sixty-first harmonic on C.mid|play}} }} || <!--TET--> || 61 || <!--M--> || <!--S-->
+|-
+| {{right|1125.00 }} || <!--letter--> || 2<sup>15/16</sup> || 2<sup>45/48</sup> || bgcolor="#EFCFCF" | {{splitspan|45 steps in 48 equal temperament|{{audio|help=no|15 steps in 16-et on C.mid|play}} }} || 16, 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1129.33 }} || C′{{music|b}}<ref name="Fonville"/> || 48 : 25 || 2<sup>4</sup>×3 : 5<sup>2</sup>|| bgcolor="#CFEFCF" |{{splitspan|Classic diminished octave,<ref name="HF"/><ref name="Haluska"/> large just [[major seventh]]<ref name="Partch"/>|{{audio|help=no|Classic diminished octave on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1131.02 }} || B{{music|41}} || 123 : 64 || 3×41 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-twenty-third harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-twenty-third harmonic on C.mid|play}} }} || <!--TET--> || 41 || <!--M--> || <!--S-->
+|-
+| {{right|1137.04 }} || B{{music|L}} || 27 : 14 || 3<sup>3</sup> : 2×7 || bgcolor="#CFEFEF" | {{splitspan|Septimal major seventh<ref name="Gann"/>|{{audio|help=no|Septimal major seventh on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|1138.04 }} || C{{music|19}}{{music|13}}{{music|b}} || 247 : 128 || 13×19 : 2<sup>7</sup>|| bgcolor="#CFCFCF" |{{splitspan|Two-hundred-forty-seventh harmonic|{{audio|help=no|Two-hundred-forty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 19 || <!--M--> || <!--S-->
+|-
+| {{right|1145.04 }} || B{{music|31}} || 31 : 16 || 31 : 2<sup>4</sup>|| bgcolor="#BC8F8F" |{{splitspan|Thirty-first harmonic,<ref name="Gann"/> augmented seventh{{Citation needed|date=July 2014}}|{{audio|help=no|Thirty-first harmonic on C.mid|play}} }} || <!--TET--> || 31 || <!--M--> || <!--S-->
+|-
+| {{right|1146.73 }} || C↓ || 64 : 33 || 2<sup>6</sup> : 3×11 || bgcolor="#CFCFEF" | {{splitspan|33rd subharmonic<ref name="Haluska"/>|{{audio|help=no|33rd subharmonic on C.mid|play}} }} || <!--TET--> || 11 || <!--M--> || <!--S-->
+|-
+| {{right|1150.00 }} || B{{music|t}}/C{{music|d}} || 2<sup>23/24</sup> || 2<sup>23/24</sup> || bgcolor="#EFCFCF" | {{splitspan|23 steps in 24 equal temperament|{{audio|help=no|Supermajor seventh on C.mid|play}} }} || 24 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1151.23 }} || C{{music|7}} || 35 : 18 || 5×7 : 2×3<sup>2</sup>|| bgcolor="#CFEFEF" |{{splitspan|Septimal supermajor seventh, septimal quarter tone inverted |{{audio|help=no|Septimal supermajor seventh on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|1158.94 }} || B{{music|#}}<ref name="Fonville"/> || 125 : 64 || 5<sup>3</sup> : 2<sup>6</sup> || bgcolor="#CFEFCF" | {{splitspan|Just [[augmented seventh]],<ref name="Gann"/> 125th harmonic|{{audio|help=no|Just augmented seventh on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1172.74 }} || C{{music|7}}+ || 63 : 32 || 3<sup>2</sup>×7 : 2<sup>5</sup>|| bgcolor="#CFEFEF" |{{splitspan|Sixty-third harmonic<ref name="Gann"/>|{{audio|help=no|Sixty-third harmonic on C.mid|play}} }} || <!--TET--> || 7 || <!--M--> || <!--S-->
+|-
+| {{right|1175.00 }} || <!--letter--> || 2<sup>47/48</sup> || 2<sup>47/48</sup> || bgcolor="#EFCFCF" | {{splitspan|47 steps in 48 equal temperament|{{audio|help=no|47 steps in 48-et on C.mid|play}} }} || 48 || <!--L--> || <!--M--> || <!--S-->
+|-
+| {{right|1178.49 }} || C′− || 160 : 81 || 2<sup>5</sup>×5 : 3<sup>4</sup>|| bgcolor="#CFEFCF" |{{splitspan|Octave − syntonic comma,<ref name="HF"/> semi-diminished octave{{Citation needed|date=July 2014}}|{{audio|help=no|Octave minus syntonic comma on C.mid|play}} }} || <!--TET--> || 5 || <!--M--> || <!--S-->
+|-
+| {{right|1179.59 }} || B{{music|23}}{{music|up}} || 253 : 128 || 11×23 : 2<sup>7</sup>|| bgcolor="#BC8F8F" |{{splitspan|Two-hundred-fifty-third harmonic<ref name="Gann"/>|{{audio|help=no|Two-hundred-fifty-third harmonic on C.mid|play}} }} || <!--TET--> || 23 || <!--M--> || <!--S-->
+|-
+| {{right|1186.42 }} || <!--letter--> || 127 : 64 || 127 : 2<sup>6</sup>|| bgcolor="#BC8F8F" |{{splitspan|Hundred-twenty-seventh harmonic<ref name="Gann"/>|{{audio|help=no|Hundred-twenty-seventh harmonic on C.mid|play}} }} || <!--TET--> || 127 || <!--M--> || <!--S-->
+|-
+| {{right|1200.00 }} || C′ || 2 : 1 || 2 : 1 || bgcolor="#EFCFCF" |{{splitspan|[[Octave]]<ref name="HF"/><ref name="Ellis"/> or ''diapason''<ref name="Partch"/>|{{audio|help=no|Perfect octave on C.mid|play}} }} || 1, 12 || 3 || M || S
+|}

@@ -28,6 +28,7 @@ setup(
         'python-osc',
         'opencv-python',
         'tqdm',
+        'requests'
     ],
     # tests_require=[
     #     'pytest',
