@@ -1,10 +1,10 @@
 from typing import Union
 from fractions import Fraction
 from itertools import cycle
-from ..ut import TemporalUnit, TemporalUnitSequence, TemporalUnitSequenceBlock, TemporalStructure, RhythmTree
+from ..ut import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalUnitSequenceBlock, RhythmTree
 
 
-def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalStructure:
+def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:
     """
     Segments a temporal unit into a new unit with the given ratio. eg, a ratio of 1/3 means
     the new unit will have a prolatio of (1, 2).
@@ -21,39 +21,27 @@ def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalStr
     prolatio = (ratio.numerator, ratio.denominator - ratio.numerator)
     return TemporalUnit(duration=ut.duration, tempus=ut.tempus, prolatio=prolatio, tempo=ut.tempo, beat=ut.beat)
 
-def decompose(structure: TemporalStructure, prolatio: Union[RhythmTree, tuple, str] = 'd') -> TemporalStructure:
+def decompose(ut: TemporalUnit, prolatio: Union[RhythmTree, tuple, str] = 'd') -> TemporalUnitSequence:
     """Decomposes a temporal structure into its constituent parts based on the provided prolatio."""
     
-    match structure:
-        case TemporalUnit():
-            if isinstance(prolatio, tuple):
-                prolatio = [prolatio]
-            elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
-                prolatio = [structure.rtree.subdivisions]
-                
-            prolatio_cycle = cycle(prolatio)
-            
-            return TemporalUnitSequence([
-                TemporalUnit(
-                    span=ratio,
-                    tempus=ratio,
-                    prolatio=next(prolatio_cycle),
-                    tempo=structure.tempo,
-                    beat=structure.beat
-                ) for ratio in structure.rtree.ratios
-            ])
-            
-        case TemporalUnitSequence():
-            raise NotImplementedError("Sequence decomposition not yet implemented")
-            
-        case TemporalUnitSequenceBlock():
-            raise NotImplementedError("Block decomposition not yet implemented")
-            
-        case _:
-            raise ValueError(f"Unknown temporal structure type: {type(structure)}")
+    if isinstance(prolatio, tuple):
+        prolatio = [prolatio]
+    elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
+        prolatio = [ut._rtree._children]
+        
+    prolatio_cycle = cycle(prolatio)
+    
+    return TemporalUnitSequence([
+        TemporalUnit(
+            span     = 1,
+            tempus   = ratio,
+            prolatio = next(prolatio_cycle),
+            tempo    = ut.tempo,
+            beat     = ut.beat
+        ) for ratio in ut._rtree._ratios
+    ])
 
-
-def transform(structure: TemporalStructure) -> TemporalStructure:
+def transform(structure: TemporalMeta) -> TemporalMeta:
     """Transforms a temporal structure into a higher-dimensional structure."""
     
     match structure:

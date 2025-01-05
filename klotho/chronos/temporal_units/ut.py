@@ -104,7 +104,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     @classmethod
     def from_tree(cls, tree:RhythmTree, beat = None, bpm = None):
         return cls(span     = tree._span,
-                   tempus   = tree._root,
+                   tempus   = tree._meas,
                    prolatio = tree._children,
                    beat     = beat,
                    bpm      = bpm)
@@ -308,7 +308,7 @@ class TemporalUnit(metaclass=TemporalMeta):
                     if key in Chronon._PROTECTED_KEYS:
                         raise KeyError(f"Cannot modify protected key: {key}")
                     self._elements[idx][key] = val
-            case _ if isinstance(value.__class__, TemporalMeta):
+            case TemporalMeta():
                 if value.beat is None:
                     value.beat = self._beat
                 if value.bpm is None:
