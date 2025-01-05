@@ -122,7 +122,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def tempus(self):
         """The time signature of the TemporalUnit."""
-        return self._rtree._root
+        return self._rtree._meas
     
     @property
     def prolationis(self):        
@@ -143,7 +143,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     def beat(self):
         """The rhythmic ratio that describes the beat of the TemporalUnit."""
         if self._beat is None:
-            self._beat = Fraction(1, self._rtree._root._denominator)
+            self._beat = Fraction(1, self._rtree._meas._denominator)
         return self._beat
     
     @property
@@ -278,10 +278,6 @@ class TemporalUnit(metaclass=TemporalMeta):
                     self._elements[i]['metric_ratio'] = ratio
                     self._elements[i]['beat']         = self._beat
                     self._elements[i]['bpm']          = self._bpm
-                # case TemporalStructure():
-                #     self._elements[i].offset = onset
-                #     self._elements[i].beat   = self._beat
-                #     self._elements[i].bpm    = self._bpm
                     
     def __getitem__(self, idx: int) -> dict:
         """
@@ -331,12 +327,12 @@ class TemporalUnit(metaclass=TemporalMeta):
     def __str__(self):
         result = (
             f'Span:     {self._rtree.span}\n'
-            f'Tempus:   {self._rtree._root}\n'
+            f'Tempus:   {self._rtree._meas}\n'
             f'Prolatio: {print_subdivisons(self._rtree._children)}\n'
             f'Events:   {len(self)}\n'
             f'Tempo:    {self._beat} = {self._bpm}\n'
             f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n'
-            f'{"-" * 40}\n'
+            f'{"-" * 50}\n'
         )
         return result
 
