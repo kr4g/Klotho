@@ -36,8 +36,8 @@ def decompose(ut: TemporalUnit, prolatio: Union[RhythmTree, tuple, str] = 'd') -
             span     = 1,
             tempus   = ratio,
             prolatio = next(prolatio_cycle),
-            tempo    = ut.tempo,
-            beat     = ut.beat
+            beat     = ut.beat,
+            bpm      = ut.bpm
         ) for ratio in ut._rtree._ratios
     ])
 

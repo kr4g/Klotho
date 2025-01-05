@@ -102,10 +102,10 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._set_elements()
     
     @classmethod
-    def from_tree(cls, tree:RhythmTree, beat = None, bpm = None):
-        return cls(span     = tree._span,
-                   tempus   = tree._meas,
-                   prolatio = tree._children,
+    def from_tree(cls, rt:RhythmTree, beat = None, bpm = None):
+        return cls(span     = rt._span,
+                   tempus   = rt._meas,
+                   prolatio = rt._children,
                    beat     = beat,
                    bpm      = bpm)
 
@@ -174,7 +174,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     def duration(self):
         """The total duration (in seconds) of the TemporalUnit."""
         # return sum(abs(d) for d in self.durations)
-        return beat_duration(ratio      = str(self._rtree._root * self._rtree._span),
+        return beat_duration(ratio      = str(self._rtree._meas * self._rtree._span),
                              bpm        = self.bpm,
                              beat_ratio = self.beat
                 )
@@ -326,7 +326,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         
     def __str__(self):
         result = (
-            f'Span:     {self._rtree.span}\n'
+            f'Span:     {self._rtree._span}\n'
             f'Tempus:   {self._rtree._meas}\n'
             f'Prolatio: {print_subdivisons(self._rtree._children)}\n'
             f'Events:   {len(self)}\n'
@@ -393,15 +393,17 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         self._offset = offset
         self._set_offsets()
     
-    def bpm(self, bpm:Union[None,int,float]):
-        """Sets the bpm for all TemporalUnits in the sequence."""
-        for ut in self._seq:
-            ut.bpm = bpm
-    
     def beat(self, beat:Union[None,Fraction,str]):
         """Sets the beat ratio for all TemporalUnits in the sequence."""
         for ut in self._seq:
             ut.beat = beat
+        self._set_offsets()
+    
+    def bpm(self, bpm:Union[None,int,float]):
+        """Sets the bpm for all TemporalUnits in the sequence."""
+        for ut in self._seq:
+            ut.bpm = bpm
+        self._set_offsets()
     
     def _set_offsets(self):
         """Updates the offsets of all TemporalUnits based on their position in the sequence."""
@@ -521,16 +523,16 @@ class TemporalUnitSequenceBlock(metaclass=TemporalMeta):
             raise ValueError("Axis must be between -1 and 1")
         self._axis = float(axis)
         self._align_sequences()
-        
-    def bpm(self, bpm):
-        """Sets the bpm for all TemporalUnitSequences in the block."""
-        for utseq in self._tb:
-            utseq.bpm(bpm)
             
     def beat(self, beat):
         """Sets the beat ratio for all TemporalUnitSequences in the block."""
         for utseq in self._tb:
             utseq.beat(beat)
+        
+    def bpm(self, bpm):
+        """Sets the bpm for all TemporalUnitSequences in the block."""
+        for utseq in self._tb:
+            utseq.bpm(bpm)
 
     def __iter__(self):
         return iter(self._tb)
