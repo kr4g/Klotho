@@ -327,27 +327,3 @@ def plot_dataframe(df, column_name):
   ax.set_ylabel(column_name + ' (Hz)', color='white')
   ax.tick_params(colors='white')
   ax.grid(True, which="both", ls="--", c='gray')
-
-if __name__ == '__main__':
-  # ------------------------------------------------------------------------------------
-  # SCORE TOOLS
-  # ------------------------------------------------------------------------------------
-  '''
-  --------------------------------------------------------------------------------------
-  HELP
-  --------------------------------------------------------------------------------------
-  '''
-  freqs = [110 * n for n in range(1, 11)]
-  notelist = make_notelist(pfields={
-    # 'start'      : list(np.linspace(0.0833, 13.33, 36)**0.5),
-    'dur'        : [np.random.uniform(0.25, 0.75) for _ in range(36)],
-    'dc'         : [np.random.uniform(0.1, 0.7) for _ in range(23)],
-    'synthName'  : 'OscAM',
-    'frequency'  : freqs,
-    'amplitude'  : [a*0.2 + 0.6*a*(min(freqs) / freqs[i % len(freqs)]) for i, a in enumerate([np.random.uniform(0.005, 0.1) for _ in range(5)])],
-    # 'attackTime' : list(np.linspace(0.3, 0.005, 36)**2),
-    'attackTime' : list(np.linspace(0.6, 0.0, 36)**2),
-    'releaseTime': list(np.linspace(1.0, 0.0, 36)**1.3),
-  })
-  notelist_to_synthSeq(notelist, os.path.join(set_score_path(), 'notelist_gen.synthSequence'))
-  

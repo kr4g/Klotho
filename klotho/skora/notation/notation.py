@@ -66,13 +66,13 @@ def remove_ties(S:Tuple) -> Tuple:
         return tuple(result)        
     return process_tuple(S)
 
-def symbolic_unit(time_signature:Union[Meas, Fraction, str]) -> Fraction:
-    return Fraction(1, symbolic_approx(Meas(time_signature).denominator))
+def symbolic_unit(meas:Union[Meas, Fraction, str]) -> Fraction:
+    return Fraction(1, symbolic_approx(Meas(meas).denominator))
 
-def symbolic_duration(f:int, time_signature:Union[Meas, Fraction, str], S:tuple) -> Fraction:
+def symbolic_duration(f:int, meas:Union[Meas, Fraction, str], S:tuple) -> Fraction:
     # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
-    time_signature = Meas(time_signature)
-    return Fraction(f * time_signature.numerator) / (1 / symbolic_unit(time_signature) * sum_proportions(S))
+    meas = Meas(meas)
+    return Fraction(f * meas.numerator) / (1 / symbolic_unit(meas) * sum_proportions(S))
 
 def get_denom(n:int, n_type:str = 'bin') -> int:
     if n_type == 'bin':
@@ -332,6 +332,11 @@ def notate(rt: RT):
         if children:
             level_sum = sum(abs(rt.graph.nodes[c]['label']) for c in children)
             
+            p_sum = rt.graph.nodes[node]['label'] if node != 0 else rt.graph.nodes[node]['label'].numerator
+            print(f"{level_sum} : {p_sum}")
+            # n, m = get_group_subdivision((p_sum, (level_sum,)))
+            # print(f"n: {n}, m: {m}")
+            
             for child in children:
                 child_label = rt.graph.nodes[child]['label']
                 sym_dur = symbolic_duration(child_label, parent_dur, (level_sum,))
@@ -341,8 +346,7 @@ def notate(rt: RT):
                     hdb = head_dots_beams(unit * mult)
                     print(f"Node {child} -> {hdb}")
                 else:  # internal node
-                    next_dur = symbolic_unit(sym_dur) * child_label
-                    # next_dur = symbolic_unit(sym_dur) * mult
+                    # next_dur = symbolic_unit(sym_dur) * child_label
+                    next_dur = symbolic_unit(sym_dur) * mult
                     _process(child, next_dur)
-    # parent_dur = symbolic_unit(rt.meas.to_fraction()) * rt.meas.numerator
     return _process()

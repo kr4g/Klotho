@@ -7,7 +7,7 @@ Temporal Units
 --------------------------------------------------------------------------------------
 '''
 from fractions import Fraction
-from typing import Union, Protocol, runtime_checkable, Tuple
+from typing import Union, Tuple
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms.rt_algs import auto_subdiv
@@ -27,41 +27,12 @@ class ProlatioTypes(Enum):
     SUBTYPES    = {'s', 'subdivision', 'subdivisions'}
 
 
-@runtime_checkable
-class TemporalStructure(Protocol):
-    """Protocol defining the interface for temporal structures in the chronos system.
-    
-    Any class that implements these properties and methods is considered a temporal structure,
-    regardless of how they're implemented.
-    """
-    
-    @property
-    def offset(self) -> float:
-        """The offset (or absolute start time) in seconds of the structure."""
-        ...
-    
-    @property
-    def duration(self) -> float:
-        """The total duration (in seconds) of the temporal structure."""
-        ...
-    
-    @property
-    def time(self) -> Tuple[float, float]:
-        """The absolute start and end times (in seconds) of the structure."""
-        ...
-    
-    @property
-    def bpm(self, bpm: Union[None, int, float]) -> None:
-        """Sets the bpm for the temporal structure."""
-        ...
-    
-    @property
-    def beat(self, beat: Union[None, 'Fraction', str]) -> None:
-        """Sets the beat ratio for the temporal structure."""
-        ...
+class TemporalMeta(type):
+    """Metaclass for all temporal structures."""
+    pass
 
 
-class Chronon:
+class Chronon(metaclass=TemporalMeta):
     """An indivisible unit of musical time within a TemporalUnit."""
     
     __slots__ = ('_data',)
@@ -111,7 +82,7 @@ class Chronon:
         self._data[key] = value
     
 
-class TemporalUnit:
+class TemporalUnit(metaclass=TemporalMeta):
     def __init__(self,
                  span:Union[int,float,Fraction]            = 1,
                  tempus:Union[Meas,Fraction,int,float,str] = '1/1',
@@ -327,17 +298,13 @@ class TemporalUnit:
         """
         return self._elements[idx]
     
-    def __setitem__(self, idx: int, value: Union[dict,TemporalStructure]):
+    def __setitem__(self, idx: int, value: Union[dict, TemporalMeta]):
         """
         Allows setting values in the TemporalUnit's events while protecting certain keys.
         
         Args:
             idx: The index of the event to modify
-            value: The key-value pair to set
-            
-        Raises:
-            IndexError: If the index is out of range
-            KeyError: If attempting to modify a protected key
+            value: The key-value pair to set or a temporal structure
         """
         match value:
             case dict():
@@ -345,7 +312,7 @@ class TemporalUnit:
                     if key in Chronon._PROTECTED_KEYS:
                         raise KeyError(f"Cannot modify protected key: {key}")
                     self._elements[idx][key] = val
-            case TemporalStructure():
+            case _ if isinstance(value.__class__, TemporalMeta):
                 if value.beat is None:
                     value.beat = self._beat
                 if value.bpm is None:
@@ -353,7 +320,7 @@ class TemporalUnit:
                 value.bpm = value.bpm * (value.duration / self._elements[idx]['duration'])
                 self._elements[idx] = value
             case _:
-                raise TypeError(f"Value must be a dictionary or TemporalStructure")
+                raise TypeError(f"Value must be a dictionary or temporal structure")
     
     def __iter__(self):
         return iter(self._elements)
@@ -366,12 +333,9 @@ class TemporalUnit:
             f'Span:     {self._rtree.span}\n'
             f'Tempus:   {self._rtree._root}\n'
             f'Prolatio: {print_subdivisons(self._rtree._children)}\n'
-            # f'Prolatio: {self._type.value}\n'
-            # f'Prolatio: {self.display()}\n'
             f'Events:   {len(self)}\n'
             f'Tempo:    {self._beat} = {self._bpm}\n'
             f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n'
-            # f'{self.display()}\n'
             f'{"-" * 40}\n'
         )
         return result
@@ -379,98 +343,12 @@ class TemporalUnit:
     def __repr__(self):
         return self.__str__()
 
-    def to_dict(self):
-        """Serializes the TemporalUnit into a dictionary for visualization."""
-        return {
-            'events': [{
-                'start'        : event['start'],
-                'duration'     : event['duration'],
-                'metric_ratio' : str(event['metric_ratio']),
-            } for event in self.events],
-            'bpm'  : self.bpm,
-            'beat' : str(self.beat),
-            'time' : self.time
-        }
-
-    def display(self) -> str:
-        """
-        Returns a string representation of the TemporalUnit as blocks.
-        
-        Returns:
-            str: Visual representation of the temporal unit using block characters
-        """
-        total_width = 60
-        
-        total_duration = sum(abs(d) for d in self.durations)
-        blocks = []
-        
-        for duration, ratio in zip(self.durations, self._rtree._ratios):
-            rel_width = round((abs(duration) / total_duration) * total_width, 0)
-            char = "█" if duration > 0 else "░"
-            block = char * int(max(rel_width, 1))
-            blocks.append(block)
-        
-        return " ".join(blocks)
-
-    def save_image(self, filename: str, width: int = 500, height: int = 25) -> None:
-        """
-        Saves the temporal unit visualization as a PDF image.
-        
-        Args:
-            filename: Path where to save the image (should end in .pdf)
-            width: Width in points (1/72 inch)
-            height: Height in points
-        """
-        import cairo
-        
-        # Colors (RGB values from 0 to 1)
-        BLACK = (0, 0, 0)
-        GRAY = (0.5, 0.5, 0.5)
-        WHITE = (1, 1, 1)
-        BORDER = 1
-        
-        # Create PDF surface
-        surface = cairo.PDFSurface(filename, width, height)
-        ctx = cairo.Context(surface)
-        
-        # Calculate total duration and positions
-        total_duration = sum(abs(d) for d in self.durations)
-        current_x = 0
-        
-        for duration in self.durations:
-            # Calculate width for this segment
-            block_width = (abs(duration) / total_duration) * width
-            if block_width == 0:
-                continue
-            
-            # Set fill color and draw rectangle
-            if duration < 0:
-                ctx.set_source_rgb(*GRAY)
-            else:
-                ctx.set_source_rgb(*BLACK)
-            
-            ctx.rectangle(current_x, 0, block_width, height)
-            ctx.fill()
-            
-            # Draw white border
-            if current_x > 0:  # Draw left border if not first segment
-                ctx.set_source_rgb(*WHITE)
-                ctx.set_line_width(BORDER)
-                ctx.move_to(current_x, 0)
-                ctx.line_to(current_x, height)
-                ctx.stroke()
-            
-            current_x += block_width
-        
-        # Clean up
-        surface.finish()
-
 
 class TemporalUnitMatrix:
     pass
 
 
-class TemporalUnitSequence:
+class TemporalUnitSequence(metaclass=TemporalMeta):
     """A sequence of TemporalUnit objects that represent consecutive temporal events."""
     
     def __init__(self, ut_seq:list[TemporalUnit]=[]):
@@ -541,7 +419,7 @@ class TemporalUnitSequence:
         return len(self._seq)
 
 
-class TemporalUnitSequenceBlock:
+class TemporalUnitSequenceBlock(metaclass=TemporalMeta):
     """A collection of parallel TemporalUnitSequences that represent simultaneous temporal events."""
     
     def __init__(self, tb:list[TemporalUnitSequence]=[]):
@@ -556,7 +434,8 @@ class TemporalUnitSequenceBlock:
     @classmethod
     def from_tree_mat(cls, matrix, meas_denom:int=1, subdiv:bool=False,
                       rotation_offset:int=1, beat=None, bpm=None):
-        """Creates a TemporalUnitSequenceBlock from a matrix of tree specifications.
+        """
+        Creates a TemporalUnitSequenceBlock from a matrix of tree specifications.
         
         Args:
             matrix: Input matrix containing duration and subdivision specifications
@@ -632,7 +511,8 @@ class TemporalUnitSequenceBlock:
     
     @axis.setter
     def axis(self, axis: float):
-        """Sets the temporal axis position of the block and realigns sequences.
+        """
+        Sets the temporal axis position of the block and realigns sequences.
         
         Args:
             axis: Float between -1 and 1, where:
@@ -660,6 +540,6 @@ class TemporalUnitSequenceBlock:
         return iter(self._tb)
 
 
-class TemporalComposition:
+class TemporalComposition(metaclass=TemporalMeta):
     pass
     

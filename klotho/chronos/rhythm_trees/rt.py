@@ -280,8 +280,8 @@ class RhythmTree(Tree):
                  span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '1/1',
                  subdivisions:Tuple            = (1,1)):
-        
-        super().__init__(Meas(meas), subdivisions)
+        self._meas = Meas(meas)
+        super().__init__(self._meas.numerator, subdivisions)
         self._span = span
         self._ratios = self._evaluate()
         self._type = self._set_type()
@@ -303,7 +303,7 @@ class RhythmTree(Tree):
 
     @property
     def meas(self):
-        return self._root
+        return self._meas
 
     @property
     def subdivisions(self):
@@ -318,8 +318,9 @@ class RhythmTree(Tree):
         return self._type
 
     def _evaluate(self):
-        self.graph.nodes[0]['span'] = self._span
-        def process_subtree(node=0, parent_ratio=self._span * self._root.to_fraction()):
+        # self.graph.nodes[0]['span'] = self._span
+        self.graph.nodes[0]['ratio'] = self._meas
+        def _process_subtree(node=0, parent_ratio=self._span * self._meas.to_fraction()):
             self.graph.nodes[node]['proportion'] = self.graph.nodes[node]['label']
             children = list(self.graph.successors(node))
             
@@ -335,29 +336,32 @@ class RhythmTree(Tree):
                 ratio = Fraction(s, div) * parent_ratio
                 self.graph.nodes[child]['ratio'] = ratio
                 if self.graph.out_degree(child) > 0:
-                    process_subtree(child, ratio)
+                    _process_subtree(child, ratio)
         
-        process_subtree()
+        _process_subtree()
         return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
     
     def _set_type(self):
         div = sum_proportions(self._children)
-        if bin(div).count('1') != 1 and div != self._root.numerator:
+        if bin(div).count('1') != 1 and div != self._meas.numerator:
             return 'complex'
         return 'complex' if measure_complexity(self._children) else 'simple'
 
     def __len__(self):
         return len(self._ratios)
 
-    def __repr__(self):
+    def __str__(self):
         subdivs = print_subdivisons(self._children)
         ratios = ', '.join(tuple([str(r) for r in self._ratios]))
         return (
             f'Span:         {self._span}\n'
-            f'Meas:         {self._root}\n'
+            f'Meas:         {self._meas}\n'
             f'Subdivisions: {subdivs}\n'
             f'Ratios:       {ratios}\n'
             # f'Type:          {self._type}\n'
         )
+
+    def __repr__(self):
+        return self.__str__()
 
 # ------------------------------------------------------------------------------------
