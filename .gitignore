@@ -20,3 +20,5 @@ ut_plotter/
 .ipynb_checkpoints/
 *.pdf
 *.zip
+*.ly
+/venv/
