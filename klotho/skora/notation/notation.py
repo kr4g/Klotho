@@ -3,6 +3,7 @@ from fractions import Fraction
 from math import gcd, lcm, prod, floor, log
 from ...chronos.rhythm_trees import Meas, RhythmTree as RT
 from ...chronos.rhythm_trees.algorithms import sum_proportions
+import abjad
 
 # ------------------------------------------------------------------------------------
 # NOTATION
@@ -30,13 +31,13 @@ def add_tie(n) -> Union[int, Tuple[int]]:
             return (-p, -add_tie(n - p))
     
 def add_ties(S:Tuple) -> Tuple:
-    S = remove_ties(S)
+    # S = remove_ties(S)
     def process_tuple(t):
         result = []
         for value in t:
             if isinstance(value, tuple):
-                processed_tuple = process_tuple(value)
-                result.append(processed_tuple)
+                processed_tuple = process_tuple(value[1])
+                result.append((value[0], processed_tuple))
             elif isinstance(value, int):
                 v = add_tie(value)
                 result.extend(v if isinstance(v, tuple) else (v,))
@@ -72,7 +73,8 @@ def symbolic_unit(meas:Union[Meas, Fraction, str]) -> Fraction:
 def symbolic_duration(f:int, meas:Union[Meas, Fraction, str], S:tuple) -> Fraction:
     # ds (f,m) = (f * numerator (D)) / (1/us (m) * sum of elements in S)
     meas = Meas(meas)
-    return Fraction(f * meas.numerator) / (1 / symbolic_unit(meas) * sum_proportions(S))
+    # return Fraction(f * meas.numerator) / (1 / symbolic_unit(meas) * sum_proportions(S))
+    return Fraction(f * meas.numerator) / (Fraction(1, symbolic_unit(meas)) * sum_proportions(S))
 
 def get_denom(n:int, n_type:str = 'bin') -> int:
     if n_type == 'bin':
@@ -157,7 +159,7 @@ def is_ternary(durtot:Fraction) -> bool:
 
 def create_tuplet(G):
     D, S = G
-    div = sum_proportions(S)
+    div = int(sum_proportions(S))
     n, m = div, D
     
     if n > m and n % 2 == 0:
@@ -173,6 +175,10 @@ def create_tuplet(G):
     elif m < n and m % 2 == 0:
         while (new_m := m * 2) <= n and new_m % 2 == 0:
             m = new_m
+            
+    n = int(n)
+    m = int(m)
+    
     if n == m:
         return None
     return [n, m]
@@ -262,20 +268,21 @@ def get_group_subdivision(G:tuple) -> List[int]:
     return [n, m];
     '''
     D, S = G
-    ds = D
-    subdiv = sum_proportions(S)
+    # ds = D
+    subdiv = int(sum_proportions(S))
+    ds = symbolic_duration(D, symbolic_unit(f'{1}/{subdiv}'), S)
     
     if subdiv == 1:
         n = ds
-    elif (ds / subdiv).is_integer() and ((ds // subdiv).bit_length() == 1 or (subdiv // ds).bit_length() == 1):
+    elif float(ds / subdiv).is_integer() and ((ds // subdiv).bit_length() == 1 or (subdiv // ds).bit_length() == 1):
         n = ds
     else:
         n = subdiv
     
-    ratio = Fraction(ds, subdiv)
-    if is_binary(ratio):
+    # ratio = Fraction(ds, subdiv)
+    if is_binary(ds):
         m = symbolic_approx(n)
-    elif is_ternary(ratio):
+    elif is_ternary(ds):
         m = int(symbolic_approx(n) * 3 / 2)
     else:
         num = n.numerator if isinstance(n, Fraction) else n
@@ -292,61 +299,248 @@ def get_group_subdivision(G:tuple) -> List[int]:
             m = ps if abs(n - pi) > abs(n - ps) else pi
     return [n, m]
 
-# def notate(tree):
-#     def _notate(tree, level=0):
-#         if level == 0:
-#             return f'\\time {tree.meas}\n' + _notate(tree, level + 1)
+def notate_rt(rt: RT) -> str:
+    """Generate Lilypond notation from a RhythmTree.
+    Returns a string of Lilypond code."""
+    
+    _rt = rt  # RT(meas=rt.meas, subdivisions=add_ties(rt.subdivisions))
+    
+    def _process_node(node=0, parent_dur=symbolic_unit(_rt.meas) * _rt.meas.numerator) -> str:
+        children = list(_rt.graph.successors(node))
+        if not children:
+            return ""
         
-#         # print(f'tree: {tree}, level: {level}')
-#         if level == 1:
-#             S = add_ties(tree.subdivisions)
-#             tup = tree.meas.numerator, (sum_proportions(tree.subdivisions),)
-#             n, m = get_group_subdivision(tup)
-#             if n == m: # no tuplet
-#                 return _notate(S, level + 1)
-#             return f'\\tuplet {n}/{m} ' + '{' + _notate(S, level + 1) + '}'
-#         else:
-#             result = ""
-#             for element in tree:
-#                 if isinstance(element, (int, float)):      # Rest or single note
-#                     if element < 0:     # Rest
-#                         result += f" r{abs(element)}"
-#                     else:       # Single note
-#                         result += f" {element}"
-#                 elif isinstance(element, tuple):           # Subdivision                
-#                     D, S = element
-#                     tup = D, (sum_proportions(S),)
-#                     n, m = get_group_subdivision(tup)
-#                     if n == m:
-#                         result += f' {_notate(S, level + 1)}'
-#                     else:
-#                         result += f' \\tuplet {n}/{m} ' + '{' + _notate(S, level + 1) + '}'
-#                 if level == 0:
-#                     result = result.strip() + ' '
-#             return result.strip()
-#     return _notate(tree)
+        level_sum = sum(abs(_rt.graph.nodes[c]['label']) for c in children)
+        p_sum = _rt.graph.nodes[node]['label'] if node != 0 else _rt.graph.nodes[node]['label'].numerator
+        
+        tuplet = create_tuplet((p_sum, (level_sum,)))
+        # tuplet = get_group_subdivision((p_sum, (level_sum,)))
+        
+        child_notes = []
+        for i, child in enumerate(children):
+            child_label = _rt.graph.nodes[child]['label']
+            is_tied = isinstance(child_label, float)
+            
+            value = int(child_label) if is_tied else child_label
+            
+            sym_dur = symbolic_duration(value, parent_dur, (level_sum,))
+            unit = symbolic_unit(sym_dur)
+            mult = sym_dur.numerator if unit == sym_dur else value
+            
+            if _rt.graph.out_degree(child) == 0:  # leaf node
+                hdb = head_dots_beams(unit * Fraction(mult))
+                note_type = hdb[0]
+                dots = '.' * hdb[1]
+                beams = hdb[2]
+                
+                base_duration = {
+                    'square': '\\longa',
+                    'whole': '1',
+                    'half': '2',
+                    'quarter': '4',
+                }[note_type]
+                
+                if isinstance(base_duration, str) and base_duration.startswith('\\'): 
+                    actual_duration = base_duration
+                else:
+                    duration_value = int(base_duration)
+                    if beams > 0:
+                        duration_value *= 2 ** beams
+                    actual_duration = str(int(duration_value))
+                
+                is_rest = value < 0
+                note = f"r{actual_duration}{dots}" if is_rest else f"bd{actual_duration}{dots}"
+                
+                if i > 0 and is_tied:
+                    child_notes[-1] += " ~"
+                
+                child_notes.append(note)
+            else:
+                next_dur = symbolic_unit(sym_dur) * mult
+                child_notes.append(_process_node(child, next_dur))
+        
+        result = ' '.join(child_notes)
+        
+        if tuplet:
+            n, m = tuplet
+            result = f"\\tuplet {n}/{m} {{ {result} }}"
+            # result = f"\\tuplet {n}/{p_sum} {{ {result} }}"
+        
+        return result
 
-def notate(rt: RT):
-    def _process(node=0, parent_dur=symbolic_unit(rt.meas) * rt.meas.numerator):
+    lily_code = f"\\time {_rt.meas}\n"
+    lily_code += _process_node()
+    
+    return lily_code
+
+def create_lily_file(rt: RT, filename: str = "rhythm") -> str:
+    """Create a complete Lilypond file from a RhythmTree.
+    
+    Args:
+        rt: RhythmTree instance
+        filename: Output filename (without extension)
+    
+    Returns:
+        Complete Lilypond code as string
+    """
+    lily_code = f'''\\version "2.24.0"
+    \\header {{
+        title = "{rt.subdivisions}"
+        tagline = ##f
+    }}
+
+    \\score {{
+        \\new DrumStaff \\with {{
+            \\override StaffSymbol.line-count = #1
+            drumStyleTable = #drums-style
+            \\override Stem.direction = #up
+        }} {{
+            \\override Score.TupletNumber.text = #(lambda (grob) (tuplet-number::calc-fraction-text grob))
+            \\drummode {{
+                {notate_rt(rt)}
+            }}
+        }}
+        \\layout {{ }}
+    }}'''
+    
+    # Write to file
+    with open(f"{filename}.ly", "w") as f:
+        f.write(lily_code)
+    
+    return lily_code
+
+def notate_multiple_rts(rts: List[RT]) -> List[str]:
+    """Generate Lilypond notation for multiple RhythmTrees.
+    Returns a list of strings, each containing Lilypond code for a separate staff."""
+    
+    def _process_node(rt:RT, node:int=0, parent_dur=None) -> str:
         children = list(rt.graph.successors(node))
-        if children:
-            level_sum = sum(abs(rt.graph.nodes[c]['label']) for c in children)
+        if not children:
+            return ""
+        
+        level_sum = sum(abs(rt.graph.nodes[c]['label']) for c in children)
+        p_sum = rt.graph.nodes[node]['label'] if node != 0 else rt.graph.nodes[node]['label'].numerator
+        
+        tuplet = create_tuplet((p_sum, (level_sum,)))
+        # tuplet = get_group_subdivision((p_sum, (level_sum,)))
+        # tuplet = (int(level_sum), int(p_sum))
+        
+        child_notes = []
+        for i, child in enumerate(children):
+            child_label = rt.graph.nodes[child]['label']
+            is_tied = isinstance(child_label, float)
             
-            p_sum = rt.graph.nodes[node]['label'] if node != 0 else rt.graph.nodes[node]['label'].numerator
-            print(f"{level_sum} : {p_sum}")
-            # n, m = get_group_subdivision((p_sum, (level_sum,)))
-            # print(f"n: {n}, m: {m}")
+            value = int(child_label) if is_tied else child_label
             
-            for child in children:
-                child_label = rt.graph.nodes[child]['label']
-                sym_dur = symbolic_duration(child_label, parent_dur, (level_sum,))
-                unit = symbolic_unit(sym_dur)
-                mult = sym_dur.numerator if unit == sym_dur else child_label
-                if rt.graph.out_degree(child) == 0:  # leaf node
-                    hdb = head_dots_beams(unit * mult)
-                    print(f"Node {child} -> {hdb}")
-                else:  # internal node
-                    # next_dur = symbolic_unit(sym_dur) * child_label
-                    next_dur = symbolic_unit(sym_dur) * mult
-                    _process(child, next_dur)
-    return _process()
+            # sym_dur = symbolic_duration(value, parent_dur, (level_sum,))
+            sym_dur = rt.graph.nodes[child]['ratio']
+            unit = symbolic_unit(sym_dur)
+            
+            if isinstance(sym_dur, float):
+                sym_dur = Fraction(sym_dur).limit_denominator()
+            
+            # mult = sym_dur.numerator if unit == sym_dur else value
+            mult = 1 if unit == sym_dur else abs(value)
+            note_duration = unit * Fraction(mult)
+            
+            if rt.graph.out_degree(child) == 0:  # leaf node
+                hdb = head_dots_beams(note_duration)
+                note_type = hdb[0]
+                dots = '.' * hdb[1]
+                beams = hdb[2]
+                
+                base_duration = {
+                    'square': '\\longa',
+                    'whole': '1',
+                    'half': '2',
+                    'quarter': '4',
+                }[note_type]
+                
+                if isinstance(base_duration, str) and base_duration.startswith('\\'): 
+                    actual_duration = base_duration
+                else:
+                    duration_value = int(base_duration)
+                    if beams > 0:
+                        duration_value *= 2 ** beams
+                    actual_duration = str(int(duration_value))
+                
+                is_rest = value < 0
+
+                note = f"r{actual_duration}{dots}" if is_rest else f"c{actual_duration}{dots}"
+                
+                if i > 0 and is_tied:
+                    child_notes[-1] += " ~"
+                
+                child_notes.append(note)
+            else:
+                # next_dur = symbolic_unit(sym_dur) * mult
+                next_dur = note_duration
+                child_notes.append(_process_node(rt, child, next_dur))
+        
+        result = ' '.join(child_notes)
+        
+        if tuplet:
+            n, m = tuplet
+            if n.bit_length() != 1 and not ((n/m).is_integer() or (m/n).is_integer()):
+                result = f"\\tuplet {n}/{m} {{ {result} }}"
+                # result = f"\\tuplet {n}/{p_sum} {{ {result} }}"
+        
+        return result
+
+    lily_codes = []
+    for rt in rts:
+        parent_dur = symbolic_unit(rt.meas) * rt.meas.numerator
+        lily_code = f"\\time {rt.meas}\n"
+        lily_code += _process_node(rt, parent_dur=parent_dur)
+        lily_codes.append(lily_code)
+    
+    return lily_codes
+
+def create_lily_file_multiple(rts: List[RT], filename: str = "my_rhythms") -> str:
+    """Create a complete Lilypond file from multiple RhythmTrees.
+    
+    Args:
+        rts: List of RhythmTree instances
+        filename: Output filename (without extension)
+    
+    Returns:
+        Complete Lilypond code as string
+    """
+    lily_codes = notate_multiple_rts(rts)
+    
+    lily_code = f'''\\version "2.24.0"
+    \\header {{
+        title = "Multiple Rhythm Trees"
+        tagline = ##f
+    }}
+    
+    \\score {{
+        <<
+    '''
+    
+    for i, code in enumerate(lily_codes):
+        lily_code += f'''
+        \\new RhythmicStaff {{
+            \\override Score.TupletNumber.text = #(lambda (grob) (tuplet-number::calc-fraction-text grob))
+            {code}
+        }}
+        '''
+    
+    lily_code += '''
+        >>
+        \\layout {
+            \\context {
+                \\Score
+                \\remove "Bar_number_engraver"
+                \\override SpacingSpanner.uniform-stretching = ##t
+                proportionalNotationDuration = #(ly:make-moment 1/22)
+            }
+        }
+    }
+    '''
+    
+    # Write to file
+    with open(f"{filename}.ly", "w") as f:
+        f.write(lily_code)
+    
+    return lily_code

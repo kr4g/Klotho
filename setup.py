@@ -28,7 +28,9 @@ setup(
         'python-osc',
         'opencv-python',
         'tqdm',
-        'requests'
+        'requests',
+        'abjad',
+        'jupyter'
     ],
     # tests_require=[
     #     'pytest',

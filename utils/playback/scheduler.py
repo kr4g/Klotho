@@ -16,7 +16,7 @@ class EventBuilder:
         self._add_event()
             
     def _add_event(self):
-        args = [str(self), self.synth_name, self.start] + [item for sublist in self.params.items() for item in sublist]
+        args = [self.uid, self.synth_name, self.start] + [item for sublist in self.params.items() for item in sublist]
         event_type = self.event_type
         heapq.heappush(self.scheduler.events, (self.start, (event_type, args)))
         self.scheduler.total_events += 1
@@ -27,39 +27,6 @@ class EventBuilder:
     def __repr__(self):
         return self.uid
 
-class SchedulerClient:
-    def __init__(self, ip:str='127.0.0.1', send_port:int=9000):
-        self.client = udp_client.SimpleUDPClient(ip, send_port)
-        
-    def new_synth(self, synth_name:str = None, start:float = 0, **params):
-        uid = str(uuid4()).replace('-', '')
-        msg = osc_message_builder.OscMessageBuilder(address='/new_synth')
-        msg.add_arg(uid)
-        msg.add_arg(synth_name)
-        msg.add_arg(start)
-        for key, value in params.items():
-            msg.add_arg(key)
-            msg.add_arg(value)
-        self.client.send(msg.build())
-        return uid
-
-    def set_synth(self, uid:str, start:float, **params):
-        msg = osc_message_builder.OscMessageBuilder(address='/set_synth')
-        msg.add_arg(uid)
-        msg.add_arg(start)
-        for key, value in params.items():
-            msg.add_arg(key)
-            msg.add_arg(value)
-        self.client.send(msg.build())
-    
-    def clear_events(self):
-        self.client.send(osc_message_builder.OscMessageBuilder(address='/clear_events').build())
-    
-    def start(self):
-        self.client.send(osc_message_builder.OscMessageBuilder(address='/start').build())
-        
-    def reset(self):
-        self.client.send(osc_message_builder.OscMessageBuilder(address='/reset').build())
 
 class Scheduler:
     def __init__(self, ip:str='127.0.0.1', send_port:int=57121, receive_port:int=9000):
@@ -82,23 +49,28 @@ class Scheduler:
         self.dispatcher.map("/clear_events", self.clear_events)
         
         self.server = osc_server.ThreadingOSCUDPServer((ip, receive_port), self.dispatcher)
-        self.server_thread = threading.Thread(target=self.server.serve_forever)
-        # self.server_thread.start()
+        self.server_thread = None
+        self.running = False
         self.send_progress = None
         self.process_progress = None
         
     def init_progress_bars(self):
+        if self.send_progress:
+            self.send_progress.close()
+        if self.process_progress:
+            self.process_progress.close()
+            
         self.send_progress = tqdm(total=self.total_events, 
                                 desc="Ready to send", 
                                 unit="events",
                                 position=0,
-                                leave=False)
+                                leave=True)
         
         self.process_progress = tqdm(total=self.total_events,
                                    desc="Ready to process",
                                    unit="events",
                                    position=1,
-                                   leave=False)
+                                   leave=True)
     
     def reset_progress_bars(self):
         if self.send_progress:
@@ -178,8 +150,8 @@ class Scheduler:
             self.client.send(msg.build())
             self.events_sent += 1
             self.send_progress.update(1)
-            # self.process_progress.total = self.events_sent
-            # self.process_progress.refresh()
+            self.process_progress.total = self.events_sent
+            self.process_progress.refresh()
             time.sleep(0.01)
 
         eot_msg = osc_message_builder.OscMessageBuilder(address='/storeEvent')
@@ -187,34 +159,34 @@ class Scheduler:
         self.client.send(eot_msg.build())
         self.send_progress.set_description("All Events Sent")
 
-    def clear_events(self):
+    def clear_events(self, address=None, *args):
         self.events = []
         self.total_events = 0
         self.events_processed = 0
         self.events_sent = 0
         self.paused = True
-        self.reset_progress_bars()
+        if self.send_progress:
+            self.send_progress.reset()
+        if self.process_progress:
+            self.process_progress.reset()
 
     def stop_server(self):
-        self.server.shutdown()
-        self.server_thread.join()
-        # exit(0)
+        if self.running:
+            self.server.shutdown()
+            if self.server_thread and self.server_thread.is_alive():
+                self.server_thread.join()
+            self.server_thread = None
+            self.running = False
+            if self.send_progress:
+                self.send_progress.close()
+            if self.process_progress:
+                self.process_progress.close()
 
     def run(self):
-        self.server_thread.start()
-        self.init_progress_bars()
-        # self.send_events()
-        # self.stop_server()
-
-if __name__ == '__main__':
-    print('Scheduler server initialized and running...')
-    scheduler = Scheduler()
-    scheduler.run()
-    # scheduler.init_progress_bars()
-    # scheduler.server_thread.start()
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down scheduler server...")
-        scheduler.stop_server()
+        if not self.running:
+            self.running = True
+            self.server_thread = threading.Thread(target=self.server.serve_forever)
+            self.server_thread.start()
+            self.init_progress_bars()
+        else:
+            print("Server is already running")

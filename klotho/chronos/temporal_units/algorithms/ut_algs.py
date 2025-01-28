@@ -42,7 +42,6 @@ def decompose(ut: TemporalUnit, prolatio: Union[RhythmTree, tuple, str] = 'd') -
     ])
 
 def transform(structure: TemporalMeta) -> TemporalMeta:
-    """Transforms a temporal structure into a higher-dimensional structure."""
     
     match structure:
         case TemporalUnit():

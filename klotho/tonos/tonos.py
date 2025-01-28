@@ -8,14 +8,15 @@ frequency.
 --------------------------------------------------------------------------------------
 '''
 from typing import Union, List, Tuple, Dict, Set
+from collections import namedtuple
 from fractions import Fraction
 import numpy as np
 
 A4_Hz   = 440.0
 A4_MIDI = 69
 
-from utils.data_structures.enums import DirectValueEnumMeta, Enum
-      
+from utils.data_structures.enums import DirectValueEnumMeta, Enum  
+
 class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
   class N_TET_12(Enum, metaclass=DirectValueEnumMeta):
     C  = 0
@@ -42,6 +43,66 @@ class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
     class names:
       as_sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
       as_flats  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+
+
+class Pitch:
+  def __init__(self, pitchclass: str = 'A', octave: int = 4, cents_offset: float = 0.0, partial: int = 1):
+    self._pitchclass = pitchclass
+    self._octave = octave
+    self._cents_offset = cents_offset
+    self._partial = partial
+  
+  @property
+  def pitchclass(self):
+    return self._pitchclass
+  
+  @property
+  def octave(self):
+    return self._octave
+  
+  @property
+  def cents_offset(self):
+    return self._cents_offset
+  
+  @property
+  def partial(self):
+    return self._partial
+  
+  @property
+  def virtual_fundamental(self):
+    return Pitch(*partial_to_fundamental(self._pitchclass, self._octave, self._partial, self._cents_offset))
+  
+  @property
+  def freq(self):
+    return pitchclass_to_freq(self._pitchclass, self._octave, self._cents_offset)
+  
+  @cents_offset.setter
+  def cents_offset(self, value):
+    self._cents_offset = value
+  
+  @partial.setter
+  def partial(self, value):
+    self._partial = value
+  
+  def __str__(self):
+    cents_offset = f'({self._cents_offset:+0.2f} cents)' if round(self._cents_offset, 2) != 0 else ''
+    base_str = (
+      f'Name:          {self._pitchclass}{self._octave} {cents_offset}\n'
+      f'Frequency:     {round(self.freq, 4)} Hz'
+    )
+    
+    # if self._partial != 1:
+    #   base_str += (
+    #     f'\nPartial:       {self._partial}\n'
+    #     f'Virtual Fund.: {self.virtual_fundamental.pitchclass}{self.virtual_fundamental.octave} '
+    #     f'({self.virtual_fundamental.cents_offset:+0.4f} cents)'
+    #   )
+    
+    return base_str + '\n'
+    
+  def __repr__(self):
+    return self.__str__()
+
 
 def freq_to_midicents(frequency: float) -> float:
   '''
@@ -95,7 +156,7 @@ def midicents_to_freq(midicents: float) -> float:
   '''
   return A4_Hz * (2 ** ((midicents - A4_MIDI * 100) / 1200.0))
 
-def midicents_to_pitchclass(midicents: float) -> str:
+def midicents_to_pitchclass(midicents: float) -> Pitch:
   '''
   Convert MIDI cents to a pitch class with offset in cents.
   
@@ -112,7 +173,8 @@ def midicents_to_pitchclass(midicents: float) -> str:
   octave = int(midi_round // len(PITCH_LABELS)) - 1  # MIDI starts from C-1
   pitch_label = PITCH_LABELS[note_index]
   cents_diff = (midi - midi_round) * 100
-  return f'{pitch_label}{octave}', round(cents_diff, 4)
+  return pitch_label, octave, round(cents_diff, 4)
+  # return Pitch(pitch_label, octave, round(cents_diff, 4))
 
 def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -> float:
   '''
@@ -166,54 +228,93 @@ def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int =
   '''
   return cents_to_setclass(ratio_to_cents(ratio), n_tet, round_to)
 
-def freq_to_pitchclass(freq: float, cent_round: int = 4):
-  '''
-  Converts a frequency to a pitch class with offset in cents.
-  
-  Args:
-    freq: The frequency in Hertz to convert.
-    A4_Hz: The frequency of A4, default is 440 Hz.
-    A4_MIDI: The MIDI note number of A4, default is 69.
-  
-  Returns:
-    A tuple containing the pitch class and the cents offset.
-  '''
-  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
-  n_PITCH_LABELS = len(PITCH_LABELS)
-  midi = A4_MIDI + n_PITCH_LABELS * np.log2(freq / A4_Hz)
-  midi_round = round(midi)
-  note_index = int(midi_round) % n_PITCH_LABELS
-  octave = int(midi_round // n_PITCH_LABELS) - 1  # MIDI starts from C-1
-  pitch_label = PITCH_LABELS[note_index]
-  cents_diff = (midi - midi_round) * 100
-  return f'{pitch_label}{octave}', round(cents_diff, cent_round)
+def freq_to_pitchclass(freq: float, cent_round: int = 4) -> Pitch:
+    '''
+    Converts a frequency to a pitch class with offset in cents.
+    
+    Args:
+        freq: The frequency in Hertz to convert.
+        cent_round: Number of decimal places to round cents to
+    
+    Returns:
+        A tuple containing the pitch class and the cents offset.
+    '''
+    PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
+    n_PITCH_LABELS = len(PITCH_LABELS)
+    midi = A4_MIDI + n_PITCH_LABELS * np.log2(freq / A4_Hz)
+    midi_round = round(midi)
+    note_index = int(midi_round) % n_PITCH_LABELS
+    octave = int(midi_round // n_PITCH_LABELS) - 1  # MIDI starts from C-1
+    pitch_label = PITCH_LABELS[note_index]
+    cents_diff = (midi - midi_round) * 100
+    
+    # Format negative octaves with proper number
+    # octave_str = str(octave) if octave >= 0 else f"-{abs(octave)}"
+    return pitch_label, octave, round(cents_diff, cent_round)
+    # return Pitch(pitch_label, octave, round(cents_diff, cent_round))
 
-def pitchclass_to_freq(pitchclass: str, cent_offset: float = 0.0, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
-  '''
-  Converts a pitch class with offset in cents to a frequency.
-  
-  Args:
-    pitchclass: The pitch class (like "C4") to convert.
-    cent_offset: The cents offset, default is 0.0.
-    A4_Hz: The frequency of A4, default is 440 Hz.
-    A4_MIDI: The MIDI note number of A4, default is 69.
-  
-  Returns:
-    The frequency in Hertz.
-  '''
-  PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
-  if pitchclass[-1].isdigit():
-        note = pitchclass[:-1]
-        octave = int(pitchclass[-1])
-  else:  # Default to octave 4 if no octave is provided
-      note = pitchclass
-      octave = 4
-  note_index = PITCH_LABELS.index(note)
-  midi = note_index + (octave + 1) * 12
-  midi = midi - A4_MIDI
-  midi = midi + cent_offset / 100
-  frequency = A4_Hz * (2 ** (midi / 12))
-  return frequency
+def pitchclass_to_freq(pitchclass: str, octave: int = 4, cent_offset: float = 0.0, hz_round: int = 4, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
+    '''
+    Converts a pitch class with offset in cents to a frequency.
+    
+    Args:
+        pitchclass: The pitch class (like "C4" or "F#-2") to convert.
+        cent_offset: The cents offset, default is 0.0.
+        A4_Hz: The frequency of A4, default is 440 Hz.
+        A4_MIDI: The MIDI note number of A4, default is 69.
+    
+    Returns:
+        The frequency in Hertz.
+    '''
+    # Try both sharp and flat notations
+    SHARP_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
+    FLAT_LABELS = PITCH_CLASSES.N_TET_12.names.as_flats
+    
+    try:
+        note_index = SHARP_LABELS.index(pitchclass)
+    except ValueError:
+        try:
+            note_index = FLAT_LABELS.index(pitchclass)
+        except ValueError:
+            raise ValueError(f"Invalid pitch class: {pitchclass}")
+
+    midi = note_index + (octave + 1) * 12
+    midi = midi - A4_MIDI
+    midi = midi + cent_offset / 100
+    frequency = A4_Hz * (2 ** (midi / 12))
+    return round(frequency, hz_round)
+
+def partial_to_fundamental(pitchclass: str, octave: int = 4, partial: int = 1, cent_offset: float = 0.0) -> Tuple[str, float]:
+    '''
+    Calculate the fundamental frequency given a pitch class and its partial number.
+    
+    Args:
+        pitchclass: The pitch class with octave (e.g., "A4", "C#3", "Bb2")
+        partial: The partial number (integer >= 1)
+        cent_offset: The cents offset from the pitch class, default is 0.0
+        
+    Returns:
+        A tuple containing the fundamental's pitch class with octave and cents offset
+    '''
+    if partial < 1:
+        raise ValueError("Partial number must be 1 or greater")
+
+    freq = pitchclass_to_freq(pitchclass, octave, cent_offset)
+    fundamental_freq = freq / partial
+    return freq_to_pitchclass(fundamental_freq)
+
+def split_interval(interval:Union[int, float, Fraction, str], n:int = 2):
+    result = namedtuple('result', ['sequence', 'k'])
+
+    multiplier = float(Fraction(interval))
+    k = 1
+    while True:
+        d = ((multiplier-1) * k) / n
+        if d.is_integer():
+            sequence = [k + i*int(d) for i in range(n+1)]
+            if sequence[-1] / sequence[0] == multiplier:
+                return result(sequence, k)
+        k += 1
 
 def find_first_equave(harmonic: Union[int, float, Fraction], equave=2, max_equave=None):
   '''
@@ -233,7 +334,7 @@ def find_first_equave(harmonic: Union[int, float, Fraction], equave=2, max_equav
     n_equave += 1
   return None
 
-def equave_reduce(interval:Union[int, float, Fraction], equave:Union[Fraction, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:
+def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fraction, int, str, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:
   '''
   Reduce an interval to within the span of a specified octave.
   
@@ -245,11 +346,13 @@ def equave_reduce(interval:Union[int, float, Fraction], equave:Union[Fraction, f
   Returns:
     The equave-reduced interval as a float.
   '''
+  interval = Fraction(interval)
+  equave = Fraction(equave)
   while interval > equave**n_equaves:
     interval /= equave
   return interval
 
-def fold_interval(interval:Union[Fraction, float, str], equave:Union[Fraction, float, str] = 2, n_equaves:int = 1) -> float:
+def fold_interval(interval:Union[Fraction, int, float, str], equave:Union[Fraction, int, float, str] = 2, n_equaves:int = 1) -> float:
   '''
   Fold an interval to within a specified range.
 
@@ -261,10 +364,8 @@ def fold_interval(interval:Union[Fraction, float, str], equave:Union[Fraction, f
   Returns:
     The folded interval as a float.
   '''
-  if isinstance(interval, str):
-    interval = Fraction(interval)
-  if isinstance(equave, str):
-    equave = Fraction(equave)
+  interval = Fraction(interval)
+  equave = Fraction(equave)  
   while interval < 1/(equave**n_equaves):
     interval *= equave
   while interval > (equave**n_equaves):

@@ -152,7 +152,7 @@ class Sieve:
 
 # --------------------------------------------------------------------------------
 # Combination Sets (CS)
-# ------------------------------
+# ---------------------
 
 class CombinationSet:
   '''
@@ -183,3 +183,63 @@ class CombinationSet:
   
   def _repr__(self) -> str:
     return self.__str__()
+
+
+# ------------------------------------------------------------------------------
+#  Partition Set
+# --------------
+
+class PartitionSet:
+    '''
+    A class that generates integer partitions of a given number into a specified number of parts.
+    Each partition is a way to write n as a sum of k positive integers.
+    '''
+    def __init__(self, n: int, k: int):
+        self._n = n
+        self._k = k
+        self._partitions = self._generate_partitions()
+    
+    @property
+    def n(self):
+        return self._n
+    
+    @property
+    def k(self):
+        return self._k
+    
+    @property
+    def partitions(self):
+        return self._partitions
+    
+    def _generate_partitions(self) -> list:
+        '''
+        Generate all possible partitions of n into k parts using backtracking.
+        
+        Returns:
+            list: A list of lists, where each inner list represents a partition.
+        '''
+        results = []
+        
+        def backtrack(path: list, start: int, remaining: int, k: int):
+            if k == 0:
+                if remaining == 0:
+                    results.append(path[:])
+                return
+            for x in range(start, 0, -1):
+                if x <= remaining:
+                    path.append(x)
+                    backtrack(path, x, remaining - x, k - 1)
+                    path.pop()
+                    
+        backtrack([], self._n, self._n, self._k)
+        return results
+    
+    def __str__(self) -> str:
+        return (
+            f'n:          {self._n}\n'
+            f'k:          {self._k}\n'
+            f'Partitions: {self._partitions}\n'
+        )
+    
+    def __repr__(self) -> str:
+        return self.__str__()

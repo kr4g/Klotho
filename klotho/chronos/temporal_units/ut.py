@@ -102,7 +102,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._set_elements()
     
     @classmethod
-    def from_tree(cls, rt:RhythmTree, beat = None, bpm = None):
+    def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
         return cls(span     = rt._span,
                    tempus   = rt._meas,
                    prolatio = rt._children,

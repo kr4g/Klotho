@@ -13,3 +13,5 @@ python-osc
 opencv-python
 tqdm
 requests
+abjad
+jupyter
