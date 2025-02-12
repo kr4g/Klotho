@@ -101,7 +101,7 @@
 
 #         return pruned_graph
 
-#     def plot_graph(self, figsize=(10, 5)):
+#     def plot_tree(self, figsize=(10, 5)):
 #         root = [n for n, d in self.G.in_degree() if d == 0][0]
 #         pos = self._hierarchy_pos(root)
 #         labels = nx.get_node_attributes(self.G, 'label')

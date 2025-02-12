@@ -45,7 +45,8 @@ class Chronon(metaclass=TemporalMeta):
                  metric_ratio:Union[None,Fraction]=None, beat:Union[None,Fraction]=None,
                  bpm:Union[None,int,float]=None, depth:int=0, parent_ratio:Union[None,Fraction]=None,
                  ancestor_id:int=0, sibling_count:int=1, sibling_index:int=0, node_id:int=0,
-                 parent_duration:float=0.0, proportion:Union[None,Fraction]=None):
+                 parent_duration:float=0.0, proportion:Union[None,Fraction]=None,
+                 parent_id:int=0):
         
         self._data = {
             'start'           : start,
@@ -59,6 +60,7 @@ class Chronon(metaclass=TemporalMeta):
             'depth'           : depth,
             'parent_ratio'    : parent_ratio,
             'parent_duration' : parent_duration,
+            'parent_id'       : parent_id,
             'ancestor_id'     : ancestor_id,
             'sibling_count'   : sibling_count,
             'sibling_index'   : sibling_index
@@ -341,9 +343,10 @@ class TemporalUnit(metaclass=TemporalMeta):
             self._elements[i]['node_id']         = node_id
             self._elements[i]['depth']           = nx.shortest_path_length(G, 0, node_id)
             self._elements[i]['parent_ratio']    = parent_ratio
-            self._elements[i]['parent_duration'] = beat_duration(ratio      = parent_ratio,
+            self._elements[i]['parent_duration'] = beat_duration(ratio      = str(parent_ratio),
                                                                  bpm        = self._bpm,
                                                                  beat_ratio = self._beat)
+            self._elements[i]['parent_id']       = parent_id
             self._elements[i]['ancestor_id']     = ancestor_id
             self._elements[i]['sibling_count']   = sibling_count
             self._elements[i]['sibling_index']   = sibling_index

@@ -74,14 +74,14 @@ def extract_pfields(filepath):
         json_file.write(instruments_json)
         print(f'New JSON file created at: {output_file_path}')
 
-def get_pfields(instrument_file, instrument_name):
-    instruments_dir = './utils/instruments'
+def get_pfields(instrument_name, instruments_dir='utils/instruments', instrument_file='_instrument_classes.json'):
+    # instruments_dir = './utils/instruments'
     base_name = os.path.splitext(os.path.basename(instrument_file))[0] + '.json'
     json_path = os.path.join(instruments_dir, base_name)
 
     # if not os.path.exists(json_path):
     #     extract_pfields(instrument_file)
-    extract_pfields(instrument_file)
+    # extract_pfields(instrument_file)
 
     with open(json_path, 'r') as file:
         instruments_data = json.load(file)

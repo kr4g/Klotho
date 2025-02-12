@@ -4,7 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-def plot_graph(G, attributes=None, invert=True, output_file=None):
+def plot_tree(G, attributes=None, invert=True, output_file=None):
     """
     Plot graph with node labels and optional attributes.
     
@@ -20,8 +20,8 @@ def plot_graph(G, attributes=None, invert=True, output_file=None):
     plt.figure(figsize=(20, 5))
     ax = plt.gca()
     
-    ax.set_facecolor('white')
-    plt.gcf().set_facecolor('white')
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
     
     for node, (x, y) in pos.items():
         label_parts = [str(labels[node])]
@@ -34,18 +34,16 @@ def plot_graph(G, attributes=None, invert=True, output_file=None):
         
         label_text = "\n".join(label_parts)
         
-        # Determine if node is a leaf
         is_leaf = len(list(G.neighbors(node))) == 0
         box_style = "circle,pad=0.3" if is_leaf else "square,pad=0.3"
         
-        # Increased text size with fontsize=12
         ax.text(x, y, label_text, ha='center', va='center', zorder=5, fontsize=16,
-                bbox=dict(boxstyle=box_style, fc="white", ec="black", linewidth=2))
+                bbox=dict(boxstyle=box_style, fc="black", ec="white", linewidth=2),
+                color='white')
     
-    nx.draw_networkx_edges(G, pos, arrows=False, width=2.0)
+    nx.draw_networkx_edges(G, pos, arrows=False, width=2.0, edge_color='white')
     plt.axis('off')
     
-    # Remove padding by setting margins to 0
     plt.margins(x=0)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
@@ -83,3 +81,56 @@ def _hierarchy_pos(G, root, width=1.5, vert_gap=0.2, xcenter=0.5, pos=None, pare
                          inverted=inverted)
             nextx += dx
     return pos
+
+def plot_ratios(ratios, total_value, output_file=None):
+    """
+    Plot ratios as horizontal bars with thin white borders.
+    
+    Args:
+        ratios: List of ratios (positive for white segments, negative for grey "rests")
+        total_value: Total value that the ratios divide (typically a fraction)
+        output_file: Path to save the plot (if None, displays plot)
+    """
+    total_value = float(total_value)
+    
+    plt.figure(figsize=(25, 1))
+    ax = plt.gca()
+    
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
+    
+    total_ratio = sum(abs(r) for r in ratios)
+    segment_widths = [abs(r) * total_value / total_ratio for r in ratios]
+    
+    positions = [0]
+    for width in segment_widths[:-1]:
+        positions.append(positions[-1] + width)
+    
+    bar_height = 0.2
+    border_height = 0.6
+    y_offset_bar = (1 - bar_height) / 2
+    y_offset_border = (1 - border_height) / 2
+    
+    for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):
+        color = '#808080' if ratio < 0 else '#e6e6e6'
+        ax.add_patch(plt.Rectangle((pos, y_offset_bar), width, bar_height, 
+                                 facecolor=color,
+                                 edgecolor=None))
+    
+    for pos in positions + [total_value]:
+        ax.plot([pos, pos], [y_offset_border, y_offset_border + border_height], 
+                color='white', linewidth=2)
+    
+    ax.set_xlim(-0.01, total_value + 0.01)
+    ax.set_ylim(0, 1)
+    plt.axis('off')
+    
+    plt.margins(x=0)
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    
+    if output_file:
+        plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
+        plt.close()
+    else:
+        plt.show()
+

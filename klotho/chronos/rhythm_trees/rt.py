@@ -320,13 +320,12 @@ class RhythmTree(Tree):
     def _evaluate(self):
         self.graph.nodes[0]['ratio'] = self._meas
         def _process_subtree(node=0, parent_ratio=self._span * self._meas.to_fraction()):
-            # Get the node's label value
             label = self.graph.nodes[node]['label']
             
-            # Handle float values as ties
+            # floats = ties
             is_tied = isinstance(label, float)
             self.graph.nodes[node]['tied'] = is_tied
-            # Convert float to int for Fraction calculations
+
             label_value = int(label) if is_tied else label
             
             self.graph.nodes[node]['proportion'] = label_value
@@ -341,10 +340,11 @@ class RhythmTree(Tree):
             
             for child in children:
                 s = self.graph.nodes[child]['label']
-                # Convert float to int for division
+
                 s = int(s) if isinstance(s, float) else s
                 ratio = Fraction(s, div) * parent_ratio
                 self.graph.nodes[child]['ratio'] = ratio
+                self.graph.nodes[child]['proportion'] = s#elf.graph.nodes[child]['label']
                 if self.graph.out_degree(child) > 0:
                     _process_subtree(child, ratio)
         
