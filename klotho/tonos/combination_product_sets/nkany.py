@@ -113,6 +113,9 @@ class NKany(CS, ABC):
       f'Products: {self.products}\n'
       f'Ratios:   {ratios}\n'
     )
+  
+  def __repr__(self):
+    return self.__str__()
 
 
 class Hexany(NKany):
