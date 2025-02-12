@@ -4,7 +4,7 @@ from math import prod
 from fractions import Fraction
 
 from klotho.topos.sets import CombinationSet as CS
-from klotho.tonos.tonos import fold_interval
+from klotho.tonos.tonos import reduce_interval
 
 class NKany(CS, ABC):
   '''
@@ -81,7 +81,7 @@ class NKany(CS, ABC):
     norm_prod = min(products) if self._normalized else 1
     
     for combo, product in combo_to_prod.items():
-      ratio = fold_interval(Fraction(product, norm_prod))
+      ratio = reduce_interval(Fraction(product, norm_prod))
       ratios.append(ratio)
       combo_to_ratio[combo] = ratio
       prod_to_ratio[product] = ratio

@@ -14,6 +14,7 @@ from ..rhythm_trees.algorithms.rt_algs import auto_subdiv
 from klotho.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
 
 from enum import Enum
+import networkx as nx
 
 # Prolationis Types
 class ProlatioTypes(Enum):
@@ -36,19 +37,31 @@ class Chronon(metaclass=TemporalMeta):
     """An indivisible unit of musical time within a TemporalUnit."""
     
     __slots__ = ('_data',)
-    _PROTECTED_KEYS = {'start', 'duration', 'end', 'metric_ratio', 'beat', 'bpm'}
+    _PROTECTED_KEYS = {'start', 'duration', 'end', 'metric_ratio', 'beat', 'bpm',
+                       'node_id', 'depth', 'parent_ratio', 'ancestor_id', 'sibling_count',
+                       'sibling_index', 'parent_duration', 'proportion'}
     
     def __init__(self, start:float=0.0, duration:float=0.0, end:float=0.0,
                  metric_ratio:Union[None,Fraction]=None, beat:Union[None,Fraction]=None,
-                 bpm:Union[None,int,float]=None):
+                 bpm:Union[None,int,float]=None, depth:int=0, parent_ratio:Union[None,Fraction]=None,
+                 ancestor_id:int=0, sibling_count:int=1, sibling_index:int=0, node_id:int=0,
+                 parent_duration:float=0.0, proportion:Union[None,Fraction]=None):
         
         self._data = {
-            'start'        : start,
-            'duration'     : duration,
-            'end'          : end,
-            'metric_ratio' : metric_ratio,
-            'beat'         : beat,
-            'bpm'          : bpm
+            'start'           : start,
+            'duration'        : duration,
+            'end'             : end,
+            'metric_ratio'    : metric_ratio,
+            'proportion'      : proportion,
+            'beat'            : beat,
+            'bpm'             : bpm,
+            'node_id'         : node_id,
+            'depth'           : depth,
+            'parent_ratio'    : parent_ratio,
+            'parent_duration' : parent_duration,
+            'ancestor_id'     : ancestor_id,
+            'sibling_count'   : sibling_count,
+            'sibling_index'   : sibling_index
         }
     
     @property
@@ -68,12 +81,44 @@ class Chronon(metaclass=TemporalMeta):
         return self._data['metric_ratio']
     
     @property
+    def proportion(self):
+        return self._data['proportion']
+    
+    @property
     def beat(self):
         return self._data['beat']
     
     @property
     def bpm(self):
         return self._data['bpm']
+    
+    @property
+    def node_id(self):
+        return self._data['node_id']
+    
+    @property
+    def depth(self):
+        return self._data['depth']
+    
+    @property
+    def parent_ratio(self):
+        return self._data['parent_ratio']
+    
+    @property
+    def parent_duration(self):
+        return self._data['parent_duration']
+    
+    @property
+    def ancestor_id(self):
+        return self._data['ancestor_id']
+    
+    @property
+    def sibling_count(self):
+        return self._data['sibling_count']
+    
+    @property
+    def sibling_index(self):
+        return self._data['sibling_index']
     
     def __getitem__(self, key):
         return self._data[key]
@@ -269,16 +314,40 @@ class TemporalUnit(metaclass=TemporalMeta):
                 raise ValueError(f'Invalid prolatio type: {type(prolatio)}')
 
     def _set_elements(self):
-        for i, (onset, duration, ratio) in enumerate(zip(self.onsets, self.durations, self._rtree._ratios)):
-            match self._elements[i]:
-                case Chronon():
-                    self._elements[i]['start']        = onset
-                    self._elements[i]['duration']     = duration
-                    self._elements[i]['end']          = onset + duration
-                    self._elements[i]['metric_ratio'] = ratio
-                    self._elements[i]['beat']         = self._beat
-                    self._elements[i]['bpm']          = self._bpm
-                    
+        """Updates the chronon elements with timing and tree metadata."""
+        leaf_nodes = self._rtree.leaf_nodes
+        G = self._rtree.graph
+        
+        for i, node_id in enumerate(leaf_nodes):
+            node_data = G.nodes[node_id]
+            
+            parent_id = next(G.predecessors(node_id), None)
+            parent_ratio = G.nodes[parent_id]['ratio'] if parent_id is not None else None
+            
+            path = nx.shortest_path(G, 0, node_id)[1:]
+            ancestor_id = path[0] if len(path) > 0 else 0
+            
+            siblings = list(G.successors(parent_id)) if parent_id is not None else [node_id]
+            sibling_count = len(siblings)
+            sibling_index = siblings.index(node_id)
+            
+            self._elements[i]['start']           = self.onsets[i]
+            self._elements[i]['duration']        = self.durations[i]
+            self._elements[i]['end']             = self.onsets[i] + self.durations[i]
+            self._elements[i]['metric_ratio']    = node_data['ratio']
+            self._elements[i]['proportion']      = node_data['proportion']
+            self._elements[i]['beat']            = self._beat
+            self._elements[i]['bpm']             = self._bpm
+            self._elements[i]['node_id']         = node_id
+            self._elements[i]['depth']           = nx.shortest_path_length(G, 0, node_id)
+            self._elements[i]['parent_ratio']    = parent_ratio
+            self._elements[i]['parent_duration'] = beat_duration(ratio      = parent_ratio,
+                                                                 bpm        = self._bpm,
+                                                                 beat_ratio = self._beat)
+            self._elements[i]['ancestor_id']     = ancestor_id
+            self._elements[i]['sibling_count']   = sibling_count
+            self._elements[i]['sibling_index']   = sibling_index
+            
     def __getitem__(self, idx: int) -> dict:
         """
         Allows indexing into the TemporalUnit to access specific events.

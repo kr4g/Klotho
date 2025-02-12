@@ -1,6 +1,6 @@
 from klotho.topos.graphs import Tree
 from .algorithms.ht_algs import *
-from klotho.tonos import fold_interval
+from klotho.tonos import reduce_interval
 from fractions import Fraction
 
 class HarmonicTree(Tree):
@@ -22,7 +22,7 @@ class HarmonicTree(Tree):
         self._evaluate()
 
     # def _evaluate(self, inverse:bool=False):
-    #     return tuple(fold_interval(
+    #     return tuple(reduce_interval(
     #         interval  = p if not inverse else 1 / p,
     #         equave    = self.__equave,
     #         spans = self.__span) for p in measure_partials(self._children))
@@ -36,13 +36,13 @@ class HarmonicTree(Tree):
             if not children:
                 harmonic = value * factor
                 self.graph.nodes[node]['harmonic'] = harmonic
-                self.graph.nodes[node]['ratio'] = fold_interval(Fraction(harmonic), self._equave, self._span)
+                self.graph.nodes[node]['ratio'] = reduce_interval(Fraction(harmonic), self._equave, self._span)
                 return
             else:
                 for child in children:
                     harmonic = self.graph.nodes[child]['label'] * factor
                     self.graph.nodes[child]['harmonic'] = harmonic
-                    self.graph.nodes[child]['ratio'] = fold_interval(Fraction(harmonic), self._equave, self._span)
+                    self.graph.nodes[child]['ratio'] = reduce_interval(Fraction(harmonic), self._equave, self._span)
                     if self.graph.out_degree(child) > 0:
                         process_subtree(child, harmonic)
         

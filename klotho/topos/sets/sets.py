@@ -134,6 +134,11 @@ class Sieve:
     def compl(self):
         return Operations.complement(self.__S, self.__N)
     
+    @N.setter
+    def N(self, N: int):
+        self.__N = N
+        self.__S = set(np.arange(self._residue, N + 1, self.__modulus))
+    
     def __str__(self) -> str:
         if len(self.__S) > 10:
             sieve = f'{list(self.__S)[:5]} ... {list(self.__S)[-1]}'
@@ -157,7 +162,7 @@ class Sieve:
 class CombinationSet:
   '''
   '''
-  def __init__(self, factors:tuple[int] = ('A', 'B', 'C', 'D'), r:int = 2):
+  def __init__(self, factors:tuple = ('A', 'B', 'C', 'D'), r:int = 2):
     self._factors = tuple(sorted(factors))
     self._r = r
     self._combos = set(combinations(self._factors, self._r))
@@ -243,3 +248,4 @@ class PartitionSet:
     
     def __repr__(self) -> str:
         return self.__str__()
+

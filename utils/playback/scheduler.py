@@ -158,6 +158,7 @@ class Scheduler:
         eot_msg.add_arg('end_of_transmission')
         self.client.send(eot_msg.build())
         self.send_progress.set_description("All Events Sent")
+        # print("All events sent.")
 
     def clear_events(self, address=None, *args):
         self.events = []
@@ -188,5 +189,6 @@ class Scheduler:
             self.server_thread = threading.Thread(target=self.server.serve_forever)
             self.server_thread.start()
             self.init_progress_bars()
+            # print("Server is running.")
         else:
-            print("Server is already running")
+            print("Server is already running.")

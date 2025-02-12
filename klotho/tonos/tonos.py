@@ -11,6 +11,7 @@ from typing import Union, List, Tuple, Dict, Set
 from collections import namedtuple
 from fractions import Fraction
 import numpy as np
+from sympy import Rational, root
 
 A4_Hz   = 440.0
 A4_MIDI = 69
@@ -156,7 +157,7 @@ def midicents_to_freq(midicents: float) -> float:
   '''
   return A4_Hz * (2 ** ((midicents - A4_MIDI * 100) / 1200.0))
 
-def midicents_to_pitchclass(midicents: float) -> Pitch:
+def midicents_to_pitchclass(midicents: float) -> namedtuple:
   '''
   Convert MIDI cents to a pitch class with offset in cents.
   
@@ -166,6 +167,7 @@ def midicents_to_pitchclass(midicents: float) -> Pitch:
   Returns:
     A tuple containing the pitch class and the cents offset.
   '''
+  result = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
   PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
   midi = midicents / 100
   midi_round = round(midi)
@@ -173,7 +175,7 @@ def midicents_to_pitchclass(midicents: float) -> Pitch:
   octave = int(midi_round // len(PITCH_LABELS)) - 1  # MIDI starts from C-1
   pitch_label = PITCH_LABELS[note_index]
   cents_diff = (midi - midi_round) * 100
-  return pitch_label, octave, round(cents_diff, 4)
+  return result(pitch_label, octave, round(cents_diff, 4))
   # return Pitch(pitch_label, octave, round(cents_diff, 4))
 
 def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -> float:
@@ -228,7 +230,7 @@ def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int =
   '''
   return cents_to_setclass(ratio_to_cents(ratio), n_tet, round_to)
 
-def freq_to_pitchclass(freq: float, cent_round: int = 4) -> Pitch:
+def freq_to_pitchclass(freq: float, cent_round: int = 4) -> namedtuple:
     '''
     Converts a frequency to a pitch class with offset in cents.
     
@@ -239,6 +241,7 @@ def freq_to_pitchclass(freq: float, cent_round: int = 4) -> Pitch:
     Returns:
         A tuple containing the pitch class and the cents offset.
     '''
+    result = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
     PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
     n_PITCH_LABELS = len(PITCH_LABELS)
     midi = A4_MIDI + n_PITCH_LABELS * np.log2(freq / A4_Hz)
@@ -248,10 +251,7 @@ def freq_to_pitchclass(freq: float, cent_round: int = 4) -> Pitch:
     pitch_label = PITCH_LABELS[note_index]
     cents_diff = (midi - midi_round) * 100
     
-    # Format negative octaves with proper number
-    # octave_str = str(octave) if octave >= 0 else f"-{abs(octave)}"
-    return pitch_label, octave, round(cents_diff, cent_round)
-    # return Pitch(pitch_label, octave, round(cents_diff, cent_round))
+    return result(pitch_label, octave, round(cents_diff, cent_round))
 
 def pitchclass_to_freq(pitchclass: str, octave: int = 4, cent_offset: float = 0.0, hz_round: int = 4, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
     '''
@@ -304,19 +304,80 @@ def partial_to_fundamental(pitchclass: str, octave: int = 4, partial: int = 1, c
     return freq_to_pitchclass(fundamental_freq)
 
 def split_interval(interval:Union[int, float, Fraction, str], n:int = 2):
+    '''
+    Find the smallest sequence of n+1 integers that form n equal subdivisions of a given interval ratio.
+    
+    For a given interval ratio r and number of divisions n, finds a sequence of integers [a₀, a₁, ..., aₙ]
+    where each adjacent pair forms the same ratio, and aₙ/a₀ equals the target ratio r.
+    
+    Algorithm:
+    1. Initialize k = 1
+    2. Loop:
+        a. Calculate step size d = (r-1)k/n where r is target ratio
+        b. If d is an integer:
+            - Generate sequence [k, k+d, k+2d, ..., k+nd]
+            - If sequence[n]/sequence[0] equals target ratio:
+                return sequence and k
+        c. Increment k
+    
+    Args:
+        interval: The target interval ratio to be subdivided
+        n: Number of equal subdivisions (default: 2)
+        
+    Returns:
+        A named tuple containing:
+            - sequence: List of n+1 integers forming the subdivisions
+            - k: The smallest starting value that produces valid subdivisions
+            
+    Example:
+        split_interval('3/2', 2) returns sequence [4, 5, 6] and k=4
+        because 5/4 = 6/5 = √(3/2)
+    '''
     result = namedtuple('result', ['sequence', 'k'])
 
-    multiplier = float(Fraction(interval))
+    multiplier = Fraction(interval)
     k = 1
     while True:
         d = ((multiplier-1) * k) / n
-        if d.is_integer():
+        if d.denominator == 1:
             sequence = [k + i*int(d) for i in range(n+1)]
-            if sequence[-1] / sequence[0] == multiplier:
+            if Fraction(sequence[-1], sequence[0]) == multiplier:
                 return result(sequence, k)
         k += 1
 
-def find_first_equave(harmonic: Union[int, float, Fraction], equave=2, max_equave=None):
+def harmonic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str]) -> Fraction:
+    '''
+    Calculate the harmonic mean between two values.
+    
+    The harmonic mean is defined as: 2 / (1/a + 1/b)
+    
+    Args:
+        a: First value
+        b: Second value
+        
+    Returns:
+        The harmonic mean as a Fraction
+    '''
+    a, b = Fraction(a), Fraction(b)
+    return 2 / (1/a + 1/b)
+
+def arithmetic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str]) -> Fraction:
+    '''
+    Calculate the arithmetic mean between two values.
+    
+    The arithmetic mean is defined as: (a + b) / 2
+    
+    Args:
+        a: First value
+        b: Second value
+        
+    Returns:
+        The arithmetic mean as a Fraction
+    '''
+    a, b = Fraction(a), Fraction(b)
+    return (a + b) / 2
+
+def first_equave(harmonic: Union[int, float, Fraction], equave: Union[int, float, Fraction, str] = 2, max_equave: Union[int, float, Fraction, str] = None):
   '''
   Returns the first equave in which a harmonic first appears.
   
@@ -327,6 +388,8 @@ def find_first_equave(harmonic: Union[int, float, Fraction], equave=2, max_equav
   Returns:
     The first equave in which the harmonic first appears as an integer.
   '''
+  equave = Fraction(equave)
+  max_equave = Fraction(max_equave) if max_equave is not None else None
   n_equave = 0
   while max_equave is None or n_equave <= max_equave:
     if harmonic <= equave ** n_equave:
@@ -352,7 +415,7 @@ def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fracti
     interval /= equave
   return interval
 
-def fold_interval(interval:Union[Fraction, int, float, str], equave:Union[Fraction, int, float, str] = 2, n_equaves:int = 1) -> float:
+def reduce_interval(interval:Union[Fraction, int, float, str], equave:Union[Fraction, int, float, str] = 2, n_equaves:int = 1) -> Fraction: 
   '''
   Fold an interval to within a specified range.
 
@@ -372,7 +435,103 @@ def fold_interval(interval:Union[Fraction, int, float, str], equave:Union[Fracti
     interval /= equave
   return interval
 
-def fold_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: float = 2.0) -> float:
+def reduce_interval_relative(target: Union[Fraction, int, float, str], source: Union[Fraction, int, float, str], equave: Union[Fraction, int, float, str] = 2) -> Fraction:
+    '''
+    Fold a target interval to minimize its distance from a source interval through octave reduction.
+
+    Args:
+        target: The interval to be folded
+        source: The reference interval to fold relative to
+        equave: The equave value, default is 2 (octave)
+
+    Returns:
+        The folded interval as a Fraction that minimizes distance from source
+    '''
+    target = Fraction(target)
+    source = Fraction(source)
+    equave = Fraction(equave)
+    
+    while target < 1:
+        target *= equave
+    while source < 1:
+        source *= equave
+        
+    best_target = target
+    min_distance = abs(source - target)
+    
+    test_up = target
+    test_down = target
+    while True:
+        test_up *= equave
+        test_down /= equave
+        
+        up_dist = abs(source - test_up)
+        down_dist = abs(source - test_down)
+        
+        if up_dist < min_distance:
+            min_distance = up_dist
+            best_target = test_up
+        elif down_dist < min_distance:
+            min_distance = down_dist
+            best_target = test_down
+        else:
+            break
+            
+    return best_target
+
+def reduce_sequence_relative(sequence: List[Union[Fraction, int, float, str]], equave: Union[Fraction, int, float, str] = 2) -> List[Fraction]:
+    '''
+    Fold a sequence of intervals where each interval is folded relative to the previous one.
+    The first interval remains unchanged and serves as the initial reference.
+
+    Args:
+        sequence: List of intervals to be folded
+        equave: The equave value, default is 2 (octave)
+
+    Returns:
+        List of folded intervals as Fractions
+    '''
+    if not sequence:
+        return []
+    
+    result = [Fraction(sequence[0])]
+    
+    for i in range(1, len(sequence)):
+        folded = reduce_interval_relative(sequence[i], result[i-1], equave)
+        result.append(folded)
+    
+    return result
+  
+def fold_interval(interval: Union[Fraction, int, float, str], lower_thresh: Union[Fraction, int, float, str], upper_thresh: Union[Fraction, int, float, str]) -> Fraction:
+    '''
+    Fold an interval by reflecting it relative to explicit threshold boundaries.
+    If interval exceeds upper threshold, measure how far above it is and move that 
+    same distance down FROM the upper threshold.
+    If interval is below lower threshold, measure how far below it is and move that
+    same distance up FROM the lower threshold.
+
+    Args:
+        interval: The interval to be folded
+        lower_thresh: The lower threshold interval
+        upper_thresh: The upper threshold interval
+
+    Returns:
+        The folded interval as a Fraction
+    '''
+    interval = Fraction(interval)
+    lower_thresh = Fraction(lower_thresh)
+    upper_thresh = Fraction(upper_thresh)
+    
+    if interval > upper_thresh:
+        distance = interval / upper_thresh
+        return upper_thresh / distance
+    elif interval < lower_thresh:
+        distance = lower_thresh / interval
+        return lower_thresh * distance
+    
+    return interval
+
+def fold_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: Union[int, float, Fraction, str] = 2) -> float:
   '''
   Fold a frequency value to within a specified range.
   
@@ -384,33 +543,43 @@ def fold_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: flo
   Returns:
     The folded frequency as a float.
   '''
+  equave = Fraction(equave)
   while freq < lower:
       freq *= equave
   while freq > upper:
       freq /= equave  
-  return freq
+  return float(freq)
 
-def n_tet(divisions=12, equave=2, nth_division=1):
-  '''
-  Calculate the size of the nth division of an interval in equal temperament.
-  
-  see:  https://en.wikipedia.org/wiki/Equal_temperament
+def n_tet(divisions: int = 12, equave: Union[int, float, Fraction, str] = 2, nth_division: int = 1, symbolic: bool = False) -> Union[float, Rational]:
+    '''
+    Calculate the size of the nth division of an interval in equal temperament.
+    
+    Args:
+        divisions: The number of equal divisions (default: 12)
+        equave: The interval to divide (default: 2 for octave)
+        nth_division: The nth division to calculate (default: 1)
+        symbolic: If True, return symbolic expression instead of float (default: False)
+    
+    Returns:
+        The frequency ratio either as a float or as a sympy expression
+    '''
+    ratio = root(Fraction(equave), Rational(divisions)) ** nth_division
+    return ratio if symbolic else float(ratio)
 
-  :param interval: The interval to divide (default is 2 for an octave)
-  :param divisions: The number of equal divisions
-  :param nth_division: The nth division to calculate
-  :return: The frequency ratio of the nth division
-  '''
-  return equave ** (nth_division / divisions)
-
-def ratios_n_tet(divisions=12, equave=2):
+def ratios_n_tet(divisions: int = 12, equave: Union[int, float, Fraction, str] = 2, symbolic: bool = False) -> List[Union[float, Rational]]:
   '''
   Calculate the ratios of the divisions of an interval in equal temperament.
-  
+
   see:  https://en.wikipedia.org/wiki/Equal_temperament
 
-  :param interval: The interval to divide (default is 2 for an octave)
-  :param divisions: The number of equal divisions
-  :return: A list of the frequency ratios of the divisions
+  Args:
+    divisions: The number of equal divisions
+    equave: The interval to divide (default is 2 for an octave)
+    symbolic: If True, return symbolic expression instead of float (default: False)
+    
+  Returns:
+    A list of the frequency ratios of the divisions
   '''
-  return [n_tet(divisions, equave, nth_division) for nth_division in range(divisions)]
+  return [n_tet(divisions, equave, nth_division, symbolic) for nth_division in range(divisions)]
+
+
