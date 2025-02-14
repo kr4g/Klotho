@@ -1,5 +1,6 @@
 import numpy as np
 from itertools import combinations
+import pandas as pd
 
 # ------------------------------------------------------------------------------
 # Set Operations
@@ -195,57 +196,66 @@ class CombinationSet:
 # --------------
 
 class PartitionSet:
-    '''
-    A class that generates integer partitions of a given number into a specified number of parts.
-    Each partition is a way to write n as a sum of k positive integers.
-    '''
     def __init__(self, n: int, k: int):
         self._n = n
         self._k = k
-        self._partitions = self._generate_partitions()
+        self._data = self._generate_partitions()
+    
+    def _generate_partitions(self) -> pd.DataFrame:
+        '''
+        Generate all possible partitions of n into k parts using backtracking,
+        computing metadata for each partition as it's generated.
+        
+        Returns:
+            pd.DataFrame: DataFrame containing partitions and their metadata.
+        '''
+        def backtrack(remaining: int, k: int, start: int, current: tuple) -> list:
+            if k == 0:
+                if remaining == 0:
+                    return [{
+                        'partition': current,
+                        'unique_count': len(set(current)),
+                        'span': max(current) - min(current),
+                        'variance': np.var(current)
+                    }]
+                return []
+            
+            results = []
+            for x in range(start, 0, -1):
+                if x <= remaining:
+                    results.extend(backtrack(remaining - x, k - 1, x, current + (x,)))
+            return results
+                    
+        return pd.DataFrame(backtrack(self._n, self._k, self._n, ()))
     
     @property
-    def n(self):
-        return self._n
-    
-    @property
-    def k(self):
-        return self._k
+    def data(self):
+        return self._data
     
     @property
     def partitions(self):
-        return self._partitions
+        return tuple(self._data['partition'])
     
-    def _generate_partitions(self) -> list:
-        '''
-        Generate all possible partitions of n into k parts using backtracking.
-        
-        Returns:
-            list: A list of lists, where each inner list represents a partition.
-        '''
-        results = []
-        
-        def backtrack(path: list, start: int, remaining: int, k: int):
-            if k == 0:
-                if remaining == 0:
-                    results.append(path[:])
-                return
-            for x in range(start, 0, -1):
-                if x <= remaining:
-                    path.append(x)
-                    backtrack(path, x, remaining - x, k - 1)
-                    path.pop()
-                    
-        backtrack([], self._n, self._n, self._k)
-        return results
-    
+    @property
+    def mean(self) -> float:
+        '''The mean value of every partition in this set.'''
+        return self._n / self._k
+
     def __str__(self) -> str:
-        return (
-            f'n:          {self._n}\n'
-            f'k:          {self._k}\n'
-            f'Partitions: {self._partitions}\n'
+        display_df = self._data.copy()
+        display_df['variance'] = display_df['variance'].round(4)
+        
+        df_str = str(display_df)
+        width = max(len(line) for line in df_str.split('\n'))
+        border = '-' * width
+        
+        header = (
+            f"{border}\n"
+            f"PS(n={self._n}, k={self._k})\n"
+            f"Mean: ~{round(self.mean, 4)}\n"
+            f"{border}\n"
         )
+        return header + df_str + f"\n{border}\n"
     
     def __repr__(self) -> str:
         return self.__str__()
-

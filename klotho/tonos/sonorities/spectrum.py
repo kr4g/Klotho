@@ -2,6 +2,7 @@ from ..tonos import Pitch, freq_to_pitchclass, partial_to_fundamental
 from typing import Union
 from fractions import Fraction
 from klotho.topos.graphs.trees import Tree
+import pandas as pd
 
 class Spectrum(Tree):
     """
@@ -21,8 +22,11 @@ class Spectrum(Tree):
         >>> spectrum = Spectrum.from_target(Pitch('A', 4, partial=3), [1, 2, 3, 4])  # Creates spectrum where A4 is 3rd partial
     """
     def __init__(self, fundamental: Union[int, float, Pitch], partials: list[Union[int, float, Fraction]]):
-        self._data = self._init_data(fundamental, partials)
-        super().__init__(self._data['fundamental'], tuple(self._data['partials'].values()))
+        self._fundamental = (Pitch(*freq_to_pitchclass(fundamental)) 
+                           if isinstance(fundamental, (int, float)) 
+                           else fundamental)
+        self._data = self._init_data(partials)
+        super().__init__(self._fundamental, tuple(self._data['pitch']))
 
     @property
     def fundamental(self):
@@ -30,21 +34,24 @@ class Spectrum(Tree):
 
     @property
     def partials(self):
-        return tuple(pitch.partial for pitch in self._children)
+        return tuple(self._data['partial'])
     
     @property
     def data(self):
         return self._data
 
-    def _init_data(self, fundamental, partials):
-        fundamental = Pitch(*freq_to_pitchclass(fundamental)) if isinstance(fundamental, (int, float)) else fundamental
-        sonority = {}
-        sonority['fundamental'] = fundamental
-        sonority['partials'] = {
-            p: Pitch(*freq_to_pitchclass(fundamental.freq * p), partial=p) for p in partials
-        }
-        return sonority
-    
+    def _init_data(self, partials):
+        df_data = []
+        for p in partials:
+            pitch = Pitch(*freq_to_pitchclass(self._fundamental.freq * p), partial=p)
+            df_data.append({
+                'partial': p,
+                'freq (Hz)': pitch.freq,
+                'pitch': str(pitch),
+                'cents offset': pitch.cents_offset
+            })
+        return pd.DataFrame(df_data)
+
     @classmethod
     def from_target(cls, target: Pitch, partials: list[Union[int, float, Fraction]]):
         """
@@ -92,9 +99,9 @@ class Spectrum(Tree):
         elif target_partial not in self.partials:
             raise ValueError(f"Target partial {target_partial} not found in spectrum")
         
-        pitch_to_pivot = self.data['partials'][source_partial]
-        pitch_to_pivot.partial = target_partial
-        new_fundamental = pitch_to_pivot.virtual_fundamental
+        pitch_to_pivot = self.data['pitch'][self.data['partial'] == source_partial].iloc[0]
+        pitch_to_pivot['partial'] = target_partial
+        new_fundamental = pitch_to_pivot['pitch']
         return Spectrum(new_fundamental, self.partials)
 
     def retarget(self, partial: Union[int, float], target: Pitch) -> 'Spectrum':
@@ -114,7 +121,7 @@ class Spectrum(Tree):
         if partial not in self.partials:
             raise ValueError(f"Partial {partial} not found in spectrum")
         
-        ratio = target.freq / self.data['partials'][partial].freq
+        ratio = target.freq / self.data['frequency'][self.data['partial'] == partial].iloc[0]
         new_fundamental = self.fundamental.freq * ratio
         return Spectrum(new_fundamental, self.partials)
 
@@ -138,19 +145,25 @@ class Spectrum(Tree):
         if target_partial not in target.partials:
             raise ValueError(f"Target partial {target_partial} not found in target spectrum")
         
-        source_pitch = self.data['partials'][source_partial]
-        target_pitch = target.data['partials'][target_partial]
-        ratio = target_pitch.freq / source_pitch.freq
+        source_pitch = self.data['pitch'][self.data['partial'] == source_partial].iloc[0]
+        target_pitch = target.data['pitch'][target.data['partial'] == target_partial].iloc[0]
+        ratio = target_pitch['frequency'] / source_pitch['frequency']
         new_fundamental = self.fundamental.freq * ratio
         return Spectrum(new_fundamental, self.partials)
 
-    def __str__(self):
-        cents_offset = f'({self.fundamental.cents_offset:+0.2f} cents)' if round(self.fundamental.cents_offset, 2) != 0 else ''
-        return (
-            f'Fundamental: {self.fundamental.pitchclass}{self.fundamental.octave} {cents_offset}\n'
-            f'Partials:    {self.partials}\n'
-            f'Freq. Range: {round(self.fundamental.freq, 2)} Hz - {round(self.fundamental.freq * max(self.partials), 2)} Hz\n'
+    def __str__(self) -> str:
+        df_str = str(self._data)
+        width = max(len(line) for line in df_str.split('\n'))
+        border = '-' * width
+        
+        fund_cents = f'({round(self.fundamental.cents_offset, 2):+} cents)' if round(self.fundamental.cents_offset, 2) != 0 else ''
+        header = (
+            f"{border}\n"
+            f"Fundamental: {self.fundamental.freq} Hz | {self.fundamental.pitchclass}{self.fundamental.octave} {fund_cents}\n"
+            # f"Freq. Range: {round(self.fundamental.freq, 2)} Hz - {round(self.fundamental.freq * max(self.partials), 2)} Hz\n"
+            f"{border}\n"
         )
+        return header + df_str + f"\n{border}\n"
     
     def __repr__(self):
         return self.__str__()

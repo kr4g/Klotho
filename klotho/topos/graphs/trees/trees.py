@@ -40,16 +40,21 @@ class Tree:
     def _graph_tree(self) -> nx.DiGraph:
         def add_nodes(graph, parent_id, children_list):        
             for child in children_list:
-                if isinstance(child, tuple):
-                    D, S = child
-                    duration_id = next(unique_id)
-                    graph.add_node(duration_id, label=D)
-                    graph.add_edge(parent_id, duration_id)
-                    add_nodes(graph, duration_id, S)
-                else:
-                    child_id = next(unique_id)
-                    graph.add_node(child_id, label=child)
-                    graph.add_edge(parent_id, child_id)
+                match child:
+                    case tuple((D, S)):
+                        duration_id = next(unique_id)
+                        graph.add_node(duration_id, label=D)
+                        graph.add_edge(parent_id, duration_id)
+                        add_nodes(graph, duration_id, S)
+                    case Tree():
+                        duration_id = next(unique_id)
+                        graph.add_node(duration_id, label=child.root)
+                        graph.add_edge(parent_id, duration_id)
+                        add_nodes(graph, duration_id, child.children)
+                    case _:
+                        child_id = next(unique_id)
+                        graph.add_node(child_id, label=child)
+                        graph.add_edge(parent_id, child_id)
         unique_id = count()
         G = nx.DiGraph()
         root_id = next(unique_id)
