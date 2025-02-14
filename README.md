@@ -29,7 +29,7 @@ Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python in
     pip install -r requirements.txt
     ```
 
-4. **Install Klotho (Development Mode)**:
+<!-- 4. **Install Klotho (Development Mode)**:
 
     To install Klotho in development mode, which allows you to modify the source code and have the changes reflected immediately:
 
@@ -45,7 +45,7 @@ Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python in
     Python
     ```
 
-    Once the interpreter loads, import from `klotho` as needed.
+    Once the interpreter loads, import from `klotho` as needed. -->
 
 ## About
 
