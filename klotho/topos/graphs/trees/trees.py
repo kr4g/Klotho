@@ -1,13 +1,18 @@
 import networkx as nx
 from itertools import count
+import pandas as pd
 
 class Tree:
     def __init__(self, root, children:tuple):
         self._root = root
         self._children = children
         self._graph = None
-        self._depth = None
         self._leaf_nodes = None
+        self._graph = self._graph_tree()
+        self._meta = pd.DataFrame([{
+            'depth': max(nx.single_source_shortest_path_length(self.graph, 0).values()),
+            'k': max((self.graph.out_degree(n) for n in self.graph.nodes), default=0)
+        }], index=[''])
     
     @property
     def root(self):
@@ -33,9 +38,11 @@ class Tree:
     
     @property
     def depth(self):
-        if self._depth is None:
-            self._depth = self._calculate_depth()
-        return self._depth
+        return self._meta['depth'].iloc[0]
+    
+    @property
+    def k(self):
+        return self._meta['k'].iloc[0]
     
     def _graph_tree(self) -> nx.DiGraph:
         def add_nodes(graph, parent_id, children_list):        
@@ -48,7 +55,7 @@ class Tree:
                         add_nodes(graph, duration_id, S)
                     case Tree():
                         duration_id = next(unique_id)
-                        graph.add_node(duration_id, label=child.root)
+                        graph.add_node(duration_id, label=child.root, meta=child._meta.to_dict('records')[0])
                         graph.add_edge(parent_id, duration_id)
                         add_nodes(graph, duration_id, child.children)
                     case _:
@@ -61,11 +68,6 @@ class Tree:
         G.add_node(root_id, label=self._root)
         add_nodes(G, root_id, self._children)
         return G
-    
-    def _calculate_depth(self) -> int:
-        if self._depth is None:
-            self._depth = max(nx.single_source_shortest_path_length(self._graph, 0).values())
-        return self._depth
     
     @classmethod
     def from_graph(cls, G):

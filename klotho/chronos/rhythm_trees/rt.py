@@ -19,6 +19,7 @@ from fractions import Fraction
 from typing import Union, Tuple
 from math import gcd, lcm
 from functools import reduce
+import pandas as pd
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
@@ -280,11 +281,12 @@ class RhythmTree(Tree):
                  span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '1/1',
                  subdivisions:Tuple            = (1,1)):
-        self._meas = Meas(meas)
-        super().__init__(self._meas.numerator, subdivisions)
-        self._span = span
+        super().__init__(Meas(meas).numerator, subdivisions)
+        self._subdivisions = self._cast_subdivs(subdivisions)
+        self._meta['span'] = span
+        self._meta['meas'] = str(Meas(meas))
+        self._meta['type'] = None
         self._ratios = self._evaluate()
-        # self._type = self._set_type()
     
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
@@ -294,38 +296,52 @@ class RhythmTree(Tree):
     def from_ratios(cls, lst:Tuple[Fraction], span:int = 1):
         pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
         S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
-        meas = (sum_proportions(S), pgcd_denom)
+        meas = Meas(sum_proportions(S), pgcd_denom)
         return cls(span = span, meas = meas, subdivisions = S)
 
     @property
     def span(self):
-        return self._span
+        return self._meta['span'].iloc[0]
 
     @property
     def meas(self):
-        return self._meas
+        return Meas(self._meta['meas'].iloc[0])
 
     @property
     def subdivisions(self):
-        return self._children
+        return self._subdivisions
 
     @property
     def ratios(self):
         return self._ratios
     
-    @property
-    def type(self):
-        return self._type
+    # @property
+    # def type(self):
+    #     if self._meta['type'] is None:
+    #         self._meta['type'] = self._set_type()
+    #     return self._meta['type']
 
+    def _cast_subdivs(self, children):
+        def convert_to_tuple(item):
+            if isinstance(item, RhythmTree):
+                return (item.meas.numerator * item.span, item.subdivisions)
+            if isinstance(item, tuple):
+                return tuple(convert_to_tuple(x) for x in item)
+            return item
+        
+        return tuple(convert_to_tuple(child) for child in children)
+    
     def _evaluate(self):
-        self.graph.nodes[0]['ratio'] = self._meas
-        def _process_subtree(node=0, parent_ratio=self._span * self._meas.to_fraction()):
-            label = self.graph.nodes[node]['label']
+        self.graph.nodes[0]['ratio'] = self.meas
+        def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
+            node_data = self.graph.nodes[node]
             
-            # floats = ties
+            if 'meta' in node_data:
+                node_data['label'] = node_data['label'] * node_data['meta']['span']
+            
+            label = node_data['label']
             is_tied = isinstance(label, float)
             self.graph.nodes[node]['tied'] = is_tied
-
             label_value = int(label) if is_tied else label
             
             self.graph.nodes[node]['proportion'] = label_value
@@ -336,15 +352,24 @@ class RhythmTree(Tree):
                 self.graph.nodes[node]['ratio'] = ratio
                 return
             
-            div = int(sum(abs(self.graph.nodes[c]['label']) for c in children))
+            div = int(sum(abs(self.graph.nodes[c]['label'] * 
+                             self.graph.nodes[c]['meta']['span'] if 'meta' in self.graph.nodes[c]
+                             else self.graph.nodes[c]['label']) 
+                         for c in children))
             
             for child in children:
-                s = self.graph.nodes[child]['label']
-
+                child_data = self.graph.nodes[child]
+                
+                # if 'meta' in child_data:
+                    # child_data['label'] = child_data['label'] * child_data['meta']['span']
+                
+                s = child_data['label']
+                if 'meta' in child_data:
+                    s = s * child_data['meta']['span']
                 s = int(s) if isinstance(s, float) else s
                 ratio = Fraction(s, div) * parent_ratio
                 self.graph.nodes[child]['ratio'] = ratio
-                self.graph.nodes[child]['proportion'] = s#elf.graph.nodes[child]['label']
+                self.graph.nodes[child]['proportion'] = s
                 if self.graph.out_degree(child) > 0:
                     _process_subtree(child, ratio)
         
@@ -352,23 +377,36 @@ class RhythmTree(Tree):
         return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
     
     def _set_type(self):
-        div = sum_proportions(self._children)
-        if bin(div).count('1') != 1 and div != self._meas.numerator:
+        div = sum_proportions(self.subdivisions)
+        if bin(div).count('1') != 1 and div != self.meas.numerator:
             return 'complex'
-        return 'complex' if measure_complexity(self._children) else 'simple'
+        return 'complex' if measure_complexity(self.subdivisions) else 'simple'
 
     def __len__(self):
         return len(self._ratios)
 
     def __str__(self):
-        subdivs = print_subdivisons(self._children)
-        ratios = ', '.join(tuple([str(r) for r in self._ratios]))
+        meta_dict = self._meta.iloc[0].to_dict()
+        ordered_meta = {k: meta_dict[k] for k in ['span', 'meas', 'type', 'depth', 'k']}
+        meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
+        
+        content = [
+            meta_str,
+            f"Subdivs: {print_subdivisons(self.subdivisions)}",
+            f"Ratios:  {', '.join(str(r) for r in self._ratios)}"
+        ]
+        
+        width = max(len(line) for block in content 
+                   for line in block.split('\n'))
+        border = '-' * width
+        
         return (
-            f'Span:         {self._span}\n'
-            f'Meas:         {self._meas}\n'
-            f'Subdivisions: {subdivs}\n'
-            f'Ratios:       {ratios}\n'
-            # f'Type:          {self._type}\n'
+            f"{border}\n"
+            f"{content[0]}\n"
+            f"{border}\n"
+            f"{content[1]}\n"
+            f"{content[2]}\n"
+            f"{border}\n"
         )
 
     def __repr__(self):

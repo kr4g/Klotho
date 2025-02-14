@@ -290,17 +290,18 @@ def partial_to_fundamental(pitchclass: str, octave: int = 4, partial: int = 1, c
     
     Args:
         pitchclass: The pitch class with octave (e.g., "A4", "C#3", "Bb2")
-        partial: The partial number (integer >= 1)
+        partial: The partial number (integer, non-zero). Negative values indicate undertones.
         cent_offset: The cents offset from the pitch class, default is 0.0
         
     Returns:
         A tuple containing the fundamental's pitch class with octave and cents offset
     '''
-    if partial < 1:
-        raise ValueError("Partial number must be 1 or greater")
+    if partial == 0:
+        raise ValueError("Partial number cannot be zero")
 
     freq = pitchclass_to_freq(pitchclass, octave, cent_offset)
-    fundamental_freq = freq / partial
+    # For negative partials (undertones), multiply by |p| instead of dividing
+    fundamental_freq = freq * abs(partial) if partial < 0 else freq / partial
     return freq_to_pitchclass(fundamental_freq)
 
 def split_interval(interval:Union[int, float, Fraction, str], n:int = 2):

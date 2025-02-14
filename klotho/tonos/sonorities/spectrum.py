@@ -43,12 +43,13 @@ class Spectrum(Tree):
     def _init_data(self, partials):
         df_data = []
         for p in partials:
-            pitch = Pitch(*freq_to_pitchclass(self._fundamental.freq * p), partial=p)
+            multiplier = 1/abs(p) if p < 0 else p
+            pitch = Pitch(*freq_to_pitchclass(self._fundamental.freq * multiplier), partial=p)
             df_data.append({
                 'partial': p,
                 'freq (Hz)': pitch.freq,
                 'pitch': str(pitch),
-                'cents offset': pitch.cents_offset
+                'cents_offset': pitch.cents_offset
             })
         return pd.DataFrame(df_data)
 
