@@ -41,11 +41,11 @@ class Tree:
         def add_nodes(graph, parent_id, children_list):        
             for child in children_list:
                 if isinstance(child, tuple):
-                    duration, subdivisions = child
+                    D, S = child
                     duration_id = next(unique_id)
-                    graph.add_node(duration_id, label=duration)
+                    graph.add_node(duration_id, label=D)
                     graph.add_edge(parent_id, duration_id)
-                    add_nodes(graph, duration_id, subdivisions)
+                    add_nodes(graph, duration_id, S)
                 else:
                     child_id = next(unique_id)
                     graph.add_node(child_id, label=child)

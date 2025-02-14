@@ -1,10 +1,10 @@
 from ...topos.graphs.networks import ComboNet
-from ..combination_product_sets.nkany import NKany
+from ..combination_product_sets.nkany import CombinationProductSet
 
 class ComboProdNet(ComboNet):
-    def __init__(self, cps: NKany):
-        if not isinstance(cps, NKany):
-            raise ValueError("ComboProdNet requires an instance of NKany or its subclasses.")
+    def __init__(self, cps: CombinationProductSet):
+        if not isinstance(cps, CombinationProductSet):
+            raise ValueError("ComboProdNet requires an instance of CombinationProductSet or its subclasses.")
         
         self._cps = cps
         

@@ -1,11 +1,11 @@
 import random
 from collections import defaultdict
 from ..networks import ComboNet
-from klotho.tonos.combination_product_sets import NKany
+from klotho.tonos.combination_product_sets import CombinationProductSet
 from typing import Union
 
 class ComboNetTraversal:
-    def __init__(self, combnet: Union[ComboNet, NKany]):
+    def __init__(self, combnet: Union[ComboNet, CombinationProductSet]):
         self.combnet = combnet if isinstance(combnet, ComboNet) else ComboNet(combnet)
         self.visited_edges = defaultdict(int)
 

@@ -9,52 +9,34 @@ General functions for generating and transforming sequences in a topological man
 from math import prod
 
 # Algorithm 4: PermutList
-def permut_list(lst:tuple, pt:int) -> tuple:
+def permut_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     '''
-    Algorithm 4: PermutList
-    
-    Data: lst is a list with n finite elements; pt is the position of the element where circular permutation of list lst begins
-    Result: List circularly permuted starting from position pt
-    
-    begin
-        n = 0;
-        while n ≠ (pt + 1) do
-            lst = ([car of lst] [cdr of lst]);
-            n = n + 1;
-        end while
-        return lst;
-    end
-    
-    /* car = returns the first element of lst  */
-    /* cdr = returns lst without its first element  */
+    Algorithm 4: PermutList with optional sign preservation
     
     :param lst: List of elements to be permuted.
     :param pt: Starting position for the permutation.
+    :param preserve_signs: If True, preserves signs while rotating absolute values.
     :return: Circularly permuted list.
     '''
-    pt = pt % len(lst)
-    return lst[pt:] + lst[:pt]
+    if not preserve_signs:
+        pt = pt % len(lst)
+        return lst[pt:] + lst[:pt]
+    
+    signs = tuple(1 if x >= 0 else -1 for x in lst)
+    abs_values = tuple(abs(x) for x in lst)
+    
+    pt = pt % len(abs_values)
+    rotated = abs_values[pt:] + abs_values[:pt]
+    
+    return tuple(val * sign for val, sign in zip(rotated, signs))
 
 # Algorithm 5: AutoRef
-def autoref(*args):    
+def autoref(*args, preserve_signs:bool=False):    
     '''
-    Algorithm 5: AutoRef
-
-    Data: lst est une liste à n éléments finis
-    Result: Liste doublement permuteé circulairement.
-
-    begin
-        n = 0;
-        lgt = nombre d'éléments dans la liste;
-        foreach elt in lst do
-            while n ≠ (lgt + 1) do
-                return [elt, (PermutList(lst, n))];
-                n = n + 1;
-            end while
-        end foreach
-    end
+    Algorithm 5: AutoRef with optional sign preservation
     
-    :param lst: List of finite elements to be doubly circularly permuted.
+    :param args: One or two lists to be doubly circularly permuted.
+    :param preserve_signs: If True, preserves signs while rotating absolute values.
     :return: List containing the original element and its permutations.
     '''
     if len(args) == 1:
@@ -67,40 +49,18 @@ def autoref(*args):
     if len(lst1) != len(lst2):
         raise ValueError('The tuples must be of equal length.')
 
-    return tuple((elt, permut_list(lst2, n + 1)) for n, elt in enumerate(lst1))
+    return tuple((elt, permut_list(lst2, n + 1, preserve_signs)) 
+                 for n, elt in enumerate(lst1))
 
 # AutoRef Matrices
-def autoref_rotmat(*args, mode='G'):
+def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     '''
-    Matrices for lst = (3,4,5,7):
-
-    Mode G (Group Rotation):
-
-    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
-    ((4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)))
-    ((5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)))
-    ((7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)))
-
-    Mode S:
-
-    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
-    ((3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)))
-    ((3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)), (5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)))
-    ((3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)))
-
-    Mode D:
-
-    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
-    ((4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)))
-    ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)))
-    ((7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)))
-
-    Mode C (Circular Rotation):
-
-    ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)))
-    ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)))
-    ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)))
-    ((7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)))
+    AutoRef rotation matrices with optional sign preservation
+    
+    :param args: One or two lists to generate rotation matrices from.
+    :param mode: Rotation mode ('G', 'S', 'D', or 'C').
+    :param preserve_signs: If True, preserves signs while rotating absolute values.
+    :return: Tuple of rotation matrices based on the specified mode.
     '''
     if len(args) == 1:
         lst1 = lst2 = tuple(args[0])
@@ -114,11 +74,18 @@ def autoref_rotmat(*args, mode='G'):
 
     match mode.upper():
         case 'G':
-            return tuple(autoref(permut_list(lst1, i), permut_list(lst2, i)) for i in range(len(lst1)))
+            return tuple(autoref(permut_list(lst1, i, preserve_signs), 
+                               permut_list(lst2, i, preserve_signs), 
+                               preserve_signs=preserve_signs) 
+                        for i in range(len(lst1)))
         case 'S':
-            return tuple(tuple((lst1[j], permut_list(lst2, i + j + 1)) for j in range(len(lst1))) for i in range(len(lst1)))
+            return tuple(tuple((lst1[j], permut_list(lst2, i + j + 1, preserve_signs)) 
+                             for j in range(len(lst1))) 
+                        for i in range(len(lst1)))
         case 'D':
-            return tuple(tuple((elem, autoref(lst2)[j][1]) for j, elem in enumerate(permut_list(lst1, i))) for i in range(len(lst1)))
+            return tuple(tuple((elem, autoref(lst2, preserve_signs=preserve_signs)[j][1]) 
+                             for j, elem in enumerate(permut_list(lst1, i, preserve_signs))) 
+                        for i in range(len(lst1)))
         case 'C':
             return None
         case _:

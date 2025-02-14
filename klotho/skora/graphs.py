@@ -133,4 +133,3 @@ def plot_ratios(ratios, total_value, output_file=None):
         plt.close()
     else:
         plt.show()
-

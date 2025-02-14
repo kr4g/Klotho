@@ -324,7 +324,7 @@ class TemporalUnit(metaclass=TemporalMeta):
             node_data = G.nodes[node_id]
             
             parent_id = next(G.predecessors(node_id), None)
-            parent_ratio = G.nodes[parent_id]['ratio'] if parent_id is not None else None
+            parent_ratio = str(G.nodes[parent_id]['ratio']) if parent_id is not None else None
             
             path = nx.shortest_path(G, 0, node_id)[1:]
             ancestor_id = path[0] if len(path) > 0 else 0
@@ -342,8 +342,8 @@ class TemporalUnit(metaclass=TemporalMeta):
             self._elements[i]['bpm']             = self._bpm
             self._elements[i]['node_id']         = node_id
             self._elements[i]['depth']           = nx.shortest_path_length(G, 0, node_id)
-            self._elements[i]['parent_ratio']    = parent_ratio
-            self._elements[i]['parent_duration'] = beat_duration(ratio      = str(parent_ratio),
+            self._elements[i]['parent_ratio']    = Fraction(parent_ratio)
+            self._elements[i]['parent_duration'] = beat_duration(ratio      = parent_ratio,
                                                                  bpm        = self._bpm,
                                                                  beat_ratio = self._beat)
             self._elements[i]['parent_id']       = parent_id
@@ -524,8 +524,8 @@ class TemporalUnitSequenceBlock(metaclass=TemporalMeta):
                     D, S = e[0], auto_subdiv(e[1][::-1], offset - j - i)
                 else:
                     D, S = e[0], e[1]
-                seq.append(TemporalUnit(tempus   = Meas(D, meas_denom),
-                                        prolatio = S,
+                seq.append(TemporalUnit(tempus   = Meas(abs(D), meas_denom),
+                                        prolatio = S if D > 0 else 'r',
                                         bpm      = bpm,
                                         beat     = beat))
             tb.append(TemporalUnitSequence(seq))

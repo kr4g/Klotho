@@ -6,7 +6,7 @@ from fractions import Fraction
 from klotho.topos.sets import CombinationSet as CS
 from klotho.tonos.tonos import reduce_interval
 
-class NKany(CS, ABC):
+class CombinationProductSet(CS, ABC):
   '''
   General class for an arbitrary Combination Product Set (CPS).
   
@@ -118,7 +118,7 @@ class NKany(CS, ABC):
     return self.__str__()
 
 
-class Hexany(NKany):
+class Hexany(CombinationProductSet):
   '''
   Calculate a Hexany scale from a list of factors and a rank value.
   
@@ -134,7 +134,7 @@ class Hexany(NKany):
       raise ValueError('Hexany must have exactly 4 factors.')
     super().__init__(factors, r=2, normalized=normalized)
 
-class Dekany(NKany):
+class Dekany(CombinationProductSet):
   '''
   A dekany is a 10-note scale built using all the possible combinations 
   of either 2 or 3 intervals (but not a mix of both) from a given set of 
@@ -150,7 +150,7 @@ class Dekany(NKany):
       raise ValueError('Dekany rank must be 2 or 3.')
     super().__init__(factors, r, normalized)
     
-class Pentadekany(NKany):
+class Pentadekany(CombinationProductSet):
   '''
   A pentadekany is a 15-note scale built using all the possible combinations
   of either 2 or 4 intervals (but not a mix of both) from a given set of 6 
@@ -168,7 +168,7 @@ class Pentadekany(NKany):
       raise ValueError('Pentadekany rank must be 2 or 4.')
     super().__init__(factors, r, normalized)
 
-class Eikosany(NKany):
+class Eikosany(CombinationProductSet):
   '''
   An eikosany is a 20-note scale built using all the possible combinations 
   of 3 intervals from a given set of 6 intervals. It is a particular case 

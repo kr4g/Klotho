@@ -1,8 +1,9 @@
 from ..tonos import Pitch, freq_to_pitchclass, partial_to_fundamental
 from typing import Union
 from fractions import Fraction
+from klotho.topos.graphs.trees import Tree
 
-class Spectrum:
+class Spectrum(Tree):
     """
     A class representing a harmonic spectrum based on a fundamental frequency and its partials.
 
@@ -20,27 +21,27 @@ class Spectrum:
         >>> spectrum = Spectrum.from_target(Pitch('A', 4, partial=3), [1, 2, 3, 4])  # Creates spectrum where A4 is 3rd partial
     """
     def __init__(self, fundamental: Union[int, float, Pitch], partials: list[Union[int, float, Fraction]]):
-        self._fundamental = Pitch(*freq_to_pitchclass(fundamental)) if isinstance(fundamental, (int, float)) else fundamental
-        self._partials = partials
-        self._data = self._init_data()
+        self._data = self._init_data(fundamental, partials)
+        super().__init__(self._data['fundamental'], tuple(self._data['partials'].values()))
 
     @property
     def fundamental(self):
-        return self._fundamental
+        return self._root
 
     @property
     def partials(self):
-        return self._partials
+        return tuple(pitch.partial for pitch in self._children)
     
     @property
     def data(self):
         return self._data
 
-    def _init_data(self):
+    def _init_data(self, fundamental, partials):
+        fundamental = Pitch(*freq_to_pitchclass(fundamental)) if isinstance(fundamental, (int, float)) else fundamental
         sonority = {}
-        sonority['fundamental'] = self._fundamental
+        sonority['fundamental'] = fundamental
         sonority['partials'] = {
-            p: Pitch(*freq_to_pitchclass(self._fundamental.freq * p), partial = p) for p in self._partials
+            p: Pitch(*freq_to_pitchclass(fundamental.freq * p), partial=p) for p in partials
         }
         return sonority
     
@@ -86,15 +87,15 @@ class Spectrum:
         Raises:
             ValueError: If either partial is not in the spectrum
         """
-        if source_partial not in self._partials:
+        if source_partial not in self.partials:
             raise ValueError(f"Source partial {source_partial} not found in spectrum")
-        elif target_partial not in self._partials:
+        elif target_partial not in self.partials:
             raise ValueError(f"Target partial {target_partial} not found in spectrum")
         
-        pitch_to_pivot = self._data['partials'][source_partial]
+        pitch_to_pivot = self.data['partials'][source_partial]
         pitch_to_pivot.partial = target_partial
         new_fundamental = pitch_to_pivot.virtual_fundamental
-        return Spectrum(new_fundamental, self._partials)
+        return Spectrum(new_fundamental, self.partials)
 
     def retarget(self, partial: Union[int, float], target: Pitch) -> 'Spectrum':
         """
@@ -110,12 +111,12 @@ class Spectrum:
         Raises:
             ValueError: If the partial is not in the spectrum
         """
-        if partial not in self._partials:
+        if partial not in self.partials:
             raise ValueError(f"Partial {partial} not found in spectrum")
         
-        ratio = target.freq / self._data['partials'][partial].freq
-        new_fundamental = self._fundamental.freq * ratio
-        return Spectrum(new_fundamental, self._partials)
+        ratio = target.freq / self.data['partials'][partial].freq
+        new_fundamental = self.fundamental.freq * ratio
+        return Spectrum(new_fundamental, self.partials)
 
     def modulate(self, target: 'Spectrum', source_partial: Union[int, float], target_partial: Union[int, float]) -> 'Spectrum':
         """
@@ -132,23 +133,23 @@ class Spectrum:
         Raises:
             ValueError: If either partial is not in its respective spectrum
         """
-        if source_partial not in self._partials:
+        if source_partial not in self.partials:
             raise ValueError(f"Source partial {source_partial} not found in source spectrum")
         if target_partial not in target.partials:
             raise ValueError(f"Target partial {target_partial} not found in target spectrum")
         
-        source_pitch = self._data['partials'][source_partial]
+        source_pitch = self.data['partials'][source_partial]
         target_pitch = target.data['partials'][target_partial]
         ratio = target_pitch.freq / source_pitch.freq
-        new_fundamental = self._fundamental.freq * ratio
-        return Spectrum(new_fundamental, self._partials)
+        new_fundamental = self.fundamental.freq * ratio
+        return Spectrum(new_fundamental, self.partials)
 
     def __str__(self):
-        cents_offset = f'({self._fundamental.cents_offset:+0.2f} cents)' if round(self._fundamental.cents_offset, 2) != 0 else ''
+        cents_offset = f'({self.fundamental.cents_offset:+0.2f} cents)' if round(self.fundamental.cents_offset, 2) != 0 else ''
         return (
-            f'Fundamental: {self._fundamental.pitchclass}{self._fundamental.octave} {cents_offset}\n'
-            f'Partials:    {self._partials}\n'
-            f'Freq. Range: {round(self._fundamental.freq, 2)} Hz - {round(self._fundamental.freq * max(self._partials), 2)} Hz\n'
+            f'Fundamental: {self.fundamental.pitchclass}{self.fundamental.octave} {cents_offset}\n'
+            f'Partials:    {self.partials}\n'
+            f'Freq. Range: {round(self.fundamental.freq, 2)} Hz - {round(self.fundamental.freq * max(self.partials), 2)} Hz\n'
         )
     
     def __repr__(self):
