@@ -21,7 +21,6 @@ setup(
         'ipywidgets',
         'IPython',
         'tabulate',
-        'PySide6',
         'sympy',
         'networkx',
         'hypernetx',
@@ -29,7 +28,6 @@ setup(
         'opencv-python',
         'tqdm',
         'requests',
-        'abjad',
         'jupyter'
     ],
     # tests_require=[

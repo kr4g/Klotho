@@ -6,12 +6,10 @@ matplotlib
 ipywidgets
 IPython
 tabulate
-PySide6
 networkx
 hypernetx
 python-osc
 opencv-python
 tqdm
 requests
-abjad
 jupyter
