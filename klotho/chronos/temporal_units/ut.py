@@ -103,6 +103,10 @@ class Chronon(metaclass=TemporalMeta):
         return self._data['depth']
     
     @property
+    def parent_id(self):
+        return self._data['parent_id']
+    
+    @property
     def parent_ratio(self):
         return self._data['parent_ratio']
     
@@ -150,8 +154,8 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
-        return cls(span     = rt._span,
-                   tempus   = rt._meas,
+        return cls(span     = rt.span,
+                   tempus   = rt.meas,
                    prolatio = rt._children,
                    beat     = beat,
                    bpm      = bpm)
@@ -164,12 +168,12 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def span(self):
         """The number of measures that the TemporalUnit spans."""
-        return self._rtree._span
+        return self._rtree.span
 
     @property
     def tempus(self):
         """The time signature of the TemporalUnit."""
-        return self._rtree._meas
+        return self._rtree.meas
     
     @property
     def prolationis(self):        
@@ -190,7 +194,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     def beat(self):
         """The rhythmic ratio that describes the beat of the TemporalUnit."""
         if self._beat is None:
-            self._beat = Fraction(1, self._rtree._meas._denominator)
+            self._beat = Fraction(1, self._rtree.meas._denominator)
         return self._beat
     
     @property
@@ -218,15 +222,6 @@ class TemporalUnit(metaclass=TemporalMeta):
         return self._onsets
 
     @property
-    def duration(self):
-        """The total duration (in seconds) of the TemporalUnit."""
-        # return sum(abs(d) for d in self.durations)
-        return beat_duration(ratio      = str(self._rtree._meas * self._rtree._span),
-                             bpm        = self.bpm,
-                             beat_ratio = self.beat
-                )
-    
-    @property
     def durations(self):
         """A tuple of durations (in seconds) for each event in the TemporalUnit."""
         if self._durations is None:
@@ -237,6 +232,15 @@ class TemporalUnit(metaclass=TemporalMeta):
                 )
         return self._durations
 
+    @property
+    def duration(self):
+        """The total duration (in seconds) of the TemporalUnit."""
+        # return sum(abs(d) for d in self.durations)
+        return beat_duration(ratio      = str(self._rtree.meas * self._rtree.span),
+                             bpm        = self.bpm,
+                             beat_ratio = self.beat
+                )
+    
     @property
     def time(self):
         """The absolute start and end times (in seconds) of the TemporalUnit."""
@@ -250,7 +254,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     # @tempus.setter
     # def tempus(self, tempus:Union[Meas,Fraction,int,float,str]):
     #     """Sets the time signature of the TemporalUnit."""
-    #     self._rtree = self._set_rtree(self._span, tempus, self._rtree._children)
+    #     self._rtree = self._set_rtree(self.span, tempus, self._rtree._children)
     #     self._set_elements()
     
     @bpm.setter
@@ -398,9 +402,10 @@ class TemporalUnit(metaclass=TemporalMeta):
         
     def __str__(self):
         result = (
-            f'Span:     {self._rtree._span}\n'
-            f'Tempus:   {self._rtree._meas}\n'
-            f'Prolatio: {print_subdivisons(self._rtree._children)}\n'
+            f'Span:     {self._rtree.span}\n'
+            f'Tempus:   {self._rtree.meas}\n'
+            # f'Prolatio: {print_subdivisons(self._rtree.subdivisions)}\n'
+            f'Prolatio: {self._type.value}\n'
             f'Events:   {len(self)}\n'
             f'Tempo:    {self._beat} = {self._bpm}\n'
             f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n'
@@ -458,6 +463,11 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     def time(self):
         """The absolute start and end times (in seconds) of the sequence."""
         return self.offset, self.offset + self.duration
+    
+    @property
+    def T(self):
+        """Transforms the TemporalUnitSequence into a TemporalUnitSequenceBlock."""
+        return TemporalUnitSequenceBlock([TemporalUnitSequence([ut]) for ut in self._seq])
     
     @offset.setter
     def offset(self, offset:float):

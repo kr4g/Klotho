@@ -1,3 +1,3 @@
-from .nkany import *
+from .cps import *
 
 __all__ = []

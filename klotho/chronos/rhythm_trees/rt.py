@@ -9,8 +9,8 @@ pulses and rhythmic elements in the traditional notation.
 
 Hence, the expression form of rhythm trees is crucially different from that of onsets 
 and offsets. It can be exacting and not very "ergonomic", from a musician's point of 
-view : rhythm trees can be long, with a great number of parenthesis and sub lists nested 
-within each others.
+view : rhythm trees can be long, with a great number of parenthesis and sub lists 
+nested within each others.
 
 see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 --------------------------------------------------------------------------------------

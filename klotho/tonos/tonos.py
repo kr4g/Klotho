@@ -7,6 +7,7 @@ General functions for performing calculations and computations related to pitch 
 frequency.
 --------------------------------------------------------------------------------------
 '''
+from utils.algorithms.numbers import to_factors
 from typing import Union, List, Tuple, Dict, Set
 from collections import namedtuple
 from fractions import Fraction
@@ -56,6 +57,10 @@ class Pitch:
             'partial': partial,
             'freq': pitchclass_to_freq(pitchclass, octave, cents_offset)
         }]).set_index(pd.Index(['']))
+    
+    @classmethod
+    def from_freq(cls, freq: float, partial: int = 1):
+        return cls(*freq_to_pitchclass(freq), partial=partial)
     
     @property
     def pitchclass(self):
@@ -531,6 +536,39 @@ def fold_interval(interval: Union[Fraction, int, float, str], lower_thresh: Unio
         return lower_thresh * distance
     
     return interval
+
+def interval_cost(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str], diff_coeff: float = 1.0, prime_coeff: float = 1.0,
+                  equave: Union[int, float, Fraction, str] = 2) -> float:
+    match a:
+        case int() as i:
+            r1 = Fraction(i, 1)
+        case Fraction() as f:
+            r1 = f
+        case str() as s:
+            r1 = Fraction(s)
+        case _:
+            raise TypeError("Unsupported type")
+
+    match b:
+        case int() as i:
+            r2 = Fraction(i, 1)
+        case Fraction() as f:
+            r2 = f
+        case str() as s:
+            r2 = Fraction(s)
+        case _:
+            raise TypeError("Unsupported type")
+
+    dist_interval = r2 / r1
+    # log_dist = abs(np.log2(dist_interval.numerator) - np.log2(dist_interval.denominator))
+    log_dist = abs(np.log(float(dist_interval)) / np.log(float(equave)))
+
+    f1 = to_factors(r1)
+    f2 = to_factors(r2)
+    p_all = set(f1.keys()) | set(f2.keys())
+    prime_diff = sum(abs(f1.get(p, 0) - f2.get(p, 0)) for p in p_all)
+
+    return diff_coeff * log_dist + prime_coeff * prime_diff
 
 def fold_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: Union[int, float, Fraction, str] = 2) -> float:
   '''

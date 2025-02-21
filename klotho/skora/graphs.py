@@ -2,37 +2,41 @@ from typing import Tuple
 from itertools import count
 import networkx as nx
 import matplotlib.pyplot as plt
+from ..topos.graphs.trees.trees import Tree
+from ..chronos.rhythm_trees.rt import RhythmTree
+from ..chronos.temporal_units import TemporalUnit
 
-
-def plot_tree(G, attributes=None, invert=True, output_file=None):
+def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
+             invert: bool = True, output_file: str | None = None) -> None:
     """
-    Plot graph with node labels and optional attributes.
+    Plot tree with node labels and optional attributes.
     
     Args:
-        G: NetworkX graph
+        tree: Tree instance to plot
+        attributes: List of node attributes to display (if None, shows only labels)
+        figsize: Tuple of (width, height) for the figure size
+        invert: If True, root is at top. If False, root is at bottom
         output_file: Path to save the plot (if None, displays plot)
-        attributes: List of node attributes to display below the label
     """
-    root = [n for n, d in G.in_degree() if d == 0][0]
-    pos = _hierarchy_pos(G, root, inverted=invert)
-    labels = nx.get_node_attributes(G, 'label')
+    G = tree.graph
+    root = tree.root
+    pos = _hierarchy_pos(G, 0, inverted=invert)
     
-    plt.figure(figsize=(20, 5))
+    plt.figure(figsize=figsize)
     ax = plt.gca()
     
     ax.set_facecolor('black')
     plt.gcf().set_facecolor('black')
     
     for node, (x, y) in pos.items():
-        label_parts = [str(labels[node])]
-        
-        if attributes:
+        if attributes is None:
+            label_text = str(G.nodes[node]['label'])
+        else:
+            label_parts = []
             for attr in attributes:
-                attr_dict = nx.get_node_attributes(G, attr)
-                if node in attr_dict:
-                    label_parts.append(f"{attr_dict[node]}")
-        
-        label_text = "\n".join(label_parts)
+                if attr in G.nodes[node]:
+                    label_parts.append(str(G.nodes[node][attr]))
+            label_text = "\n".join(label_parts)
         
         is_leaf = len(list(G.neighbors(node))) == 0
         box_style = "circle,pad=0.3" if is_leaf else "square,pad=0.3"

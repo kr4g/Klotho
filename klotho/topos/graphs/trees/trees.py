@@ -30,6 +30,9 @@ class Tree:
                 if self._graph.out_degree(n) == 0]
         return self._leaf_nodes
     
+    def __getitem__(self, node):
+        return self.graph.nodes[node]
+    
     @property
     def graph(self):
         if self._graph is None:
@@ -44,6 +47,51 @@ class Tree:
     def k(self):
         return self._meta['k'].iloc[0]
     
+    def parent(self, node):
+        return next(self.graph.predecessors(node), None)
+
+    def branch(self, node):
+        """The highest ancestor of a node, not including the root."""
+        if node is None:
+            return None
+
+        if self.parent(node) is None:
+            return None
+
+        current = node
+        while self.parent(current) is not None:
+            if self.parent(self.parent(current)) is None:
+                return current
+            current = self.parent(current)
+            
+        return current
+    
+    def siblings(self, node):
+        return tuple(self.graph.successors(self.parent(node)))
+    
+    def successors(self, node):
+        return tuple(self.graph.successors(node))
+    
+    def at_depth(self, n, operator='=='):
+        """Returns nodes filtered by depth using the specified operator
+        
+        Args:
+            n (int): The depth to compare against
+            operator (str): One of '==', '<', '<=', '>', '>='
+        """
+        ops = {
+            '==': lambda x, y: x == y,
+            '<': lambda x, y: x < y,
+            '<=': lambda x, y: x <= y,
+            '>': lambda x, y: x > y,
+            '>=': lambda x, y: x >= y
+        }
+        if operator not in ops:
+            raise ValueError(f"Operator must be one of {list(ops.keys())}")
+            
+        return tuple(node for node, depth in nx.single_source_shortest_path_length(self.graph, 0).items() 
+                if ops[operator](depth, n))
+    
     def _graph_tree(self) -> nx.DiGraph:
         def add_nodes(graph, parent_id, children_list):        
             for child in children_list:
@@ -57,7 +105,7 @@ class Tree:
                         duration_id = next(unique_id)
                         graph.add_node(duration_id, label=child.root, meta=child._meta.to_dict('records')[0])
                         graph.add_edge(parent_id, duration_id)
-                        add_nodes(graph, duration_id, child.children)
+                        add_nodes(graph, duration_id, child._children)
                     case _:
                         child_id = next(unique_id)
                         graph.add_node(child_id, label=child)

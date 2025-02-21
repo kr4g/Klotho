@@ -1,5 +1,5 @@
 from ...topos.graphs.networks import ComboNet
-from ..combination_product_sets.nkany import CombinationProductSet
+from .cps import CombinationProductSet
 
 class ComboProdNet(ComboNet):
     def __init__(self, cps: CombinationProductSet):
