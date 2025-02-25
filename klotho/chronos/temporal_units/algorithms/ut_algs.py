@@ -1,7 +1,7 @@
 from typing import Union
 from fractions import Fraction
 from itertools import cycle
-from ..ut import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalUnitSequenceBlock, RhythmTree
+from ..ut import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree
 
 
 def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:
@@ -21,13 +21,13 @@ def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUni
     prolatio = (ratio.numerator, ratio.denominator - ratio.numerator)
     return TemporalUnit(duration=ut.duration, tempus=ut.tempus, prolatio=prolatio, tempo=ut.tempo, beat=ut.beat)
 
-def decompose(ut: TemporalUnit, prolatio: Union[RhythmTree, tuple, str] = 'd') -> TemporalUnitSequence:
+def decompose(ut: TemporalUnit, prolatio: Union[tuple, str] = 'd') -> TemporalUnitSequence:
     """Decomposes a temporal structure into its constituent parts based on the provided prolatio."""
     
     if isinstance(prolatio, tuple):
         prolatio = [prolatio]
     elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
-        prolatio = [ut._rtree._children]
+        prolatio = [ut._rt.subdivisions]
         
     prolatio_cycle = cycle(prolatio)
     
@@ -38,19 +38,19 @@ def decompose(ut: TemporalUnit, prolatio: Union[RhythmTree, tuple, str] = 'd') -
             prolatio = next(prolatio_cycle),
             beat     = ut.beat,
             bpm      = ut.bpm
-        ) for ratio in ut._rtree._ratios
+        ) for ratio in ut._rt._ratios
     ])
 
 def transform(structure: TemporalMeta) -> TemporalMeta:
     
     match structure:
         case TemporalUnit():
-            return TemporalUnitSequenceBlock([TemporalUnitSequence([structure])])
+            return TemporalBlock([TemporalUnitSequence([structure])])
             
         case TemporalUnitSequence():
-            return TemporalUnitSequenceBlock([TemporalUnitSequence([ut]) for ut in structure.uts])
+            return TemporalBlock([TemporalUnitSequence([ut]) for ut in structure.uts])
             
-        case TemporalUnitSequenceBlock():
+        case TemporalBlock():
             raise NotImplementedError("Block transformation not yet implemented")
             
         case _:

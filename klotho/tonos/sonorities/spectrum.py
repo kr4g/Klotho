@@ -1,10 +1,11 @@
 from ..tonos import Pitch, freq_to_pitchclass, partial_to_fundamental
 from typing import Union
 from fractions import Fraction
-from klotho.topos.graphs.trees import Tree
+# from klotho.topos.graphs.trees import Tree
+from ..harmonic_trees import HarmonicTree
 import pandas as pd
 
-class Spectrum(Tree):
+class Spectrum():
     """
     A class representing a harmonic spectrum based on a fundamental frequency and its partials.
 
@@ -25,12 +26,12 @@ class Spectrum(Tree):
         self._fundamental = (Pitch(*freq_to_pitchclass(fundamental)) 
                            if isinstance(fundamental, (int, float)) 
                            else fundamental)
-        self._data = self._init_data(partials)
-        super().__init__(self._fundamental, tuple(self._data['pitch']))
+        self._ht = HarmonicTree(self._fundamental.partial, partials)
+        self._data = self._init_data()
 
     @property
     def fundamental(self):
-        return self._root
+        return self._fundamental
 
     @property
     def partials(self):
@@ -39,19 +40,27 @@ class Spectrum(Tree):
     @property
     def data(self):
         return self._data
-
-    def _init_data(self, partials):
+    
+    @property
+    def ht(self):
+        return self._ht
+    
+    def _init_data(self):
         df_data = []
-        for p in partials:
-            multiplier = 1/abs(p) if p < 0 else p
-            pitch = Pitch(*freq_to_pitchclass(self._fundamental.freq * multiplier), partial=p)
-            df_data.append({
-                'partial': p,
-                'freq (Hz)': pitch.freq,
-                'pitch': str(pitch),
-                'cents_offset': pitch.cents_offset
-            })
-        return pd.DataFrame(df_data)
+        for node in self._ht.nodes:
+            harmonic = self._ht.graph.nodes[node]['harmonic']
+            pitch = Pitch.from_freq(self._fundamental.freq * harmonic, harmonic)
+            self._ht.graph.nodes[node]['pitch'] = pitch
+
+            if node in self._ht.leaf_nodes:
+                df_data.append({
+                    'partial': harmonic,
+                    'freq (Hz)': pitch.freq,
+                    'pitch': str(pitch),
+                    'cents_offset': pitch.cents_offset,
+                    'node_id': node
+                })
+        return pd.DataFrame(df_data).sort_values('partial').reset_index(drop=True)
 
     @classmethod
     def from_target(cls, target: Pitch, partials: list[Union[int, float, Fraction]]):

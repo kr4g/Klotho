@@ -7,7 +7,7 @@ General functions for performing calculations and computations related to pitch 
 frequency.
 --------------------------------------------------------------------------------------
 '''
-from utils.algorithms.numbers import to_factors
+from utils.algorithms.factors import to_factors
 from typing import Union, List, Tuple, Dict, Set
 from collections import namedtuple
 from fractions import Fraction
@@ -487,24 +487,27 @@ def reduce_interval_relative(target: Union[Fraction, int, float, str], source: U
 
 def reduce_sequence_relative(sequence: List[Union[Fraction, int, float, str]], equave: Union[Fraction, int, float, str] = 2) -> List[Fraction]:
     '''
-    Fold a sequence of intervals where each interval is folded relative to the previous one.
-    The first interval remains unchanged and serves as the initial reference.
+    Fold a sequence of intervals where each interval is folded relative to its neighbors.
+    The first and last intervals remain unchanged, serving as anchors.
+    Intermediate intervals are folded to minimize octave displacement between adjacent pairs.
 
     Args:
         sequence: List of intervals to be folded
         equave: The equave value, default is 2 (octave)
 
     Returns:
-        List of folded intervals as Fractions
+        List of folded intervals as Fractions, preserving original start and end values
     '''
-    if not sequence:
-        return []
+    if len(sequence) <= 2:
+        return [Fraction(x) for x in sequence]
     
-    result = [Fraction(sequence[0])]
+    result = [Fraction(x) for x in sequence]
     
-    for i in range(1, len(sequence)):
-        folded = reduce_interval_relative(sequence[i], result[i-1], equave)
-        result.append(folded)
+    for i in range(1, len(sequence)-1):
+        result[i] = reduce_interval_relative(result[i], result[i-1], equave)
+    
+    for i in range(len(sequence)-2, 0, -1):
+        result[i] = reduce_interval_relative(result[i], result[i+1], equave)
     
     return result
   
@@ -570,7 +573,7 @@ def interval_cost(a: Union[int, float, Fraction, str], b: Union[int, float, Frac
 
     return diff_coeff * log_dist + prime_coeff * prime_diff
 
-def fold_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: Union[int, float, Fraction, str] = 2) -> float:
+def reduce_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: Union[int, float, Fraction, str] = 2) -> float:
   '''
   Fold a frequency value to within a specified range.
   
@@ -620,5 +623,4 @@ def ratios_n_tet(divisions: int = 12, equave: Union[int, float, Fraction, str] =
     A list of the frequency ratios of the divisions
   '''
   return [n_tet(divisions, equave, nth_division, symbolic) for nth_division in range(divisions)]
-
 

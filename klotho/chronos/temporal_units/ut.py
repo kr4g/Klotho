@@ -15,6 +15,8 @@ from klotho.chronos.chronos import calc_onsets, beat_duration, seconds_to_hmsms
 
 from enum import Enum
 import networkx as nx
+import pandas as pd
+from sympy import pretty
 
 # Prolationis Types
 class ProlatioTypes(Enum):
@@ -32,106 +34,42 @@ class TemporalMeta(type):
     """Metaclass for all temporal structures."""
     pass
 
-
 class Chronon(metaclass=TemporalMeta):
-    """An indivisible unit of musical time within a TemporalUnit."""
+    __slots__ = ('_node_id', '_rt')
     
-    __slots__ = ('_data',)
-    _PROTECTED_KEYS = {'start', 'duration', 'end', 'metric_ratio', 'beat', 'bpm',
-                       'node_id', 'depth', 'parent_ratio', 'ancestor_id', 'sibling_count',
-                       'sibling_index', 'parent_duration', 'proportion'}
-    
-    def __init__(self, start:float=0.0, duration:float=0.0, end:float=0.0,
-                 metric_ratio:Union[None,Fraction]=None, beat:Union[None,Fraction]=None,
-                 bpm:Union[None,int,float]=None, depth:int=0, parent_ratio:Union[None,Fraction]=None,
-                 ancestor_id:int=0, sibling_count:int=1, sibling_index:int=0, node_id:int=0,
-                 parent_duration:float=0.0, proportion:Union[None,Fraction]=None,
-                 parent_id:int=0):
-        
-        self._data = {
-            'start'           : start,
-            'duration'        : duration,
-            'end'             : end,
-            'metric_ratio'    : metric_ratio,
-            'proportion'      : proportion,
-            'beat'            : beat,
-            'bpm'             : bpm,
-            'node_id'         : node_id,
-            'depth'           : depth,
-            'parent_ratio'    : parent_ratio,
-            'parent_duration' : parent_duration,
-            'parent_id'       : parent_id,
-            'ancestor_id'     : ancestor_id,
-            'sibling_count'   : sibling_count,
-            'sibling_index'   : sibling_index
-        }
+    def __init__(self, node_id:int, rt:RhythmTree):
+        self._node_id = node_id
+        self._rt = rt
     
     @property
-    def start(self):
-        return self._data['start']
-    
+    def start(self): return self._rt[self._node_id]['onset']
     @property
-    def duration(self):
-        return self._data['duration']
-    
+    def duration(self): return self._rt[self._node_id]['duration']
     @property
-    def end(self):
-        return self._data['end']
-    
+    def end(self): return self.start + abs(self.duration)
     @property
-    def metric_ratio(self):
-        return self._data['metric_ratio']
-    
+    def proportion(self): return self._rt[self._node_id]['proportion']
     @property
-    def proportion(self):
-        return self._data['proportion']
-    
+    def metric_ratio(self): return self._rt[self._node_id]['ratio']
     @property
-    def beat(self):
-        return self._data['beat']
-    
+    def node_id(self): return self._node_id
     @property
-    def bpm(self):
-        return self._data['bpm']
+    def is_rest(self): return self._rt[self._node_id]['duration'] < 0
     
-    @property
-    def node_id(self):
-        return self._data['node_id']
+    def __str__(self):
+        return pd.DataFrame({
+            'start': [self.start],
+            'duration': [self.duration], 
+            'end': [self.end],
+            'proportion': [self.proportion],
+            'ratio': [self.metric_ratio],
+            'node_id': [self.node_id],
+            'is_rest': [self.is_rest]
+        }, index=['']).__str__()
     
-    @property
-    def depth(self):
-        return self._data['depth']
-    
-    @property
-    def parent_id(self):
-        return self._data['parent_id']
-    
-    @property
-    def parent_ratio(self):
-        return self._data['parent_ratio']
-    
-    @property
-    def parent_duration(self):
-        return self._data['parent_duration']
-    
-    @property
-    def ancestor_id(self):
-        return self._data['ancestor_id']
-    
-    @property
-    def sibling_count(self):
-        return self._data['sibling_count']
-    
-    @property
-    def sibling_index(self):
-        return self._data['sibling_index']
-    
-    def __getitem__(self, key):
-        return self._data[key]
-    
-    def __setitem__(self, key, value):
-        self._data[key] = value
-    
+    def __repr__(self):
+        return self.__str__()
+
 
 class TemporalUnit(metaclass=TemporalMeta):
     def __init__(self,
@@ -141,16 +79,13 @@ class TemporalUnit(metaclass=TemporalMeta):
                  beat:Union[None,Fraction,int,float,str]   = None,
                  bpm:Union[None,int,float]                 = None):
         
-        self._type      = None
-        self._rtree     = self._set_rtree(span, Meas(tempus), prolatio)
-        self._beat      = beat
-        self._bpm       = bpm
-        self._onsets    = None
-        self._durations = None
-        self._offset    = 0.0
-        self._elements  = [Chronon() for _ in range(len(self._rtree._ratios))]
+        self._type   = None
+        self._rt     = self._set_rt(span, Meas(tempus), prolatio)
+        self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
+        self._bpm    = bpm if bpm else 60
+        self._offset = 0.0
         
-        self._set_elements()
+        self._events = self._set_nodes()
     
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
@@ -159,49 +94,40 @@ class TemporalUnit(metaclass=TemporalMeta):
                    prolatio = rt._children,
                    beat     = beat,
                    bpm      = bpm)
-
-    # @property
-    # def size(self):
-    #     """The number of events in the TemporalUnit."""
-    #     return len(self._rtree.ratios)
     
     @property
     def span(self):
         """The number of measures that the TemporalUnit spans."""
-        return self._rtree.span
+        return self._rt.span
 
     @property
     def tempus(self):
         """The time signature of the TemporalUnit."""
-        return self._rtree.meas
+        return self._rt.meas
     
     @property
     def prolationis(self):        
         """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
-        return self._rtree._children
+        return self._rt._children
     
     @property
-    def rtree(self):
+    def rt(self):
         """The RhythmTree of the TemporalUnit."""
-        return self._rtree
+        return self._rt
 
     @property
     def ratios(self):
         """The ratios of a RhythmTree which describe the proportional durations of the TemporalUnit."""
-        return self._rtree._ratios
+        return self._rt._ratios
 
     @property
     def beat(self):
         """The rhythmic ratio that describes the beat of the TemporalUnit."""
-        if self._beat is None:
-            self._beat = Fraction(1, self._rtree.meas._denominator)
         return self._beat
     
     @property
     def bpm(self):
         """The beats per minute of the TemporalUnit."""
-        if self._bpm is None:
-            self._bpm = 60
         return self._bpm
     
     @property
@@ -216,27 +142,17 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def onsets(self):
-        """A tuple of onset times (in seconds) for each event in the TemporalUnit."""
-        if self._onsets is None:
-            self._onsets = tuple(onset + self._offset for onset in calc_onsets(self.durations))
-        return self._onsets
+        return tuple(self._rt.graph.nodes[n]['onset'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
-        """A tuple of durations (in seconds) for each event in the TemporalUnit."""
-        if self._durations is None:
-            self._durations = tuple(
-                beat_duration(ratio      = r,
-                              bpm        = self.bpm,
-                              beat_ratio = self.beat) for r in self._rtree._ratios
-                )
-        return self._durations
+        return tuple(self._rt.graph.nodes[n]['duration'] for n in self._rt.leaf_nodes)
 
     @property
     def duration(self):
         """The total duration (in seconds) of the TemporalUnit."""
         # return sum(abs(d) for d in self.durations)
-        return beat_duration(ratio      = str(self._rtree.meas * self._rtree.span),
+        return beat_duration(ratio      = str(self._rt.meas * self._rt.span),
                              bpm        = self.bpm,
                              beat_ratio = self.beat
                 )
@@ -248,39 +164,35 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def events(self):
-        """A list of events (dicts) for each event in the TemporalUnit."""
-        return self._elements
-    
-    # @tempus.setter
-    # def tempus(self, tempus:Union[Meas,Fraction,int,float,str]):
-    #     """Sets the time signature of the TemporalUnit."""
-    #     self._rtree = self._set_rtree(self.span, tempus, self._rtree._children)
-    #     self._set_elements()
+        return pd.DataFrame([{
+            'start': c.start,
+            'duration': c.duration,
+            'end': c.end,
+            'metric_ratio': c.metric_ratio,
+            's': c.proportion,
+            'is_rest': c.is_rest,
+            'node_id': c.node_id,
+        } for c in self._events], index=range(len(self._events)))
     
     @bpm.setter
     def bpm(self, bpm:Union[None,float,int]):
         """Sets the bpm in beats per minute of the TemporalUnit."""
-        self._bpm       = bpm
-        self._onsets    = None
-        self._durations = None
-        self._set_elements()
+        self._bpm = bpm
+        self._events = self._set_nodes()
         
     @beat.setter
     def beat(self, beat:Union[Fraction,str]):
         """Sets the rhythmic ratio that describes the beat of the TemporalUnit."""
-        self._beat      = Fraction(beat)
-        self._onsets    = None
-        self._durations = None
-        self._set_elements()
+        self._beat = Fraction(beat)
+        self._events = self._set_nodes()
         
     @offset.setter
     def offset(self, offset:float):
         """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
         self._offset = offset
-        self._onsets = None
-        self._set_elements()
-
-    def _set_rtree(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
+        self._events = self._set_nodes()
+        
+    def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         match prolatio:
             case tuple():
                 self._type = ProlatioTypes.SUBDIVISION
@@ -319,92 +231,46 @@ class TemporalUnit(metaclass=TemporalMeta):
             case _:
                 raise ValueError(f'Invalid prolatio type: {type(prolatio)}')
 
-    def _set_elements(self):
-        """Updates the chronon elements with timing and tree metadata."""
-        leaf_nodes = self._rtree.leaf_nodes
-        G = self._rtree.graph
+    def _set_nodes(self):
+        """Updates node timings and returns chronon events."""
+        leaf_nodes = self._rt.leaf_nodes
+        leaf_durations = [beat_duration(ratio=self._rt[n]['ratio'], 
+                                      bpm=self.bpm, 
+                                      beat_ratio=self.beat) for n in leaf_nodes]
+        leaf_onsets = [onset + self._offset for onset in calc_onsets(leaf_durations)]
         
-        for i, node_id in enumerate(leaf_nodes):
-            node_data = G.nodes[node_id]
-            
-            parent_id = next(G.predecessors(node_id), None)
-            parent_ratio = str(G.nodes[parent_id]['ratio']) if parent_id is not None else None
-            
-            path = nx.shortest_path(G, 0, node_id)[1:]
-            ancestor_id = path[0] if len(path) > 0 else 0
-            
-            siblings = list(G.successors(parent_id)) if parent_id is not None else [node_id]
-            sibling_count = len(siblings)
-            sibling_index = siblings.index(node_id)
-            
-            self._elements[i]['start']           = self.onsets[i]
-            self._elements[i]['duration']        = self.durations[i]
-            self._elements[i]['end']             = self.onsets[i] + self.durations[i]
-            self._elements[i]['metric_ratio']    = node_data['ratio']
-            self._elements[i]['proportion']      = node_data['proportion']
-            self._elements[i]['beat']            = self._beat
-            self._elements[i]['bpm']             = self._bpm
-            self._elements[i]['node_id']         = node_id
-            self._elements[i]['depth']           = nx.shortest_path_length(G, 0, node_id)
-            self._elements[i]['parent_ratio']    = Fraction(parent_ratio)
-            self._elements[i]['parent_duration'] = beat_duration(ratio      = parent_ratio,
-                                                                 bpm        = self._bpm,
-                                                                 beat_ratio = self._beat)
-            self._elements[i]['parent_id']       = parent_id
-            self._elements[i]['ancestor_id']     = ancestor_id
-            self._elements[i]['sibling_count']   = sibling_count
-            self._elements[i]['sibling_index']   = sibling_index
-            
-    def __getitem__(self, idx: int) -> dict:
-        """
-        Allows indexing into the TemporalUnit to access specific events.
+        for node, onset, duration in zip(leaf_nodes, leaf_onsets, leaf_durations):
+            self._rt[node]['onset'] = onset
+            self._rt[node]['duration'] = duration
         
-        Args:
-            idx: The index of the event to retrieve
+        non_leaf_nodes = [n for n,d in self._rt.graph.out_degree() if d > 0]
+        for node in non_leaf_nodes:
+            self._rt[node]['duration'] = beat_duration(
+                ratio=str(self._rt[node]['ratio']),
+                bpm=self.bpm,
+                beat_ratio=self.beat)
             
-        Returns:
-            dict: A copy of the event at the specified index
-            
-        Raises:
-            IndexError: If the index is out of range
-        """
-        return self._elements[idx]
-    
-    def __setitem__(self, idx: int, value: Union[dict, TemporalMeta]):
-        """
-        Allows setting values in the TemporalUnit's events while protecting certain keys.
-        
-        Args:
-            idx: The index of the event to modify
-            value: The key-value pair to set or a temporal structure
-        """
-        match value:
-            case dict():
-                for key, val in value.items():
-                    if key in Chronon._PROTECTED_KEYS:
-                        raise KeyError(f"Cannot modify protected key: {key}")
-                    self._elements[idx][key] = val
-            case TemporalMeta():
-                if value.beat is None:
-                    value.beat = self._beat
-                if value.bpm is None:
-                    value.bpm = self._bpm
-                value.bpm = value.bpm * (value.duration / self._elements[idx]['duration'])
-                self._elements[idx] = value
-            case _:
-                raise TypeError(f"Value must be a dictionary or temporal structure")
+            current = node
+            while self._rt.graph.out_degree(current) > 0:
+                current = min(self._rt.graph.successors(current))
+            self._rt[node]['onset'] = self._rt[current]['onset']
+
+        return tuple(Chronon(node_id, self._rt) for node_id in leaf_nodes)
+
+    def __getitem__(self, idx: int) -> Chronon:
+        return self._events[idx]
     
     def __iter__(self):
-        return iter(self._elements)
+        return iter(self._events)
     
     def __len__(self):
-        return len(self._elements)
+        return len(self._events)
         
     def __str__(self):
         result = (
-            f'Span:     {self._rtree.span}\n'
-            f'Tempus:   {self._rtree.meas}\n'
-            # f'Prolatio: {print_subdivisons(self._rtree.subdivisions)}\n'
+            f'Span:     {self._rt.span}\n'
+            f'Tempus:   {self._rt.meas}\n'
+            # f'Prolatio: {print_subdivisons(self._rt.subdivisions)}\n'
             f'Prolatio: {self._type.value}\n'
             f'Events:   {len(self)}\n'
             f'Tempo:    {self._beat} = {self._bpm}\n'
@@ -415,10 +281,6 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     def __repr__(self):
         return self.__str__()
-
-
-class TemporalUnitMatrix:
-    pass
 
 
 class TemporalUnitSequence(metaclass=TemporalMeta):
@@ -466,8 +328,8 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     
     @property
     def T(self):
-        """Transforms the TemporalUnitSequence into a TemporalUnitSequenceBlock."""
-        return TemporalUnitSequenceBlock([TemporalUnitSequence([ut]) for ut in self._seq])
+        """Transforms the TemporalUnitSequence into a TemporalBlock."""
+        return TemporalBlock([TemporalUnitSequence([ut]) for ut in self._seq])
     
     @offset.setter
     def offset(self, offset:float):
@@ -498,8 +360,21 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     def __len__(self):
         return len(self._seq)
 
+    def __str__(self):
+        return pd.DataFrame([{
+            'Tempus': ut.tempus,
+            'Beat': ut.beat,
+            'BPM': ut.bpm,
+            'Start': seconds_to_hmsms(ut.time[0]),
+            'Duration': seconds_to_hmsms(ut.duration),
+            'End': seconds_to_hmsms(ut.time[1]),
+        } for ut in self._seq]).__str__()
 
-class TemporalUnitSequenceBlock(metaclass=TemporalMeta):
+    def __repr__(self):
+        return self.__str__()
+
+
+class TemporalBlock(metaclass=TemporalMeta):
     """A collection of parallel TemporalUnitSequences that represent simultaneous temporal events."""
     
     def __init__(self, tb:list[TemporalUnitSequence]=[]):
@@ -515,7 +390,7 @@ class TemporalUnitSequenceBlock(metaclass=TemporalMeta):
     def from_tree_mat(cls, matrix, meas_denom:int=1, subdiv:bool=False,
                       rotation_offset:int=1, beat=None, bpm=None):
         """
-        Creates a TemporalUnitSequenceBlock from a matrix of tree specifications.
+        Creates a TemporalBlock from a matrix of tree specifications.
         
         Args:
             matrix: Input matrix containing duration and subdivision specifications
@@ -618,8 +493,3 @@ class TemporalUnitSequenceBlock(metaclass=TemporalMeta):
 
     def __iter__(self):
         return iter(self._tb)
-
-
-class TemporalComposition(metaclass=TemporalMeta):
-    pass
-    

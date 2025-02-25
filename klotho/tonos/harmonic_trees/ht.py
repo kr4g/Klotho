@@ -9,39 +9,45 @@ class HarmonicTree(Tree):
     def __init__(self,
                  root:int                                   = 1,
                  children:Tuple[int, ...]                   = (1,),
-                 equave:Union[Fraction,int,float,str, None] = None,
-                 span:int                                   = 1,
-                 inverse:bool                               = False
-    ):
+                 equave:Union[Fraction,int,float,str,None]  = None,
+                 span:int                                   = 1):
         
         super().__init__(root, children)
-        self._equave    = Fraction(equave) if equave is not None else None
-        self._span      = span
-        self._inverse   = inverse
-        self._harmonics = None
-        self._ratios    = None
+        
+        self._meta['equave'] = Fraction(equave) if equave is not None else None
+        self._meta['span']   = span
+        
         self._evaluate()
 
     def _evaluate(self):
-        self.graph.nodes[0]['span'] = self._span
+        self.graph.nodes[0]['multiple'] = self.root
+        self.graph.nodes[0]['harmonic'] = self.root
         def process_subtree(node=0, factor=1):
             value = self.graph.nodes[node]['label']
-            value
-            self.graph.nodes[node]['multiple'] = value
+            self.graph.nodes[node]['multiple'] = value if value > 0 else Fraction(1, abs(value))
             children = list(self.graph.successors(node))
             
             if not children:
                 harmonic = value * factor
                 self.graph.nodes[node]['harmonic'] = harmonic
-                if self._equave is not None:
-                    self.graph.nodes[node]['ratio'] = reduce_interval(Fraction(harmonic), self._equave, self._span)
+                
+                if self.equave is not None:
+                    self.graph.nodes[node]['ratio'] = reduce_interval(Fraction(harmonic), self.equave, self.span)
+                else:
+                    self.graph.nodes[node]['ratio'] = harmonic
+                
                 return
             else:
                 for child in children:
-                    harmonic = self.graph.nodes[child]['label'] * factor
+                    value = self.graph.nodes[child]['label']
+                    self.graph.nodes[child]['multiple'] = value
+                    harmonic = value * factor
                     self.graph.nodes[child]['harmonic'] = harmonic
-                    if self._equave is not None:
-                        self.graph.nodes[child]['ratio'] = reduce_interval(Fraction(harmonic), self._equave, self._span)
+                    
+                    if self.equave is not None:
+                        self.graph.nodes[child]['ratio'] = reduce_interval(Fraction(harmonic), self.equave, self.span)
+                    else:
+                        self.graph.nodes[child]['ratio'] = harmonic
                     
                     if self.graph.out_degree(child) > 0:
                         process_subtree(child, harmonic)
@@ -50,23 +56,19 @@ class HarmonicTree(Tree):
     
     @property
     def harmonics(self):
-        if self._harmonics is None:
-            self._harmonics = tuple(self.graph.nodes[n]['harmonic'] for n in self.leaf_nodes)
-        return self._harmonics
+        return tuple(self.graph.nodes[n]['harmonic'] for n in self.leaf_nodes)
     
     @property
     def ratios(self):
-        if self._ratios is None:
-            self._ratios = tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
-        return self._ratios
+        return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
     
     @property
     def equave(self):
-        return self._equave
+        return self._meta['equave'].iloc[0]
     
     @property
     def span(self):
-        return self._span
+        return self._meta['span'].iloc[0]
     
     # @property
     # def inverse(self):

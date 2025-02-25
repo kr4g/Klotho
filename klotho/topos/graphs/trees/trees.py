@@ -6,7 +6,6 @@ class Tree:
     def __init__(self, root, children:tuple):
         self._root = root
         self._children = children
-        self._graph = None
         self._leaf_nodes = None
         self._graph = self._graph_tree()
         self._meta = pd.DataFrame([{
@@ -35,8 +34,6 @@ class Tree:
     
     @property
     def graph(self):
-        if self._graph is None:
-            self._graph = self._graph_tree()
         return self._graph
     
     @property
@@ -46,6 +43,10 @@ class Tree:
     @property
     def k(self):
         return self._meta['k'].iloc[0]
+    
+    @property
+    def nodes(self):
+        return self.graph.nodes
     
     def parent(self, node):
         return next(self.graph.predecessors(node), None)
@@ -118,22 +119,22 @@ class Tree:
         return G
     
     @classmethod
-    def from_graph(cls, G):
+    def from_graph(cls, G, clear_attributes=False):
         root_node = [n for n, d in G.in_degree() if d == 0]
         if len(root_node) != 1:
             raise ValueError("Graph must have exactly one root node.")
         
         root_id = root_node[0]
-        root = G.nodes[root_id]['label']
+        root = None if clear_attributes else G.nodes[root_id].get('label')
         
         def _build_children(node_id):
             children = list(G.successors(node_id))
             if not children:
-                return G.nodes[node_id]['label']
+                return None if clear_attributes else G.nodes[node_id].get('label')
             
             result = []
             for child_id in children:
-                child_label = G.nodes[child_id]['label']
+                child_label = None if clear_attributes else G.nodes[child_id].get('label')
                 child_tuple = _build_children(child_id)
                 
                 if isinstance(child_tuple, tuple):
@@ -144,4 +145,14 @@ class Tree:
             return tuple(result) if len(result) > 1 else (result[0],)
         
         children = _build_children(root_id)
-        return cls(root, children)
+        tree = cls(root, children)
+        
+        mapping = {new: old for new, old in zip(nx.dfs_preorder_nodes(tree.graph), nx.dfs_preorder_nodes(G))}
+        tree._graph = nx.relabel_nodes(tree._graph, mapping)
+        
+        if clear_attributes:
+            for node in tree._graph.nodes:
+                tree._graph.nodes[node].clear()
+                tree._graph.nodes[node]['label'] = None
+            
+        return tree
