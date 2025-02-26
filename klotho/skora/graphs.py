@@ -175,9 +175,9 @@ def plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
             min_weight, max_weight = min(weights), max(weights)
             width_scale = lambda w: 1 + 3 * ((w - min_weight) / (max_weight - min_weight) if max_weight > min_weight else 0)
             edge_widths = [width_scale(w) for w in weights]
-            nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color='#808080', width=edge_widths)
+            nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color='#808080', width=edge_widths, alpha=0.5)
         else:
-            nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color='#808080', width=2)
+            nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color='#808080', width=2, alpha=0.5)
         
         if path_edges:
             colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
