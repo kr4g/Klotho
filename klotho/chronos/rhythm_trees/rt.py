@@ -279,7 +279,7 @@ class RhythmTree(Tree):
     '''
     def __init__(self, 
                  span:int                      = 1,
-                 meas:Union[Meas,Fraction,str] = '1/1',
+                 meas:Union[Meas,Fraction,str] = '4/4',
                  subdivisions:Tuple            = (1,1)):
         super().__init__(Meas(meas).numerator, subdivisions)
         self._subdivisions = self._cast_subdivs(subdivisions)

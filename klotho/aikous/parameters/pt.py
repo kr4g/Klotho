@@ -4,44 +4,41 @@ import pandas as pd
 class ParameterTree(Tree):
     def __init__(self, root, children:tuple):
         super().__init__(root, children)
-        self._parameters = {}
+        self._meta['pfields'] = pd.Series([set()], index=[''])
     
     def __getitem__(self, node):
         return ParameterNode(self, node)
     
+    @property
+    def pfields(self):
+        return sorted(self._meta.loc['', 'pfields'])
+    
     def set(self, node, **kwargs):
-        if node not in self._parameters:
-            self._parameters[node] = {}
-        self._parameters[node].update(kwargs)
+        self._meta.loc['', 'pfields'].update(kwargs.keys())
         
-        # Update the graph nodes with the new parameters
         for key, value in kwargs.items():
             self.graph.nodes[node][key] = value
         
+        for descendant in self.descendants(node):
+            for key, value in kwargs.items():
+                self.graph.nodes[descendant][key] = value
+        
     def get(self, node, key):
-        current = node
-        while current is not None:
-            if current in self._parameters and key in self._parameters[current]:
-                return self._parameters[current][key]
-            current = self.parent(current)
+        if key in self.graph.nodes[node]:
+            return self.graph.nodes[node][key]
         return None
     
     def clear(self, node=None):
         if node is None:
-            self._parameters.clear()
-        elif node in self._parameters:
-            del self._parameters[node]
+            for n in self.graph.nodes:
+                self.graph.nodes[n].clear()
+        else:
+            self.graph.nodes[node].clear()
+            for descendant in self.descendants(node):
+                self.graph.nodes[descendant].clear()
             
     def items(self, node):
-        params = {}
-        current = node
-        while current is not None:
-            if current in self._parameters:
-                for k, v in self._parameters[current].items():
-                    if k not in params:
-                        params[k] = v
-            current = self.parent(current)
-        return params
+        return dict(self.graph.nodes[node])
 
 class ParameterNode:
     def __init__(self, tree, node):
@@ -49,7 +46,9 @@ class ParameterNode:
         self._node = node
         
     def __getitem__(self, key):
-        return self._tree.get(self._node, key)
+        if isinstance(key, str):
+            return self._tree.get(self._node, key)
+        raise TypeError("Key must be a string")
     
     def __setitem__(self, key, value):
         self._tree.set(self._node, **{key: value})
@@ -59,3 +58,12 @@ class ParameterNode:
         
     def items(self):
         return self._tree.items(self._node)
+    
+    def __dict__(self):
+        return self._tree.items(self._node)
+        
+    def __str__(self):
+        return str(self._tree.items(self._node))
+    
+    def __repr__(self):
+        return repr(self._tree.items(self._node))

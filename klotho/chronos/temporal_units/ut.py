@@ -74,7 +74,7 @@ class Chronon(metaclass=TemporalMeta):
 class TemporalUnit(metaclass=TemporalMeta):
     def __init__(self,
                  span:Union[int,float,Fraction]            = 1,
-                 tempus:Union[Meas,Fraction,int,float,str] = '1/1',
+                 tempus:Union[Meas,Fraction,int,float,str] = '4/4',
                  prolatio:Union[tuple,str]                 = 'd',
                  beat:Union[None,Fraction,int,float,str]   = None,
                  bpm:Union[None,int,float]                 = None):
@@ -91,7 +91,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
         return cls(span     = rt.span,
                    tempus   = rt.meas,
-                   prolatio = rt._children,
+                   prolatio = rt._subdivisions,
                    beat     = beat,
                    bpm      = bpm)
     
@@ -108,7 +108,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def prolationis(self):        
         """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
-        return self._rt._children
+        return self._rt._subdivisions
     
     @property
     def rt(self):

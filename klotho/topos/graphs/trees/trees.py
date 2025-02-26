@@ -73,6 +73,18 @@ class Tree:
     def successors(self, node):
         return tuple(self.graph.successors(node))
     
+    def descendants(self, node):
+        """Returns all descendants of a node in depth-first order.
+        
+        Args:
+            node: The node whose descendants to return
+            
+        Returns:
+            tuple: All descendants of the node in depth-first order
+        """
+        descendants = list(nx.dfs_preorder_nodes(self.graph, node))
+        return tuple(descendants[1:])
+    
     def at_depth(self, n, operator='=='):
         """Returns nodes filtered by depth using the specified operator
         
