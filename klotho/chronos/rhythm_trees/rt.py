@@ -323,7 +323,7 @@ class RhythmTree(Tree):
 
     def subtree(self, node, renumber=True):
         tree_subtree = super().subtree(node, renumber)
-        return self.__class__.from_tree(tree_subtree, self.span)
+        return self.__class__.from_tree(tree_subtree, 1)
     
     def _cast_subdivs(self, children):
         def convert_to_tuple(item):
@@ -336,7 +336,7 @@ class RhythmTree(Tree):
         return tuple(convert_to_tuple(child) for child in children)
     
     def _evaluate(self):
-        self.graph.nodes[0]['ratio'] = self.meas
+        self.graph.nodes[self.root]['ratio'] = self.meas
         def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
             node_data = self.graph.nodes[node]
             
