@@ -4,9 +4,12 @@ import threading
 import time
 from tqdm import tqdm
 import heapq
+import json
+import os
+from typing import Union
 
-class EventBuilder:
-    def __init__(self, scheduler: 'Scheduler', event_type: str, uid: str, synth_name: str, start: float, params: dict):
+class StreamBuilder:
+    def __init__(self, scheduler: 'Streamer', event_type: str, uid: str, synth_name: str, start: float, params: dict):
         self.scheduler = scheduler
         self.event_type = event_type
         self.uid = str(uuid4()).replace('-', '') if uid is None else uid
@@ -28,7 +31,7 @@ class EventBuilder:
         return self.uid
 
 
-class Scheduler:
+class Streamer:
     def __init__(self, ip:str='127.0.0.1', send_port:int=57121, receive_port:int=9000):
         self.client = udp_client.SimpleUDPClient(ip, send_port)
         self.events = []
@@ -111,19 +114,19 @@ class Scheduler:
         self.reset_progress_bars()
 
     def new_synth(self, synth_name:str = None, start:float = 0, **params):
-        return EventBuilder(self, 'new', None, synth_name, start, params).uid
+        return StreamBuilder(self, 'new', None, synth_name, start, params).uid
 
     def set_synth(self, uid:str, start:float, **params):
-        EventBuilder(self, 'set', uid, None, start, params)
+        StreamBuilder(self, 'set', uid, None, start, params)
 
     def new_synth_handler(self, address, uid, synth_name, start, *params):
         param_dict = {params[i]: params[i+1] for i in range(0, len(params), 2)}
-        EventBuilder(self, 'new', uid, synth_name, float(start), param_dict)
+        StreamBuilder(self, 'new', uid, synth_name, float(start), param_dict)
         self.reset_progress_bars()
         
     def set_synth_handler(self, address, uid, start, *params):
         param_dict = {params[i]: params[i+1] for i in range(0, len(params), 2)}
-        EventBuilder(self, 'set', uid, None, float(start), param_dict)
+        StreamBuilder(self, 'set', uid, None, float(start), param_dict)
         self.reset_progress_bars()
         
     def start(self, address, *args):
@@ -192,3 +195,78 @@ class Scheduler:
             # print("Server is running.")
         else:
             print("Server is already running.")
+
+
+class Scheduler:
+    def __init__(self):
+        self.events = []
+        self.total_events = 0
+        self.event_counter = 0  # sorting for final tiebreaker
+        
+    def new_node(self, synth_name: str, start: float = 0, dur: Union[float, None] = None, group: str = None, **pfields):
+        uid = str(uuid4()).replace('-', '')
+        
+        event = {
+            "type": "new",
+            "id": uid,
+            "synthName": synth_name,
+            "start": start,
+            "pfields": pfields
+        }
+        
+        if group:
+            event["group"] = group
+        else:
+            event["group"] = "default"
+            
+        priority = 0 # higher priority
+        heapq.heappush(self.events, (start, priority, uid, self.event_counter, event))
+        self.event_counter += 1
+        self.total_events += 1
+        
+        if dur:
+            self.set_node(uid, start = start + dur, gate = 0)
+        
+        return uid
+
+    def set_node(self, uid: str, start: float, **pfields):
+        event = {
+            "type": "set",
+            "id": uid,
+            "start": start,
+            "pfields": pfields
+        }
+        
+        priority = 1 # lower priority
+        heapq.heappush(self.events, (start, priority, uid, self.event_counter, event))
+        self.event_counter += 1
+        self.total_events += 1
+        
+    def clear_events(self):
+        self.events = []
+        self.total_events = 0
+        self.event_counter = 0
+        
+    def write(self, filepath, start_time: Union[float, None] = None, time_scale: float = 1.0):
+        sorted_events = []
+        events_copy = self.events.copy()
+        
+        if events_copy:
+            if start_time:
+                min_start = min(start for start, _, _, _, _ in events_copy)
+                time_shift = start_time - min_start
+            else:
+                time_shift = 0
+            
+            while events_copy:
+                start, _, _, _, event = heapq.heappop(events_copy)
+                new_start = (start + time_shift) * time_scale
+                event["start"] = new_start
+                sorted_events.append(event)
+            
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(sorted_events, f, indent=2)
+            print(f"Successfully wrote {self.total_events} events to {os.path.abspath(filepath)}")
+        except Exception as e:
+            print(f"Error writing to {filepath}: {e}")

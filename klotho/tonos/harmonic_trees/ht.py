@@ -7,10 +7,10 @@ class HarmonicTree(Tree):
     '''
     '''
     def __init__(self,
-                 root:int                                   = 1,
-                 children:Tuple[int, ...]                   = (1,),
-                 equave:Union[Fraction,int,float,str,None]  = None,
-                 span:int                                   = 1):
+                 root:int                                  = 1,
+                 children:Tuple[int, ...]                  = (1,),
+                 equave:Union[Fraction,int,float,str,None] = None,
+                 span:int                                  = 1):
         
         super().__init__(root, children)
         
@@ -20,8 +20,8 @@ class HarmonicTree(Tree):
         self._evaluate()
 
     def _evaluate(self):
-        self.graph.nodes[0]['multiple'] = self.root
-        self.graph.nodes[0]['harmonic'] = self.root
+        self.graph.nodes[0]['multiple'] = self._graph.nodes[self.root]['label']
+        self.graph.nodes[0]['harmonic'] = self._graph.nodes[self.root]['label']
         def process_subtree(node=0, factor=1):
             value = self.graph.nodes[node]['label']
             self.graph.nodes[node]['multiple'] = value if value > 0 else Fraction(1, abs(value))
@@ -53,7 +53,7 @@ class HarmonicTree(Tree):
                         process_subtree(child, harmonic)
         
         process_subtree()
-    
+
     @property
     def harmonics(self):
         return tuple(self.graph.nodes[n]['harmonic'] for n in self.leaf_nodes)

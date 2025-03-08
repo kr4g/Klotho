@@ -1,6 +1,7 @@
 import numpy as np
 from collections.abc import Iterable
 from itertools import cycle
+from math import lcm
 
 class Norg:
     '''
@@ -67,20 +68,30 @@ class Norg:
 
 
 class Pattern:
-    def __init__(self, iterable):
-        self.iterable = iterable
-        self.cycles = self._create_cycles(iterable)
-
+    def __init__(self, iterable, end=False):
+        self._iterable = iterable
+        self._cycles, self._pattern_length = self._create_cycles(iterable)
+        self._end = end
+        self._current = 0
+        
     def _create_cycles(self, item):
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
-            return cycle([self._create_cycles(subitem) for subitem in item])
-        return item
+            sub_results = [self._create_cycles(subitem) for subitem in item]
+            subcycles, lengths = zip(*sub_results)
+            this_level_length = len(item)
+            nested_lengths = [this_level_length * length for length in lengths if length > 0]
+            total_length = lcm(*nested_lengths) if nested_lengths else this_level_length
+            return cycle(subcycles), total_length
+        return item, 1
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        return self._get_next(self.cycles)
+        if self._current >= self._pattern_length and self._end:
+            return next(self._end) if isinstance(self._end, Pattern) else self._end
+        self._current += 1
+        return self._get_next(self._cycles)
 
     def _get_next(self, cyc):
         item = next(cyc)
@@ -88,8 +99,11 @@ class Pattern:
             item = self._get_next(item)
         return item
     
+    def __len__(self):
+        return self._pattern_length
+    
     def __str__(self):
-        return str(list(self.iterable))
+        return str(list(self._iterable))
 
     def __repr__(self):
         return self.__str__()

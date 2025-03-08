@@ -34,6 +34,7 @@ class TemporalMeta(type):
     """Metaclass for all temporal structures."""
     pass
 
+
 class Chronon(metaclass=TemporalMeta):
     __slots__ = ('_node_id', '_rt')
     
@@ -191,6 +192,27 @@ class TemporalUnit(metaclass=TemporalMeta):
         """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
         self._offset = offset
         self._events = self._set_nodes()
+    
+    def set_duration(self, target_duration: float) -> None:
+        """
+        Sets the tempo (bpm) to achieve a specific duration in seconds.
+        
+        This method calculates and sets the appropriate bpm value so that
+        the TemporalUnit's total duration matches the target duration.
+        
+        Args:
+            target_duration: The desired duration in seconds
+            
+        Raises:
+            ValueError: If target_duration is not positive
+        """
+        if target_duration <= 0:
+            raise ValueError("Target duration must be positive")
+            
+        current_duration = self.duration
+        ratio = current_duration / target_duration
+        new_bpm = self._bpm * ratio
+        self.bpm = new_bpm
         
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         match prolatio:
@@ -349,6 +371,35 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
             ut.bpm = bpm
         self._set_offsets()
     
+    def set_duration(self, target_duration: float) -> None:
+        """
+        Sets the tempo (bpm) of all TemporalUnits to achieve a specific total duration in seconds.
+        
+        This method calculates and sets the appropriate bpm values for all TemporalUnits
+        in the sequence so that the total duration matches the target duration.
+        The relative durations between units are preserved by scaling all bpm values
+        by the same factor.
+        
+        Args:
+            target_duration: The desired total duration in seconds
+            
+        Raises:
+            ValueError: If target_duration is not positive or if sequence is empty
+        """
+        if target_duration <= 0:
+            raise ValueError("Target duration must be positive")
+        
+        if not self._seq:
+            raise ValueError("Cannot set duration of empty sequence")
+            
+        current_duration = self.duration
+        ratio = current_duration / target_duration
+        
+        for ut in self._seq:
+            ut.bpm = ut.bpm * ratio
+            
+        self._set_offsets()
+        
     def _set_offsets(self):
         """Updates the offsets of all TemporalUnits based on their position in the sequence."""
         for i, ut in enumerate(self._seq):
@@ -372,6 +423,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
 
     def __repr__(self):
         return self.__str__()
+
 
 
 class TemporalBlock(metaclass=TemporalMeta):

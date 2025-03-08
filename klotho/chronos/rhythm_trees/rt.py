@@ -290,7 +290,7 @@ class RhythmTree(Tree):
     
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
-        return cls(span = span, meas = Meas(tree._root), subdivisions = tree._children)
+        return cls(span = span, meas = Meas(tree[tree.root]['ratio']), subdivisions = tree._list[1])
     
     @classmethod
     def from_ratios(cls, lst:Tuple[Fraction], span:int = 1):
@@ -321,6 +321,10 @@ class RhythmTree(Tree):
     #         self._meta['type'] = self._set_type()
     #     return self._meta['type']
 
+    def subtree(self, node, renumber=True):
+        tree_subtree = super().subtree(node, renumber)
+        return self.__class__.from_tree(tree_subtree, self.span)
+    
     def _cast_subdivs(self, children):
         def convert_to_tuple(item):
             if isinstance(item, RhythmTree):
@@ -375,7 +379,7 @@ class RhythmTree(Tree):
         
         _process_subtree()
         return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
-    
+
     def _set_type(self):
         div = sum_proportions(self.subdivisions)
         if bin(div).count('1') != 1 and div != self.meas.numerator:

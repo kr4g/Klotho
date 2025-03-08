@@ -85,16 +85,7 @@ class Pitch:
     @property
     def virtual_fundamental(self):
         return Pitch(*partial_to_fundamental(self.pitchclass, self.octave, self.partial, self.cents_offset))
-    
-    @cents_offset.setter
-    def cents_offset(self, value):
-        self._data.at['', 'cents_offset'] = value
-        self._data.at['', 'freq'] = pitchclass_to_freq(self.pitchclass, self.octave, value)
-    
-    @partial.setter
-    def partial(self, value):
-        self._data.at['', 'partial'] = value
-    
+        
     def __str__(self):
         return f'{self.pitchclass}{self.octave}'
     

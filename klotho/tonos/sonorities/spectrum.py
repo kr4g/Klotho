@@ -45,6 +45,24 @@ class Spectrum():
     def ht(self):
         return self._ht
     
+    def __getitem__(self, key):
+        """
+        Get a Pitch by its partial number.
+        
+        Args:
+            key: The partial number to retrieve
+            
+        Returns:
+            The Pitch corresponding to the partial number
+            
+        Raises:
+            KeyError: If the partial number doesn't exist in the spectrum
+        """
+        if key not in self.partials:
+            raise KeyError(f"Partial {key} not found in spectrum")
+            
+        return self.data.loc[self.data['partial'] == key, 'pitch'].iloc[0]
+    
     def _init_data(self):
         df_data = []
         for node in self._ht.nodes:
@@ -56,7 +74,7 @@ class Spectrum():
                 df_data.append({
                     'partial': harmonic,
                     'freq (Hz)': pitch.freq,
-                    'pitch': str(pitch),
+                    'pitch': pitch,
                     'cents_offset': pitch.cents_offset,
                     'node_id': node
                 })
@@ -109,10 +127,17 @@ class Spectrum():
         elif target_partial not in self.partials:
             raise ValueError(f"Target partial {target_partial} not found in spectrum")
         
-        pitch_to_pivot = self.data['pitch'][self.data['partial'] == source_partial].iloc[0]
-        pitch_to_pivot['partial'] = target_partial
-        new_fundamental = pitch_to_pivot['pitch']
-        return Spectrum(new_fundamental, self.partials)
+        source_pitch = self.data.loc[self.data['partial'] == source_partial, 'pitch'].iloc[0]
+        
+        # Create a new Pitch with the target partial instead of trying to modify the existing one
+        new_pitch = Pitch(
+            source_pitch.pitchclass,
+            source_pitch.octave,
+            source_pitch.cents_offset,
+            target_partial  # Use the target partial here
+        )
+        
+        return Spectrum.from_target(new_pitch, self.partials)
 
     def retarget(self, partial: Union[int, float], target: Pitch) -> 'Spectrum':
         """
@@ -131,7 +156,7 @@ class Spectrum():
         if partial not in self.partials:
             raise ValueError(f"Partial {partial} not found in spectrum")
         
-        ratio = target.freq / self.data['frequency'][self.data['partial'] == partial].iloc[0]
+        ratio = target.freq / self.data['freq (Hz)'][self.data['partial'] == partial].iloc[0]
         new_fundamental = self.fundamental.freq * ratio
         return Spectrum(new_fundamental, self.partials)
 
