@@ -34,12 +34,62 @@ class Tree(Graph):
         
     @property
     def depth(self):
-        return self._meta['depth'].iloc[0]
+        class DepthAccessor:
+            def __init__(self, tree):
+                self.tree = tree
+                self._overall_depth = tree._meta['depth'].iloc[0]
+                
+            def __getitem__(self, node):
+                """Get the depth of a specific node in the tree."""
+                if node not in self.tree.graph:
+                    raise ValueError(f"Node {node} not found in graph")
+                return nx.shortest_path_length(self.tree.graph, self.tree.root, node)
+                
+            def __int__(self):
+                """Return the overall depth of the tree."""
+                return self._overall_depth
+                
+            def __index__(self):
+                """Allow using depth in integer contexts."""
+                return self._overall_depth
+                
+            def __repr__(self):
+                return str(self._overall_depth)
+                
+            def __str__(self):
+                return str(self._overall_depth)
+        
+        return DepthAccessor(self)
     
     @property
     def k(self):
-        return self._meta['k'].iloc[0]
-            
+        class KAccessor:
+            def __init__(self, tree):
+                self.tree = tree
+                self._max_branching = tree._meta['k'].iloc[0]
+                
+            def __getitem__(self, node):
+                """Get the number of children for a specific node."""
+                if node not in self.tree.graph:
+                    raise ValueError(f"Node {node} not found in graph")
+                return self.tree.graph.out_degree(node)
+                
+            def __int__(self):
+                """Return the maximum branching factor of the tree."""
+                return self._max_branching
+                
+            def __index__(self):
+                """Allow using k in integer contexts."""
+                return self._max_branching
+                
+            def __repr__(self):
+                return str(self._max_branching)
+                
+            def __str__(self):
+                return str(self._max_branching)
+        
+        return KAccessor(self)
+
     def parent(self, node):
         return next(self.graph.predecessors(node), None)
 

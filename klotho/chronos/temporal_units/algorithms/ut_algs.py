@@ -1,10 +1,12 @@
 from typing import Union
 from fractions import Fraction
 from itertools import cycle
-from ..ut import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree
+from ..ut import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
+from ...chronos import beat_duration
+from ...rhythm_trees.algorithms import segment
 
 
-def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:
+def segment_ut(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:
     """
     Segments a temporal unit into a new unit with the given ratio. eg, a ratio of 1/3 means
     the new unit will have a prolatio of (1, 2).
@@ -16,10 +18,7 @@ def segment(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUni
     Returns:
     TemporalUnit: A new temporal unit with the given ratio.
     """
-    
-    ratio = Fraction(ratio)
-    prolatio = (ratio.numerator, ratio.denominator - ratio.numerator)
-    return TemporalUnit(duration=ut.duration, tempus=ut.tempus, prolatio=prolatio, tempo=ut.tempo, beat=ut.beat)
+    return TemporalUnit(span=ut.span, tempus=ut.tempus, prolatio=segment(ratio), beat=ut.beat, bpm=ut.bpm)
 
 def decompose(ut: TemporalUnit, prolatio: Union[tuple, str, None] = None, depth: Union[int, None] = None) -> TemporalUnitSequence:
     """Decomposes a temporal structure into its constituent parts based on the provided prolatio."""
@@ -32,14 +31,16 @@ def decompose(ut: TemporalUnit, prolatio: Union[tuple, str, None] = None, depth:
         prolatio_cycle = [ut._rt.subdivisions]
     elif not prolatio:
         prolatio_cycle = ['d']
+    else:
+        prolatio_cycle = [prolatio]
         
     prolatio_cycle = cycle(prolatio_cycle)
     if depth:
         return TemporalUnitSequence([
             TemporalUnit(
                 span     = 1,
-                tempus   = subtree[min(subtree.nodes)]['ratio'],
-                prolatio = subtree._children if not prolatio else next(prolatio_cycle),
+                tempus   = subtree[subtree.root]['ratio'],
+                prolatio = subtree._list[1] if not prolatio else next(prolatio_cycle),
                 beat     = ut._beat,
                 bpm      = ut._bpm
             ) for subtree in [ut._rt.subtree(n) for n in ut._rt.at_depth(depth)]
@@ -69,3 +70,68 @@ def transform(structure: TemporalMeta) -> TemporalMeta:
             
         case _:
             raise ValueError(f"Unknown temporal structure type: {type(structure)}")
+
+def modulate_tempo(ut: TemporalUnit, beat: Union[Fraction, str, float], bpm: Union[int, float]) -> TemporalUnit:
+    """
+    Creates a new TemporalUnit with the specified beat and bpm, adjusting the tempus 
+    to maintain the same duration as the original unit.
+    
+    Args:
+        ut (TemporalUnit): The original temporal unit
+        beat (Union[Fraction, str, float]): The new beat value
+        bpm (Union[int, float]): The new beats per minute
+        
+    Returns:
+        TemporalUnit: A new temporal unit with adjusted tempus and the specified beat/bpm
+    """
+    ratio = ut.duration / beat_duration(str(ut.tempus * ut.span), bpm, beat)
+    new_tempus = Meas(ut.tempus * ut.span * ratio)
+    
+    return TemporalUnit(
+        span=1,
+        tempus=new_tempus,
+        prolatio=ut.prolationis,
+        beat=beat,
+        bpm=bpm
+    )
+
+def modulate_tempus(ut: TemporalUnit, span: int, tempus: Union[Meas, Fraction, float, str]) -> TemporalUnit:
+    """
+    Creates a new TemporalUnit with the specified tempus, adjusting the beat/bpm 
+    to maintain the same duration as the original unit.
+    
+    Args:
+        ut (TemporalUnit): The original temporal unit
+        tempus (Union[Meas, Fraction, float, str]): The new tempus value
+        
+    Returns:
+        TemporalUnit: A new temporal unit with the specified tempus and adjusted beat/bpm
+    """
+    if not isinstance(tempus, Meas):
+        tempus = Meas(tempus)
+    
+    ratio = beat_duration(str(tempus * span), ut.bpm, ut.beat) / beat_duration(str(ut.tempus * ut.span), ut.bpm, ut.beat)
+
+    return TemporalUnit(
+        span=span,
+        tempus=tempus,
+        prolatio=ut.prolationis,
+        beat=ut.beat,
+        bpm=ut.bpm * ratio
+    )
+
+def convolve(x: TemporalUnitSequence, h: TemporalUnitSequence, beat: Union[Fraction, str, float], bpm: Union[int, float]) -> TemporalUnitSequence:
+    
+    
+    
+    y_len = len(x) + len(h) - 1
+    y = []
+    for n in range(y_len):
+        s = Fraction(0, 1)
+        for k in range(len(x)):
+            m = n - k
+            if 0 <= m < len(h):
+                s += x.uts[k].tempus.to_fraction() * h.uts[m].tempus.to_fraction()
+        y.append(s)
+        
+    return TemporalUnitSequence([TemporalUnit(span=1, tempus=r, prolatio='d', beat='1/4', bpm=120) for r in y])

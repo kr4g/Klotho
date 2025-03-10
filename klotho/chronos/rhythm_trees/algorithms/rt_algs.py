@@ -21,7 +21,7 @@ from fractions import Fraction
 from math import gcd, lcm, prod
 from functools import reduce
 import numpy as np
-
+from typing import Union
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
     '''
@@ -134,6 +134,21 @@ def rhythm_pair(lst:Tuple, MM:bool=True) -> Tuple:
     combined_sequence = np.unique(np.concatenate(sequences))
     deltas = np.diff(combined_sequence)
     return tuple(int(x) for x in deltas)
+
+def segment(ratio: Union[Fraction, float, str]) -> tuple[int]:
+    """
+    Segments a ratio into a tuple of two integers.
+    
+    Args:
+        ratio (Union[Fraction, float, str]): The ratio to segment.
+        
+    Returns:
+        tuple[int]: A tuple of two integers representing the numerator and denominator of the ratio.
+    """
+    ratio = Fraction(ratio)
+    if ratio >= 1:
+        raise ValueError("Ratio must be less than 1")
+    return (ratio.numerator, ratio.denominator - ratio.numerator)
 
 # ------------------------------------------------------------------------------------
 
