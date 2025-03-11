@@ -392,6 +392,43 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
             ut.bpm = ut.bpm * ratio
             
         self._set_offsets()
+    
+    def append(self, ut: TemporalUnit) -> None:
+        """
+        Append a TemporalUnit to the end of the sequence.
+        
+        Args:
+            ut: The TemporalUnit to append
+        """
+        self._seq.append(ut)
+        self._set_offsets()
+        
+    def prepend(self, ut: TemporalUnit) -> None:
+        """
+        Prepend a TemporalUnit to the beginning of the sequence.
+        
+        Args:
+            ut: The TemporalUnit to prepend
+        """
+        self._seq.insert(0, ut)
+        self._set_offsets()
+        
+    def insert(self, index: int, ut: TemporalUnit) -> None:
+        """
+        Insert a TemporalUnit at the specified index in the sequence.
+        
+        Args:
+            index: The index at which to insert the TemporalUnit
+            ut: The TemporalUnit to insert
+            
+        Raises:
+            IndexError: If the index is out of range
+        """
+        if not -len(self._seq) <= index <= len(self._seq):
+            raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
+        
+        self._seq.insert(index, ut)
+        self._set_offsets()
         
     def _set_offsets(self):
         """Updates the offsets of all TemporalUnits based on their position in the sequence."""
@@ -592,6 +629,49 @@ class TemporalBlock(metaclass=TemporalMeta):
             
         self._align_rows()
 
+    def prepend(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
+        """
+        Add a temporal structure at the beginning of the block (index 0).
+        
+        Note: In this implementation, index 0 is considered the "bottom" row.
+        
+        Args:
+            row: The temporal structure to add (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
+        """
+        self._rows.insert(0, row)
+        self._align_rows()
+        
+    def append(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
+        """
+        Add a temporal structure at the end of the block (highest index).
+        
+        Note: In this implementation, the highest index is considered the "top" row.
+        
+        Args:
+            row: The temporal structure to add (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
+        """
+        self._rows.append(row)
+        self._align_rows()
+        
+    def insert(self, index: int, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
+        """
+        Insert a temporal structure at the specified index in the block.
+        
+        Note: Index 0 is the first row (bottom), with higher indices moving upward.
+        
+        Args:
+            index: The index at which to insert the row
+            row: The temporal structure to insert
+            
+        Raises:
+            IndexError: If the index is out of range
+        """
+        if not -len(self._rows) <= index <= len(self._rows):
+            raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
+        
+        self._rows.insert(index, row)
+        self._align_rows()
+        
     def __iter__(self):
         return iter(self._rows)
     
