@@ -17,7 +17,6 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-from math import gcd
 
 from .meas import Meas
 from klotho.topos.graphs import Tree
@@ -197,5 +196,3 @@ class RhythmTree(Tree):
 
     def __repr__(self):
         return self.__str__()
-
-# ------------------------------------------------------------------------------------

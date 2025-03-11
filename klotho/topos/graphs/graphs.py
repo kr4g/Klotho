@@ -7,11 +7,27 @@ class Graph:
     def __init__(self, graph: nx.Graph):
         self._graph = graph
         self._meta = pd.DataFrame(index=[''])
+        self._observers = []
         
+    def register_observer(self, observer):
+        """Register an object to be notified of graph mutations."""
+        if observer not in self._observers:
+            self._observers.append(observer)
+            
+    def unregister_observer(self, observer):
+        """Remove an observer from notification list."""
+        if observer in self._observers:
+            self._observers.remove(observer)
+            
+    def notify_observers(self):
+        """Notify all registered observers that the graph has been modified."""
+        for observer in self._observers:
+            observer.graph_updated(self)    
+   
     @property
     def graph(self):
         return self._graph
-    
+   
     @property
     def nodes(self):
         return self._graph.nodes
@@ -98,6 +114,62 @@ class Graph:
         """Returns root nodes (nodes with no predecessors)"""
         return tuple(n for n, d in self._graph.in_degree() if d == 0)
     
+    def add_node(self, node_id, **attr):
+        """Add a node to the graph with optional attributes."""
+        self._graph.add_node(node_id, **attr)
+        self.notify_observers()
+        
+    def add_nodes_from(self, nodes_for_adding, **attr):
+        """Add multiple nodes to the graph."""
+        self._graph.add_nodes_from(nodes_for_adding, **attr)
+        self.notify_observers()
+        
+    def remove_node(self, node):
+        """Remove a node from the graph."""
+        self._graph.remove_node(node)
+        self.notify_observers()
+        
+    def remove_nodes_from(self, nodes):
+        """Remove multiple nodes from the graph."""
+        self._graph.remove_nodes_from(nodes)
+        self.notify_observers()
+        
+    def add_edge(self, u, v, **attr):
+        """Add an edge to the graph with optional attributes."""
+        self._graph.add_edge(u, v, **attr)
+        self.notify_observers()
+        
+    def add_edges_from(self, ebunch_to_add, **attr):
+        """Add multiple edges to the graph."""
+        self._graph.add_edges_from(ebunch_to_add, **attr)
+        self.notify_observers()
+        
+    def remove_edge(self, u, v):
+        """Remove an edge from the graph."""
+        self._graph.remove_edge(u, v)
+        self.notify_observers()
+        
+    def remove_edges_from(self, ebunch):
+        """Remove multiple edges from the graph."""
+        self._graph.remove_edges_from(ebunch)
+        self.notify_observers()
+        
+    def update(self, edges=None, nodes=None):
+        """Update the graph with nodes and edges."""
+        self._graph.update(edges=edges, nodes=nodes)
+        self.notify_observers()
+        
+    def clear(self):
+        """Remove all nodes and edges from the graph."""
+        self._graph.clear()
+        self.notify_observers()
+    
+    def set_node_attributes(self, node, attributes):
+        """Set attributes for a node."""
+        for key, value in attributes.items():
+            self._graph.nodes[node][key] = value
+        self.notify_observers()
+    
     def clear_node_attributes(self, nodes=None):
         """Clear attributes of specified nodes or all nodes.
         
@@ -108,7 +180,8 @@ class Graph:
         for node in nodes_to_clear:
             if node in self._graph:
                 self._graph.nodes[node].clear()
-
+        self.notify_observers()
+        
     def renumber_nodes(self, method='default'):
         """Renumber the nodes in the graph to consecutive integers.
         
@@ -139,6 +212,7 @@ class Graph:
             raise ValueError(f"Unknown renumbering method: {method}")
             
         self._graph = nx.relabel_nodes(self._graph, mapping)
+        # self.notify_observers()
         return self
 
     @classmethod
@@ -154,3 +228,4 @@ class Graph:
             Graph: A new Graph instance
         """
         return cls(G)
+    
