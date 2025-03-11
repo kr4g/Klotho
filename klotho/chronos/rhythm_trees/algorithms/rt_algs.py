@@ -108,6 +108,14 @@ def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
 
 # ------------------------------------------------------------------------------------
 
+def ratios_to_subdivs(ratios:tuple[Fraction]) -> tuple[int]:
+    common_denom = reduce(lcm, (abs(f.denominator) for f in ratios), 1)
+    ints = [int(f * common_denom) for f in ratios]
+    overall_gcd = reduce(gcd, ints)
+    return tuple(x // overall_gcd for x in ints)
+
+# ------------------------------------------------------------------------------------
+
 def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
     '''
     Algorithm: AutoSubdiv

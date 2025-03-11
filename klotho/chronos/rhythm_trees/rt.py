@@ -23,7 +23,7 @@ import pandas as pd
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
-from .algorithms.rt_algs import sum_proportions, measure_complexity
+from .algorithms.rt_algs import sum_proportions, measure_complexity, ratios_to_subdivs
 
 class Meas:
     '''
@@ -211,6 +211,9 @@ class Meas:
                     return False
             case _:
                 return NotImplemented
+    
+    def __abs__(self):
+        return Meas(abs(self._numerator), abs(self._denominator))
 
     def is_equivalent(self, other) -> bool:
         """Check if two time signatures represent the same metric proportion"""
@@ -282,10 +285,10 @@ class RhythmTree(Tree):
                  meas:Union[Meas,Fraction,str] = '4/4',
                  subdivisions:Tuple            = (1,1)):
         super().__init__(Meas(meas).numerator, subdivisions)
-        self._subdivisions = self._cast_subdivs(subdivisions)
         self._meta['span'] = span
         self._meta['meas'] = str(Meas(meas))
         self._meta['type'] = None
+        self._subdivisions = self._cast_subdivs(subdivisions)
         self._ratios = self._evaluate()
     
     @classmethod
@@ -293,10 +296,10 @@ class RhythmTree(Tree):
         return cls(span = span, meas = Meas(tree[tree.root]['ratio']), subdivisions = tree._list[1])
     
     @classmethod
-    def from_ratios(cls, lst:Tuple[Fraction], span:int = 1):
-        pgcd_denom = reduce(lcm, (abs(ratio.denominator) for ratio in lst))
-        S = tuple((r.numerator * (pgcd_denom // r.denominator)) for r in lst)
-        meas = Meas(sum_proportions(S), pgcd_denom)
+    def from_ratios(cls, ratios:Tuple[Fraction, float, str], span:int = 1):
+        ratios = tuple(Fraction(r) for r in ratios)
+        S = ratios_to_subdivs(ratios)
+        meas = Meas(sum(abs(r) for r in ratios))
         return cls(span = span, meas = meas, subdivisions = S)
 
     @property

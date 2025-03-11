@@ -18,7 +18,6 @@ import networkx as nx
 import pandas as pd
 from sympy import pretty
 
-# Prolationis Types
 class ProlatioTypes(Enum):
     DURATION    = 'Duration'
     REST        = 'Rest'
@@ -78,13 +77,13 @@ class TemporalUnit(metaclass=TemporalMeta):
                  tempus:Union[Meas,Fraction,int,float,str] = '4/4',
                  prolatio:Union[tuple,str]                 = 'd',
                  beat:Union[None,Fraction,int,float,str]   = None,
-                 bpm:Union[None,int,float]                 = None):
-        
+                 bpm:Union[None,int,float]                 = None,
+                 offset:float                              = 0):
         self._type   = None
-        self._rt     = self._set_rt(span, Meas(tempus), prolatio)
+        self._rt     = self._set_rt(span, abs(Meas(tempus)), prolatio)
         self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
         self._bpm    = bpm if bpm else 60
-        self._offset = 0.0
+        self._offset = offset
         
         self._events = self._set_nodes()
     
@@ -152,7 +151,6 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def duration(self):
         """The total duration (in seconds) of the TemporalUnit."""
-        # return sum(abs(d) for d in self.durations)
         return beat_duration(ratio      = str(self._rt.meas * self._rt.span),
                              bpm        = self.bpm,
                              beat_ratio = self.beat
@@ -174,17 +172,17 @@ class TemporalUnit(metaclass=TemporalMeta):
             'is_rest': c.is_rest,
             'node_id': c.node_id,
         } for c in self._events], index=range(len(self._events)))
-    
-    @bpm.setter
-    def bpm(self, bpm:Union[None,float,int]):
-        """Sets the bpm in beats per minute of the TemporalUnit."""
-        self._bpm = bpm
-        self._events = self._set_nodes()
         
     @beat.setter
     def beat(self, beat:Union[Fraction,str]):
         """Sets the rhythmic ratio that describes the beat of the TemporalUnit."""
         self._beat = Fraction(beat)
+        self._events = self._set_nodes()
+    
+    @bpm.setter
+    def bpm(self, bpm:Union[None,float,int]):
+        """Sets the bpm in beats per minute of the TemporalUnit."""
+        self._bpm = bpm
         self._events = self._set_nodes()
         
     @offset.setter
@@ -308,13 +306,13 @@ class TemporalUnit(metaclass=TemporalMeta):
 class TemporalUnitSequence(metaclass=TemporalMeta):
     """A sequence of TemporalUnit objects that represent consecutive temporal events."""
     
-    def __init__(self, ut_seq:list[TemporalUnit]=[]):
+    def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0):
         self._seq    = ut_seq
-        self._offset = 0.0
+        self._offset = offset
         self._set_offsets()
 
     @property
-    def uts(self):
+    def seq(self):
         """The list of TemporalUnit objects in the sequence."""
         return self._seq
 
@@ -347,18 +345,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     def time(self):
         """The absolute start and end times (in seconds) of the sequence."""
         return self.offset, self.offset + self.duration
-    
-    @property
-    def T(self):
-        """Transforms the TemporalUnitSequence into a TemporalBlock."""
-        return TemporalBlock([TemporalUnitSequence([ut]) for ut in self._seq])
-    
-    @offset.setter
-    def offset(self, offset:float):
-        """Sets the offset (or absolute start time) in seconds of the sequence."""
-        self._offset = offset
-        self._set_offsets()
-    
+
     def beat(self, beat:Union[None,Fraction,str]):
         """Sets the beat ratio for all TemporalUnits in the sequence."""
         for ut in self._seq:
@@ -369,6 +356,12 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         """Sets the bpm for all TemporalUnits in the sequence."""
         for ut in self._seq:
             ut.bpm = bpm
+        self._set_offsets()
+    
+    @offset.setter
+    def offset(self, offset:float):
+        """Sets the offset (or absolute start time) in seconds of the sequence."""
+        self._offset = offset
         self._set_offsets()
     
     def set_duration(self, target_duration: float) -> None:
@@ -414,27 +407,38 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     def __str__(self):
         return pd.DataFrame([{
             'Tempus': ut.tempus,
-            'Beat': ut.beat,
-            'BPM': ut.bpm,
+            'Prolatio': ut.type.value,
+            'Events': len(ut),
+            'Tempo': f'{ut.beat} = {ut.bpm}',
             'Start': seconds_to_hmsms(ut.time[0]),
-            'Duration': seconds_to_hmsms(ut.duration),
             'End': seconds_to_hmsms(ut.time[1]),
+            'Duration': seconds_to_hmsms(ut.duration),
         } for ut in self._seq]).__str__()
 
     def __repr__(self):
         return self.__str__()
 
 
-
 class TemporalBlock(metaclass=TemporalMeta):
-    """A collection of parallel TemporalUnitSequences that represent simultaneous temporal events."""
+    """
+    A collection of parallel temporal structures that represent simultaneous temporal events.
+    Each row can be a TemporalUnit, TemporalUnitSequence, or another TemporalBlock.
+    """
     
-    def __init__(self, tb:list[TemporalUnitSequence]=[]):
-        self._tb = tb
-        self._axis = -1.0
-        self._offset = 0.0
-        self._duration = max(ut_seq.duration for ut_seq in self._tb) if self._tb else 0.0
-        self._align_sequences()
+    def __init__(self, rows:list[TemporalUnit|TemporalUnitSequence|'TemporalBlock']=[], offset:float=0, sort_rows:bool=True):
+        """
+        Initialize a TemporalBlock with rows of temporal structures.
+        
+        Args:
+            rows: List of temporal structures (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
+            offset: Initial time offset in seconds
+            sort_rows: Whether to sort rows by duration (longest at index 0)
+        """
+        self._rows = rows or []
+        self._axis = -1
+        self._offset = offset
+        self._sort_rows = sort_rows
+        self._align_rows()
         
     # TODO: make free method in UT algos
     # Matrix to Block
@@ -468,37 +472,43 @@ class TemporalBlock(metaclass=TemporalMeta):
             tb.append(TemporalUnitSequence(seq))
         return cls(tuple(tb))
 
-    def _align_sequences(self):
-        """Aligns the sequences based on the current axis value."""
-        if not self._tb:
+    def _align_rows(self):
+        """
+        Aligns the rows based on the current axis value and optionally sorts them by duration.
+        If sorting is enabled, the longest duration will be at the bottom (index 0), 
+        shortest at the top. If two rows have the same duration, their original order is preserved.
+        """
+        if not self._rows:
             return
-            
-        max_duration = self._duration
-        base_offset = self._offset
         
-        for seq in self._tb:
-            if seq.duration == max_duration:
-                seq.offset = base_offset
+        if self._sort_rows:
+            self._rows = sorted(self._rows, key=lambda row: -row.duration, reverse=False)
+        
+        max_duration = self.duration
+        
+        for row in self._rows:
+            if row.duration == max_duration:
+                row.offset = self._offset
                 continue
-                
-            duration_diff = max_duration - seq.duration    
+            
+            duration_diff = max_duration - row.duration    
             adjustment = duration_diff * (self._axis + 1) / 2
-            seq.offset = base_offset + adjustment
+            row.offset = self._offset + adjustment
 
     @property
-    def size(self):
-        """The number of TemporalUnitSequences in the block."""
-        return len(self._tb)
+    def height(self):
+        """The number of rows in the block."""
+        return len(self._rows)
     
     @property
-    def utseqs(self):
-        """The list of TemporalUnitSequences in the block."""
-        return self._tb
+    def rows(self):
+        """The list of temporal structures in the block."""
+        return self._rows
 
     @property
     def duration(self):
-        """The total duration (in seconds) of the longest sequence in the block."""
-        return self._duration
+        """The total duration (in seconds) of the longest row in the block."""
+        return max(row.duration for row in self._rows) if self._rows else 0.0
 
     @property
     def axis(self):
@@ -514,34 +524,89 @@ class TemporalBlock(metaclass=TemporalMeta):
     def offset(self, offset):
         """Sets the offset (or absolute start time) in seconds of the block."""
         self._offset = offset
-        self._align_sequences()
+        self._align_rows()
     
     @axis.setter
     def axis(self, axis: float):
         """
-        Sets the temporal axis position of the block and realigns sequences.
+        Sets the temporal axis position of the block and realigns rows.
         
         Args:
             axis: Float between -1 and 1, where:
-                -1: sequences start at block offset (left-aligned)
-                 0: sequences are centered within the block
-                 1: sequences end at block offset + duration (right-aligned)
+                -1: rows start at block offset (left-aligned)
+                 0: rows are centered within the block
+                 1: rows end at block offset + duration (right-aligned)
                 Any value in between creates a proportional alignment
         """
         if not -1 <= axis <= 1:
             raise ValueError("Axis must be between -1 and 1")
         self._axis = float(axis)
-        self._align_sequences()
-            
-    def beat(self, beat):
-        """Sets the beat ratio for all TemporalUnitSequences in the block."""
-        for utseq in self._tb:
-            utseq.beat(beat)
+        self._align_rows()
+    
+    def beat(self, beat:Union[None,Fraction,str]):
+        """Sets the beat ratio for all temporal structures in the block."""
+        for row in self._rows:
+            if hasattr(row, 'beat'):
+                row.beat(beat)
+            elif hasattr(row, '_beat'):
+                row.beat = beat
+        self._align_rows()
+    
+    def bpm(self, bpm:Union[None,int,float]):
+        """Sets the bpm for all temporal structures in the block."""
+        for row in self._rows:
+            if hasattr(row, 'bpm'):
+                row.bpm(bpm)
+            elif hasattr(row, '_bpm'):
+                row.bpm = bpm
+        self._align_rows()
         
-    def bpm(self, bpm):
-        """Sets the bpm for all TemporalUnitSequences in the block."""
-        for utseq in self._tb:
-            utseq.bpm(bpm)
+    def set_duration(self, target_duration: float) -> None:
+        """
+        Sets the tempo (bpm) of all rows to achieve a specific total duration in seconds.
+        
+        This method calculates and sets the appropriate bpm values for all rows
+        in the block so that the total duration matches the target duration.
+        The relative durations between rows are preserved by scaling all bpm values
+        by the same factor.
+        
+        Args:
+            target_duration: The desired total duration in seconds
+            
+        Raises:
+            ValueError: If target_duration is not positive or if block is empty
+        """
+        if target_duration <= 0:
+            raise ValueError("Target duration must be positive")
+        
+        if not self._rows:
+            raise ValueError("Cannot set duration of empty block")
+            
+        current_duration = self.duration
+        ratio = current_duration / target_duration
+        
+        for row in self._rows:
+            if hasattr(row, 'set_duration'):
+                row_target = row.duration / ratio
+                row.set_duration(row_target)
+            
+        self._align_rows()
 
     def __iter__(self):
-        return iter(self._tb)
+        return iter(self._rows)
+    
+    def __len__(self):
+        return len(self._rows)
+    
+    def __str__(self):
+        result = (
+            f'Rows:     {len(self._rows)}\n'
+            f'Axis:     {self._axis}\n'
+            f'Duration: {seconds_to_hmsms(self.duration)}\n'
+            f'Time:     {seconds_to_hmsms(self._offset)} - {seconds_to_hmsms(self._offset + self.duration)}\n'
+            f'{"-" * 50}\n'
+        )
+        return result
+
+    def __repr__(self):
+        return self.__str__()

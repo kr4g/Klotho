@@ -49,7 +49,7 @@ def decompose(ut: TemporalUnit, prolatio: Union[tuple, str, None] = None, depth:
         return TemporalUnitSequence([
            TemporalUnit(
                span     = 1,
-               tempus   = ratio,
+               tempus   = abs(ratio),
                prolatio = next(prolatio_cycle),
                beat     = ut._beat,
                bpm      = ut._bpm
@@ -120,10 +120,15 @@ def modulate_tempus(ut: TemporalUnit, span: int, tempus: Union[Meas, Fraction, f
         bpm=ut.bpm * ratio
     )
 
-def convolve(x: TemporalUnitSequence, h: TemporalUnitSequence, beat: Union[Fraction, str, float], bpm: Union[int, float]) -> TemporalUnitSequence:
+def convolve(x: Union[TemporalUnit, TemporalUnitSequence], h: Union[TemporalUnit, TemporalUnitSequence], beat: Union[Fraction, str, float] = '1/4', bpm: Union[int, float] = 60) -> TemporalUnitSequence:
+    beat = Fraction(beat)
+    bpm = float(bpm)
     
-    
-    
+    if isinstance(x, TemporalUnit):
+        x = decompose(x)
+    if isinstance(h, TemporalUnit):
+        h = decompose(h)
+        
     y_len = len(x) + len(h) - 1
     y = []
     for n in range(y_len):
@@ -131,7 +136,7 @@ def convolve(x: TemporalUnitSequence, h: TemporalUnitSequence, beat: Union[Fract
         for k in range(len(x)):
             m = n - k
             if 0 <= m < len(h):
-                s += x.uts[k].tempus.to_fraction() * h.uts[m].tempus.to_fraction()
+                s += modulate_tempo(x.seq[k], beat, bpm).tempus.to_fraction() * modulate_tempo(h.seq[m], beat, bpm).tempus.to_fraction()
         y.append(s)
         
-    return TemporalUnitSequence([TemporalUnit(span=1, tempus=r, prolatio='d', beat='1/4', bpm=120) for r in y])
+    return TemporalUnitSequence([TemporalUnit(span=1, tempus=r, prolatio='d' if r > 0 else 'r', beat=beat, bpm=bpm) for r in y])
