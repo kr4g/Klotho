@@ -465,7 +465,7 @@ class TemporalBlock(metaclass=TemporalMeta):
     Each row can be a TemporalUnit, TemporalUnitSequence, or another TemporalBlock.
     """
     
-    def __init__(self, rows:list[TemporalUnit|TemporalUnitSequence|'TemporalBlock']=[], offset:float=0, sort_rows:bool=True):
+    def __init__(self, rows:list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']]=[], offset:float=0, sort_rows:bool=True):
         """
         Initialize a TemporalBlock with rows of temporal structures.
         
