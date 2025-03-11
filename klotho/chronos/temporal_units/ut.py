@@ -435,6 +435,9 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         for i, ut in enumerate(self._seq):
             ut.offset = self._offset + sum(self.durations[j] for j in range(i))
 
+    def __getitem__(self, idx: int) -> TemporalUnit:
+        return self._seq[idx]
+
     def __iter__(self):
         return iter(self._seq)
     

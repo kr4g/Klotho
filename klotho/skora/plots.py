@@ -386,29 +386,20 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
     
     elif layout == 'containers':
         
-        # For each node, calculate:
-        # 1. The current depth of the node
-        # 2. The maximum depth of any leaf descendant from this node
-        # 3. Scale the height based on how close it is to being a leaf
-
         def get_node_scaling(node, rt, min_scale=0.5):
             """Calculate the height scaling for a node based on its position in the tree."""
-            # If it's a leaf node, return the minimum scale directly
             if rt.graph.out_degree(node) == 0:
                 return min_scale
             
-            # Get the current depth of this node
             current_depth = rt.depth_of(node)
             
-            # Find the maximum depth of any leaf descendant from this node
-            # This gives us the "local max depth" for this subtree
+            # Find the maximum depth of any leaf descendant from this 
             max_descendant_depth = current_depth
             for descendant in nx.descendants(rt.graph, node):
                 if rt.graph.out_degree(descendant) == 0:  # If it's a leaf
                     descendant_depth = rt.depth_of(descendant)
                     max_descendant_depth = max(max_descendant_depth, descendant_depth)
             
-            # Calculate how many levels are between this node and its furthest leaf
             levels_to_leaf = max_descendant_depth - current_depth
             
             if levels_to_leaf == 0:  # This is a leaf
@@ -428,35 +419,27 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
         ax.set_facecolor('black')
         plt.gcf().set_facecolor('black')
         
-        # Get the maximum depth of the tree
         max_depth = rt.depth
         
-        # Set vertical margins and calculate usable space
         margin = 0.01
         usable_height = 1.0 - (2 * margin)
         
-        # Calculate level positions first to ensure proper spacing
         level_positions = []
         level_height = usable_height / (max_depth + 1)
         
         for level in range(max_depth + 1):
             if invert:
-                # Start from top (1.0 - margin) and move down
                 y_pos = 1.0 - margin - (level * level_height) - (level_height / 2)
             else:
-                # Start from bottom (margin) and move up
                 y_pos = margin + (level * level_height) + (level_height / 2)
             level_positions.append(y_pos)
         
-        # Track all vertical line positions to avoid duplicates
-        vertical_line_positions = set()
+        vertical_line_positions = set() # avoid duplicates
         
-        # Process the tree level by level
         for level in range(max_depth + 1):
             nodes = rt.at_depth(level)
             y_pos = level_positions[level]
             
-            # Group nodes by parent to determine first/last child status
             nodes_by_parent = {}
             for node in nodes:
                 parent = rt.parent(node)
@@ -465,16 +448,14 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
                 nodes_by_parent[parent].append(node)
             
             for node in nodes:
-                # Get node data
                 node_data = rt.graph.nodes[node]
                 ratio = node_data.get('ratio', None)
                 proportion = node_data.get('proportion', None)
                 
-                # Skip nodes without ratio information
+                # XXX - maybe not necessary
                 if ratio is None:
                     continue
                 
-                # Get parent node to determine position and width
                 parent = rt.parent(node)
                 
                 if parent is None:  # Root node spans the entire width
@@ -483,36 +464,29 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
                     is_first_child = True
                     is_last_child = True
                 else:
-                    # Find all siblings to calculate relative position
                     siblings = nodes_by_parent[parent]
                     parent_data = rt.graph.nodes[parent]
                     
-                    # Determine if this is the first or last child
                     is_first_child = siblings[0] == node
                     is_last_child = siblings[-1] == node
                     
-                    # Get the total proportion of all siblings
                     total_proportion = sum(abs(rt.graph.nodes[sib].get('proportion', 1)) for sib in siblings)
                     
-                    # Calculate the starting position based on preceding siblings
                     preceding_proportion = 0
                     for sib in siblings:
                         if sib == node:
                             break
                         preceding_proportion += abs(rt.graph.nodes[sib].get('proportion', 1))
                     
-                    # Calculate relative position within parent's span
                     parent_x_start = parent_data.get('_x_start', 0)
                     parent_width = parent_data.get('_width', 1)
                     
                     x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
                     width = (abs(proportion) / total_proportion) * parent_width
                 
-                # Store position and width for children to use
                 rt.graph.nodes[node]['_x_start'] = x_start
                 rt.graph.nodes[node]['_width'] = width
                 
-                # Determine if this is a leaf node (no children)
                 is_leaf = rt.graph.out_degree(node) == 0
                 
                 # Assign color based on node type and ratio sign
@@ -524,38 +498,30 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
                     # For positive ratios, leaf nodes are bright white, parent nodes slightly darker
                     color = '#e6e6e6' if is_leaf else '#c8c8c8'
                 
-                # Draw the container with proper height
                 bar_height = level_height * 0.5 * get_node_scaling(node, rt)
                 rect = plt.Rectangle((x_start, y_pos - bar_height/2), width, bar_height,
                                     facecolor=color, edgecolor='black', linewidth=1, alpha=0.4 if is_rest else 1 if is_leaf else 0.95)
                 ax.add_patch(rect)
                 
-                # Add label
                 label_text = f"{ratio}" if ratio is not None else ""
                 ax.text(x_start + width/2, y_pos, 
                        label_text, ha='center', va='center', color='black' if not is_rest else 'white', fontsize=12 * get_node_scaling(node, rt, 9/12), fontweight='bold' if is_leaf else 'normal')
                 
-                # Add vertical lines if enabled
                 if vertical_lines:
-                    # Calculate line positions
                     left_x = x_start
                     right_x = x_start + width
                     
-                    # Draw left line if not the first child of parent
                     if not is_first_child and left_x not in vertical_line_positions:
                         vertical_line_positions.add(left_x)
                         plt.plot([left_x, left_x], [y_pos - bar_height/2, 0], 
                                 color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
                     
-                    # Draw right line if not the last child of parent
                     if not is_last_child and right_x not in vertical_line_positions:
                         vertical_line_positions.add(right_x)
                         plt.plot([right_x, right_x], [y_pos - bar_height/2, 0], 
                                 color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
         
-        # Add the left and right border lines if vertical_lines is enabled
         if vertical_lines:
-            # Get the top-most bar position (root level)
             top_y_pos = level_positions[0]
             bar_height = level_height * 0.5
             top_bar_bottom = top_y_pos - bar_height/2
@@ -570,7 +536,6 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
                 plt.plot([1, 1], [top_bar_bottom, 0], 
                         color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
         
-        # Set axis limits with a small buffer to ensure nothing is cut off
         plt.axis('off')
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
