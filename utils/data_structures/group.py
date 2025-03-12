@@ -1,15 +1,29 @@
-
 class Group(tuple):
-    def __init__(self, G:tuple) -> None:
-        self.__G = G
+    def __new__(cls, G):
+        if isinstance(G, tuple):
+            D = G[0]
+            S = G[1]
+            
+            if isinstance(S, tuple):
+                processed_S = []
+                for item in S:
+                    if isinstance(item, tuple):
+                        processed_S.append(Group(item))
+                    else:
+                        processed_S.append(item)
+                S = tuple(processed_S)
+            
+            G = (D, S)
+        
+        return super(Group, cls).__new__(cls, G)
     
     @property
     def D(self):
-        return self.__G[0]
+        return self[0]
     
     @property
     def S(self):
-        return self.__G[1]
+        return self[1]
     
     def __repr__(self) -> str:
         return super().__repr__()

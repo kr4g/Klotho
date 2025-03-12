@@ -22,6 +22,7 @@ from math import gcd, lcm, prod
 from functools import reduce
 import numpy as np
 from typing import Union
+
 # Algorithm 1: MeasureRatios
 def measure_ratios(subdivs:tuple[int]) -> Tuple[Fraction]:
     '''
@@ -133,6 +134,31 @@ def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
         return (next_elt,) + _recurse(idx + 1)
     return _recurse(0)
 
+def auto_subdiv_matrix(matrix, rotation_offset=1):
+    '''
+    Applies auto_subdiv to each element in a matrix of tree specifications.
+    
+    This function takes a matrix where each element is a tuple (D, S) with D representing
+    a duration and S representing subdivisions. It applies auto_subdiv to each element's
+    subdivisions with a rotation offset that depends on the element's position in the matrix.
+    
+    Args:
+        matrix: A matrix (tuple of tuples) where each element is a tuple (D, S)
+        rotation_offset: Base offset for rotation calculations (default: 1)
+        
+    Returns:
+        A new matrix with the same structure but with auto_subdiv applied to each element
+    '''
+    result = []
+    for i, row in enumerate(matrix):
+        new_row = []
+        for j, e in enumerate(row):
+            offset = rotation_offset * i
+            D, S = e[0], auto_subdiv(e[1], j - i + offset)
+            new_row.append((D, S))
+        result.append(tuple(new_row))
+    return tuple(result)
+
 def rhythm_pair(lst:Tuple, MM:bool=True) -> Tuple:
     total_product = prod(lst)
     if MM:
@@ -185,7 +211,6 @@ def measure_complexity(subdivs:tuple) -> bool:
 
 def clean_subdivs(subdivs:tuple) -> tuple:
     pass
-
 
 # def flatten(self):
 #     return RhythmTree.from_ratios(self._ratios, self._span, self._decomp)

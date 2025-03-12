@@ -668,7 +668,18 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
     def offset(self):
         """The offset (or absolute start time) in seconds of the block."""
         return self._offset
+
+    @property
+    def sort_rows(self):
+        """Whether to sort rows by duration (longest at index 0)."""
+        return self._sort_rows
     
+    @sort_rows.setter
+    def sort_rows(self, sort_rows:bool):
+        self._sort_rows = sort_rows
+        self._align_rows()
+        # self.notify_observers()
+        
     @offset.setter
     def offset(self, offset):
         """Sets the offset (or absolute start time) in seconds of the block."""
