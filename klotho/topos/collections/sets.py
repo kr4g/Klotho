@@ -2,6 +2,13 @@ import numpy as np
 from itertools import combinations
 import pandas as pd
 
+__all__ = [
+    'Operations',
+    'Sieve',
+    'CombinationSet',
+    'PartitionSet',
+]
+
 # ------------------------------------------------------------------------------
 # Set Operations
 # --------------

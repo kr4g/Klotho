@@ -3,8 +3,17 @@ from typing import Union, Dict, Tuple
 from math import prod
 from fractions import Fraction
 
-from klotho.topos.sets import CombinationSet as CS
-from klotho.tonos.tonos import reduce_interval
+from klotho.topos.collections import CombinationSet as CS
+from klotho.tonos.utils import reduce_interval
+
+__all__ = [
+    'CombinationProductSet',
+    'Hexany',
+    'Dekany',
+    'Pentadekany',
+    'Eikosany',
+    'Diamond',
+]
 
 class CombinationProductSet(CS, ABC):
   '''

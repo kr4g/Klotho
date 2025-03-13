@@ -1,5 +1,13 @@
 from enum import Enum, EnumMeta
 
+__all__ = [
+    'ANCIENT_GREEK',
+    'RUNIC',
+    'LOGOGRAPHIC',
+    'CUNEIFORM',
+    'MATHEMATICAL',
+]
+
 class DirectValueEnumMeta(EnumMeta):
     def __getattribute__(cls, name):
         member = super().__getattribute__(name)
@@ -515,7 +523,7 @@ class CUNEIFORM(Enum, metaclass=DirectValueEnumMeta):
 # ------------------------------------------------------------------------------------
 # MATH SYMBOLS
 # ------------------------------------------------------------------------------------
-class Mathematical(Enum, metaclass=DirectValueEnumMeta):
+class MATHEMATICAL(Enum, metaclass=DirectValueEnumMeta):
     '''
     Enum for various mathematical symbols and their Unicode representations.
     

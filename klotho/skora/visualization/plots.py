@@ -2,9 +2,9 @@ from typing import Tuple
 from itertools import count
 import networkx as nx
 import matplotlib.pyplot as plt
-from ..topos.graphs.trees.trees import Tree
-from ..chronos.rhythm_trees.rt import RhythmTree
-from ..chronos.temporal_units import TemporalUnit
+from klotho.topos.graphs.trees.trees import Tree
+from klotho.chronos.rhythm_trees import RhythmTree
+from klotho.chronos.temporal_units import TemporalUnit
 from fractions import Fraction
 import numpy as np
 import plotly.graph_objects as go

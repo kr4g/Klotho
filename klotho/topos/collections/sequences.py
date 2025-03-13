@@ -3,6 +3,11 @@ from collections.abc import Iterable
 from itertools import cycle
 from math import lcm
 
+__all__ = [
+    'Norg',
+    'Pattern',
+]
+
 class Norg:
     '''
     Class for Per Nørgård's "infinity" sequences.

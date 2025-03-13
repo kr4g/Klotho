@@ -1,8 +1,8 @@
 from typing import Union, Tuple, List
 from fractions import Fraction
 from math import gcd, lcm, prod, floor, log
-from ...chronos.rhythm_trees import Meas, RhythmTree as RT
-from ...chronos.rhythm_trees.algorithms import sum_proportions
+from klotho.chronos.rhythm_trees import Meas, RhythmTree as RT
+from klotho.chronos.rhythm_trees.algorithms import sum_proportions
 import abjad
 
 # ------------------------------------------------------------------------------------

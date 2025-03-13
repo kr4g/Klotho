@@ -22,9 +22,16 @@ that prevail, and upon the skill and the soul of the composer."
 
 --------------------------------------------------------------------------------------
 '''
+from . import combination_product_sets
+from . import harmonic_trees
+from . import sonorities
+from . import utils
 
-from .tonos  import *
+from .combination_product_sets import CombinationProductSet
+from .harmonic_trees import HarmonicTree
+from .sonorities import Spectrum
+from .utils import *
 
-__all__ = [
-    # 'TonosClass', 'tonos_function',
-]
+__all__ = []
+
+__version__ = '2.0.0'

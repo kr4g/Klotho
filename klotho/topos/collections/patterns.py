@@ -8,6 +8,20 @@ General functions for generating and transforming sequences in a topological man
 '''
 from math import prod
 
+__all__ = [
+    'permut_list',
+    'autoref',
+    'autoref_rotmat',
+    'iso_pairs',
+    'planar_spiral',
+    'fract_seq',
+    'symmetry_fold',
+    'hyper_fold',
+    'klein_mapping',
+    'mobius_ladder',
+    'mobius_strip',
+]
+
 # Algorithm 4: PermutList
 def permut_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     '''

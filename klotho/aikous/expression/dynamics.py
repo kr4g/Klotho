@@ -9,7 +9,13 @@ Classes and functions for working with musical dynamics.
 
 import numpy as np
 from numpy.polynomial import Polynomial
-# from utils.data_structures.enums import MinMaxEnum, Enum
+
+__all__ = [
+    'DynamicRange',
+    'amp_db',
+    'db_amp',
+    'amp_freq_scale',
+]
 
 DYNAMIC_MARKINGS = ('ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff')
 

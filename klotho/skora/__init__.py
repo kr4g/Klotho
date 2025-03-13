@@ -1,5 +1,16 @@
+"""
+Skora: A specialized module for visualization, notation, and representation of music.
+
+From the Greek "σκορ" (skor) related to "score" or "notation," this module
+provides tools for visualizing and notating musical structures.
+"""
 from .skora import *
-from .plots import *
-# from .animation.animate import *
+
+from . import animation
+from . import notation
+from . import visualization
+
+from .visualization import plots
+from .visualization.plots import plot_graph, plot_tree, plot_rt
 
 __all__ = []

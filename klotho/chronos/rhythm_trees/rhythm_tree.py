@@ -18,10 +18,10 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 from fractions import Fraction
 from typing import Union, Tuple
 
-from .meas import Meas
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
-from .algorithms.rt_algs import sum_proportions, measure_complexity, ratios_to_subdivs
+from .meas import Meas
+from .algorithms import sum_proportions, measure_complexity, ratios_to_subdivs
 
 
 class RhythmTree(Tree):

@@ -1,6 +1,7 @@
 from klotho.topos.graphs import Tree
-from .algorithms.ht_algs import *
-from klotho.tonos import reduce_interval
+from .algorithms import *
+from klotho.tonos.utils import reduce_interval
+from typing import Tuple, Union
 from fractions import Fraction
 
 class HarmonicTree(Tree):

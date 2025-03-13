@@ -1,9 +1,9 @@
 from typing import Union
 from fractions import Fraction
 from itertools import cycle
-from ..ut import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
-from ...chronos import beat_duration
-from ...rhythm_trees.algorithms import segment
+from .temporal import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
+from klotho.chronos.utils import beat_duration
+from klotho.chronos.rhythm_trees.algorithms import segment
 
 
 def segment_ut(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:

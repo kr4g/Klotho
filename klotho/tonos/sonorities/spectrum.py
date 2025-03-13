@@ -1,4 +1,4 @@
-from ..tonos import Pitch, freq_to_pitchclass, partial_to_fundamental
+from klotho.tonos.utils import Pitch, freq_to_pitchclass, partial_to_fundamental
 from typing import Union
 from fractions import Fraction
 # from klotho.topos.graphs.trees import Tree

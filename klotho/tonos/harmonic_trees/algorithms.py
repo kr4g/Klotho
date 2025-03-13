@@ -1,5 +1,9 @@
 from typing import Union, Tuple
 
+__all__ = [
+    'measure_partials',
+]
+
 def measure_partials(partials:Tuple[int], f:Union[int,float]=1):
     result = []
     for s in partials:

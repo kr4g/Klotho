@@ -9,6 +9,12 @@ Envelopes for shaping the dynamics of a sequence of discrete values.
 
 import numpy as np
 
+__all__ = [
+    'line',
+    'arch',
+    'map_curve',
+]
+
 def line(start=0.0, end=1.0, steps=100, curve=0.0):
     '''
     Generate a curved line from start to end value over n steps.

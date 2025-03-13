@@ -6,7 +6,7 @@
 Notation and visualization tools.
 --------------------------------------------------------------------------------------
 '''
-from ..aikous.instruments import PFIELDS
+from klotho.aikous.parameters.instruments import PFIELDS
 from utils.data_structures.dictionaries import SafeDict
 
 import numpy as np

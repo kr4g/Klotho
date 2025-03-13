@@ -22,10 +22,17 @@ the double message of this module's title in fact condenses to a unified intenti
 to unite philosphical insight with mathematical explicitness.
 --------------------------------------------------------------------------------------
 '''
+from . import collections
+from . import formal_grammars
+from . import graphs
+from . import random
 
-from .topos import *
-# from .formal_grammars import *
+from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
+from .formal_grammars import alphabets, grammars
+from .graphs import trees, networks, fields, Tree, Network, Field, Graph
 
 __all__ = [
-    # 'topos',
+    'collections', 'formal_grammars', 'graphs', 'random'
 ]
+
+__version__ = '2.0.0'

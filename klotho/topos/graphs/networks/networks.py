@@ -1,4 +1,4 @@
-from ...sets.sets import CombinationSet as CS
+from ...collections.sets import CombinationSet as CS
 
 class Network:
     def __init__(self, nodes=None, edges=None):

@@ -1,3 +1,3 @@
-from .spectrum import *
+from .spectrum import Spectrum
 
 # __all__ = ['*']
