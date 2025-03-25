@@ -252,7 +252,7 @@ class Scheduler:
         events_copy = self.events.copy()
         
         if events_copy:
-            if start_time:
+            if start_time is not None:
                 min_start = min(start for start, _, _, _, _ in events_copy)
                 time_shift = start_time - min_start
             else:

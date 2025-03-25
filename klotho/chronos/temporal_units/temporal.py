@@ -537,6 +537,12 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
 
     def __getitem__(self, idx: int) -> TemporalUnit:
         return self._seq[idx]
+    
+    def __setitem__(self, idx: int, ut: TemporalUnit) -> None:
+        self._seq[idx] = ut
+        ut.register_observer(self)
+        self._set_offsets()
+        self.notify_observers()
 
     def __iter__(self):
         return iter(self._seq)

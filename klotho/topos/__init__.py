@@ -28,6 +28,7 @@ from . import graphs
 from . import random
 
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
+from .collections import autoref, autoref_rotmat, permut_list
 from .formal_grammars import alphabets, grammars
 from .graphs import trees, networks, fields, Tree, Network, Field, Graph
 
