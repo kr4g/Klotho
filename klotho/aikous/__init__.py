@@ -8,7 +8,7 @@ deals with the expressive aspects of music that affect how we perceive sound.
 from . import expression
 from . import parameters
 
-from .expression import DynamicRange, db_amp, amp_db, amp_freq_scale
+from .expression import DynamicRange, dbamp, ampdb, amp_freq_scale
 from .parameters import ParameterTree
 
 __all__ = []

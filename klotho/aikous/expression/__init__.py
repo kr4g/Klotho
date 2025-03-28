@@ -19,6 +19,6 @@ from .enevelopes import *
 
 __all__ = [
     # 'Dynamics',
-    # 'amp_db',
-    # 'db_amp',
+    # 'ampdb',
+    # 'dbamp',
 ]
