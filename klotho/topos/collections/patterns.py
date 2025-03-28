@@ -13,13 +13,9 @@ __all__ = [
     'autoref',
     'autoref_rotmat',
     'iso_pairs',
-    'planar_spiral',
-    'fract_seq',
-    'symmetry_fold',
-    'hyper_fold',
-    'klein_mapping',
-    'mobius_ladder',
-    'mobius_strip',
+    'pair_adjacent',
+    'nested_chain',
+    'alternate_sequence',
 ]
 
 # Algorithm 4: PermutList
@@ -142,256 +138,89 @@ def iso_pairs(*lists):
 
     return tuple(tuple(lst[i % len(lst)] for lst in lists) for i in range(total_length))
 
-def planar_spiral(*args):
-    '''
-    Algorithm: Planar Spiral Transform
-    
-    Data: args is one or more tuples
-    Result: 2D tuple representing a spiral pattern of the input sequence
-    
-    begin
-        seq = flatten args into a single tuple
-        size = square root of length of seq
-        result = 2D tuple of size x size, initialized with None
-        directions = ((0, 1), (1, 0), (0, -1), (-1, 0))
-        d = 0
-        r, c = 0, 0
-        for each item in seq do
-            result[r][c] = item
-            r_next, c_next = r + directions[d][0], c + directions[d][1]
-            if r_next and c_next are within bounds and result[r_next][c_next] is None then
-                r, c = r_next, c_next
-            else
-                d = (d + 1) mod 4
-                r, c = r + directions[d][0], c + directions[d][1]
-        end for
-        return result
-    end
-    
-    :param args: One or more tuples to be transformed into a spiral pattern.
-    :return: 2D tuple representing the spiral pattern.
+# ------------------------------------------------------------------------------------
 
-    Example:
-    >>> planar_spiral((1, 2, 3), (4, 5, 6), (7, 8, 9))
-    ((1, 2, 3), (8, 9, 4), (7, 6, 5))
+def pair_adjacent(elements):
     '''
-    seq = sum(args, ())  # Flatten input tuples into a single tuple
-    size = int(len(seq) ** 0.5)
-    result = tuple(tuple(None for _ in range(size)) for _ in range(size))
+    Creates groups where elements are paired with their adjacent elements.
     
-    directions = ((0, 1), (1, 0), (0, -1), (-1, 0))
-    d = 0
-    r, c = 0, 0
-    
-    def fill_spiral(seq, result, r, c, d):
-        if not seq:
-            return result
-        new_result = tuple(
-            row[:c] + (seq[0],) + row[c+1:]
-            if i == r else row
-            for i, row in enumerate(result)
-        )
-        r_next, c_next = r + directions[d][0], c + directions[d][1]
-        if 0 <= r_next < size and 0 <= c_next < size and result[r_next][c_next] is None:
-            return fill_spiral(seq[1:], new_result, r_next, c_next, d)
-        else:
-            d = (d + 1) % 4
-            r, c = r + directions[d][0], c + directions[d][1]
-            return fill_spiral(seq[1:], new_result, r, c, d)
-    
-    return fill_spiral(seq, result, r, c, d)
-
-def fract_seq(*args, depth=3):
-    '''
-    Algorithm: Self-Similar Sequence Generation
-    
-    Data: args is one or more tuples, depth is the recursion depth
-    Result: Self-similar tuple based on the input
-    
-    begin
-        seq = flatten args into a single tuple
-        function expand(s, d)
-            if d == 0 then
-                return s
-            else
-                return concatenate(expand((x,) * length(s), d-1) for x in s)
-            end if
-        end function
+    Args:
+        elements: A tuple of elements to be grouped.
         
-        return expand(seq, depth)
-    end
-    
-    :param args: One or more tuples to generate the self-similar sequence from.
-    :param depth: Recursion depth for the self-similar pattern.
-    :return: Self-similar tuple based on the input.
-
+    Returns:
+        A tuple of valid groups.
+        
     Example:
-    >>> fract_seq((1, 2, 3), depth=2)
-    (1, 2, 3, 1, 1, 2, 3, 2, 1, 2, 3, 3)
+        >> pair_adjacent((1, 2, 3, 4, 5))
+        ((1, (2, 3)), (2, (3, 4)), (3, (4, 5)), (4, (5, 1)), (5, (1, 2)))
     '''
-    seq = sum(args, ())
+    if not elements:
+        return ()
     
-    def expand(s, d):
-        if d == 0:
-            return s
-        return sum((expand((x,) * len(s), d-1) for x in s), ())
+    n = len(elements)
+    if n == 1:
+        return ((elements[0], ()),)
     
-    return expand(seq, depth)
+    if n == 2:
+        return ((elements[0], (elements[1],)), (elements[1], (elements[0],)))
+    
+    result = []
+    for i in range(n):
+        next_idx = (i + 1) % n
+        next_next_idx = (i + 2) % n
+        result.append((elements[i], (elements[next_idx], elements[next_next_idx])))
+    
+    return tuple(result)
 
-def symmetry_fold(*args, fold_points=2):
+def nested_chain(elements):
     '''
-    Algorithm: Symmetry Fold
+    Creates a nested chain structure with elements.
     
-    Data: args is one or more tuples, fold_points is the number of folds
-    Result: Tuple folded onto itself to create symmetry
-    
-    begin
-        seq = flatten args into a single tuple
-        result = seq
-        for i = 1 to fold_points do
-            result = result + reverse(result)
-        end for
-        return result
-    end
-    
-    :param args: One or more tuples to be folded for symmetry.
-    :param fold_points: Number of times to fold the sequence.
-    :return: Symmetrically folded tuple.
-
+    Args:
+        elements: A tuple of elements to chain.
+        
+    Returns:
+        A valid group with a nested chain structure.
+        
     Example:
-    >>> symmetry_fold((1, 2), (3, 4), fold_points=2)
-    (1, 2, 3, 4, 4, 3, 2, 1, 1, 2, 3, 4, 4, 3, 2, 1)
+        >> nested_chain((1, 2, 3, 4, 5))
+        (1, (2, 3, 4, 5))
     '''
-    seq = sum(args, ())
+    if not elements:
+        return None
     
-    result = seq
-    for _ in range(fold_points):
-        result = result + result[::-1]
+    if len(elements) == 1:
+        return (elements[0], ())
     
-    return result
+    if len(elements) == 2:
+        return (elements[0], (elements[1],))
+    
+    return (elements[0], elements[1:])
 
-def hyper_fold(*args):
+def alternate_sequence(elements):
     '''
-    Algorithm: Hypercube Fold
+    Creates a sequence where elements alternate between being part of the head and tail.
     
-    Data: args is one or more tuples with a total of exactly 8 elements
-    Result: Tuple arranged in a 4D hypercube-like structure
-    
-    begin
-        seq = flatten args into a single tuple
-        if length of seq ≠ 8 then
-            raise error "Total number of elements must be exactly 8"
-        end if
-        return (seq[0], seq[7], seq[3], seq[4], seq[1], seq[6], seq[2], seq[5],
-                seq[7], seq[0], seq[4], seq[3], seq[6], seq[1], seq[5], seq[2])
-    end
-    
-    :param args: One or more tuples with a total of exactly 8 elements to be folded into a hypercube-like structure.
-    :return: Tuple representing the hypercube fold.
-
+    Args:
+        elements: A tuple of elements to alternate.
+        
+    Returns:
+        A valid group with alternating elements.
+        
     Example:
-    >>> hyper_fold((1, 2, 3, 4), (5, 6, 7, 8))
-    (1, 8, 4, 5, 2, 7, 3, 6, 8, 1, 5, 4, 7, 2, 6, 3)
+        >> alternate_sequence((1, 2, 3, 4, 5))
+        (1, (3, 5, 2, 4))
     '''
-    seq = sum(args, ())
+    if not elements:
+        return None
     
-    if len(seq) != 8:
-        raise ValueError("Total number of elements must be exactly 8 for a hypercube fold")
+    if len(elements) == 1:
+        return (elements[0], ())
     
-    return (seq[0], seq[7], seq[3], seq[4], seq[1], seq[6], seq[2], seq[5],
-            seq[7], seq[0], seq[4], seq[3], seq[6], seq[1], seq[5], seq[2])
-
-def klein_mapping(*args):
-    '''
-    Algorithm: Non-Orientable Surface Mapping
+    if len(elements) == 2:
+        return (elements[0], (elements[1],))
     
-    Data: args is one or more tuples
-    Result: Tuple of tuples representing a non-orientable surface-like structure
+    odds = elements[1::2]
+    evens = elements[2::2]
     
-    begin
-        seq = flatten args into a single tuple
-        mid = length of seq / 2
-        return (
-            seq[0:mid],
-            reverse(seq[mid:]),
-            reverse(seq[0:mid]),
-            seq[mid:]
-        )
-    end
-    
-    :param args: One or more tuples to be mapped onto a non-orientable surface-like structure.
-    :return: Tuple of tuples representing the mapping.
-
-    Example:
-    >>> klein_mapping((1, 2, 3, 4), (5, 6, 7, 8))
-    ((1, 2, 3, 4), (8, 7, 6, 5), (4, 3, 2, 1), (5, 6, 7, 8))
-    '''
-    seq = sum(args, ())
-    
-    mid = len(seq) // 2
-    return (
-        seq[:mid],
-        seq[mid:][::-1],
-        seq[:mid][::-1],
-        seq[mid:]
-    )
-
-def mobius_ladder(*args):
-    '''
-    Algorithm: Twisted Ladder Structure
-    
-    Data: args is one or more tuples
-    Result: Tuple of tuples arranged in a twisted ladder structure
-    
-    begin
-        seq = flatten args into a single tuple
-        n = length of seq
-        return (
-            (seq[i], seq[(n-i-1) mod n]) for i from 0 to n-1
-        )
-    end
-    
-    :param args: One or more tuples to be arranged in a twisted ladder structure.
-    :return: Tuple of tuples representing the twisted ladder.
-
-    Example:
-    >>> mobius_ladder((1, 2, 3), (4, 5, 6))
-    ((1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 1))
-    '''
-    seq = sum(args, ())
-    
-    n = len(seq)
-    return tuple((seq[i], seq[(n-i-1) % n]) for i in range(n))
-
-def mobius_strip(*args):
-    '''
-    Algorithm: Non-Orientable Strip Transform
-    
-    Data: args is one or more tuples
-    Result: Tuple of tuples representing a non-orientable strip-like pattern
-    
-    begin
-        seq = flatten args into a single tuple
-        mid = length of seq / 2
-        return (
-            seq[0:mid],
-            reverse(seq[mid:]),
-            seq[0:mid]
-        )
-    end
-    
-    :param args: One or more tuples to be transformed into a non-orientable strip-like pattern.
-    :return: Tuple of tuples representing the transformed sequence.
-
-    Example:
-    >>> mobius_strip((1, 2, 3), (4, 5, 6))
-    ((1, 2, 3), (6, 5, 4), (1, 2, 3))
-    '''
-    seq = sum(args, ())
-    
-    mid = len(seq) // 2
-    return (
-        seq[:mid],
-        seq[mid:][::-1],
-        seq[:mid]
-    )
+    return (elements[0], odds + evens)
