@@ -59,7 +59,6 @@ class TemporalBase:
         """Context manager for batching updates to children."""
         return _BatchUpdateContext(self)
 
-
 class _BatchUpdateContext:
     """Context manager for batching updates to children."""
     
@@ -553,8 +552,7 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
     def __str__(self):
         return pd.DataFrame([{
             'Tempus': ut.tempus,
-            'Prolatio': ut.type.value,
-            'Events': len(ut),
+            'Type': ut.type.name[0] if ut.type else '',
             'Tempo': f'{ut.beat} = {ut.bpm}',
             'Start': seconds_to_hmsms(ut.time[0]),
             'End': seconds_to_hmsms(ut.time[1]),
@@ -571,7 +569,7 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
     Each row can be a TemporalUnit, TemporalUnitSequence, or another TemporalBlock.
     """
     
-    def __init__(self, rows:list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']]=[], offset:float=0, sort_rows:bool=True):
+    def __init__(self, rows:list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']]=[], axis:float = -1, offset:float=0, sort_rows:bool=True):
         """
         Initialize a TemporalBlock with rows of temporal structures.
         
@@ -582,7 +580,7 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
         """
         super().__init__()
         self._rows = rows or []
-        self._axis = -1
+        self._axis = axis
         self._offset = offset
         self._sort_rows = sort_rows
         

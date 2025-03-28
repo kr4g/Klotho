@@ -548,3 +548,78 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
     
     else:
         raise ValueError(f"Unknown layout: {layout}. Choose 'default' or 'containers'.")
+
+def plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
+               title=None, grid=True, legend=True, output_file=None):
+    """
+    Plot one or more curves with a consistent dark background style.
+    
+    Args:
+        *args: One or more sequences of y-values to plot
+        figsize: Tuple of (width, height) for the figure
+        x_range: Tuple of (min, max) for the x-axis range
+        colors: List of colors for multiple curves (defaults to viridis colormap)
+        labels: List of labels for the legend
+        title: Title for the plot
+        grid: Whether to show grid lines
+        legend: Whether to display the legend
+        output_file: Path to save the plot (if None, displays plot)
+    
+    Returns:
+        None
+    """
+    plt.figure(figsize=figsize)
+    ax = plt.gca()
+    
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
+    
+    curves = args
+    
+    if not curves:
+        raise ValueError("At least one curve must be provided")
+    
+    if colors is None and len(curves) > 1:
+        colors = plt.cm.viridis(np.linspace(0, 0.8, len(curves)))
+    elif colors is None:
+        colors = ['#e6e6e6']  # Default white
+    
+    if labels is None:
+        labels = [f"Curve {i+1}" for i in range(len(curves))]
+    
+    for i, curve in enumerate(curves):
+        if i < len(colors):
+            color = colors[i]
+        else:
+            color = plt.cm.viridis(i / len(curves))
+            
+        label = labels[i] if i < len(labels) else f"Curve {i+1}"
+        
+        x = np.linspace(x_range[0], x_range[1], len(curve))
+        ax.plot(x, curve, color=color, linewidth=2.5, label=label)
+    
+    if title:
+        ax.set_title(title, color='white', fontsize=14)
+    
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'].set_color('white') 
+    ax.spines['right'].set_color('white')
+    ax.spines['left'].set_color('white')
+    
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    
+    if grid:
+        ax.grid(color='#555555', linestyle='-', linewidth=0.5, alpha=0.5)
+    
+    if legend and len(curves) > 1:
+        ax.legend(frameon=True, facecolor='black', edgecolor='#555555', labelcolor='white')
+    
+    plt.tight_layout()
+    
+    if output_file:
+        plt.savefig(output_file, bbox_inches='tight', facecolor='black')
+        plt.close()
+    else:
+        plt.show()
+

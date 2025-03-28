@@ -63,7 +63,7 @@ def transform(structure: TemporalMeta) -> TemporalMeta:
             return TemporalBlock([TemporalUnitSequence([structure])])
             
         case TemporalUnitSequence():
-            return TemporalBlock([TemporalUnitSequence([ut]) for ut in structure.uts])
+            return TemporalBlock([ut for ut in structure.seq])
             
         case TemporalBlock():
             raise NotImplementedError("Block transformation not yet implemented")

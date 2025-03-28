@@ -6,6 +6,21 @@ from networkx.algorithms.approximation import greedy_tsp
 
 T = TypeVar('T')
 
+def normalize_sum(values: List[float]) -> List[float]:
+    """
+    Normalize a list of positive values so they sum to 1 while maintaining their proportions.
+    
+    Args:
+        values: List of positive numerical values
+        
+    Returns:
+        List of normalized values that sum to 1
+    """
+    total = sum(values)
+    if total <= 0:
+        raise ValueError("Sum of values must be positive")
+    return [v / total for v in values]
+
 def cost_matrix(items: List[T], cost_function: Callable[[T, T], float], **kwargs: Any) -> pd.DataFrame:
     cost_ufunc = np.frompyfunc(lambda a, b: cost_function(a, b, **kwargs), 2, 1)
     arr = cost_ufunc(np.array(items)[:, None], np.array(items)[None, :]).astype(float)
