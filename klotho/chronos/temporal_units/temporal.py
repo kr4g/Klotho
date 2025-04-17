@@ -375,6 +375,17 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
     def __repr__(self):
         return self.__str__()
 
+    def copy(self):
+        """Create a deep copy of this TemporalUnit."""
+        return TemporalUnit(
+            span=self.span,
+            tempus=self.tempus,
+            prolatio=self.prolationis,
+            beat=self._beat,
+            bpm=self._bpm,
+            offset=self._offset
+        )
+
 
 class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
     """A sequence of TemporalUnit objects that represent consecutive temporal events."""
@@ -561,6 +572,14 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
 
     def __repr__(self):
         return self.__str__()
+
+    def copy(self):
+        """Create a deep copy of this TemporalUnitSequence."""
+        copied_units = [ut.copy() for ut in self._seq]
+        return TemporalUnitSequence(
+            ut_seq=copied_units,
+            offset=self._offset
+        )
 
 
 class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
@@ -834,3 +853,13 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
 
     def __repr__(self):
         return self.__str__()
+
+    def copy(self):
+        """Create a deep copy of this TemporalBlock."""
+        copied_rows = [row.copy() for row in self._rows]
+        return TemporalBlock(
+            rows=copied_rows,
+            axis=self._axis,
+            offset=self._offset,
+            sort_rows=self._sort_rows
+        )

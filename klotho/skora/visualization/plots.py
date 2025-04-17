@@ -4,11 +4,16 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from klotho.topos.graphs.trees.trees import Tree
 from klotho.chronos.rhythm_trees import RhythmTree
-from klotho.chronos.temporal_units import TemporalUnit
+from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from fractions import Fraction
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from typing import List, Union, Dict, Optional
+
+__all__ = [
+    'plot_tree', 'plot_ratios', 'plot_graph', 'plot_ut', 'plot_rt', 'plot_curve', 'plot_timeline'
+]
 
 def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
              invert: bool = True, output_file: str | None = None) -> None:
@@ -368,7 +373,7 @@ def plot_ut(ut, height=100):
 
 def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] = (20, 5), 
             invert: bool = True, output_file: str | None = None, 
-            attributes: list[str] | None = None, vertical_lines: bool = False) -> None:
+            attributes: list[str] | None = None, vertical_lines: bool = True) -> None:
     """
     Visualize a rhythm tree with customizable layout options.
     
@@ -622,4 +627,199 @@ def plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None,
         plt.close()
     else:
         plt.show()
+
+def plot_timeline(
+    units: List[Union[TemporalUnit, TemporalUnitSequence, TemporalBlock]],
+    width: int = 1200,
+    track_height: int = 100,
+    title: str = "Timeline",
+    show_labels: bool = True,
+    show_grid: bool = True,
+    color_scheme: str = "dark",
+    output_file: Optional[str] = None
+) -> go.Figure:
+    
+    temporal_objects = []
+    
+    for unit in units:
+        if isinstance(unit, TemporalUnit):
+            temporal_objects.append(unit)
+        elif isinstance(unit, TemporalUnitSequence):
+            temporal_objects.extend(unit.seq)
+        elif isinstance(unit, TemporalBlock):
+            for row in unit.rows:
+                if isinstance(row, TemporalUnit):
+                    temporal_objects.append(row)
+                elif isinstance(row, TemporalUnitSequence):
+                    temporal_objects.extend(row.seq)
+    
+    if not temporal_objects:
+        raise ValueError("No temporal units found in input")
+    
+    tracks = _assign_tracks(temporal_objects)
+    num_tracks = max(track for _, track in tracks.items()) + 1
+    
+    colors = {
+        "dark": {
+            "background": "black",
+            "grid": "#333333",
+            "text": "white",
+            "rest": "#808080",
+            "duration": "#e6e6e6",
+            "subdivision": "#c8c8c8"
+        }
+    }
+    scheme = colors.get(color_scheme, colors["dark"])
+    
+    fig = go.Figure()
+    
+    for idx, ut in enumerate(temporal_objects):
+        track = tracks[idx]
+        
+        for _, event in ut.events.iterrows():
+            is_rest = event['is_rest']
+            ratio = event['metric_ratio']
+            
+            color = scheme["rest"] if is_rest else scheme["duration"]
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=[event['start'], event['start'] + abs(event['duration'])],
+                    y=[track, track],
+                    mode="lines",
+                    line=dict(
+                        color=color,
+                        width=track_height * 0.6,
+                    ),
+                    fill=None,
+                    showlegend=False,
+                    hovertemplate=(
+                        f"Track: {track}<br>"
+                        f"Start: %{{x[0]:.2f}}s<br>"
+                        f"End: %{{x[1]:.2f}}s<br>"
+                        f"Duration: {abs(event['duration']):.2f}s<br>"
+                        f"Ratio: {ratio}<br>"
+                        f"Unit: {ut.tempus} | {ut.beat}={ut.bpm} BPM"
+                    ),
+                    hoverlabel=dict(bgcolor=scheme["background"]),
+                )
+            )
+            
+            if show_labels and track_height >= 80:
+                fig.add_annotation(
+                    x=(event['start'] + event['start'] + abs(event['duration'])) / 2,
+                    y=track,
+                    text=str(ratio),
+                    showarrow=False,
+                    font=dict(
+                        size=min(12, max(8, int(track_height * 0.1))),
+                        color="white" if is_rest else "black"
+                    ),
+                    bgcolor="rgba(0,0,0,0)"
+                )
+    
+    y_range = [-0.5, num_tracks - 0.5]
+    x_min = min(ut.offset for ut in temporal_objects)
+    x_max = max(ut.offset + ut.duration for ut in temporal_objects)
+    x_padding = (x_max - x_min) * 0.05
+    
+    fig.update_layout(
+        title=title,
+        width=width,
+        height=track_height * num_tracks + 100,
+        plot_bgcolor=scheme["background"],
+        paper_bgcolor=scheme["background"],
+        font=dict(color=scheme["text"]),
+        margin=dict(l=50, r=50, t=50, b=50),
+        xaxis=dict(
+            showgrid=show_grid,
+            gridcolor=scheme["grid"],
+            zeroline=False,
+            title="Time (seconds)",
+            range=[x_min - x_padding, x_max + x_padding]
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=y_range
+        ),
+        dragmode="pan",
+        modebar=dict(
+            orientation="v",
+            bgcolor=scheme["background"],
+            color=scheme["text"]
+        ),
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="left",
+                buttons=[
+                    dict(
+                        args=[{"yaxis.range": y_range}],
+                        label="Reset Y",
+                        method="relayout"
+                    ),
+                    dict(
+                        args=[{"xaxis.range": [x_min - x_padding, x_max + x_padding]}],
+                        label="Reset X",
+                        method="relayout"
+                    ),
+                    dict(
+                        args=[{"xaxis.range": [x_min - x_padding, x_max + x_padding], 
+                              "yaxis.range": y_range}],
+                        label="Reset All",
+                        method="relayout"
+                    ),
+                ],
+                pad={"r": 10, "t": 10},
+                showactive=False,
+                x=0.15,
+                y=1.1,
+                bgcolor=scheme["background"],
+                bordercolor=scheme["grid"],
+                font=dict(color=scheme["text"])
+            )
+        ]
+    )
+    
+    config = {
+        "scrollZoom": True,
+        "displayModeBar": True,
+        "modeBarButtonsToAdd": ["drawline", "eraseshape"],
+        "toImageButtonOptions": {
+            "format": "png",
+            "filename": "timeline",
+            "height": track_height * num_tracks + 100,
+            "width": width,
+            "scale": 2
+        }
+    }
+    
+    if output_file:
+        fig.write_html(output_file, include_plotlyjs="cdn", config=config)
+    
+    return fig
+
+def _assign_tracks(units: List[TemporalUnit]) -> Dict[int, int]:
+    sorted_units = sorted(enumerate(units), key=lambda x: x[1].offset)
+    tracks = {}
+    track_end_times = []
+    
+    for idx, unit in sorted_units:
+        unit_start = unit.offset
+        unit_end = unit.offset + unit.duration
+        
+        track_idx = 0
+        while track_idx < len(track_end_times) and unit_start < track_end_times[track_idx]:
+            track_idx += 1
+            
+        if track_idx == len(track_end_times):
+            track_end_times.append(unit_end)
+        else:
+            track_end_times[track_idx] = unit_end
+            
+        tracks[idx] = track_idx
+        
+    return tracks
 

@@ -11,6 +11,6 @@ from . import notation
 from . import visualization
 
 from .visualization import plots
-from .visualization.plots import plot_graph, plot_tree, plot_rt, plot_ratios, plot_curve
+from .visualization.plots import *
 
 __all__ = []

@@ -60,10 +60,10 @@ def transform(structure: TemporalMeta) -> TemporalMeta:
     
     match structure:
         case TemporalUnit():
-            return TemporalBlock([TemporalUnitSequence([structure])])
+            return TemporalBlock([ut for ut in decompose(structure).seq])
             
         case TemporalUnitSequence():
-            return TemporalBlock([ut for ut in structure.seq])
+            return TemporalBlock([ut.copy() for ut in structure.seq])
             
         case TemporalBlock():
             raise NotImplementedError("Block transformation not yet implemented")

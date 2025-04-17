@@ -15,7 +15,7 @@ __all__ = [
     'DynamicRange',
     'ampdb',
     'dbamp',
-    'amp_freq_scale',
+    # 'amp_freq_scale',
     'freq_amp_scale',
 ]
 
@@ -172,4 +172,3 @@ def freq_amp_scale(freq: float, db_level: float, min_db: float = -60) -> float:
     
     raw_amp = dbamp(db_level)
     return raw_amp * scaling_factor
-

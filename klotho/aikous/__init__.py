@@ -7,9 +7,11 @@ deals with the expressive aspects of music that affect how we perceive sound.
 
 from . import expression
 from . import parameters
+from . import instruments
 
-from .expression import DynamicRange, dbamp, ampdb, amp_freq_scale
+from .expression import DynamicRange, dbamp, ampdb, freq_amp_scale
 from .parameters import ParameterTree
+from .instruments import Instrument
 
 __all__ = []
 
