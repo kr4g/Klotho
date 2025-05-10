@@ -19,6 +19,8 @@ from .topos.graphs import trees, networks, fields, Tree, Network, Field, Graph
 
 from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
+from .tonos.utils import Pitch, Scale
+
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'aikous', 'skora',

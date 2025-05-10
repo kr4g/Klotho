@@ -4,14 +4,42 @@ from .harmonics import partial_to_fundamental
 import pandas as pd
 
 class Pitch:
-    def __init__(self, pitchclass: str = 'A', octave: int = 4, cents_offset: float = 0.0, partial: int = 1):
-        self._data = pd.DataFrame([{
-            'pitchclass': pitchclass,
-            'octave': octave,
-            'cents_offset': cents_offset,
-            'partial': partial,
-            'freq': pitchclass_to_freq(pitchclass, octave, cents_offset)
-        }]).set_index(pd.Index(['']))
+    def __init__(self, pitch_input=None, octave=4, cents_offset=0.0, partial=1):
+        if isinstance(pitch_input, str) and len(pitch_input) >= 1:
+            # Handle string input like "C4", "F#5", "Bb3"
+            pitchclass = ""
+            octave_from_str = None
+            
+            # Extract octave number if present
+            for i, char in enumerate(pitch_input):
+                if char.isdigit() or (char == '-' and i > 0):
+                    octave_from_str = int(pitch_input[i:])
+                    pitchclass = pitch_input[:i]
+                    break
+            
+            # If no octave in string, use the provided octave parameter
+            if octave_from_str is None:
+                pitchclass = pitch_input
+            else:
+                octave = octave_from_str
+            
+            # Initialize with extracted values
+            self._data = pd.DataFrame([{
+                'pitchclass': pitchclass,
+                'octave': octave,
+                'cents_offset': cents_offset,
+                'partial': partial,
+                'freq': pitchclass_to_freq(pitchclass, octave, cents_offset)
+            }]).set_index(pd.Index(['']))
+        else:
+            # Original initialization
+            self._data = pd.DataFrame([{
+                'pitchclass': pitch_input or 'A',  # Default to 'A' if None
+                'octave': octave,
+                'cents_offset': cents_offset,
+                'partial': partial,
+                'freq': pitchclass_to_freq(pitch_input or 'A', octave, cents_offset)
+            }]).set_index(pd.Index(['']))
     
     @classmethod
     def from_freq(cls, freq: float, partial: int = 1):

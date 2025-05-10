@@ -45,22 +45,22 @@ class Norg:
         return Norg.inf_num((n - 1) // 2) + 1
 
     @staticmethod
-    def n_partite(seed: list = [0,-2,-1], size: int = 128, inv_pat: list = [-1,1,1]):
+    def n_partite(seed: list = [0,-2,-1], inv_pat: list = [-1,1,1], size: int = 128):
         '''
         Generalized form of the tripartite series for any arbitrary length seed and inv_pat.
 
         from: https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
 
         '''
-        if (seed_len := len(seed)) != len(inv_pat):
-            raise ValueError('seed and inv_pat must be lists of the same length')             
+        seed_len = len(seed)
         p = np.empty(size, dtype=int)
         p[:seed_len] = seed
+        inv_pat_cycle = cycle(inv_pat)
         for i in range(1, (size - 1) // seed_len + 1):
             delta = p[i] - p[i - 1]
             for j in range(seed_len):
                 if seed_len * i + j < size:
-                    p[seed_len * i + j] = p[seed_len * i + j - seed_len] + inv_pat[j] * delta
+                    p[seed_len * i + j] = p[seed_len * i + j - seed_len] + next(inv_pat_cycle) * delta
         return p
     
     @staticmethod

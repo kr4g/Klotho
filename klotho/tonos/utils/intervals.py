@@ -137,6 +137,42 @@ def arithmetic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fr
     a, b = Fraction(a), Fraction(b)
     return (a + b) / 2
 
+def logarithmic_distance(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str], 
+                         equave: Union[int, float, Fraction, str] = 2) -> float:
+    """
+    Calculate the logarithmic distance between two musical intervals.
+    
+    Args:
+        a: First interval
+        b: Second interval
+        equave: The equave to use for logarithmic scaling (default: 2 for octave)
+        
+    Returns:
+        Logarithmic distance between the intervals
+    """
+    match a:
+        case int() as i:
+            r1 = Fraction(i, 1)
+        case Fraction() as f:
+            r1 = f
+        case str() as s:
+            r1 = Fraction(s)
+        case _:
+            raise TypeError("Unsupported type")
+
+    match b:
+        case int() as i:
+            r2 = Fraction(i, 1)
+        case Fraction() as f:
+            r2 = f
+        case str() as s:
+            r2 = Fraction(s)
+        case _:
+            raise TypeError("Unsupported type")
+            
+    dist_interval = r2 / r1
+    return abs(np.log(float(dist_interval)) / np.log(float(equave)))
+
 def interval_cost(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str], diff_coeff: float = 1.0, prime_coeff: float = 1.0,
                   equave: Union[int, float, Fraction, str] = 2) -> float:
     match a:
@@ -159,9 +195,7 @@ def interval_cost(a: Union[int, float, Fraction, str], b: Union[int, float, Frac
         case _:
             raise TypeError("Unsupported type")
 
-    dist_interval = r2 / r1
-    # log_dist = abs(np.log2(dist_interval.numerator) - np.log2(dist_interval.denominator))
-    log_dist = abs(np.log(float(dist_interval)) / np.log(float(equave)))
+    log_dist = logarithmic_distance(r1, r2, equave)
 
     f1 = to_factors(r1)
     f2 = to_factors(r2)

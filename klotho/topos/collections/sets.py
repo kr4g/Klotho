@@ -1,12 +1,16 @@
 import numpy as np
 from itertools import combinations
 import pandas as pd
+import math
+from fractions import Fraction
+from typing import List, Tuple, Set, Dict, Any, Union
 
 __all__ = [
     'Operations',
     'Sieve',
     'CombinationSet',
     'PartitionSet',
+    'GenCol',
 ]
 
 # ------------------------------------------------------------------------------
@@ -163,6 +167,116 @@ class Sieve:
         return self.__str__()
     
 
+# ------------------------------------------------------------------------------
+#  Generated Collection
+# --------------
+
+class GenCol:
+    """
+    Generated Collection - A multiplicative collection formed by repeatedly
+    applying a generator within a periodic space.
+    
+    The collection is created by starting with an initial value (default 1)
+    and repeatedly multiplying by the generator, reducing modulo the period.
+    
+    This is the multiplicative analog to the Sieve class.
+    """
+    def __init__(self, generator: Union[str,int,float,Fraction], period: Union[str,int,float,Fraction] = 2, iterations: int = 12, normalize: bool = True):
+        """
+        Initialize a Generated Collection.
+        
+        Args:
+            generator: The generator value (as str, int, float, or Fraction)
+            period: The period of equivalence (as str, int, float, or Fraction)
+            iterations: Number of times to apply the generator
+            normalize: If True, values will be normalized within the period
+        """
+        self._generator = Fraction(generator)
+        self._period = Fraction(period)
+        self._iterations = iterations
+        self._normalize = normalize
+        self._generate()
+        
+    @property
+    def generator(self) -> Fraction:
+        return self._generator
+    
+    @property
+    def period(self) -> Fraction:
+        return self._period
+    
+    @property
+    def iterations(self) -> int:
+        return self._iterations
+        
+    @iterations.setter
+    def iterations(self, value: int):
+        self._iterations = value
+        self._generate()
+    
+    @property
+    def normalize(self) -> bool:
+        return self._normalize
+    
+    @normalize.setter
+    def normalize(self, value: bool):
+        self._normalize = value
+        self._generate()
+    
+    @property
+    def collection(self) -> List[Fraction]:
+        return self._collection.copy()
+    
+    @property
+    def sorted_collection(self) -> List[Fraction]:
+        return sorted(self._collection)
+    
+    @property
+    def steps(self) -> List[Fraction]:
+        values = sorted(self._collection)
+        steps = []
+        
+        for i in range(len(values)):
+            if i < len(values) - 1:
+                steps.append(values[i+1] / values[i])
+            elif self._normalize:
+                steps.append(self._period * values[0] / values[i])
+        
+        return steps
+    
+    def _generate(self):
+        self._collection = [Fraction(1, 1)]
+        current = Fraction(1, 1)
+        
+        for _ in range(self._iterations):
+            current = current * self._generator
+            
+            if self._normalize:
+                while current >= self._period:
+                    current /= self._period
+            
+            self._collection.append(current)
+    
+    def __str__(self):
+        result = (
+            f"Generated Collection\n"
+            f"Generator: {self._generator}\n"
+            f"Period: {self._period}\n"
+            f"Iterations: {self._iterations}\n"
+            f"Normalize: {self._normalize}\n"
+        )
+        
+        if len(self._collection) <= 20:
+            sorted_values = sorted(self._collection)
+            result += f"Values (sorted): {sorted_values}\n"
+            result += f"Steps: {self.steps}\n"
+        
+        return result
+    
+    def __repr__(self):
+        return self.__str__()
+
+
 # --------------------------------------------------------------------------------
 # Combination Sets (CS)
 # ---------------------
@@ -266,3 +380,4 @@ class PartitionSet:
     
     def __repr__(self) -> str:
         return self.__str__()
+
