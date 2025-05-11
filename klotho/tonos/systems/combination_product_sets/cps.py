@@ -4,7 +4,7 @@ from math import prod
 from fractions import Fraction
 
 from klotho.topos.collections import CombinationSet as CS
-from ....utils.interval_normalization import reduce_interval
+from klotho.tonos.utils.interval_normalization import reduce_interval
 
 __all__ = [
     'CombinationProductSet',

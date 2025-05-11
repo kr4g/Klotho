@@ -1,8 +1,10 @@
+from abc import ABC, abstractmethod
 from klotho.aikous.expression.dynamics import Dynamic, DynamicRange
-from klotho.tonos.utils.pitch import Pitch
+from klotho.tonos.pitch import Pitch
 from utils.data_structures.dictionaries import SafeDict
+from typing import List, Dict, TypeVar, Union
 
-class Instrument:
+class Instrument(ABC):
     
     def __init__(self, name, freq_range=None, dynamic_range=None, pfields=None):
         """

@@ -2,6 +2,11 @@ from .frequency_conversion import pitchclass_to_freq, freq_to_pitchclass
 from fractions import Fraction
 from typing import Tuple, Union
 
+__all__ = [
+    'partial_to_fundamental',
+    'first_equave'
+]
+
 def partial_to_fundamental(pitchclass: str, octave: int = 4, partial: int = 1, cent_offset: float = 0.0) -> Tuple[str, float]:
     '''
     Calculate the fundamental frequency given a pitch class and its partial number.

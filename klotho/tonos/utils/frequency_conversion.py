@@ -6,6 +6,17 @@ from enum import member
 A4_Hz   = 440.0
 A4_MIDI = 69
 
+__all__ = [
+    'PITCH_CLASSES',
+    'freq_to_midicents',
+    'midicents_to_freq',
+    'midicents_to_pitchclass',
+    'freq_to_pitchclass',
+    'pitchclass_to_freq',
+    'A4_Hz',
+    'A4_MIDI'
+]
+
 class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
   @member
   class N_TET_12(Enum, metaclass=DirectValueEnumMeta):

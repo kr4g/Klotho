@@ -27,23 +27,93 @@ from . import systems
 from . import scales
 from . import chords
 
+# Make submodules accessible directly at the top level
+combination_product_sets = systems.combination_product_sets
+harmonic_trees = systems.harmonic_trees
+
+# Import classes
 from .pitch import Pitch
 from .pitch_collection import PitchCollection, AddressedPitchCollection
 from .scales import Scale
 from .chords import Chord
-from .systems.combination_product_sets import CombinationProductSet
+from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
 
+# Import utility functions from intervals module
+from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
+from .utils.intervals import split_interval, harmonic_mean, arithmetic_mean, logarithmic_distance
+from .utils.intervals import interval_cost, n_tet, ratios_n_tet
+
+# Import utility functions from frequency_conversion module
+from .utils.frequency_conversion import freq_to_midicents, midicents_to_freq
+from .utils.frequency_conversion import midicents_to_pitchclass, freq_to_pitchclass, pitchclass_to_freq
+from .utils.frequency_conversion import A4_Hz, A4_MIDI, PITCH_CLASSES
+
+# Import utility functions from harmonics module
+from .utils.harmonics import partial_to_fundamental, first_equave
+
+# Import utility functions from interval_normalization module
+from .utils.interval_normalization import equave_reduce, reduce_interval, reduce_interval_relative
+from .utils.interval_normalization import reduce_sequence_relative, fold_interval, reduce_freq
+
 __all__ = [
+    # Modules
+    'utils',
+    'systems',
+    'scales',
+    'chords',
+    'combination_product_sets',
+    'harmonic_trees',
+    
+    # Classes
     'Pitch',
     'PitchCollection', 
     'AddressedPitchCollection',
     'Scale',
     'Chord',
     'CombinationProductSet',
+    'Hexany',
+    'Dekany',
+    'Pentadekany',
+    'Eikosany',
     'HarmonicTree',
     'Spectrum',
+    
+    # Interval utilities
+    'ratio_to_cents',
+    'cents_to_ratio',
+    'cents_to_setclass',
+    'ratio_to_setclass',
+    'split_interval',
+    'harmonic_mean',
+    'arithmetic_mean',
+    'logarithmic_distance',
+    'interval_cost',
+    'n_tet',
+    'ratios_n_tet',
+    
+    # Frequency conversion utilities
+    'freq_to_midicents',
+    'midicents_to_freq',
+    'midicents_to_pitchclass',
+    'freq_to_pitchclass',
+    'pitchclass_to_freq',
+    'A4_Hz',
+    'A4_MIDI',
+    'PITCH_CLASSES',
+    
+    # Harmonics utilities
+    'partial_to_fundamental',
+    'first_equave',
+    
+    # Interval normalization utilities
+    'equave_reduce',
+    'reduce_interval',
+    'reduce_interval_relative',
+    'reduce_sequence_relative',
+    'fold_interval',
+    'reduce_freq',
 ]
 
 __version__ = '2.0.0'

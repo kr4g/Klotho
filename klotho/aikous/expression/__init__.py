@@ -14,11 +14,16 @@ The `aikous` module contains tools for translating physics phenomena, as perceiv
 humans, into algebraic musical representations.
 --------------------------------------------------------------------------------------
 '''
-from .dynamics import *
-from .enevelopes import *
+from .dynamics import Dynamic, DynamicRange, dbamp, ampdb, freq_amp_scale
+from .enevelopes import line, arch, map_curve
 
 __all__ = [
-    # 'Dynamics',
-    # 'ampdb',
-    # 'dbamp',
+    'Dynamic',
+    'DynamicRange',
+    'dbamp',
+    'ampdb',
+    'freq_amp_scale',
+    'line',
+    'arch',
+    'map_curve'
 ]

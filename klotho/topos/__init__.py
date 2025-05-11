@@ -27,13 +27,29 @@ from . import formal_grammars
 from . import graphs
 from . import random
 
+# Import classes and collections-related utility functions
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
 from .collections import autoref, autoref_rotmat, permut_list
+
+# Import formal grammars-related utility functions
 from .formal_grammars import alphabets, grammars
+
+# Import graph-related utility functions
 from .graphs import trees, networks, fields, Tree, Network, Field, Graph
 
 __all__ = [
-    'collections', 'formal_grammars', 'graphs', 'random'
+    # Modules
+    'collections', 'formal_grammars', 'graphs', 'random',
+    
+    # Classes
+    'Pattern', 'CombinationSet', 'PartitionSet',
+    'Tree', 'Network', 'Field', 'Graph',
+    
+    # Functions
+    'autoref', 'autoref_rotmat', 'permut_list',
+    'patterns', 'sequences', 'sets',
+    'alphabets', 'grammars',
+    'trees', 'networks', 'fields',
 ]
 
 __version__ = '2.0.0'

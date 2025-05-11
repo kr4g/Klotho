@@ -1,6 +1,6 @@
 from klotho.topos.graphs import Tree
 from .algorithms import *
-from ....utils.interval_normalization import reduce_interval
+from klotho.tonos.utils.interval_normalization import reduce_interval
 from typing import Tuple, Union
 from fractions import Fraction
 
