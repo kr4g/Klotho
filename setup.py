@@ -28,12 +28,13 @@ setup(
         'opencv-python',
         'tqdm',
         'requests',
-        'jupyter'
+        'jupyter',
+        'scipy'
     ],
     # tests_require=[
     #     'pytest',
     # ],
-    description='An open source computer-assisted composition toolkit implemented in Python',
+    description='Graph-Oriented Computer-Assisted Composition in Python',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/kr4g/Klotho',
