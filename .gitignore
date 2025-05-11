@@ -1,6 +1,7 @@
 .DS_Store
-examples/old.zip
-examples/*
+projects/
+# Keep examples directory tracked but empty for now
+!examples/
 !examples/.gitkeep
 gui
 klotho.egg-info
