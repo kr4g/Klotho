@@ -2,6 +2,7 @@ from .frequency_conversion import pitchclass_to_freq, freq_to_pitchclass
 from .harmonics import partial_to_fundamental
 
 import pandas as pd
+import numpy as np
 
 class Pitch:
     def __init__(self, pitch_input=None, octave=4, cents_offset=0.0, partial=1):
@@ -68,6 +69,49 @@ class Pitch:
     @property
     def virtual_fundamental(self):
         return Pitch(*partial_to_fundamental(self.pitchclass, self.octave, self.partial, self.cents_offset))
+    
+    def __eq__(self, other):
+        if not isinstance(other, Pitch):
+            return NotImplemented
+        return abs(self.freq - other.freq) < 1e-6
+    
+    def __lt__(self, other):
+        if not isinstance(other, Pitch):
+            return NotImplemented
+        return self.freq < other.freq
+    
+    def __le__(self, other):
+        if not isinstance(other, Pitch):
+            return NotImplemented
+        return self.freq <= other.freq or abs(self.freq - other.freq) < 1e-6
+    
+    def __gt__(self, other):
+        if not isinstance(other, Pitch):
+            return NotImplemented
+        return self.freq > other.freq
+    
+    def __ge__(self, other):
+        if not isinstance(other, Pitch):
+            return NotImplemented
+        return self.freq >= other.freq or abs(self.freq - other.freq) < 1e-6
+    
+    def __hash__(self):
+        return hash((self.pitchclass, self.octave, round(self.cents_offset, 1), self.partial))
+    
+    def is_same_note(self, other):
+        if not isinstance(other, Pitch):
+            return False
+        return self.pitchclass == other.pitchclass and self.octave == other.octave
+    
+    def is_same_pitchclass(self, other):
+        if not isinstance(other, Pitch):
+            return False
+        return self.pitchclass == other.pitchclass
+    
+    def cents_difference(self, other):
+        if not isinstance(other, Pitch):
+            raise TypeError("Can only calculate cents difference with another Pitch")
+        return 1200 * np.log2(self.freq / other.freq)
         
     def __str__(self):
         return f'{self.pitchclass}{self.octave}'

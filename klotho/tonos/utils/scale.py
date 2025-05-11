@@ -1,16 +1,16 @@
 from fractions import Fraction
 import numpy as np
-from typing import Union, List, Optional, Any, Sequence, TypeVar, cast, Callable, Generic, overload, Set
+from typing import Union, List, Optional, Any, Sequence, TypeVar, cast, Callable, Generic, overload, Set, Dict, Type
 from .pitch import Pitch
 from functools import lru_cache
 
-T = TypeVar('T', bound='Scale')
+PC = TypeVar('PC', bound='PitchCollection')
 IntervalType = TypeVar('IntervalType', float, Fraction)
 IntervalList = Union[List[float], List[Fraction], List[int], List[str]]
 
-_addressed_scale_cache = {}
+_addressed_collection_cache = {}
 
-class Scale(Generic[IntervalType]):
+class PitchCollection(Generic[IntervalType]):
     def __init__(self, intervals: IntervalList = ["9/8", "5/4", "4/3", "3/2", "5/3", "15/8", "2/1"], 
                  equave: Optional[Union[float, Fraction, int, str]] = None):
         self._intervals: List[IntervalType] = []
@@ -55,7 +55,6 @@ class Scale(Generic[IntervalType]):
         
         self._intervals = cast(List[IntervalType], converted)
         
-        # Add caches
         self._calculate_value_cache = {}
         self._mode_cache = {}
     
@@ -91,18 +90,16 @@ class Scale(Generic[IntervalType]):
     
     def _get_octave_shift_and_index(self, index: int) -> tuple[int, int]:
         if not self._intervals:
-            raise IndexError("Cannot index an empty scale")
+            raise IndexError("Cannot index an empty collection")
             
-        scale_size = len(self._intervals)
+        size = len(self._intervals)
         
         if index >= 0:
-            octave_shift = index // scale_size
-            wrapped_index = index % scale_size
+            octave_shift = index // size
+            wrapped_index = index % size
         else:
-            # For negative indices, we want to go backward through the scale
-            # index -1 should be the last element of the previous octave
-            octave_shift = -((-index - 1) // scale_size + 1)
-            wrapped_index = scale_size - 1 - ((-index - 1) % scale_size)
+            octave_shift = -((-index - 1) // size + 1)
+            wrapped_index = size - 1 - ((-index - 1) % size)
             
         return octave_shift, wrapped_index
     
@@ -139,8 +136,8 @@ class Scale(Generic[IntervalType]):
         octave_shift, wrapped_index = self._get_octave_shift_and_index(index)
         return self._calculate_value(octave_shift, wrapped_index)
     
-    def __or__(self: T, other: T) -> T:
-        if not isinstance(other, Scale):
+    def __or__(self: PC, other: PC) -> PC:
+        if not isinstance(other, self.__class__):
             return NotImplemented
         
         match (self.interval_type, other.interval_type):
@@ -150,18 +147,18 @@ class Scale(Generic[IntervalType]):
                     for interval in other._intervals:
                         if not any(abs(interval - existing) < 1e-6 for existing in combined):
                             combined.append(interval)
-                    return Scale(sorted(combined), self._equave)
+                    return self.__class__(sorted(combined), self._equave)
                 else:
                     combined = sorted(list(set(self._intervals) | set(other._intervals)))
-                    return Scale(combined, self._equave)
+                    return self.__class__(combined, self._equave)
             case (float, _):
                 converted = self._convert_to_other_type(other)
                 return converted | other
             case (_, float):
                 return other | self
     
-    def __and__(self: T, other: T) -> T:
-        if not isinstance(other, Scale):
+    def __and__(self: PC, other: PC) -> PC:
+        if not isinstance(other, self.__class__):
             return NotImplemented
         
         match (self.interval_type, other.interval_type):
@@ -171,18 +168,18 @@ class Scale(Generic[IntervalType]):
                     for interval1 in self._intervals:
                         if any(abs(interval1 - interval2) < 1e-6 for interval2 in other._intervals):
                             intersection.append(interval1)
-                    return Scale(sorted(intersection), self._equave)
+                    return self.__class__(sorted(intersection), self._equave)
                 else:
                     intersection = sorted(list(set(self._intervals) & set(other._intervals)))
-                    return Scale(intersection, self._equave)
+                    return self.__class__(intersection, self._equave)
             case (float, _):
                 converted = self._convert_to_other_type(other)
                 return converted & other
             case (_, float):
                 return other & self
     
-    def __xor__(self: T, other: T) -> T:
-        if not isinstance(other, Scale):
+    def __xor__(self: PC, other: PC) -> PC:
+        if not isinstance(other, self.__class__):
             return NotImplemented
         
         match (self.interval_type, other.interval_type):
@@ -195,18 +192,18 @@ class Scale(Generic[IntervalType]):
                     for interval2 in other._intervals:
                         if not any(abs(interval2 - interval1) < 1e-6 for interval1 in self._intervals):
                             difference.append(interval2)
-                    return Scale(sorted(difference), self._equave)
+                    return self.__class__(sorted(difference), self._equave)
                 else:
                     difference = sorted(list(set(self._intervals) ^ set(other._intervals)))
-                    return Scale(difference, self._equave)
+                    return self.__class__(difference, self._equave)
             case (float, _):
                 converted = self._convert_to_other_type(other)
                 return converted ^ other
             case (_, float):
                 return other ^ self
     
-    def _convert_to_other_type(self: T, other: T) -> T:
-        result = Scale.__new__(Scale)
+    def _convert_to_other_type(self: PC, other: PC) -> PC:
+        result = self.__class__.__new__(self.__class__)
         
         if self.interval_type == float and other.interval_type == float:
             converted = [1200 * np.log2(float(interval)) for interval in self._intervals]
@@ -217,51 +214,29 @@ class Scale(Generic[IntervalType]):
             result._intervals = converted
             result._equave = Fraction(2, 1) if isinstance(other._equave, Fraction) else other._equave
             
-        return cast(T, result)
+        return cast(PC, result)
     
-    def __invert__(self: T) -> T:
-        if self.interval_type == float:
-            inverted = [0.0 if abs(interval) < 1e-6 else 1200.0 - interval for interval in self._intervals]
-        else:
-            inverted = [Fraction(1, 1) if interval == Fraction(1, 1) else Fraction(interval.denominator * 2, interval.numerator) for interval in self._intervals]
-        
-        return Scale(sorted(inverted), self._equave)
-    
-    def __mul__(self, other: 'Pitch') -> 'AddressedScale':
-        # Create a unique key for the cache
-        cache_key = (id(self), id(other))
-        if cache_key not in _addressed_scale_cache:
-            _addressed_scale_cache[cache_key] = AddressedScale(self, other)
-        return _addressed_scale_cache[cache_key]
-    
-    def __rmul__(self, other: 'Pitch') -> 'AddressedScale':
-        # Create a unique key for the cache
-        cache_key = (id(other), id(self))
-        if cache_key not in _addressed_scale_cache:
-            _addressed_scale_cache[cache_key] = AddressedScale(self, other)
-        return _addressed_scale_cache[cache_key]
-    
-    def mode(self, mode_number: int) -> 'Scale':
+    def mode(self: PC, mode_number: int) -> PC:
         if mode_number in self._mode_cache:
             return self._mode_cache[mode_number]
             
         if mode_number == 0:
             return self
             
-        scale_size = len(self._intervals)
-        if scale_size == 0:
-            return Scale([], self._equave)
+        size = len(self._intervals)
+        if size == 0:
+            return self.__class__([], self._equave)
         
-        start_index = mode_number % scale_size
+        start_index = mode_number % size
         if start_index < 0:
-            start_index += scale_size
+            start_index += size
         
         first_interval = self._intervals[start_index]
         modal_intervals = []
         
         if self.interval_type == float:
-            for i in range(scale_size):
-                current_idx = (start_index + i) % scale_size
+            for i in range(size):
+                current_idx = (start_index + i) % size
                 
                 if i == 0:
                     modal_intervals.append(0.0)
@@ -272,8 +247,8 @@ class Scale(Generic[IntervalType]):
                         interval += equave_value
                     modal_intervals.append(interval)
         else:
-            for i in range(scale_size):
-                current_idx = (start_index + i) % scale_size
+            for i in range(size):
+                current_idx = (start_index + i) % size
                 
                 if i == 0:
                     modal_intervals.append(Fraction(1, 1))
@@ -284,30 +259,86 @@ class Scale(Generic[IntervalType]):
                         interval *= equave_value
                     modal_intervals.append(interval)
         
-        result = Scale(modal_intervals, self._equave)
+        result = self.__class__(modal_intervals, self._equave)
         self._mode_cache[mode_number] = result
         return result
     
     def __len__(self):
         return len(self._intervals)
     
+    def __mul__(self, other: 'Pitch') -> 'AddressedPitchCollection':
+        cache_key = (id(self), id(other))
+        if cache_key not in _addressed_collection_cache:
+            _addressed_collection_cache[cache_key] = AddressedPitchCollection(self, other)
+        return _addressed_collection_cache[cache_key]
+    
+    def __rmul__(self, other: 'Pitch') -> 'AddressedPitchCollection':
+        cache_key = (id(other), id(self))
+        if cache_key not in _addressed_collection_cache:
+            _addressed_collection_cache[cache_key] = AddressedPitchCollection(self, other)
+        return _addressed_collection_cache[cache_key]
+    
+    def __invert__(self: PC) -> PC:
+        raise NotImplementedError("Subclasses must implement __invert__")
+    
+    def __neg__(self: PC) -> PC:
+        raise NotImplementedError("Subclasses must implement __neg__")
+    
     def __repr__(self):
         intervals_str = ', '.join(str(i) for i in self._intervals)
-        return f"Scale([{intervals_str}], equave={self._equave})"
+        return f"{self.__class__.__name__}([{intervals_str}], equave={self._equave})"
 
-class AddressedScale:
-    def __init__(self, scale: 'Scale', reference_pitch: 'Pitch'):
-        self.scale = scale
+class Scale(PitchCollection[IntervalType]):
+    def __invert__(self: PC) -> PC:
+        if self.interval_type == float:
+            inverted = [0.0 if abs(interval) < 1e-6 else 1200.0 - interval for interval in self._intervals]
+        else:
+            inverted = [Fraction(1, 1) if interval == Fraction(1, 1) else Fraction(interval.denominator * 2, interval.numerator) for interval in self._intervals]
+        
+        return Scale(sorted(inverted), self._equave)
+    
+    def __neg__(self: PC) -> PC:
+        return self.__invert__()
+
+class Chord(PitchCollection[IntervalType]):
+    def __neg__(self: PC) -> PC:
+        if self.interval_type == float:
+            inverted = [0.0 if abs(interval) < 1e-6 else 1200.0 - interval for interval in self._intervals]
+        else:
+            inverted = [Fraction(1, 1) if interval == Fraction(1, 1) else Fraction(interval.denominator * 2, interval.numerator) for interval in self._intervals]
+        
+        return Chord(sorted(inverted), self._equave)
+    
+    def __invert__(self: PC) -> PC:
+        if len(self._intervals) <= 1:
+            return Chord(self._intervals.copy(), self._equave)
+        
+        if self.interval_type == float:
+            new_intervals = [0.0]
+            for i in range(len(self._intervals) - 1, 0, -1):
+                interval_difference = self._intervals[i] - self._intervals[i-1]
+                new_intervals.append(new_intervals[-1] + interval_difference)
+        else:
+            new_intervals = [Fraction(1, 1)]
+            for i in range(len(self._intervals) - 1, 0, -1):
+                interval_ratio = self._intervals[i] / self._intervals[i-1]
+                new_intervals.append(new_intervals[-1] * interval_ratio)
+        
+        return Chord(new_intervals, self._equave)
+
+class AddressedPitchCollection:
+    def __init__(self, collection: PitchCollection, reference_pitch: 'Pitch'):
+        self.collection = collection
         self.reference_pitch = reference_pitch
         self._get_pitch = lru_cache(maxsize=128)(self._calculate_pitch)
-        
+    
     def _calculate_pitch(self, index: int) -> 'Pitch':
-        interval = self.scale[index]
+        interval = self.collection[index]
         
-        if self.scale.interval_type == float:
+        if self.collection.interval_type == float:
             return Pitch.from_freq(self.reference_pitch.freq * (2**(float(interval)/1200)))
         else:
-            return Pitch.from_freq(self.reference_pitch.freq * float(interval))
+            return Pitch.from_freq(self.reference_pitch.freq * float(interval), partial=interval)
     
     def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union['Pitch', List['Pitch']]:
         if hasattr(index, '__iter__') and not isinstance(index, str):
@@ -321,10 +352,13 @@ class AddressedScale:
     def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', List['Pitch']]:
         return self[index]
     
+    def __getattr__(self, name):
+        return getattr(self.collection, name)
+    
     def __repr__(self):
-        scale_size = len(self.scale)
+        size = len(self.collection)
         pitches = []
-        for i in range(scale_size):
+        for i in range(size):
             pitch = self[i]
             if pitch.cents_offset != 0.0:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave} ({pitch.cents_offset:+.1f}¢)")
@@ -332,4 +366,5 @@ class AddressedScale:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave}")
         
         pitches_str = ', '.join(pitches)
-        return f"AddressedScale([{pitches_str}])" 
+        collection_type = self.collection.__class__.__name__
+        return f"Addressed{collection_type}([{pitches_str}])" 
