@@ -22,16 +22,28 @@ that prevail, and upon the skill and the soul of the composer."
 
 --------------------------------------------------------------------------------------
 '''
-from . import combination_product_sets
-from . import harmonic_trees
-from . import sonorities
 from . import utils
+from . import systems
+from . import scales
+from . import chords
 
-from .combination_product_sets import CombinationProductSet
-from .harmonic_trees import HarmonicTree
-from .sonorities import Spectrum
-from .utils import *
+from .pitch import Pitch
+from .pitch_collection import PitchCollection, AddressedPitchCollection
+from .scales import Scale
+from .chords import Chord
+from .systems.combination_product_sets import CombinationProductSet
+from .systems.harmonic_trees import HarmonicTree
+from .systems.harmonic_trees.spectrum import Spectrum
 
-__all__ = []
+__all__ = [
+    'Pitch',
+    'PitchCollection', 
+    'AddressedPitchCollection',
+    'Scale',
+    'Chord',
+    'CombinationProductSet',
+    'HarmonicTree',
+    'Spectrum',
+]
 
 __version__ = '2.0.0'

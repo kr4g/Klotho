@@ -1,8 +1,10 @@
-from klotho.tonos.utils import Pitch, freq_to_pitchclass, partial_to_fundamental
+from ....utils.frequency_conversion import freq_to_pitchclass
+from ....utils.harmonics import partial_to_fundamental
+from ....pitch import Pitch
 from typing import Union
 from fractions import Fraction
 # from klotho.topos.graphs.trees import Tree
-from ..harmonic_trees import HarmonicTree
+from .. import HarmonicTree
 import pandas as pd
 
 class Spectrum():

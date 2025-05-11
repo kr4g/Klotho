@@ -1,14 +1,14 @@
-from ...topos.graphs.networks import ComboNet
+from klotho.topos.graphs.networks import ComboNet
 from .cps import CombinationProductSet
 
-class ComboProdNet(ComboNet):
+class CombinationProductNetwork(ComboNet):
     def __init__(self, cps: CombinationProductSet):
         if not isinstance(cps, CombinationProductSet):
-            raise ValueError("ComboProdNet requires an instance of CombinationProductSet or its subclasses.")
+            raise ValueError("CombinationProductNetwork requires an instance of CombinationProductSet or its subclasses.")
         
         self._cps = cps
         
-        nodes = {combo: {'product': cps.combo_product[combo], 'ratio': cps.combo_ratio[combo]} 
+        nodes = {combo: {'product': cps.combo_to_product[combo], 'ratio': cps.combo_to_ratio[combo]} 
                  for combo in cps.combos}
         
         super().__init__(nodes=nodes)
@@ -28,8 +28,8 @@ class ComboProdNet(ComboNet):
                         self.add_edge(combo2, combo1, common_factors=common_factors, interval=interval_reverse)
 
     def _calculate_interval(self, source_combo, target_combo):
-        source_ratio = self._cps.combo_ratio[source_combo]
-        target_ratio = self._cps.combo_ratio[target_combo]
+        source_ratio = self._cps.combo_to_ratio[source_combo]
+        target_ratio = self._cps.combo_to_ratio[target_combo]
         return target_ratio / source_ratio
 
     def edge_interval(self, source, target):

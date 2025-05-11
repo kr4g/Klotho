@@ -11,6 +11,20 @@ A4_MIDI = 69
 
 from utils.data_structures.enums import DirectValueEnumMeta, Enum  
 
+__all__ = [
+    'ratio_to_cents',
+    'cents_to_ratio',
+    'cents_to_setclass',
+    'ratio_to_setclass',
+    'split_interval',
+    'harmonic_mean',
+    'arithmetic_mean',
+    'logarithmic_distance',
+    'interval_cost',
+    'n_tet',
+    'ratios_n_tet'
+]
+
 def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -> float:
   '''
   Convert a musical interval ratio to cents, a logarithmic unit of measure.

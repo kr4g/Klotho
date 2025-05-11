@@ -11,6 +11,15 @@ A4_MIDI = 69
 
 from utils.data_structures.enums import DirectValueEnumMeta, Enum  
 
+__all__ = [
+    'equave_reduce',
+    'reduce_interval',
+    'reduce_interval_relative',
+    'reduce_sequence_relative',
+    'fold_interval',
+    'reduce_freq'
+]
+
 def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fraction, int, str, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:
   '''
   Reduce an interval to within the span of a specified octave.
