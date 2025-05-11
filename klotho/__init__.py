@@ -4,7 +4,7 @@ Klotho: A graph-oriented Python package for computational composition.
 This package provides tools for working with musical structures across multiple domains:
 - Topos: Abstract structures and relationships
 - Chronos: Time and rhythm
-- Tonos: Pitch and frequency
+- Tonos: Pitch and harmony
 - Aikous: Expression and parameters
 - Skora: Visualization and notation
 """
@@ -27,4 +27,4 @@ __all__ = [
     'topos', 'chronos', 'tonos', 'aikous', 'skora',
 ]
 
-__version__ = '2.0.0'
+__version__ = '2.1.0'
