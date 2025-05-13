@@ -4,10 +4,12 @@ import pandas as pd
 from itertools import count
 
 class Graph:
-    def __init__(self, graph: nx.Graph):
-        self._graph = graph
+    def __init__(self, graph=None):
+        self._graph = graph if graph is not None else nx.DiGraph()
         self._meta = pd.DataFrame(index=[''])
         self._observers = []
+        self._next_id = max(self._graph.nodes(), default=-1) + 1
+        self._suppress_notifications = False
         
     def register_observer(self, observer):
         """Register an object to be notified of graph mutations."""
@@ -21,8 +23,16 @@ class Graph:
             
     def notify_observers(self):
         """Notify all registered observers that the graph has been modified."""
+        if self._suppress_notifications:
+            return
+            
+        self.before_notify()
         for observer in self._observers:
-            observer.graph_updated(self)    
+            observer.graph_updated(self)
+            
+    def before_notify(self):
+        """Hook called before notifying observers. Subclasses can override."""
+        pass
    
     @property
     def graph(self):
@@ -114,24 +124,20 @@ class Graph:
         """Returns root nodes (nodes with no predecessors)"""
         return tuple(n for n, d in self._graph.in_degree() if d == 0)
     
-    def add_node(self, node_id, **attr):
-        """Add a node to the graph with optional attributes."""
+    def get_next_id(self):
+        next_id = self._next_id
+        self._next_id += 1
+        return next_id
+        
+    def add_node(self, **attr):
+        node_id = self.get_next_id()
         self._graph.add_node(node_id, **attr)
         self.notify_observers()
-        
-    def add_nodes_from(self, nodes_for_adding, **attr):
-        """Add multiple nodes to the graph."""
-        self._graph.add_nodes_from(nodes_for_adding, **attr)
-        self.notify_observers()
-        
+        return node_id
+    
     def remove_node(self, node):
         """Remove a node from the graph."""
         self._graph.remove_node(node)
-        self.notify_observers()
-        
-    def remove_nodes_from(self, nodes):
-        """Remove multiple nodes from the graph."""
-        self._graph.remove_nodes_from(nodes)
         self.notify_observers()
         
     def add_edge(self, u, v, **attr):
@@ -139,19 +145,9 @@ class Graph:
         self._graph.add_edge(u, v, **attr)
         self.notify_observers()
         
-    def add_edges_from(self, ebunch_to_add, **attr):
-        """Add multiple edges to the graph."""
-        self._graph.add_edges_from(ebunch_to_add, **attr)
-        self.notify_observers()
-        
     def remove_edge(self, u, v):
         """Remove an edge from the graph."""
         self._graph.remove_edge(u, v)
-        self.notify_observers()
-        
-    def remove_edges_from(self, ebunch):
-        """Remove multiple edges from the graph."""
-        self._graph.remove_edges_from(ebunch)
         self.notify_observers()
         
     def update(self, edges=None, nodes=None):
@@ -228,4 +224,21 @@ class Graph:
             Graph: A new Graph instance
         """
         return cls(G)
+    
+    def batch_operation(self):
+        """Context manager for batching operations."""
+        return GraphBatchOperation(self)
+
+class GraphBatchOperation:
+    """Context manager for batching graph operations."""
+    def __init__(self, graph):
+        self.graph = graph
+        
+    def __enter__(self):
+        self.graph._suppress_notifications = True
+        return self.graph
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.graph._suppress_notifications = False
+        self.graph.notify_observers()
     

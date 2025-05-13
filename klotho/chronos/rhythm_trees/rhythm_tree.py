@@ -62,11 +62,17 @@ class RhythmTree(Tree):
                  span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '4/4',
                  subdivisions:Tuple            = (1,1)):
+        
+        self._initializing = True
         super().__init__(Meas(meas).numerator, subdivisions)
+        
         self._meta['span'] = span
         self._meta['meas'] = str(Meas(meas))
         self._meta['type'] = None
         self._subdivisions = self._cast_subdivs(subdivisions)
+        
+       
+        self._initializing = False
         self._ratios = self._evaluate()
     
     @classmethod
@@ -172,7 +178,9 @@ class RhythmTree(Tree):
 
     def __str__(self):
         meta_dict = self._meta.iloc[0].to_dict()
-        ordered_meta = {k: meta_dict[k] for k in ['span', 'meas', 'type', 'depth', 'k']}
+        ordered_meta = {k: meta_dict[k] for k in ['span', 'meas', 'type']}
+        ordered_meta['depth'] = self.depth
+        ordered_meta['k'] = self.k
         meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
         
         content = [
@@ -196,3 +204,9 @@ class RhythmTree(Tree):
 
     def __repr__(self):
         return self.__str__()
+
+    def before_notify(self):
+        """Recalculate ratios before notifying observers."""
+        super().before_notify()
+        if not getattr(self, '_initializing', False):
+            self._ratios = self._evaluate()

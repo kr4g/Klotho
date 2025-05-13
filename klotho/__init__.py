@@ -19,12 +19,12 @@ from .topos.graphs import trees, networks, fields, Tree, Network, Field, Graph
 
 from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
-from .tonos.pitch import Pitch
-from .tonos.scales import Scale
-
+from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'aikous', 'skora',
+    'Pitch', 'Scale', 'Chord', 
+    'AddressedScale', 'AddressedChord'
 ]
 
 __version__ = '2.1.0'

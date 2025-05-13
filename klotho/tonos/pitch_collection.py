@@ -11,26 +11,26 @@ IntervalList = Union[List[float], List[Fraction], List[int], List[str]]
 _addressed_collection_cache = {}
 
 class PitchCollection(Generic[IntervalType]):
-    def __init__(self, intervals: IntervalList = ["9/8", "5/4", "4/3", "3/2", "5/3", "15/8", "2/1"], 
-                 equave: Optional[Union[float, Fraction, int, str]] = None):
-        self._intervals: List[IntervalType] = []
+    def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
+                 equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
+        self._degrees: List[IntervalType] = []
         
-        if not intervals:
+        if not degrees:
             equave_value = 2 if equave is None else equave
             self._equave = self._convert_value(equave_value)
             return
         
-        converted = [self._convert_value(i) for i in intervals]
+        converted = [self._convert_value(i) for i in degrees]
         
         self._interval_type = float if any(isinstance(i, float) for i in converted) else Fraction
         
         if self._interval_type == float:
             converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
-            unique_intervals = []
+            unique_degrees = []
             for i in converted:
-                if not any(abs(i - j) < 1e-6 for j in unique_intervals):
-                    unique_intervals.append(i)
-            converted = sorted(unique_intervals)
+                if not any(abs(i - j) < 1e-6 for j in unique_degrees):
+                    unique_degrees.append(i)
+            converted = sorted(unique_degrees)
             
             if abs(converted[0]) >= 1e-6:
                 converted.insert(0, 0.0)
@@ -40,7 +40,7 @@ class PitchCollection(Generic[IntervalType]):
             if converted[0] != Fraction(1, 1):
                 converted.insert(0, Fraction(1, 1))
         
-        self._equave = self._convert_value(intervals[-1] if equave is None else equave)
+        self._equave = self._convert_value(degrees[-1] if equave is None else equave)
         
         if isinstance(converted[0], float) and not isinstance(self._equave, float):
             self._equave = float(self._equave)
@@ -53,13 +53,34 @@ class PitchCollection(Generic[IntervalType]):
              converted[-1] == self._equave)):
             converted.pop()
         
-        self._intervals = cast(List[IntervalType], converted)
+        self._degrees = cast(List[IntervalType], converted)
+        self._intervals = self._compute_intervals()
         
         self._calculate_value_cache = {}
         self._mode_cache = {}
+            
+    def _compute_intervals(self) -> List[IntervalType]:
+        """Compute intervals between consecutive degrees"""
+        if not self._degrees or len(self._degrees) <= 1:
+            return []
+            
+        result = []
+        if self.interval_type == float:
+            for i in range(1, len(self._degrees)):
+                result.append(self._degrees[i] - self._degrees[i-1])
+        else:
+            for i in range(1, len(self._degrees)):
+                result.append(self._degrees[i] / self._degrees[i-1])
+                
+        return result
+    
+    @property
+    def degrees(self) -> List[IntervalType]:
+        return self._degrees
     
     @property
     def intervals(self) -> List[IntervalType]:
+        """Returns the intervals between consecutive degrees"""
         return self._intervals
         
     @property
@@ -68,9 +89,9 @@ class PitchCollection(Generic[IntervalType]):
     
     @property
     def interval_type(self) -> type:
-        if not self._intervals:
+        if not self._degrees:
             return None
-        return type(self._intervals[0])
+        return type(self._degrees[0])
     
     def _convert_value(self, value: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
         match value:
@@ -89,10 +110,10 @@ class PitchCollection(Generic[IntervalType]):
                     raise ValueError(f"Cannot convert {value} to either a float or Fraction")
     
     def _get_octave_shift_and_index(self, index: int) -> tuple[int, int]:
-        if not self._intervals:
+        if not self._degrees:
             raise IndexError("Cannot index an empty collection")
             
-        size = len(self._intervals)
+        size = len(self._degrees)
         
         if index >= 0:
             octave_shift = index // size
@@ -108,7 +129,7 @@ class PitchCollection(Generic[IntervalType]):
         if cache_key in self._calculate_value_cache:
             return self._calculate_value_cache[cache_key]
             
-        interval = self._intervals[wrapped_index]
+        interval = self._degrees[wrapped_index]
         
         if self.interval_type == float:
             if isinstance(self._equave, float):
@@ -143,13 +164,13 @@ class PitchCollection(Generic[IntervalType]):
         match (self.interval_type, other.interval_type):
             case (type1, type2) if type1 == type2:
                 if type1 == float:
-                    combined = list(self._intervals)
-                    for interval in other._intervals:
+                    combined = list(self._degrees)
+                    for interval in other._degrees:
                         if not any(abs(interval - existing) < 1e-6 for existing in combined):
                             combined.append(interval)
                     return self.__class__(sorted(combined), self._equave)
                 else:
-                    combined = sorted(list(set(self._intervals) | set(other._intervals)))
+                    combined = sorted(list(set(self._degrees) | set(other._degrees)))
                     return self.__class__(combined, self._equave)
             case (float, _):
                 converted = self._convert_to_other_type(other)
@@ -165,12 +186,12 @@ class PitchCollection(Generic[IntervalType]):
             case (type1, type2) if type1 == type2:
                 if type1 == float:
                     intersection = []
-                    for interval1 in self._intervals:
-                        if any(abs(interval1 - interval2) < 1e-6 for interval2 in other._intervals):
+                    for interval1 in self._degrees:
+                        if any(abs(interval1 - interval2) < 1e-6 for interval2 in other._degrees):
                             intersection.append(interval1)
                     return self.__class__(sorted(intersection), self._equave)
                 else:
-                    intersection = sorted(list(set(self._intervals) & set(other._intervals)))
+                    intersection = sorted(list(set(self._degrees) & set(other._degrees)))
                     return self.__class__(intersection, self._equave)
             case (float, _):
                 converted = self._convert_to_other_type(other)
@@ -186,15 +207,15 @@ class PitchCollection(Generic[IntervalType]):
             case (type1, type2) if type1 == type2:
                 if type1 == float:
                     difference = []
-                    for interval1 in self._intervals:
-                        if not any(abs(interval1 - interval2) < 1e-6 for interval2 in other._intervals):
+                    for interval1 in self._degrees:
+                        if not any(abs(interval1 - interval2) < 1e-6 for interval2 in other._degrees):
                             difference.append(interval1)
-                    for interval2 in other._intervals:
-                        if not any(abs(interval2 - interval1) < 1e-6 for interval1 in self._intervals):
+                    for interval2 in other._degrees:
+                        if not any(abs(interval2 - interval1) < 1e-6 for interval1 in self._degrees):
                             difference.append(interval2)
                     return self.__class__(sorted(difference), self._equave)
                 else:
-                    difference = sorted(list(set(self._intervals) ^ set(other._intervals)))
+                    difference = sorted(list(set(self._degrees) ^ set(other._degrees)))
                     return self.__class__(difference, self._equave)
             case (float, _):
                 converted = self._convert_to_other_type(other)
@@ -206,13 +227,20 @@ class PitchCollection(Generic[IntervalType]):
         result = self.__class__.__new__(self.__class__)
         
         if self.interval_type == float and other.interval_type == float:
-            converted = [1200 * np.log2(float(interval)) for interval in self._intervals]
-            result._intervals = converted
+            converted = [1200 * np.log2(float(interval)) for interval in self._degrees]
+            result._degrees = converted
             result._equave = 1200.0 if isinstance(other._equave, float) else other._equave
         else:
-            converted = [Fraction.from_float(2 ** (interval / 1200)) for interval in self._intervals]
-            result._intervals = converted
+            converted = [Fraction.from_float(2 ** (interval / 1200)) for interval in self._degrees]
+            result._degrees = converted
             result._equave = Fraction(2, 1) if isinstance(other._equave, Fraction) else other._equave
+            
+        # Initialize the intervals as well
+        result._intervals = []
+        if hasattr(result, '_compute_intervals'):
+            result._intervals = result._compute_intervals()
+        result._calculate_value_cache = {}
+        result._mode_cache = {}
             
         return cast(PC, result)
     
@@ -223,7 +251,7 @@ class PitchCollection(Generic[IntervalType]):
         if mode_number == 0:
             return self
             
-        size = len(self._intervals)
+        size = len(self._degrees)
         if size == 0:
             return self.__class__([], self._equave)
         
@@ -231,40 +259,40 @@ class PitchCollection(Generic[IntervalType]):
         if start_index < 0:
             start_index += size
         
-        first_interval = self._intervals[start_index]
-        modal_intervals = []
+        first_degree = self._degrees[start_index]
+        modal_degrees = []
         
         if self.interval_type == float:
             for i in range(size):
                 current_idx = (start_index + i) % size
                 
                 if i == 0:
-                    modal_intervals.append(0.0)
+                    modal_degrees.append(0.0)
                 else:
-                    interval = self._intervals[current_idx] - first_interval
+                    interval = self._degrees[current_idx] - first_degree
                     if current_idx < start_index:
                         equave_value = self._equave if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
                         interval += equave_value
-                    modal_intervals.append(interval)
+                    modal_degrees.append(interval)
         else:
             for i in range(size):
                 current_idx = (start_index + i) % size
                 
                 if i == 0:
-                    modal_intervals.append(Fraction(1, 1))
+                    modal_degrees.append(Fraction(1, 1))
                 else:
-                    interval = self._intervals[current_idx] / first_interval
+                    interval = self._degrees[current_idx] / first_degree
                     if current_idx < start_index:
                         equave_value = self._equave if isinstance(self._equave, Fraction) else Fraction.from_float(2 ** (self._equave / 1200))
                         interval *= equave_value
-                    modal_intervals.append(interval)
+                    modal_degrees.append(interval)
         
-        result = self.__class__(modal_intervals, self._equave)
+        result = self.__class__(modal_degrees, self._equave)
         self._mode_cache[mode_number] = result
         return result
     
     def __len__(self):
-        return len(self._intervals)
+        return len(self._degrees)
     
     def __mul__(self, other: 'Pitch') -> 'AddressedPitchCollection':
         cache_key = (id(self), id(other))
@@ -273,10 +301,7 @@ class PitchCollection(Generic[IntervalType]):
         return _addressed_collection_cache[cache_key]
     
     def __rmul__(self, other: 'Pitch') -> 'AddressedPitchCollection':
-        cache_key = (id(other), id(self))
-        if cache_key not in _addressed_collection_cache:
-            _addressed_collection_cache[cache_key] = AddressedPitchCollection(self, other)
-        return _addressed_collection_cache[cache_key]
+        return self.__mul__(other)
     
     def __invert__(self: PC) -> PC:
         raise NotImplementedError("Subclasses must implement __invert__")
@@ -285,8 +310,8 @@ class PitchCollection(Generic[IntervalType]):
         raise NotImplementedError("Subclasses must implement __neg__")
     
     def __repr__(self):
-        intervals_str = ', '.join(str(i) for i in self._intervals)
-        return f"{self.__class__.__name__}([{intervals_str}], equave={self._equave})"
+        degrees_str = ', '.join(str(i) for i in self._degrees)
+        return f"{self.__class__.__name__}([{degrees_str}], equave={self._equave})"
 
 class AddressedPitchCollection:
     def __init__(self, collection: PitchCollection, reference_pitch: 'Pitch'):
@@ -328,5 +353,4 @@ class AddressedPitchCollection:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave}")
         
         pitches_str = ', '.join(pitches)
-        collection_type = self.collection.__class__.__name__
-        return f"Addressed{collection_type}([{pitches_str}])" 
+        return f"{self.__class__.__name__}([{pitches_str}])" 

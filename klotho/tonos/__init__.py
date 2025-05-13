@@ -39,6 +39,8 @@ from .chords import Chord
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
+from .scales.scale import AddressedScale
+from .chords.chord import AddressedChord
 
 # Import utility functions from intervals module
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
@@ -79,6 +81,8 @@ __all__ = [
     'Eikosany',
     'HarmonicTree',
     'Spectrum',
+    'AddressedScale',
+    'AddressedChord',
     
     # Interval utilities
     'ratio_to_cents',
