@@ -1,7 +1,6 @@
 from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union
-from ..pitch_collection import PitchCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList
-from ..pitch import Pitch
+from ..pitch import EquaveCyclicPitchCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
 import numpy as np
 
 PC = TypeVar('PC', bound='Chord')
@@ -9,11 +8,11 @@ PC = TypeVar('PC', bound='Chord')
 class AddressedChord(AddressedPitchCollection):
     pass
 
-class Chord(PitchCollection[IntervalType]):
+class Chord(EquaveCyclicPitchCollection[IntervalType]):
     def __init__(self, degrees: IntervalList = ["1/1", "5/4", "3/2"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
         if degrees:
-            converted = [PitchCollection._convert_value(i) for i in degrees]
+            converted = [EquaveCyclicPitchCollection._convert_value(i) for i in degrees]
             is_float = any(isinstance(i, float) for i in converted)
             
             if is_float:
@@ -118,3 +117,4 @@ class Chord(PitchCollection[IntervalType]):
         if cache_key not in _addressed_collection_cache:
             _addressed_collection_cache[cache_key] = AddressedChord(self, other)
         return _addressed_collection_cache[cache_key] 
+    

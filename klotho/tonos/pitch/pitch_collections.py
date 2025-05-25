@@ -5,6 +5,7 @@ from .pitch import Pitch
 from functools import lru_cache
 
 PC = TypeVar('PC', bound='PitchCollection')
+ECC = TypeVar('ECC', bound='EquaveCyclicPitchCollection')
 IntervalType = TypeVar('IntervalType', float, Fraction)
 IntervalList = Union[List[float], List[Fraction], List[int], List[str]]
 
@@ -43,8 +44,6 @@ class PitchCollection(Generic[IntervalType]):
         
         self._degrees = cast(List[IntervalType], converted)
         self._intervals = self._compute_intervals()
-        
-        self._calculate_value_cache = {}
             
     def _compute_intervals(self) -> List[IntervalType]:
         """Compute intervals between consecutive degrees"""
@@ -96,44 +95,6 @@ class PitchCollection(Generic[IntervalType]):
             except ValueError:
                 raise ValueError(f"Cannot convert {value} to either a float or Fraction")
     
-    def _get_octave_shift_and_index(self, index: int) -> tuple[int, int]:
-        if not self._degrees:
-            raise IndexError("Cannot index an empty collection")
-            
-        size = len(self._degrees)
-        
-        if index >= 0:
-            octave_shift = index // size
-            wrapped_index = index % size
-        else:
-            octave_shift = -((-index - 1) // size + 1)
-            wrapped_index = size - 1 - ((-index - 1) % size)
-            
-        return octave_shift, wrapped_index
-    
-    def _calculate_value(self, octave_shift: int, wrapped_index: int) -> IntervalType:
-        cache_key = (octave_shift, wrapped_index)
-        if cache_key in self._calculate_value_cache:
-            return self._calculate_value_cache[cache_key]
-            
-        interval = self._degrees[wrapped_index]
-        
-        if self.interval_type == float:
-            if isinstance(self._equave, float):
-                result = cast(IntervalType, interval + (octave_shift * self._equave))
-            else:
-                equave_cents = 1200 * np.log2(float(self._equave))
-                result = cast(IntervalType, interval + (octave_shift * equave_cents))
-        else:
-            if isinstance(self._equave, float):
-                equave_ratio = Fraction.from_float(2 ** (self._equave / 1200))
-                result = cast(IntervalType, interval * (equave_ratio ** octave_shift))
-            else:
-                result = cast(IntervalType, interval * (self._equave ** octave_shift))
-        
-        self._calculate_value_cache[cache_key] = result
-        return result
-    
     def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, List[IntervalType]]:
         if hasattr(index, '__iter__') and not isinstance(index, str):
             return [self[int(i) if not isinstance(i, int) else i] for i in index]
@@ -141,8 +102,10 @@ class PitchCollection(Generic[IntervalType]):
         if not isinstance(index, int):
             raise TypeError("Index must be an integer or a sequence of integers")
         
-        octave_shift, wrapped_index = self._get_octave_shift_and_index(index)
-        return self._calculate_value(octave_shift, wrapped_index)
+        if index < 0 or index >= len(self._degrees):
+            raise IndexError("Index out of range")
+            
+        return self._degrees[index]
     
     def __or__(self: PC, other: PC) -> PC:
         if not isinstance(other, self.__class__):
@@ -231,7 +194,6 @@ class PitchCollection(Generic[IntervalType]):
         result._intervals = []
         if hasattr(result, '_compute_intervals'):
             result._intervals = result._compute_intervals()
-        result._calculate_value_cache = {}
             
         return cast(PC, result)
     
@@ -249,54 +211,16 @@ class PitchCollection(Generic[IntervalType]):
         elif self.interval_type == Fraction and isinstance(target_value, float):
             target_value = Fraction.from_float(target_value)
         
-        size = len(self._degrees)
-        
         if self.interval_type == float:
             for i, degree in enumerate(self._degrees):
                 if abs(degree - target_value) < 1e-6:
-                    base_index = i
-                    if base_index >= start and (stop is None or base_index < stop):
-                        return base_index
+                    if i >= start and (stop is None or i < stop):
+                        return i
         else:
             try:
                 base_index = self._degrees.index(target_value)
                 if base_index >= start and (stop is None or base_index < stop):
                     return base_index
-            except ValueError:
-                pass
-        
-        if self.interval_type == float:
-            equave_cents = 1200.0 if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
-            reduced_value = target_value % equave_cents
-            octave_shift = int(target_value // equave_cents)
-            
-            for i, degree in enumerate(self._degrees):
-                if abs(degree - reduced_value) < 1e-6:
-                    calculated_index = octave_shift * size + i
-                    if (start <= 0 or calculated_index >= start) and (stop is None or calculated_index < stop):
-                        return calculated_index
-        else:
-            if isinstance(self._equave, float):
-                equave_ratio = Fraction.from_float(2 ** (self._equave / 1200))
-            else:
-                equave_ratio = self._equave
-            
-            octave_shift = 0
-            reduced_value = target_value
-            
-            while reduced_value >= equave_ratio:
-                reduced_value /= equave_ratio
-                octave_shift += 1
-            
-            while reduced_value < Fraction(1, 1):
-                reduced_value *= equave_ratio
-                octave_shift -= 1
-            
-            try:
-                base_index = self._degrees.index(reduced_value)
-                calculated_index = octave_shift * size + base_index
-                if (start <= 0 or calculated_index >= start) and (stop is None or calculated_index < stop):
-                    return calculated_index
             except ValueError:
                 pass
         
@@ -345,6 +269,137 @@ class PitchCollection(Generic[IntervalType]):
     def __repr__(self):
         degrees_str = ', '.join(str(i) for i in self._degrees)
         return f"{self.__class__.__name__}([{degrees_str}], equave={self._equave})"
+
+
+class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
+    """
+    A pitch collection that supports infinite equave-displacement indexing.
+    
+    This class extends PitchCollection to allow indexing beyond the bounds of the
+    collection, where out-of-bounds indices are wrapped around the equave. This
+    behavior is useful for scales and chords that conceptually repeat infinitely
+    up and down the frequency spectrum.
+    """
+    
+    def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
+                 equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
+        super().__init__(degrees, equave)
+        self._calculate_value_cache = {}
+    
+    def _get_octave_shift_and_index(self, index: int) -> tuple[int, int]:
+        if not self._degrees:
+            raise IndexError("Cannot index an empty collection")
+            
+        size = len(self._degrees)
+        
+        if index >= 0:
+            octave_shift = index // size
+            wrapped_index = index % size
+        else:
+            octave_shift = -((-index - 1) // size + 1)
+            wrapped_index = size - 1 - ((-index - 1) % size)
+            
+        return octave_shift, wrapped_index
+    
+    def _calculate_value(self, octave_shift: int, wrapped_index: int) -> IntervalType:
+        cache_key = (octave_shift, wrapped_index)
+        if cache_key in self._calculate_value_cache:
+            return self._calculate_value_cache[cache_key]
+            
+        interval = self._degrees[wrapped_index]
+        
+        if self.interval_type == float:
+            if isinstance(self._equave, float):
+                result = cast(IntervalType, interval + (octave_shift * self._equave))
+            else:
+                equave_cents = 1200 * np.log2(float(self._equave))
+                result = cast(IntervalType, interval + (octave_shift * equave_cents))
+        else:
+            if isinstance(self._equave, float):
+                equave_ratio = Fraction.from_float(2 ** (self._equave / 1200))
+                result = cast(IntervalType, interval * (equave_ratio ** octave_shift))
+            else:
+                result = cast(IntervalType, interval * (self._equave ** octave_shift))
+        
+        self._calculate_value_cache[cache_key] = result
+        return result
+    
+    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, List[IntervalType]]:
+        if hasattr(index, '__iter__') and not isinstance(index, str):
+            return [self[int(i) if not isinstance(i, int) else i] for i in index]
+        
+        if not isinstance(index, int):
+            raise TypeError("Index must be an integer or a sequence of integers")
+        
+        octave_shift, wrapped_index = self._get_octave_shift_and_index(index)
+        return self._calculate_value(octave_shift, wrapped_index)
+    
+    def index(self, value: Union[float, Fraction, int, str], start: int = 0, stop: Optional[int] = None) -> int:
+        if not self._degrees:
+            raise ValueError("Cannot search in an empty collection")
+        
+        target_value = self._convert_value(value)
+        
+        if self.interval_type == float and not isinstance(target_value, float):
+            target_value = float(target_value)
+        elif self.interval_type == Fraction and isinstance(target_value, float):
+            target_value = Fraction.from_float(target_value)
+        
+        size = len(self._degrees)
+        
+        # First check for exact matches in the base collection
+        if self.interval_type == float:
+            for i, degree in enumerate(self._degrees):
+                if abs(degree - target_value) < 1e-6:
+                    base_index = i
+                    if base_index >= start and (stop is None or base_index < stop):
+                        return base_index
+        else:
+            try:
+                base_index = self._degrees.index(target_value)
+                if base_index >= start and (stop is None or base_index < stop):
+                    return base_index
+            except ValueError:
+                pass
+        
+        # Then check for equave-displaced matches
+        if self.interval_type == float:
+            equave_cents = 1200.0 if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
+            reduced_value = target_value % equave_cents
+            octave_shift = int(target_value // equave_cents)
+            
+            for i, degree in enumerate(self._degrees):
+                if abs(degree - reduced_value) < 1e-6:
+                    calculated_index = octave_shift * size + i
+                    if (start <= 0 or calculated_index >= start) and (stop is None or calculated_index < stop):
+                        return calculated_index
+        else:
+            if isinstance(self._equave, float):
+                equave_ratio = Fraction.from_float(2 ** (self._equave / 1200))
+            else:
+                equave_ratio = self._equave
+            
+            octave_shift = 0
+            reduced_value = target_value
+            
+            while reduced_value >= equave_ratio:
+                reduced_value /= equave_ratio
+                octave_shift += 1
+            
+            while reduced_value < Fraction(1, 1):
+                reduced_value *= equave_ratio
+                octave_shift -= 1
+            
+            try:
+                base_index = self._degrees.index(reduced_value)
+                calculated_index = octave_shift * size + base_index
+                if (start <= 0 or calculated_index >= start) and (stop is None or calculated_index < stop):
+                    return calculated_index
+            except ValueError:
+                pass
+        
+        raise ValueError(f"Interval {value} not found in collection")
+
 
 class AddressedPitchCollection:
     def __init__(self, collection: PitchCollection, reference_pitch: 'Pitch'):

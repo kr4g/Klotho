@@ -26,14 +26,14 @@ from . import utils
 from . import systems
 from . import scales
 from . import chords
+from . import pitch
 
 # Make submodules accessible directly at the top level
 combination_product_sets = systems.combination_product_sets
 harmonic_trees = systems.harmonic_trees
 
 # Import classes
-from .pitch import Pitch
-from .pitch_collection import PitchCollection, AddressedPitchCollection
+from .pitch import Pitch, PitchCollection, EquaveCyclicPitchCollection, AddressedPitchCollection
 from .scales import Scale
 from .chords import Chord
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
@@ -65,12 +65,14 @@ __all__ = [
     'systems',
     'scales',
     'chords',
+    'pitch',
     'combination_product_sets',
     'harmonic_trees',
     
     # Classes
     'Pitch',
     'PitchCollection', 
+    'EquaveCyclicPitchCollection',
     'AddressedPitchCollection',
     'Scale',
     'Chord',

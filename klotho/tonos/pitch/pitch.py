@@ -1,5 +1,5 @@
-from .utils.frequency_conversion import pitchclass_to_freq, freq_to_pitchclass, freq_to_midicents, midicents_to_freq, A4_Hz, A4_MIDI
-from .utils.harmonics import partial_to_fundamental
+from ..utils.frequency_conversion import pitchclass_to_freq, freq_to_pitchclass, freq_to_midicents, midicents_to_freq, A4_Hz, A4_MIDI
+from ..utils.harmonics import partial_to_fundamental
 
 import pandas as pd
 import numpy as np

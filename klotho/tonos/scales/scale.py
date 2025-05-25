@@ -1,7 +1,6 @@
 from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union
-from ..pitch_collection import PitchCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList
-from ..pitch import Pitch
+from ..pitch import EquaveCyclicPitchCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
 import numpy as np
 from ..utils.interval_normalization import equave_reduce
 
@@ -10,13 +9,13 @@ PC = TypeVar('PC', bound='Scale')
 class AddressedScale(AddressedPitchCollection):
     pass
 
-class Scale(PitchCollection[IntervalType]):
+class Scale(EquaveCyclicPitchCollection[IntervalType]):
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
         if degrees:
-            converted = [PitchCollection._convert_value(i) for i in degrees]
+            converted = [EquaveCyclicPitchCollection._convert_value(i) for i in degrees]
             is_float = any(isinstance(i, float) for i in converted)
-            equave_val = PitchCollection._convert_value(equave if equave is not None else "2/1")
+            equave_val = EquaveCyclicPitchCollection._convert_value(equave if equave is not None else "2/1")
             
             if is_float:
                 converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
@@ -120,3 +119,4 @@ class Scale(PitchCollection[IntervalType]):
         if cache_key not in _addressed_collection_cache:
             _addressed_collection_cache[cache_key] = AddressedScale(self, other)
         return _addressed_collection_cache[cache_key] 
+    
