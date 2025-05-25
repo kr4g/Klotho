@@ -870,12 +870,9 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
         node_positions = {}
     
-    # Get all strongly connected components
     components = list(nx.strongly_connected_components(G))
     
-    # Run the BFS placement algorithm on each component
     for component in components:
-        # Pick an arbitrary starting node from this component
         start_node = next(iter(component))
         component_positions = {start_node: (0, 0)}
         
@@ -902,7 +899,6 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                                 to_visit.append(neighbor_node)
                                 break
         
-        # Center this component around the origin
         if component_positions:
             center_x = sum(x for x, y in component_positions.values()) / len(component_positions)
             center_y = sum(y for x, y in component_positions.values()) / len(component_positions)
@@ -911,7 +907,6 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 x, y = component_positions[node]
                 component_positions[node] = (x - center_x, y - center_y)
         
-        # Add this component's centered positions to the overall positions
         node_positions.update(component_positions)
     
     fig = go.Figure()
