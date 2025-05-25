@@ -996,4 +996,3 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             fig.write_image(output_file)
     
     return fig
-

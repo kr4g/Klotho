@@ -7,6 +7,7 @@ from typing import List, Tuple, Set, Dict, Any, Union
 import networkx as nx
 import sympy as sp
 
+
 __all__ = [
     'Operations',
     'Sieve',
@@ -183,7 +184,7 @@ class GenCol:
     
     This is the multiplicative analog to the Sieve class.
     """
-    def __init__(self, generator: Union[str,int,float,Fraction], period: Union[str,int,float,Fraction] = 2, iterations: int = 12, normalize: bool = True):
+    def __init__(self, generator: Union[str,int,float,Fraction], period: Union[str,int,float,Fraction] = 2, iterations: int = 12):
         """
         Initialize a Generated Collection.
         
@@ -191,12 +192,10 @@ class GenCol:
             generator: The generator value (as str, int, float, or Fraction)
             period: The period of equivalence (as str, int, float, or Fraction)
             iterations: Number of times to apply the generator
-            normalize: If True, values will be normalized within the period
         """
         self._generator = Fraction(generator)
         self._period = Fraction(period)
         self._iterations = iterations
-        self._normalize = normalize
         self._generate()
         
     @property
@@ -210,54 +209,45 @@ class GenCol:
     @property
     def iterations(self) -> int:
         return self._iterations
-        
-    @iterations.setter
-    def iterations(self, value: int):
-        self._iterations = value
-        self._generate()
-    
-    @property
-    def normalize(self) -> bool:
-        return self._normalize
-    
-    @normalize.setter
-    def normalize(self, value: bool):
-        self._normalize = value
-        self._generate()
     
     @property
     def collection(self) -> List[Fraction]:
         return self._collection.copy()
     
     @property
-    def sorted_collection(self) -> List[Fraction]:
-        return sorted(self._collection)
-    
-    @property
-    def steps(self) -> List[Fraction]:
-        values = sorted(self._collection)
-        steps = []
-        
-        for i in range(len(values)):
-            if i < len(values) - 1:
-                steps.append(values[i+1] / values[i])
-            elif self._normalize:
-                steps.append(self._period * values[0] / values[i])
-        
-        return steps
-    
-    def _generate(self):
-        self._collection = [Fraction(1, 1)]
-        current = Fraction(1, 1)
-        
-        for _ in range(self._iterations):
-            current = current * self._generator
-            
-            if self._normalize:
+    def normalized_collection(self) -> List[Fraction]:
+        if not hasattr(self, '_normalized_collection'):
+            normalized = []
+            for value in self._collection:
+                current = value
                 while current >= self._period:
                     current /= self._period
+                normalized.append(current)
+            self._normalized_collection = normalized
+        return self._normalized_collection.copy()
+    
+    @property
+    def steps(self) -> Set[Fraction]:
+        if not hasattr(self, '_steps'):
+            values = sorted(self.normalized_collection)
+            steps = set()
             
-            self._collection.append(current)
+            for i in range(len(values)):
+                if i < len(values) - 1:
+                    steps.add(values[i+1] / values[i])
+                else:
+                    steps.add(self._period * values[0] / values[i])
+            
+            self._steps = steps
+        return self._steps.copy()
+    
+    def _generate(self):
+        self._collection = [self._generator ** i for i in range(self._iterations + 1)]
+        
+        if hasattr(self, '_normalized_collection'):
+            delattr(self, '_normalized_collection')
+        if hasattr(self, '_steps'):
+            delattr(self, '_steps')
     
     def __str__(self):
         result = (
@@ -265,13 +255,11 @@ class GenCol:
             f"Generator: {self._generator}\n"
             f"Period: {self._period}\n"
             f"Iterations: {self._iterations}\n"
-            f"Normalize: {self._normalize}\n"
         )
         
         if len(self._collection) <= 20:
-            sorted_values = sorted(self._collection)
-            result += f"Values (sorted): {', '.join([str(s) for s in sorted_values])}\n"
-            result += f"Steps: {', '.join([str(s) for s in self.steps])}\n"
+            result += f"Values: {', '.join([str(s) for s in self.normalized_collection])}\n"
+            result += f"Steps: {', '.join([str(s) for s in sorted(self.steps)])}\n"
         
         return result
     

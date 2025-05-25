@@ -238,6 +238,70 @@ class PitchCollection(Generic[IntervalType]):
     def __len__(self):
         return len(self._degrees)
     
+    def index(self, value: Union[float, Fraction, int, str], start: int = 0, stop: Optional[int] = None) -> int:
+        if not self._degrees:
+            raise ValueError("Cannot search in an empty collection")
+        
+        target_value = self._convert_value(value)
+        
+        if self.interval_type == float and not isinstance(target_value, float):
+            target_value = float(target_value)
+        elif self.interval_type == Fraction and isinstance(target_value, float):
+            target_value = Fraction.from_float(target_value)
+        
+        size = len(self._degrees)
+        
+        if self.interval_type == float:
+            for i, degree in enumerate(self._degrees):
+                if abs(degree - target_value) < 1e-6:
+                    base_index = i
+                    if base_index >= start and (stop is None or base_index < stop):
+                        return base_index
+        else:
+            try:
+                base_index = self._degrees.index(target_value)
+                if base_index >= start and (stop is None or base_index < stop):
+                    return base_index
+            except ValueError:
+                pass
+        
+        if self.interval_type == float:
+            equave_cents = 1200.0 if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
+            reduced_value = target_value % equave_cents
+            octave_shift = int(target_value // equave_cents)
+            
+            for i, degree in enumerate(self._degrees):
+                if abs(degree - reduced_value) < 1e-6:
+                    calculated_index = octave_shift * size + i
+                    if (start <= 0 or calculated_index >= start) and (stop is None or calculated_index < stop):
+                        return calculated_index
+        else:
+            if isinstance(self._equave, float):
+                equave_ratio = Fraction.from_float(2 ** (self._equave / 1200))
+            else:
+                equave_ratio = self._equave
+            
+            octave_shift = 0
+            reduced_value = target_value
+            
+            while reduced_value >= equave_ratio:
+                reduced_value /= equave_ratio
+                octave_shift += 1
+            
+            while reduced_value < Fraction(1, 1):
+                reduced_value *= equave_ratio
+                octave_shift -= 1
+            
+            try:
+                base_index = self._degrees.index(reduced_value)
+                calculated_index = octave_shift * size + base_index
+                if (start <= 0 or calculated_index >= start) and (stop is None or calculated_index < stop):
+                    return calculated_index
+            except ValueError:
+                pass
+        
+        raise ValueError(f"Interval {value} not found in collection")
+    
     def root(self, pitch: Union[Pitch, str]) -> 'AddressedPitchCollection':
         """Create an addressed pitch collection with the given root pitch"""
         if isinstance(pitch, str):
@@ -322,4 +386,4 @@ class AddressedPitchCollection:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave}")
         
         pitches_str = ', '.join(pitches)
-        return f"{self.__class__.__name__}([{pitches_str}], equave={self.collection.equave})" 
+        return f"{self.__class__.__name__}([{pitches_str}], equave={self.collection.equave})"
