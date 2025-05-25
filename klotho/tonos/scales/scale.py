@@ -12,45 +12,7 @@ class AddressedScale(AddressedPitchCollection):
 class Scale(EquaveCyclicPitchCollection[IntervalType]):
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
-        if degrees:
-            converted = [EquaveCyclicPitchCollection._convert_value(i) for i in degrees]
-            is_float = any(isinstance(i, float) for i in converted)
-            equave_val = EquaveCyclicPitchCollection._convert_value(equave if equave is not None else "2/1")
-            
-            if is_float:
-                converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
-                
-                unique_degrees = []
-                for i in converted:
-                    if not any(abs(i - j) < 1e-6 for j in unique_degrees):
-                        unique_degrees.append(i)
-                
-                equave_cents = float(equave_val) if isinstance(equave_val, float) else 1200.0 * np.log2(float(equave_val))
-                reduced_degrees = [float(equave_reduce(i, equave_cents)) for i in unique_degrees]
-                reduced_degrees.sort()
-                
-                if reduced_degrees and abs(reduced_degrees[-1] - equave_cents) < 1e-6:
-                    reduced_degrees.pop()
-                    
-                if not reduced_degrees or abs(reduced_degrees[0]) >= 1e-6:
-                    reduced_degrees.insert(0, 0.0)
-                    
-                degrees = reduced_degrees
-            else:
-                converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
-                unique_degrees = list(set(converted))
-                reduced_degrees = [equave_reduce(i, equave_val) for i in unique_degrees]
-                reduced_degrees.sort()
-                
-                if reduced_degrees and reduced_degrees[-1] == equave_val:
-                    reduced_degrees.pop()
-                    
-                if not reduced_degrees or reduced_degrees[0] != Fraction(1, 1):
-                    reduced_degrees.insert(0, Fraction(1, 1))
-                    
-                degrees = reduced_degrees
-                
-        super().__init__(degrees, equave)
+        super().__init__(degrees, equave, remove_equave=True)
         self._mode_cache = {}
         
     def mode(self, mode_number: int) -> 'Scale':

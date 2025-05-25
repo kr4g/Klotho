@@ -11,27 +11,7 @@ class AddressedChord(AddressedPitchCollection):
 class Chord(EquaveCyclicPitchCollection[IntervalType]):
     def __init__(self, degrees: IntervalList = ["1/1", "5/4", "3/2"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
-        if degrees:
-            converted = [EquaveCyclicPitchCollection._convert_value(i) for i in degrees]
-            is_float = any(isinstance(i, float) for i in converted)
-            
-            if is_float:
-                converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
-                
-                unique_degrees = []
-                for i in converted:
-                    if not any(abs(i - j) < 1e-6 for j in unique_degrees):
-                        unique_degrees.append(i)
-                
-                unique_degrees.sort()
-                degrees = unique_degrees
-            else:
-                converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
-                unique_degrees = list(set(converted))
-                unique_degrees.sort()
-                degrees = unique_degrees
-        
-        super().__init__(degrees, equave)
+        super().__init__(degrees, equave, remove_equave=False)
         self._inversion_cache = {}
     
     def inversion(self, inversion_number: int) -> 'Chord':

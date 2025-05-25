@@ -4,6 +4,14 @@ from typing import Union, List, Optional, Any, Sequence, TypeVar, cast, Callable
 from .pitch import Pitch
 from functools import lru_cache
 
+# Import equave_reduce for scale processing
+try:
+    from ..utils.interval_normalization import equave_reduce
+except ImportError:
+    # Fallback if import fails
+    def equave_reduce(interval, equave):
+        return interval
+
 PC = TypeVar('PC', bound='PitchCollection')
 ECC = TypeVar('ECC', bound='EquaveCyclicPitchCollection')
 IntervalType = TypeVar('IntervalType', float, Fraction)
@@ -12,34 +20,50 @@ IntervalList = Union[List[float], List[Fraction], List[int], List[str]]
 _addressed_collection_cache = {}
 
 class PitchCollection(Generic[IntervalType]):
+    """
+    A collection of pitch intervals that preserves order and allows duplicates.
+    
+    PitchCollection is the base class for organizing musical intervals. It maintains
+    the exact order and duplicates as provided, making it suitable for sequences
+    where order matters and repetition is meaningful.
+    
+    Args:
+        degrees: List of intervals as ratios (strings like "3/2"), decimals, or numbers
+        equave: The interval of equivalence, defaults to "2/1" (octave)
+        
+    Examples:
+        >>> pc = PitchCollection(["1/1", "5/4", "3/2"])
+        >>> pc.degrees
+        [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
+        
+        >>> pc = PitchCollection([0.0, 386.3, 702.0])  # cents
+        >>> pc.interval_type
+        <class 'float'>
+    """
+    
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
         self._degrees: List[IntervalType] = []
         
         if not degrees:
-            equave_value = 2 if equave is None else equave
-            self._equave = self._convert_value(equave_value)
+            self._equave = self._convert_value(equave if equave is not None else "2/1")
             return
         
         converted = [self._convert_value(i) for i in degrees]
         
         self._interval_type = float if any(isinstance(i, float) for i in converted) else Fraction
         
+        # Preserve order and allow duplicates - no sorting or deduplication
         if self._interval_type == float:
             converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
-            unique_degrees = []
-            for i in converted:
-                if not any(abs(i - j) < 1e-6 for j in unique_degrees):
-                    unique_degrees.append(i)
-            converted = sorted(unique_degrees)
         else:
-            converted = sorted(list(set(converted)))
+            converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
         
-        self._equave = self._convert_value(degrees[-1] if equave is None else equave)
+        self._equave = self._convert_value(equave if equave is not None else "2/1")
         
-        if isinstance(converted[0], float) and not isinstance(self._equave, float):
+        if converted and isinstance(converted[0], float) and not isinstance(self._equave, float):
             self._equave = float(self._equave)
-        elif isinstance(converted[0], Fraction) and isinstance(self._equave, float):
+        elif converted and isinstance(converted[0], Fraction) and isinstance(self._equave, float):
             self._equave = Fraction.from_float(self._equave)
         
         self._degrees = cast(List[IntervalType], converted)
@@ -95,9 +119,10 @@ class PitchCollection(Generic[IntervalType]):
             except ValueError:
                 raise ValueError(f"Cannot convert {value} to either a float or Fraction")
     
-    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, List[IntervalType]]:
+    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
         if hasattr(index, '__iter__') and not isinstance(index, str):
-            return [self[int(i) if not isinstance(i, int) else i] for i in index]
+            selected_degrees = [self[int(i) if not isinstance(i, int) else i] for i in index]
+            return PitchCollection(selected_degrees, self._equave)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer or a sequence of integers")
@@ -273,16 +298,83 @@ class PitchCollection(Generic[IntervalType]):
 
 class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
     """
-    A pitch collection that supports infinite equave-displacement indexing.
+    A pitch collection with infinite equave-displacement indexing and automatic sorting.
     
-    This class extends PitchCollection to allow indexing beyond the bounds of the
-    collection, where out-of-bounds indices are wrapped around the equave. This
-    behavior is useful for scales and chords that conceptually repeat infinitely
-    up and down the frequency spectrum.
+    This class extends PitchCollection to support indexing beyond the collection bounds,
+    where out-of-bounds indices wrap around the equave. It automatically sorts degrees
+    and removes duplicates, making it suitable for scales and chords that represent
+    pitch classes within an equave.
+    
+    Args:
+        degrees: List of intervals as ratios, decimals, or numbers
+        equave: The interval of equivalence, defaults to "2/1" (octave)
+        remove_equave: Whether to remove the equave from degrees (True for scales, False for chords)
+        
+    Examples:
+        >>> ecc = EquaveCyclicPitchCollection(["5/4", "1/1", "3/2"])
+        >>> ecc.degrees  # Automatically sorted
+        [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
+        
+        >>> ecc[3]  # Equave displacement
+        Fraction(2, 1)
+        
+        >>> ecc[-1]  # Negative indexing
+        Fraction(3, 4)
     """
     
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
-                 equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
+                 equave: Optional[Union[float, Fraction, int, str]] = "2/1",
+                 remove_equave: bool = True):
+        if degrees:
+            converted = [self._convert_value(i) for i in degrees]
+            is_float = any(isinstance(i, float) for i in converted)
+            equave_val = self._convert_value(equave if equave is not None else "2/1")
+            
+            if is_float:
+                converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
+                
+                if remove_equave:
+                    equave_cents = float(equave_val) if isinstance(equave_val, float) else 1200.0 * np.log2(float(equave_val))
+                    reduced_degrees = [float(equave_reduce(i, equave_cents)) for i in converted]
+                else:
+                    reduced_degrees = converted
+                
+                unique_degrees = []
+                for i in reduced_degrees:
+                    if not any(abs(i - j) < 1e-6 for j in unique_degrees):
+                        unique_degrees.append(i)
+                
+                unique_degrees.sort()
+                
+                if remove_equave:
+                    equave_cents = float(equave_val) if isinstance(equave_val, float) else 1200.0 * np.log2(float(equave_val))
+                    if unique_degrees and abs(unique_degrees[-1] - equave_cents) < 1e-6:
+                        unique_degrees.pop()
+                        
+                    if not unique_degrees or abs(unique_degrees[0]) >= 1e-6:
+                        unique_degrees.insert(0, 0.0)
+                
+                degrees = unique_degrees
+            else:
+                converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
+                
+                if remove_equave:
+                    reduced_degrees = [equave_reduce(i, equave_val) for i in converted]
+                else:
+                    reduced_degrees = converted
+                
+                unique_degrees = list(set(reduced_degrees))
+                unique_degrees.sort()
+                
+                if remove_equave:
+                    if unique_degrees and unique_degrees[-1] == equave_val:
+                        unique_degrees.pop()
+                        
+                    if not unique_degrees or unique_degrees[0] != Fraction(1, 1):
+                        unique_degrees.insert(0, Fraction(1, 1))
+                
+                degrees = unique_degrees
+                
         super().__init__(degrees, equave)
         self._calculate_value_cache = {}
     
@@ -324,9 +416,10 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
         self._calculate_value_cache[cache_key] = result
         return result
     
-    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, List[IntervalType]]:
+    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
         if hasattr(index, '__iter__') and not isinstance(index, str):
-            return [self[int(i) if not isinstance(i, int) else i] for i in index]
+            selected_degrees = [self[int(i) if not isinstance(i, int) else i] for i in index]
+            return PitchCollection(selected_degrees, self._equave)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer or a sequence of integers")
@@ -347,7 +440,6 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
         
         size = len(self._degrees)
         
-        # First check for exact matches in the base collection
         if self.interval_type == float:
             for i, degree in enumerate(self._degrees):
                 if abs(degree - target_value) < 1e-6:
@@ -362,7 +454,6 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
             except ValueError:
                 pass
         
-        # Then check for equave-displaced matches
         if self.interval_type == float:
             equave_cents = 1200.0 if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
             reduced_value = target_value % equave_cents
@@ -402,6 +493,30 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
 
 
 class AddressedPitchCollection:
+    """
+    A pitch collection bound to a specific reference pitch.
+    
+    AddressedPitchCollection wraps any PitchCollection with a reference pitch,
+    allowing access to actual Pitch objects rather than abstract intervals.
+    This enables working with concrete frequencies and pitch names.
+    
+    Args:
+        collection: The underlying PitchCollection
+        reference_pitch: The pitch that corresponds to the collection's reference interval
+        
+    Examples:
+        >>> from klotho.tonos import Scale, Pitch
+        >>> scale = Scale(["1/1", "9/8", "5/4"])
+        >>> addressed = scale.root("C4")
+        >>> addressed[0]
+        C4
+        >>> addressed[1] 
+        D4
+        
+        >>> addressed[[0, 1, 2]]  # Returns AddressedPitchCollection
+        AddressedPitchCollection([C4, D4, E4], equave=2)
+    """
+    
     def __init__(self, collection: PitchCollection, reference_pitch: 'Pitch'):
         self.collection = collection
         self.reference_pitch = reference_pitch
@@ -415,17 +530,30 @@ class AddressedPitchCollection:
         else:
             return Pitch.from_freq(self.reference_pitch.freq * float(interval), partial=interval)
     
-    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union['Pitch', List['Pitch']]:
+    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'AddressedPitchCollection']:
         if hasattr(index, '__iter__') and not isinstance(index, str):
-            return [self[int(i) if not isinstance(i, int) else i] for i in index]
+            selected_pitches = [self[int(i) if not isinstance(i, int) else i] for i in index]
+            selected_intervals = []
+            for pitch in selected_pitches:
+                if self.collection.interval_type == float:
+                    interval = 1200 * np.log2(pitch.freq / self.reference_pitch.freq)
+                else:
+                    interval = Fraction(pitch.freq / self.reference_pitch.freq)
+                selected_intervals.append(interval)
+            
+            new_collection = PitchCollection(selected_intervals, self.collection.equave)
+            return AddressedPitchCollection(new_collection, self.reference_pitch)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer or a sequence of integers")
         
         return self._get_pitch(index)
     
-    def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', List['Pitch']]:
+    def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', 'AddressedPitchCollection']:
         return self[index]
+    
+    def __len__(self):
+        return len(self.collection)
     
     def __getattr__(self, name):
         return getattr(self.collection, name)
