@@ -6,9 +6,53 @@ import numpy as np
 PC = TypeVar('PC', bound='Chord')
 
 class AddressedChord(AddressedPitchCollection):
+    """
+    A chord bound to a specific root pitch.
+    
+    AddressedChord provides access to the actual pitches of a chord when rooted
+    at a specific pitch, enabling work with concrete frequencies and pitch names
+    rather than abstract intervals.
+    
+    Examples:
+        >>> from klotho.tonos import Chord
+        >>> major_triad = Chord(["1/1", "5/4", "3/2"])
+        >>> c_major = major_triad.root("C4")
+        >>> c_major[0]
+        C4
+        >>> c_major[2]
+        G4
+    """
     pass
 
 class Chord(EquaveCyclicPitchCollection[IntervalType]):
+    """
+    A musical chord with automatic sorting and deduplication, preserving equave.
+    
+    Chord represents a collection of pitch intervals that form a musical chord.
+    It automatically sorts degrees and removes duplicates, but unlike Scale,
+    it preserves the equave interval when present. Chords support infinite 
+    equave displacement for accessing chord tones in different octaves.
+    
+    Args:
+        degrees: List of intervals as ratios, decimals, or numbers
+        equave: The interval of equivalence, defaults to "2/1" (octave)
+        
+    Examples:
+        >>> chord = Chord(["1/1", "5/4", "3/2"])  # Major triad
+        >>> chord.degrees
+        [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
+        
+        >>> chord[3]  # Next octave
+        Fraction(2, 1)
+        
+        >>> chord.inversion(1)  # First inversion
+        Chord([Fraction(5, 4), Fraction(3, 2), Fraction(2, 1)], equave=2)
+        
+        >>> c_major = chord.root("C4")
+        >>> c_major[0]
+        C4
+    """
+    
     def __init__(self, degrees: IntervalList = ["1/1", "5/4", "3/2"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
         super().__init__(degrees, equave, remove_equave=False)

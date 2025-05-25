@@ -3,14 +3,7 @@ import numpy as np
 from typing import Union, List, Optional, Any, Sequence, TypeVar, cast, Callable, Generic, overload, Set, Dict, Type
 from .pitch import Pitch
 from functools import lru_cache
-
-# Import equave_reduce for scale processing
-try:
-    from ..utils.interval_normalization import equave_reduce
-except ImportError:
-    # Fallback if import fails
-    def equave_reduce(interval, equave):
-        return interval
+from ..utils.interval_normalization import equave_reduce
 
 PC = TypeVar('PC', bound='PitchCollection')
 ECC = TypeVar('ECC', bound='EquaveCyclicPitchCollection')

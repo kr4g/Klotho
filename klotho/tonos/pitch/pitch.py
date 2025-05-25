@@ -5,6 +5,37 @@ import pandas as pd
 import numpy as np
 
 class Pitch:
+    """
+    A musical pitch with frequency, pitch class, octave, and partial information.
+    
+    Pitch represents a specific musical frequency with associated metadata including
+    pitch class name, octave number, cents offset from equal temperament, and 
+    partial number for harmonic series calculations.
+    
+    Args:
+        pitch_input: Pitch class name (e.g., "C", "F#") or pitch with octave (e.g., "C4", "Bb-1")
+        octave: Octave number (default 4 for middle octave)
+        cents_offset: Deviation from equal temperament in cents (default 0.0)
+        partial: Partial number for harmonic series (default 1 for fundamental)
+        
+    Examples:
+        >>> p = Pitch("C4")
+        >>> p.freq
+        261.6255653005986
+        
+        >>> p = Pitch("A", 4, 0.0)  # A4 = 440 Hz
+        >>> p.freq
+        440.0
+        
+        >>> p = Pitch("C", 4, 14.0)  # C4 + 14 cents
+        >>> p.cents_offset
+        14.0
+        
+        >>> p = Pitch.from_freq(880.0)  # Create from frequency
+        >>> str(p)
+        'A5'
+    """
+    
     def __init__(self, pitch_input=None, octave=4, cents_offset=0.0, partial=1):
         if isinstance(pitch_input, str) and len(pitch_input) >= 1:
             pitchclass = ""

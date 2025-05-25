@@ -7,9 +7,52 @@ from ..utils.interval_normalization import equave_reduce
 PC = TypeVar('PC', bound='Scale')
 
 class AddressedScale(AddressedPitchCollection):
+    """
+    A scale bound to a specific root pitch.
+    
+    AddressedScale provides access to the actual pitches of a scale when rooted
+    at a specific pitch, enabling work with concrete frequencies and pitch names
+    rather than abstract intervals.
+    
+    Examples:
+        >>> from klotho.tonos import Scale
+        >>> major = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
+        >>> c_major = major.root("C4")
+        >>> c_major[0]
+        C4
+        >>> c_major[2] 
+        E4
+    """
     pass
 
 class Scale(EquaveCyclicPitchCollection[IntervalType]):
+    """
+    A musical scale with automatic sorting, deduplication, and equave removal.
+    
+    Scale represents a collection of pitch intervals that form a musical scale.
+    It automatically sorts degrees, removes duplicates, removes the equave interval,
+    and ensures the unison (1/1) is present. Scales support infinite equave 
+    displacement for accessing pitches in different octaves.
+    
+    Args:
+        degrees: List of intervals as ratios, decimals, or numbers
+        equave: The interval of equivalence, defaults to "2/1" (octave)
+        
+    Examples:
+        >>> scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
+        >>> scale.degrees
+        [Fraction(1, 1), Fraction(9, 8), Fraction(5, 4), Fraction(4, 3), Fraction(3, 2), Fraction(5, 3), Fraction(15, 8)]
+        
+        >>> scale[7]  # Next octave
+        Fraction(2, 1)
+        
+        >>> scale.mode(1)  # Dorian mode
+        Scale([Fraction(1, 1), Fraction(10, 9), ...], equave=2)
+        
+        >>> c_major = scale.root("C4")
+        >>> c_major[0]
+        C4
+    """
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
         super().__init__(degrees, equave, remove_equave=True)
