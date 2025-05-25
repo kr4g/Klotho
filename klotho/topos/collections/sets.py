@@ -4,6 +4,8 @@ import pandas as pd
 import math
 from fractions import Fraction
 from typing import List, Tuple, Set, Dict, Any, Union
+import networkx as nx
+import sympy as sp
 
 __all__ = [
     'Operations',
@@ -268,8 +270,8 @@ class GenCol:
         
         if len(self._collection) <= 20:
             sorted_values = sorted(self._collection)
-            result += f"Values (sorted): {sorted_values}\n"
-            result += f"Steps: {self.steps}\n"
+            result += f"Values (sorted): {', '.join([str(s) for s in sorted_values])}\n"
+            result += f"Steps: {', '.join([str(s) for s in self.steps])}\n"
         
         return result
     
@@ -282,34 +284,58 @@ class GenCol:
 # ---------------------
 
 class CombinationSet:
-  '''
-  '''
-  def __init__(self, factors:tuple = ('A', 'B', 'C', 'D'), r:int = 2):
-    self._factors = tuple(sorted(factors))
-    self._r = r
-    self._combos = set(combinations(self._factors, self._r))
+    '''
+    A class representing a combination set where elements from a set of factors
+    are combined according to a specified rank parameter.
+    
+    This class generates all combinations of size r from a set of factors.
+    '''
+    def __init__(self, factors:tuple = ('A', 'B', 'C', 'D'), r:int = 2):
+        self._factors = tuple(sorted(factors))
+        self._r = r
+        self._combos = set(combinations(self._factors, self._r))
+        self._factor_aliases = {f: sp.Symbol(chr(65 + i)) for i, f in enumerate(self._factors)}
+        self._graph = self._generate_graph()
 
-  @property
-  def factors(self):
-    return self._factors
-  
-  @property
-  def rank(self):
-    return self._r
-  
-  @property
-  def combos(self):
-    return self._combos
-  
-  def __str__(self):    
-    return (        
-        f'Rank:    {self._r}\n'
-        f'Factors: {self._factors}\n'
-        f'Combos:  {self._combos}\n'
-    )
-  
-  def _repr__(self) -> str:
-    return self.__str__()
+    @property
+    def factors(self):
+        return self._factors
+    
+    @property
+    def rank(self):
+        return self._r
+    
+    @property
+    def combos(self):
+        return self._combos
+    
+    @property
+    def graph(self):
+        return self._graph
+    
+    @property
+    def factor_to_alias(self):
+        return self._factor_aliases
+    
+    @property
+    def alias_to_factor(self):
+        return {v: k for k, v in self._factor_aliases.items()}
+    
+    def _generate_graph(self):
+        G = nx.DiGraph()
+        for i, combo in enumerate(self._combos):
+            G.add_node(i, combo=combo)
+        return G
+    
+    def __str__(self):    
+        return (        
+            f'Rank:    {self._r}\n'
+            f'Factors: {self._factors}\n'
+            f'Combos:  {self._combos}\n'
+        )
+    
+    def _repr__(self) -> str:
+        return self.__str__()
 
 
 # ------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-from .utils.frequency_conversion import pitchclass_to_freq, freq_to_pitchclass
+from .utils.frequency_conversion import pitchclass_to_freq, freq_to_pitchclass, freq_to_midicents, midicents_to_freq, A4_Hz, A4_MIDI
 from .utils.harmonics import partial_to_fundamental
 
 import pandas as pd
@@ -41,6 +41,16 @@ class Pitch:
     def from_freq(cls, freq: float, partial: int = 1):
         return cls(*freq_to_pitchclass(freq), partial=partial)
     
+    @classmethod
+    def from_midi(cls, midi_note: float, partial: int = 1):
+        midicents = midi_note * 100
+        return cls.from_midicent(midicents, partial)
+    
+    @classmethod
+    def from_midicent(cls, midicent_value: float, partial: int = 1):
+        freq = midicents_to_freq(midicent_value)
+        return cls.from_freq(freq, partial)
+    
     @property
     def pitchclass(self):
         return self._data['pitchclass'].iloc[0]
@@ -60,6 +70,14 @@ class Pitch:
     @property
     def freq(self):
         return self._data['freq'].iloc[0]
+    
+    @property
+    def midicent(self):
+        return freq_to_midicents(self.freq)
+    
+    @property
+    def midi(self):
+        return self.midicent / 100
     
     @property
     def virtual_fundamental(self):

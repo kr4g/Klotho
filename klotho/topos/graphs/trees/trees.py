@@ -335,3 +335,45 @@ class Tree(Graph):
                     child_id = super().add_node(label=child)
                     self._graph.add_edge(parent_id, child_id)
     
+    @classmethod
+    def _from_graph(cls, G, clear_attributes=False, renumber=True):
+        tree = cls.__new__(cls)
+        Graph.__init__(tree, G.copy())
+        
+        if renumber:
+            tree.renumber_nodes(method='dfs')
+        
+        root_nodes = tree.root_nodes
+        if len(root_nodes) != 1:
+            raise ValueError("Graph must have exactly one root node.")
+        
+        tree._root = root_nodes[0]
+        root_label = None if clear_attributes else tree.graph.nodes[tree._root].get('label')
+        
+        def _build_children_list(node_id):
+            children = list(tree.graph.successors(node_id))
+            if not children:
+                return None if clear_attributes else tree.graph.nodes[node_id].get('label')
+            
+            result = []
+            for child_id in children:
+                child_label = None if clear_attributes else tree.graph.nodes[child_id].get('label')
+                child_tuple = _build_children_list(child_id)
+                
+                if isinstance(child_tuple, tuple):
+                    result.append((child_label, child_tuple))
+                else:
+                    result.append(child_label)
+            
+            return tuple(result) if len(result) > 1 else (result[0],)
+        
+        children = _build_children_list(tree._root)
+        tree._list = (root_label, children)
+        
+        tree._meta['depth'] = max(nx.single_source_shortest_path_length(tree.graph, tree._root).values())
+        tree._meta['k'] = max((tree.graph.out_degree(n) for n in tree.graph.nodes), default=0)
+        
+        if clear_attributes:
+            tree.clear_node_attributes()
+
+        return tree

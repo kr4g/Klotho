@@ -72,4 +72,5 @@ class Instrument(ABC):
         return self._pfields
     
     def __repr__(self):
-        return f"Instrument(name='{self._name}', freq_range={self._freq_range}, dynamic_range={self._dynamic_range}, pfields={dict(self._pfields)})"
+        # return f"Instrument(name='{self._name}', freq_range={self._freq_range}, dynamic_range={self._dynamic_range}, pfields={dict(self._pfields)})"
+        return f"Instrument(name='{self._name}', pfields={dict(self._pfields)})"

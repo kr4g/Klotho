@@ -31,14 +31,8 @@ class PitchCollection(Generic[IntervalType]):
                 if not any(abs(i - j) < 1e-6 for j in unique_degrees):
                     unique_degrees.append(i)
             converted = sorted(unique_degrees)
-            
-            if abs(converted[0]) >= 1e-6:
-                converted.insert(0, 0.0)
         else:
             converted = sorted(list(set(converted)))
-            
-            if converted[0] != Fraction(1, 1):
-                converted.insert(0, Fraction(1, 1))
         
         self._equave = self._convert_value(degrees[-1] if equave is None else equave)
         
@@ -47,17 +41,10 @@ class PitchCollection(Generic[IntervalType]):
         elif isinstance(converted[0], Fraction) and isinstance(self._equave, float):
             self._equave = Fraction.from_float(self._equave)
         
-        if ((isinstance(converted[-1], float) and isinstance(self._equave, float) and 
-             abs(converted[-1] - self._equave) < 1e-6) or
-            (isinstance(converted[-1], Fraction) and isinstance(self._equave, Fraction) and 
-             converted[-1] == self._equave)):
-            converted.pop()
-        
         self._degrees = cast(List[IntervalType], converted)
         self._intervals = self._compute_intervals()
         
         self._calculate_value_cache = {}
-        self._mode_cache = {}
             
     def _compute_intervals(self) -> List[IntervalType]:
         """Compute intervals between consecutive degrees"""
@@ -93,21 +80,21 @@ class PitchCollection(Generic[IntervalType]):
             return None
         return type(self._degrees[0])
     
-    def _convert_value(self, value: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
-        match value:
-            case float():
-                return value
-            case Fraction():
-                return value
-            case int():
-                return Fraction(value, 1)
-            case str() if '/' in value:
-                return Fraction(value)
-            case _:
-                try:
-                    return float(value)
-                except ValueError:
-                    raise ValueError(f"Cannot convert {value} to either a float or Fraction")
+    @staticmethod
+    def _convert_value(value: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
+        if isinstance(value, float):
+            return value
+        elif isinstance(value, Fraction):
+            return value
+        elif isinstance(value, int):
+            return Fraction(value, 1)
+        elif isinstance(value, str) and '/' in value:
+            return Fraction(value)
+        else:
+            try:
+                return float(value)
+            except ValueError:
+                raise ValueError(f"Cannot convert {value} to either a float or Fraction")
     
     def _get_octave_shift_and_index(self, index: int) -> tuple[int, int]:
         if not self._degrees:
@@ -161,67 +148,73 @@ class PitchCollection(Generic[IntervalType]):
         if not isinstance(other, self.__class__):
             return NotImplemented
         
-        match (self.interval_type, other.interval_type):
-            case (type1, type2) if type1 == type2:
-                if type1 == float:
-                    combined = list(self._degrees)
-                    for interval in other._degrees:
-                        if not any(abs(interval - existing) < 1e-6 for existing in combined):
-                            combined.append(interval)
-                    return self.__class__(sorted(combined), self._equave)
-                else:
-                    combined = sorted(list(set(self._degrees) | set(other._degrees)))
-                    return self.__class__(combined, self._equave)
-            case (float, _):
-                converted = self._convert_to_other_type(other)
-                return converted | other
-            case (_, float):
-                return other | self
+        type1 = self.interval_type
+        type2 = other.interval_type
+        
+        if type1 == type2:
+            if type1 == float:
+                combined = list(self._degrees)
+                for interval in other._degrees:
+                    if not any(abs(interval - existing) < 1e-6 for existing in combined):
+                        combined.append(interval)
+                return self.__class__(sorted(combined), self._equave)
+            else:
+                combined = sorted(list(set(self._degrees) | set(other._degrees)))
+                return self.__class__(combined, self._equave)
+        elif type1 == float:
+            converted = self._convert_to_other_type(other)
+            return converted | other
+        else:
+            return other | self
     
     def __and__(self: PC, other: PC) -> PC:
         if not isinstance(other, self.__class__):
             return NotImplemented
         
-        match (self.interval_type, other.interval_type):
-            case (type1, type2) if type1 == type2:
-                if type1 == float:
-                    intersection = []
-                    for interval1 in self._degrees:
-                        if any(abs(interval1 - interval2) < 1e-6 for interval2 in other._degrees):
-                            intersection.append(interval1)
-                    return self.__class__(sorted(intersection), self._equave)
-                else:
-                    intersection = sorted(list(set(self._degrees) & set(other._degrees)))
-                    return self.__class__(intersection, self._equave)
-            case (float, _):
-                converted = self._convert_to_other_type(other)
-                return converted & other
-            case (_, float):
-                return other & self
+        type1 = self.interval_type
+        type2 = other.interval_type
+        
+        if type1 == type2:
+            if type1 == float:
+                intersection = []
+                for interval1 in self._degrees:
+                    if any(abs(interval1 - interval2) < 1e-6 for interval2 in other._degrees):
+                        intersection.append(interval1)
+                return self.__class__(sorted(intersection), self._equave)
+            else:
+                intersection = sorted(list(set(self._degrees) & set(other._degrees)))
+                return self.__class__(intersection, self._equave)
+        elif type1 == float:
+            converted = self._convert_to_other_type(other)
+            return converted & other
+        else:
+            return other & self
     
     def __xor__(self: PC, other: PC) -> PC:
         if not isinstance(other, self.__class__):
             return NotImplemented
         
-        match (self.interval_type, other.interval_type):
-            case (type1, type2) if type1 == type2:
-                if type1 == float:
-                    difference = []
-                    for interval1 in self._degrees:
-                        if not any(abs(interval1 - interval2) < 1e-6 for interval2 in other._degrees):
-                            difference.append(interval1)
-                    for interval2 in other._degrees:
-                        if not any(abs(interval2 - interval1) < 1e-6 for interval1 in self._degrees):
-                            difference.append(interval2)
-                    return self.__class__(sorted(difference), self._equave)
-                else:
-                    difference = sorted(list(set(self._degrees) ^ set(other._degrees)))
-                    return self.__class__(difference, self._equave)
-            case (float, _):
-                converted = self._convert_to_other_type(other)
-                return converted ^ other
-            case (_, float):
-                return other ^ self
+        type1 = self.interval_type
+        type2 = other.interval_type
+        
+        if type1 == type2:
+            if type1 == float:
+                difference = []
+                for interval1 in self._degrees:
+                    if not any(abs(interval1 - interval2) < 1e-6 for interval2 in other._degrees):
+                        difference.append(interval1)
+                for interval2 in other._degrees:
+                    if not any(abs(interval2 - interval1) < 1e-6 for interval1 in self._degrees):
+                        difference.append(interval2)
+                return self.__class__(sorted(difference), self._equave)
+            else:
+                difference = sorted(list(set(self._degrees) ^ set(other._degrees)))
+                return self.__class__(difference, self._equave)
+        elif type1 == float:
+            converted = self._convert_to_other_type(other)
+            return converted ^ other
+        else:
+            return other ^ self
     
     def _convert_to_other_type(self: PC, other: PC) -> PC:
         result = self.__class__.__new__(self.__class__)
@@ -235,73 +228,49 @@ class PitchCollection(Generic[IntervalType]):
             result._degrees = converted
             result._equave = Fraction(2, 1) if isinstance(other._equave, Fraction) else other._equave
             
-        # Initialize the intervals as well
         result._intervals = []
         if hasattr(result, '_compute_intervals'):
             result._intervals = result._compute_intervals()
         result._calculate_value_cache = {}
-        result._mode_cache = {}
             
         return cast(PC, result)
-    
-    def mode(self: PC, mode_number: int) -> PC:
-        if mode_number in self._mode_cache:
-            return self._mode_cache[mode_number]
-            
-        if mode_number == 0:
-            return self
-            
-        size = len(self._degrees)
-        if size == 0:
-            return self.__class__([], self._equave)
-        
-        start_index = mode_number % size
-        if start_index < 0:
-            start_index += size
-        
-        first_degree = self._degrees[start_index]
-        modal_degrees = []
-        
-        if self.interval_type == float:
-            for i in range(size):
-                current_idx = (start_index + i) % size
-                
-                if i == 0:
-                    modal_degrees.append(0.0)
-                else:
-                    interval = self._degrees[current_idx] - first_degree
-                    if current_idx < start_index:
-                        equave_value = self._equave if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
-                        interval += equave_value
-                    modal_degrees.append(interval)
-        else:
-            for i in range(size):
-                current_idx = (start_index + i) % size
-                
-                if i == 0:
-                    modal_degrees.append(Fraction(1, 1))
-                else:
-                    interval = self._degrees[current_idx] / first_degree
-                    if current_idx < start_index:
-                        equave_value = self._equave if isinstance(self._equave, Fraction) else Fraction.from_float(2 ** (self._equave / 1200))
-                        interval *= equave_value
-                    modal_degrees.append(interval)
-        
-        result = self.__class__(modal_degrees, self._equave)
-        self._mode_cache[mode_number] = result
-        return result
     
     def __len__(self):
         return len(self._degrees)
     
-    def __mul__(self, other: 'Pitch') -> 'AddressedPitchCollection':
-        cache_key = (id(self), id(other))
+    def root(self, pitch: Union[Pitch, str]) -> 'AddressedPitchCollection':
+        """Create an addressed pitch collection with the given root pitch"""
+        if isinstance(pitch, str):
+            pitch = Pitch(pitch)
+            
+        cache_key = (id(self), id(pitch))
         if cache_key not in _addressed_collection_cache:
-            _addressed_collection_cache[cache_key] = AddressedPitchCollection(self, other)
+            _addressed_collection_cache[cache_key] = AddressedPitchCollection(self, pitch)
         return _addressed_collection_cache[cache_key]
     
-    def __rmul__(self, other: 'Pitch') -> 'AddressedPitchCollection':
-        return self.__mul__(other)
+    @classmethod
+    def from_intervals(cls, intervals: IntervalList) -> PC:
+        """Create a pitch collection from a list of intervals"""
+        if not intervals:
+            return cls()
+            
+        is_cents = any('.' in str(i) for i in intervals if isinstance(i, (str, float)))
+        
+        degrees = []
+        if is_cents:
+            current = 0.0
+            degrees = [current]
+            for interval in intervals:
+                current += float(interval)
+                degrees.append(current)
+        else:
+            current = Fraction(1, 1)
+            degrees = [current]
+            for interval in intervals:
+                current *= Fraction(interval)
+                degrees.append(current)
+                
+        return cls(degrees)
     
     def __invert__(self: PC) -> PC:
         raise NotImplementedError("Subclasses must implement __invert__")
@@ -347,10 +316,10 @@ class AddressedPitchCollection:
         pitches = []
         for i in range(size):
             pitch = self[i]
-            if pitch.cents_offset != 0.0:
+            if abs(pitch.cents_offset) > 0.1:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave} ({pitch.cents_offset:+.1f}¢)")
             else:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave}")
         
         pitches_str = ', '.join(pitches)
-        return f"{self.__class__.__name__}([{pitches_str}])" 
+        return f"{self.__class__.__name__}([{pitches_str}], equave={self.collection.equave})" 

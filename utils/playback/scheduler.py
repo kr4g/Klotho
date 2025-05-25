@@ -241,6 +241,15 @@ class Scheduler:
         heapq.heappush(self.events, (start, priority, uid, self.event_counter, event))
         self.event_counter += 1
         self.total_events += 1
+    
+    def free_node(self, uid: str):
+        event = {
+            "type": "free",
+            "id": uid
+        }
+        heapq.heappush(self.events, (0, 0, uid, self.event_counter, event))
+        self.event_counter += 1
+        self.total_events += 1
         
     def clear_events(self):
         self.events = []

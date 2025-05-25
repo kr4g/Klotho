@@ -21,10 +21,14 @@ from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence,
 
 from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 
+from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
+
 __all__ = [
     'topos', 'chronos', 'tonos', 'aikous', 'skora',
     'Pitch', 'Scale', 'Chord', 
-    'AddressedScale', 'AddressedChord'
+    'AddressedScale', 'AddressedChord',
+    'frequency', 'cent', 'midicent', 'midi',
+    'amplitude', 'decibel', 'onset', 'duration'
 ]
 
 __version__ = '2.1.0'

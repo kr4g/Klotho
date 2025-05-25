@@ -10,9 +10,14 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from typing import List, Union, Dict, Optional
+import math
+
+from klotho.tonos.systems.combination_product_sets import CombinationProductSet
+from klotho.tonos.systems.combination_product_sets.cps import MASTER_SETS
 
 __all__ = [
-    'plot_tree', 'plot_ratios', 'plot_graph', 'plot_ut', 'plot_rt', 'plot_curve', 'plot_timeline'
+    'plot_tree', 'plot_ratios', 'plot_graph', 'plot_ut', 'plot_rt', 'plot_curve', 
+    'plot_timeline', 'plot_cps'
 ]
 
 def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
@@ -822,4 +827,178 @@ def _assign_tracks(units: List[TemporalUnit]) -> Dict[int, int]:
         tracks[idx] = track_idx
         
     return tracks
+
+def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
+             node_size: int = 30, text_size: int = 12, show_labels: bool = True,
+             title: str = None, output_file: str = None) -> go.Figure:
+    """
+    Plot a Combination Product Set as an interactive network diagram based on its master set.
+    
+    Args:
+        cps: CombinationProductSet instance to visualize
+        figsize: Size of the figure as (width, height) in inches
+        node_size: Size of the nodes in the plot
+        show_labels: Whether to show labels on the nodes
+        title: Title for the plot (default is derived from CPS if None)
+        output_file: Path to save the figure (if None, display instead)
+        
+    Returns:
+        Plotly figure object that can be displayed or further customized
+    """
+    master_set_name = cps.master_set
+    if not master_set_name or master_set_name not in MASTER_SETS:
+        raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
+    
+    relationship_angles = MASTER_SETS[master_set_name]
+    G = cps.graph
+    
+    combo_to_node = {}
+    node_to_combo = {}
+    for node, attrs in G.nodes(data=True):
+        if 'combo' in attrs:
+            combo = attrs['combo']
+            combo_to_node[combo] = node
+            node_to_combo[node] = combo
+    
+    node_relationships = {}
+    for u, v, data in G.edges(data=True):
+        if 'relation' in data:
+            if u not in node_relationships:
+                node_relationships[u] = []
+            relation_str = str(data['relation'])
+            node_relationships[u].append((v, relation_str))
+    
+        node_positions = {}
+    
+    # Get all strongly connected components
+    components = list(nx.strongly_connected_components(G))
+    
+    # Run the BFS placement algorithm on each component
+    for component in components:
+        # Pick an arbitrary starting node from this component
+        start_node = next(iter(component))
+        component_positions = {start_node: (0, 0)}
+        
+        placed_nodes = set([start_node])
+        to_visit = [start_node]
+        
+        while to_visit:
+            current_node = to_visit.pop(0)
+            
+            if current_node in node_relationships:
+                for neighbor_node, relation in node_relationships[current_node]:
+                    if neighbor_node not in placed_nodes and neighbor_node in component:
+                        for sym_rel, rel_data in relationship_angles.items():
+                            if str(sym_rel) == relation:
+                                current_pos = component_positions[current_node]
+                                distance = rel_data['distance']
+                                angle = rel_data['angle']
+                                
+                                x = current_pos[0] + distance * math.cos(angle)
+                                y = current_pos[1] + distance * math.sin(angle)
+                                
+                                component_positions[neighbor_node] = (x, y)
+                                placed_nodes.add(neighbor_node)
+                                to_visit.append(neighbor_node)
+                                break
+        
+        # Center this component around the origin
+        if component_positions:
+            center_x = sum(x for x, y in component_positions.values()) / len(component_positions)
+            center_y = sum(y for x, y in component_positions.values()) / len(component_positions)
+            
+            for node in component_positions:
+                x, y = component_positions[node]
+                component_positions[node] = (x - center_x, y - center_y)
+        
+        # Add this component's centered positions to the overall positions
+        node_positions.update(component_positions)
+    
+    fig = go.Figure()
+    
+    for u, v, data in G.edges(data=True):
+        if u in node_positions and v in node_positions:
+            x1, y1 = node_positions[u]
+            x2, y2 = node_positions[v]
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color='white', width=1),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+    
+    node_x, node_y = [], []
+    node_text, hover_data = [], []
+    
+    for node, attrs in G.nodes(data=True):
+        if node in node_positions and 'combo' in attrs:
+            x, y = node_positions[node]
+            node_x.append(x)
+            node_y.append(y)
+            
+            combo = attrs['combo']
+            label = ''.join(str(cps.factor_to_alias[f]).strip('()') for f in combo)
+            node_text.append(label)
+            
+            combo_str = str(combo).replace(',)', ')')
+            product = attrs['product']
+            ratio = attrs['ratio']
+            
+            hover_info = f"Combo: {combo_str}<br>Product: {product}<br>Ratio: {ratio}"
+            hover_data.append(hover_info)
+    
+    fig.add_trace(
+        go.Scatter(
+            x=node_x, y=node_y,
+            mode='markers+text' if show_labels else 'markers',
+            marker=dict(
+                size=node_size,
+                color='white',
+                line=dict(color='white', width=2)
+            ),
+            text=node_text,
+            textposition='middle center',
+            textfont=dict(color='black', size=text_size, family='Arial Black', weight='bold'),
+            hovertemplate='%{customdata}<extra></extra>',
+            customdata=hover_data,
+            showlegend=False
+        )
+    )
+    
+    if title is None:
+        cps_type = type(cps).__name__
+        factor_string = ', '.join(str(f) for f in cps.factors)
+        title = f"{cps_type} [{factor_string}]"
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        xaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[min(node_x)-1, max(node_x)+1]
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            scaleanchor="x", scaleratio=1,
+            range=[min(node_y)-1, max(node_y)+1]
+        ),
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0),
+    )
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
 

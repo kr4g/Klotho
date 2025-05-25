@@ -1,4 +1,4 @@
-from .cps import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Diamond
+from .cps import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany,Diamond
 from .combination_product_networks import CombinationProductNetwork
 
 __all__ = [
@@ -7,6 +7,7 @@ __all__ = [
     'Dekany',
     'Pentadekany',
     'Eikosany',
+    'Hebdomekontany',
     'Diamond',
     'CombinationProductNetwork'
 ]
