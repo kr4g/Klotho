@@ -125,6 +125,10 @@ class PitchCollection(Generic[IntervalType]):
             
         return self._degrees[index]
     
+    def __iter__(self):
+        """Iterate over the base degrees only"""
+        return iter(self._degrees)
+    
     def __or__(self: PC, other: PC) -> PC:
         if not isinstance(other, self.__class__):
             return NotImplemented
@@ -511,31 +515,41 @@ class AddressedPitchCollection:
     """
     
     def __init__(self, collection: PitchCollection, reference_pitch: 'Pitch'):
-        self.collection = collection
-        self.reference_pitch = reference_pitch
+        self._collection = collection
+        self._reference_pitch = reference_pitch
         self._get_pitch = lru_cache(maxsize=128)(self._calculate_pitch)
     
+    @property
+    def reference_pitch(self) -> 'Pitch':
+        """The reference pitch for this addressed collection"""
+        return self._reference_pitch
+    
+    @property
+    def degrees(self) -> List['Pitch']:
+        """Returns the degrees as Pitch instances"""
+        return [self[i] for i in range(len(self._collection))]
+    
     def _calculate_pitch(self, index: int) -> 'Pitch':
-        interval = self.collection[index]
+        interval = self._collection[index]
         
-        if self.collection.interval_type == float:
-            return Pitch.from_freq(self.reference_pitch.freq * (2**(float(interval)/1200)))
+        if self._collection.interval_type == float:
+            return Pitch.from_freq(self._reference_pitch.freq * (2**(float(interval)/1200)))
         else:
-            return Pitch.from_freq(self.reference_pitch.freq * float(interval), partial=interval)
+            return Pitch.from_freq(self._reference_pitch.freq * float(interval), partial=interval)
     
     def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'AddressedPitchCollection']:
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_pitches = [self[int(i) if not isinstance(i, int) else i] for i in index]
             selected_intervals = []
             for pitch in selected_pitches:
-                if self.collection.interval_type == float:
-                    interval = 1200 * np.log2(pitch.freq / self.reference_pitch.freq)
+                if self._collection.interval_type == float:
+                    interval = 1200 * np.log2(pitch.freq / self._reference_pitch.freq)
                 else:
-                    interval = Fraction(pitch.freq / self.reference_pitch.freq)
+                    interval = Fraction(pitch.freq / self._reference_pitch.freq)
                 selected_intervals.append(interval)
             
-            new_collection = PitchCollection(selected_intervals, self.collection.equave)
-            return AddressedPitchCollection(new_collection, self.reference_pitch)
+            new_collection = PitchCollection(selected_intervals, self._collection.equave)
+            return AddressedPitchCollection(new_collection, self._reference_pitch)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer or a sequence of integers")
@@ -546,13 +560,18 @@ class AddressedPitchCollection:
         return self[index]
     
     def __len__(self):
-        return len(self.collection)
+        return len(self._collection)
+    
+    def __iter__(self):
+        """Iterate over the base degrees as Pitch instances"""
+        for i in range(len(self._collection)):
+            yield self[i]
     
     def __getattr__(self, name):
-        return getattr(self.collection, name)
+        return getattr(self._collection, name)
     
     def __repr__(self):
-        size = len(self.collection)
+        size = len(self._collection)
         pitches = []
         for i in range(size):
             pitch = self[i]
@@ -562,4 +581,4 @@ class AddressedPitchCollection:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave}")
         
         pitches_str = ', '.join(pitches)
-        return f"{self.__class__.__name__}([{pitches_str}], equave={self.collection.equave})"
+        return f"{self.__class__.__name__}([{pitches_str}], equave={self._collection.equave})"

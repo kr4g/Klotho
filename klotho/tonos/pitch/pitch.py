@@ -157,16 +157,17 @@ class Pitch:
             raise TypeError("Can only calculate cents difference with another Pitch")
         return 1200 * np.log2(self.freq / other.freq)
         
-    def __str__(self):
-        return f'{self.pitchclass}{self.octave}'
-    
     def __repr__(self):
-        display_df = self._data.copy()
-        display_df['freq'] = display_df['freq'].round(2)
-        display_df['cents_offset'] = display_df['cents_offset'].round(2)
+        return self.__str__()
+    
+    def __str__(self):
+        pitch_name = f"{self.pitchclass}{self.octave}"
         
-        df_str = str(display_df)
-        width = max(len(line) for line in df_str.split('\n'))
-        border = '-' * width
+        if abs(self.cents_offset) > 1e-6:
+            cents_str = f" ({self.cents_offset:+.2f}¢)"
+        else:
+            cents_str = ""
+            
+        freq_str = f"{self.freq:.2f} Hz"
         
-        return f"{border}\n{df_str}\n{border}\n" 
+        return f"Pitch({pitch_name}{cents_str}, {freq_str})" 
