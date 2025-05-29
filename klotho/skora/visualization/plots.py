@@ -185,7 +185,7 @@ def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[fl
     else:
         plt.show()
 
-def plot_ratios(ratios, output_file=None):
+def plot_ratios(ratios, figsize=(25, 1), output_file=None):
     """
     Plot ratios as horizontal bars with thin white borders.
     
@@ -193,7 +193,7 @@ def plot_ratios(ratios, output_file=None):
         ratios: List of ratios (positive for white segments, negative for grey "rests")
         output_file: Path to save the plot (if None, displays plot)
     """
-    plt.figure(figsize=(25, 1))
+    plt.figure(figsize=figsize)
     ax = plt.gca()
     
     ax.set_facecolor('black')
@@ -965,7 +965,8 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
     if title is None:
         cps_type = type(cps).__name__
-        factor_string = ', '.join(str(f) for f in cps.factors)
+        # factor_string = ', '.join(str(f) for f in cps.factors)
+        factor_string = ' '.join(str(cps.factor_to_alias[f]) for f in cps.factors)
         title = f"{cps_type} [{factor_string}]"
     
     width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)

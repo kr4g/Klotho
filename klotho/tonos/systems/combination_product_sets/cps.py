@@ -6,6 +6,7 @@ import pandas as pd
 import sympy as sp
 import math
 import networkx as nx
+from tabulate import tabulate
 
 from klotho.topos.collections import CombinationSet as CS
 from klotho.tonos.utils.interval_normalization import equave_reduce
@@ -297,11 +298,10 @@ class CombinationProductSet(CS, ABC):
     return df, sorted_products, sorted_ratios
 
   def __str__(self):
-    ratios = ', '.join(str(ratio) for ratio in self.ratios)
-    return super().__str__() + (
-      f'Products: {self.products}\n'
-      f'Ratios:   {ratios}\n'
-    )
+    table_data = []
+    for combo, product, ratio in zip(self._combos, self._products, self._ratios):
+      table_data.append([combo, product, str(ratio)])
+    return tabulate(table_data, headers=['Combo', 'Product', 'Ratio'], tablefmt='simple', colalign=('center', 'center', 'center'))
   
   def __repr__(self):
     return self.__str__()
