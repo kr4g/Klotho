@@ -381,7 +381,7 @@ class Hebdomekontany(CombinationProductSet):
   
   see: https://en.xen.wiki/w/Hebdomekontany
   '''
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11, 13, 15), normalized:bool = False):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11, 13, 17), normalized:bool = False):
     if len(factors) != 8:
       raise ValueError('Hebdomekontany must have exactly 8 factors.')
     super().__init__(factors, r=4, normalized=normalized, master_set='ogdoad')
