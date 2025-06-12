@@ -87,3 +87,7 @@ docs/_build/
 *.json
 *.zip
 *.ly
+
+# Build and deployment scripts
+build_and_upload.sh
+build_and_upload_test.sh
