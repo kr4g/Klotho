@@ -22,14 +22,19 @@ from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence,
 
 from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 
+from .skora.visualization.plots import plot_tree, plot_rt, plot_ratios, plot_curve, plot_cps, plot_graph
+
 from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
 
+from .utils.playback.player import play, pause, stop, sync
+
 __all__ = [
-    'topos', 'chronos', 'tonos', 'aikous', 'skora',
+    'topos', 'chronos', 'tonos', 'aikous', 'skora', 'utils',
     'Pitch', 'Scale', 'Chord', 
     'AddressedScale', 'AddressedChord',
     'frequency', 'cent', 'midicent', 'midi',
-    'amplitude', 'decibel', 'onset', 'duration'
+    'amplitude', 'decibel', 'onset', 'duration',
+    'play', 'pause', 'stop', 'sync'
 ]
 
-__version__ = '2.1.0'
+__version__ = '2.2.1'

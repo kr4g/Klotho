@@ -23,7 +23,8 @@ setup(
         'networkx',
         'hypernetx',
         'scipy',
-        'python-osc'
+        'python-osc',
+        'abjad'
     ],
     # tests_require=[
     #     'pytest',
