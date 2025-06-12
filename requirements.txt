@@ -3,14 +3,8 @@ numpy
 sympy
 regex
 matplotlib
-ipywidgets
-IPython
 tabulate
 networkx
 hypernetx
-python-osc
-opencv-python
-tqdm
-requests
-jupyter
 scipy
+python-osc

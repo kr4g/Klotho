@@ -112,13 +112,19 @@ class PitchCollection(Generic[IntervalType]):
             except ValueError:
                 raise ValueError(f"Cannot convert {value} to either a float or Fraction")
     
-    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
+    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(self._degrees))
+            indices = list(range(start, stop, step))
+            selected_degrees = [self._degrees[i] for i in indices]
+            return PitchCollection(selected_degrees, self._equave)
+            
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_degrees = [self[int(i) if not isinstance(i, int) else i] for i in index]
             return PitchCollection(selected_degrees, self._equave)
         
         if not isinstance(index, int):
-            raise TypeError("Index must be an integer or a sequence of integers")
+            raise TypeError("Index must be an integer, slice, or sequence of integers")
         
         if index < 0 or index >= len(self._degrees):
             raise IndexError("Index out of range")
@@ -413,13 +419,29 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
         self._calculate_value_cache[cache_key] = result
         return result
     
-    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
+    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
+        if isinstance(index, slice):
+            size = len(self._degrees)
+            if size == 0:
+                return PitchCollection([], self._equave)
+                
+            start, stop, step = index.indices(size)
+            
+            if index.stop is None or (index.stop is not None and abs(index.stop) <= size):
+                indices = list(range(start, stop, step))
+                selected_degrees = [self._degrees[i] for i in indices]
+                return PitchCollection(selected_degrees, self._equave)
+            else:
+                indices = list(range(index.start or 0, index.stop, step))
+                selected_degrees = [self[i] for i in indices]
+                return PitchCollection(selected_degrees, self._equave)
+            
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_degrees = [self[int(i) if not isinstance(i, int) else i] for i in index]
             return PitchCollection(selected_degrees, self._equave)
         
         if not isinstance(index, int):
-            raise TypeError("Index must be an integer or a sequence of integers")
+            raise TypeError("Index must be an integer, slice, or sequence of integers")
         
         octave_shift, wrapped_index = self._get_octave_shift_and_index(index)
         return self._calculate_value(octave_shift, wrapped_index)
@@ -537,7 +559,11 @@ class AddressedPitchCollection:
         else:
             return Pitch.from_freq(self._reference_pitch.freq * float(interval), partial=interval)
     
-    def __getitem__(self, index: Union[int, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'AddressedPitchCollection']:
+    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'AddressedPitchCollection']:
+        if isinstance(index, slice):
+            interval_collection = self._collection[index]
+            return AddressedPitchCollection(interval_collection, self._reference_pitch)
+            
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_pitches = [self[int(i) if not isinstance(i, int) else i] for i in index]
             selected_intervals = []
@@ -552,7 +578,7 @@ class AddressedPitchCollection:
             return AddressedPitchCollection(new_collection, self._reference_pitch)
         
         if not isinstance(index, int):
-            raise TypeError("Index must be an integer or a sequence of integers")
+            raise TypeError("Index must be an integer, slice, or sequence of integers")
         
         return self._get_pitch(index)
     

@@ -1,4 +1,4 @@
-from utils.algorithms.factors import to_factors
+from klotho.utils.algorithms.factors import to_factors
 from typing import Union, List, Tuple, Dict, Set
 from collections import namedtuple
 from fractions import Fraction
@@ -9,7 +9,7 @@ import pandas as pd
 A4_Hz   = 440.0
 A4_MIDI = 69
 
-from utils.data_structures.enums import DirectValueEnumMeta, Enum  
+from klotho.utils.data_structures.enums import DirectValueEnumMeta, Enum  
 
 __all__ = [
     'equave_reduce',

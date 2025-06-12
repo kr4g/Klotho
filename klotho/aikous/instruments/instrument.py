@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from klotho.aikous.expression.dynamics import Dynamic, DynamicRange
 from klotho.tonos.pitch import Pitch
-from utils.data_structures.dictionaries import SafeDict
+from klotho.utils.data_structures.dictionaries import SafeDict
 from typing import List, Dict, TypeVar, Union
 
 class Instrument(ABC):

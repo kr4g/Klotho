@@ -1,5 +1,5 @@
 from enum import Enum
-from utils.data_structures.dictionaries import SafeDict
+from klotho.utils.data_structures.dictionaries import SafeDict
 
 class PFIELDS(Enum):
     def __call__(self):

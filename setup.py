@@ -8,7 +8,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='klotho',
+    name='klotho-cac',
     version=version,
     author='Ryan Millett',
     author_email='rmillett@mat.ucsb.edu',
@@ -16,20 +16,14 @@ setup(
     install_requires=[
         'pandas',
         'numpy',
+        'sympy',
         'regex',
         'matplotlib',
-        'ipywidgets',
-        'IPython',
         'tabulate',
-        'sympy',
         'networkx',
         'hypernetx',
-        'python-osc',
-        'opencv-python',
-        'tqdm',
-        'requests',
-        'jupyter',
-        'scipy'
+        'scipy',
+        'python-osc'
     ],
     # tests_require=[
     #     'pytest',
@@ -41,10 +35,13 @@ setup(
     license='CC-BY-SA-4.0',
     classifiers=[
         'Development Status :: 3 - Alpha',
-        'License :: OSI Approved :: Creative Commons License',
+        'License :: Other/Proprietary License',
+        'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3 :: Only',
+        'Topic :: Multimedia :: Sound/Audio',
+        'Topic :: Artistic Software',
     ],
     python_requires='>=3.10',
 )

@@ -7,6 +7,14 @@
 
 Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
 
+### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install klotho-cac
+```
+
+### Option 2: Install from Source
+
 1. **Clone the Repository**:
 
    First, clone the Klotho repository by running the following command in your terminal or command prompt:
@@ -21,9 +29,15 @@ Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python in
     cd Klotho/
     ```
 
-3. **Install Dependencies**:
+3. **Install in Development Mode**:
 
-    Install the required dependencies by running:
+    Install Klotho in development mode (recommended for development):
+    
+    ```
+    pip install -e .
+    ```
+    
+    Or install the required dependencies separately:
     
     ```
     pip install -r requirements.txt

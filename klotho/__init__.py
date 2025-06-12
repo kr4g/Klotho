@@ -13,6 +13,7 @@ from . import chronos
 from . import tonos
 from . import aikous
 from . import skora
+from . import utils
 
 from .topos.collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
 from .topos.graphs import trees, networks, fields, Tree, Network, Field, Graph

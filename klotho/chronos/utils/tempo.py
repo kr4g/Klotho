@@ -1,6 +1,6 @@
 from typing import Union
 from fractions import Fraction
-from utils.data_structures.enums import MinMaxEnum
+from klotho.utils.data_structures.enums import MinMaxEnum
 
 __all__ = [
     'TEMPO',

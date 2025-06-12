@@ -1,4 +1,4 @@
-from utils.data_structures.enums import DirectValueEnumMeta, Enum
+from klotho.utils.data_structures.enums import DirectValueEnumMeta, Enum
 from collections import namedtuple
 import numpy as np
 from enum import member

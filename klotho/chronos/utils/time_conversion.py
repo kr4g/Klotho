@@ -2,7 +2,7 @@ from typing import Union
 import numpy as np
 from fractions import Fraction
 from itertools import accumulate
-from utils.data_structures.enums import MinMaxEnum
+from klotho.utils.data_structures.enums import MinMaxEnum
 
 __all__ = [
     'seconds_to_hmsms',
