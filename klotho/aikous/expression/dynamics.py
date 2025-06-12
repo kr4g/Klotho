@@ -22,8 +22,13 @@ __all__ = [
 DYNAMIC_MARKINGS = ('ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff')
 
 class Dynamic:
-    def __init__(self, db_value):
+    def __init__(self, marking, db_value):
+        self._marking = marking
         self._db_value = db_value
+    
+    @property
+    def marking(self):
+        return self._marking
     
     @property
     def db(self):
@@ -37,7 +42,7 @@ class Dynamic:
         return float(self._db_value)
     
     def __repr__(self):
-        return f"Dynamic(db={self._db_value:.2f}, amp={self.amp:.4f})"
+        return f"Dynamic(marking='{self._marking}', db={self._db_value:.2f}, amp={self.amp:.4f})"
 
 
 class DynamicRange:
@@ -63,20 +68,20 @@ class DynamicRange:
 
   see https://en.wikipedia.org/wiki/Dynamics_(music)#
   '''
-  def __init__(self, min_dynamic=-60, max_dynamic=0, curve=0, dynamics=DYNAMIC_MARKINGS):
-    self._min_dynamic = min_dynamic if isinstance(min_dynamic, Dynamic) else Dynamic(min_dynamic)
-    self._max_dynamic = max_dynamic if isinstance(max_dynamic, Dynamic) else Dynamic(max_dynamic)
+  def __init__(self, min_dynamic=-60, max_dynamic=-3, curve=0, dynamics=DYNAMIC_MARKINGS):
+    self._min_db = min_dynamic
+    self._max_db = max_dynamic
     self._curve = curve
     self._dynamics = dynamics
     self._range = self._calculate_range()
     
   @property
-  def min_dynamic(self):
-    return self._min_dynamic
+  def min_db(self):
+    return self._min_db
   
   @property
-  def max_dynamic(self):
-    return self._max_dynamic
+  def max_db(self):
+    return self._max_db
   
   @property
   def curve(self):
@@ -87,8 +92,8 @@ class DynamicRange:
     return self._range
 
   def _calculate_range(self):
-    min_db = float(self._min_dynamic.db)
-    max_db = float(self._max_dynamic.db)
+    min_db = float(self._min_db)
+    max_db = float(self._max_db)
     num_dynamics = len(self._dynamics)
     
     result = {}
@@ -103,7 +108,7 @@ class DynamicRange:
             curved_pos = 1 - ((1 - normalized_pos) ** (1 - self._curve))
             
         db_value = min_db + curved_pos * (max_db - min_db)
-        result[dyn] = Dynamic(db_value)
+        result[dyn] = Dynamic(dyn, db_value)
         
     return result
 

@@ -24,7 +24,8 @@ setup(
         'hypernetx',
         'scipy',
         'python-osc',
-        'abjad'
+        'abjad',
+        'mido'
     ],
     # tests_require=[
     #     'pytest',

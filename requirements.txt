@@ -9,3 +9,4 @@ hypernetx
 scipy
 python-osc
 abjad
+mido

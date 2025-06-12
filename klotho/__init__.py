@@ -27,6 +27,7 @@ from .skora.visualization.plots import plot_tree, plot_rt, plot_ratios, plot_cur
 from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
 
 from .utils.playback.player import play, pause, stop, sync
+from .utils.playback.midi_export import midi as export_midi
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'aikous', 'skora', 'utils',
@@ -34,7 +35,7 @@ __all__ = [
     'AddressedScale', 'AddressedChord',
     'frequency', 'cent', 'midicent', 'midi',
     'amplitude', 'decibel', 'onset', 'duration',
-    'play', 'pause', 'stop', 'sync'
+    'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
-__version__ = '2.2.1'
+__version__ = '2.2.2'

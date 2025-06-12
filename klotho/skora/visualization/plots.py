@@ -185,7 +185,7 @@ def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[fl
     else:
         plt.show()
 
-def plot_ratios(ratios, figsize=(25, 1), output_file=None):
+def plot_ratios(ratios, figsize=(20, 1), output_file=None):
     """
     Plot ratios as horizontal bars with thin white borders.
     
@@ -549,6 +549,9 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
         plt.axis('off')
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
+        
+        plt.margins(x=0)
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         
         if output_file:
             plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
