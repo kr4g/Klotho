@@ -163,6 +163,7 @@ class CombinationProductSet(CS, ABC):
         combo = attrs['combo']
         product = prod(combo)
         ratio = equave_reduce(product)
+        
         if self._normalized:
           ratio = equave_reduce(ratio / max(self._factors))
         
@@ -171,8 +172,8 @@ class CombinationProductSet(CS, ABC):
           symbolic_expr *= self.factor_to_alias[factor]
         
         self._graph.nodes[node]['product'] = product
-        self._graph.nodes[node]['ratio'] = ratio
-        self._graph.nodes[node]['alias'] = symbolic_expr
+        self._graph.nodes[node]['ratio']   = ratio
+        self._graph.nodes[node]['alias']   = symbolic_expr
   
   def _build_master_set_structure(self, relationship_dict):
     """
