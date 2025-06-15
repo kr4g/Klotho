@@ -1,9 +1,7 @@
-# Klotho/klotho/tonos/pitch/__init__.py
-
 from .pitch import Pitch
 from .pitch_collections import (
     PitchCollection, 
-    EquaveCyclicPitchCollection, 
+    EquaveCyclicCollection, 
     AddressedPitchCollection,
     IntervalType,
     IntervalList,
@@ -13,7 +11,7 @@ from .pitch_collections import (
 __all__ = [
     'Pitch',
     'PitchCollection',
-    'EquaveCyclicPitchCollection', 
+    'EquaveCyclicCollection', 
     'AddressedPitchCollection',
     'IntervalType',
     'IntervalList',

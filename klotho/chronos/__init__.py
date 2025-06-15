@@ -1,4 +1,3 @@
-# Klotho/klotho/chronos/__init__.py
 """
 Chronos: A specialized module for working with time and rhythm in music.
 
@@ -14,17 +13,13 @@ from . import rhythm_trees
 from . import temporal_units
 from . import utils
 
-# Import classes
 from .rhythm_pairs import RhythmPair
 from .rhythm_trees import RhythmTree, Meas
 from .temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 
-# Import utilities directly
 from .utils.beat import *
 from .utils.tempo import *
 from .utils.time_conversion import *
-
-# Collect all __all__ values from utility modules
 from .utils.beat import __all__ as beat_all
 from .utils.tempo import __all__ as tempo_all
 from .utils.time_conversion import __all__ as time_conversion_all
@@ -45,7 +40,6 @@ __all__ = [
     'TemporalBlock',
 ]
 
-# Add utility functions to __all__
 __all__.extend(beat_all)
 __all__.extend(tempo_all)
 __all__.extend(time_conversion_all)

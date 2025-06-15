@@ -1,6 +1,6 @@
 from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union
-from ..pitch import EquaveCyclicPitchCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
+from ..pitch import EquaveCyclicCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
 import numpy as np
 
 PC = TypeVar('PC', bound='Chord')
@@ -22,9 +22,22 @@ class AddressedChord(AddressedPitchCollection):
         >>> c_major[2]
         G4
     """
-    pass
+    def _calculate_pitch(self, index: int) -> 'Pitch':
+        interval = self._collection[index]
+        
+        if len(self._collection.degrees) == 0:
+            return self._reference_pitch
+        
+        lowest_interval = self._collection.degrees[0]
+        
+        if self._collection.interval_type == float:
+            freq_ratio = 2**((interval - lowest_interval)/1200)
+            return Pitch.from_freq(self._reference_pitch.freq * freq_ratio)
+        else:
+            freq_ratio = interval / lowest_interval
+            return Pitch.from_freq(self._reference_pitch.freq * float(freq_ratio))
 
-class Chord(EquaveCyclicPitchCollection[IntervalType]):
+class Chord(EquaveCyclicCollection[IntervalType]):
     """
     A musical chord with automatic sorting and deduplication, preserving equave.
     
@@ -55,63 +68,7 @@ class Chord(EquaveCyclicPitchCollection[IntervalType]):
     
     def __init__(self, degrees: IntervalList = ["1/1", "5/4", "3/2"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
-        super().__init__(degrees, equave, remove_equave=False)
-        self._inversion_cache = {}
-    
-    def inversion(self, inversion_number: int) -> 'Chord':
-        """Create a chord inversion by moving the bottom notes to the top.
-        
-        Args:
-            inversion_number: The inversion number (0 = root position, 1 = first inversion, etc.)
-            
-        Returns:
-            A new chord with the specified inversion
-        """
-        if inversion_number in self._inversion_cache:
-            return self._inversion_cache[inversion_number]
-            
-        if inversion_number == 0:
-            return self
-            
-        size = len(self._degrees)
-        if size == 0:
-            return Chord([], self._equave)
-        
-        start_index = inversion_number % size
-        if start_index < 0:
-            start_index += size
-        
-        first_degree = self._degrees[start_index]
-        inverted_degrees = []
-        
-        if self.interval_type == float:
-            for i in range(size):
-                current_idx = (start_index + i) % size
-                
-                if i == 0:
-                    inverted_degrees.append(self._degrees[current_idx])
-                else:
-                    interval = self._degrees[current_idx] - first_degree
-                    if current_idx < start_index:
-                        equave_value = self._equave if isinstance(self._equave, float) else 1200 * np.log2(float(self._equave))
-                        interval += equave_value
-                    inverted_degrees.append(first_degree + interval)
-        else:
-            for i in range(size):
-                current_idx = (start_index + i) % size
-                
-                if i == 0:
-                    inverted_degrees.append(self._degrees[current_idx])
-                else:
-                    interval = self._degrees[current_idx] / first_degree
-                    if current_idx < start_index:
-                        equave_value = self._equave if isinstance(self._equave, Fraction) else Fraction.from_float(2 ** (self._equave / 1200))
-                        interval *= equave_value
-                    inverted_degrees.append(first_degree * interval)
-        
-        result = Chord(inverted_degrees, self._equave)
-        self._inversion_cache[inversion_number] = result
-        return result
+        super().__init__(degrees, equave)
     
     def __invert__(self: PC) -> PC:
         if len(self._degrees) <= 1:

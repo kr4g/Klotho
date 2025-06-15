@@ -6,7 +6,7 @@ from functools import lru_cache
 from ..utils.interval_normalization import equave_reduce
 
 PC = TypeVar('PC', bound='PitchCollection')
-ECC = TypeVar('ECC', bound='EquaveCyclicPitchCollection')
+ECC = TypeVar('ECC', bound='EquaveCyclicCollection')
 IntervalType = TypeVar('IntervalType', float, Fraction)
 IntervalList = Union[List[float], List[Fraction], List[int], List[str]]
 
@@ -36,32 +36,29 @@ class PitchCollection(Generic[IntervalType]):
     
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
-        self._degrees: List[IntervalType] = []
-        
+        self._equave = self._convert_value(equave if equave is not None else "2/1")
+        self._degrees = self._process_degrees(degrees)
+        self._intervals = self._compute_intervals()
+            
+    def _process_degrees(self, degrees: IntervalList) -> List[IntervalType]:
         if not degrees:
-            self._equave = self._convert_value(equave if equave is not None else "2/1")
-            return
+            return []
         
         converted = [self._convert_value(i) for i in degrees]
-        
         self._interval_type = float if any(isinstance(i, float) for i in converted) else Fraction
         
-        # Preserve order and allow duplicates - no sorting or deduplication
         if self._interval_type == float:
             converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
         else:
             converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
-        
-        self._equave = self._convert_value(equave if equave is not None else "2/1")
         
         if converted and isinstance(converted[0], float) and not isinstance(self._equave, float):
             self._equave = float(self._equave)
         elif converted and isinstance(converted[0], Fraction) and isinstance(self._equave, float):
             self._equave = Fraction.from_float(self._equave)
         
-        self._degrees = cast(List[IntervalType], converted)
-        self._intervals = self._compute_intervals()
-            
+        return cast(List[IntervalType], converted)
+    
     def _compute_intervals(self) -> List[IntervalType]:
         """Compute intervals between consecutive degrees"""
         if not self._degrees or len(self._degrees) <= 1:
@@ -112,6 +109,11 @@ class PitchCollection(Generic[IntervalType]):
             except ValueError:
                 raise ValueError(f"Cannot convert {value} to either a float or Fraction")
     
+    def _get_wrapped_index(self, index: int) -> int:
+        if not self._degrees:
+            raise IndexError("Cannot index an empty collection")
+        return index % len(self._degrees)
+    
     def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
         if isinstance(index, slice):
             start, stop, step = index.indices(len(self._degrees))
@@ -126,10 +128,8 @@ class PitchCollection(Generic[IntervalType]):
         if not isinstance(index, int):
             raise TypeError("Index must be an integer, slice, or sequence of integers")
         
-        if index < 0 or index >= len(self._degrees):
-            raise IndexError("Index out of range")
-            
-        return self._degrees[index]
+        wrapped_index = self._get_wrapped_index(index)
+        return self._degrees[wrapped_index]
     
     def __iter__(self):
         """Iterate over the base degrees only"""
@@ -299,7 +299,7 @@ class PitchCollection(Generic[IntervalType]):
         return f"{self.__class__.__name__}([{degrees_str}], equave={self._equave})"
 
 
-class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
+class EquaveCyclicCollection(PitchCollection[IntervalType]):
     """
     A pitch collection with infinite equave-displacement indexing and automatic sorting.
     
@@ -314,7 +314,7 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
         remove_equave: Whether to remove the equave from degrees (True for scales, False for chords)
         
     Examples:
-        >>> ecc = EquaveCyclicPitchCollection(["5/4", "1/1", "3/2"])
+        >>> ecc = EquaveCyclicCollection(["5/4", "1/1", "3/2"])
         >>> ecc.degrees  # Automatically sorted
         [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
         
@@ -325,61 +325,38 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
         Fraction(3, 4)
     """
     
-    def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
-                 equave: Optional[Union[float, Fraction, int, str]] = "2/1",
-                 remove_equave: bool = True):
-        if degrees:
-            converted = [self._convert_value(i) for i in degrees]
-            is_float = any(isinstance(i, float) for i in converted)
-            equave_val = self._convert_value(equave if equave is not None else "2/1")
+    def _process_degrees(self, degrees: IntervalList) -> List[IntervalType]:
+        if not degrees:
+            return []
+        
+        converted = [self._convert_value(i) for i in degrees]
+        is_float = any(isinstance(i, float) for i in converted)
+        
+        if is_float:
+            converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
+            self._interval_type = float
             
-            if is_float:
-                converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
-                
-                if remove_equave:
-                    equave_cents = float(equave_val) if isinstance(equave_val, float) else 1200.0 * np.log2(float(equave_val))
-                    reduced_degrees = [float(equave_reduce(i, equave_cents)) for i in converted]
-                else:
-                    reduced_degrees = converted
-                
-                unique_degrees = []
-                for i in reduced_degrees:
-                    if not any(abs(i - j) < 1e-6 for j in unique_degrees):
-                        unique_degrees.append(i)
-                
-                unique_degrees.sort()
-                
-                if remove_equave:
-                    equave_cents = float(equave_val) if isinstance(equave_val, float) else 1200.0 * np.log2(float(equave_val))
-                    if unique_degrees and abs(unique_degrees[-1] - equave_cents) < 1e-6:
-                        unique_degrees.pop()
-                        
-                    if not unique_degrees or abs(unique_degrees[0]) >= 1e-6:
-                        unique_degrees.insert(0, 0.0)
-                
-                degrees = unique_degrees
-            else:
-                converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
-                
-                if remove_equave:
-                    reduced_degrees = [equave_reduce(i, equave_val) for i in converted]
-                else:
-                    reduced_degrees = converted
-                
-                unique_degrees = list(set(reduced_degrees))
-                unique_degrees.sort()
-                
-                if remove_equave:
-                    if unique_degrees and unique_degrees[-1] == equave_val:
-                        unique_degrees.pop()
-                        
-                    if not unique_degrees or unique_degrees[0] != Fraction(1, 1):
-                        unique_degrees.insert(0, Fraction(1, 1))
-                
-                degrees = unique_degrees
-                
-        super().__init__(degrees, equave)
-        self._calculate_value_cache = {}
+            reduced_degrees = [float(equave_reduce(i, self._equave)) for i in converted]
+            
+            unique_degrees = []
+            for i in reduced_degrees:
+                if not any(abs(i - j) < 1e-6 for j in unique_degrees):
+                    unique_degrees.append(i)
+            
+            unique_degrees.sort()
+        else:
+            converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
+            self._interval_type = Fraction
+            
+            reduced_degrees = [equave_reduce(i, self._equave) for i in converted]
+            unique_degrees = sorted(list(set(reduced_degrees)))
+        
+        if converted and isinstance(converted[0], float) and not isinstance(self._equave, float):
+            self._equave = float(self._equave)
+        elif converted and isinstance(converted[0], Fraction) and isinstance(self._equave, float):
+            self._equave = Fraction.from_float(self._equave)
+        
+        return cast(List[IntervalType], unique_degrees)
     
     def _get_octave_shift_and_index(self, index: int) -> tuple[int, int]:
         if not self._degrees:
@@ -397,10 +374,6 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
         return octave_shift, wrapped_index
     
     def _calculate_value(self, octave_shift: int, wrapped_index: int) -> IntervalType:
-        cache_key = (octave_shift, wrapped_index)
-        if cache_key in self._calculate_value_cache:
-            return self._calculate_value_cache[cache_key]
-            
         interval = self._degrees[wrapped_index]
         
         if self.interval_type == float:
@@ -416,7 +389,6 @@ class EquaveCyclicPitchCollection(PitchCollection[IntervalType]):
             else:
                 result = cast(IntervalType, interval * (self._equave ** octave_shift))
         
-        self._calculate_value_cache[cache_key] = result
         return result
     
     def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union[IntervalType, 'PitchCollection']:
@@ -601,7 +573,7 @@ class AddressedPitchCollection:
         pitches = []
         for i in range(size):
             pitch = self[i]
-            if abs(pitch.cents_offset) > 0.1:
+            if abs(pitch.cents_offset) > 0.01:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave} ({pitch.cents_offset:+.1f}¢)")
             else:
                 pitches.append(f"{pitch.pitchclass}{pitch.octave}")

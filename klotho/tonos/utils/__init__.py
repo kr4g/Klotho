@@ -5,7 +5,6 @@ from .intervals import *
 
 __all__ = []
 
-# Import all public symbols from the utility modules
 from .interval_normalization import __all__ as interval_normalization_all
 from .frequency_conversion import __all__ as frequency_conversion_all
 from .harmonics import __all__ as harmonics_all

@@ -2,7 +2,6 @@ from abc import ABC
 from typing import Union, Dict, Tuple
 from math import prod
 from fractions import Fraction
-import pandas as pd
 import sympy as sp
 import math
 import networkx as nx
@@ -153,34 +152,27 @@ class CombinationProductSet(CS, ABC):
     super().__init__(factors, r)
     self._normalized = normalized
     self._master_set = master_set.lower() if master_set else None
-    self._mapping_df, self._products, self._ratios = self._calculate()
-    self._combo_aliases = self._create_combo_aliases()
-    self._enhance_graph()
+    self._populate_graph()
     if self._master_set and self._master_set in MASTER_SETS:
       self._build_master_set_structure(MASTER_SETS[self._master_set])
     
-  def _create_combo_aliases(self):
-    """Create symbolic aliases for each combination using the factor aliases"""
-    combo_aliases = {}
-    
-    for combo in self._combos:
-      symbolic_expr = sp.Integer(1)
-      for factor in combo:
-        symbolic_expr *= self.factor_to_alias[factor]
-      combo_aliases[combo] = symbolic_expr
-      
-    return combo_aliases
-    
-  def _enhance_graph(self):
-    """Enhance the existing graph with additional combo information."""
-    combo_to_node = {}
+  def _populate_graph(self):
+    """Populate graph nodes with combo, product, ratio, and alias information."""
     for node, attrs in self._graph.nodes(data=True):
       if 'combo' in attrs:
         combo = attrs['combo']
-        combo_to_node[combo] = node
-        self._graph.nodes[node]['alias'] = self.combo_to_alias[combo]
-        self._graph.nodes[node]['product'] = self.combo_to_product[combo]
-        self._graph.nodes[node]['ratio'] = str(self.combo_to_ratio[combo])
+        product = prod(combo)
+        ratio = equave_reduce(product)
+        if self._normalized:
+          ratio = equave_reduce(ratio / max(self._factors))
+        
+        symbolic_expr = sp.Integer(1)
+        for factor in combo:
+          symbolic_expr *= self.factor_to_alias[factor]
+        
+        self._graph.nodes[node]['product'] = product
+        self._graph.nodes[node]['ratio'] = ratio
+        self._graph.nodes[node]['alias'] = symbolic_expr
   
   def _build_master_set_structure(self, relationship_dict):
     """
@@ -203,8 +195,8 @@ class CombinationProductSet(CS, ABC):
         if c1 != c2:
           node2 = combo_to_node[c2]
           
-          alias1 = self.combo_to_alias[c1]
-          alias2 = self.combo_to_alias[c2]
+          alias1 = self.get_attrs_by('combo', c1)['alias']
+          alias2 = self.get_attrs_by('combo', c2)['alias']
           sym_ratio = sp.simplify(alias1 / alias2)
           
           if sym_ratio in relationship_dict:
@@ -219,87 +211,30 @@ class CombinationProductSet(CS, ABC):
     return self.factor_to_alias
     
   @property
-  def combo_to_alias(self):
-    return self._combo_aliases
-    
-  @property
-  def alias_to_combo(self):
-    return {v: k for k, v in self._combo_aliases.items()}
-  
-  @property
   def products(self):
-    return self._products
+    return tuple(sorted(attrs['product'] for _, attrs in self._graph.nodes(data=True)))
   
   @property
   def ratios(self):
-    return self._ratios
+    return tuple(sorted(attrs['ratio'] for _, attrs in self._graph.nodes(data=True)))
   
-  @property
-  def combo_to_product(self):
-    return {combo: row['product'] for combo, row in self._mapping_df.iterrows()}
+  def get_node_by(self, attr_name, value):
+    for node, attrs in self._graph.nodes(data=True):
+      if attrs.get(attr_name) == value:
+        return node
+    return None
   
-  @property
-  def product_to_combo(self):
-    product_to_combo = {}
-    for combo, row in self._mapping_df.iterrows():
-      product = row['product']
-      if product not in product_to_combo:
-        product_to_combo[product] = combo
-    return product_to_combo
+  def get_attrs_by(self, attr_name, value):
+    for node, attrs in self._graph.nodes(data=True):
+      if attrs.get(attr_name) == value:
+        return attrs
+    return None  
   
-  @property
-  def combo_to_ratio(self):
-    return {combo: row['ratio'] for combo, row in self._mapping_df.iterrows()}
-  
-  @property
-  def ratio_to_combo(self):
-    ratio_to_combo = {}
-    for combo, row in self._mapping_df.iterrows():
-      ratio = row['ratio']
-      if ratio not in ratio_to_combo:
-        ratio_to_combo[ratio] = combo
-    return ratio_to_combo
-  
-  @property
-  def product_to_ratio(self):
-    return dict(zip(self._mapping_df['product'], self._mapping_df['ratio']))
-  
-  @property
-  def ratio_to_product(self):
-    ratio_to_product = {}
-    for _, row in self._mapping_df.iterrows():
-      ratio = row['ratio']
-      if ratio not in ratio_to_product:
-        ratio_to_product[ratio] = row['product']
-    return ratio_to_product
-    
-  @property
-  def combo_to_symbolic(self):
-    return self.combo_to_alias
-  
-  def _calculate(self):
-    data = []
-    
-    for combo in self._combos:
-      product = prod(combo)
-      symbolic = ''.join(str(self.factor_to_alias[f]) for f in combo)
-      data.append((combo, product, symbolic))
-    
-    df = pd.DataFrame(data, columns=['combo', 'product', 'symbolic'])
-    df.set_index('combo', inplace=True)
-    
-    norm_prod = max(self._factors) if self._normalized else 1
-    
-    df['ratio'] = df['product'].apply(lambda p: equave_reduce(Fraction(p, norm_prod)))
-    
-    sorted_products = tuple(sorted(df['product']))
-    sorted_ratios = tuple(sorted(df['ratio']))
-    
-    return df, sorted_products, sorted_ratios
-
   def __str__(self):
     table_data = []
-    for combo, product, ratio in zip(self._combos, self._products, self._ratios):
+    node_data = [(attrs['combo'], attrs['product'], attrs['ratio']) for _, attrs in self._graph.nodes(data=True)]
+    sorted_data = sorted(node_data, key=lambda x: x[2])
+    for combo, product, ratio in sorted_data:
       table_data.append([combo, product, str(ratio)])
     return tabulate(table_data, headers=['Combo', 'Product', 'Ratio'], tablefmt='simple', colalign=('center', 'center', 'center'))
   

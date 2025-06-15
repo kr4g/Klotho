@@ -1,7 +1,7 @@
 from pythonosc import udp_client, osc_bundle_builder, osc_message_builder
 import time
 import threading
-from klotho.tonos import Pitch, PitchCollection, EquaveCyclicPitchCollection, Scale, Chord, AddressedPitchCollection
+from klotho.tonos import Pitch, PitchCollection, EquaveCyclicCollection, Scale, Chord, AddressedPitchCollection
 from klotho.tonos.chords.chord import AddressedChord
 from klotho.tonos.scales.scale import AddressedScale
 from klotho.aikous.expression.dynamics import freq_amp_scale, ampdb
@@ -91,7 +91,7 @@ def _execute_play(obj, verbose=False, start_time=None, **kwargs):
         case Pitch():
             _play_pitch(obj, verbose, start_time)
         
-        case PitchCollection() | EquaveCyclicPitchCollection() | AddressedPitchCollection():
+        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
             if isinstance(obj, (Scale, AddressedScale)):
                 _play_scale(obj, verbose, start_time)
             elif isinstance(obj, (Chord, AddressedChord)):
@@ -308,7 +308,7 @@ def _extract_frequencies(freq_obj):
     if isinstance(freq_obj, Pitch):
         return [freq_obj.freq]
     
-    if isinstance(freq_obj, (PitchCollection, EquaveCyclicPitchCollection, AddressedPitchCollection, Scale, Chord, AddressedScale, AddressedChord)):
+    if isinstance(freq_obj, (PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, AddressedScale, AddressedChord)):
         addressed_collection = _get_addressed_collection(freq_obj)
         return [addressed_collection[i].freq for i in range(len(addressed_collection))]
     

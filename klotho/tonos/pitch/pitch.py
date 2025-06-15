@@ -163,7 +163,7 @@ class Pitch:
     def __str__(self):
         pitch_name = f"{self.pitchclass}{self.octave}"
         
-        if abs(self.cents_offset) > 1e-6:
+        if abs(self.cents_offset) > 0.01:
             cents_str = f" ({self.cents_offset:+.2f}¢)"
         else:
             cents_str = ""

@@ -1,6 +1,6 @@
 from fractions import Fraction
-from typing import TypeVar, cast, Optional, Union
-from ..pitch import EquaveCyclicPitchCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
+from typing import TypeVar, cast, Optional, Union, List
+from ..pitch import EquaveCyclicCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
 import numpy as np
 from ..utils.interval_normalization import equave_reduce
 
@@ -25,7 +25,7 @@ class AddressedScale(AddressedPitchCollection):
     """
     pass
 
-class Scale(EquaveCyclicPitchCollection[IntervalType]):
+class Scale(EquaveCyclicCollection[IntervalType]):
     """
     A musical scale with automatic sorting, deduplication, and equave removal.
     
@@ -55,8 +55,23 @@ class Scale(EquaveCyclicPitchCollection[IntervalType]):
     """
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
-        super().__init__(degrees, equave, remove_equave=True)
+        super().__init__(degrees, equave)
         self._mode_cache = {}
+        
+    def _process_degrees(self, degrees: IntervalList) -> List[IntervalType]:
+        processed = super()._process_degrees(degrees)
+        
+        if not processed:
+            return processed
+        
+        if self._interval_type == float:
+            if not processed or abs(processed[0]) >= 1e-6:
+                processed.insert(0, 0.0)
+        else:
+            if not processed or processed[0] != Fraction(1, 1):
+                processed.insert(0, Fraction(1, 1))
+        
+        return processed
         
     def mode(self, mode_number: int) -> 'Scale':
         if mode_number in self._mode_cache:

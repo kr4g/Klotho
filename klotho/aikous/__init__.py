@@ -9,12 +9,10 @@ from . import expression
 from . import parameters
 from . import instruments
 
-# Import classes
 from .expression import Dynamic, DynamicRange
 from .parameters import ParameterTree
 from .instruments import Instrument
 
-# Import expression utility functions 
 from .expression import dbamp, ampdb, freq_amp_scale
 from .expression import line, arch, map_curve
 

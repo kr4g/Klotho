@@ -27,14 +27,11 @@ from . import formal_grammars
 from . import graphs
 from . import random
 
-# Import classes and collections-related utility functions
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
 from .collections import autoref, autoref_rotmat, permut_list
 
-# Import formal grammars-related utility functions
 from .formal_grammars import alphabets, grammars
 
-# Import graph-related utility functions
 from .graphs import trees, networks, fields, Tree, Network, Field, Graph
 
 __all__ = [

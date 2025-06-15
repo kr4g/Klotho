@@ -36,7 +36,7 @@ def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fracti
   equave = Fraction(equave)
   while interval < 1:
     interval *= equave
-  while interval > equave**n_equaves:
+  while interval >= equave**n_equaves:
     interval /= equave
   return interval
 
@@ -56,7 +56,7 @@ def reduce_interval(interval:Union[Fraction, int, float, str], equave:Union[Frac
   equave = Fraction(equave)  
   while interval < 1/(equave**n_equaves):
     interval *= equave
-  while interval > (equave**n_equaves):
+  while interval >= (equave**n_equaves):
     interval /= equave
   return interval
 
