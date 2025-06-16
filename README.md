@@ -1,11 +1,10 @@
 # Klotho
-`Klotho` is an open source computer-assisted composition toolkit implemented in Python.  It is designed to work in tandem with external synthesis applications and as a general resource for the methods, models, works, and frameworks associated with the art and craft of music composition and metacomposition.
+`Klotho` is an open source computer-assisted composition toolkit implemented in Python. It is designed to work in tandem with external synthesis applications and as a resource for the methods, models, works, and frameworks associated with music composition and multi-media metacomposition.
 
+Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
 ---
 
 ## Installation
-
-Klotho works as both a Python scripting toolkit and 'on-the-fly' via a Python interpreter.
 
 ### Option 1: Install from PyPI (Recommended)
 
@@ -17,7 +16,7 @@ pip install klotho-cac
 
 1. **Clone the Repository**:
 
-   First, clone the Klotho repository by running the following command in your terminal or command prompt:
+   Clone the Klotho repository:
    
    ```
    git clone https://github.com/kr4g/Klotho.git
@@ -30,8 +29,6 @@ pip install klotho-cac
     ```
 
 3. **Install in Development Mode**:
-
-    Install Klotho in development mode (recommended for development):
     
     ```
     pip install -e .
@@ -43,31 +40,33 @@ pip install klotho-cac
     pip install -r requirements.txt
     ```
 
-<!-- 4. **Install Klotho (Development Mode)**:
-
-    To install Klotho in development mode, which allows you to modify the source code and have the changes reflected immediately:
-
-    ```
-    pip install -e .
-    ```
-
-5. **Play**:
-
-    To work with Klotho as an 'on-the-fly' compositional-aid, initiate a Python interpreter from within the `Klotho/` directory by running the command:
-
-    ```
-    Python
-    ```
-
-    Once the interpreter loads, import from `klotho` as needed. -->
-
 ## About
 
-Klotho extends from a lineage of CAC-oriented theories and softwares.  This means that, while Klotho provides many classes and functions for 'standard' music materials, its strengths are best utilized when working with more complex, abstract, or otherwise unconventional materials not easily accessible with standard notation softwares.  
+Klotho extends from a lineage of computer-assisted composition (CAC) theories, practices, and software environments. While it provides support for conventional musical materials, its strengths are best utilized when working with complex, abstract, and unconventional musical structures not easily accessible with traditional notation software or digital audio workstations.
 
-The ethos of Klotho draws heavily from the concepts and computations possible with patching-based softwares like [OpenMusic](https://openmusic-project.github.io/) (which also influenced [Bach](https://www.bachproject.net/) and [Cage](https://www.bachproject.net/cage/) for Max).
+While drawing from the computational paradigms found in patching-based environments like [OpenMusic](https://openmusic-project.github.io/), [Bach](https://www.bachproject.net/), and [Cage](https://www.bachproject.net/cage/), Klotho diverges from the visual patching paradigm in favor of a high-level, text-based scripting syntax. As such, Klotho is closer in spirit to [OpusModus](https://opusmodus.com/), which also favors text-based scripting over visual patching, though its LISP-based proprietary language creates unnecessary barriers to entry and forecloses access to Python's diverse ecosystem—libraries like Librosa, Music21, and Pyo, as well as scientific tools that enable more analytical and data-oriented approaches to music generation. While such libraries operate outside Klotho's scope, they interface with it naturally—allowing Klotho to embody the underlying mathematical expressions governing musical materials from topological, algebraic, and computational perspectives.
 
-Klotho seeks to avoid this patching paradigm in favor of a high-level scripting syntax that more closely resembles the underlying mathematical expressions at play when working with computational composition tools.  Many of Klotho's core features, particularly in the implementation of Rhythm Trees, adhere to a "LISP-like" presentation and programming paradigm inspired by the underlying Common LISP source code for OpenMusic.  It is then also closer to the abstract, algebraic language of music in its symbolic representations.
+## Architecture
+
+Klotho is organized into six primary modules, each addressing fundamental aspects of musical composition and computation:
+
+### **Topos** (*τόπος* - "place, location")
+The foundation of musical topology in its most abstract form. Topos operates independently of specific musical parameters or numerical constraints, modeling pure structural relationships, patterns, and processes. This module provides topological scaffolding that can be instantiated into any musical context.
+
+### **Chronos** (*χρόνος* - "time")
+Encompasses all temporal materials from microscopic rhythmic gestures to macroscopic formal architectures. Beyond local rhythm, Chronos provides frameworks for temporal formalism across time scales, handling complex and unconventional rhythmic techniques such as nested tuplets, irrational time signatures, metric modulation, poly-meter, and poly-tempi.
+
+### **Tonos** (*τόνος* - "tone, tension")
+Handles all aspects of pitch and harmonic material including individual tones, pitch collections, scales, chords, harmonic systems and spaces, interval relationships, and frequency-based transformations. Tonos includes traditional and extended approaches to pitch organization and harmonic analysis, supporting arbitrary n-TET and n-EDO systems, extended Just Intonation frameworks, and n-dimensional microtonal lattices and scale systems.
+
+### **Dynatos** (*δυνατός* - "powerful, capable")
+Dedicated to dynamics, articulations, and expressive envelopes. This module handles the conversion of symbolic dynamics (p, mf, ff, etc.) into precise dB/amplitude values, mapping of symbolic articulations to parametric envelopes, and designing custom expressive curves and envelopes ranging from standard ADSR models to polynomial functions for more complex shapes.
+
+### **Thetos** (*θετός* - "placed, positioned")
+The compositional complement to Topos, Thetos handles the concrete assembly and combination of musical materials across all dimensions—temporal, tonal, dynamic, instrumental, and parametric. It manages the systematic composition and positioning of musical elements into coherent structures.
+
+### **Semeios** (*σημεῖον* - "sign, mark")
+Manages all forms of musical representation including visualization, notation, plotting, animation, and multimedia output. Semeios converts computational processes into human-readable and performable representations as well as automated formats.
 
 ## License
 
@@ -78,5 +77,3 @@ Klotho seeks to avoid this patching paradigm in favor of a high-level scripting 
 ![SA Icon](https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1)
 
 Klotho © 2023 by Ryan Millett is licensed under CC BY-SA 4.0. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
-
----
