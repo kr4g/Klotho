@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
 from klotho.aikous.expression.dynamics import Dynamic, DynamicRange
 from klotho.tonos.pitch import Pitch
 from klotho.utils.data_structures.dictionaries import SafeDict
 from typing import List, Dict, TypeVar, Union
 
-class Instrument(ABC):
+class Instrument():
     
     def __init__(self, name, freq_range=None, dynamic_range=None, pfields=None):
         """
@@ -19,12 +18,14 @@ class Instrument(ABC):
         self._name = name
         
         if freq_range is None:
-            freq_range = (20.0, 20000.0)
-        self._freq_range = self._process_freq_range(freq_range)
+            self._freq_range = (Pitch.from_freq(27.5), Pitch.from_freq(4186.01))
+        else:
+            self._freq_range = self._process_freq_range(freq_range)
         
         if dynamic_range is None:
-            dynamic_range = (-60, 0)
-        self._dynamic_range = self._process_dynamic_range(dynamic_range)
+            self._dynamic_range = DynamicRange(min_dynamic=-60, max_dynamic=-3, curve=1.25)
+        else:
+            self._dynamic_range = self._process_dynamic_range(dynamic_range)
         
         if pfields is None:
             pfields = {}
@@ -69,8 +70,20 @@ class Instrument(ABC):
     
     @property
     def pfields(self):
-        return self._pfields
+        return self._pfields.copy()
+    
+    def keys(self):
+        keys = ['synth_name']
+        keys.extend(self._pfields.keys())
+        return keys
+    
+    def __getitem__(self, key):
+        if key == 'synth_name':
+            return self._name
+        return self._pfields[key]
+    
+    def __str__(self):
+        return f"Instrument(name='{self._name}', pfields={dict(self._pfields)})"
     
     def __repr__(self):
-        # return f"Instrument(name='{self._name}', freq_range={self._freq_range}, dynamic_range={self._dynamic_range}, pfields={dict(self._pfields)})"
-        return f"Instrument(name='{self._name}', pfields={dict(self._pfields)})"
+        return self.__str__()

@@ -4,6 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from klotho.topos.graphs.trees.trees import Tree
 from klotho.chronos.rhythm_trees import RhythmTree
+from klotho.aikous.parameters.parameter_tree import ParameterTree
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from fractions import Fraction
 import numpy as np
@@ -36,6 +37,8 @@ def plot(obj, **kwargs):
             match obj:
                 case RhythmTree():
                     return _plot_rt(obj, **kwargs)
+                case ParameterTree():
+                    return _plot_parameter_tree(obj, **kwargs)
                 case _:
                     return _plot_tree(obj, **kwargs)
         case CombinationSet():
@@ -54,6 +57,214 @@ def plot(obj, **kwargs):
             raise NotImplementedError("Plotting for temporal units not yet implemented")
         case _:
             raise TypeError(f"Unsupported object type for plotting: {type(obj)}")
+
+def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
+                        invert: bool = True, output_file: str | None = None) -> go.Figure:
+    """
+    Visualize a ParameterTree structure with muting logic applied.
+    
+    Similar to _plot_tree but respects the ParameterTree's muting mechanism,
+    only displaying active (non-muted) attributes for each node.
+    
+    Args:
+        tree: ParameterTree instance to visualize
+        attributes: List of node attributes to display instead of labels. If None, shows only labels.
+                   Special values "node_id", "node", or "id" will display the node identifier.
+        figsize: Width and height of the output figure in inches
+        invert: When True, places root at the top; when False, root is at the bottom
+        output_file: Path to save the visualization (displays plot if None)
+    """
+    def _hierarchy_pos(G, root, width=1.5, height=1.0, xcenter=0.5, pos=None, parent=None, depth=0, inverted=True, vert_gap=None):
+        if pos is None:
+            max_depth = _get_max_depth(G, root)
+            vert_gap = height / max(max_depth, 1) if max_depth > 0 else height
+            max_breadth = _get_max_breadth(G, root)
+            width = max(2.5, 1.5 * max_breadth)
+            pos = {root: (xcenter, height if inverted else 0)}
+        else:
+            y = (height - (depth * vert_gap)) if inverted else (depth * vert_gap)
+            pos[root] = (xcenter, y)
+        
+        children = list(G.neighbors(root))
+        if not isinstance(G, nx.DiGraph) and parent is not None:
+            children.remove(parent)
+        
+        if children:
+            chain_depths = {child: _get_max_depth(G, child, parent=root) for child in children}
+            total_depth = sum(chain_depths.values())
+            
+            if len(children) == 1:
+                dx = width * 0.8
+            else:
+                dx = width / len(children)
+            
+            nextx = xcenter - width/2 + dx/2
+            
+            for child in children:
+                depth_factor = 1.0
+                if total_depth > 0 and len(children) > 1:
+                    depth_factor = 0.5 + (0.5 * chain_depths[child] / total_depth)
+                
+                child_width = dx * depth_factor * 1.5
+                
+                _hierarchy_pos(G, child,
+                             width=child_width,
+                             height=height,
+                             xcenter=nextx,
+                             pos=pos,
+                             parent=root,
+                             depth=depth+1,
+                             inverted=inverted,
+                             vert_gap=vert_gap)
+                nextx += dx
+        return pos
+    
+    def _count_leaves(G, node, parent=None):
+        children = list(G.neighbors(node))
+        if not isinstance(G, nx.DiGraph) and parent is not None:
+            children.remove(parent)
+        
+        if not children:
+            return 1
+        
+        return sum(_count_leaves(G, child, node) for child in children)
+    
+    def _get_max_depth(G, node, parent=None, current_depth=0):
+        children = list(G.neighbors(node))
+        if not isinstance(G, nx.DiGraph) and parent is not None:
+            children.remove(parent)
+        
+        if not children:
+            return current_depth
+        
+        return max(_get_max_depth(G, child, node, current_depth + 1) for child in children)
+    
+    def _get_max_breadth(G, root, parent=None):
+        nodes_by_level = {}
+        
+        def _count_by_level(node, level=0, parent=None):
+            if level not in nodes_by_level:
+                nodes_by_level[level] = 0
+            nodes_by_level[level] += 1
+            
+            children = list(G.neighbors(node))
+            if parent is not None and parent in children:
+                children.remove(parent)
+            
+            for child in children:
+                _count_by_level(child, level+1, node)
+        
+        _count_by_level(root, parent=parent)
+        
+        return max(nodes_by_level.values()) if nodes_by_level else 1
+    
+    G = tree.graph
+    root = tree.root
+    height_scale = figsize[1] / 1.5
+    pos = _hierarchy_pos(G, root, height=height_scale, inverted=invert)
+    
+    fig = go.Figure()
+    
+    for u, v in G.edges():
+        if u in pos and v in pos:
+            x1, y1 = pos[u]
+            x2, y2 = pos[v]
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color='#808080', width=2),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+    
+    node_x, node_y = [], []
+    hover_data = []
+    node_symbols = []
+    node_text = []
+    
+    for node in G.nodes():
+        if node in pos:
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+            
+            active_items = tree[node].active_items()
+            
+            display_text = ""
+            if "synth_name" in active_items:
+                display_text = str(active_items["synth_name"])
+            
+            node_text.append(display_text)
+            
+            if attributes is None:
+                label_text = str(G.nodes[node]['label']) if G.nodes[node]['label'] is not None else ''
+            else:
+                label_parts = []
+                for attr in attributes:
+                    if attr in {"node_id", "node", "id"}:
+                        label_parts.append(str(node))
+                    else:
+                        if attr in active_items:
+                            value = active_items[attr]
+                            label_parts.append(f"{attr}: {value}" if value is not None else f"{attr}: None")
+                label_text = "<br>".join(label_parts)
+            
+            hover_data.append(label_text)
+            
+            is_leaf = len(list(G.neighbors(node))) == 0
+            node_symbols.append('circle' if is_leaf else 'square')
+    
+    fig.add_trace(
+        go.Scatter(
+            x=node_x, y=node_y,
+            mode='markers+text',
+            marker=dict(
+                size=30,
+                color='white',
+                line=dict(color='white', width=2),
+                symbol=node_symbols
+            ),
+            text=node_text,
+            textposition='middle center',
+            textfont=dict(color='#404040', size=10, family='Arial', weight='bold'),
+            hovertemplate='%{customdata}<extra></extra>',
+            customdata=hover_data,
+            showlegend=False
+        )
+    )
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    x_padding = (max(node_x) - min(node_x)) * 0.02 if node_x else 0.05
+    y_padding = (max(node_y) - min(node_y)) * 0.1 if node_y else 0.2
+    
+    fig.update_layout(
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        xaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[min(node_x)-x_padding, max(node_x)+x_padding] if node_x else [-1, 1]
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            scaleanchor="x", scaleratio=1,
+            range=[min(node_y)-y_padding, max(node_y)+y_padding] if node_y else [-1, 1]
+        ),
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
 
 def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
              invert: bool = True, output_file: str | None = None) -> None:
@@ -894,7 +1105,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
     return fig
 
-def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(16, 8), 
+def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(20, 5), 
                        resolution: int = 1000, show_labels: bool = True, 
                        show_grid: bool = True, title: str = None, output_file: str = None):
     """
@@ -977,7 +1188,7 @@ def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(
     
     # ax.set_xlabel('Dynamic Range Position', color='white', fontsize=12)
     ax.set_ylabel(ylabel, color='white', fontsize=12)
-    
+        
     if title is None:
         curve_desc = f"curve={dynamic_range.curve}" if dynamic_range.curve != 0 else "linear"
         title = f"Dynamic Range ({mode_display}) - {curve_desc}"
@@ -1003,7 +1214,7 @@ def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(
     else:
         plt.show()
 
-def _plot_envelope(envelope: Envelope, figsize=(16, 8), show_points: bool = True,
+def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True,
                   show_grid: bool = True, title: str = None, output_file: str = None):
     plt.figure(figsize=figsize)
     ax = plt.gca()
