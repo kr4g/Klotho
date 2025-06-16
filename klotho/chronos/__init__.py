@@ -43,5 +43,3 @@ __all__ = [
 __all__.extend(beat_all)
 __all__.extend(tempo_all)
 __all__.extend(time_conversion_all)
-
-__version__ = '2.0.0'

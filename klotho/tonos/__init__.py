@@ -114,5 +114,3 @@ __all__ = [
     'fold_interval',
     'reduce_freq',
 ]
-
-__version__ = '2.0.0'

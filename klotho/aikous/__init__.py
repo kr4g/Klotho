@@ -36,5 +36,3 @@ __all__ = [
     'arch', 
     'map_curve',
 ]
-
-__version__ = '2.0.0'

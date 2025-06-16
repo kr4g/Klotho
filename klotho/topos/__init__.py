@@ -48,5 +48,3 @@ __all__ = [
     'alphabets', 'grammars',
     'trees', 'networks', 'fields',
 ]
-
-__version__ = '2.0.0'

@@ -13,7 +13,7 @@ from typing import List, Union, Dict, Optional
 import math
 
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet
-from klotho.tonos.systems.combination_product_sets.cps import MASTER_SETS
+from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
 
 __all__ = [
     'plot_tree', 'plot_ratios', 'plot_graph', 'plot_ut', 'plot_rt', 'plot_curve', 
@@ -837,8 +837,17 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     """
     Plot a Combination Product Set as an interactive network diagram based on its master set.
     
+    Note: This function requires a CPS instance with a defined master set. 
+    
+    Supported types:
+    - Hexany (tetrad master set)
+    - Eikosany (asterisk master set) 
+    - Hebdomekontany (ogdoad master set)
+    - Dekany/Pentadekany (with master_set parameter)
+    - CombinationProductSet (with master_set parameter)
+    
     Args:
-        cps: CombinationProductSet instance to visualize
+        cps: CPS instance to visualize (must have a master_set defined)
         figsize: Size of the figure as (width, height) in inches
         node_size: Size of the nodes in the plot
         show_labels: Whether to show labels on the nodes
@@ -849,7 +858,14 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         Plotly figure object that can be displayed or further customized
     """
     master_set_name = cps.master_set
-    if not master_set_name or master_set_name not in MASTER_SETS:
+    if not master_set_name:
+        raise ValueError(
+            f"CPS instance has no master set defined. plot_cps() requires a master set for node positioning.\n"
+            f"Available master sets: {list(MASTER_SETS.keys())}\n"
+            f"Try using specific CPS classes like Hexany, Eikosany, or Hebdomekontany, "
+            f"or create a CPS with master_set parameter: CombinationProductSet(factors, r, master_set='tetrad')"
+        )
+    if master_set_name not in MASTER_SETS:
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
     relationship_angles = MASTER_SETS[master_set_name]
