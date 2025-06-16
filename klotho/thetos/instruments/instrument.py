@@ -1,4 +1,4 @@
-from klotho.aikous.expression.dynamics import Dynamic, DynamicRange
+from klotho.dynatos.expression.dynamics import Dynamic, DynamicRange
 from klotho.tonos.pitch import Pitch
 from klotho.utils.data_structures.dictionaries import SafeDict
 from typing import List, Dict, TypeVar, Union

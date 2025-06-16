@@ -1,8 +1,11 @@
 import numpy as np
 from typing import Union, List, Tuple, TypeVar, Any
 
-from .tonos.utils.frequency_conversion import freq_to_midicents, midicents_to_freq
-from .aikous.expression.dynamics import ampdb, dbamp
+from ..tonos.utils.frequency_conversion import freq_to_midicents, midicents_to_freq
+from ..topos.graphs.graphs import Graph
+from ..topos.graphs.fields import Field
+from ..topos.graphs.trees.trees import Tree
+from ..dynatos.expression.dynamics import ampdb, dbamp
 
 T = TypeVar('T', bound='float')
 Collection = Union[List[float], Tuple[float, ...], np.ndarray]

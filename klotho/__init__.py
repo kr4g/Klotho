@@ -1,18 +1,24 @@
 """
-Klotho: A graph-oriented Python package for computational composition.
+Klotho: A comprehensive toolkit for complex musical analysis, generation, and visualization.
 
-This package provides tools for working with musical structures across multiple domains:
-- Topos: Abstract structures and relationships
-- Chronos: Time and rhythm
-- Tonos: Pitch and harmony
-- Aikous: Expression and parameters
-- Skora: Visualization and notation
+From the Greek "Κλωθώ" (Klotho), one of the three Fates who spins the thread of life.
+This library weaves together various aspects of musical computation.
+
+Submodules:
+- topos: Abstract mathematical and structural foundations
+- chronos: Temporal structures and rhythm generation  
+- tonos: Tonal systems, pitches, scales, and harmony
+- thetos: Musical parameter trees and instrumentation
+- dynatos: Expression, dynamics, and envelopes
+- semeios: Visualization, notation, and representation
+- utils: General utilities and helper functions
 """
 from . import topos
 from . import chronos
 from . import tonos
-from . import aikous
-from . import skora
+from . import thetos
+from . import dynatos
+from . import semeios
 from . import utils
 
 from .topos.collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
@@ -22,20 +28,23 @@ from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence,
 
 from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 
-from .skora.visualization.plots import plot
+from .semeios.visualization.plots import plot
+from .semeios.notelists.scheduler import Scheduler
+from .semeios.midi import midi as export_midi
 
-from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
+from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
 
 from .utils.playback.player import play, pause, stop, sync
-from .utils.playback.midi_export import midi as export_midi
 
 __all__ = [
-    'topos', 'chronos', 'tonos', 'aikous', 'skora', 'utils',
+    'topos', 'chronos', 'tonos', 'thetos', 'dynatos', 'semeios', 'utils',
     'Pitch', 'Scale', 'Chord', 
     'AddressedScale', 'AddressedChord',
     'frequency', 'cent', 'midicent', 'midi',
     'amplitude', 'decibel', 'onset', 'duration',
+    'RhythmTree', 'TemporalUnit',
+    'plot', 'Scheduler',
     'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
-__version__ = '2.4.0'
+__version__ = '3.0.0'

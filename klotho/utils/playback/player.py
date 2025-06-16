@@ -4,7 +4,7 @@ import threading
 from klotho.tonos import Pitch, PitchCollection, EquaveCyclicCollection, Scale, Chord, AddressedPitchCollection
 from klotho.tonos.chords.chord import AddressedChord
 from klotho.tonos.scales.scale import AddressedScale
-from klotho.aikous.expression.dynamics import freq_amp_scale, ampdb
+from klotho.dynatos.expression.dynamics import freq_amp_scale, ampdb
 from klotho.chronos.temporal_units.temporal import TemporalUnit
 
 client = udp_client.SimpleUDPClient("127.0.0.1", 57110)

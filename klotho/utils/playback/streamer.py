@@ -1,3 +1,10 @@
+"""
+Streamer: A module for real-time OSC streaming of musical events.
+
+Provides StreamBuilder and Streamer classes for real-time communication
+with external audio systems via OSC protocol.
+"""
+
 from pythonosc import udp_client, osc_message_builder, dispatcher, osc_server
 from uuid import uuid4
 import threading
@@ -5,8 +12,9 @@ import time
 from tqdm import tqdm
 import heapq
 
-class EventBuilder:
-    def __init__(self, scheduler: 'Scheduler', event_type: str, uid: str, synth_name: str, start: float, params: dict):
+
+class StreamBuilder:
+    def __init__(self, scheduler: 'Streamer', event_type: str, uid: str, synth_name: str, start: float, params: dict):
         self.scheduler = scheduler
         self.event_type = event_type
         self.uid = str(uuid4()).replace('-', '') if uid is None else uid
@@ -28,7 +36,7 @@ class EventBuilder:
         return self.uid
 
 
-class Scheduler:
+class Streamer:
     def __init__(self, ip:str='127.0.0.1', send_port:int=57121, receive_port:int=9000):
         self.client = udp_client.SimpleUDPClient(ip, send_port)
         self.events = []
@@ -49,23 +57,28 @@ class Scheduler:
         self.dispatcher.map("/clear_events", self.clear_events)
         
         self.server = osc_server.ThreadingOSCUDPServer((ip, receive_port), self.dispatcher)
-        self.server_thread = threading.Thread(target=self.server.serve_forever)
-        # self.server_thread.start()
+        self.server_thread = None
+        self.running = False
         self.send_progress = None
         self.process_progress = None
         
     def init_progress_bars(self):
+        if self.send_progress:
+            self.send_progress.close()
+        if self.process_progress:
+            self.process_progress.close()
+            
         self.send_progress = tqdm(total=self.total_events, 
                                 desc="Ready to send", 
                                 unit="events",
                                 position=0,
-                                leave=False)
+                                leave=True)
         
         self.process_progress = tqdm(total=self.total_events,
                                    desc="Ready to process",
                                    unit="events",
                                    position=1,
-                                   leave=False)
+                                   leave=True)
     
     def reset_progress_bars(self):
         if self.send_progress:
@@ -106,19 +119,19 @@ class Scheduler:
         self.reset_progress_bars()
 
     def new_synth(self, synth_name:str = None, start:float = 0, **params):
-        return EventBuilder(self, 'new', None, synth_name, start, params).uid
+        return StreamBuilder(self, 'new', None, synth_name, start, params).uid
 
     def set_synth(self, uid:str, start:float, **params):
-        EventBuilder(self, 'set', uid, None, start, params)
+        StreamBuilder(self, 'set', uid, None, start, params)
 
     def new_synth_handler(self, address, uid, synth_name, start, *params):
         param_dict = {params[i]: params[i+1] for i in range(0, len(params), 2)}
-        EventBuilder(self, 'new', uid, synth_name, float(start), param_dict)
+        StreamBuilder(self, 'new', uid, synth_name, float(start), param_dict)
         self.reset_progress_bars()
         
     def set_synth_handler(self, address, uid, start, *params):
         param_dict = {params[i]: params[i+1] for i in range(0, len(params), 2)}
-        EventBuilder(self, 'set', uid, None, float(start), param_dict)
+        StreamBuilder(self, 'set', uid, None, float(start), param_dict)
         self.reset_progress_bars()
         
     def start(self, address, *args):
@@ -154,22 +167,34 @@ class Scheduler:
         self.client.send(eot_msg.build())
         self.send_progress.set_description("All Events Sent")
 
-    def clear_events(self):
+    def clear_events(self, address=None, *args):
         self.events = []
         self.total_events = 0
         self.events_processed = 0
         self.events_sent = 0
         self.paused = True
-        self.reset_progress_bars()
+        if self.send_progress:
+            self.send_progress.reset()
+        if self.process_progress:
+            self.process_progress.reset()
 
     def stop_server(self):
-        self.server.shutdown()
-        self.server_thread.join()
-        # exit(0)
+        if self.running:
+            self.server.shutdown()
+            if self.server_thread and self.server_thread.is_alive():
+                self.server_thread.join()
+            self.server_thread = None
+            self.running = False
+            if self.send_progress:
+                self.send_progress.close()
+            if self.process_progress:
+                self.process_progress.close()
 
     def run(self):
-        self.server_thread.start()
-        self.init_progress_bars()
-        # self.start()
-        # self.send_events()
-        # self.stop_server()
+        if not self.running:
+            self.running = True
+            self.server_thread = threading.Thread(target=self.server.serve_forever)
+            self.server_thread.start()
+            self.init_progress_bars()
+        else:
+            print("Server is already running.") 

@@ -4,7 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from klotho.topos.graphs.trees.trees import Tree
 from klotho.chronos.rhythm_trees import RhythmTree
-from klotho.aikous.parameters.parameter_tree import ParameterTree
+from klotho.thetos.parameters.parameter_tree import ParameterTree
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from fractions import Fraction
 import numpy as np
@@ -16,8 +16,8 @@ import math
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
 from klotho.topos.collections.sets import CombinationSet
-from klotho.aikous.expression.dynamics import DynamicRange
-from klotho.aikous.expression.enevelopes import Envelope
+from klotho.dynatos.expression.dynamics import DynamicRange
+from klotho.dynatos.expression.enevelopes import Envelope
 
 __all__ = ['plot']
 
