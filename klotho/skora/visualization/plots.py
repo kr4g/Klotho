@@ -14,13 +14,48 @@ import math
 
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
+from klotho.topos.collections.sets import CombinationSet
+from klotho.aikous.expression.dynamics import DynamicRange
+from klotho.aikous.expression.enevelopes import Envelope
 
-__all__ = [
-    'plot_tree', 'plot_ratios', 'plot_graph', 'plot_ut', 'plot_rt', 'plot_curve', 
-    'plot_timeline', 'plot_cps'
-]
+__all__ = ['plot']
 
-def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
+def plot(obj, **kwargs):
+    """
+    Universal plot function that dispatches to appropriate plotting function based on object type.
+    
+    Args:
+        obj: Object to plot (Tree, RhythmTree, CombinationSet, CombinationProductSet, DynamicRange, Envelope, networkx.Graph, etc.)
+        **kwargs: Keyword arguments passed to the specific plotting function
+        
+    Raises:
+        TypeError: If the object type is not supported
+    """
+    match obj:
+        case Tree():
+            match obj:
+                case RhythmTree():
+                    return _plot_rt(obj, **kwargs)
+                case _:
+                    return _plot_tree(obj, **kwargs)
+        case CombinationSet():
+            match obj:
+                case CombinationProductSet():
+                    return _plot_cps(obj, **kwargs)
+                case _:
+                    return _plot_cs(obj, **kwargs)
+        case DynamicRange():
+            return _plot_dynamic_range(obj, **kwargs)
+        case Envelope():
+            return _plot_envelope(obj, **kwargs)
+        case nx.Graph():
+            return _plot_graph(obj, **kwargs)
+        case TemporalUnit() | TemporalUnitSequence() | TemporalBlock():
+            raise NotImplementedError("Plotting for temporal units not yet implemented")
+        case _:
+            raise TypeError(f"Unsupported object type for plotting: {type(obj)}")
+
+def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
              invert: bool = True, output_file: str | None = None) -> None:
     """
     Visualize a tree structure with customizable node appearance and layout.
@@ -185,7 +220,7 @@ def plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[fl
     else:
         plt.show()
 
-def plot_ratios(ratios, figsize=(20, 1), output_file=None):
+def _plot_ratios(ratios, figsize=(20, 1), output_file=None):
     """
     Plot ratios as horizontal bars with thin white borders.
     
@@ -235,7 +270,7 @@ def plot_ratios(ratios, figsize=(20, 1), output_file=None):
     else:
         plt.show()
 
-def plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10), 
+def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10), 
                node_size: float = 1000, font_size: float = 12,
                layout: str = 'spring', k: float = 1,
                show_edge_labels: bool = True,
@@ -318,65 +353,7 @@ def plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
     else:
         plt.show()
 
-def plot_ut(ut, height=100):
-    fig = make_subplots(rows=1, cols=1)
-    
-    events = ut.events
-    
-    # Plot each event as a separate trace
-    for _, event in events.iterrows():
-        fig.add_trace(
-            go.Bar(
-                base=[event['start']],  # Single value in a list
-                x=[abs(event['duration'])],  # Single value in a list
-                y=['Timeline'],  # All events on same timeline
-                orientation='h',
-                marker=dict(
-                    color='#808080' if event['is_rest'] else '#e6e6e6',
-                    line=dict(color='white', width=1)
-                ),
-                hovertemplate=(
-                    'Start: %{base:.2f}s<br>'
-                    'Duration: %{x:.2f}s<br>'
-                    'End: %{customdata[0]:.2f}s<br>'
-                    'Ratio: %{customdata[1]}<br>'
-                    'Type: ' + ut.type.value +
-                    '<extra></extra>'
-                ),
-                customdata=[[event['end'], str(event['metric_ratio'])]]
-            )
-        )
-
-    fig.update_layout(
-        title=dict(
-            text=f'Tempus: {ut.tempus} | Beat: {str(ut.beat)} = {ut.bpm} BPM',
-            x=0,
-            font=dict(color='white')
-        ),
-        plot_bgcolor='black',
-        paper_bgcolor='black',
-        showlegend=False,
-        height=height,
-        margin=dict(l=50, r=20, t=40, b=20),
-        yaxis=dict(
-            showgrid=False,
-            showticklabels=False,
-            fixedrange=True,
-            range=[-0.5, 0.5]
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor='#333333',
-            color='white',
-            title='Time (seconds)',
-            range=[ut.offset, ut.offset + ut.duration * 1.1]
-        ),
-        barmode='overlay'  # Changed to overlay mode
-    )
-
-    return fig
-
-def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] = (20, 5), 
+def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] = (20, 5), 
             invert: bool = True, output_file: str | None = None, 
             attributes: list[str] | None = None, vertical_lines: bool = True) -> None:
     """
@@ -392,7 +369,7 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
         vertical_lines: When True, draws vertical lines at block boundaries
     """
     if layout == 'default':
-        return plot_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
+        return _plot_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
     
     elif layout == 'containers':
         
@@ -562,7 +539,7 @@ def plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, fl
     else:
         raise ValueError(f"Unknown layout: {layout}. Choose 'default' or 'containers'.")
 
-def plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
+def _plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
                title=None, grid=True, legend=True, output_file=None):
     """
     Plot one or more curves with a consistent dark background style.
@@ -636,202 +613,71 @@ def plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None,
     else:
         plt.show()
 
-def plot_timeline(
-    units: List[Union[TemporalUnit, TemporalUnitSequence, TemporalBlock]],
-    width: int = 1200,
-    track_height: int = 100,
-    title: str = "Timeline",
-    show_labels: bool = True,
-    show_grid: bool = True,
-    color_scheme: str = "dark",
-    output_file: Optional[str] = None
-) -> go.Figure:
+def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (10, 10), 
+             node_size: float = 1000, font_size: float = 12, 
+             show_edge_labels: bool = False, edge_alpha: float = 0.3,
+             title: str = None, output_file: str = None) -> None:
+    """
+    Plot a CombinationSet as a circular graph with all combinations connected.
     
-    temporal_objects = []
+    Args:
+        cs: CombinationSet instance to visualize
+        figsize: Width and height of the output figure in inches
+        node_size: Size of the nodes in the plot
+        font_size: Size of the node labels
+        show_edge_labels: Whether to show labels on edges
+        edge_alpha: Transparency of the edges (0-1)
+        title: Title for the plot (auto-generated if None)
+        output_file: Path to save the visualization (displays plot if None)
+    """
+    plt.figure(figsize=figsize)
+    ax = plt.gca()
     
-    for unit in units:
-        if isinstance(unit, TemporalUnit):
-            temporal_objects.append(unit)
-        elif isinstance(unit, TemporalUnitSequence):
-            temporal_objects.extend(unit.seq)
-        elif isinstance(unit, TemporalBlock):
-            for row in unit.rows:
-                if isinstance(row, TemporalUnit):
-                    temporal_objects.append(row)
-                elif isinstance(row, TemporalUnitSequence):
-                    temporal_objects.extend(row.seq)
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
     
-    if not temporal_objects:
-        raise ValueError("No temporal units found in input")
+    G = cs.graph
+    pos = nx.circular_layout(G)
     
-    tracks = _assign_tracks(temporal_objects)
-    num_tracks = max(track for _, track in tracks.items()) + 1
+    # Draw edges with low alpha since it's a complete graph
+    nx.draw_networkx_edges(G, pos, edge_color='#808080', width=1, alpha=edge_alpha)
     
-    colors = {
-        "dark": {
-            "background": "black",
-            "grid": "#333333",
-            "text": "white",
-            "rest": "#808080",
-            "duration": "#e6e6e6",
-            "subdivision": "#c8c8c8"
-        }
-    }
-    scheme = colors.get(color_scheme, colors["dark"])
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos, node_color='black', node_size=node_size,
+                         edgecolors='white', linewidths=2)
     
-    fig = go.Figure()
+    # Create labels from combos
+    labels = {}
+    for node, attrs in G.nodes(data=True):
+        if 'combo' in attrs:
+            combo = attrs['combo']
+            label = ''.join(str(cs.factor_to_alias[f]).strip('()') for f in combo)
+            labels[node] = label
     
-    for idx, ut in enumerate(temporal_objects):
-        track = tracks[idx]
-        
-        for _, event in ut.events.iterrows():
-            is_rest = event['is_rest']
-            ratio = event['metric_ratio']
-            
-            color = scheme["rest"] if is_rest else scheme["duration"]
-            
-            fig.add_trace(
-                go.Scatter(
-                    x=[event['start'], event['start'] + abs(event['duration'])],
-                    y=[track, track],
-                    mode="lines",
-                    line=dict(
-                        color=color,
-                        width=track_height * 0.6,
-                    ),
-                    fill=None,
-                    showlegend=False,
-                    hovertemplate=(
-                        f"Track: {track}<br>"
-                        f"Start: %{{x[0]:.2f}}s<br>"
-                        f"End: %{{x[1]:.2f}}s<br>"
-                        f"Duration: {abs(event['duration']):.2f}s<br>"
-                        f"Ratio: {ratio}<br>"
-                        f"Unit: {ut.tempus} | {ut.beat}={ut.bpm} BPM"
-                    ),
-                    hoverlabel=dict(bgcolor=scheme["background"]),
-                )
-            )
-            
-            if show_labels and track_height >= 80:
-                fig.add_annotation(
-                    x=(event['start'] + event['start'] + abs(event['duration'])) / 2,
-                    y=track,
-                    text=str(ratio),
-                    showarrow=False,
-                    font=dict(
-                        size=min(12, max(8, int(track_height * 0.1))),
-                        color="white" if is_rest else "black"
-                    ),
-                    bgcolor="rgba(0,0,0,0)"
-                )
+    nx.draw_networkx_labels(G, pos, labels=labels, font_color='white', font_size=font_size)
     
-    y_range = [-0.5, num_tracks - 0.5]
-    x_min = min(ut.offset for ut in temporal_objects)
-    x_max = max(ut.offset + ut.duration for ut in temporal_objects)
-    x_padding = (x_max - x_min) * 0.05
+    if show_edge_labels and G.number_of_edges() < 50:  # Only show edge labels for smaller graphs
+        edge_labels = {(u, v): f'{u}-{v}' for u, v in G.edges()}
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels,
+                                   font_color='white', font_size=font_size-2,
+                                   bbox=dict(facecolor='black', edgecolor='none', alpha=0.6))
     
-    fig.update_layout(
-        title=title,
-        width=width,
-        height=track_height * num_tracks + 100,
-        plot_bgcolor=scheme["background"],
-        paper_bgcolor=scheme["background"],
-        font=dict(color=scheme["text"]),
-        margin=dict(l=50, r=50, t=50, b=50),
-        xaxis=dict(
-            showgrid=show_grid,
-            gridcolor=scheme["grid"],
-            zeroline=False,
-            title="Time (seconds)",
-            range=[x_min - x_padding, x_max + x_padding]
-        ),
-        yaxis=dict(
-            showgrid=False,
-            zeroline=False,
-            showticklabels=False,
-            range=y_range
-        ),
-        dragmode="pan",
-        modebar=dict(
-            orientation="v",
-            bgcolor=scheme["background"],
-            color=scheme["text"]
-        ),
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="left",
-                buttons=[
-                    dict(
-                        args=[{"yaxis.range": y_range}],
-                        label="Reset Y",
-                        method="relayout"
-                    ),
-                    dict(
-                        args=[{"xaxis.range": [x_min - x_padding, x_max + x_padding]}],
-                        label="Reset X",
-                        method="relayout"
-                    ),
-                    dict(
-                        args=[{"xaxis.range": [x_min - x_padding, x_max + x_padding], 
-                              "yaxis.range": y_range}],
-                        label="Reset All",
-                        method="relayout"
-                    ),
-                ],
-                pad={"r": 10, "t": 10},
-                showactive=False,
-                x=0.15,
-                y=1.1,
-                bgcolor=scheme["background"],
-                bordercolor=scheme["grid"],
-                font=dict(color=scheme["text"])
-            )
-        ]
-    )
+    if title is None:
+        factor_string = ' '.join(str(cs.factor_to_alias[f]) for f in cs.factors)
+        title = f"CombinationSet r={cs.rank} [{factor_string}]"
     
-    config = {
-        "scrollZoom": True,
-        "displayModeBar": True,
-        "modeBarButtonsToAdd": ["drawline", "eraseshape"],
-        "toImageButtonOptions": {
-            "format": "png",
-            "filename": "timeline",
-            "height": track_height * num_tracks + 100,
-            "width": width,
-            "scale": 2
-        }
-    }
+    ax.set_title(title, color='white', fontsize=14)
+    plt.axis('off')
+    plt.margins(x=0.1, y=0.1)
     
     if output_file:
-        fig.write_html(output_file, include_plotlyjs="cdn", config=config)
-    
-    return fig
+        plt.savefig(output_file, bbox_inches='tight', pad_inches=0, 
+                    facecolor='black', edgecolor='none')
+        plt.close()
+    else:
+        plt.show()
 
-def _assign_tracks(units: List[TemporalUnit]) -> Dict[int, int]:
-    sorted_units = sorted(enumerate(units), key=lambda x: x[1].offset)
-    tracks = {}
-    track_end_times = []
-    
-    for idx, unit in sorted_units:
-        unit_start = unit.offset
-        unit_end = unit.offset + unit.duration
-        
-        track_idx = 0
-        while track_idx < len(track_end_times) and unit_start < track_end_times[track_idx]:
-            track_idx += 1
-            
-        if track_idx == len(track_end_times):
-            track_end_times.append(unit_end)
-        else:
-            track_end_times[track_idx] = unit_end
-            
-        tracks[idx] = track_idx
-        
-    return tracks
-
-def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
+def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
              node_size: int = 30, text_size: int = 12, show_labels: bool = True,
              title: str = None, output_file: str = None) -> go.Figure:
     """
@@ -860,7 +706,7 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     master_set_name = cps.master_set
     if not master_set_name:
         raise ValueError(
-            f"CPS instance has no master set defined. plot_cps() requires a master set for node positioning.\n"
+            f"CPS instance has no master set defined. plot() requires a master set for node positioning.\n"
             f"Available master sets: {list(MASTER_SETS.keys())}\n"
             f"Try using specific CPS classes like Hexany, Eikosany, or Hebdomekontany, "
             f"or create a CPS with master_set parameter: CombinationProductSet(factors, r, master_set='tetrad')"
@@ -938,7 +784,7 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
                     mode='lines',
-                    line=dict(color='white', width=1),
+                    line=dict(color='#808080', width=1),
                     showlegend=False,
                     hoverinfo='none'
                 )
@@ -1016,3 +862,166 @@ def plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             fig.write_image(output_file)
     
     return fig
+
+def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(16, 8), 
+                       resolution: int = 1000, show_labels: bool = True, 
+                       show_grid: bool = True, title: str = None, output_file: str = None):
+    """
+    Plot a DynamicRange as a colored curve with dynamic markings.
+    
+    Args:
+        dynamic_range: DynamicRange instance to visualize
+        mode: 'db' or 'amp' to plot decibel or amplitude values
+        figsize: Tuple of (width, height) for the figure
+        resolution: Number of points in the curve for smooth plotting
+        show_labels: Whether to show dynamic marking labels
+        show_grid: Whether to show grid lines
+        title: Title for the plot (auto-generated if None)
+        output_file: Path to save the plot (if None, displays plot)
+        
+    Returns:
+        None
+    """
+    plt.figure(figsize=figsize)
+    ax = plt.gca()
+    
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
+    
+    dynamics = dynamic_range._dynamics
+    num_dynamics = len(dynamics)
+    
+    match mode.lower():
+        case 'db':
+            min_val = dynamic_range.min_dynamic.db
+            max_val = dynamic_range.max_dynamic.db
+            ylabel = 'Decibels (dB)'
+            get_value = lambda d: d.db
+            mode_display = 'dB'
+        case 'amp':
+            min_val = dynamic_range.min_dynamic.amp
+            max_val = dynamic_range.max_dynamic.amp
+            ylabel = 'Amplitude'
+            get_value = lambda d: d.amp
+            mode_display = 'amp'
+        case _:
+            raise ValueError(f"Invalid mode '{mode}'. Must be 'db' or 'amp'.")
+    
+    x = np.linspace(0, 1, resolution)
+    y = np.zeros(resolution)
+    
+    for i, xi in enumerate(x):
+        norm_pos = xi
+        
+        if dynamic_range.curve == 0:
+            curved_pos = norm_pos
+        else:
+            curved_pos = (np.exp(dynamic_range.curve * norm_pos) - 1) / (np.exp(dynamic_range.curve) - 1)
+        
+        value = min_val + curved_pos * (max_val - min_val)
+        y[i] = value
+    
+    colors = plt.cm.plasma(np.linspace(0, 1, resolution))
+    
+    for i in range(resolution - 1):
+        ax.plot([x[i], x[i+1]], [y[i], y[i+1]], 
+               color=colors[i], linewidth=3, alpha=0.8)
+    
+    if show_labels:
+        dynamic_positions = np.linspace(0, 1, num_dynamics)
+        
+        for i, (pos, dyn) in enumerate(zip(dynamic_positions, dynamics)):
+            dynamic_obj = dynamic_range[dyn]
+            value = get_value(dynamic_obj)
+            
+            ax.axvline(x=pos, color='white', linestyle='--', alpha=0.6, linewidth=1)
+            
+            ax.text(pos, max_val + (max_val - min_val) * 0.02, dyn, 
+                   ha='center', va='bottom', color='white', fontsize=12, fontweight='bold')
+            
+            ax.scatter([pos], [value], color='white', s=50, zorder=5, edgecolor='black', linewidth=1)
+    
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_ylim(min_val - (max_val - min_val) * 0.05, max_val + (max_val - min_val) * 0.1)
+    
+    # ax.set_xlabel('Dynamic Range Position', color='white', fontsize=12)
+    ax.set_ylabel(ylabel, color='white', fontsize=12)
+    
+    if title is None:
+        curve_desc = f"curve={dynamic_range.curve}" if dynamic_range.curve != 0 else "linear"
+        title = f"Dynamic Range ({mode_display}) - {curve_desc}"
+    
+    ax.set_title(title, color='white', fontsize=14)
+    
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'].set_color('white') 
+    ax.spines['right'].set_color('white')
+    ax.spines['left'].set_color('white')
+    
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    
+    if show_grid:
+        ax.grid(color='#555555', linestyle='-', linewidth=0.5, alpha=0.5)
+    
+    plt.tight_layout()
+    
+    if output_file:
+        plt.savefig(output_file, bbox_inches='tight', facecolor='black')
+        plt.close()
+    else:
+        plt.show()
+
+def _plot_envelope(envelope: Envelope, figsize=(16, 8), show_points: bool = True,
+                  show_grid: bool = True, title: str = None, output_file: str = None):
+    plt.figure(figsize=figsize)
+    ax = plt.gca()
+    
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
+    
+    x = envelope.time_points
+    y = np.array(envelope)
+    
+    ax.plot(x, y, color='#e6e6e6', linewidth=2.5)
+    
+    if show_points:
+        point_times = [0]
+        current_time = 0
+        for duration in envelope._times:
+            current_time += duration * envelope._time_scale
+            point_times.append(current_time)
+        
+        point_values = envelope._values
+        ax.scatter(point_times, point_values, color='white', s=80, 
+                  zorder=5, edgecolor='black', linewidth=2)
+        
+        for i, (t, v) in enumerate(zip(point_times, point_values)):
+            ax.text(t, v + (max(y) - min(y)) * 0.05, f'{v:.2f}', 
+                   ha='center', va='bottom', color='white', fontsize=10, fontweight='bold')
+    
+    if title is None:
+        title = f"Envelope"
+    
+    ax.set_title(title, color='white', fontsize=14)
+    ax.set_xlabel('Time', color='white', fontsize=12)
+    ax.set_ylabel('Value', color='white', fontsize=12)
+    
+    ax.spines['bottom'].set_color('white')
+    ax.spines['top'].set_color('white') 
+    ax.spines['right'].set_color('white')
+    ax.spines['left'].set_color('white')
+    
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    
+    if show_grid:
+        ax.grid(color='#555555', linestyle='-', linewidth=0.5, alpha=0.5)
+    
+    plt.tight_layout()
+    
+    if output_file:
+        plt.savefig(output_file, bbox_inches='tight', facecolor='black')
+        plt.close()
+    else:
+        plt.show()

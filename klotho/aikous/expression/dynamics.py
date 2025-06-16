@@ -10,6 +10,7 @@ Classes and functions for working with musical dynamics.
 import numpy as np
 from numpy.polynomial import Polynomial
 from scipy import interpolate
+from functools import lru_cache
 
 __all__ = [
     'DynamicRange',
@@ -47,12 +48,6 @@ class Dynamic:
 
 class DynamicRange:
   '''
-  Musical dynamics mapped to decibels.
-
-  Note: the decibel level for the loudest 
-  dynamic (ffff) is 0 dB as this translates 
-  to an amplitude of 1.0.
-
   ----------------|---------|----------------
   Name            | Letters	| Level
   ----------------|---------|----------------
@@ -74,14 +69,14 @@ class DynamicRange:
     self._curve = curve
     self._dynamics = dynamics
     self._range = self._calculate_range()
-    
+
   @property
-  def min_db(self):
-    return self._min_db
+  def min_dynamic(self):
+    return self._range[self._dynamics[0]]
   
   @property
-  def max_db(self):
-    return self._max_db
+  def max_dynamic(self):
+    return self._range[self._dynamics[-1]]
   
   @property
   def curve(self):
@@ -102,10 +97,8 @@ class DynamicRange:
         
         if self._curve == 0:
             curved_pos = normalized_pos
-        elif self._curve > 0:
-            curved_pos = normalized_pos ** (1 + self._curve)
         else:
-            curved_pos = 1 - ((1 - normalized_pos) ** (1 - self._curve))
+            curved_pos = (np.exp(self._curve * normalized_pos) - 1) / (np.exp(self._curve) - 1)
             
         db_value = min_db + curved_pos * (max_db - min_db)
         result[dyn] = Dynamic(dyn, db_value)
@@ -114,6 +107,41 @@ class DynamicRange:
 
   def __getitem__(self, dynamic):
     return self._range[dynamic]
+
+  @lru_cache(maxsize=128)
+  def at(self, position):
+    if position < 0 or position > 1:
+        raise ValueError(f"Position {position} must be between 0 and 1")
+    
+    if position == 0:
+        return self._range[self._dynamics[0]]
+    if position == 1:
+        return self._range[self._dynamics[-1]]
+    
+    num_dynamics = len(self._dynamics)
+    dynamic_positions = np.linspace(0, 1, num_dynamics)
+    
+    zone_index = 0
+    for i in range(num_dynamics - 1):
+        if position < dynamic_positions[i + 1]:
+            zone_index = i
+            break
+    else:
+        zone_index = num_dynamics - 1
+    
+    marking = self._dynamics[zone_index]
+    
+    min_db = float(self._min_db)
+    max_db = float(self._max_db)
+    
+    if self._curve == 0:
+        curved_pos = position
+    else:
+        curved_pos = (np.exp(self._curve * position) - 1) / (np.exp(self._curve) - 1)
+        
+    db_value = min_db + curved_pos * (max_db - min_db)
+    
+    return Dynamic(marking, db_value)
 
 def ampdb(amp: float) -> float:
   '''

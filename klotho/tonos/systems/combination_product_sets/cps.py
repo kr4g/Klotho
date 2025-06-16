@@ -47,6 +47,10 @@ class CombinationProductSet(CS):
     
   def _populate_graph(self):
     """Populate graph nodes with combo, product, ratio, and alias information."""
+    
+    self._graph = self._graph.to_directed()
+    self._graph.clear_edges()
+    
     for node, attrs in self._graph.nodes(data=True):
       if 'combo' in attrs:
         combo = attrs['combo']

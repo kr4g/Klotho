@@ -310,9 +310,10 @@ class CombinationSet:
         return {v: k for k, v in self._factor_aliases.items()}
     
     def _generate_graph(self):
-        G = nx.DiGraph()
+        n_nodes = len(self._combos)
+        G = nx.complete_graph(n_nodes)
         for i, combo in enumerate(self._combos):
-            G.add_node(i, combo=combo)
+            G.nodes[i]['combo'] = combo
         return G
     
     def __str__(self):    

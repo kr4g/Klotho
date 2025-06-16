@@ -22,7 +22,7 @@ from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence,
 
 from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 
-from .skora.visualization.plots import plot_tree, plot_rt, plot_ratios, plot_curve, plot_cps, plot_graph
+from .skora.visualization.plots import plot
 
 from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
 
@@ -38,4 +38,4 @@ __all__ = [
     'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
-__version__ = '2.2.5'
+__version__ = '2.3.0'
