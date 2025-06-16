@@ -353,7 +353,7 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
     else:
         plt.show()
 
-def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] = (20, 5), 
+def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] | None = None, 
             invert: bool = True, output_file: str | None = None, 
             attributes: list[str] | None = None, vertical_lines: bool = True) -> None:
     """
@@ -361,17 +361,26 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     
     Args:
         rt: RhythmTree instance to visualize
-        layout: 'default' uses the standard tree visualization, 'containers' shows proportional containers
+        layout: 'tree' uses the standard tree visualization, 'containers' shows proportional containers, 'ratios' shows just the ratio segmentation
         figsize: Width and height of the output figure in inches
         invert: When True, places root at the top; when False, root is at the bottom
         output_file: Path to save the visualization (displays plot if None)
-        attributes: List of node attributes to display (only used with 'default' layout)
+        attributes: List of node attributes to display (only used with 'tree' layout)
         vertical_lines: When True, draws vertical lines at block boundaries
     """
-    if layout == 'default':
+    if layout == 'tree':
+        if figsize is None:
+            figsize = (20, 5)
         return _plot_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
     
+    elif layout == 'ratios':
+        if figsize is None:
+            figsize = (20, 1)
+        return _plot_ratios(rt.ratios, figsize=figsize, output_file=output_file)
+    
     elif layout == 'containers':
+        if figsize is None:
+            figsize = (20, 5)
         
         def get_node_scaling(node, rt, min_scale=0.5):
             """Calculate the height scaling for a node based on its position in the tree."""
@@ -409,7 +418,8 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         max_depth = rt.depth
         
         margin = 0.01
-        usable_height = 1.0 - (2 * margin)
+        ratio_space = 0.15
+        usable_height = 1.0 - (2 * margin) - ratio_space
         
         level_positions = []
         level_height = usable_height / (max_depth + 1)
@@ -418,7 +428,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             if invert:
                 y_pos = 1.0 - margin - (level * level_height) - (level_height / 2)
             else:
-                y_pos = margin + (level * level_height) + (level_height / 2)
+                y_pos = margin + ratio_space + (level * level_height) + (level_height / 2)
             level_positions.append(y_pos)
         
         vertical_line_positions = set() # avoid duplicates
@@ -500,12 +510,12 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                     
                     if not is_first_child and left_x not in vertical_line_positions:
                         vertical_line_positions.add(left_x)
-                        plt.plot([left_x, left_x], [y_pos - bar_height/2, 0], 
+                        plt.plot([left_x, left_x], [y_pos - bar_height/2, margin], 
                                 color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
                     
                     if not is_last_child and right_x not in vertical_line_positions:
                         vertical_line_positions.add(right_x)
-                        plt.plot([right_x, right_x], [y_pos - bar_height/2, 0], 
+                        plt.plot([right_x, right_x], [y_pos - bar_height/2, margin], 
                                 color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
         
         if vertical_lines:
@@ -515,13 +525,34 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             
             # Left border (x=0)
             if 0 not in vertical_line_positions:
-                plt.plot([0, 0], [top_bar_bottom, 0], 
+                plt.plot([0, 0], [top_bar_bottom, margin], 
                         color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
             
             # Right border (x=1)
             if 1 not in vertical_line_positions:
-                plt.plot([1, 1], [top_bar_bottom, 0], 
+                plt.plot([1, 1], [top_bar_bottom, margin], 
                         color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
+        
+        ratios = rt.ratios
+        total_ratio = sum(abs(r) for r in ratios)
+        segment_widths = [abs(r) / total_ratio for r in ratios]
+        
+        positions = [0]
+        for width in segment_widths[:-1]:
+            positions.append(positions[-1] + width)
+        
+        ratio_bar_height = ratio_space * 0.4
+        ratio_y_center = margin + ratio_space * 0.5
+        
+        for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):
+            color = '#808080' if ratio < 0 else '#e6e6e6'
+            ax.add_patch(plt.Rectangle((pos, ratio_y_center - ratio_bar_height/2), width, ratio_bar_height, 
+                                     facecolor=color,
+                                     edgecolor=None, alpha=0.4 if ratio < 0 else 1))
+        
+        for pos in positions + [1.0]:
+            ax.plot([pos, pos], [ratio_y_center - ratio_bar_height/2, ratio_y_center + ratio_bar_height/2], 
+                    color='#aaaaaa', linewidth=2)
         
         plt.axis('off')
         plt.xlim(-0.01, 1.01)
@@ -537,7 +568,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             plt.show()
     
     else:
-        raise ValueError(f"Unknown layout: {layout}. Choose 'default' or 'containers'.")
+        raise ValueError(f"Unknown layout: {layout}. Choose 'tree', 'containers', or 'ratios'.")
 
 def _plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
                title=None, grid=True, legend=True, output_file=None):
