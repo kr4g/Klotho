@@ -71,6 +71,8 @@ coverage.xml
 
 # Documentation
 docs/_build/
+docs/rebuild_docs.sh
+check_docs.py
 
 # Media files
 *.mp4

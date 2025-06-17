@@ -17,7 +17,7 @@ from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
 from klotho.topos.collections.sets import CombinationSet
 from klotho.dynatos.expression.dynamics import DynamicRange
-from klotho.dynatos.expression.enevelopes import Envelope
+from klotho.dynatos.expression.envelopes import Envelope
 
 __all__ = ['plot']
 

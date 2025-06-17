@@ -50,4 +50,4 @@ __all__ = [
     'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
-__version__ = '3.0.5'
+__version__ = '3.1.0'

@@ -15,7 +15,7 @@ humans, into algebraic musical representations.
 --------------------------------------------------------------------------------------
 '''
 from .dynamics import Dynamic, DynamicRange, dbamp, ampdb, freq_amp_scale
-from .enevelopes import line, arch, map_curve
+from .envelopes import line, arch, map_curve
 
 __all__ = [
     'Dynamic',

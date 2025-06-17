@@ -1,7 +1,7 @@
 import random
 from collections import defaultdict
 from ..networks import ComboNet
-from klotho.tonos.combination_product_sets import CombinationProductSet
+from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from typing import Union
 
 class ComboNetTraversal:

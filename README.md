@@ -9,8 +9,19 @@ Klotho adapts to multiple Python workflows, supporting traditional scripting, in
 
 ### Option 1: Install from PyPI (Recommended)
 
+**Basic Installation:**
 ```bash
 pip install klotho-cac
+```
+
+**With Documentation Tools:**
+```bash
+pip install klotho-cac[docs]
+```
+
+**For Development (includes documentation tools and testing):**
+```bash
+pip install klotho-cac[dev]
 ```
 
 ### Option 2: Install from Source
@@ -33,6 +44,12 @@ pip install klotho-cac
     
     ```
     pip install -e .
+    ```
+    
+    **For development with all dependencies:**
+    
+    ```
+    pip install -e .[dev]
     ```
     
     Or install the required dependencies separately:

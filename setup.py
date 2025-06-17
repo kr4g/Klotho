@@ -27,9 +27,23 @@ setup(
         'abjad',
         'mido'
     ],
-    # tests_require=[
-    #     'pytest',
-    # ],
+    extras_require={
+        'docs': [
+            'sphinx>=7.0.0',
+            'sphinx-rtd-theme',
+            'numpydoc',
+            'sphinx-autodoc-typehints',
+            'sphinx-copybutton',
+        ],
+        'dev': [
+            'pytest',
+            'sphinx>=7.0.0',
+            'sphinx-rtd-theme',
+            'numpydoc',
+            'sphinx-autodoc-typehints',
+            'sphinx-copybutton',
+        ]
+    },
     description='Graph-Oriented Computer-Assisted Composition in Python',
     long_description=long_description,
     long_description_content_type='text/markdown',
