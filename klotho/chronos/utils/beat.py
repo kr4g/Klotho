@@ -46,5 +46,5 @@ def beat_duration(ratio:Union[int, float, Fraction, str], bpm:Union[int, float],
   return tempo_factor * ratio_value * (beat_ratio.denominator / beat_ratio.numerator)
 
 def calc_onsets(durations:tuple):
-    return tuple(accumulate([0] + list(abs(r) for r in durations)))
+    return tuple(accumulate([0] + list(abs(r) for r in durations[:-1])))
 

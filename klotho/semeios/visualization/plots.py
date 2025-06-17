@@ -657,7 +657,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             
             for node in nodes:
                 node_data = rt.graph.nodes[node]
-                ratio = node_data.get('ratio', None)
+                ratio = node_data.get('duration_ratio', None)
                 proportion = node_data.get('proportion', None)
                 
                 # XXX - maybe not necessary

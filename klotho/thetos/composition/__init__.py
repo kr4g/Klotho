@@ -5,4 +5,8 @@ This module provides tools for creating and manipulating composite musical struc
 that span multiple domains (temporal, tonal, parametric, etc.).
 """
 
-__all__ = [] 
+from .compositional import CompositionalUnit
+
+__all__ = [
+    'CompositionalUnit',
+] 

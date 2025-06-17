@@ -16,8 +16,8 @@ Submodules:
 from . import topos
 from . import chronos
 from . import tonos
-from . import thetos
 from . import dynatos
+from . import thetos
 from . import semeios
 from . import utils
 
@@ -28,6 +28,8 @@ from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence,
 
 from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 
+from .thetos import ParameterTree, Instrument, CompositionalUnit
+
 from .semeios.visualization.plots import plot
 from .semeios.notelists.scheduler import Scheduler
 from .semeios.midi import midi as export_midi
@@ -37,9 +39,10 @@ from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, o
 from .utils.playback.player import play, pause, stop, sync
 
 __all__ = [
-    'topos', 'chronos', 'tonos', 'thetos', 'dynatos', 'semeios', 'utils',
+    'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
     'Pitch', 'Scale', 'Chord', 
     'AddressedScale', 'AddressedChord',
+    'ParameterTree', 'Instrument', 'CompositionalUnit',
     'frequency', 'cent', 'midicent', 'midi',
     'amplitude', 'decibel', 'onset', 'duration',
     'RhythmTree', 'TemporalUnit',
@@ -47,4 +50,4 @@ __all__ = [
     'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
-__version__ = '3.0.4'
+__version__ = '3.0.5'

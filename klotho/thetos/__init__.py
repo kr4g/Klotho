@@ -7,16 +7,20 @@ deals with the placement and configuration of musical parameters and instruments
 
 from . import instruments
 from . import parameters
+from . import composition
 
 from .parameters import ParameterTree
 from .instruments import Instrument
+from .composition import CompositionalUnit
 from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
 
 __all__ = [
     'instruments',
     'parameters',
+    'composition',
     'ParameterTree',
     'Instrument',
+    'CompositionalUnit',
     'frequency', 
     'cent', 
     'midicent', 

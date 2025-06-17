@@ -17,11 +17,13 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
+import networkx as nx
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
 from .meas import Meas
 from .algorithms import sum_proportions, measure_complexity, ratios_to_subdivs
+from ..utils.beat import calc_onsets
 
 
 class RhythmTree(Tree):
@@ -63,7 +65,6 @@ class RhythmTree(Tree):
                  meas:Union[Meas,Fraction,str] = '4/4',
                  subdivisions:Tuple            = (1,1)):
         
-        self._initializing = True
         super().__init__(Meas(meas).numerator, subdivisions)
         
         self._meta['span'] = span
@@ -71,13 +72,11 @@ class RhythmTree(Tree):
         self._meta['type'] = None
         self._subdivisions = self._cast_subdivs(subdivisions)
         
-       
-        self._initializing = False
         self._ratios = self._evaluate()
     
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
-        return cls(span = span, meas = Meas(tree[tree.root]['ratio']), subdivisions = tree._list[1])
+        return cls(span = span, meas = Meas(tree[tree.root]['duration_ratio']), subdivisions = tree._list[1])
     
     @classmethod
     def from_ratios(cls, ratios:Tuple[Fraction, float, str], span:int = 1):
@@ -123,7 +122,7 @@ class RhythmTree(Tree):
         return tuple(convert_to_tuple(child) for child in children)
     
     def _evaluate(self):
-        self.graph.nodes[self.root]['ratio'] = self.meas
+        self.graph.nodes[self.root]['duration_ratio'] = self.meas
         def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
             node_data = self.graph.nodes[node]
             
@@ -140,7 +139,7 @@ class RhythmTree(Tree):
             
             if not children:
                 ratio = Fraction(label_value) * parent_ratio
-                self.graph.nodes[node]['ratio'] = ratio
+                self.graph.nodes[node]['duration_ratio'] = ratio
                 return
             
             div = int(sum(abs(self.graph.nodes[c]['label'] * 
@@ -159,13 +158,27 @@ class RhythmTree(Tree):
                     s = s * child_data['meta']['span']
                 s = int(s) if isinstance(s, float) else s
                 ratio = Fraction(s, div) * parent_ratio
-                self.graph.nodes[child]['ratio'] = ratio
+                self.graph.nodes[child]['duration_ratio'] = ratio
                 self.graph.nodes[child]['proportion'] = s
                 if self.graph.out_degree(child) > 0:
                     _process_subtree(child, ratio)
         
         _process_subtree()
-        return tuple(self.graph.nodes[n]['ratio'] for n in self.leaf_nodes)
+        onsets = calc_onsets([self.graph.nodes[n]['duration_ratio'] for n in self.leaf_nodes])
+        for n, o in zip(self.leaf_nodes, onsets):
+            onset = -o if self.graph.nodes[n]['duration_ratio'] < 0 else o
+            self.graph.nodes[n]['onset_ratio'] = onset
+        
+        bfs_order = list(nx.bfs_tree(self.graph, self.root).nodes())
+        non_leaf_nodes = [n for n, d in self.graph.out_degree() if d > 0]
+        for node in non_leaf_nodes:
+            current = node
+            while self.graph.out_degree(current) > 0:
+                children = list(self.graph.successors(current))
+                current = min(children, key=lambda x: bfs_order.index(x))
+            self.graph.nodes[node]['onset_ratio'] = self.graph.nodes[current]['onset_ratio']
+        
+        return tuple(self.graph.nodes[n]['duration_ratio'] for n in self.leaf_nodes)
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)
@@ -205,8 +218,7 @@ class RhythmTree(Tree):
     def __repr__(self):
         return self.__str__()
 
-    def before_notify(self):
-        """Recalculate ratios before notifying observers."""
-        super().before_notify()
-        if not getattr(self, '_initializing', False):
-            self._ratios = self._evaluate()
+    def copy(self):
+        return RhythmTree(span=self.span, meas=self.meas, subdivisions=self.subdivisions)
+
+

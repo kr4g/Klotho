@@ -2,7 +2,6 @@ from fractions import Fraction
 from math import gcd
 from numbers import Rational
 
-
 class Meas:
     '''
     Time signature class that preserves unreduced fractions.

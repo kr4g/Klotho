@@ -127,19 +127,18 @@ class Tree(Graph):
         if parent not in self._graph:
             raise ValueError(f"Parent node {parent} not found in tree")
         
-        with self.batch_operation():
-            node_id = super().add_node(**attr)
+        node_id = super().add_node(**attr)
+        
+        if index is None or index >= len(list(self._graph.successors(parent))):
+            self._graph.add_edge(parent, node_id)
+        else:
+            children = list(self._graph.successors(parent))
+            self._graph.add_edge(parent, node_id)
             
-            if index is None or index >= len(list(self._graph.successors(parent))):
-                self._graph.add_edge(parent, node_id)
-            else:
-                children = list(self._graph.successors(parent))
-                self._graph.add_edge(parent, node_id)
-                
-                for i, child in enumerate(children):
-                    if i >= index:
-                        self._graph.remove_edge(parent, child)
-                        self._graph.add_edge(parent, child)
+            for i, child in enumerate(children):
+                if i >= index:
+                    self._graph.remove_edge(parent, child)
+                    self._graph.add_edge(parent, child)
         
         return node_id
     
@@ -147,25 +146,24 @@ class Tree(Graph):
         if parent not in self._graph:
             raise ValueError(f"Parent node {parent} not found in tree")
         
-        with self.batch_operation():
-            id_mapping = {}
-            for node in subtree.graph.nodes():
-                new_id = super().add_node(**subtree.graph.nodes[node])
-                id_mapping[node] = new_id
+        id_mapping = {}
+        for node in subtree.graph.nodes():
+            new_id = super().add_node(**subtree.graph.nodes[node])
+            id_mapping[node] = new_id
+        
+        for u, v in subtree.graph.edges():
+            self._graph.add_edge(id_mapping[u], id_mapping[v])
+        
+        if index is None or index >= len(list(self._graph.successors(parent))):
+            self._graph.add_edge(parent, id_mapping[subtree.root])
+        else:
+            children = list(self._graph.successors(parent))
+            self._graph.add_edge(parent, id_mapping[subtree.root])
             
-            for u, v in subtree.graph.edges():
-                self._graph.add_edge(id_mapping[u], id_mapping[v])
-            
-            if index is None or index >= len(list(self._graph.successors(parent))):
-                self._graph.add_edge(parent, id_mapping[subtree.root])
-            else:
-                children = list(self._graph.successors(parent))
-                self._graph.add_edge(parent, id_mapping[subtree.root])
-                
-                for i, child in enumerate(children):
-                    if i >= index:
-                        self._graph.remove_edge(parent, child)
-                        self._graph.add_edge(parent, child)
+            for i, child in enumerate(children):
+                if i >= index:
+                    self._graph.remove_edge(parent, child)
+                    self._graph.add_edge(parent, child)
         
         return id_mapping
     
@@ -179,32 +177,26 @@ class Tree(Graph):
         if self._graph.out_degree(node) > 0:
             raise ValueError(f"Node {node} is not a leaf node")
         
-        with self.batch_operation():
-            parent = self.parent(node)
-            if parent:
-                self._graph.remove_edge(parent, node)
-            self._graph.remove_node(node)
-        self.notify_observers()
+        parent = self.parent(node)
+        if parent:
+            self._graph.remove_edge(parent, node)
+        self._graph.remove_node(node)
     
     def remove_subtree(self, node):
         if node not in self._graph:
             raise ValueError(f"Node {node} not found in tree")
         
         if node == self.root:
-            with self.batch_operation():
-                self.clear()
+            self.clear()
             return
         
-        with self.batch_operation():
-            parent = self.parent(node)
-            if parent:
-                self._graph.remove_edge(parent, node)
-            
-            descendants = [node] + list(self.descendants(node))
-            for n in descendants:
-                self._graph.remove_node(n)
+        parent = self.parent(node)
+        if parent:
+            self._graph.remove_edge(parent, node)
         
-        self.notify_observers()
+        descendants = [node] + list(self.descendants(node))
+        for n in descendants:
+            self._graph.remove_node(n)
     
     def replace_node(self, old_node, **attr):
         if old_node not in self._graph:
@@ -284,7 +276,6 @@ class Tree(Graph):
                     self._graph.add_edge(leaves[leaf_idx], child)
         
         self._graph.remove_node(node)
-        self.notify_observers()
         
         return id_mapping
     
@@ -312,8 +303,6 @@ class Tree(Graph):
                     self._graph.remove_edge(new_parent, child)
                     self._graph.add_edge(new_parent, child)
         
-        self.notify_observers()
-    
     def _build_tree(self, root, children):
         root_id = super().add_node(label=root)
         self._add_children(root_id, children)
@@ -335,6 +324,13 @@ class Tree(Graph):
                     child_id = super().add_node(label=child)
                     self._graph.add_edge(parent_id, child_id)
     
+    def copy(self):
+        """Create a deep copy of this tree."""
+        copied = super().copy()
+        copied._root = self._root
+        copied._list = self._list
+        return copied
+
     @classmethod
     def _from_graph(cls, G, clear_attributes=False, renumber=True):
         tree = cls.__new__(cls)

@@ -15,9 +15,8 @@ from ..rhythm_trees.algorithms import auto_subdiv
 from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms
 
 from enum import Enum
-import networkx as nx
 import pandas as pd
-from sympy import pretty
+import networkx as nx
 
 class ProlatioTypes(Enum):
     DURATION    = 'Duration'
@@ -34,60 +33,6 @@ class TemporalMeta(type):
     """Metaclass for all temporal structures."""
     pass
 
-class TemporalBase:
-    """Base class for all temporal structures with observer support."""
-    
-    def __init__(self):
-        self._observers = []
-    
-    def register_observer(self, observer):
-        """Register an object to be notified of temporal structure changes."""
-        if observer not in self._observers:
-            self._observers.append(observer)
-            
-    def unregister_observer(self, observer):
-        """Remove an observer from notification list."""
-        if observer in self._observers:
-            self._observers.remove(observer)
-            
-    def notify_observers(self):
-        """Notify all registered observers that the temporal structure has been modified."""
-        for observer in self._observers:
-            observer.temporal_updated(self)
-    
-    def batch_update(self):
-        """Context manager for batching updates to children."""
-        return _BatchUpdateContext(self)
-
-class _BatchUpdateContext:
-    """Context manager for batching updates to children."""
-    
-    def __init__(self, parent):
-        self.parent = parent
-        self.children = []
-        self.original_states = {}
-    
-    def __enter__(self):
-        return self
-    
-    def add_child(self, child):
-        """Add a child to be updated in batch mode."""
-        if child not in self.children:
-            self.children.append(child)
-            # Store original observers
-            self.original_states[child] = {
-                'observers': child._observers.copy()
-            }
-            # Temporarily remove parent from child's observers
-            if self.parent in child._observers:
-                child._observers.remove(self.parent)
-        return child
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # Restore original observers
-        for child, state in self.original_states.items():
-            child._observers = state['observers']
-
 
 class Chronon(metaclass=TemporalMeta):
     __slots__ = ('_node_id', '_rt')
@@ -97,19 +42,19 @@ class Chronon(metaclass=TemporalMeta):
         self._rt = rt
     
     @property
-    def start(self): return self._rt[self._node_id]['onset']
+    def start(self): return self._rt[self._node_id]['onset_time']
     @property
-    def duration(self): return self._rt[self._node_id]['duration']
+    def duration(self): return self._rt[self._node_id]['duration_time']
     @property
     def end(self): return self.start + abs(self.duration)
     @property
     def proportion(self): return self._rt[self._node_id]['proportion']
     @property
-    def metric_ratio(self): return self._rt[self._node_id]['ratio']
+    def metric_ratio(self): return self._rt[self._node_id]['duration_ratio']
     @property
     def node_id(self): return self._node_id
     @property
-    def is_rest(self): return self._rt[self._node_id]['duration'] < 0
+    def is_rest(self): return self._rt[self._node_id]['duration_time'] < 0
     
     def __str__(self):
         return pd.DataFrame({
@@ -126,7 +71,7 @@ class Chronon(metaclass=TemporalMeta):
         return self.__str__()
 
 
-class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
+class TemporalUnit(metaclass=TemporalMeta):
     def __init__(self,
                  span:Union[int,float,Fraction]            = 1,
                  tempus:Union[Meas,Fraction,int,float,str] = '4/4',
@@ -135,11 +80,9 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
                  bpm:Union[None,int,float]                 = None,
                  offset:float                              = 0):
         
-        super().__init__()
         self._type   = None
         
         self._rt     = self._set_rt(span, abs(Meas(tempus)), prolatio)
-        self._rt.register_observer(self)
         
         self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
         self._bpm    = bpm if bpm else 60
@@ -147,16 +90,6 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
         
         self._events = self._set_nodes()
     
-    def graph_updated(self, graph):
-        """Called when the observed graph is modified."""
-        if graph is self._rt:
-            self._events = self._set_nodes()
-            self.notify_observers()
-
-    def temporal_updated(self, temporal):
-        """Called when an observed temporal structure is modified."""
-        self.notify_observers()
-            
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
         return cls(span     = rt.span,
@@ -180,10 +113,15 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
         """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
         return self._rt._subdivisions
     
+    @prolationis.setter
+    def prolationis(self, prolatio: Union[tuple, str]):
+        self._rt = self._set_rt(self.span, self.tempus, prolatio)
+        self._events = self._set_nodes()
+    
     @property
     def rt(self):
-        """The RhythmTree of the TemporalUnit."""
-        return self._rt
+        """The RhythmTree of the TemporalUnit (returns a copy)."""
+        return self._rt.copy()
 
     @property
     def ratios(self):
@@ -212,11 +150,11 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
     
     @property
     def onsets(self):
-        return tuple(self._rt.graph.nodes[n]['onset'] for n in self._rt.leaf_nodes)
+        return tuple(self._rt.graph.nodes[n]['onset_time'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
-        return tuple(self._rt.graph.nodes[n]['duration'] for n in self._rt.leaf_nodes)
+        return tuple(self._rt.graph.nodes[n]['duration_time'] for n in self._rt.leaf_nodes)
 
     @property
     def duration(self):
@@ -243,26 +181,11 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
             'node_id': c.node_id,
         } for c in self._events], index=range(len(self._events)))
         
-    @beat.setter
-    def beat(self, beat:Union[Fraction,str]):
-        """Sets the rhythmic ratio that describes the beat of the TemporalUnit."""
-        self._beat = Fraction(beat)
-        self._events = self._set_nodes()
-        self.notify_observers()
-        
-    @bpm.setter
-    def bpm(self, bpm:Union[None,float,int]):
-        """Sets the bpm in beats per minute of the TemporalUnit."""
-        self._bpm = bpm
-        self._events = self._set_nodes()
-        self.notify_observers()
-        
     @offset.setter
     def offset(self, offset:float):
         """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
         self._offset = offset
         self._events = self._set_nodes()
-        # self.notify_observers()
         
     def set_duration(self, target_duration: float) -> None:
         """
@@ -283,7 +206,8 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
         current_duration = self.duration
         ratio = current_duration / target_duration
         new_bpm = self._bpm * ratio
-        self.bpm = new_bpm  
+        self._bpm = new_bpm
+        self._events = self._set_nodes()
 
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         match prolatio:
@@ -327,26 +251,29 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
     def _set_nodes(self):
         """Updates node timings and returns chronon events."""
         leaf_nodes = self._rt.leaf_nodes
-        leaf_durations = [beat_duration(ratio=self._rt[n]['ratio'], 
+        leaf_durations = [beat_duration(ratio=self._rt[n]['duration_ratio'], 
                                       bpm=self.bpm, 
                                       beat_ratio=self.beat) for n in leaf_nodes]
         leaf_onsets = [onset + self._offset for onset in calc_onsets(leaf_durations)]
         
         for node, onset, duration in zip(leaf_nodes, leaf_onsets, leaf_durations):
-            self._rt[node]['onset'] = onset
-            self._rt[node]['duration'] = duration
+            onset_time = -onset if duration < 0 else onset
+            self._rt[node]['onset_time'] = onset_time
+            self._rt[node]['duration_time'] = duration
         
+        bfs_order = list(nx.bfs_tree(self._rt.graph, self._rt.root).nodes())
         non_leaf_nodes = [n for n,d in self._rt.graph.out_degree() if d > 0]
         for node in non_leaf_nodes:
-            self._rt[node]['duration'] = beat_duration(
-                ratio=str(self._rt[node]['ratio']),
+            self._rt[node]['duration_time'] = beat_duration(
+                ratio=str(self._rt[node]['duration_ratio']),
                 bpm=self.bpm,
                 beat_ratio=self.beat)
             
             current = node
             while self._rt.graph.out_degree(current) > 0:
-                current = min(self._rt.graph.successors(current))
-            self._rt[node]['onset'] = self._rt[current]['onset']
+                children = list(self._rt.graph.successors(current))
+                current = min(children, key=lambda x: bfs_order.index(x))
+            self._rt[node]['onset_time'] = self._rt[current]['onset_time']
 
         return tuple(Chronon(node_id, self._rt) for node_id in leaf_nodes)
 
@@ -387,24 +314,18 @@ class TemporalUnit(TemporalBase, metaclass=TemporalMeta):
         )
 
 
-class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
+class TemporalUnitSequence(metaclass=TemporalMeta):
     """A sequence of TemporalUnit objects that represent consecutive temporal events."""
     
     def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0):
-        
-        super().__init__()
-        self._seq    = ut_seq
+        self._seq    = [ut.copy() for ut in ut_seq]
         self._offset = offset
-        
-        for ut in self._seq:
-            ut.register_observer(self)
-        
         self._set_offsets()
     
-    def temporal_updated(self, temporal):
-        """Called when an observed temporal structure is modified."""
-        self._set_offsets()
-        self.notify_observers()
+    def _set_offsets(self):
+        """Updates the offsets of all TemporalUnits based on their position in the sequence."""
+        for i, ut in enumerate(self._seq):
+            ut.offset = self._offset + sum(self.durations[j] for j in range(i))
 
     @property
     def seq(self):
@@ -440,31 +361,12 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
     def time(self):
         """The absolute start and end times (in seconds) of the sequence."""
         return self.offset, self.offset + self.duration
-
-    def beat(self, beat:Union[None,Fraction,str]):
-        """Sets the beat ratio for all TemporalUnits in the sequence."""
-        with self.batch_update() as batch:
-            for ut in self._seq:
-                batch.add_child(ut).beat = beat
-        
-        self._set_offsets()
-        self.notify_observers()
-    
-    def bpm(self, bpm:Union[None,int,float]):
-        """Sets the bpm for all TemporalUnits in the sequence."""
-        with self.batch_update() as batch:
-            for ut in self._seq:
-                batch.add_child(ut).bpm = bpm
-        
-        self._set_offsets()
-        self.notify_observers()
         
     @offset.setter
     def offset(self, offset:float):
         """Sets the offset (or absolute start time) in seconds of the sequence."""
         self._offset = offset
         self._set_offsets()
-        # self.notify_observers()
     
     def set_duration(self, target_duration: float) -> None:
         """
@@ -490,12 +392,11 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
         current_duration = self.duration
         ratio = current_duration / target_duration
         
-        with self.batch_update() as batch:
-            for ut in self._seq:
-                batch.add_child(ut).bpm = ut.bpm * ratio
+        for ut in self._seq:
+            ut._bpm = ut.bpm * ratio
+            ut._events = ut._set_nodes()
         
         self._set_offsets()
-        self.notify_observers()
         
     def append(self, ut: TemporalUnit) -> None:
         """
@@ -504,10 +405,8 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
         Args:
             ut: The TemporalUnit to append
         """
-        self._seq.append(ut)
-        ut.register_observer(self)
+        self._seq.append(ut.copy())
         self._set_offsets()
-        self.notify_observers()
         
     def prepend(self, ut: TemporalUnit) -> None:
         """
@@ -516,10 +415,8 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
         Args:
             ut: The TemporalUnit to prepend
         """
-        self._seq.insert(0, ut)
-        ut.register_observer(self)
+        self._seq.insert(0, ut.copy())
         self._set_offsets()
-        self.notify_observers()
         
     def insert(self, index: int, ut: TemporalUnit) -> None:
         """
@@ -535,24 +432,48 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
         if not -len(self._seq) <= index <= len(self._seq):
             raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
         
-        self._seq.insert(index, ut)
-        ut.register_observer(self)
+        self._seq.insert(index, ut.copy())
         self._set_offsets()
-        self.notify_observers()
         
-    def _set_offsets(self):
-        """Updates the offsets of all TemporalUnits based on their position in the sequence."""
-        for i, ut in enumerate(self._seq):
-            ut.offset = self._offset + sum(self.durations[j] for j in range(i))
+    def remove(self, index: int) -> None:
+        """
+        Remove the TemporalUnit at the specified index.
+        
+        Args:
+            index: The index of the TemporalUnit to remove
+            
+        Raises:
+            IndexError: If the index is out of range
+        """
+        if not -len(self._seq) <= index < len(self._seq):
+            raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
+        
+        self._seq.pop(index)
+        self._set_offsets()
+        
+    def replace(self, index: int, ut: TemporalUnit) -> None:
+        """
+        Replace the TemporalUnit at the specified index with a new one.
+        
+        Args:
+            index: The index of the TemporalUnit to replace
+            ut: The new TemporalUnit
+            
+        Raises:
+            IndexError: If the index is out of range
+        """
+        if not -len(self._seq) <= index < len(self._seq):
+            raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
+        
+        self._seq[index] = ut.copy()
+        self._set_offsets()
 
     def __getitem__(self, idx: int) -> TemporalUnit:
         return self._seq[idx]
     
     def __setitem__(self, idx: int, ut: TemporalUnit) -> None:
-        self._seq[idx] = ut
-        ut.register_observer(self)
+        self._seq[idx] = ut.copy()
         self._set_offsets()
-        self.notify_observers()
 
     def __iter__(self):
         return iter(self._seq)
@@ -582,7 +503,7 @@ class TemporalUnitSequence(TemporalBase, metaclass=TemporalMeta):
         )
 
 
-class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
+class TemporalBlock(metaclass=TemporalMeta):
     """
     A collection of parallel temporal structures that represent simultaneous temporal events.
     Each row can be a TemporalUnit, TemporalUnitSequence, or another TemporalBlock.
@@ -597,22 +518,13 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
             offset: Initial time offset in seconds
             sort_rows: Whether to sort rows by duration (longest at index 0)
         """
-        super().__init__()
-        self._rows = rows or []
+        self._rows = [row.copy() for row in rows] if rows else []
         self._axis = axis
         self._offset = offset
         self._sort_rows = sort_rows
         
-        for row in self._rows:
-            row.register_observer(self)
-        
         self._align_rows()
       
-    def temporal_updated(self, temporal):
-        """Called when an observed temporal structure is modified."""
-        self._align_rows()
-        self.notify_observers()
-        
     # TODO: make free method in UT algos
     # Matrix to Block
     @classmethod
@@ -702,14 +614,12 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
     def sort_rows(self, sort_rows:bool):
         self._sort_rows = sort_rows
         self._align_rows()
-        # self.notify_observers()
         
     @offset.setter
     def offset(self, offset):
         """Sets the offset (or absolute start time) in seconds of the block."""
         self._offset = offset
         self._align_rows()
-        # self.notify_observers()
     
     @axis.setter
     def axis(self, axis: float):
@@ -727,31 +637,6 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
             raise ValueError("Axis must be between -1 and 1")
         self._axis = float(axis)
         self._align_rows()
-        self.notify_observers()
-        
-    def beat(self, beat:Union[None,Fraction,str]):
-        """Sets the beat ratio for all temporal structures in the block."""
-        with self.batch_update() as batch:
-            for row in self._rows:
-                if hasattr(row, 'beat'):
-                    batch.add_child(row).beat(beat)
-                elif hasattr(row, '_beat'):
-                    batch.add_child(row).beat = beat
-        
-        self._align_rows()
-        self.notify_observers()
-    
-    def bpm(self, bpm:Union[None,int,float]):
-        """Sets the bpm for all temporal structures in the block."""
-        with self.batch_update() as batch:
-            for row in self._rows:
-                if hasattr(row, 'bpm'):
-                    batch.add_child(row).bpm(bpm)
-                elif hasattr(row, '_bpm'):
-                    batch.add_child(row).bpm = bpm
-        
-        self._align_rows()
-        self.notify_observers()
         
     def set_duration(self, target_duration: float) -> None:
         """
@@ -777,14 +662,12 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
         current_duration = self.duration
         ratio = current_duration / target_duration
         
-        with self.batch_update() as batch:
-            for row in self._rows:
-                if hasattr(row, 'set_duration'):
-                    row_target = row.duration / ratio
-                    batch.add_child(row).set_duration(row_target)
+        for row in self._rows:
+            if hasattr(row, 'set_duration'):
+                row_target = row.duration / ratio
+                row.set_duration(row_target)
         
         self._align_rows()
-        self.notify_observers()
 
     def prepend(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
@@ -795,10 +678,8 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
         Args:
             row: The temporal structure to add (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
         """
-        self._rows.insert(0, row)
-        row.register_observer(self)
+        self._rows.insert(0, row.copy())
         self._align_rows()
-        self.notify_observers()
         
     def append(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
@@ -809,10 +690,8 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
         Args:
             row: The temporal structure to add (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
         """
-        self._rows.append(row)
-        row.register_observer(self)
+        self._rows.append(row.copy())
         self._align_rows()
-        self.notify_observers()
         
     def insert(self, index: int, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
@@ -830,10 +709,44 @@ class TemporalBlock(TemporalBase, metaclass=TemporalMeta):
         if not -len(self._rows) <= index <= len(self._rows):
             raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
         
-        self._rows.insert(index, row)
-        row.register_observer(self)
+        self._rows.insert(index, row.copy())
         self._align_rows()
-        self.notify_observers()
+
+    def remove(self, index: int) -> None:
+        """
+        Remove the row at the specified index.
+        
+        Args:
+            index: The index of the row to remove
+            
+        Raises:
+            IndexError: If the index is out of range
+        """
+        if not -len(self._rows) <= index < len(self._rows):
+            raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
+        
+        self._rows.pop(index)
+        self._align_rows()
+        
+    def replace(self, index: int, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
+        """
+        Replace the row at the specified index with a new one.
+        
+        Args:
+            index: The index of the row to replace
+            row: The new temporal structure
+            
+        Raises:
+            IndexError: If the index is out of range
+        """
+        if not -len(self._rows) <= index < len(self._rows):
+            raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
+        
+        self._rows[index] = row.copy()
+        self._align_rows()
+
+    def __getitem__(self, idx: int) -> Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']:
+        return self._rows[idx]
 
     def __iter__(self):
         return iter(self._rows)
