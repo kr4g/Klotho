@@ -68,18 +68,18 @@ Notelists
    :undoc-members:
    :show-inheritance:
 
-Notelist Core
-~~~~~~~~~~~~~
+Allolib
+~~~~~~~
 
-.. automodule:: klotho.semeios.notelists.notelist
+.. automodule:: klotho.semeios.notelists.allolib
    :members:
    :undoc-members:
    :show-inheritance:
 
-Scheduler
-~~~~~~~~~
+SuperCollider
+~~~~~~~~~~~~~
 
-.. automodule:: klotho.semeios.notelists.scheduler
+.. automodule:: klotho.semeios.notelists.supercollider
    :members:
    :undoc-members:
    :show-inheritance:

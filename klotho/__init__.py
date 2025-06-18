@@ -31,7 +31,7 @@ from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
 from .thetos import ParameterTree, Instrument, CompositionalUnit
 
 from .semeios.visualization.plots import plot
-from .semeios.notelists.scheduler import Scheduler
+from .semeios.notelists.supercollider import Scheduler
 from .semeios.midi import midi as export_midi
 
 from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
@@ -43,8 +43,6 @@ __all__ = [
     'Pitch', 'Scale', 'Chord', 
     'AddressedScale', 'AddressedChord',
     'ParameterTree', 'Instrument', 'CompositionalUnit',
-    'frequency', 'cent', 'midicent', 'midi',
-    'amplitude', 'decibel', 'onset', 'duration',
     'RhythmTree', 'TemporalUnit',
     'plot', 'Scheduler',
     'play', 'pause', 'stop', 'sync', 'export_midi'

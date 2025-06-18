@@ -83,4 +83,4 @@ class duration(float):
     def __new__(cls, value):
         if isinstance(value, (list, tuple, np.ndarray)):
             return type(value)(cls(x) for x in value)
-        return super().__new__(cls, value) 
+        return super().__new__(cls, value)
