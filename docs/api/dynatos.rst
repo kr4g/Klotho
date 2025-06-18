@@ -4,26 +4,50 @@ dynatos
 Dynatos is dedicated to dynamics, articulations, and expressive envelopes, handling 
 the conversion of symbolic dynamics into precise amplitude values and parametric envelopes.
 
-Expression
-----------
+Dynamics
+--------
 
-.. automodule:: klotho.dynatos.expression
+.. automodule:: klotho.dynatos.dynamics
    :members:
    :undoc-members:
    :show-inheritance:
 
-Dynamics
-~~~~~~~~
+Dynamics Classes
+~~~~~~~~~~~~~~~~
 
-.. automodule:: klotho.dynatos.expression.dynamics
+.. automodule:: klotho.dynatos.dynamics.dynamics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Dynamics Utils
+~~~~~~~~~~~~~~
+
+.. automodule:: klotho.dynatos.dynamics.utils
    :members:
    :undoc-members:
    :show-inheritance:
 
 Envelopes
-~~~~~~~~~
+---------
 
-.. automodule:: klotho.dynatos.expression.envelopes
+.. automodule:: klotho.dynatos.envelopes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Envelope Classes
+~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.dynatos.envelopes.envelopes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Envelope Utils
+~~~~~~~~~~~~~~
+
+.. automodule:: klotho.dynatos.envelopes.utils
    :members:
    :undoc-members:
    :show-inheritance: 
