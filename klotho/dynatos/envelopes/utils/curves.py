@@ -1,3 +1,11 @@
+"""
+Curve generation and mapping utilities for envelopes.
+
+This module provides functions for generating various types of curves
+including linear and exponential lines, arch/swell shapes, and value
+mapping with curve transformations.
+"""
+
 import numpy as np
 
 __all__ = [

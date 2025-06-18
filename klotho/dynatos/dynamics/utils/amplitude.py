@@ -1,3 +1,10 @@
+"""
+Amplitude and decibel conversion utilities.
+
+This module provides functions for converting between linear amplitude
+values and logarithmic decibel representations.
+"""
+
 import numpy as np
 
 __all__ = [

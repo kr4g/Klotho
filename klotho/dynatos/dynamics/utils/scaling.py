@@ -1,3 +1,11 @@
+"""
+Psychoacoustic frequency-amplitude scaling utilities.
+
+This module provides functions for scaling amplitude based on frequency
+and loudness according to psychoacoustic principles, accounting for
+human perception of sound at different frequencies and levels.
+"""
+
 import numpy as np
 from scipy import interpolate
 from .amplitude import dbamp

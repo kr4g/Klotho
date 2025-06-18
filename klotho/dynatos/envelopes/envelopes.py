@@ -1,3 +1,11 @@
+"""
+Envelopes for shaping the dynamics of musical sequences.
+
+This module provides the Envelope class for creating and manipulating
+time-varying amplitude or parameter envelopes with support for various
+curve shapes and normalization options.
+"""
+
 import numpy as np
 from functools import lru_cache
 from .utils import line
@@ -7,6 +15,42 @@ __all__ = [
 ]
 
 class Envelope:
+    """
+    A flexible envelope generator for time-varying parameter control.
+    
+    The Envelope class creates smooth transitions between a series of values
+    over specified time durations, with support for curve shaping, normalization,
+    and scaling. 
+    
+    Args:
+        values (list): List of values to interpolate between
+        times (float or list): Duration(s) for each segment. If a single value,
+            all segments use the same duration. If a list, must have one fewer
+            element than values (default: 1.0)
+        curve (float or list): Curve shape for each segment. 0 = linear,
+            negative = exponential, positive = logarithmic. If a single value,
+            all segments use the same curve (default: 0.0)
+        normalize_values (bool): Whether to normalize values to 0-1 range (default: False)
+        normalize_times (bool): Whether to normalize times to sum to 1 (default: False)
+        value_scale (float): Scale factor applied to all values (default: 1.0)
+        time_scale (float): Scale factor applied to all times (default: 1.0)
+        resolution (int): Number of points to generate for the envelope (default: 1000)
+        
+    Example:
+        >>> # Simple fade in/out envelope
+        >>> env = Envelope([0, 1, 0.5, 0], times=[0.1, 0.8, 0.1])
+        >>> len(env)
+        1000
+        >>> env.at_time(0.5)
+        0.875
+        
+        >>> # Exponential decay
+        >>> decay = Envelope([1, 0], times=2.0, curve=-3)
+        >>> decay[0]  # Start value
+        1.0
+        >>> decay[-1]  # End value
+        0.0
+    """
     def __init__(self, values, times=1.0, curve=0.0, 
                  normalize_values=False, normalize_times=False, 
                  value_scale=1.0, time_scale=1.0, resolution=1000):
