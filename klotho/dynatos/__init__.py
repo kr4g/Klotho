@@ -5,19 +5,21 @@ From the Greek "δυνατός" (dynatos) meaning "powerful" or "capable," this 
 deals with the expressive aspects of music that affect how we perceive sound.
 """
 
-from . import expression
+from . import dynamics
+from . import envelopes
 
-from .expression import Dynamic, DynamicRange
-from .expression import dbamp, ampdb, freq_amp_scale
-from .expression import line, arch, map_curve
+from .dynamics import Dynamic, DynamicRange, ampdb, dbamp, freq_amp_scale
+from .envelopes import Envelope, line, arch, map_curve
 
 __all__ = [
-    'expression',
-    'DynamicRange',
+    'dynamics',
+    'envelopes',
     'Dynamic',
-    'dbamp', 
+    'DynamicRange',
     'ampdb', 
+    'dbamp', 
     'freq_amp_scale',
+    'Envelope',
     'line', 
     'arch', 
     'map_curve',

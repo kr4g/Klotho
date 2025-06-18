@@ -12,7 +12,7 @@ from . import composition
 from .parameters import ParameterTree
 from .instruments import Instrument
 from .composition import CompositionalUnit
-from .types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
+from .types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 __all__ = [
     'instruments',
@@ -27,6 +27,8 @@ __all__ = [
     'midi',
     'amplitude', 
     'decibel', 
-    'onset', 
-    'duration',
+    'real_onset', 
+    'real_duration',
+    'metric_onset',
+    'metric_duration',
 ] 

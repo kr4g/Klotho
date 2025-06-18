@@ -34,7 +34,7 @@ from .semeios.visualization.plots import plot
 from .semeios.notelists.supercollider import Scheduler
 from .semeios.midi import midi as export_midi
 
-from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, onset, duration
+from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 from .utils.playback.player import play, pause, stop, sync
 
@@ -48,4 +48,4 @@ __all__ = [
     'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
-__version__ = '3.1.0'
+__version__ = '3.2.0'
