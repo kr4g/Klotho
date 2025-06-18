@@ -60,7 +60,7 @@ pip install klotho-cac[dev]
 
 ## Documentation
 
-**📖 Online Documentation:** [https://klotho-cac.readthedocs.io/](https://klotho-cac.readthedocs.io/)
+**📖 Online Documentation:** [https://klotho.readthedocs.io/](https://klotho.readthedocs.io/)
 
 The complete documentation is available online and includes:
 - Complete API reference for all modules
