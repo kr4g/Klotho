@@ -60,21 +60,23 @@ pip install klotho-cac[dev]
 
 ## Documentation
 
-**Online Documentation:** [https://klotho-cac.readthedocs.io/](https://klotho-cac.readthedocs.io/)
+**📖 Online Documentation:** [https://klotho-cac.readthedocs.io/](https://klotho-cac.readthedocs.io/)
 
-**Build Documentation Locally:**
-
-After installing with documentation dependencies:
-```bash
-cd docs
-make dev
-```
-
-This will build the documentation and open it in your browser. The documentation includes:
+The complete documentation is available online and includes:
 - Complete API reference for all modules
 - Usage examples and tutorials  
 - NumPy-style docstring documentation
 - Developer workflow guides
+
+**🛠️ Build Documentation Locally (Optional):**
+
+For developers who want to build the documentation locally or preview changes:
+
+```bash
+pip install klotho-cac[docs]  # Install documentation dependencies
+cd docs
+make dev
+```
 
 ## About
 

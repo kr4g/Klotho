@@ -57,22 +57,6 @@ Installation
    cd Klotho/
    pip install -e .[dev]
 
-Quick Start
------------
-
-.. code-block:: python
-
-   import klotho
-   
-   # Create a pitch
-   pitch = klotho.Pitch('A', 4)  # A440
-   
-   # Create a scale
-   scale = klotho.Scale(['1/1', '9/8', '5/4', '4/3', '3/2', '5/3', '15/8'])
-   
-   # Create a temporal unit
-   unit = klotho.TemporalUnit(tempus=klotho.Meas(1, 4), prolatio=[1, 2, 3])
-
 API Documentation
 -----------------
 
