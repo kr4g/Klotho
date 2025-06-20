@@ -25,7 +25,10 @@ setup(
         'scipy',
         'python-osc',
         'abjad',
-        'mido'
+        'mido',
+        'panel',
+        'bokeh',
+        'jupyter_bokeh'
     ],
     extras_require={
         'docs': [

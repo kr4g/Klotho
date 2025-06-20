@@ -10,6 +10,9 @@ scipy
 python-osc
 abjad
 mido
+panel
+bokeh
+jupyter_bokeh
 
 # Documentation
 sphinx>=7.0.0

@@ -7,6 +7,11 @@
 # Development and testing
 pytest>=7.0.0
 
+# GUI/Interactive dependencies (for maquettes module development)
+panel
+bokeh
+jupyter_bokeh
+
 # Documentation
 sphinx>=7.0.0
 sphinx-rtd-theme

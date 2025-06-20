@@ -11,6 +11,7 @@ from . import notation
 from . import visualization
 from . import notelists
 from . import midi
+from . import maquettes
 
 from .visualization import plots
 from .visualization.plots import *
