@@ -20,6 +20,30 @@ Animation Core
    :undoc-members:
    :show-inheritance:
 
+Maquettes
+---------
+
+.. automodule:: klotho.semeios.maquettes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Timeline
+~~~~~~~~
+
+.. automodule:: klotho.semeios.maquettes.timeline
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Clip
+~~~~
+
+.. automodule:: klotho.semeios.maquettes.clip
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 MIDI
 ----
 

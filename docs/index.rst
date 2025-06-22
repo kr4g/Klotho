@@ -25,7 +25,7 @@ Klotho is organized into six primary modules plus utilities:
 * **tonos**: Tonal systems, pitches, scales, and harmony  
 * **thetos**: Musical parameter trees and instrumentation
 * **dynatos**: Expression, dynamics, and envelopes
-* **semeios**: Visualization, notation, and representation
+* **semeios**: Visualization, notation, representation, and interactive maquettes
 * **utils**: General utilities and helper functions
 
 Installation
