@@ -2,7 +2,9 @@ from typing import Tuple
 from itertools import count
 import networkx as nx
 import matplotlib.pyplot as plt
+from klotho.topos.graphs.graphs import Graph
 from klotho.topos.graphs.trees.trees import Tree
+from klotho.topos.graphs.lattices.lattices import Lattice
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
@@ -19,6 +21,9 @@ from klotho.topos.collections.sets import CombinationSet
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
 
+from sklearn.manifold import MDS, SpectralEmbedding
+from sklearn.preprocessing import StandardScaler
+
 __all__ = ['plot']
 
 def plot(obj, **kwargs):
@@ -33,14 +38,20 @@ def plot(obj, **kwargs):
         TypeError: If the object type is not supported
     """
     match obj:
-        case Tree():
+        case Graph():
             match obj:
-                case RhythmTree():
-                    return _plot_rt(obj, **kwargs)
-                case ParameterTree():
-                    return _plot_parameter_tree(obj, **kwargs)
+                case Tree():
+                    match obj:
+                        case RhythmTree():
+                            return _plot_rt(obj, **kwargs)
+                        case ParameterTree():
+                            return _plot_parameter_tree(obj, **kwargs)
+                        case _:
+                            return _plot_tree(obj, **kwargs)
+                case Lattice():
+                    return _plot_lattice(obj, **kwargs)
                 case _:
-                    return _plot_tree(obj, **kwargs)
+                    return _plot_graph(obj.graph, **kwargs)
         case CombinationSet():
             match obj:
                 case CombinationProductSet():
@@ -855,7 +866,7 @@ def _plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None
     else:
         plt.show()
 
-def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (10, 10), 
+def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12), 
              node_size: float = 1000, font_size: float = 12, 
              show_edge_labels: bool = False, edge_alpha: float = 0.3,
              title: str = None, output_file: str = None) -> None:
@@ -1267,3 +1278,382 @@ def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True
         plt.close()
     else:
         plt.show()
+
+def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
+                 node_size: float = 8, title: str = None, 
+                 output_file: str = None, 
+                 dim_reduction: str = None, target_dims: int = 3,
+                 mds_metric: bool = True, mds_max_iter: int = 300,
+                 spectral_affinity: str = 'rbf', spectral_gamma: float = None) -> go.Figure:
+    """
+    Plot a Lattice as a 2D or 3D grid visualization.
+    
+    Args:
+        lattice: Lattice instance to visualize
+        figsize: Width and height of the output figure in inches
+        node_size: Size of the nodes in the plot
+        title: Title for the plot (auto-generated if None)
+        output_file: Path to save the visualization (displays plot if None)
+        dim_reduction: Dimensionality reduction method for high-dimensional lattices.
+                      Options: 'mds', 'spectral', or None (raises error for dim > 3)
+        target_dims: Target dimensionality for reduction (2 or 3, default 3)
+        mds_metric: Whether to use metric MDS (True) or non-metric MDS (False)
+        mds_max_iter: Maximum iterations for MDS algorithm
+        spectral_affinity: Kernel for spectral embedding ('rbf', 'nearest_neighbors', etc.)
+        spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
+        
+    Returns:
+        go.Figure: Plotly figure object
+        
+    Raises:
+        ValueError: If lattice dimensionality > 3 and dim_reduction is None
+    """
+    if lattice.dimensionality > 3 and dim_reduction is None:
+        raise ValueError(f"Plotting dimensionality > 3 requires dim_reduction. Got dimensionality={lattice.dimensionality}. "
+                        f"Use dim_reduction='mds' or 'spectral'")
+    
+    if target_dims not in [2, 3]:
+        raise ValueError(f"target_dims must be 2 or 3, got {target_dims}")
+    
+    coords = lattice.coords()
+    G = lattice.graph
+    original_coords = coords
+    
+    if lattice.dimensionality > 3:
+        coord_matrix = np.array([list(coord) for coord in coords])
+        
+        if dim_reduction == 'mds':
+            reducer = MDS(n_components=target_dims, metric=mds_metric, max_iter=mds_max_iter, random_state=42)
+            reduced_coords = reducer.fit_transform(coord_matrix)
+        elif dim_reduction == 'spectral':
+            if spectral_affinity == 'precomputed':
+                adjacency_matrix = nx.adjacency_matrix(G, nodelist=coords).toarray()
+                reducer = SpectralEmbedding(n_components=target_dims, affinity='precomputed', random_state=42)
+                reduced_coords = reducer.fit_transform(adjacency_matrix)
+            else:
+                reducer = SpectralEmbedding(n_components=target_dims, affinity=spectral_affinity, 
+                                          gamma=spectral_gamma, random_state=42)
+                reduced_coords = reducer.fit_transform(coord_matrix)
+        else:
+            raise ValueError(f"Unknown dim_reduction method: {dim_reduction}. Use 'mds' or 'spectral'")
+        
+        coords = [tuple(reduced_coords[i]) for i in range(len(coords))]
+        effective_dimensionality = target_dims
+        
+        coord_mapping = {original_coords[i]: coords[i] for i in range(len(coords))}
+        G_reduced = nx.Graph()
+        G_reduced.add_nodes_from(coords)
+        
+        for u, v in G.edges():
+            u_reduced = coord_mapping[u]
+            v_reduced = coord_mapping[v]
+            G_reduced.add_edge(u_reduced, v_reduced)
+        
+        G = G_reduced
+    else:
+        effective_dimensionality = lattice.dimensionality
+    
+    if title is None:
+        resolution_str = 'x'.join(str(r) for r in lattice.resolution)
+        bipolar_str = "bipolar" if lattice.bipolar else "unipolar"
+        if lattice.dimensionality > 3:
+            title = f"{lattice.dimensionality}D→{target_dims}D Lattice ({resolution_str}, {bipolar_str}, {dim_reduction})"
+        else:
+            title = f"{lattice.dimensionality}D Lattice ({resolution_str}, {bipolar_str})"
+    
+    fig = go.Figure()
+    
+    if effective_dimensionality == 1:
+        for u, v in G.edges():
+            x1, y1 = u[0], 0
+            x2, y2 = v[0], 0
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color='#808080', width=3),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+        
+        node_x, node_y = [], []
+        hover_data = []
+        
+        for i, coord in enumerate(coords):
+            x = coord[0]
+            node_x.append(x)
+            node_y.append(0)
+            if lattice.dimensionality > 3:
+                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                reduced_coord_str = f"({x:.2f})"
+                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
+            else:
+                hover_data.append(f"Coordinate: ({x})")
+        
+        fig.add_trace(
+            go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers',
+                marker=dict(
+                    size=node_size * 2,
+                    color='white',
+                    line=dict(color='white', width=2)
+                ),
+                hovertemplate='%{text}<extra></extra>',
+                text=hover_data,
+                showlegend=False
+            )
+        )
+        
+        fig.update_layout(
+            yaxis=dict(
+                showgrid=False, zeroline=False, showticklabels=False,
+                range=[-0.5, 0.5]
+            )
+        )
+    
+    elif effective_dimensionality == 2:
+        for u, v in G.edges():
+            x1, y1 = u
+            x2, y2 = v
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color='#808080', width=2),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+        
+        node_x, node_y = [], []
+        hover_data = []
+        
+        for i, coord in enumerate(coords):
+            x, y = coord
+            node_x.append(x)
+            node_y.append(y)
+            if lattice.dimensionality > 3:
+                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                reduced_coord_str = f"({x:.2f}, {y:.2f})"
+                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
+            else:
+                hover_data.append(f"Coordinate: ({x}, {y})")
+        
+        fig.add_trace(
+            go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers',
+                marker=dict(
+                    size=node_size * 2,
+                    color='white',
+                    line=dict(color='white', width=2)
+                ),
+                hovertemplate='%{text}<extra></extra>',
+                text=hover_data,
+                showlegend=False
+            )
+        )
+        
+        fig.update_layout(
+            yaxis=dict(
+                scaleanchor="x", scaleratio=1
+            )
+        )
+    
+    elif effective_dimensionality == 3:
+        for u, v in G.edges():
+            x1, y1, z1 = u
+            x2, y2, z2 = v
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                    mode='lines',
+                    line=dict(color='#808080', width=3),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+        
+        node_x, node_y, node_z = [], [], []
+        hover_data = []
+        
+        for i, coord in enumerate(coords):
+            x, y, z = coord
+            node_x.append(x)
+            node_y.append(y) 
+            node_z.append(z)
+            if lattice.dimensionality > 3:
+                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                reduced_coord_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
+                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
+            else:
+                hover_data.append(f"Coordinate: ({x}, {y}, {z})")
+        
+        fig.add_trace(
+            go.Scatter3d(
+                x=node_x, y=node_y, z=node_z,
+                mode='markers',
+                marker=dict(
+                    size=node_size,
+                    color='white',
+                    line=dict(color='white', width=2)
+                ),
+                hovertemplate='%{text}<extra></extra>',
+                text=hover_data,
+                showlegend=False
+            )
+        )
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    x_coords = [coord[0] for coord in coords]
+    x_min, x_max = min(x_coords), max(x_coords)
+    
+    if effective_dimensionality >= 2:
+        y_coords = [coord[1] for coord in coords]
+        y_min, y_max = min(y_coords), max(y_coords)
+    
+    if effective_dimensionality == 3:
+        z_coords = [coord[2] for coord in coords]
+        z_min, z_max = min(z_coords), max(z_coords)
+    
+    if lattice.dimensionality > 3:
+        x_ticks = np.linspace(x_min, x_max, min(10, int(x_max - x_min) + 1))
+        x_ticks = [round(t, 1) for t in x_ticks]
+        if effective_dimensionality >= 2:
+            y_ticks = np.linspace(y_min, y_max, min(10, int(y_max - y_min) + 1))
+            y_ticks = [round(t, 1) for t in y_ticks]
+        if effective_dimensionality == 3:
+            z_ticks = np.linspace(z_min, z_max, min(10, int(z_max - z_min) + 1))
+            z_ticks = [round(t, 1) for t in z_ticks]
+    else:
+        x_ticks = list(range(int(x_min), int(x_max) + 1))
+        if effective_dimensionality >= 2:
+            y_ticks = list(range(int(y_min), int(y_max) + 1))
+        if effective_dimensionality == 3:
+            z_ticks = list(range(int(z_min), int(z_max) + 1))
+    
+    layout_dict = dict(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0)
+    )
+    
+    if effective_dimensionality <= 2:
+        if lattice.dimensionality > 3:
+            layout_dict.update(dict(
+                xaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, title=dict(text='', font=dict(color='white'))
+                ),
+                yaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, title=dict(text='', font=dict(color='white'))
+                )
+            ))
+        else:
+            x_title = 'X'
+            y_title = 'Y' if effective_dimensionality == 2 else ''
+            
+            layout_dict.update(dict(
+                xaxis=dict(
+                    title=dict(text=x_title, font=dict(color='white')),
+                    tickfont=dict(color='white'),
+                    gridcolor='#555555',
+                    zerolinecolor='#555555',
+                    tickmode='array',
+                    tickvals=x_ticks,
+                    ticktext=[str(t) for t in x_ticks]
+                ),
+                yaxis=dict(
+                    title=dict(text=y_title, font=dict(color='white')),
+                    tickfont=dict(color='white'),
+                    gridcolor='#555555',
+                    zerolinecolor='#555555',
+                    tickmode='array',
+                    tickvals=y_ticks if effective_dimensionality == 2 else [0],
+                    ticktext=[str(t) for t in y_ticks] if effective_dimensionality == 2 else ['']
+                )
+            ))
+    else:
+        if lattice.dimensionality > 3:
+            layout_dict.update(dict(
+                scene=dict(
+                    camera=dict(
+                        eye=dict(x=1.5, y=1.5, z=1.5),
+                        center=dict(x=0, y=0, z=0)
+                    ),
+                    xaxis=dict(
+                        showgrid=False, zeroline=False, showticklabels=False,
+                        showline=False, showbackground=False,
+                        title=dict(text='', font=dict(color='white'))
+                    ),
+                    yaxis=dict(
+                        showgrid=False, zeroline=False, showticklabels=False,
+                        showline=False, showbackground=False,
+                        title=dict(text='', font=dict(color='white'))
+                    ),
+                    zaxis=dict(
+                        showgrid=False, zeroline=False, showticklabels=False,
+                        showline=False, showbackground=False,
+                        title=dict(text='', font=dict(color='white'))
+                    ),
+                    bgcolor='black'
+                )
+            ))
+        else:
+            layout_dict.update(dict(
+                scene=dict(
+                    camera=dict(
+                        eye=dict(x=1.5, y=1.5, z=1.5),
+                        center=dict(x=0, y=0, z=0)
+                    ),
+                    xaxis=dict(
+                        title=dict(text='X', font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        gridcolor='#555555',
+                        zerolinecolor='#555555',
+                        backgroundcolor='black',
+                        tickmode='array',
+                        tickvals=x_ticks,
+                        ticktext=[str(t) for t in x_ticks]
+                    ),
+                    yaxis=dict(
+                        title=dict(text='Y', font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        gridcolor='#555555',
+                        zerolinecolor='#555555',
+                        backgroundcolor='black',
+                        tickmode='array',
+                        tickvals=y_ticks,
+                        ticktext=[str(t) for t in y_ticks]
+                    ),
+                    zaxis=dict(
+                        title=dict(text='Z', font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        gridcolor='#555555',
+                        zerolinecolor='#555555',
+                        backgroundcolor='black',
+                        tickmode='array',
+                        tickvals=z_ticks,
+                        ticktext=[str(t) for t in z_ticks]
+                    ),
+                    bgcolor='black'
+                )
+            ))
+    
+    fig.update_layout(**layout_dict)
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig

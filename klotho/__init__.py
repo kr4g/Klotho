@@ -43,4 +43,4 @@ __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
 ]
 
-__version__ = '3.4.2'
+__version__ = '3.4.3'
