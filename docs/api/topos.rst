@@ -92,82 +92,68 @@ Tree Algorithms
    :undoc-members:
    :show-inheritance:
 
-Networks
+Lattices
 ~~~~~~~~
 
-.. automodule:: klotho.topos.graphs.networks
+.. automodule:: klotho.topos.graphs.lattices
    :members:
    :undoc-members:
    :show-inheritance:
 
-Network Algorithms
-^^^^^^^^^^^^^^^^^^
+Lattice Core
+^^^^^^^^^^^^
 
-.. automodule:: klotho.topos.graphs.networks.algorithms
+.. automodule:: klotho.topos.graphs.lattices.lattices
    :members:
    :undoc-members:
    :show-inheritance:
 
 Fields
-~~~~~~
+^^^^^^
 
-.. automodule:: klotho.topos.graphs.fields
+.. automodule:: klotho.topos.graphs.lattices.fields
    :members:
    :undoc-members:
    :show-inheritance:
 
 Field Core
-^^^^^^^^^^
+**********
 
-.. automodule:: klotho.topos.graphs.fields.fields
+.. automodule:: klotho.topos.graphs.lattices.fields.fields
    :members:
    :undoc-members:
    :show-inheritance:
 
 Field Functions
-^^^^^^^^^^^^^^^
+***************
 
-.. automodule:: klotho.topos.graphs.fields.functions
+.. automodule:: klotho.topos.graphs.lattices.fields.functions
    :members:
    :undoc-members:
    :show-inheritance:
 
 Field Function Implementations
-*******************************
++++++++++++++++++++++++++++++++
 
-.. automodule:: klotho.topos.graphs.fields.functions.field_funcs
+.. automodule:: klotho.topos.graphs.lattices.fields.functions.field_funcs
    :members:
    :undoc-members:
    :show-inheritance:
 
 Field Algorithms
-^^^^^^^^^^^^^^^^
+****************
 
-.. automodule:: klotho.topos.graphs.fields.algorithms
+.. automodule:: klotho.topos.graphs.lattices.fields.algorithms
    :members:
    :undoc-members:
    :show-inheritance:
 
 Field Algorithm Implementations
-*******************************
+++++++++++++++++++++++++++++++++
 
-.. automodule:: klotho.topos.graphs.fields.algorithms.field_algs
+.. automodule:: klotho.topos.graphs.lattices.fields.algorithms.field_algs
    :members:
    :undoc-members:
    :show-inheritance:
 
-Random
-------
-
-.. automodule:: klotho.topos.random
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Random Generators
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: klotho.topos.random.rando
-   :members:
-   :undoc-members:
-   :show-inheritance: 
+ 

@@ -1,6 +1,5 @@
 from .trees import Tree
-from .networks import Network
-from .fields import Field
+from .lattices import Lattice, Field
 from .graphs import Graph
 
 from .trees.algorithms import *

@@ -25,26 +25,25 @@ to unite philosphical insight with mathematical explicitness.
 from . import collections
 from . import formal_grammars
 from . import graphs
-from . import random
 
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
 from .collections import autoref, autoref_rotmat, permut_list
 
 from .formal_grammars import alphabets, grammars
 
-from .graphs import trees, networks, fields, Tree, Network, Field, Graph
+from .graphs import trees, Graph, Tree, Lattice
 
 __all__ = [
     # Modules
-    'collections', 'formal_grammars', 'graphs', 'random',
+    'collections', 'formal_grammars', 'graphs',
     
     # Classes
     'Pattern', 'CombinationSet', 'PartitionSet',
-    'Tree', 'Network', 'Field', 'Graph',
+    'Tree', 'Graph', 'Lattice',
     
     # Functions
     'autoref', 'autoref_rotmat', 'permut_list',
     'patterns', 'sequences', 'sets',
     'alphabets', 'grammars',
-    'trees', 'networks', 'fields',
+    'trees',
 ]

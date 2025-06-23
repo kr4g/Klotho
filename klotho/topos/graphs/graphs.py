@@ -3,9 +3,10 @@ import hypernetx as hnx
 import pandas as pd
 from itertools import count
 
+
 class Graph:
-    def __init__(self, graph=None):
-        self._graph = graph if graph is not None else nx.DiGraph()
+    def __init__(self, graph: nx.Graph = nx.Graph()):
+        self._graph = graph
         self._meta = pd.DataFrame(index=[''])
         self._next_id = max(self._graph.nodes(), default=-1) + 1
    

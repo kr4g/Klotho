@@ -22,11 +22,11 @@ from . import semeios
 from . import utils
 
 from .topos.collections import Pattern, CombinationSet, PartitionSet
-from .topos.graphs import trees, networks, fields, Tree, Network, Field, Graph
+from .topos.graphs import trees, Graph, Tree, Lattice
 
 from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
-from .tonos import Pitch, Scale, Chord, AddressedScale, AddressedChord
+from .tonos import Pitch, Scale, Chord
 
 from .dynatos import Envelope, DynamicRange
 
@@ -41,12 +41,6 @@ from .utils.playback.player import play, pause, stop, sync
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
-    'Pitch', 'Scale', 'Chord', 
-    'AddressedScale', 'AddressedChord',
-    'ParameterTree', 'Instrument', 'CompositionalUnit',
-    'RhythmTree', 'TemporalUnit',
-    'plot', 'Scheduler',
-    'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 
 __version__ = '3.4.0'
