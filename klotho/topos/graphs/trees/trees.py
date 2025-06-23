@@ -6,7 +6,7 @@ from collections import deque
 
 class Tree(Graph):
     def __init__(self, root, children:tuple):
-        super().__init__()
+        super().__init__(nx.DiGraph())
         self._root = self._build_tree(root, children)
         self._list = (self._graph.nodes[self._root]['label'], children)
     
