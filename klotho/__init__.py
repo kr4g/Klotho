@@ -35,7 +35,6 @@ from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, r
 
 from .semeios.visualization.plots import plot
 from .semeios.notelists.supercollider import Scheduler
-from .semeios.notelists.allolib import Notelist
 from .semeios.midi import midi as export_midi
 
 from .utils.playback.player import play, pause, stop, sync
@@ -46,7 +45,7 @@ __all__ = [
     'AddressedScale', 'AddressedChord',
     'ParameterTree', 'Instrument', 'CompositionalUnit',
     'RhythmTree', 'TemporalUnit',
-    'plot', 'Scheduler', 'Notelist',
+    'plot', 'Scheduler',
     'play', 'pause', 'stop', 'sync', 'export_midi'
 ]
 

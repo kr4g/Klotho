@@ -8,7 +8,7 @@ Klotho: Graph-Oriented Computer-Assisted Composition
 
 **Klotho** is a comprehensive toolkit for complex musical analysis, generation, and visualization implemented in Python.
 
-From the Greek "Κλωθώ" (Klotho), one of the three Fates who spins the thread of life, this library weaves together various aspects of musical computation.
+From the Ancient Greek "Κλωθώ" (Klotho), meaning "to spin".
 
 Overview
 --------

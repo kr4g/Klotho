@@ -20,6 +20,20 @@ Factors
    :members:
    :show-inheritance:
 
+Graphs
+~~~~~~
+
+.. automodule:: klotho.utils.algorithms.graphs
+   :members:
+   :show-inheritance:
+
+Lists
+~~~~~
+
+.. automodule:: klotho.utils.algorithms.lists
+   :members:
+   :show-inheritance:
+
 Data Structures
 ---------------
 
