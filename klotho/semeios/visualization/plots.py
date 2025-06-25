@@ -503,34 +503,47 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
                invert_weights: bool = False,
                path: list | None = None,
                attributes: list[str] | None = None,
-               output_file: str | None = None) -> None:
-    plt.figure(figsize=figsize)
-    ax = plt.gca()
+               dim: int = 2,
+               output_file: str | None = None):
     
-    ax.set_facecolor('black')
-    plt.gcf().set_facecolor('black')
+    if dim not in [2, 3]:
+        raise ValueError(f"dim must be 2 or 3, got {dim}")
     
-    layouts = {
-        'spring': lambda: nx.spring_layout(G, k=k),
-        'circular': lambda: nx.circular_layout(G),
-        'random': lambda: nx.random_layout(G),
-        'shell': lambda: nx.shell_layout(G),
-        'spectral': lambda: nx.spectral_layout(G),
-        'kamada_kawai': lambda: nx.kamada_kawai_layout(G)
-    }
-    
-    pos = layouts.get(layout, layouts['spring'])()
+    try:
+        if layout == 'spring':
+            pos = nx.spring_layout(G, k=k, dim=dim)
+        elif layout == 'random':
+            pos = nx.random_layout(G, dim=dim)
+        elif layout == 'kamada_kawai':
+            pos = nx.kamada_kawai_layout(G, dim=dim)
+        elif layout == 'spectral':
+            if dim == 3:
+                try:
+                    pos = nx.spectral_layout(G, dim=3)
+                except (ValueError, Exception):
+                    pos = nx.spectral_layout(G, dim=2)
+                    pos = {node: (*coords, 0) for node, coords in pos.items()}
+            else:
+                pos = nx.spectral_layout(G, dim=dim)
+        else:
+            layout_func = getattr(nx, f'{layout}_layout')
+            pos = layout_func(G)
+            if dim == 3:
+                pos = {node: (*coords, 0) for node, coords in pos.items()}
+    except (ValueError, Exception):
+        pos = nx.spring_layout(G, k=k, dim=dim)
     
     is_directed = isinstance(G, nx.DiGraph)
     
     weights = []
+    min_weight = max_weight = None
     if edge_width or edge_color:
         weight_dict = nx.get_edge_attributes(G, 'weight')
         if weight_dict:
             weights = list(weight_dict.values())
             min_weight, max_weight = min(weights), max(weights)
     
-    def get_edge_props(edge_list):
+    def get_edge_props(edge_list, for_plotly=False):
         widths = []
         colors = []
         
@@ -557,114 +570,288 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
                 else:
                     norm_w = 0
                 color = plt.cm.get_cmap(cmap)(norm_w)
-                colors.append(color)
+                if for_plotly:
+                    color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    colors.append(color_hex)
+                else:
+                    colors.append(color)
             else:
                 colors.append('#808080')
         
         return widths, colors
     
-    if path:
-        path_edges = list(zip(path[:-1], path[1:]))
-        non_path_edges = [(u, v) for u, v in G.edges() if (u, v) not in path_edges and (v, u) not in path_edges]
-        
-        if non_path_edges:
-            widths, colors = get_edge_props(non_path_edges)
-            if is_directed:
-                nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
-                                     width=widths, alpha=0.5, arrows=True,
-                                     connectionstyle="arc3,rad=0.1")
+    def get_node_labels():
+        labels = {}
+        for node in G.nodes():
+            if attributes is None:
+                label_text = str(node)
             else:
-                nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
-                                     width=widths, alpha=0.5)
+                label_parts = []
+                for attr in attributes:
+                    if attr in {"node_id", "node", "id"}:
+                        label_parts.append(str(node))
+                    elif attr in G.nodes[node]:
+                        value = G.nodes[node][attr]
+                        label_parts.append(str(value) if value is not None else '')
+                if dim == 3:
+                    label_text = "<br>".join(label_parts)
+                else:
+                    label_text = "\n".join(label_parts)
+            labels[node] = label_text
+        return labels
+    
+    if dim == 3:
+        fig = go.Figure()
         
-        if path_edges:
-            path_colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
-            for (u, v), color in zip(path_edges, path_colors):
+        if path:
+            path_edges = list(zip(path[:-1], path[1:]))
+            non_path_edges = [(u, v) for u, v in G.edges() if (u, v) not in path_edges and (v, u) not in path_edges]
+            
+            if non_path_edges:
+                widths, colors = get_edge_props(non_path_edges, for_plotly=True)
+                for i, (u, v) in enumerate(non_path_edges):
+                    x1, y1, z1 = pos[u]
+                    x2, y2, z2 = pos[v]
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                            mode='lines',
+                            line=dict(color=colors[i], width=widths[i]),
+                            opacity=0.5,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+            
+            if path_edges:
+                path_colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
+                for i, (u, v) in enumerate(path_edges):
+                    x1, y1, z1 = pos[u]
+                    x2, y2, z2 = pos[v]
+                    color = path_colors[i]
+                    color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                            mode='lines',
+                            line=dict(color=color_hex, width=6),
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        else:
+            edge_list = list(G.edges())
+            widths, colors = get_edge_props(edge_list, for_plotly=True)
+            for i, (u, v) in enumerate(edge_list):
+                x1, y1, z1 = pos[u]
+                x2, y2, z2 = pos[v]
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                        mode='lines',
+                        line=dict(color=colors[i], width=widths[i]),
+                        showlegend=False,
+                        hoverinfo='none'
+                    )
+                )
+        
+        node_x, node_y, node_z = [], [], []
+        node_text, hover_data = [], []
+        node_colors = []
+        labels = get_node_labels()
+        
+        for node in G.nodes():
+            if node in pos:
+                x, y, z = pos[node]
+                node_x.append(x)
+                node_y.append(y)
+                node_z.append(z)
+                
+                node_text.append(str(node))
+                hover_data.append(labels[node])
+                
+                if path and node in path:
+                    path_index = path.index(node)
+                    color = plt.cm.viridis(path_index / len(path))
+                    color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    node_colors.append(color_hex)
+                else:
+                    node_colors.append('white')
+        
+        fig.add_trace(
+            go.Scatter3d(
+                x=node_x, y=node_y, z=node_z,
+                mode='markers+text',
+                marker=dict(
+                    size=node_size/50,
+                    color=node_colors,
+                    line=dict(color='white', width=2)
+                ),
+                text=node_text,
+                textposition='middle center',
+                textfont=dict(color='black', size=font_size, family='Arial', weight='bold'),
+                hovertemplate='%{customdata}<extra></extra>',
+                customdata=hover_data,
+                showlegend=False
+            )
+        )
+        
+        if show_edge_labels:
+            edge_weights = nx.get_edge_attributes(G, 'weight')
+            for (u, v), weight in edge_weights.items():
+                if u in pos and v in pos:
+                    x1, y1, z1 = pos[u]
+                    x2, y2, z2 = pos[v]
+                    mid_x, mid_y, mid_z = (x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2
+                    
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[mid_x], y=[mid_y], z=[mid_z],
+                            mode='text',
+                            text=[f'{weight:.2f}'],
+                            textfont=dict(color='white', size=font_size-2),
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
+        width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+        
+        fig.update_layout(
+            width=width_px,
+            height=height_px,
+            paper_bgcolor='black',
+            plot_bgcolor='black',
+            scene=dict(
+                camera=dict(
+                    eye=dict(x=1.5, y=1.5, z=1.5),
+                    center=dict(x=0, y=0, z=0)
+                ),
+                xaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, showbackground=False,
+                    title=dict(text='', font=dict(color='white'))
+                ),
+                yaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, showbackground=False,
+                    title=dict(text='', font=dict(color='white'))
+                ),
+                zaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, showbackground=False,
+                    title=dict(text='', font=dict(color='white'))
+                ),
+                bgcolor='black'
+            ),
+            hovermode='closest',
+            margin=dict(l=0, r=0, t=0, b=0)
+        )
+        
+        if output_file:
+            if output_file.endswith('.html'):
+                fig.write_html(output_file)
+            else:
+                fig.write_image(output_file)
+        
+        return fig
+    
+    else:
+        plt.figure(figsize=figsize)
+        ax = plt.gca()
+        
+        ax.set_facecolor('black')
+        plt.gcf().set_facecolor('black')
+        
+        if path:
+            path_edges = list(zip(path[:-1], path[1:]))
+            non_path_edges = [(u, v) for u, v in G.edges() if (u, v) not in path_edges and (v, u) not in path_edges]
+            
+            if non_path_edges:
+                widths, colors = get_edge_props(non_path_edges)
                 if is_directed:
-                    nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
-                                         width=3, arrows=True,
+                    nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
+                                         width=widths, alpha=0.5, arrows=True,
                                          connectionstyle="arc3,rad=0.1")
                 else:
-                    nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
-                                         width=3)
-    else:
-        edge_list = list(G.edges())
-        widths, colors = get_edge_props(edge_list)
-        if is_directed:
-            nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths,
-                                 arrows=True, connectionstyle="arc3,rad=0.1")
+                    nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
+                                         width=widths, alpha=0.5)
+            
+            if path_edges:
+                path_colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
+                for (u, v), color in zip(path_edges, path_colors):
+                    if is_directed:
+                        nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
+                                             width=3, arrows=True,
+                                             connectionstyle="arc3,rad=0.1")
+                    else:
+                        nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
+                                             width=3)
         else:
-            nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths)
-    
-    if path:
-        non_path_nodes = [node for node in G.nodes() if node not in path]
-        nx.draw_networkx_nodes(G, pos, nodelist=non_path_nodes, node_color='black',
-                             node_size=node_size, edgecolors='white', linewidths=2)
+            edge_list = list(G.edges())
+            widths, colors = get_edge_props(edge_list)
+            if is_directed:
+                nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths,
+                                     arrows=True, connectionstyle="arc3,rad=0.1")
+            else:
+                nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths)
         
-        colors = plt.cm.viridis(np.linspace(0, 1, len(path)))
-        nx.draw_networkx_nodes(G, pos, nodelist=path, node_color=colors,
-                             node_size=node_size, edgecolors='white', linewidths=2)
-    else:
-        nx.draw_networkx_nodes(G, pos, node_color='black', node_size=node_size,
-                             edgecolors='white', linewidths=2)
-    
-    labels = {}
-    for node in G.nodes():
-        if attributes is None:
-            labels[node] = str(node)
+        if path:
+            non_path_nodes = [node for node in G.nodes() if node not in path]
+            nx.draw_networkx_nodes(G, pos, nodelist=non_path_nodes, node_color='black',
+                                 node_size=node_size, edgecolors='white', linewidths=2)
+            
+            colors = plt.cm.viridis(np.linspace(0, 1, len(path)))
+            nx.draw_networkx_nodes(G, pos, nodelist=path, node_color=colors,
+                                 node_size=node_size, edgecolors='white', linewidths=2)
         else:
-            label_parts = []
-            for attr in attributes:
-                if attr in {"node_id", "node", "id"}:
-                    label_parts.append(str(node))
-                elif attr in G.nodes[node]:
-                    value = G.nodes[node][attr]
-                    label_parts.append(str(value) if value is not None else '')
-            labels[node] = "\n".join(label_parts)
-    
-    nx.draw_networkx_labels(G, pos, labels=labels, font_color='white', font_size=font_size)
-    
-    if show_edge_labels:
-        edge_weights = {(u,v): f'{w:.2f}' for (u,v), w in nx.get_edge_attributes(G, 'weight').items()}
-        if is_directed:
-            for (u, v), weight in edge_weights.items():
-                x1, y1 = pos[u]
-                x2, y2 = pos[v]
-                
-                mid_x = (x1 + x2) / 2
-                mid_y = (y1 + y2) / 2
-                
-                dx = x2 - x1
-                dy = y2 - y1
-                length = (dx**2 + dy**2)**0.5
-                if length > 0:
-                    curve_rad = 0.1
-                    offset_x = -dy / length * curve_rad
-                    offset_y = dx / length * curve_rad
+            nx.draw_networkx_nodes(G, pos, node_color='black', node_size=node_size,
+                                 edgecolors='white', linewidths=2)
+        
+        labels = get_node_labels()
+        nx.draw_networkx_labels(G, pos, labels=labels, font_color='white', font_size=font_size)
+        
+        if show_edge_labels:
+            edge_weights = {(u,v): f'{w:.2f}' for (u,v), w in nx.get_edge_attributes(G, 'weight').items()}
+            if is_directed:
+                for (u, v), weight in edge_weights.items():
+                    x1, y1 = pos[u]
+                    x2, y2 = pos[v]
                     
-                    curve_mid_x = mid_x + offset_x
-                    curve_mid_y = mid_y + offset_y
-                else:
-                    curve_mid_x, curve_mid_y = mid_x, mid_y
-                
-                ax.text(curve_mid_x, curve_mid_y, weight, ha='center', va='center',
-                       color='white', fontsize=font_size,
-                       bbox=dict(facecolor='black', edgecolor='none', alpha=0.6))
+                    mid_x = (x1 + x2) / 2
+                    mid_y = (y1 + y2) / 2
+                    
+                    dx = x2 - x1
+                    dy = y2 - y1
+                    length = (dx**2 + dy**2)**0.5
+                    if length > 0:
+                        curve_rad = 0.1
+                        offset_x = -dy / length * curve_rad
+                        offset_y = dx / length * curve_rad
+                        
+                        curve_mid_x = mid_x + offset_x
+                        curve_mid_y = mid_y + offset_y
+                    else:
+                        curve_mid_x, curve_mid_y = mid_x, mid_y
+                    
+                    ax.text(curve_mid_x, curve_mid_y, weight, ha='center', va='center',
+                           color='white', fontsize=font_size,
+                           bbox=dict(facecolor='black', edgecolor='none', alpha=0.6))
+            else:
+                nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_weights,
+                                           font_color='white', font_size=font_size,
+                                           bbox=dict(facecolor='black', edgecolor='none', alpha=0.6),
+                                           label_pos=0.5, rotate=False)
+        
+        plt.axis('off')
+        plt.margins(x=0.1, y=0.1)
+        
+        if output_file:
+            plt.savefig(output_file, bbox_inches='tight', pad_inches=0, 
+                        facecolor='black', edgecolor='none')
+            plt.close()
         else:
-            nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_weights,
-                                       font_color='white', font_size=font_size,
-                                       bbox=dict(facecolor='black', edgecolor='none', alpha=0.6),
-                                       label_pos=0.5, rotate=False)
-    
-    plt.axis('off')
-    plt.margins(x=0.1, y=0.1)
-    
-    if output_file:
-        plt.savefig(output_file, bbox_inches='tight', pad_inches=0, 
-                    facecolor='black', edgecolor='none')
-        plt.close()
-    else:
-        plt.show()
+            plt.show()
 
 def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] | None = None, 
             invert: bool = True, output_file: str | None = None, 
