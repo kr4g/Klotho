@@ -85,7 +85,7 @@ def rotate_children(subdivs: tuple, n: int = 1, preserve_signs: bool = False) ->
     return refactor_children(subdivs, tuple(signed_values))
 
 def rotate_tree(tree:Tree, n:int=1) -> Tree:
-    return Tree(tree._root, rotate_children(tree._children, n))
+    return Tree(tree.group.D, rotate_children(tree.group.S, n))
 
 def print_subdivisons(subdivs):
     """Format nested tuple structure removing commas."""

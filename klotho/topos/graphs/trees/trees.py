@@ -3,27 +3,23 @@ import networkx as nx
 from itertools import count
 import pandas as pd
 from collections import deque
+from ....utils.data_structures.group import Group
+
 
 class Tree(Graph):
     def __init__(self, root, children:tuple):
         super().__init__(nx.DiGraph())
         self._root = self._build_tree(root, children)
-        self._list = (self._graph.nodes[self._root]['label'], children)
+        self._list = Group((root, children))
     
-    def __iter__(self):
-        yield self._graph.nodes[self.root]['label']
-        yield self._list[1]
-    
-    def __tuple__(self):
-        return self._list
-    
-    def __call__(self):
-        return self._list
-
     @property
     def root(self):
         return self._root
 
+    @property
+    def group(self):
+        return self._list
+    
     @property
     def depth(self):
         return max(nx.single_source_shortest_path_length(self.graph, self._root).values())
@@ -93,11 +89,11 @@ class Tree(Graph):
             tuple: Nodes at the specified depth, ordered from left to right
         """
         ops = {
-            '==': lambda x, y: x == y,
-            '<': lambda x, y: x < y,
-            '<=': lambda x, y: x <= y,
-            '>': lambda x, y: x > y,
-            '>=': lambda x, y: x >= y
+            '==' : lambda x, y: x == y,
+            '<'  : lambda x, y: x < y,
+            '<=' : lambda x, y: x <= y,
+            '>'  : lambda x, y: x > y,
+            '>=' : lambda x, y: x >= y
         }
         
         if operator not in ops:
@@ -319,7 +315,7 @@ class Tree(Graph):
                     duration_id = super().add_node(label=child._graph.nodes[child.root]['label'], 
                                                meta=child._meta.to_dict('records')[0])
                     self._graph.add_edge(parent_id, duration_id)
-                    self._add_children(duration_id, child._list[1])
+                    self._add_children(duration_id, child.group.S)
                 case _:
                     child_id = super().add_node(label=child)
                     self._graph.add_edge(parent_id, child_id)
@@ -364,7 +360,7 @@ class Tree(Graph):
             return tuple(result) if len(result) > 1 else (result[0],)
         
         children = _build_children_list(tree._root)
-        tree._list = (root_label, children)
+        tree._list = Group((root_label, children))
         
         tree._meta['depth'] = max(nx.single_source_shortest_path_length(tree.graph, tree._root).values())
         tree._meta['k'] = max((tree.graph.out_degree(n) for n in tree.graph.nodes), default=0)

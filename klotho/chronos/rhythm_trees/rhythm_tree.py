@@ -76,7 +76,7 @@ class RhythmTree(Tree):
     
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
-        return cls(span = span, meas = Meas(tree[tree.root]['duration_ratio']), subdivisions = tree._list[1])
+        return cls(span = span, meas = Meas(tree[tree.root]['duration_ratio']), subdivisions = tree.group.S)
     
     @classmethod
     def from_ratios(cls, ratios:Tuple[Fraction, float, str], span:int = 1):
@@ -140,6 +140,7 @@ class RhythmTree(Tree):
             if not children:
                 ratio = Fraction(label_value) * parent_ratio
                 self.graph.nodes[node]['duration_ratio'] = ratio
+                self.graph.nodes[node].pop('label', None)
                 return
             
             div = int(sum(abs(self.graph.nodes[c]['label'] * 
@@ -162,6 +163,9 @@ class RhythmTree(Tree):
                 self.graph.nodes[child]['proportion'] = s
                 if self.graph.out_degree(child) > 0:
                     _process_subtree(child, ratio)
+                self.graph.nodes[child].pop('label', None)
+            
+            self.graph.nodes[node].pop('label', None)
         
         _process_subtree()
         onsets = calc_onsets([self.graph.nodes[n]['duration_ratio'] for n in self.leaf_nodes])

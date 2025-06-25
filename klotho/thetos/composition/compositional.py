@@ -1,266 +1,342 @@
-from typing import Union, Optional
+from typing import Union, Optional, Any
 from fractions import Fraction
+import pandas as pd
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
+from klotho.chronos.temporal_units.temporal import Chronon
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
 
 
+class Event(Chronon):
+    """
+    An enhanced Chronon that includes parameter field access.
+    
+    Extends the basic temporal event data (start, duration, etc.) with 
+    access to musical parameters stored in a synchronized ParameterTree.
+    """
+    
+    __slots__ = ('_pt',)
+    
+    def __init__(self, node_id: int, rt: RhythmTree, pt: ParameterTree):
+        super().__init__(node_id, rt)
+        self._pt = pt
+    
+    @property
+    def parameters(self):
+        """
+        Get all active parameter fields for this event.
+        
+        Returns
+        -------
+        dict
+            Dictionary of active parameter field names and values
+        """
+        return self._pt[self._node_id].active_items()
+    
+    def get_parameter(self, key: str, default=None):
+        """
+        Get a specific parameter value for this event.
+        
+        Parameters
+        ----------
+        key : str
+            The parameter field name to retrieve
+        default : Any, optional
+            Default value if parameter not found
+            
+        Returns
+        -------
+        Any
+            The parameter value or default
+        """
+        return self._pt.get(self._node_id, key) or default
+    
+    def __getitem__(self, key: str):
+        """
+        Access temporal or parameter attributes by key.
+        
+        Parameters
+        ----------
+        key : str
+            Attribute name (temporal property or parameter field)
+            
+        Returns
+        -------
+        Any
+            The requested attribute value
+        """
+        temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_ratio', 'node_id', 'is_rest'}
+        if key in temporal_attrs:
+            return getattr(self, key)
+        return self.get_parameter(key)
+
+
 class CompositionalUnit(TemporalUnit):
     """
-    A TemporalUnit that maintains synchronized ParameterTrees for each parameter field.
+    A TemporalUnit enhanced with synchronized parameter management capabilities.
     
-    This class extends TemporalUnit to include parameter management capabilities,
-    allowing for complex parameter automation synchronized with the temporal structure.
+    Extends TemporalUnit to include a shadow ParameterTree that maintains 
+    identical structural form to the internal RhythmTree. This allows for 
+    hierarchical parameter organization where parameter values can be set at 
+    any level and automatically propagate to descendant events.
+    
+    Parameters
+    ----------
+    span : Union[int, float, Fraction], default=1
+        Number of measures the unit spans
+    tempus : Union[Meas, Fraction, int, float, str], default='4/4'
+        Time signature (e.g., '4/4', Meas(4,4))
+    prolatio : Union[tuple, str], default='d'
+        Subdivision pattern (tuple) or type ('d', 'r', 'p', 's')
+    beat : Union[None, Fraction, int, float, str], optional
+        Beat unit for tempo (e.g., Fraction(1,4) for quarter note)
+    bpm : Union[None, int, float], optional
+        Beats per minute
+    offset : float, default=0
+        Start time offset in seconds
+    pfields : Union[dict, list, None], optional
+        Parameter fields to initialize. Can be:
+        - dict: {field_name: default_value, ...}
+        - list: [field_name1, field_name2, ...] (defaults to 0.0)
+        - None: No parameter fields initially
+        
+    Attributes
+    ----------
+    pt : ParameterTree
+        The synchronized parameter tree matching RhythmTree structure (returns copy)
+    pfields : list
+        List of all available parameter field names
     """
     
     def __init__(self,
-                 span: Union[int, float, Fraction] = 1,
-                 tempus: Union[Meas, Fraction, int, float, str] = '4/4',
-                 prolatio: Union[tuple, str] = 'd',
-                 beat: Union[None, Fraction, int, float, str] = None,
-                 bpm: Union[None, int, float] = None,
-                 offset: float = 0,
-                 auto_sync: bool = True,
-                 pfields: Union[dict, list, None] = None):
-        """
-        Initialize a CompositionalUnit.
+                 span     : Union[int, float, Fraction]            = 1,
+                 tempus   : Union[Meas, Fraction, int, float, str] = '4/4',
+                 prolatio : Union[tuple, str]                      = 'd',
+                 beat     : Union[None, Fraction, int, float, str] = None,
+                 bpm      : Union[None, int, float]                = None,
+                 offset   : float                                  = 0,
+                 pfields  : Union[dict, list, None]                = None):
         
-        Args:
-            span: Number of measures the unit spans
-            tempus: Time signature (e.g., '4/4', Meas(4,4))
-            prolatio: Subdivision pattern (tuple) or type ('d', 'r', 'p', 's')
-            beat: Beat unit for tempo (e.g., Fraction(1,4) for quarter note)
-            bpm: Beats per minute
-            offset: Start time offset in seconds
-            auto_sync: Whether to automatically sync ParameterTree when RhythmTree changes
-            pfields: Parameter fields to initialize. Can be:
-                    - dict: {field_name: default_value, ...}
-                    - list: [field_name1, field_name2, ...] (defaults to 0.0)
-                    - None: No parameter fields initially
-        """
-        # Initialize the base TemporalUnit
-        super().__init__(span, tempus, prolatio, beat, bpm, offset)
+        # Initialize TemporalUnit components without calling _set_nodes yet
+        self._type = None
+        self._rt = self._set_rt(span, abs(Meas(tempus)), prolatio)
+        self._beat = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
+        self._bpm = bpm if bpm else 60
+        self._offset = offset
         
-        # Initialize parameter management
-        self._auto_sync = auto_sync
-        self._parameter_trees = {}
-        self._default_values = {}
+        # Create parameter tree before setting nodes
+        self._pt = self._create_synchronized_parameter_tree(pfields)
         
-        # Initialize parameter fields
-        if pfields is not None:
-            if isinstance(pfields, dict):
-                for field_name, default_value in pfields.items():
-                    self.add_pfield(field_name, default_value)
-            elif isinstance(pfields, list):
-                for field_name in pfields:
-                    self.add_pfield(field_name, 0.0)
-            else:
-                raise ValueError("pfields must be a dict, list, or None")
-    
-    @property
-    def prolationis(self):        
-        """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
-        return self._rt._subdivisions
-    
-    @prolationis.setter
-    def prolationis(self, prolatio: Union[tuple, str]):
-        self._rt = self._set_rt(self.span, self.tempus, prolatio)
+        # Now set the events (which creates Event objects needing both _rt and _pt)
         self._events = self._set_nodes()
+    
+    def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None]) -> ParameterTree:
+        """
+        Create a ParameterTree with identical structure to the RhythmTree but blank node data.
         
-        if self._auto_sync:
-            self._synchronize_parameter_trees()
-    
-    def _synchronize_parameter_trees(self):
-        """Synchronize all parameter trees with the current RhythmTree structure."""
-        for field_name in self._parameter_trees:
-            new_pt = self._create_shadow_parameter_tree()
+        Parameters
+        ----------
+        pfields : Union[dict, list, None]
+            Parameter fields to initialize
             
-            old_pt = self._parameter_trees[field_name]
-            self._transfer_parameter_values(old_pt, new_pt)
-            
-            self._parameter_trees[field_name] = new_pt
-    
-    def _create_shadow_parameter_tree(self) -> ParameterTree:
-        """Creates a ParameterTree that shadows the RhythmTree structure."""
-        rt = self._rt
-        pt = ParameterTree(rt._graph.nodes[rt.root]['label'], rt._list[1])
+        Returns
+        -------
+        ParameterTree
+            A parameter tree matching the rhythm tree structure with clean nodes
+        """
+        pt = ParameterTree(self._rt.meas.numerator, self._rt._subdivisions)
+        
+        # Clear all node attributes to ensure PT contains no RT data
+        for node in pt.graph.nodes():
+            # Keep only essential Tree attributes, clear everything else
+            node_data = pt.graph.nodes[node]
+            label = node_data.get('label')  # Preserve the structural label
+            node_data.clear()
+            if label is not None:
+                node_data['label'] = label
+        
+        if pfields is not None:
+            self._initialize_parameter_fields(pt, pfields)
+        
         return pt
     
-    def _transfer_parameter_values(self, old_pt: ParameterTree, new_pt: ParameterTree):
-        """Transfer parameter values from old tree to new tree where structure matches."""
-        try:
-            for leaf_node in new_pt.leaf_nodes:
-                if leaf_node in old_pt.graph.nodes:
-                    if 'value' in old_pt.graph.nodes[leaf_node]:
-                        new_pt.graph.nodes[leaf_node]['value'] = old_pt.graph.nodes[leaf_node]['value']
-        except:
-            pass
+    def _initialize_parameter_fields(self, pt: ParameterTree, pfields: Union[dict, list]):
+        """
+        Initialize parameter fields across all nodes in the parameter tree.
+        
+        Parameters
+        ----------
+        pt : ParameterTree
+            The parameter tree to initialize
+        pfields : Union[dict, list]
+            Parameter fields to set
+        """
+        if isinstance(pfields, dict):
+            pt.set_pfields(pt.root, **pfields)
+        elif isinstance(pfields, list):
+            default_values = {field: 0.0 for field in pfields}
+            pt.set_pfields(pt.root, **default_values)
+    
+    def _set_nodes(self):
+        """
+        Updates node timings and returns Event objects instead of Chronon objects.
+        
+        Returns
+        -------
+        tuple of Event
+            Events containing both temporal and parameter data
+        """
+        super()._set_nodes()
+        leaf_nodes = self._rt.leaf_nodes
+        return tuple(Event(node_id, self._rt, self._pt) for node_id in leaf_nodes)
     
     @property
-    def auto_sync(self) -> bool:
-        """Whether parameter trees are automatically synchronized with rhythm tree changes."""
-        return self._auto_sync
-    
-    @auto_sync.setter
-    def auto_sync(self, value: bool):
-        """Set auto-sync behavior."""
-        self._auto_sync = value
-        if value:
-            self._synchronize_parameter_trees()
+    def pt(self) -> ParameterTree:
+        """
+        The ParameterTree of the CompositionalUnit (returns a copy).
+        
+        Returns
+        -------
+        ParameterTree
+            A copy of the parameter tree maintaining structural synchronization with RhythmTree
+        """
+        return self._pt.copy()
     
     @property
-    def pfields(self) -> tuple:
-        """Return tuple of parameter field names."""
-        return tuple(self._parameter_trees.keys())
+    def pfields(self) -> list:
+        """
+        List of all available parameter field names.
+        
+        Returns
+        -------
+        list of str
+            Sorted list of parameter field names
+        """
+        return self._pt.pfields
     
-    def add_pfield(self, field_name: str, default_value: float = 0.0) -> None:
+    @property
+    def events(self):
         """
-        Add a new parameter field with a synchronized ParameterTree.
+        Enhanced events DataFrame including both temporal and parameter data.
         
-        Args:
-            field_name: Name of the parameter field
-            default_value: Default value for all nodes in the parameter tree
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame with temporal properties and all parameter fields
         """
-        if field_name in self._parameter_trees:
-            raise ValueError(f"Parameter field '{field_name}' already exists")
+        base_data = []
+        for event in self._events:
+            event_dict = {
+                'node_id': event.node_id,
+                'start': event.start,
+                'duration': event.duration,
+                'end': event.end,
+                'is_rest': event.is_rest,
+                's': event.proportion,
+                'metric_ratio': event.metric_ratio,
+            }
+            event_dict.update(event.parameters)
+            base_data.append(event_dict)
         
-        # Create a new parameter tree that shadows the rhythm tree
-        pt = self._create_shadow_parameter_tree()
-        
-        # Set default values for all leaf nodes
-        for leaf_node in pt.leaf_nodes:
-            pt.graph.nodes[leaf_node]['value'] = default_value
-        
-        self._parameter_trees[field_name] = pt
-        self._default_values[field_name] = default_value
+        return pd.DataFrame(base_data, index=range(len(self._events)))
     
-    def remove_pfield(self, field_name: str) -> None:
+    def set_pfields(self, node: int, **kwargs) -> None:
         """
-        Remove a parameter field and its associated ParameterTree.
+        Set parameter field values for a specific node and its descendants.
         
-        Args:
-            field_name: Name of the parameter field to remove
+        Parameters
+        ----------
+        node : int
+            The node ID to set parameters for
+        **kwargs
+            Parameter field names and values to set
         """
-        if field_name not in self._parameter_trees:
-            raise ValueError(f"Parameter field '{field_name}' does not exist")
-        
-        del self._parameter_trees[field_name]
-        del self._default_values[field_name]
+        self._pt.set_pfields(node, **kwargs)
     
-    def get_ptree(self, field_name: str) -> ParameterTree:
+    def set_instrument(self, node: int, instrument: Instrument, exclude: Union[str, list, set, None] = None) -> None:
         """
-        Get the ParameterTree for a specific field.
+        Set an instrument for a specific node, applying its parameter fields.
         
-        Args:
-            field_name: Name of the parameter field
+        Parameters
+        ----------
+        node : int
+            The node ID to set the instrument for
+        instrument : Instrument
+            The instrument to apply
+        exclude : Union[str, list, set, None], optional
+            Parameter fields to exclude from application
+        """
+        self._pt.set_instrument(node, instrument, exclude)
+    
+    def get_parameter(self, node: int, key: str, default=None):
+        """
+        Get a parameter value for a specific node.
+        
+        Parameters
+        ----------
+        node : int
+            The node ID to query
+        key : str
+            The parameter field name
+        default : Any, optional
+            Default value if parameter not found
             
-        Returns:
-            ParameterTree: The parameter tree for the specified field
+        Returns
+        -------
+        Any
+            The parameter value or default
         """
-        if field_name not in self._parameter_trees:
-            raise ValueError(f"Parameter field '{field_name}' does not exist")
-        
-        return self._parameter_trees[field_name]
+        return self._pt.get(node, key) or default
     
-    def set_pfield_values(self, field_name: str, values: Union[list, tuple, dict]) -> None:
+    def clear_parameters(self, node: int = None) -> None:
         """
-        Set parameter values for a specific field.
+        Clear parameter values for a node and its descendants.
         
-        Args:
-            field_name: Name of the parameter field
-            values: Values to set. Can be:
-                   - list/tuple: Values for each leaf node in order
-                   - dict: {node_id: value, ...}
+        Parameters
+        ----------
+        node : int, optional
+            The node ID to clear. If None, clears all nodes
         """
-        if field_name not in self._parameter_trees:
-            raise ValueError(f"Parameter field '{field_name}' does not exist")
+        self._pt.clear(node)
+    
+    def get_event_parameters(self, idx: int) -> dict:
+        """
+        Get all parameter values for a specific event by index.
         
-        pt = self._parameter_trees[field_name]
-        leaf_nodes = pt.leaf_nodes
-        
-        if isinstance(values, (list, tuple)):
-            if len(values) != len(leaf_nodes):
-                raise ValueError(f"Expected {len(leaf_nodes)} values, got {len(values)}")
+        Parameters
+        ----------
+        idx : int
+            Event index
             
-            for node, value in zip(leaf_nodes, values):
-                pt.graph.nodes[node]['value'] = value
-                
-        elif isinstance(values, dict):
-            for node_id, value in values.items():
-                if node_id not in pt.graph.nodes:
-                    raise ValueError(f"Node {node_id} not found in parameter tree")
-                pt.graph.nodes[node_id]['value'] = value
-        else:
-            raise ValueError("values must be a list, tuple, or dict")
-    
-    def get_pfield_values(self, field_name: str) -> list:
+        Returns
+        -------
+        dict
+            Dictionary of parameter field names and values
         """
-        Get parameter values for a specific field.
-        
-        Args:
-            field_name: Name of the parameter field
-            
-        Returns:
-            list: Values for each leaf node in order
-        """
-        if field_name not in self._parameter_trees:
-            raise ValueError(f"Parameter field '{field_name}' does not exist")
-        
-        pt = self._parameter_trees[field_name]
-        return [pt.graph.nodes[node].get('value', self._default_values[field_name]) 
-                for node in pt.leaf_nodes]
-    
-    def sync_now(self):
-        """Manually trigger synchronization of ParameterTrees with RhythmTree."""
-        self._synchronize_parameter_trees()
-    
-    # === ENHANCED STRING REPRESENTATION ===
-    
-    def __str__(self):
-        # Get the base TemporalUnit string representation
-        temporal_str = super().__str__()
-        
-        # Add parameter information
-        param_info = f'PFields:  {len(self.pfields)} ({", ".join(self.pfields) if self.pfields else "none"})\n'
-        
-        # Insert parameter info before the final separator
-        lines = temporal_str.split('\n')
-        # Find the last separator line and insert parameter info before it
-        for i in range(len(lines) - 1, -1, -1):
-            if lines[i].startswith('-'):
-                lines.insert(i, param_info.rstrip())
-                break
-        
-        # Update the header to indicate this is a CompositionalUnit
-        for i, line in enumerate(lines):
-            if 'Span:' in line:
-                lines.insert(i, 'CompositionalUnit')
-                lines.insert(i + 1, '-' * 50)
-                break
-        
-        return '\n'.join(lines)
-    
-    def __repr__(self):
-        return self.__str__()
+        return self._events[idx].parameters
     
     def copy(self):
-        """Create a deep copy of this CompositionalUnit."""
-        # Create base copy
-        copy_unit = CompositionalUnit(
+        """
+        Create a deep copy of this CompositionalUnit.
+        
+        Returns
+        -------
+        CompositionalUnit
+            A new CompositionalUnit with copied structure and parameters
+        """
+        new_cu = CompositionalUnit(
             span=self.span,
             tempus=self.tempus,
             prolatio=self.prolationis,
             beat=self._beat,
             bpm=self._bpm,
-            offset=self._offset,
-            auto_sync=self._auto_sync
+            offset=self._offset
         )
         
-        # Copy parameter fields and their values
-        for field_name in self.pfields:
-            copy_unit.add_pfield(field_name, self._default_values[field_name])
-            values = self.get_pfield_values(field_name)
-            copy_unit.set_pfield_values(field_name, values)
+        for node in self._pt.graph.nodes():
+            node_params = self._pt.items(node)
+            if node_params:
+                new_cu.set_pfields(node, **node_params)
         
-        return copy_unit 
+        return new_cu

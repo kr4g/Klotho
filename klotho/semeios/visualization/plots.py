@@ -1,13 +1,11 @@
+from klotho.topos.graphs import Graph, Tree, Lattice
+from klotho.thetos.parameters.parameter_tree import ParameterTree
+from klotho.chronos.rhythm_trees import RhythmTree
+from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from typing import Tuple
 from itertools import count
 import networkx as nx
 import matplotlib.pyplot as plt
-from klotho.topos.graphs.graphs import Graph
-from klotho.topos.graphs.trees.trees import Tree
-from klotho.topos.graphs.lattices.lattices import Lattice
-from klotho.chronos.rhythm_trees import RhythmTree
-from klotho.thetos.parameters.parameter_tree import ParameterTree
-from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from fractions import Fraction
 import numpy as np
 import plotly.graph_objects as go
@@ -17,7 +15,7 @@ import math
 
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
-from klotho.topos.collections.sets import CombinationSet
+from klotho.topos.collections.sets import CombinationSet, PartitionSet
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
 
@@ -58,6 +56,8 @@ def plot(obj, **kwargs):
                     return _plot_cps(obj, **kwargs)
                 case _:
                     return _plot_cs(obj, **kwargs)
+        case PartitionSet():
+            return _plot_graph(obj.graph, **kwargs)
         case DynamicRange():
             return _plot_dynamic_range(obj, **kwargs)
         case Envelope():
@@ -496,8 +496,13 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
                node_size: float = 1000, font_size: float = 12,
                layout: str = 'spring', k: float = 1,
                show_edge_labels: bool = True,
-               weighted_edges: bool = False,
+               edge_width: bool = False,
+               edge_color: bool = False,
+               width_range: tuple[float, float] = (0.75, 3),
+               cmap: str = 'viridis',
+               invert_weights: bool = False,
                path: list | None = None,
+               attributes: list[str] | None = None,
                output_file: str | None = None) -> None:
     plt.figure(figsize=figsize)
     ax = plt.gca()
@@ -516,32 +521,80 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
     
     pos = layouts.get(layout, layouts['spring'])()
     
+    is_directed = isinstance(G, nx.DiGraph)
+    
+    weights = []
+    if edge_width or edge_color:
+        weight_dict = nx.get_edge_attributes(G, 'weight')
+        if weight_dict:
+            weights = list(weight_dict.values())
+            min_weight, max_weight = min(weights), max(weights)
+    
+    def get_edge_props(edge_list):
+        widths = []
+        colors = []
+        
+        for u, v in edge_list:
+            if edge_width and weights:
+                w = G[u][v].get('weight', min_weight)
+                if max_weight > min_weight:
+                    norm_w = (w - min_weight) / (max_weight - min_weight)
+                    if invert_weights:
+                        norm_w = 1 - norm_w
+                else:
+                    norm_w = 0
+                width = width_range[0] + norm_w * (width_range[1] - width_range[0])
+                widths.append(width)
+            else:
+                widths.append(2)
+            
+            if edge_color and weights:
+                w = G[u][v].get('weight', min_weight)
+                if max_weight > min_weight:
+                    norm_w = (w - min_weight) / (max_weight - min_weight)
+                    if invert_weights:
+                        norm_w = 1 - norm_w
+                else:
+                    norm_w = 0
+                color = plt.cm.get_cmap(cmap)(norm_w)
+                colors.append(color)
+            else:
+                colors.append('#808080')
+        
+        return widths, colors
+    
     if path:
         path_edges = list(zip(path[:-1], path[1:]))
         non_path_edges = [(u, v) for u, v in G.edges() if (u, v) not in path_edges and (v, u) not in path_edges]
         
-        if weighted_edges and non_path_edges:
-            weights = [G[u][v]['weight'] for u, v in non_path_edges]
-            min_weight, max_weight = min(weights), max(weights)
-            width_scale = lambda w: 1 + 3 * ((w - min_weight) / (max_weight - min_weight) if max_weight > min_weight else 0)
-            edge_widths = [width_scale(w) for w in weights]
-            nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color='#808080', width=edge_widths, alpha=0.5)
-        else:
-            nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color='#808080', width=2, alpha=0.5)
+        if non_path_edges:
+            widths, colors = get_edge_props(non_path_edges)
+            if is_directed:
+                nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
+                                     width=widths, alpha=0.5, arrows=True,
+                                     connectionstyle="arc3,rad=0.1")
+            else:
+                nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
+                                     width=widths, alpha=0.5)
         
         if path_edges:
-            colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
-            for (u, v), color in zip(path_edges, colors):
-                nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], width=3)
+            path_colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
+            for (u, v), color in zip(path_edges, path_colors):
+                if is_directed:
+                    nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
+                                         width=3, arrows=True,
+                                         connectionstyle="arc3,rad=0.1")
+                else:
+                    nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
+                                         width=3)
     else:
-        if weighted_edges:
-            weights = list(nx.get_edge_attributes(G, 'weight').values())
-            min_weight, max_weight = min(weights), max(weights)
-            width_scale = lambda w: 1 + 3 * ((w - min_weight) / (max_weight - min_weight) if max_weight > min_weight else 0)
-            edge_widths = [width_scale(w) for w in weights]
-            nx.draw_networkx_edges(G, pos, edge_color='#808080', width=edge_widths)
+        edge_list = list(G.edges())
+        widths, colors = get_edge_props(edge_list)
+        if is_directed:
+            nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths,
+                                 arrows=True, connectionstyle="arc3,rad=0.1")
         else:
-            nx.draw_networkx_edges(G, pos, edge_color='#808080', width=2)
+            nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths)
     
     if path:
         non_path_nodes = [node for node in G.nodes() if node not in path]
@@ -555,15 +608,53 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
         nx.draw_networkx_nodes(G, pos, node_color='black', node_size=node_size,
                              edgecolors='white', linewidths=2)
     
-    labels = {node: G.nodes[node]['value'] for node in G.nodes()}
+    labels = {}
+    for node in G.nodes():
+        if attributes is None:
+            labels[node] = str(node)
+        else:
+            label_parts = []
+            for attr in attributes:
+                if attr in {"node_id", "node", "id"}:
+                    label_parts.append(str(node))
+                elif attr in G.nodes[node]:
+                    value = G.nodes[node][attr]
+                    label_parts.append(str(value) if value is not None else '')
+            labels[node] = "\n".join(label_parts)
+    
     nx.draw_networkx_labels(G, pos, labels=labels, font_color='white', font_size=font_size)
     
     if show_edge_labels:
         edge_weights = {(u,v): f'{w:.2f}' for (u,v), w in nx.get_edge_attributes(G, 'weight').items()}
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_weights,
-                                   font_color='white', font_size=font_size,
-                                   bbox=dict(facecolor='black', edgecolor='none', alpha=0.6),
-                                   label_pos=0.5, rotate=False)
+        if is_directed:
+            for (u, v), weight in edge_weights.items():
+                x1, y1 = pos[u]
+                x2, y2 = pos[v]
+                
+                mid_x = (x1 + x2) / 2
+                mid_y = (y1 + y2) / 2
+                
+                dx = x2 - x1
+                dy = y2 - y1
+                length = (dx**2 + dy**2)**0.5
+                if length > 0:
+                    curve_rad = 0.1
+                    offset_x = -dy / length * curve_rad
+                    offset_y = dx / length * curve_rad
+                    
+                    curve_mid_x = mid_x + offset_x
+                    curve_mid_y = mid_y + offset_y
+                else:
+                    curve_mid_x, curve_mid_y = mid_x, mid_y
+                
+                ax.text(curve_mid_x, curve_mid_y, weight, ha='center', va='center',
+                       color='white', fontsize=font_size,
+                       bbox=dict(facecolor='black', edgecolor='none', alpha=0.6))
+        else:
+            nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_weights,
+                                       font_color='white', font_size=font_size,
+                                       bbox=dict(facecolor='black', edgecolor='none', alpha=0.6),
+                                       label_pos=0.5, rotate=False)
     
     plt.axis('off')
     plt.margins(x=0.1, y=0.1)

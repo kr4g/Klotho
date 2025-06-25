@@ -40,7 +40,7 @@ def decompose(ut: TemporalUnit, prolatio: Union[tuple, str, None] = None, depth:
             TemporalUnit(
                 span     = 1,
                 tempus   = subtree[subtree.root]['ratio'],
-                prolatio = subtree._list[1] if not prolatio else next(prolatio_cycle),
+                prolatio = subtree.group.S if not prolatio else next(prolatio_cycle),
                 beat     = ut._beat,
                 bpm      = ut._bpm
             ) for subtree in [ut._rt.subtree(n) for n in ut._rt.at_depth(depth)]

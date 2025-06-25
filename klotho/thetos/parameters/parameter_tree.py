@@ -2,9 +2,12 @@ from ...topos.graphs.trees import Tree
 from ..instruments.instrument import Instrument
 import pandas as pd
 
+
 class ParameterTree(Tree):
     def __init__(self, root, children:tuple):
         super().__init__(root, children)
+        for node in self.graph.nodes:
+            self.graph.nodes[node].pop('label', None)
         self._meta['pfields'] = pd.Series([set()], index=[''])
         self._node_instruments = {}
         self._subtree_muted_pfields = {}

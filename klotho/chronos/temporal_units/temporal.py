@@ -42,9 +42,9 @@ class Chronon(metaclass=TemporalMeta):
         self._rt = rt
     
     @property
-    def start(self): return self._rt[self._node_id]['onset_time']
+    def start(self): return abs(self._rt[self._node_id]['onset_time'])
     @property
-    def duration(self): return self._rt[self._node_id]['duration_time']
+    def duration(self): return abs(self._rt[self._node_id]['duration_time'])
     @property
     def end(self): return self.start + abs(self.duration)
     @property
@@ -58,13 +58,13 @@ class Chronon(metaclass=TemporalMeta):
     
     def __str__(self):
         return pd.DataFrame({
+            'node_id': [self.node_id],
             'start': [self.start],
             'duration': [self.duration], 
             'end': [self.end],
+            'is_rest': [self.is_rest],
             'proportion': [self.proportion],
-            'ratio': [self.metric_ratio],
-            'node_id': [self.node_id],
-            'is_rest': [self.is_rest]
+            'metric_ratio': [self.metric_ratio],
         }, index=['']).__str__()
     
     def __repr__(self):
@@ -73,12 +73,13 @@ class Chronon(metaclass=TemporalMeta):
 
 class TemporalUnit(metaclass=TemporalMeta):
     def __init__(self,
-                 span:Union[int,float,Fraction]            = 1,
-                 tempus:Union[Meas,Fraction,int,float,str] = '4/4',
-                 prolatio:Union[tuple,str]                 = 'd',
-                 beat:Union[None,Fraction,int,float,str]   = None,
-                 bpm:Union[None,int,float]                 = None,
-                 offset:float                              = 0):
+                 span     : Union[int,float,Fraction]          = 1,
+                 tempus   : Union[Meas,Fraction,int,float,str] = '4/4',
+                 prolatio : Union[tuple,str]                   = 'd',
+                 beat     : Union[None,Fraction,int,float,str] = None,
+                 bpm      : Union[None,int,float]              = None,
+                 offset   : float                              = 0
+        ):
         
         self._type   = None
         
@@ -113,10 +114,10 @@ class TemporalUnit(metaclass=TemporalMeta):
         """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
         return self._rt._subdivisions
     
-    @prolationis.setter
-    def prolationis(self, prolatio: Union[tuple, str]):
-        self._rt = self._set_rt(self.span, self.tempus, prolatio)
-        self._events = self._set_nodes()
+    # @prolationis.setter
+    # def prolationis(self, prolatio: Union[tuple, str]):
+    #     self._rt = self._set_rt(self.span, self.tempus, prolatio)
+    #     self._events = self._set_nodes()
     
     @property
     def rt(self):
@@ -172,13 +173,13 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def events(self):
         return pd.DataFrame([{
+            'node_id': c.node_id,
             'start': c.start,
             'duration': c.duration,
             'end': c.end,
-            'metric_ratio': c.metric_ratio,
-            's': c.proportion,
             'is_rest': c.is_rest,
-            'node_id': c.node_id,
+            's': c.proportion,
+            'metric_ratio': c.metric_ratio,
         } for c in self._events], index=range(len(self._events)))
         
     @offset.setter

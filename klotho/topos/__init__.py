@@ -34,9 +34,6 @@ from .formal_grammars import alphabets, grammars
 from .graphs import trees, Graph, Tree, Lattice
 
 __all__ = [
-    # Modules
-    'collections', 'formal_grammars', 'graphs',
-    
     # Classes
     'Pattern', 'CombinationSet', 'PartitionSet',
     'Tree', 'Graph', 'Lattice',

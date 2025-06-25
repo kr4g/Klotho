@@ -1,5 +1,5 @@
 from .trees import Tree
-from .lattices import Lattice, Field
+from .lattices import Lattice
 from .graphs import Graph
 
 from .trees.algorithms import *
