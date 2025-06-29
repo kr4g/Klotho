@@ -6,6 +6,7 @@ from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
+from klotho.dynatos.envelopes import Envelope
 
 
 class Event(Chronon):
@@ -50,7 +51,8 @@ class Event(Chronon):
         Any
             The parameter value or default
         """
-        return self._pt.get(self._node_id, key) or default
+        value = self._pt.get(self._node_id, key)
+        return value if value is not None else default
     
     def __getitem__(self, key: str):
         """
@@ -118,17 +120,17 @@ class CompositionalUnit(TemporalUnit):
                  offset   : float                                  = 0,
                  pfields  : Union[dict, list, None]                = None):
         
-        # Initialize TemporalUnit components without calling _set_nodes yet
         self._type = None
         self._rt = self._set_rt(span, abs(Meas(tempus)), prolatio)
         self._beat = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
         self._bpm = bpm if bpm else 60
         self._offset = offset
         
-        # Create parameter tree before setting nodes
         self._pt = self._create_synchronized_parameter_tree(pfields)
         
-        # Now set the events (which creates Event objects needing both _rt and _pt)
+        self._envelopes = {}
+        self._next_envelope_id = 0
+        
         self._events = self._set_nodes()
     
     def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None]) -> ParameterTree:
@@ -147,14 +149,9 @@ class CompositionalUnit(TemporalUnit):
         """
         pt = ParameterTree(self._rt.meas.numerator, self._rt._subdivisions)
         
-        # Clear all node attributes to ensure PT contains no RT data
         for node in pt.graph.nodes():
-            # Keep only essential Tree attributes, clear everything else
             node_data = pt.graph.nodes[node]
-            label = node_data.get('label')  # Preserve the structural label
             node_data.clear()
-            if label is not None:
-                node_data['label'] = label
         
         if pfields is not None:
             self._initialize_parameter_fields(pt, pfields)
@@ -177,7 +174,35 @@ class CompositionalUnit(TemporalUnit):
         elif isinstance(pfields, list):
             default_values = {field: 0.0 for field in pfields}
             pt.set_pfields(pt.root, **default_values)
-    
+
+    def _validate_non_overlapping_subtrees(self, nodes):
+        """Ensure no node is a descendant of another in the list"""
+        for i, node1 in enumerate(nodes):
+            for j, node2 in enumerate(nodes):
+                if i != j and node2 in self._pt.descendants(node1):
+                    raise ValueError(f"Node {node2} is a descendant of node {node1}. Overlapping subtrees not allowed for envelope assignment.")
+
+    def _evaluate_envelopes(self):
+        """Evaluate all envelopes and update parameter tree with computed values"""
+        for envelope_id, env_data in self._envelopes.items():
+            envelope = env_data['envelope']
+            start_time = env_data['start_time']
+            
+            for node in env_data['affected_nodes']:
+                event_time = self._rt[node]['onset_time']
+                relative_time = event_time - start_time
+                
+                relative_time = max(0, min(relative_time, envelope.total_time))
+                
+                try:
+                    envelope_value = envelope.at_time(relative_time)
+                except ValueError:
+                    envelope_value = envelope._values[0] if relative_time <= 0 else envelope._values[-1]
+                
+                pfield_updates = {pfield: envelope_value for pfield in env_data['pfields']}
+                if pfield_updates:
+                    self._pt.set_pfields(node, **pfield_updates)
+
     def _set_nodes(self):
         """
         Updates node timings and returns Event objects instead of Chronon objects.
@@ -188,6 +213,7 @@ class CompositionalUnit(TemporalUnit):
             Events containing both temporal and parameter data
         """
         super()._set_nodes()
+        self._evaluate_envelopes()
         leaf_nodes = self._rt.leaf_nodes
         return tuple(Event(node_id, self._rt, self._pt) for node_id in leaf_nodes)
     
@@ -241,18 +267,172 @@ class CompositionalUnit(TemporalUnit):
         
         return pd.DataFrame(base_data, index=range(len(self._events)))
     
-    def set_pfields(self, node: int, **kwargs) -> None:
+    def set_pfields(self, node: Union[int, list], endpoint: bool = True, **kwargs) -> None:
         """
-        Set parameter field values for a specific node and its descendants.
+        Set parameter field values for a specific node(s) and their descendants.
         
         Parameters
         ----------
-        node : int
-            The node ID to set parameters for
+        node : Union[int, list]
+            The node ID(s) to set parameters for
+        endpoint : bool, default=True
+            Whether envelope spans through complete duration of final nodes (True)
+            or only to their onset times (False)
         **kwargs
-            Parameter field names and values to set
+            Parameter field names and values to set (can include Envelope instances)
         """
-        self._pt.set_pfields(node, **kwargs)
+        nodes = [node] if not isinstance(node, (list, tuple, set)) else list(node)
+        
+        envelope_fields = {k: v for k, v in kwargs.items() if isinstance(v, Envelope)}
+        static_fields = {k: v for k, v in kwargs.items() if not isinstance(v, Envelope)}
+        
+        if envelope_fields and len(nodes) > 1:
+            self._validate_non_overlapping_subtrees(nodes)
+        
+        for n in nodes:
+            if static_fields:
+                self._pt.set_pfields(n, **static_fields)
+        for n in nodes:
+            for pfield, envelope in envelope_fields.items():
+                affected_nodes = set(self._pt.descendants(n))
+                if n in self._pt.leaf_nodes:
+                    affected_nodes.add(n)
+                
+                start_time = min(self._rt[desc]['onset_time'] for desc in affected_nodes)
+                
+                if endpoint:
+                    end_time = max(self._rt[desc]['onset_time'] + abs(self._rt[desc]['duration_time']) 
+                                 for desc in affected_nodes)
+                else:
+                    end_time = max(self._rt[desc]['onset_time'] for desc in affected_nodes)
+                
+                envelope_duration = end_time - start_time
+                scaled_envelope = Envelope(
+                    values=envelope._original_values,
+                    times=envelope._original_times,
+                    curve=envelope._curve,
+                    normalize_values=envelope._normalize_values,
+                    normalize_times=envelope._normalize_times,
+                    value_scale=envelope._value_scale,
+                    time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0,
+                    resolution=envelope._resolution
+                )
+                
+                envelope_id = self._next_envelope_id
+                self._next_envelope_id += 1
+                
+                self._envelopes[envelope_id] = {
+                    'envelope': scaled_envelope,
+                    'affected_nodes': affected_nodes,
+                    'pfields': [pfield],
+                    'start_time': start_time,
+                    'duration': envelope_duration
+                }
+        
+        self._evaluate_envelopes()
+
+    def apply_envelope(self, level: Union[int, str], range_span: Union[tuple, int, None], envelope: Envelope, pfields: Union[str, list], endpoint: bool = True) -> int:
+        """
+        Apply envelope to a consecutive span of nodes at a specific level.
+        
+        Parameters
+        ----------
+        level : Union[int, str]
+            Tree depth level, or "leaf" to select from leaf nodes directly
+        range_span : Union[tuple, int, None]
+            Node selection span. Can be:
+            - None: all nodes at the level
+            - int: from this index to end of level  
+            - (start, end): inclusive range from start to end
+        envelope : Envelope
+            Envelope to apply
+        pfields : Union[str, list]
+            Parameter field name(s) to affect
+        endpoint : bool, default=True
+            Whether envelope spans through complete duration of final nodes (True)
+            or only to their onset times (False)
+            
+        Returns
+        -------
+        int
+            Envelope ID for reference
+        """
+        if level == "leaf":
+            available_nodes = list(self._pt.leaf_nodes)
+            affected_nodes = set()
+        else:
+            available_nodes = self._pt.at_depth(level)
+            affected_nodes = set()
+        
+        if not available_nodes:
+            level_desc = "leaf nodes" if level == "leaf" else f"level {level}"
+            raise ValueError(f"No nodes found at {level_desc}")
+        
+        if range_span is None:
+            start_pos, end_pos = 0, len(available_nodes) - 1
+        elif isinstance(range_span, int):
+            start_pos = range_span
+            if start_pos < 0:
+                start_pos = len(available_nodes) + start_pos
+            end_pos = len(available_nodes) - 1
+        else:
+            start_pos, end_pos = range_span
+            if start_pos < 0:
+                start_pos = len(available_nodes) + start_pos
+            if end_pos < 0:
+                end_pos = len(available_nodes) + end_pos
+            
+        if start_pos < 0 or end_pos >= len(available_nodes) or start_pos > end_pos:
+            level_desc = "leaf nodes" if level == "leaf" else f"level {level}"
+            raise ValueError(f"Invalid range ({start_pos}, {end_pos}) for {level_desc} with {len(available_nodes)} nodes")
+        
+        span_nodes = available_nodes[start_pos:end_pos+1]
+        
+        if level == "leaf":
+            affected_nodes = set(span_nodes)
+        else:
+            for node in span_nodes:
+                affected_nodes.update(self._pt.descendants(node))
+                if node in self._pt.leaf_nodes:
+                    affected_nodes.add(node)
+        
+        start_time = min(self._rt[node]['onset_time'] for node in affected_nodes)
+        
+        if endpoint:
+            end_time = max(self._rt[node]['onset_time'] + abs(self._rt[node]['duration_time']) 
+                          for node in affected_nodes)
+        else:
+            end_time = max(self._rt[node]['onset_time'] for node in affected_nodes)
+        
+        envelope_duration = end_time - start_time
+        
+        scaled_envelope = Envelope(
+            values=envelope._original_values,
+            times=envelope._original_times,
+            curve=envelope._curve,
+            normalize_values=envelope._normalize_values,
+            normalize_times=envelope._normalize_times,
+            value_scale=envelope._value_scale,
+            time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0,
+            resolution=envelope._resolution
+        )
+        
+        envelope_id = self._next_envelope_id
+        self._next_envelope_id += 1
+        
+        pfields_list = pfields if isinstance(pfields, list) else [pfields]
+        
+        self._envelopes[envelope_id] = {
+            'envelope': scaled_envelope,
+            'affected_nodes': affected_nodes,
+            'pfields': pfields_list,
+            'start_time': start_time,
+            'duration': envelope_duration
+        }
+        
+        self._evaluate_envelopes()
+        
+        return envelope_id
     
     def set_instrument(self, node: int, instrument: Instrument, exclude: Union[str, list, set, None] = None) -> None:
         """
@@ -298,6 +478,16 @@ class CompositionalUnit(TemporalUnit):
         node : int, optional
             The node ID to clear. If None, clears all nodes
         """
+        if node is None:
+            self._envelopes.clear()
+        else:
+            to_remove = []
+            for envelope_id, env_data in self._envelopes.items():
+                if node in env_data['affected_nodes']:
+                    to_remove.append(envelope_id)
+            for envelope_id in to_remove:
+                del self._envelopes[envelope_id]
+        
         self._pt.clear(node)
     
     def get_event_parameters(self, idx: int) -> dict:
@@ -337,6 +527,8 @@ class CompositionalUnit(TemporalUnit):
         for node in self._pt.graph.nodes():
             node_params = self._pt.items(node)
             if node_params:
-                new_cu.set_pfields(node, **node_params)
+                static_params = {k: v for k, v in node_params.items() if not k.startswith('_envelope_')}
+                if static_params:
+                    new_cu._pt.set_pfields(node, **static_params)
         
         return new_cu

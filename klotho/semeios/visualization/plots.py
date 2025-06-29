@@ -1,7 +1,7 @@
 from klotho.topos.graphs import Graph, Tree, Lattice
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 from klotho.chronos.rhythm_trees import RhythmTree
-from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
+from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
 from typing import Tuple
 from itertools import count
 import networkx as nx
@@ -62,10 +62,18 @@ def plot(obj, **kwargs):
             return _plot_dynamic_range(obj, **kwargs)
         case Envelope():
             return _plot_envelope(obj, **kwargs)
+        case TemporalMeta():
+            match obj:
+                case TemporalUnit():
+                    return _plot_rt(obj.rt, **kwargs)
+                case TemporalUnitSequence():
+                    raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
+                case TemporalBlock():
+                    raise NotImplementedError("Plotting for temporal blocks not yet implemented")
+                case _:
+                    raise NotImplementedError("Must be a TemporalUnit, TemporalUnitSequence, or TemporalBlock")
         case nx.Graph():
             return _plot_graph(obj, **kwargs)
-        case TemporalUnit() | TemporalUnitSequence() | TemporalBlock():
-            raise NotImplementedError("Plotting for temporal units not yet implemented")
         case _:
             raise TypeError(f"Unsupported object type for plotting: {type(obj)}")
 
@@ -210,16 +218,15 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
             node_text.append(display_text)
             
             if attributes is None:
-                label_text = str(G.nodes[node]['label']) if G.nodes[node]['label'] is not None else ''
+                label_text = str(G.nodes[node].get('label', node)) if G.nodes[node].get('label') is not None else str(node)
             else:
                 label_parts = []
                 for attr in attributes:
                     if attr in {"node_id", "node", "id"}:
                         label_parts.append(str(node))
-                    else:
-                        if attr in active_items:
-                            value = active_items[attr]
-                            label_parts.append(f"{attr}: {value}" if value is not None else f"{attr}: None")
+                    elif attr in active_items:
+                        value = active_items[attr]
+                        label_parts.append(f"{attr}: {value}" if value is not None else f"{attr}: None")
                 label_text = "<br>".join(label_parts)
             
             hover_data.append(label_text)
@@ -412,7 +419,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     
     for node, (x, y) in pos.items():
         if attributes is None:
-            label_text = str(G.nodes[node]['label']) if G.nodes[node]['label'] is not None else ''
+            label_text = str(G.nodes[node].get('label', node)) if G.nodes[node].get('label') is not None else str(node)
         else:
             label_parts = []
             for attr in attributes:

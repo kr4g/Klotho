@@ -108,6 +108,13 @@ class ParameterTree(Tree):
             
     def items(self, node):
         return dict(self.graph.nodes[node])
+    
+    def copy(self):
+        """Create a deep copy of this ParameterTree, preserving instrument-related attributes."""
+        copied = super().copy()
+        copied._node_instruments = self._node_instruments.copy()
+        copied._subtree_muted_pfields = self._subtree_muted_pfields.copy()
+        return copied
 
 class ParameterNode:
     def __init__(self, tree, node):
