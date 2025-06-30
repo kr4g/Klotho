@@ -108,12 +108,14 @@ class Scheduler:
                         if env_type.lower() in ('sustained', 'sus'):
                             self.set_node(slur_uids[slur_id], start=event.end, gate=0)
             else:
-                self.new_node(
+                uid = self.new_node(
                     synth_name=event_synth_name,
                     start=event.start,
                     group=event_group,
                     **pfields
                 )
+                if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ('sustained', 'sus'):
+                    self.set_node(uid, start=event.end, gate=0)
             
     def clear_events(self):
         self.events = []
