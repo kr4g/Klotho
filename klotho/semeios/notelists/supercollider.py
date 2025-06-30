@@ -56,16 +56,65 @@ class Scheduler:
         heapq.heappush(self.events, (start, priority, uid, self.event_counter, event))
         self.event_counter += 1
         self.total_events += 1
-    
-    def free_node(self, uid: str):
-        event = {
-            "type": "free",
-            "id": uid
-        }
-        heapq.heappush(self.events, (0, 0, uid, self.event_counter, event))
-        self.event_counter += 1
-        self.total_events += 1
         
+    def add(self, uc):
+        slur_uids = {}
+        
+        for event in uc._events:
+            if event.is_rest:
+                continue
+                
+            event_synth_name = event.get_parameter('synth_name') or event.get_parameter('synthName')
+            if not event_synth_name:
+                continue
+            
+            is_slur_start = event.get_parameter('_slur_start', 0)
+            is_slur_end = event.get_parameter('_slur_end', 0)
+            slur_id = event.get_parameter('_slur_id')
+            
+            event_group = event.get_parameter('group')
+            pfields = {k: v for k, v in event.parameters.items() 
+                      if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
+            
+            if is_slur_start:
+                instrument = uc._pt.get_active_instrument(event.node_id)
+                if instrument:
+                    env_type = getattr(instrument, 'env_type', None) or ''
+                    if env_type and env_type.lower() in ('standard', 'std'):
+                        sustain_param = None
+                        for param in ['sustaintime', 'releasetime']:
+                            if param in [k.lower() for k in instrument.keys()]:
+                                sustain_param = next(k for k in instrument.keys() if k.lower() == param)
+                                break
+                        
+                        if sustain_param:
+                            end_event = next(e for e in uc._events if e.get_parameter('_slur_id') == slur_id and e.get_parameter('_slur_end'))
+                            total_duration = end_event.end - event.start
+                            pfields[sustain_param] = total_duration
+                
+                slur_uid = self.new_node(
+                    synth_name=event_synth_name,
+                    start=event.start,
+                    group=event_group,
+                    **pfields
+                )
+                slur_uids[slur_id] = slur_uid
+            elif slur_id is not None:
+                self.set_node(slur_uids[slur_id], start=event.start, **pfields)
+                if is_slur_end:
+                    instrument = uc._pt.get_active_instrument(event.node_id)
+                    if instrument and hasattr(instrument, 'env_type'):
+                        env_type = getattr(instrument, 'env_type', '') or ''
+                        if env_type.lower() in ('sustained', 'sus'):
+                            self.set_node(slur_uids[slur_id], start=event.end, gate=0)
+            else:
+                self.new_node(
+                    synth_name=event_synth_name,
+                    start=event.start,
+                    group=event_group,
+                    **pfields
+                )
+            
     def clear_events(self):
         self.events = []
         self.total_events = 0
@@ -93,4 +142,4 @@ class Scheduler:
                 json.dump(sorted_events, f, indent=2)
             print(f"Successfully wrote {self.total_events} events to {os.path.abspath(filepath)}")
         except Exception as e:
-            print(f"Error writing to {filepath}: {e}") 
+            print(f"Error writing to {filepath}: {e}")

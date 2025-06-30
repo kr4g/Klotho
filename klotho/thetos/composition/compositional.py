@@ -434,6 +434,71 @@ class CompositionalUnit(TemporalUnit):
         
         return envelope_id
     
+    def apply_slur(self, level: Union[int, str], range_span: Union[tuple, int, None]) -> int:
+        """
+        Apply slur to a consecutive span of nodes at a specific level.
+        
+        Parameters
+        ----------
+        level : Union[int, str]
+            Tree depth level, or "leaf" to select from leaf nodes directly
+        range_span : Union[tuple, int, None]
+            Node selection span. Can be:
+            - None: all nodes at the level
+            - int: from this index to end of level  
+            - (start, end): inclusive range from start to end
+            
+        Returns
+        -------
+        int
+            Slur ID for reference
+        """
+        if level == "leaf":
+            available_nodes = list(self._pt.leaf_nodes)
+        else:
+            available_nodes = self._pt.at_depth(level)
+        
+        if not available_nodes:
+            level_desc = "leaf nodes" if level == "leaf" else f"level {level}"
+            raise ValueError(f"No nodes found at {level_desc}")
+        
+        if range_span is None:
+            start_pos, end_pos = 0, len(available_nodes) - 1
+        elif isinstance(range_span, int):
+            start_pos = range_span
+            if start_pos < 0:
+                start_pos = len(available_nodes) + start_pos
+            end_pos = len(available_nodes) - 1
+        else:
+            start_pos, end_pos = range_span
+            if start_pos < 0:
+                start_pos = len(available_nodes) + start_pos
+            if end_pos < 0:
+                end_pos = len(available_nodes) + end_pos
+        
+        if start_pos < 0 or end_pos >= len(available_nodes) or start_pos > end_pos:
+            level_desc = "leaf nodes" if level == "leaf" else f"level {level}"
+            raise ValueError(f"Invalid range ({start_pos}, {end_pos}) for {level_desc} with {len(available_nodes)} nodes")
+        
+        span_nodes = available_nodes[start_pos:end_pos+1]
+        
+        if level == "leaf":
+            affected_nodes = set(span_nodes)
+        else:
+            affected_nodes = set()
+            for node in span_nodes:
+                affected_nodes.update(self._pt.descendants(node))
+                if node in self._pt.leaf_nodes:
+                    affected_nodes.add(node)
+        
+        affected_nodes = {node for node in affected_nodes if node in self._pt.leaf_nodes}
+        affected_nodes = {node for node in affected_nodes if not self._events[self._rt.leaf_nodes.index(node)].is_rest}
+        
+        if not affected_nodes:
+            raise ValueError("No non-rest nodes found in slur span")
+        
+        return self._pt.add_slur(affected_nodes, self._rt, self._events)
+    
     def set_instrument(self, node: int, instrument: Instrument, exclude: Union[str, list, set, None] = None) -> None:
         """
         Set an instrument for a specific node, applying its parameter fields.

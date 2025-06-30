@@ -5,7 +5,13 @@ from typing import List, Dict, TypeVar, Union
 
 class Instrument():
     
-    def __init__(self, name, freq_range=None, dynamic_range=None, pfields=None):
+    def __init__(self,
+                 name          = 'default',
+                 freq_range    = None,
+                 dynamic_range = None,
+                 env_type      = 'Sustained',
+                 pfields       = {'amp': 0.1, 'freq': 440.0, 'pan': 0.0, 'gate': 1, 'out': 0}
+        ):
         """
         Initialize an Instrument.
         
@@ -27,6 +33,8 @@ class Instrument():
         else:
             self._dynamic_range = self._process_dynamic_range(dynamic_range)
         
+        self._env_type = env_type
+                
         if pfields is None:
             pfields = {}
         self._pfields = pfields if isinstance(pfields, SafeDict) else SafeDict(pfields)
@@ -71,6 +79,10 @@ class Instrument():
     @property
     def pfields(self):
         return self._pfields.copy()
+    
+    @property
+    def env_type(self):
+        return self._env_type
     
     def keys(self):
         keys = ['synth_name']
