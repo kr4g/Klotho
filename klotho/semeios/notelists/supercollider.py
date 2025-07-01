@@ -11,6 +11,8 @@ import json
 import os
 from typing import Union
 
+from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 
 class Scheduler:
     def __init__(self):
@@ -57,10 +59,20 @@ class Scheduler:
         self.event_counter += 1
         self.total_events += 1
         
-    def add(self, uc):
+    def add(self, uc: Union[CompositionalUnit, TemporalUnit, TemporalUnitSequence, TemporalBlock]):
+        
+        if isinstance(uc, TemporalUnitSequence):
+            for unit in uc:
+                self.add(unit)
+            return
+        elif isinstance(uc, TemporalBlock):
+            for unit in uc:
+                self.add(unit)
+            return
+        
         slur_uids = {}
         
-        for event in uc._events:
+        for event in uc:
             if event.is_rest:
                 continue
                 

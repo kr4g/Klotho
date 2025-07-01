@@ -80,6 +80,8 @@ def metric_modulation(current_tempo:float, current_beat_value:Union[Fraction,str
   Returns:
   float: The new tempo in beats per minute after the metric modulation.
   '''
+  current_beat_value = Fraction(current_beat_value)
+  new_beat_value = Fraction(new_beat_value)
   current_duration = 60 / current_tempo * current_beat_value
   new_tempo = 60 / current_duration * new_beat_value
-  return new_tempo
+  return float(new_tempo)

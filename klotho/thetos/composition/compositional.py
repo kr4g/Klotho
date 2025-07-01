@@ -130,6 +130,7 @@ class CompositionalUnit(TemporalUnit):
         
         self._envelopes = {}
         self._next_envelope_id = 0
+        self._envelope_offset = offset
         
         self._events = self._set_nodes()
     
@@ -184,9 +185,12 @@ class CompositionalUnit(TemporalUnit):
 
     def _evaluate_envelopes(self):
         """Evaluate all envelopes and update parameter tree with computed values"""
+        offset_diff = self._offset - self._envelope_offset
+        
         for envelope_id, env_data in self._envelopes.items():
             envelope = env_data['envelope']
-            start_time = env_data['start_time']
+            # Adjust start_time for offset changes
+            start_time = env_data['start_time'] + offset_diff
             
             for node in env_data['affected_nodes']:
                 event_time = self._rt[node]['onset_time']
@@ -202,6 +206,9 @@ class CompositionalUnit(TemporalUnit):
                 pfield_updates = {pfield: envelope_value for pfield in env_data['pfields']}
                 if pfield_updates:
                     self._pt.set_pfields(node, **pfield_updates)
+        
+        # Update envelope offset to current offset for future calculations
+        self._envelope_offset = self._offset
 
     def _set_nodes(self):
         """
@@ -588,6 +595,11 @@ class CompositionalUnit(TemporalUnit):
             bpm=self._bpm,
             offset=self._offset
         )
+        
+        # Copy envelope data
+        new_cu._envelopes = {k: v.copy() for k, v in self._envelopes.items()}
+        new_cu._next_envelope_id = self._next_envelope_id
+        new_cu._envelope_offset = self._envelope_offset
         
         for node in self._pt.graph.nodes():
             node_params = self._pt.items(node)

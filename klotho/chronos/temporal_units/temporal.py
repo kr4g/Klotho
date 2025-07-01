@@ -319,7 +319,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     """A sequence of TemporalUnit objects that represent consecutive temporal events."""
     
     def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0):
-        self._seq    = [ut.copy() for ut in ut_seq]
+        self._seq    = [ut for ut in ut_seq] # XXX - this needs to be ut.copy()
         self._offset = offset
         self._set_offsets()
     
@@ -486,7 +486,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         return pd.DataFrame([{
             'Tempus': ut.tempus,
             'Type': ut.type.name[0] if ut.type else '',
-            'Tempo': f'{ut.beat} = {ut.bpm}',
+            'Tempo': f'{ut.beat} = {round(ut.bpm, 3)}',
             'Start': seconds_to_hmsms(ut.time[0]),
             'End': seconds_to_hmsms(ut.time[1]),
             'Duration': seconds_to_hmsms(ut.duration),
@@ -519,7 +519,7 @@ class TemporalBlock(metaclass=TemporalMeta):
             offset: Initial time offset in seconds
             sort_rows: Whether to sort rows by duration (longest at index 0)
         """
-        self._rows = [row.copy() for row in rows] if rows else []
+        self._rows = [row for row in rows] if rows else [] # XXX - this needs to be row.copy()
         self._axis = axis
         self._offset = offset
         self._sort_rows = sort_rows
