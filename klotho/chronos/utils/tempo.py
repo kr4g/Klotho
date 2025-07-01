@@ -5,6 +5,8 @@ from klotho.utils.data_structures.enums import MinMaxEnum
 __all__ = [
     'TEMPO',
     'metric_modulation',
+    'tempo_for_duration',
+    'beat_for_duration',
 ]
 
 class TEMPO(MinMaxEnum):
@@ -85,3 +87,40 @@ def metric_modulation(current_tempo:float, current_beat_value:Union[Fraction,str
   current_duration = 60 / current_tempo * current_beat_value
   new_tempo = 60 / current_duration * new_beat_value
   return float(new_tempo)
+
+def tempo_for_duration(metric_ratio: Union[Fraction, str, float], reference_beat: Union[Fraction, str, float], duration: float) -> float:
+    '''
+    Calculate the tempo (BPM) required for a given metric ratio to last a specified duration.
+    
+    Args:
+        metric_ratio: The metric ratio representing the total duration (e.g., '4/4', '3/4')
+        reference_beat: The beat value that defines the tempo (e.g., '1/4' for quarter note)
+        duration: The desired duration in seconds
+    
+    Returns:
+        float: The tempo in beats per minute
+    '''
+    metric_ratio = Fraction(metric_ratio)
+    reference_beat = Fraction(reference_beat)
+    
+    beats_in_metric = metric_ratio / reference_beat
+    bpm = float(beats_in_metric * 60 / duration)
+    
+    return bpm
+
+def beat_for_duration(metric_ratio: Union[Fraction, str, float], bpm: float, duration: float) -> Fraction:
+    '''
+    Calculate the reference beat value required for a given metric ratio at a specified tempo to last a desired duration.
+    
+    Args:
+        metric_ratio: The metric ratio representing the total duration (e.g., '4/4', '3/4')
+        bpm: The tempo in beats per minute
+        duration: The desired duration in seconds
+    
+    Returns:
+        Fraction: The reference beat value as a fraction
+    '''
+    metric_ratio = Fraction(metric_ratio)
+    reference_beat = Fraction(metric_ratio * 60) / Fraction(bpm * duration)
+    
+    return reference_beat

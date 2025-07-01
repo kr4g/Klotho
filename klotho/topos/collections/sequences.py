@@ -2,6 +2,10 @@ import numpy as np
 from collections.abc import Iterable
 from itertools import cycle
 from math import lcm
+from typing import List, Optional, Union, Any, TypeVar
+
+T = TypeVar('T')
+from klotho.utils.algorithms.lists import normalize_sum
 
 __all__ = [
     'Norg',
@@ -79,6 +83,18 @@ class Pattern:
         self._end = end
         self._current = 0
         
+    @property
+    def length(self):
+        return self._pattern_length
+    
+    @property
+    def pattern(self):
+        return self._iterable
+    
+    @property
+    def end(self):
+        return self._end
+        
     def _create_cycles(self, item):
         if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
             sub_results = [self._create_cycles(subitem) for subitem in item]
@@ -112,3 +128,33 @@ class Pattern:
 
     def __repr__(self):
         return self.__str__()
+    
+    @staticmethod
+    def from_random(elements: List[T], 
+                    length: int = 5,
+                    max_nesting_level: int = 3,
+                    max_inner_length: int = 3,
+                    weights: Optional[List[float]] = None,
+                    nesting_probability: float = 0.333) -> 'Pattern':
+        if weights is not None:
+            if len(weights) != len(elements):
+                raise ValueError("Length of weights must match length of elements")
+            normalized_weights = normalize_sum(weights)
+        else:
+            normalized_weights = [1.0 / len(elements)] * len(elements)
+        
+        def _generate_structure(target_length: int, current_nesting_level: int) -> List[Union[T, List[Any]]]:
+            structure = []
+            for _ in range(target_length):
+                if max_inner_length > 0 and current_nesting_level > 0 and np.random.random() < nesting_probability:
+                    nested_length = np.random.randint(2, max_inner_length + 1)
+                    nested_structure = _generate_structure(nested_length, current_nesting_level - 1)
+                    structure.append(nested_structure)
+                else:
+                    index = np.random.choice(len(elements), p=normalized_weights)
+                    element = elements[index]
+                    structure.append(element)
+            return structure
+        
+        generated_structure = _generate_structure(length, max_nesting_level)
+        return Pattern(generated_structure)
