@@ -2,6 +2,17 @@ from typing import List, Callable, Optional
 import networkx as nx
 from networkx.algorithms.approximation import greedy_tsp
 
+__all__ = [
+    'minimum_cost_path',
+    'greedy_random_walk',
+    'probabilistic_random_walk',
+    'deterministic_greedy_walk',
+    'prim_order_traversal',
+    'greedy_nearest_unvisited',
+    'dijkstra_order_traversal',
+    'weighted_dfs_traversal'
+]
+
 def minimum_cost_path(
     G: nx.Graph,
     traversal_func: Optional[Callable] = None,
@@ -103,35 +114,27 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
     current = source
     
     for step in range(steps):
-        # Get all neighbors and their edge weights
         neighbors = list(G.neighbors(current))
         
         if not neighbors:
-            # Dead end - nowhere to go
             break
             
-        # Get weights for edges to all neighbors
         neighbor_weights = []
         for neighbor in neighbors:
             try:
                 edge_weight = G[current][neighbor].get(weight, 1.0)
                 neighbor_weights.append((neighbor, edge_weight))
             except (KeyError, TypeError):
-                # If weight attribute doesn't exist, use default weight of 1.0
                 neighbor_weights.append((neighbor, 1.0))
         
-        # Find minimum weight
         min_weight = min(neighbor_weights, key=lambda x: x[1])[1]
         
-        # Get all neighbors with minimum weight (for tie-breaking)
         min_weight_neighbors = [neighbor for neighbor, w in neighbor_weights if w == min_weight]
         
-        # Choose randomly among tied minimum weight options
         next_node = random.choice(min_weight_neighbors)
         path.append(next_node)
         current = next_node
         
-        # Stop early if we reached target
         if target is not None and current == target:
             break
     
@@ -178,7 +181,6 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
         if not neighbors:
             break
             
-        # Get weights and calculate probabilities
         weights = []
         for neighbor in neighbors:
             try:
@@ -187,19 +189,14 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
             except (KeyError, TypeError):
                 weights.append(1.0)
         
-        # Convert weights to probabilities
         if inverse_weights:
-            # Lower weights = higher probability
-            # Use 1/weight, but handle zero weights
             inv_weights = [1.0 / max(w, 1e-10) for w in weights]
             total = sum(inv_weights)
             probabilities = [w / total for w in inv_weights]
         else:
-            # Higher weights = higher probability
             total = sum(weights)
             probabilities = [w / total for w in weights] if total > 0 else [1.0/len(weights)] * len(weights)
         
-        # Choose based on probabilities
         next_node = random.choices(neighbors, weights=probabilities)[0]
         path.append(next_node)
         current = next_node
@@ -240,18 +237,16 @@ def deterministic_greedy_walk(G, source, steps: int = 10, weight: str = 'weight'
     
     path = [source]
     current = source
-    visited = set([source])  # Avoid cycles
+    visited = set([source])
     
     for step in range(steps):
         neighbors = [n for n in G.neighbors(current) if n not in visited]
         
         if not neighbors:
-            # Try all neighbors if we're stuck
             neighbors = list(G.neighbors(current))
             if not neighbors:
                 break
         
-        # Find neighbor with minimum weight
         min_neighbor = None
         min_weight = float('inf')
         
@@ -275,5 +270,267 @@ def deterministic_greedy_walk(G, source, steps: int = 10, weight: str = 'weight'
         
         if target is not None and current == target:
             break
+    
+    return path
+
+def prim_order_traversal(G, source, weight: str = 'weight', **kwargs) -> List[int]:
+    """
+    Visit all nodes in the order they would be added by Prim's MST algorithm.
+    
+    This guarantees visiting every node while prioritizing edges with lower weights.
+    Follows the minimum spanning tree construction order.
+    
+    Parameters
+    ----------
+    G : networkx.Graph
+        The graph to traverse
+    source : node
+        Starting node for traversal
+    weight : str, optional
+        Edge attribute to use for weights (default: 'weight')
+    **kwargs
+        Additional parameters (ignored)
+        
+    Returns
+    -------
+    List[int]
+        Nodes visited in Prim's algorithm order
+    """
+    if source not in G:
+        raise ValueError(f"Source node {source} not in graph")
+    
+    visited = set([source])
+    path = [source]
+    
+    while len(visited) < len(G.nodes()):
+        min_edge = None
+        min_weight = float('inf')
+        next_node = None
+        
+        for node in visited:
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    try:
+                        edge_weight = G[node][neighbor].get(weight, 1.0)
+                        if edge_weight < min_weight:
+                            min_weight = edge_weight
+                            min_edge = (node, neighbor)
+                            next_node = neighbor
+                    except (KeyError, TypeError):
+                        if 1.0 < min_weight:
+                            min_weight = 1.0
+                            min_edge = (node, neighbor)
+                            next_node = neighbor
+        
+        if next_node is None:
+            break
+            
+        visited.add(next_node)
+        path.append(next_node)
+    
+    return path
+
+
+def greedy_nearest_unvisited(G, source, weight: str = 'weight', **kwargs) -> List[int]:
+    """
+    Visit all nodes by always moving to the nearest unvisited neighbor.
+    
+    At each step, chooses the unvisited neighbor with the minimum edge weight.
+    If no unvisited neighbors exist, backtracks or jumps to nearest unvisited node.
+    
+    Parameters
+    ----------
+    G : networkx.Graph
+        The graph to traverse
+    source : node
+        Starting node for traversal
+    weight : str, optional
+        Edge attribute to use for weights (default: 'weight')
+    **kwargs
+        Additional parameters (ignored)
+        
+    Returns
+    -------
+    List[int]
+        Nodes visited in greedy nearest order
+    """
+    if source not in G:
+        raise ValueError(f"Source node {source} not in graph")
+    
+    visited = set([source])
+    path = [source]
+    current = source
+    
+    while len(visited) < len(G.nodes()):
+        min_neighbor = None
+        min_weight = float('inf')
+        
+        for neighbor in G.neighbors(current):
+            if neighbor not in visited:
+                try:
+                    edge_weight = G[current][neighbor].get(weight, 1.0)
+                    if edge_weight < min_weight:
+                        min_weight = edge_weight
+                        min_neighbor = neighbor
+                except (KeyError, TypeError):
+                    if 1.0 < min_weight:
+                        min_weight = 1.0
+                        min_neighbor = neighbor
+        
+        if min_neighbor is not None:
+            visited.add(min_neighbor)
+            path.append(min_neighbor)
+            current = min_neighbor
+        else:
+            unvisited = set(G.nodes()) - visited
+            if not unvisited:
+                break
+                
+            min_distance = float('inf')
+            best_next = None
+            best_path_node = None
+            
+            for visited_node in visited:
+                for unvisited_node in unvisited:
+                    if G.has_edge(visited_node, unvisited_node):
+                        try:
+                            edge_weight = G[visited_node][unvisited_node].get(weight, 1.0)
+                            if edge_weight < min_distance:
+                                min_distance = edge_weight
+                                best_next = unvisited_node
+                                best_path_node = visited_node
+                        except (KeyError, TypeError):
+                            if 1.0 < min_distance:
+                                min_distance = 1.0
+                                best_next = unvisited_node
+                                best_path_node = visited_node
+            
+            if best_next is not None:
+                current = best_path_node
+                visited.add(best_next)
+                path.append(best_next)
+                current = best_next
+            else:
+                break
+    
+    return path
+
+
+def dijkstra_order_traversal(G, source, weight: str = 'weight', **kwargs) -> List[int]:
+    """
+    Visit all nodes in order of their distance from source (Dijkstra-style).
+    
+    Visits nodes in order of increasing shortest path distance from the source,
+    guaranteeing that all reachable nodes are visited.
+    
+    Parameters
+    ----------
+    G : networkx.Graph
+        The graph to traverse
+    source : node
+        Starting node for traversal
+    weight : str, optional
+        Edge attribute to use for weights (default: 'weight')
+    **kwargs
+        Additional parameters (ignored)
+        
+    Returns
+    -------
+    List[int]
+        Nodes visited in order of distance from source
+    """
+    if source not in G:
+        raise ValueError(f"Source node {source} not in graph")
+    
+    import heapq
+    
+    distances = {node: float('inf') for node in G.nodes()}
+    distances[source] = 0
+    visited = set()
+    path = []
+    heap = [(0, source)]
+    
+    while heap and len(visited) < len(G.nodes()):
+        current_dist, current_node = heapq.heappop(heap)
+        
+        if current_node in visited:
+            continue
+            
+        visited.add(current_node)
+        path.append(current_node)
+        
+        for neighbor in G.neighbors(current_node):
+            if neighbor not in visited:
+                try:
+                    edge_weight = G[current_node][neighbor].get(weight, 1.0)
+                    new_distance = current_dist + edge_weight
+                    
+                    if new_distance < distances[neighbor]:
+                        distances[neighbor] = new_distance
+                        heapq.heappush(heap, (new_distance, neighbor))
+                except (KeyError, TypeError):
+                    new_distance = current_dist + 1.0
+                    if new_distance < distances[neighbor]:
+                        distances[neighbor] = new_distance
+                        heapq.heappush(heap, (new_distance, neighbor))
+    
+    return path
+
+
+def weighted_dfs_traversal(G, source, weight: str = 'weight', **kwargs) -> List[int]:
+    """
+    Depth-first traversal that prioritizes edges with lower weights.
+    
+    At each node, explores neighbors in order of increasing edge weight,
+    ensuring all reachable nodes are visited.
+    
+    Parameters
+    ----------
+    G : networkx.Graph
+        The graph to traverse
+    source : node
+        Starting node for traversal
+    weight : str, optional
+        Edge attribute to use for weights (default: 'weight')
+    **kwargs
+        Additional parameters (ignored)
+        
+    Returns
+    -------
+    List[int]
+        Nodes visited in weighted DFS order
+    """
+    if source not in G:
+        raise ValueError(f"Source node {source} not in graph")
+    
+    visited = set()
+    path = []
+    
+    def weighted_dfs_visit(node):
+        if node in visited:
+            return
+            
+        visited.add(node)
+        path.append(node)
+        
+        neighbors_with_weights = []
+        for neighbor in G.neighbors(node):
+            if neighbor not in visited:
+                try:
+                    edge_weight = G[node][neighbor].get(weight, 1.0)
+                    neighbors_with_weights.append((edge_weight, neighbor))
+                except (KeyError, TypeError):
+                    neighbors_with_weights.append((1.0, neighbor))
+        
+        neighbors_with_weights.sort(key=lambda x: x[0])
+        
+        for _, neighbor in neighbors_with_weights:
+            weighted_dfs_visit(neighbor)
+    
+    weighted_dfs_visit(source)
+    
+    unvisited = set(G.nodes()) - visited
+    for remaining_node in unvisited:
+        weighted_dfs_visit(remaining_node)
     
     return path

@@ -2,6 +2,13 @@ from .factors import *
 from .costs import *
 from .graphs import *
 from .lists import *
+from .random import *
+
+from . import costs
+from . import factors
+from . import graphs
+from . import lists
+from . import random
 
 __all__ = [
     'normalize_sum',
@@ -15,4 +22,5 @@ __all__ = [
     'cost_matrix',
     'cost_matrix_to_graph',
     'minimum_cost_path',
+    'diverse_sample',
 ]

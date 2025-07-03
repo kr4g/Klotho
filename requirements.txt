@@ -13,6 +13,7 @@ mido
 panel
 bokeh
 jupyter_bokeh
+diversipy
 
 # Documentation
 sphinx>=7.0.0

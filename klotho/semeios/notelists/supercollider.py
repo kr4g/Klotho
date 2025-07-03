@@ -58,6 +58,17 @@ class Scheduler:
         heapq.heappush(self.events, (start, priority, uid, self.event_counter, event))
         self.event_counter += 1
         self.total_events += 1
+    
+    def release_node(self, uid: str, start: float):
+        event = {
+            "type": "release",
+            "id": uid,
+            "start": start
+        }
+        priority = 1
+        heapq.heappush(self.events, (start, priority, uid, self.event_counter, event))
+        self.event_counter += 1
+        self.total_events += 1
         
     def add(self, uc: Union[CompositionalUnit, TemporalUnit, TemporalUnitSequence, TemporalBlock]):
         
@@ -127,7 +138,7 @@ class Scheduler:
                     **pfields
                 )
                 if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ('sustained', 'sus'):
-                    self.set_node(uid, start=event.end, gate=0)
+                    self.release_node(uid, start=event.end)
             
     def clear_events(self):
         self.events = []

@@ -28,7 +28,8 @@ setup(
         'mido',
         'panel',
         'bokeh',
-        'jupyter_bokeh'
+        'jupyter_bokeh',
+        'diversipy'
     ],
     extras_require={
         'docs': [
