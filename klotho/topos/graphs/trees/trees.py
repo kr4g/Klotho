@@ -320,13 +320,6 @@ class Tree(Graph):
                     child_id = super().add_node(label=child)
                     self._graph.add_edge(parent_id, child_id)
     
-    def copy(self):
-        """Create a deep copy of this tree."""
-        copied = super().copy()
-        copied._root = self._root
-        copied._list = self._list
-        return copied
-
     @classmethod
     def _from_graph(cls, G, clear_attributes=False, renumber=True):
         tree = cls.__new__(cls)

@@ -17,6 +17,7 @@ from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms
 from enum import Enum
 import pandas as pd
 import networkx as nx
+import copy
 
 class ProlatioTypes(Enum):
     DURATION    = 'Duration'
@@ -305,14 +306,7 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     def copy(self):
         """Create a deep copy of this TemporalUnit."""
-        return TemporalUnit(
-            span=self.span,
-            tempus=self.tempus,
-            prolatio=self.prolationis,
-            beat=self._beat,
-            bpm=self._bpm,
-            offset=self._offset
-        )
+        return copy.deepcopy(self)
 
 
 class TemporalUnitSequence(metaclass=TemporalMeta):
@@ -497,11 +491,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
 
     def copy(self):
         """Create a deep copy of this TemporalUnitSequence."""
-        copied_units = [ut.copy() for ut in self._seq]
-        return TemporalUnitSequence(
-            ut_seq=copied_units,
-            offset=self._offset
-        )
+        return copy.deepcopy(self)
 
 
 class TemporalBlock(metaclass=TemporalMeta):
@@ -770,10 +760,4 @@ class TemporalBlock(metaclass=TemporalMeta):
 
     def copy(self):
         """Create a deep copy of this TemporalBlock."""
-        copied_rows = [row.copy() for row in self._rows]
-        return TemporalBlock(
-            rows=copied_rows,
-            axis=self._axis,
-            offset=self._offset,
-            sort_rows=self._sort_rows
-        )
+        return copy.deepcopy(self)

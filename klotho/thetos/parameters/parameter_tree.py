@@ -1,6 +1,7 @@
 from ...topos.graphs.trees import Tree
 from ..instruments.instrument import Instrument
 import pandas as pd
+import copy
 
 
 class ParameterTree(Tree):
@@ -13,6 +14,14 @@ class ParameterTree(Tree):
         self._subtree_muted_pfields = {}
         self._slurs = {}
         self._next_slur_id = 0
+    
+    def __deepcopy__(self, memo):
+        new_pt = super().__deepcopy__(memo)
+        new_pt._node_instruments = copy.deepcopy(self._node_instruments, memo)
+        new_pt._subtree_muted_pfields = copy.deepcopy(self._subtree_muted_pfields, memo)
+        new_pt._slurs = copy.deepcopy(self._slurs, memo)
+        new_pt._next_slur_id = self._next_slur_id
+        return new_pt
     
     def __getitem__(self, node):
         return ParameterNode(self, node)
@@ -159,14 +168,7 @@ class ParameterTree(Tree):
     def items(self, node):
         return dict(self.graph.nodes[node])
     
-    def copy(self):
-        """Create a deep copy of this ParameterTree, preserving instrument-related attributes."""
-        copied = super().copy()
-        copied._node_instruments = self._node_instruments.copy()
-        copied._subtree_muted_pfields = self._subtree_muted_pfields.copy()
-        copied._slurs = self._slurs.copy()
-        copied._next_slur_id = self._next_slur_id
-        return copied
+
 
 class ParameterNode:
     def __init__(self, tree, node):

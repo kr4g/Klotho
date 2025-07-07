@@ -222,7 +222,6 @@ class RhythmTree(Tree):
     def __repr__(self):
         return self.__str__()
 
-    def copy(self):
-        return RhythmTree(span=self.span, meas=self.meas, subdivisions=self.subdivisions)
+
 
 

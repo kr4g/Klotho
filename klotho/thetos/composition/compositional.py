@@ -578,34 +578,3 @@ class CompositionalUnit(TemporalUnit):
         """
         return self._events[idx].parameters
     
-    def copy(self):
-        """
-        Create a deep copy of this CompositionalUnit.
-        
-        Returns
-        -------
-        CompositionalUnit
-            A new CompositionalUnit with copied structure and parameters
-        """
-        new_cu = CompositionalUnit(
-            span=self.span,
-            tempus=self.tempus,
-            prolatio=self.prolationis,
-            beat=self._beat,
-            bpm=self._bpm,
-            offset=self._offset
-        )
-        
-        # Copy envelope data
-        new_cu._envelopes = {k: v.copy() for k, v in self._envelopes.items()}
-        new_cu._next_envelope_id = self._next_envelope_id
-        new_cu._envelope_offset = self._envelope_offset
-        
-        for node in self._pt.graph.nodes():
-            node_params = self._pt.items(node)
-            if node_params:
-                static_params = {k: v for k, v in node_params.items() if not k.startswith('_envelope_')}
-                if static_params:
-                    new_cu._pt.set_pfields(node, **static_params)
-        
-        return new_cu
