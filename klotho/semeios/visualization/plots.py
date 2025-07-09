@@ -284,6 +284,215 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
     
     return fig
 
+def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
+                 invert: bool = True, output_file: str | None = None) -> go.Figure:
+    """
+    Visualize a RhythmTree structure with dynamic scaling to handle density.
+    
+    Uses plotly for better scaling and zoom capabilities when dealing with complex trees.
+    
+    Args:
+        rt: RhythmTree instance to visualize
+        attributes: List of node attributes to display instead of labels. If None, shows proportions.
+                   Special values "node_id", "node", or "id" will display the node identifier.
+        figsize: Width and height of the output figure in inches
+        invert: When True, places root at the top; when False, root is at the bottom
+        output_file: Path to save the visualization (displays plot if None)
+    """
+    def _proportional_tree_layout(rt, height=1.0, inverted=True):
+        """
+        Exact copy of container layout logic, but places nodes at bar centers instead of drawing bars.
+        """
+        max_depth = rt.depth
+        positions = {}
+        
+        margin = 0.01
+        ratio_space = 0.15
+        usable_height = height - (2 * margin) - ratio_space
+        
+        level_positions = []
+        level_height = usable_height / (max_depth + 1)
+        
+        for level in range(max_depth + 1):
+            if inverted:
+                y_pos = height - margin - (level * level_height) - (level_height / 2)
+            else:
+                y_pos = margin + ratio_space + (level * level_height) + (level_height / 2)
+            level_positions.append(y_pos)
+        
+        for level in range(max_depth + 1):
+            nodes = rt.at_depth(level)
+            y_pos = level_positions[level]
+            
+            nodes_by_parent = {}
+            for node in nodes:
+                parent = rt.parent(node)
+                if parent not in nodes_by_parent:
+                    nodes_by_parent[parent] = []
+                nodes_by_parent[parent].append(node)
+            
+            for node in nodes:
+                node_data = rt.graph.nodes[node]
+                ratio = node_data.get('duration_ratio', None)
+                proportion = node_data.get('proportion', None)
+                
+                if ratio is None:
+                    continue
+                
+                parent = rt.parent(node)
+                
+                if parent is None:
+                    x_start = 0
+                    width = 1
+                else:
+                    siblings = nodes_by_parent[parent]
+                    parent_data = rt.graph.nodes[parent]
+                    
+                    total_proportion = sum(abs(rt.graph.nodes[sib].get('proportion', 1)) for sib in siblings)
+                    
+                    preceding_proportion = 0
+                    for sib in siblings:
+                        if sib == node:
+                            break
+                        preceding_proportion += abs(rt.graph.nodes[sib].get('proportion', 1))
+                    
+                    parent_x_start = parent_data.get('_x_start', 0)
+                    parent_width = parent_data.get('_width', 1)
+                    
+                    x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
+                    width = (abs(proportion) / total_proportion) * parent_width
+                
+                rt.graph.nodes[node]['_x_start'] = x_start
+                rt.graph.nodes[node]['_width'] = width
+                
+                x_center = x_start + width / 2
+                positions[node] = (x_center, y_pos)
+        
+        return positions, 1.0
+    
+    G = rt.graph
+    root = rt.root
+    height_scale = figsize[1] / 1.5
+    
+    base_node_size = 25
+    base_text_size = 18
+    
+    pos, scale_factor = _proportional_tree_layout(rt, height=height_scale, inverted=invert)
+    
+    total_nodes = G.number_of_nodes()
+    max_breadth = max(len(rt.at_depth(level)) for level in range(rt.depth + 1))
+    
+    density_factor = max(1.0, max_breadth / 8.0)
+    node_size = max(8, base_node_size / density_factor)
+    text_size = max(6, base_text_size / density_factor)
+    
+    fig = go.Figure()
+    
+    for u, v in G.edges():
+        if u in pos and v in pos:
+            x1, y1 = pos[u]
+            x2, y2 = pos[v]
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color='#808080', width=2),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+    
+    node_x, node_y = [], []
+    hover_data = []
+    node_symbols = []
+    node_text = []
+    
+    for node in G.nodes():
+        if node in pos:
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+            
+            node_data = G.nodes[node]
+            
+            display_text = ""
+            if attributes is None:
+                if 'proportion' in node_data:
+                    display_text = str(node_data['proportion'])
+                else:
+                    display_text = str(node)
+            else:
+                label_parts = []
+                for attr in attributes:
+                    if attr in {"node_id", "node", "id"}:
+                        label_parts.append(str(node))
+                    elif attr in node_data:
+                        value = node_data[attr]
+                        # label_parts.append(f"{attr}: {value}" if value is not None else f"{attr}: None")
+                        label_parts.append(str(value))
+                display_text = "<br>".join(label_parts)
+            
+            node_text.append(display_text)
+            
+            hover_parts = [f"Node: {node}"]
+            if 'proportion' in node_data:
+                hover_parts.append(f"Proportion: {node_data['proportion']}")
+            if 'duration_ratio' in node_data:
+                hover_parts.append(f"Duration: {node_data['duration_ratio']}")
+            if 'onset_ratio' in node_data:
+                hover_parts.append(f"Onset: {node_data['onset_ratio']}")
+            
+            hover_data.append("<br>".join(hover_parts))
+            
+            is_leaf = len(list(G.neighbors(node))) == 0
+            node_symbols.append('square' if is_leaf else 'circle')
+    
+    fig.add_trace(
+        go.Scatter(
+            x=node_x, y=node_y,
+            mode='markers+text',
+            marker=dict(
+                size=node_size,
+                color='white',
+                line=dict(color='white', width=2),
+                symbol=node_symbols
+            ),
+            text=node_text,
+            textposition='middle center',
+            textfont=dict(color='#404040', size=text_size, family='Arial', weight='bold'),
+            hovertemplate='%{customdata}<extra></extra>',
+            customdata=hover_data,
+            showlegend=False
+        )
+    )
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    fig.update_layout(
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        xaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[-0.01, 1.01]
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[-0.01, height_scale + 0.01]
+        ),
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
+
 def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
              invert: bool = True, output_file: str | None = None) -> None:
     """
@@ -325,32 +534,34 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
             children.remove(parent)
         
         if children:
-            chain_depths = {child: _get_max_depth(G, child, parent=root) for child in children}
-            total_depth = sum(chain_depths.values())
-            
             if len(children) == 1:
-                dx = width * 0.8
-            else:
-                dx = width / len(children)
-            
-            nextx = xcenter - width/2 + dx/2
-            
-            for child in children:
-                depth_factor = 1.0
-                if total_depth > 0 and len(children) > 1:
-                    depth_factor = 0.5 + (0.5 * chain_depths[child] / total_depth)
+                child_width = width * 0.8
+                child_x = xcenter
                 
-                child_width = dx * depth_factor * 1.5
-                
-                _hierarchy_pos(G, child,
+                _hierarchy_pos(G, children[0],
                              width=child_width,
                              vert_gap=vert_gap,
-                             xcenter=nextx,
+                             xcenter=child_x,
                              pos=pos,
                              parent=root,
                              depth=depth+1,
                              inverted=inverted)
-                nextx += dx
+            else:
+                dx = width / len(children)
+                start_x = xcenter - width/2 + dx/2
+                
+                for i, child in enumerate(children):
+                    child_x = start_x + i * dx
+                    child_width = dx * 0.9
+                    
+                    _hierarchy_pos(G, child,
+                                 width=child_width,
+                                 vert_gap=vert_gap,
+                                 xcenter=child_x,
+                                 pos=pos,
+                                 parent=root,
+                                 depth=depth+1,
+                                 inverted=inverted)
         return pos
     
     def _count_leaves(G, node, parent=None):
@@ -862,7 +1073,9 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
 
 def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] | None = None, 
             invert: bool = True, output_file: str | None = None, 
-            attributes: list[str] | None = None, vertical_lines: bool = True) -> None:
+            attributes: list[str] | None = None, vertical_lines: bool = True, 
+            barlines: bool = True, barline_color: str = '#666666', 
+            subdivision_line_color: str = '#aaaaaa') -> None:
     """
     Visualize a rhythm tree with customizable layout options.
     
@@ -874,11 +1087,14 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         output_file: Path to save the visualization (displays plot if None)
         attributes: List of node attributes to display (only used with 'tree' layout)
         vertical_lines: When True, draws vertical lines at block boundaries
+        barlines: When True, draws span division lines (when span > 1)
+        barline_color: Color for span division lines and outer borders
+        subdivision_line_color: Color for subdivision lines and ratio dividers
     """
     if layout == 'tree':
         if figsize is None:
             figsize = (20, 5)
-        return _plot_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
+        return _plot_rt_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
     
     elif layout == 'ratios':
         if figsize is None:
@@ -938,7 +1154,18 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                 y_pos = margin + ratio_space + (level * level_height) + (level_height / 2)
             level_positions.append(y_pos)
         
-        vertical_line_positions = set() # avoid duplicates
+        vertical_line_positions = set()
+        
+        # Calculate cutoff point for vertical lines (above onset text)
+        onset_text_y = margin * 0.3
+        line_cutoff = onset_text_y + (margin * 2.0)  # Larger gap above text
+        
+        if rt.span > 1 and barlines:
+            top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
+            for i in range(rt.span + 1):
+                x_pos = i / rt.span
+                ax.plot([x_pos, x_pos], [level_positions[0] + top_bar_height/2, line_cutoff], 
+                       color=barline_color, linestyle=(0, (8, 4)), linewidth=1.5, alpha=0.3, zorder=0.5)
         
         for level in range(max_depth + 1):
             nodes = rt.at_depth(level)
@@ -962,11 +1189,41 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                 
                 parent = rt.parent(node)
                 
-                if parent is None:  # Root node spans the entire width
-                    x_start = 0
-                    width = 1
-                    is_first_child = True
-                    is_last_child = True
+                if parent is None:  # Root node
+                    if rt.span > 1:
+                        # Draw span divisions at the top level
+                        for i in range(rt.span):
+                            x_start = i / rt.span
+                            width = 1 / rt.span
+                            
+                            is_leaf = rt.graph.out_degree(node) == 0
+                            is_rest = Fraction(str(ratio)) < 0
+                            
+                            if is_rest:
+                                color = '#404040'
+                            else:
+                                color = '#e6e6e6' if is_leaf else '#c8c8c8'
+                            
+                            bar_height = level_height * 0.5 * get_node_scaling(node, rt)
+                            rect = plt.Rectangle((x_start, y_pos - bar_height/2), width, bar_height,
+                                                facecolor=color, edgecolor='black', linewidth=1, alpha=1, zorder=1)
+                            ax.add_patch(rect)
+                            
+                            ax.text(x_start + width/2, y_pos, 
+                                   str(rt.meas), ha='center', va='center', 
+                                   color='black' if not is_rest else 'white', 
+                                   fontsize=12 * get_node_scaling(node, rt, 9/12), 
+                                   fontweight='bold' if is_leaf else 'normal')
+                        
+                        # Store position info for child nodes
+                        rt.graph.nodes[node]['_x_start'] = 0
+                        rt.graph.nodes[node]['_width'] = 1
+                        continue
+                    else:
+                        x_start = 0
+                        width = 1
+                        is_first_child = True
+                        is_last_child = True
                 else:
                     siblings = nodes_by_parent[parent]
                     parent_data = rt.graph.nodes[parent]
@@ -996,15 +1253,13 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                 # Assign color based on node type and ratio sign
                 is_rest = Fraction(str(ratio)) < 0
                 if is_rest:
-                    # Rests are always dark grey
-                    color = '#808080'
+                    color = '#404040'
                 else:
-                    # For positive ratios, leaf nodes are bright white, parent nodes slightly darker
                     color = '#e6e6e6' if is_leaf else '#c8c8c8'
                 
                 bar_height = level_height * 0.5 * get_node_scaling(node, rt)
                 rect = plt.Rectangle((x_start, y_pos - bar_height/2), width, bar_height,
-                                    facecolor=color, edgecolor='black', linewidth=1, alpha=0.4 if is_rest else 1 if is_leaf else 0.95)
+                                    facecolor=color, edgecolor='black', linewidth=1, alpha=1, zorder=1)
                 ax.add_patch(rect)
                 
                 label_text = f"{ratio}" if ratio is not None else ""
@@ -1017,28 +1272,28 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                     
                     if not is_first_child and left_x not in vertical_line_positions:
                         vertical_line_positions.add(left_x)
-                        plt.plot([left_x, left_x], [y_pos - bar_height/2, margin], 
-                                color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
+                        plt.plot([left_x, left_x], [y_pos - bar_height/2, line_cutoff], 
+                                color=subdivision_line_color, linestyle='--', linewidth=0.8, alpha=0.9, zorder=2)
                     
                     if not is_last_child and right_x not in vertical_line_positions:
                         vertical_line_positions.add(right_x)
-                        plt.plot([right_x, right_x], [y_pos - bar_height/2, margin], 
-                                color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
+                        plt.plot([right_x, right_x], [y_pos - bar_height/2, line_cutoff], 
+                                color=subdivision_line_color, linestyle='--', linewidth=0.8, alpha=0.9, zorder=2)
         
         if vertical_lines:
             top_y_pos = level_positions[0]
-            bar_height = level_height * 0.5
-            top_bar_bottom = top_y_pos - bar_height/2
+            top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
+            top_bar_top = top_y_pos + (top_bar_height/2) - 0.001
             
-            # Left border (x=0)
+            # Left border (x=0) - always solid with barline properties, starts from top
             if 0 not in vertical_line_positions:
-                plt.plot([0, 0], [top_bar_bottom, margin], 
-                        color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
+                plt.plot([0, 0], [top_bar_top, line_cutoff], 
+                        color=barline_color, linestyle='-', linewidth=1.5, alpha=0.9, zorder=2)
             
-            # Right border (x=1)
+            # Right border (x=1) - always solid with barline properties, starts from top  
             if 1 not in vertical_line_positions:
-                plt.plot([1, 1], [top_bar_bottom, margin], 
-                        color='#aaaaaa', linestyle='--', linewidth=0.8, alpha=0.7)
+                plt.plot([1, 1], [top_bar_top, line_cutoff], 
+                        color=barline_color, linestyle='-', linewidth=1.5, alpha=0.9, zorder=2)
         
         ratios = rt.ratios
         total_ratio = sum(abs(r) for r in ratios)
@@ -1052,14 +1307,20 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         ratio_y_center = margin + ratio_space * 0.5
         
         for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):
-            color = '#808080' if ratio < 0 else '#e6e6e6'
+            color = '#404040' if ratio < 0 else '#e6e6e6'
             ax.add_patch(plt.Rectangle((pos, ratio_y_center - ratio_bar_height/2), width, ratio_bar_height, 
                                      facecolor=color,
-                                     edgecolor=None, alpha=0.4 if ratio < 0 else 1))
+                                     edgecolor=None, alpha=1, zorder=1))
         
         for pos in positions + [1.0]:
             ax.plot([pos, pos], [ratio_y_center - ratio_bar_height/2, ratio_y_center + ratio_bar_height/2], 
-                    color='#aaaaaa', linewidth=2)
+                    color=subdivision_line_color, linewidth=2, zorder=2)
+        
+        for i, onset in enumerate(rt.onsets):
+            if i < len(positions):
+                x_pos = positions[i]
+                ax.text(x_pos, margin * 0.3, str(onset), 
+                       ha='center', va='center', color='white', fontsize=10, fontweight='bold')
         
         plt.axis('off')
         plt.xlim(-0.01, 1.01)

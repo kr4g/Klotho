@@ -18,6 +18,7 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 from fractions import Fraction
 from typing import Union, Tuple
 import networkx as nx
+from tabulate import tabulate
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
@@ -62,7 +63,7 @@ class RhythmTree(Tree):
     '''
     def __init__(self, 
                  span:int                      = 1,
-                 meas:Union[Meas,Fraction,str] = '4/4',
+                 meas:Union[Meas,Fraction,str] = '1/1',
                  subdivisions:Tuple            = (1,1)):
         
         super().__init__(Meas(meas).numerator, subdivisions)
@@ -100,6 +101,54 @@ class RhythmTree(Tree):
     @property
     def ratios(self):
         return self._ratios
+    
+    @property
+    def onsets(self):
+        return tuple(self.nodes[n]['onset_ratio'] for n in self.leaf_nodes)
+    
+    @property
+    def info(self):
+        meta_dict = self._meta.iloc[0].to_dict()
+        ordered_meta = {k: meta_dict[k] for k in ['span', 'meas', 'type']}
+        ordered_meta['depth'] = self.depth
+        ordered_meta['k'] = self.k
+        meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
+        
+        table_data = [
+            [str(r) for r in self._ratios],
+            [str(o) for o in self.onsets]
+        ]
+        
+        duration_onset_table = tabulate(
+            table_data,
+            headers=[],
+            tablefmt='plain'
+        )
+        
+        table_lines = duration_onset_table.split('\n')
+        durations_line = f"Durations: {table_lines[0]}"
+        onsets_line = f"Onsets:    {table_lines[1]}"
+        
+        content = [
+            meta_str,
+            f"Subdivs: {print_subdivisons(self.subdivisions)}",
+            onsets_line,
+            durations_line
+        ]
+        
+        width = max(len(line) for line in content)
+        border = '-' * width
+        
+        return (
+            f"{border}\n"
+            f"{content[0]}\n"
+            f"{border}\n"
+            f"{content[1]}\n"
+            f"{border}\n"
+            f"{content[2]}\n"
+            f"{content[3]}\n"
+            f"{border}\n"
+        )
     
     # @property
     # def type(self):
@@ -170,8 +219,8 @@ class RhythmTree(Tree):
         _process_subtree()
         onsets = calc_onsets([self.graph.nodes[n]['duration_ratio'] for n in self.leaf_nodes])
         for n, o in zip(self.leaf_nodes, onsets):
-            onset = -o if self.graph.nodes[n]['duration_ratio'] < 0 else o
-            self.graph.nodes[n]['onset_ratio'] = onset
+            # onset = -o if self.graph.nodes[n]['duration_ratio'] < 0 else o
+            self.graph.nodes[n]['onset_ratio'] = o
         
         bfs_order = list(nx.bfs_tree(self.graph, self.root).nodes())
         non_leaf_nodes = [n for n, d in self.graph.out_degree() if d > 0]
@@ -194,33 +243,11 @@ class RhythmTree(Tree):
         return len(self._ratios)
 
     def __str__(self):
-        meta_dict = self._meta.iloc[0].to_dict()
-        ordered_meta = {k: meta_dict[k] for k in ['span', 'meas', 'type']}
-        ordered_meta['depth'] = self.depth
-        ordered_meta['k'] = self.k
-        meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
-        
-        content = [
-            meta_str,
-            f"Subdivs: {print_subdivisons(self.subdivisions)}",
-            f"Ratios:  {', '.join(str(r) for r in self._ratios)}"
-        ]
-        
-        width = max(len(line) for block in content 
-                   for line in block.split('\n'))
-        border = '-' * width
-        
-        return (
-            f"{border}\n"
-            f"{content[0]}\n"
-            f"{border}\n"
-            f"{content[1]}\n"
-            f"{content[2]}\n"
-            f"{border}\n"
-        )
+        return f"RhythmTree(span={self.span}, meas={self.meas}, subdivisions={print_subdivisons(self.subdivisions)})"
 
     def __repr__(self):
         return self.__str__()
+        
 
 
 
