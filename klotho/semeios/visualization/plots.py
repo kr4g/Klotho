@@ -1,7 +1,17 @@
 from klotho.topos.graphs import Graph, Tree, Lattice
-from klotho.thetos.parameters.parameter_tree import ParameterTree
+from klotho.topos.collections.sets import CombinationSet, PartitionSet
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
+
+from klotho.tonos.systems.combination_product_sets import CombinationProductSet
+from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
+
+from klotho.dynatos.dynamics import DynamicRange
+from klotho.dynatos.envelopes import Envelope
+
+from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.thetos.parameters.parameter_tree import ParameterTree
+
 from typing import Tuple
 from itertools import count
 import networkx as nx
@@ -12,13 +22,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from typing import List, Union, Dict, Optional
 import math
-
-from klotho.tonos.systems.combination_product_sets import CombinationProductSet
-from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
-from klotho.topos.collections.sets import CombinationSet, PartitionSet
-from klotho.dynatos.dynamics import DynamicRange
-from klotho.dynatos.envelopes import Envelope
-
 from sklearn.manifold import MDS, SpectralEmbedding
 from sklearn.preprocessing import StandardScaler
 
@@ -65,7 +68,11 @@ def plot(obj, **kwargs):
         case TemporalMeta():
             match obj:
                 case TemporalUnit():
-                    return _plot_rt(obj.rt, **kwargs)
+                    match obj:
+                        case CompositionalUnit():
+                            return _plot_rt(obj.rt, **kwargs)
+                        case _:
+                            return _plot_rt(obj.rt, **kwargs)
                 case TemporalUnitSequence():
                     raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
                 case TemporalBlock():
@@ -379,6 +386,39 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
     
     pos, scale_factor = _proportional_tree_layout(rt, height=height_scale, inverted=invert)
     
+    if pos:
+        x_coords = [x for x, y in pos.values()]
+        y_coords = [y for x, y in pos.values()]
+        
+        min_x, max_x = min(x_coords), max(x_coords)
+        min_y, max_y = min(y_coords), max(y_coords)
+        
+        x_padding = figsize[0] * 0.02
+        y_padding = figsize[1] * 0.05
+        
+        target_width = figsize[0] - (2 * x_padding)
+        target_height = figsize[1] - (2 * y_padding)
+        
+        current_width = max_x - min_x if max_x != min_x else 1
+        current_height = max_y - min_y if max_y != min_y else 1
+        
+        x_scale = target_width / current_width
+        y_scale = target_height / current_height
+        
+        scaled_pos = {}
+        for node, (x, y) in pos.items():
+            scaled_x = x_padding + (x - min_x) * x_scale
+            scaled_y = y_padding + (y - min_y) * y_scale
+            scaled_pos[node] = (scaled_x, scaled_y)
+        
+        pos = scaled_pos
+        
+        x_range = [-x_padding * 0.1, figsize[0] + x_padding * 0.1]
+        y_range = [-y_padding * 0.1, figsize[1] + y_padding * 0.1]
+    else:
+        x_range = [-0.01, figsize[0] + 0.01]
+        y_range = [-0.01, figsize[1] + 0.01]
+    
     total_nodes = G.number_of_nodes()
     max_breadth = max(len(rt.at_depth(level)) for level in range(rt.depth + 1))
     
@@ -475,11 +515,11 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
         plot_bgcolor='black',
         xaxis=dict(
             showgrid=False, zeroline=False, showticklabels=False,
-            range=[-0.01, 1.01]
+            range=x_range
         ),
         yaxis=dict(
             showgrid=False, zeroline=False, showticklabels=False,
-            range=[-0.01, height_scale + 0.01]
+            range=y_range
         ),
         hovermode='closest',
         margin=dict(l=0, r=0, t=0, b=0),
@@ -1303,7 +1343,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         for width in segment_widths[:-1]:
             positions.append(positions[-1] + width)
         
-        ratio_bar_height = ratio_space * 0.4
+        ratio_bar_height = ratio_space * 0.2
         ratio_y_center = margin + ratio_space * 0.5
         
         for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):

@@ -290,13 +290,11 @@ class TemporalUnit(metaclass=TemporalMeta):
         
     def __str__(self):
         result = (
-            f'Span:     {self._rt.span}\n'
-            f'Tempus:   {self._rt.meas}\n'
-            # f'Prolatio: {print_subdivisons(self._rt.subdivisions)}\n'
-            f'Prolatio: {self._type.value}\n'
-            f'Events:   {len(self)}\n'
-            f'Tempo:    {self._beat} = {self._bpm}\n'
-            f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n'
+            f'Tempus:   {self._rt.meas}' + (f' (x{self._rt.span})' if self._rt.span > 1 else '') + '\n' +
+            f'Prolatio: {self._type.value}\n' +
+            f'Events:   {len(self)}\n' +
+            f'Tempo:    {self._beat} = {self._bpm}\n' +
+            f'Time:     {seconds_to_hmsms(self.time[0])} - {seconds_to_hmsms(self.time[1])} ({seconds_to_hmsms(self.duration)})\n' +
             f'{"-" * 50}\n'
         )
         return result

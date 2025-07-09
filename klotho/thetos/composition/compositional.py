@@ -134,6 +134,26 @@ class CompositionalUnit(TemporalUnit):
         
         self._events = self._set_nodes()
     
+    @classmethod
+    def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None):
+        return cls(span     = rt.span,
+                   tempus   = rt.meas,
+                   prolatio = rt._subdivisions,
+                   beat     = beat,
+                   bpm      = bpm,
+                   offset   = 0,
+                   pfields  = pfields)
+        
+    @classmethod
+    def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None):
+        return cls(span     = ut.span,
+                   tempus   = ut.tempus,
+                   prolatio = ut.prolationis,
+                   beat     = ut.beat,
+                   bpm      = ut.bpm,
+                   offset   = ut.offset,
+                   pfields  = pfields)
+    
     def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None]) -> ParameterTree:
         """
         Create a ParameterTree with identical structure to the RhythmTree but blank node data.
