@@ -68,7 +68,7 @@ class Event(Chronon):
         Any
             The requested attribute value
         """
-        temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_ratio', 'node_id', 'is_rest'}
+        temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_duration', 'node_id', 'is_rest'}
         if key in temporal_attrs:
             return getattr(self, key)
         return self.get_parameter(key)
@@ -120,19 +120,13 @@ class CompositionalUnit(TemporalUnit):
                  offset   : float                                  = 0,
                  pfields  : Union[dict, list, None]                = None):
         
-        self._type = None
-        self._rt = self._set_rt(span, abs(Meas(tempus)), prolatio)
-        self._beat = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
-        self._bpm = bpm if bpm else 60
-        self._offset = offset
+        super().__init__(span, tempus, prolatio, beat, bpm, offset)
         
         self._pt = self._create_synchronized_parameter_tree(pfields)
         
         self._envelopes = {}
         self._next_envelope_id = 0
         self._envelope_offset = offset
-        
-        self._events = self._set_nodes()
     
     @classmethod
     def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None):
@@ -213,7 +207,7 @@ class CompositionalUnit(TemporalUnit):
             start_time = env_data['start_time'] + offset_diff
             
             for node in env_data['affected_nodes']:
-                event_time = self._rt[node]['onset_time']
+                event_time = self._rt[node]['real_onset']
                 relative_time = event_time - start_time
                 
                 relative_time = max(0, min(relative_time, envelope.total_time))
@@ -230,7 +224,7 @@ class CompositionalUnit(TemporalUnit):
         # Update envelope offset to current offset for future calculations
         self._envelope_offset = self._offset
 
-    def _set_nodes(self):
+    def _evaluate(self):
         """
         Updates node timings and returns Event objects instead of Chronon objects.
         
@@ -239,7 +233,7 @@ class CompositionalUnit(TemporalUnit):
         tuple of Event
             Events containing both temporal and parameter data
         """
-        super()._set_nodes()
+        super()._evaluate()
         self._evaluate_envelopes()
         leaf_nodes = self._rt.leaf_nodes
         return tuple(Event(node_id, self._rt, self._pt) for node_id in leaf_nodes)
@@ -278,6 +272,8 @@ class CompositionalUnit(TemporalUnit):
         pandas.DataFrame
             DataFrame with temporal properties and all parameter fields
         """
+        if self._events is None:
+            self._events = self._evaluate()
         base_data = []
         for event in self._events:
             event_dict = {
@@ -287,7 +283,7 @@ class CompositionalUnit(TemporalUnit):
                 'end': event.end,
                 'is_rest': event.is_rest,
                 's': event.proportion,
-                'metric_ratio': event.metric_ratio,
+                'metric_duration': event.metric_duration,
             }
             event_dict.update(event.parameters)
             base_data.append(event_dict)
@@ -325,13 +321,13 @@ class CompositionalUnit(TemporalUnit):
                 if n in self._pt.leaf_nodes:
                     affected_nodes.add(n)
                 
-                start_time = min(self._rt[desc]['onset_time'] for desc in affected_nodes)
+                start_time = min(self._rt[desc]['real_onset'] for desc in affected_nodes)
                 
                 if endpoint:
-                    end_time = max(self._rt[desc]['onset_time'] + abs(self._rt[desc]['duration_time']) 
+                    end_time = max(self._rt[desc]['real_onset'] + abs(self._rt[desc]['real_duration']) 
                                  for desc in affected_nodes)
                 else:
-                    end_time = max(self._rt[desc]['onset_time'] for desc in affected_nodes)
+                    end_time = max(self._rt[desc]['real_onset'] for desc in affected_nodes)
                 
                 envelope_duration = end_time - start_time
                 scaled_envelope = Envelope(
@@ -423,13 +419,13 @@ class CompositionalUnit(TemporalUnit):
                 if node in self._pt.leaf_nodes:
                     affected_nodes.add(node)
         
-        start_time = min(self._rt[node]['onset_time'] for node in affected_nodes)
+        start_time = min(self._rt[node]['real_onset'] for node in affected_nodes)
         
         if endpoint:
-            end_time = max(self._rt[node]['onset_time'] + abs(self._rt[node]['duration_time']) 
+            end_time = max(self._rt[node]['real_onset'] + abs(self._rt[node]['real_duration']) 
                           for node in affected_nodes)
         else:
-            end_time = max(self._rt[node]['onset_time'] for node in affected_nodes)
+            end_time = max(self._rt[node]['real_onset'] for node in affected_nodes)
         
         envelope_duration = end_time - start_time
         
@@ -519,6 +515,8 @@ class CompositionalUnit(TemporalUnit):
                     affected_nodes.add(node)
         
         affected_nodes = {node for node in affected_nodes if node in self._pt.leaf_nodes}
+        if self._events is None:
+            self._events = self._evaluate()
         affected_nodes = {node for node in affected_nodes if not self._events[self._rt.leaf_nodes.index(node)].is_rest}
         
         if not affected_nodes:
@@ -596,5 +594,7 @@ class CompositionalUnit(TemporalUnit):
         dict
             Dictionary of parameter field names and values
         """
+        if self._events is None:
+            self._events = self._evaluate()
         return self._events[idx].parameters
     

@@ -43,19 +43,21 @@ class Chronon(metaclass=TemporalMeta):
         self._rt = rt
     
     @property
-    def start(self): return abs(self._rt[self._node_id]['onset_time'])
+    def start(self): return abs(self._rt[self._node_id]['real_onset'])
     @property
-    def duration(self): return abs(self._rt[self._node_id]['duration_time'])
+    def duration(self): return abs(self._rt[self._node_id]['real_duration'])
     @property
     def end(self): return self.start + abs(self.duration)
     @property
     def proportion(self): return self._rt[self._node_id]['proportion']
     @property
-    def metric_ratio(self): return self._rt[self._node_id]['duration_ratio']
+    def metric_duration(self): return self._rt[self._node_id]['metric_duration']
+    @property
+    def metric_onset(self): return self._rt[self._node_id]['metric_onset']
     @property
     def node_id(self): return self._node_id
     @property
-    def is_rest(self): return self._rt[self._node_id]['duration_time'] < 0
+    def is_rest(self): return self._rt[self._node_id]['real_duration'] < 0
     
     def __str__(self):
         return pd.DataFrame({
@@ -65,7 +67,8 @@ class Chronon(metaclass=TemporalMeta):
             'end': [self.end],
             'is_rest': [self.is_rest],
             'proportion': [self.proportion],
-            'metric_ratio': [self.metric_ratio],
+            'metric_duration': [self.metric_duration],
+            'metric_onset': [self.metric_onset],
         }, index=['']).__str__()
     
     def __repr__(self):
@@ -90,7 +93,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._bpm    = bpm if bpm else 60
         self._offset = offset
         
-        self._events = self._set_nodes()
+        self._events = None
     
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
@@ -126,9 +129,14 @@ class TemporalUnit(metaclass=TemporalMeta):
         return self._rt.copy()
 
     @property
-    def ratios(self):
-        """The ratios of a RhythmTree which describe the proportional durations of the TemporalUnit."""
-        return self._rt._ratios
+    def metric_durations(self):
+        """The metric durations from the RhythmTree which describe the proportional durations of the TemporalUnit."""
+        return self._rt.durations
+
+    @property
+    def metric_onsets(self):
+        """The metric onsets from the RhythmTree which describe the proportional onset times of the TemporalUnit."""
+        return self._rt.onsets
 
     @property
     def beat(self):
@@ -152,11 +160,11 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def onsets(self):
-        return tuple(self._rt.graph.nodes[n]['onset_time'] for n in self._rt.leaf_nodes)
+        return tuple(self._rt.graph.nodes[n]['real_onset'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
-        return tuple(self._rt.graph.nodes[n]['duration_time'] for n in self._rt.leaf_nodes)
+        return tuple(self._rt.graph.nodes[n]['real_duration'] for n in self._rt.leaf_nodes)
 
     @property
     def duration(self):
@@ -173,6 +181,8 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def events(self):
+        if self._events is None:
+            self._events = self._evaluate()
         return pd.DataFrame([{
             'node_id': c.node_id,
             'start': c.start,
@@ -180,14 +190,15 @@ class TemporalUnit(metaclass=TemporalMeta):
             'end': c.end,
             'is_rest': c.is_rest,
             's': c.proportion,
-            'metric_ratio': c.metric_ratio,
+            'metric_duration': c.metric_duration,
+            'metric_onset': c.metric_onset,
         } for c in self._events], index=range(len(self._events)))
         
     @offset.setter
     def offset(self, offset:float):
         """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
         self._offset = offset
-        self._events = self._set_nodes()
+        self._events = None
         
     def set_duration(self, target_duration: float) -> None:
         """
@@ -209,7 +220,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         ratio = current_duration / target_duration
         new_bpm = self._bpm * ratio
         self._bpm = new_bpm
-        self._events = self._set_nodes()
+        self._events = None
 
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         match prolatio:
@@ -250,42 +261,33 @@ class TemporalUnit(metaclass=TemporalMeta):
             case _:
                 raise ValueError(f'Invalid prolatio type: {type(prolatio)}')
 
-    def _set_nodes(self):
+    def _evaluate(self):
         """Updates node timings and returns chronon events."""
-        leaf_nodes = self._rt.leaf_nodes
-        leaf_durations = [beat_duration(ratio=self._rt[n]['duration_ratio'], 
-                                      bpm=self.bpm, 
-                                      beat_ratio=self.beat) for n in leaf_nodes]
-        leaf_onsets = [onset + self._offset for onset in calc_onsets(leaf_durations)]
-        
-        for node, onset, duration in zip(leaf_nodes, leaf_onsets, leaf_durations):
-            onset_time = -onset if duration < 0 else onset
-            self._rt[node]['onset_time'] = onset_time
-            self._rt[node]['duration_time'] = duration
-        
-        bfs_order = list(nx.bfs_tree(self._rt.graph, self._rt.root).nodes())
-        non_leaf_nodes = [n for n,d in self._rt.graph.out_degree() if d > 0]
-        for node in non_leaf_nodes:
-            self._rt[node]['duration_time'] = beat_duration(
-                ratio=str(self._rt[node]['duration_ratio']),
-                bpm=self.bpm,
-                beat_ratio=self.beat)
+        for node in self._rt.nodes:
+            metric_duration = self._rt[node]['metric_duration']
+            metric_onset = self._rt[node]['metric_onset']
             
-            current = node
-            while self._rt.graph.out_degree(current) > 0:
-                children = list(self._rt.graph.successors(current))
-                current = min(children, key=lambda x: bfs_order.index(x))
-            self._rt[node]['onset_time'] = self._rt[current]['onset_time']
+            real_duration = beat_duration(ratio=metric_duration, bpm=self.bpm, beat_ratio=self.beat)
+            real_onset = beat_duration(ratio=metric_onset, bpm=self.bpm, beat_ratio=self.beat) + self._offset
+            
+            self._rt[node]['real_duration'] = real_duration
+            self._rt[node]['real_onset'] = real_onset
 
-        return tuple(Chronon(node_id, self._rt) for node_id in leaf_nodes)
+        return tuple(Chronon(node_id, self._rt) for node_id in self._rt.leaf_nodes)
 
     def __getitem__(self, idx: int) -> Chronon:
+        if self._events is None:
+            self._events = self._evaluate()
         return self._events[idx]
     
     def __iter__(self):
+        if self._events is None:
+            self._events = self._evaluate()
         return iter(self._events)
     
     def __len__(self):
+        if self._events is None:
+            self._events = self._evaluate()
         return len(self._events)
         
     def __str__(self):
@@ -387,7 +389,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
         for ut in self._seq:
             ut._bpm = ut.bpm * ratio
-            ut._events = ut._set_nodes()
+            ut._events = None
         
         self._set_offsets()
         

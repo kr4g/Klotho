@@ -340,7 +340,7 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
             
             for node in nodes:
                 node_data = rt.graph.nodes[node]
-                ratio = node_data.get('duration_ratio', None)
+                ratio = node_data.get('metric_duration', None)
                 proportion = node_data.get('proportion', None)
                 
                 if ratio is None:
@@ -477,10 +477,10 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
             hover_parts = [f"Node: {node}"]
             if 'proportion' in node_data:
                 hover_parts.append(f"Proportion: {node_data['proportion']}")
-            if 'duration_ratio' in node_data:
-                hover_parts.append(f"Duration: {node_data['duration_ratio']}")
-            if 'onset_ratio' in node_data:
-                hover_parts.append(f"Onset: {node_data['onset_ratio']}")
+            if 'metric_duration' in node_data:
+                hover_parts.append(f"Duration: {node_data['metric_duration']}")
+            if 'metric_onset' in node_data:
+                hover_parts.append(f"Onset: {node_data['metric_onset']}")
             
             hover_data.append("<br>".join(hover_parts))
             
@@ -1139,7 +1139,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     elif layout == 'ratios':
         if figsize is None:
             figsize = (20, 1)
-        return _plot_ratios(rt.ratios, figsize=figsize, output_file=output_file)
+        return _plot_ratios(rt.durations, figsize=figsize, output_file=output_file)
     
     elif layout == 'containers':
         if figsize is None:
@@ -1220,7 +1220,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             
             for node in nodes:
                 node_data = rt.graph.nodes[node]
-                ratio = node_data.get('duration_ratio', None)
+                ratio = node_data.get('metric_duration', None)
                 proportion = node_data.get('proportion', None)
                 
                 # XXX - maybe not necessary
@@ -1335,7 +1335,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                 plt.plot([1, 1], [top_bar_top, line_cutoff], 
                         color=barline_color, linestyle='-', linewidth=1.5, alpha=0.9, zorder=2)
         
-        ratios = rt.ratios
+        ratios = rt.durations
         total_ratio = sum(abs(r) for r in ratios)
         segment_widths = [abs(r) / total_ratio for r in ratios]
         

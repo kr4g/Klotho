@@ -73,11 +73,11 @@ class RhythmTree(Tree):
         self._meta['type'] = None
         self._subdivisions = self._cast_subdivs(subdivisions)
         
-        self._ratios = self._evaluate()
+        self._evaluate()
     
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
-        return cls(span = span, meas = Meas(tree[tree.root]['duration_ratio']), subdivisions = tree.group.S)
+        return cls(span = span, meas = Meas(tree[tree.root]['metric_duration']), subdivisions = tree.group.S)
     
     @classmethod
     def from_ratios(cls, ratios:Tuple[Fraction, float, str], span:int = 1):
@@ -99,12 +99,12 @@ class RhythmTree(Tree):
         return self._subdivisions
 
     @property
-    def ratios(self):
-        return self._ratios
+    def durations(self):
+        return tuple(self.nodes[n]['metric_duration'] for n in self.leaf_nodes)
     
     @property
     def onsets(self):
-        return tuple(self.nodes[n]['onset_ratio'] for n in self.leaf_nodes)
+        return tuple(self.nodes[n]['metric_onset'] for n in self.leaf_nodes)
     
     @property
     def info(self):
@@ -115,7 +115,7 @@ class RhythmTree(Tree):
         meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
         
         table_data = [
-            [str(r) for r in self._ratios],
+            [str(r) for r in self.durations],
             [str(o) for o in self.onsets]
         ]
         
@@ -171,7 +171,7 @@ class RhythmTree(Tree):
         return tuple(convert_to_tuple(child) for child in children)
     
     def _evaluate(self):
-        self.graph.nodes[self.root]['duration_ratio'] = self.meas
+        self.graph.nodes[self.root]['metric_duration'] = self.meas
         def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
             node_data = self.graph.nodes[node]
             
@@ -188,7 +188,7 @@ class RhythmTree(Tree):
             
             if not children:
                 ratio = Fraction(label_value) * parent_ratio
-                self.graph.nodes[node]['duration_ratio'] = ratio
+                self.graph.nodes[node]['metric_duration'] = ratio
                 self.graph.nodes[node].pop('label', None)
                 return
             
@@ -200,15 +200,12 @@ class RhythmTree(Tree):
             for child in children:
                 child_data = self.graph.nodes[child]
                 
-                # if 'meta' in child_data:
-                    # child_data['label'] = child_data['label'] * child_data['meta']['span']
-                
                 s = child_data['label']
                 if 'meta' in child_data:
                     s = s * child_data['meta']['span']
                 s = int(s) if isinstance(s, float) else s
                 ratio = Fraction(s, div) * parent_ratio
-                self.graph.nodes[child]['duration_ratio'] = ratio
+                self.graph.nodes[child]['metric_duration'] = ratio
                 self.graph.nodes[child]['proportion'] = s
                 if self.graph.out_degree(child) > 0:
                     _process_subtree(child, ratio)
@@ -217,10 +214,9 @@ class RhythmTree(Tree):
             self.graph.nodes[node].pop('label', None)
         
         _process_subtree()
-        onsets = calc_onsets([self.graph.nodes[n]['duration_ratio'] for n in self.leaf_nodes])
+        onsets = calc_onsets([self.graph.nodes[n]['metric_duration'] for n in self.leaf_nodes])
         for n, o in zip(self.leaf_nodes, onsets):
-            # onset = -o if self.graph.nodes[n]['duration_ratio'] < 0 else o
-            self.graph.nodes[n]['onset_ratio'] = o
+            self.graph.nodes[n]['metric_onset'] = o
         
         bfs_order = list(nx.bfs_tree(self.graph, self.root).nodes())
         non_leaf_nodes = [n for n, d in self.graph.out_degree() if d > 0]
@@ -229,9 +225,7 @@ class RhythmTree(Tree):
             while self.graph.out_degree(current) > 0:
                 children = list(self.graph.successors(current))
                 current = min(children, key=lambda x: bfs_order.index(x))
-            self.graph.nodes[node]['onset_ratio'] = self.graph.nodes[current]['onset_ratio']
-        
-        return tuple(self.graph.nodes[n]['duration_ratio'] for n in self.leaf_nodes)
+            self.graph.nodes[node]['metric_onset'] = self.graph.nodes[current]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)
@@ -240,7 +234,7 @@ class RhythmTree(Tree):
         return 'complex' if measure_complexity(self.subdivisions) else 'simple'
 
     def __len__(self):
-        return len(self._ratios)
+        return len(self.durations)
 
     def __str__(self):
         return f"RhythmTree(span={self.span}, meas={self.meas}, subdivisions={print_subdivisons(self.subdivisions)})"

@@ -53,7 +53,7 @@ def decompose(ut: TemporalUnit, prolatio: Union[tuple, str, None] = None, depth:
                prolatio = next(prolatio_cycle),
                beat     = ut._beat,
                bpm      = ut._bpm
-           ) for ratio in ut._rt._ratios
+           ) for ratio in ut._rt.durations
         ])
 
 def transform(structure: TemporalMeta) -> TemporalMeta:
