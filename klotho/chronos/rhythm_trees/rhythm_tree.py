@@ -19,6 +19,7 @@ from fractions import Fraction
 from typing import Union, Tuple
 import networkx as nx
 from tabulate import tabulate
+from concurrent.futures import ThreadPoolExecutor
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
@@ -171,8 +172,55 @@ class RhythmTree(Tree):
         return tuple(convert_to_tuple(child) for child in children)
     
     def _evaluate(self):
+        """
+        Evaluate the rhythm tree to compute metric durations and onsets.
+        
+        This method processes the tree in two phases:
+        1. Parallel computation of metric durations and proportions for all nodes
+        2. Sequential computation of metric onsets based on durations
+        
+        The parallel phase processes independent subtrees simultaneously, while
+        the onset phase uses optimized single-pass algorithms.
+        """
         self.graph.nodes[self.root]['metric_duration'] = self.meas
+        
+        def _process_child_durations(child, div, parent_ratio):
+            """
+            Process duration and proportion for a single child node.
+            
+            Parameters
+            ----------
+            child : int
+                Child node ID to process.
+            div : int
+                Sum of all proportions at this level.
+            parent_ratio : Fraction
+                Parent node's metric duration ratio.
+            """
+            child_data = self.graph.nodes[child]
+            
+            s = child_data['label']
+            if 'meta' in child_data:
+                s = s * child_data['meta']['span']
+            s = int(s) if isinstance(s, float) else s
+            ratio = Fraction(s, div) * parent_ratio
+            self.graph.nodes[child]['metric_duration'] = ratio
+            self.graph.nodes[child]['proportion'] = s
+            if self.graph.out_degree(child) > 0:
+                _process_subtree(child, ratio)
+            self.graph.nodes[child].pop('label', None)
+        
         def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
+            """
+            Process a subtree to compute metric durations and proportions.
+            
+            Parameters
+            ----------
+            node : int, optional
+                Root node of subtree to process (default is 0).
+            parent_ratio : Fraction, optional
+                Parent node's metric duration ratio.
+            """
             node_data = self.graph.nodes[node]
             
             if 'meta' in node_data:
@@ -197,35 +245,27 @@ class RhythmTree(Tree):
                              else self.graph.nodes[c]['label']) 
                          for c in children))
             
-            for child in children:
-                child_data = self.graph.nodes[child]
-                
-                s = child_data['label']
-                if 'meta' in child_data:
-                    s = s * child_data['meta']['span']
-                s = int(s) if isinstance(s, float) else s
-                ratio = Fraction(s, div) * parent_ratio
-                self.graph.nodes[child]['metric_duration'] = ratio
-                self.graph.nodes[child]['proportion'] = s
-                if self.graph.out_degree(child) > 0:
-                    _process_subtree(child, ratio)
-                self.graph.nodes[child].pop('label', None)
+            with ThreadPoolExecutor() as executor:
+                futures = [executor.submit(_process_child_durations, child, div, parent_ratio) 
+                          for child in children]
+                for future in futures:
+                    future.result()
             
             self.graph.nodes[node].pop('label', None)
         
         _process_subtree()
-        onsets = calc_onsets([self.graph.nodes[n]['metric_duration'] for n in self.leaf_nodes])
-        for n, o in zip(self.leaf_nodes, onsets):
+        
+        leaf_durations = [self.graph.nodes[n]['metric_duration'] for n in self.leaf_nodes]
+        leaf_onsets = calc_onsets(leaf_durations)
+        
+        for n, o in zip(self.leaf_nodes, leaf_onsets):
             self.graph.nodes[n]['metric_onset'] = o
         
-        bfs_order = list(nx.bfs_tree(self.graph, self.root).nodes())
-        non_leaf_nodes = [n for n, d in self.graph.out_degree() if d > 0]
-        for node in non_leaf_nodes:
-            current = node
-            while self.graph.out_degree(current) > 0:
-                children = list(self.graph.successors(current))
-                current = min(children, key=lambda x: bfs_order.index(x))
-            self.graph.nodes[node]['metric_onset'] = self.graph.nodes[current]['metric_onset']
+        for node in reversed(list(nx.topological_sort(self.graph))):
+            if self.graph.out_degree(node) > 0:
+                children = list(self.graph.successors(node))
+                leftmost_child = children[0]
+                self.graph.nodes[node]['metric_onset'] = self.graph.nodes[leftmost_child]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)

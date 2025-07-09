@@ -199,6 +199,13 @@ class CompositionalUnit(TemporalUnit):
 
     def _evaluate_envelopes(self):
         """Evaluate all envelopes and update parameter tree with computed values"""
+        if not self._envelopes:
+            return
+        
+        # Ensure temporal evaluation has occurred before accessing real_onset
+        if self._events is None:
+            self._events = super()._evaluate()
+            
         offset_diff = self._offset - self._envelope_offset
         
         for envelope_id, env_data in self._envelopes.items():
@@ -321,6 +328,9 @@ class CompositionalUnit(TemporalUnit):
                 if n in self._pt.leaf_nodes:
                     affected_nodes.add(n)
                 
+                if self._events is None:
+                    self._events = self._evaluate()
+                
                 start_time = min(self._rt[desc]['real_onset'] for desc in affected_nodes)
                 
                 if endpoint:
@@ -418,6 +428,9 @@ class CompositionalUnit(TemporalUnit):
                 affected_nodes.update(self._pt.descendants(node))
                 if node in self._pt.leaf_nodes:
                     affected_nodes.add(node)
+        
+        if self._events is None:
+            self._events = self._evaluate()
         
         start_time = min(self._rt[node]['real_onset'] for node in affected_nodes)
         
