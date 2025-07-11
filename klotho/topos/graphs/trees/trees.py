@@ -1,8 +1,8 @@
 from ..graphs import Graph
 import networkx as nx
 from itertools import count
-import pandas as pd
 from collections import deque
+from functools import cached_property, lru_cache
 from ....utils.data_structures.group import Group
 
 
@@ -20,13 +20,29 @@ class Tree(Graph):
     def group(self):
         return self._list
     
-    @property
+    def _invalidate_caches(self):
+        """Invalidate all tree caches"""
+        super()._invalidate_caches()
+        for attr in ['depth', 'k', 'leaf_nodes']:
+            if attr in self.__dict__:
+                delattr(self, attr)
+        if hasattr(self, 'parent'):
+            self.parent.cache_clear()
+    
+    @cached_property
     def depth(self):
+        """Maximum depth of the tree"""
         return max(nx.single_source_shortest_path_length(self.graph, self._root).values())
     
-    @property
+    @cached_property
     def k(self):
+        """Maximum branching factor of the tree"""
         return max((self.graph.out_degree(n) for n in self.graph.nodes), default=0)
+    
+    @cached_property
+    def leaf_nodes(self):
+        """Returns leaf nodes (nodes with no successors)"""
+        return tuple(n for n in nx.dfs_preorder_nodes(self.graph) if self._graph.out_degree(n) == 0)
 
     def depth_of(self, node):
         """Returns the depth of a node in the tree.
@@ -41,8 +57,10 @@ class Tree(Graph):
             raise ValueError(f"Node {node} not found in graph")
         return nx.shortest_path_length(self.graph, self.root, node)
 
+    @lru_cache(maxsize=None)
     def parent(self, node):
         """Returns the parent of a node, or None if the node is the root."""
+        _ = self._structure_version
         predecessors = self.predecessors(node)
         return predecessors[0] if predecessors else None
 
@@ -136,6 +154,7 @@ class Tree(Graph):
                     self._graph.remove_edge(parent, child)
                     self._graph.add_edge(parent, child)
         
+        self._invalidate_caches()
         return node_id
     
     def add_subtree(self, parent, subtree, index=None):
@@ -161,6 +180,7 @@ class Tree(Graph):
                     self._graph.remove_edge(parent, child)
                     self._graph.add_edge(parent, child)
         
+        self._invalidate_caches()
         return id_mapping
     
     def prune(self, node):
@@ -177,6 +197,7 @@ class Tree(Graph):
         if parent:
             self._graph.remove_edge(parent, node)
         self._graph.remove_node(node)
+        self._invalidate_caches()
     
     def remove_subtree(self, node):
         if node not in self._graph:
@@ -193,6 +214,7 @@ class Tree(Graph):
         descendants = [node] + list(self.descendants(node))
         for n in descendants:
             self._graph.remove_node(n)
+        self._invalidate_caches()
     
     def replace_node(self, old_node, **attr):
         if old_node not in self._graph:
@@ -220,7 +242,8 @@ class Tree(Graph):
         
         if old_node == self._root:
             self._root = new_id
-            
+        
+        self._invalidate_caches()
         return new_id
     
     def graft_subtree(self, node, subtree, handle_children='adopt'):
@@ -273,6 +296,7 @@ class Tree(Graph):
         
         self._graph.remove_node(node)
         
+        self._invalidate_caches()
         return id_mapping
     
     def move_subtree(self, node, new_parent, index=None):
@@ -298,6 +322,8 @@ class Tree(Graph):
                 if i >= index:
                     self._graph.remove_edge(new_parent, child)
                     self._graph.add_edge(new_parent, child)
+        
+        self._invalidate_caches()
         
     def _build_tree(self, root, children):
         root_id = super().add_node(label=root)
@@ -354,9 +380,6 @@ class Tree(Graph):
         
         children = _build_children_list(tree._root)
         tree._list = Group((root_label, children))
-        
-        tree._meta['depth'] = max(nx.single_source_shortest_path_length(tree.graph, tree._root).values())
-        tree._meta['k'] = max((tree.graph.out_degree(n) for n in tree.graph.nodes), default=0)
         
         if clear_attributes:
             tree.clear_node_attributes()

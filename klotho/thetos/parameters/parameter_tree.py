@@ -1,7 +1,7 @@
 from ...topos.graphs.trees import Tree
 from ..instruments.instrument import Instrument
-import pandas as pd
 import copy
+from functools import lru_cache
 
 
 class ParameterTree(Tree):
@@ -9,11 +9,17 @@ class ParameterTree(Tree):
         super().__init__(root, children)
         for node in self.graph.nodes:
             self.graph.nodes[node].pop('label', None)
-        self._meta['pfields'] = pd.Series([set()], index=[''])
+        self._meta['pfields'] = set()
         self._node_instruments = {}
         self._subtree_muted_pfields = {}
         self._slurs = {}
         self._next_slur_id = 0
+        
+        # PT-specific caches for performance optimization
+        self._governing_node_cache = {}
+        self._active_instrument_cache = {}
+        self._active_items_cache = {}
+        self._parameter_version = 0
     
     def __deepcopy__(self, memo):
         new_pt = super().__deepcopy__(memo)
@@ -21,40 +27,62 @@ class ParameterTree(Tree):
         new_pt._subtree_muted_pfields = copy.deepcopy(self._subtree_muted_pfields, memo)
         new_pt._slurs = copy.deepcopy(self._slurs, memo)
         new_pt._next_slur_id = self._next_slur_id
+        
+        # Initialize caches for the new copy
+        new_pt._governing_node_cache = {}
+        new_pt._active_instrument_cache = {}
+        new_pt._active_items_cache = {}
+        new_pt._parameter_version = 0
         return new_pt
+    
+    def _invalidate_parameter_caches(self):
+        """Invalidate parameter-specific caches when data changes"""
+        self._parameter_version += 1
+        self._governing_node_cache.clear()
+        self._active_instrument_cache.clear()
+        self._active_items_cache.clear()
+    
+    def _invalidate_caches(self):
+        """Override to include parameter cache invalidation"""
+        super()._invalidate_caches()
+        self._invalidate_parameter_caches()
     
     def __getitem__(self, node):
         return ParameterNode(self, node)
     
     @property
     def pfields(self):
-        return sorted(self._meta.loc['', 'pfields'])
+        return sorted(self._meta['pfields'])
     
     def _traverse_to_instrument_node(self, node):
-        current = node
-        while current is not None:
-            if current in self._node_instruments:
-                return current
-            try:
-                current = self.parent(current)
-            except (IndexError, AttributeError, TypeError):
-                try:
-                    parents = list(self.predecessors(current))
-                    current = parents[0] if parents else None
-                except (IndexError, AttributeError):
-                    current = None
-        return None
+        """Cached instrument node traversal"""
+        cache_key = (node, self._parameter_version)
+        if cache_key in self._governing_node_cache:
+            return self._governing_node_cache[cache_key]
+        
+        result = None
+        if node in self._node_instruments:
+            result = node
+        else:
+            for ancestor in self.ancestors(node):
+                if ancestor in self._node_instruments:
+                    result = ancestor
+                    break
+        
+        self._governing_node_cache[cache_key] = result
+        return result
     
     def set_pfields(self, node, **kwargs):
-        self._meta.loc['', 'pfields'].update(kwargs.keys())
+        """Optimized parameter setting with cache invalidation"""
+        self._meta['pfields'].update(kwargs.keys())
         
-        for key, value in kwargs.items():
-            self.graph.nodes[node][key] = value
+        affected_nodes = [node] + list(self.descendants(node))
         
-        for descendant in self.descendants(node):
-            descendant_data = self.graph.nodes[descendant]
-            for key, value in kwargs.items():
-                descendant_data[key] = value
+        for affected_node in affected_nodes:
+            node_data = self.graph.nodes[affected_node]
+            node_data.update(kwargs)
+        
+        self._invalidate_parameter_caches()
     
     def set_instrument(self, node, instrument, exclude=None):        
         if not isinstance(instrument, Instrument):
@@ -70,7 +98,7 @@ class ParameterTree(Tree):
             exclude = set(exclude)
             
         instrument_pfields = set(instrument.keys())
-        self._meta.loc['', 'pfields'].update(instrument_pfields)
+        self._meta['pfields'].update(instrument_pfields)
         
         self._node_instruments[node] = instrument
         
@@ -91,10 +119,20 @@ class ParameterTree(Tree):
                     node_data[key] = instrument[key]
                 elif key == 'synth_name' or key not in node_data:
                     node_data[key] = instrument[key]
+        
+        self._invalidate_parameter_caches()
     
     def get_active_instrument(self, node):
+        """Cached active instrument lookup"""
+        cache_key = (node, self._parameter_version)
+        if cache_key in self._active_instrument_cache:
+            return self._active_instrument_cache[cache_key]
+        
         instrument_node = self._traverse_to_instrument_node(node)
-        return self._node_instruments.get(instrument_node) if instrument_node is not None else None
+        result = self._node_instruments.get(instrument_node) if instrument_node is not None else None
+        
+        self._active_instrument_cache[cache_key] = result
+        return result
     
     def get_governing_subtree_node(self, node):
         return self._traverse_to_instrument_node(node)
@@ -164,6 +202,8 @@ class ParameterTree(Tree):
                     to_remove.append(slur_id)
             for slur_id in to_remove:
                 del self._slurs[slur_id]
+        
+        self._invalidate_parameter_caches()
             
     def items(self, node):
         return dict(self.graph.nodes[node])
@@ -196,14 +236,23 @@ class ParameterNode:
         return self._tree.items(self._node)
     
     def active_items(self):
+        """Heavily optimized active items with caching"""
+        cache_key = (self._node, self._tree._parameter_version)
+        if cache_key in self._tree._active_items_cache:
+            return self._tree._active_items_cache[cache_key]
+        
         all_items = self._tree.items(self._node)
         governing_subtree_node = self._tree.get_governing_subtree_node(self._node)
         
         if governing_subtree_node is None:
-            return all_items
+            result = all_items
+        else:
+            muted_pfields = self._tree._subtree_muted_pfields.get(governing_subtree_node, set())
+            result = {k: v for k, v in all_items.items() 
+                     if k not in muted_pfields or k.startswith('_slur_')}
         
-        muted_pfields = self._tree._subtree_muted_pfields.get(governing_subtree_node, set())
-        return {k: v for k, v in all_items.items() if k not in muted_pfields or k.startswith('_slur_')}
+        self._tree._active_items_cache[cache_key] = result
+        return result
     
     def __dict__(self):
         return self._tree.items(self._node)

@@ -65,11 +65,11 @@ class HarmonicTree(Tree):
     
     @property
     def equave(self):
-        return self._meta['equave'].iloc[0]
+        return self._meta['equave']
     
     @property
     def span(self):
-        return self._meta['span'].iloc[0]
+        return self._meta['span']
     
     # @property
     # def inverse(self):

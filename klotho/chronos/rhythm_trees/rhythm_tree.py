@@ -19,7 +19,6 @@ from fractions import Fraction
 from typing import Union, Tuple
 import networkx as nx
 from tabulate import tabulate
-from concurrent.futures import ThreadPoolExecutor
 
 from klotho.topos.graphs import Tree
 from klotho.topos.graphs.trees.algorithms import print_subdivisons
@@ -89,11 +88,11 @@ class RhythmTree(Tree):
 
     @property
     def span(self):
-        return self._meta['span'].iloc[0]
+        return self._meta['span']
 
     @property
     def meas(self):
-        return Meas(self._meta['meas'].iloc[0])
+        return Meas(self._meta['meas'])
 
     @property
     def subdivisions(self):
@@ -109,8 +108,7 @@ class RhythmTree(Tree):
     
     @property
     def info(self):
-        meta_dict = self._meta.iloc[0].to_dict()
-        ordered_meta = {k: meta_dict[k] for k in ['span', 'meas', 'type']}
+        ordered_meta = {k: self._meta[k] for k in ['span', 'meas', 'type']}
         ordered_meta['depth'] = self.depth
         ordered_meta['k'] = self.k
         meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
@@ -176,11 +174,10 @@ class RhythmTree(Tree):
         Evaluate the rhythm tree to compute metric durations and onsets.
         
         This method processes the tree in two phases:
-        1. Parallel computation of metric durations and proportions for all nodes
-        2. Sequential computation of metric onsets based on durations
+        1. Computation of metric durations and proportions for all nodes
+        2. Computation of metric onsets based on durations
         
-        The parallel phase processes independent subtrees simultaneously, while
-        the onset phase uses optimized single-pass algorithms.
+        The evaluation uses optimized algorithms with our Graph/Tree caching.
         """
         self.graph.nodes[self.root]['metric_duration'] = self.meas
         
@@ -245,11 +242,8 @@ class RhythmTree(Tree):
                              else self.graph.nodes[c]['label']) 
                          for c in children))
             
-            with ThreadPoolExecutor() as executor:
-                futures = [executor.submit(_process_child_durations, child, div, parent_ratio) 
-                          for child in children]
-                for future in futures:
-                    future.result()
+            for child in children:
+                _process_child_durations(child, div, parent_ratio)
             
             self.graph.nodes[node].pop('label', None)
         
