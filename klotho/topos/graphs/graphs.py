@@ -1,8 +1,10 @@
 import networkx as nx
-import hypernetx as hnx
-from itertools import count
 import copy
 from functools import lru_cache
+from typing import List, TypeVar
+import numpy as np
+
+T = TypeVar('T')
 
 
 class Graph:
@@ -345,6 +347,55 @@ class Graph:
             Graph: A new Graph instance with directed structure
         """
         return cls(nx.DiGraph())
+    
+    @classmethod
+    def from_cost_matrix(cls, cost_matrix: np.ndarray, items: List[T]):
+        """Create a Graph from a cost matrix.
+        
+        Transform a symmetric cost matrix into an undirected graph where
+        edge weights represent the costs between nodes. Self-loops are
+        excluded from the resulting graph.
+
+        Parameters
+        ----------
+        cost_matrix : numpy.ndarray
+            Symmetric cost matrix with numeric values. Should be square
+            with dimensions matching the length of items.
+        items : List[T]
+            List of items corresponding to matrix indices. Used as node
+            values in the resulting graph.
+
+        Returns
+        -------
+        Graph
+            Undirected graph with nodes corresponding to matrix indices
+            and edge weights equal to the cost matrix values. Only edges
+            with positive costs are included. Node attributes 'value' 
+            contain the original items.
+
+        Examples
+        --------
+        Create a graph from a simple cost matrix:
+        
+        >>> import numpy as np
+        >>> matrix = np.array([[0, 1, 2], [1, 0, 3], [2, 3, 0]])
+        >>> items = ['A', 'B', 'C']
+        >>> graph = Graph.from_cost_matrix(matrix, items)
+        >>> list(graph.edges(data=True))
+        [('A', 'B', {'weight': 1}), ('A', 'C', {'weight': 2}), ('B', 'C', {'weight': 3})]
+        """
+        G = nx.Graph()
+        
+        for i, item in enumerate(items):
+            G.add_node(i, value=item)
+        
+        for i in range(len(items)):
+            for j in range(i + 1, len(items)):
+                cost = cost_matrix[i, j]
+                if cost > 0:
+                    G.add_edge(i, j, weight=cost)
+        
+        return cls(G)
     
     def __deepcopy__(self, memo):
         new_graph = self.__class__.__new__(self.__class__)

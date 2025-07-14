@@ -1,5 +1,6 @@
 from klotho.topos.graphs import Graph, Tree, Lattice
 from klotho.topos.collections.sets import CombinationSet, PartitionSet
+
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
@@ -12,18 +13,13 @@ from klotho.dynatos.envelopes import Envelope
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 
-from typing import Tuple
-from itertools import count
 import networkx as nx
 import matplotlib.pyplot as plt
 from fractions import Fraction
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from typing import List, Union, Dict, Optional
 import math
 from sklearn.manifold import MDS, SpectralEmbedding
-from sklearn.preprocessing import StandardScaler
 
 __all__ = ['plot']
 

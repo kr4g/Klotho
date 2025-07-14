@@ -1,6 +1,7 @@
 from typing import List, Callable, Optional
 import networkx as nx
 from networkx.algorithms.approximation import greedy_tsp
+import random
 
 __all__ = [
     'minimum_cost_path',
@@ -78,9 +79,6 @@ def minimum_cost_path(
         return greedy_tsp(G, **kwargs)
     
     return traversal_func(G, **kwargs)
-
-import random
-from typing import List, Optional
 
 def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight', 
                       target: Optional[int] = None, **kwargs) -> List[int]:

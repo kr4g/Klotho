@@ -1,3 +1,5 @@
+from klotho.utils.algorithms.groups import print_subdivisions
+
 class Group(tuple):
     def __new__(cls, G):
         if isinstance(G, tuple):
@@ -25,5 +27,8 @@ class Group(tuple):
     def S(self):
         return self[1]
     
+    def __str__(self) -> str:
+        return f"Group(({self.D} {print_subdivisions(self.S)}))"
+    
     def __repr__(self) -> str:
-        return super().__repr__()
+        return self.__str__()

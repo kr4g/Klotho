@@ -7,9 +7,7 @@ Temporal Units
 --------------------------------------------------------------------------------------
 '''
 from fractions import Fraction
-from typing import Union, Tuple
-# from ...topos.graphs.trees.algorithms import print_subdivisons
-from klotho.topos.graphs.trees.algorithms import print_subdivisons
+from typing import Union
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms import auto_subdiv
 from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms

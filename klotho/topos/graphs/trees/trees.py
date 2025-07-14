@@ -1,9 +1,8 @@
 from ..graphs import Graph
 import networkx as nx
-from itertools import count
-from collections import deque
 from functools import cached_property, lru_cache
-from ....utils.data_structures.group import Group
+# from ....utils.data_structures.group import Group
+from klotho.utils.data_structures import Group
 
 
 class Tree(Graph):
