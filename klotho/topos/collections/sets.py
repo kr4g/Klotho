@@ -5,9 +5,9 @@ import math
 from fractions import Fraction
 from functools import cached_property
 from typing import List, Tuple, Set, Dict, Any, Union, Literal
-import networkx as nx
 import sympy as sp
 from scipy.spatial.distance import pdist, squareform
+from ..graphs import Graph
 
 
 __all__ = [
@@ -949,7 +949,7 @@ class CombinationSet:
         
         Returns
         -------
-        networkx.Graph
+        Graph
             A complete graph where each node represents a combination.
         """
         return self._graph
@@ -984,13 +984,13 @@ class CombinationSet:
         
         Returns
         -------
-        networkx.Graph
+        Graph
             A complete graph where each node has a 'combo' attribute.
         """
         n_nodes = len(self._combos)
-        G = nx.complete_graph(n_nodes)
+        G = Graph.complete_graph(n_nodes)
         for i, combo in enumerate(self._combos):
-            G.nodes[i]['combo'] = combo
+            G[i]['combo'] = combo
         return G
     
     def __str__(self):    
@@ -1114,7 +1114,7 @@ class PartitionSet:
                     
         return pd.DataFrame(backtrack(self._n, self._k, self._n, ()))
     
-    def _generate_graph(self) -> nx.Graph:
+    def _generate_graph(self):
         """
         Generate a graph based on the specified graph type.
         
@@ -1137,13 +1137,13 @@ class PartitionSet:
         else:
             raise ValueError(f"Unknown graph type: {self._graph_type}")
     
-    def _build_feature_distance_graph(self) -> nx.Graph:
+    def _build_feature_distance_graph(self):
         """
         Build a graph where edge weights represent feature distances.
         
         Returns
         -------
-        networkx.Graph
+        Graph
             A complete graph with edge weights based on normalized feature distances.
         """
         features = self._data[['unique_count', 'span', 'variance']].values
@@ -1151,11 +1151,11 @@ class PartitionSet:
         distances = pdist(features_normalized, metric='euclidean')
         distance_matrix = squareform(distances)
         
-        G = nx.Graph()
+        G = Graph()
         n_partitions = len(self._data)
         
         for i in range(n_partitions):
-            G.add_node(i, partition=tuple(self._data.iloc[i]['partition']))
+            G.add_node(partition=tuple(self._data.iloc[i]['partition']))
         
         for i in range(n_partitions):
             for j in range(i + 1, n_partitions):
@@ -1163,20 +1163,20 @@ class PartitionSet:
         
         return G
     
-    def _build_decomposition_tree_graph(self) -> nx.Graph:
+    def _build_decomposition_tree_graph(self):
         """
         Build a graph where edge weights represent transformation costs.
         
         Returns
         -------
-        networkx.Graph
+        Graph
             A complete graph with edge weights based on partition transformation costs.
         """
         partitions = [tuple(row['partition']) for _, row in self._data.iterrows()]
-        G = nx.Graph()
+        G = Graph()
         
         for i, partition in enumerate(partitions):
-            G.add_node(i, partition=partition)
+            G.add_node(partition=partition)
         
         for i, partition_a in enumerate(partitions):
             for j, partition_b in enumerate(partitions):
@@ -1213,20 +1213,20 @@ class PartitionSet:
         
         return cost
     
-    def _build_substructure_embedding_graph(self) -> nx.DiGraph:
+    def _build_substructure_embedding_graph(self):
         """
         Build a directed graph based on substructure embedding costs.
         
         Returns
         -------
-        networkx.DiGraph
+        Graph
             A directed graph where edge weights represent embedding costs.
         """
         partitions = [tuple(row['partition']) for _, row in self._data.iterrows()]
-        G = nx.DiGraph()
+        G = Graph.digraph()
         
         for i, partition in enumerate(partitions):
-            G.add_node(i, partition=partition)
+            G.add_node(partition=partition)
         
         for i, partition_a in enumerate(partitions):
             for j, partition_b in enumerate(partitions):
@@ -1330,7 +1330,7 @@ class PartitionSet:
         
         Returns
         -------
-        networkx.Graph or networkx.DiGraph
+        Graph
             The graph representation of partition relationships.
         """
         return self._graph

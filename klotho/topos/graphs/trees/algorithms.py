@@ -99,7 +99,7 @@ def prune_to_depth(tree: Tree, max_depth: int) -> Tree:
     if max_depth < 0:
         raise ValueError("max_depth must be non-negative")
     
-    G = tree.graph.copy()
+    G = tree._graph.copy()
     depths = nx.single_source_shortest_path_length(G, 0)
     nodes_to_remove = [n for n, depth in depths.items() if depth > max_depth]
     G.remove_nodes_from(nodes_to_remove)
@@ -113,7 +113,7 @@ def prune_leaves(tree: Tree, n: int) -> Tree:
     if n == 0:
         return tree
     
-    G = tree.graph.copy()
+    G = tree._graph.copy()
     for _ in range(n):
         leaves = [node for node in G.nodes() if G.out_degree(node) == 0]
         G.remove_nodes_from(leaves)
@@ -124,21 +124,21 @@ def prune_leaves(tree: Tree, n: int) -> Tree:
 
 def path_to_node(tree: Tree, node_id: int) -> list[int]:
     """Returns the path from root to the specified node as a list of node IDs."""
-    if node_id not in tree.graph:
+    if node_id not in tree._graph:
         raise ValueError(f"Node {node_id} not found in tree")
     
     try:
-        path = nx.shortest_path(tree.graph, 0, node_id)
+        path = nx.shortest_path(tree._graph, 0, node_id)
         return path
     except nx.NetworkXNoPath:
         raise ValueError(f"No path exists to node {node_id}")
 
 def extract_subtree(tree: Tree, root_id: int) -> Tree:
     """Creates a new tree from the subtree rooted at the specified node."""
-    if root_id not in tree.graph:
+    if root_id not in tree._graph:
         raise ValueError(f"Node {root_id} not found in tree")
     
-    G = tree.graph.copy()
+    G = tree._graph.copy()
     descendants = nx.descendants(G, root_id)
     descendants.add(root_id)
     subtree = G.subgraph(descendants).copy()
@@ -155,12 +155,12 @@ def extract_subtree(tree: Tree, root_id: int) -> Tree:
 
 def are_isomorphic(tree1: Tree, tree2: Tree) -> bool:
     """Returns True if the two trees are structurally identical."""
-    return nx.is_isomorphic(tree1.graph, tree2.graph, 
+    return nx.is_isomorphic(tree1._graph, tree2._graph, 
                            node_match=lambda x, y: x['label'] == y['label'])
 
 def get_levels(tree: Tree) -> list[list[int]]:
     """Returns lists of nodes grouped by their depth in the tree."""
-    depths = nx.single_source_shortest_path_length(tree.graph, 0)
+    depths = nx.single_source_shortest_path_length(tree._graph, 0)
     max_depth = max(depths.values())
     
     levels = [[] for _ in range(max_depth + 1)]

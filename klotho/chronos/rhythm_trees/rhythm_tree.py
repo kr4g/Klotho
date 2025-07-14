@@ -17,7 +17,6 @@ see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 '''
 from fractions import Fraction
 from typing import Union, Tuple
-import networkx as nx
 from tabulate import tabulate
 
 from klotho.topos.graphs import Tree
@@ -179,7 +178,7 @@ class RhythmTree(Tree):
         
         The evaluation uses optimized algorithms with our Graph/Tree caching.
         """
-        self.graph.nodes[self.root]['metric_duration'] = self.meas
+        self[self.root]['metric_duration'] = self.meas
         
         def _process_child_durations(child, div, parent_ratio):
             """
@@ -194,18 +193,18 @@ class RhythmTree(Tree):
             parent_ratio : Fraction
                 Parent node's metric duration ratio.
             """
-            child_data = self.graph.nodes[child]
+            child_data = self[child]
             
             s = child_data['label']
             if 'meta' in child_data:
                 s = s * child_data['meta']['span']
             s = int(s) if isinstance(s, float) else s
             ratio = Fraction(s, div) * parent_ratio
-            self.graph.nodes[child]['metric_duration'] = ratio
-            self.graph.nodes[child]['proportion'] = s
-            if self.graph.out_degree(child) > 0:
+            self[child]['metric_duration'] = ratio
+            self[child]['proportion'] = s
+            if self.out_degree(child) > 0:
                 _process_subtree(child, ratio)
-            self.graph.nodes[child].pop('label', None)
+            self[child].pop('label', None)
         
         def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
             """
@@ -218,48 +217,48 @@ class RhythmTree(Tree):
             parent_ratio : Fraction, optional
                 Parent node's metric duration ratio.
             """
-            node_data = self.graph.nodes[node]
+            node_data = self[node]
             
             if 'meta' in node_data:
                 node_data['label'] = node_data['label'] * node_data['meta']['span']
             
             label = node_data['label']
             is_tied = isinstance(label, float)
-            self.graph.nodes[node]['tied'] = is_tied
+            self[node]['tied'] = is_tied
             label_value = int(label) if is_tied else label
             
-            self.graph.nodes[node]['proportion'] = label_value
-            children = list(self.graph.successors(node))
+            self[node]['proportion'] = label_value
+            children = list(self.successors(node))
             
             if not children:
                 ratio = Fraction(label_value) * parent_ratio
-                self.graph.nodes[node]['metric_duration'] = ratio
-                self.graph.nodes[node].pop('label', None)
+                self[node]['metric_duration'] = ratio
+                self[node].pop('label', None)
                 return
             
-            div = int(sum(abs(self.graph.nodes[c]['label'] * 
-                             self.graph.nodes[c]['meta']['span'] if 'meta' in self.graph.nodes[c]
-                             else self.graph.nodes[c]['label']) 
+            div = int(sum(abs(self[c]['label'] * 
+                             self[c]['meta']['span'] if 'meta' in self[c]
+                             else self[c]['label']) 
                          for c in children))
             
             for child in children:
                 _process_child_durations(child, div, parent_ratio)
             
-            self.graph.nodes[node].pop('label', None)
+            self[node].pop('label', None)
         
         _process_subtree()
         
-        leaf_durations = [self.graph.nodes[n]['metric_duration'] for n in self.leaf_nodes]
+        leaf_durations = [self[n]['metric_duration'] for n in self.leaf_nodes]
         leaf_onsets = calc_onsets(leaf_durations)
         
         for n, o in zip(self.leaf_nodes, leaf_onsets):
-            self.graph.nodes[n]['metric_onset'] = o
+            self[n]['metric_onset'] = o
         
-        for node in reversed(list(nx.topological_sort(self.graph))):
-            if self.graph.out_degree(node) > 0:
-                children = list(self.graph.successors(node))
+        for node in reversed(list(self.topological_sort())):
+            if self.out_degree(node) > 0:
+                children = list(self.successors(node))
                 leftmost_child = children[0]
-                self.graph.nodes[node]['metric_onset'] = self.graph.nodes[leftmost_child]['metric_onset']
+                self[node]['metric_onset'] = self[leftmost_child]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)

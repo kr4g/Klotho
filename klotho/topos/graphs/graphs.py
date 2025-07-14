@@ -6,15 +6,18 @@ from functools import lru_cache
 
 
 class Graph:
-    def __init__(self, graph: nx.Graph = nx.Graph()):
+    def __init__(self, graph: nx.Graph = None):
+        if graph is None:
+            graph = nx.Graph()
         self._graph = graph
         self._meta = {}
-        self._next_id = max(self._graph.nodes(), default=-1) + 1
+        # Handle case where nodes are not integers (e.g., tuples in lattices)
+        try:
+            integer_nodes = [n for n in self._graph.nodes() if isinstance(n, int)]
+            self._next_id = max(integer_nodes, default=-1) + 1
+        except (TypeError, ValueError):
+            self._next_id = 0
         self._structure_version = 0
-   
-    @property
-    def graph(self):
-        return self._graph
    
     @property
     def nodes(self):
@@ -50,6 +53,18 @@ class Graph:
             self.successors.cache_clear()
         if hasattr(self, 'predecessors'):
             self.predecessors.cache_clear()
+    
+    def out_degree(self, node):
+        """Get the out-degree of a node"""
+        return self._graph.out_degree(node)
+    
+    def in_degree(self, node):
+        """Get the in-degree of a node"""
+        return self._graph.in_degree(node)
+    
+    def neighbors(self, node):
+        """Get neighbors of a node"""
+        return self._graph.neighbors(node)
     
     @lru_cache(maxsize=None)
     def predecessors(self, node):
@@ -110,6 +125,67 @@ class Graph:
             return tuple(path[:-1])
         except (nx.NetworkXNoPath, IndexError):
             return tuple()
+    
+    def topological_sort(self):
+        """Returns nodes in topological order.
+        
+        Returns:
+            generator: Nodes in topological order
+        """
+        return nx.topological_sort(self._graph)
+    
+    def to_directed(self):
+        """Return a directed version of this graph.
+        
+        Returns:
+            Graph: A new Graph instance with directed edges
+        """
+        directed_nx = self._graph.to_directed()
+        return Graph(directed_nx)
+    
+    def number_of_nodes(self):
+        """Return the number of nodes in the graph.
+        
+        Returns:
+            int: Number of nodes
+        """
+        return self._graph.number_of_nodes()
+        
+    def number_of_edges(self):
+        """Return the number of edges in the graph.
+        
+        Returns:
+            int: Number of edges
+        """
+        return self._graph.number_of_edges()
+        
+    def edges(self):
+        """Return a view of the edges.
+        
+        Returns:
+            EdgeView: View of the edges
+        """
+        return self._graph.edges()
+        
+    @property
+    def nodes(self):
+        """Return a view of the nodes that can be subscripted.
+        
+        Returns:
+            NodeView: View of the nodes that supports subscripting
+        """
+        return self._graph.nodes
+        
+    def nodes_with_data(self, data=True):
+        """Return nodes with their data.
+        
+        Args:
+            data: If True, return node data as well
+            
+        Returns:
+            NodeDataView: Iterator of (node, data) pairs
+        """
+        return self._graph.nodes(data=data)
     
     def subgraph(self, node, renumber=True):
         """Extract a subgraph starting from a given node.
@@ -235,6 +311,40 @@ class Graph:
             Graph: A new Graph instance
         """
         return cls(G)
+    
+    @classmethod
+    def grid_graph(cls, dims, periodic=False):
+        """Create a grid graph.
+        
+        Args:
+            dims: List/tuple of dimensions or ranges for each axis
+            periodic: Whether to create periodic boundary conditions
+            
+        Returns:
+            Graph: A new Graph instance with grid structure
+        """
+        return cls(nx.grid_graph(dims, periodic=periodic))
+    
+    @classmethod
+    def complete_graph(cls, n_nodes):
+        """Create a complete graph.
+        
+        Args:
+            n_nodes: Number of nodes in the complete graph
+            
+        Returns:
+            Graph: A new Graph instance with complete structure
+        """
+        return cls(nx.complete_graph(n_nodes))
+    
+    @classmethod
+    def digraph(cls):
+        """Create a directed graph.
+        
+        Returns:
+            Graph: A new Graph instance with directed structure
+        """
+        return cls(nx.DiGraph())
     
     def __deepcopy__(self, memo):
         new_graph = self.__class__.__new__(self.__class__)

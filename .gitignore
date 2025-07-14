@@ -5,6 +5,8 @@
 projects/
 gui
 ut_plotter/
+.taskmaster/
+CLAUDE.md
 
 # Keep examples directory tracked but empty for now
 !examples/
@@ -47,10 +49,13 @@ venv.bak/
 .env
 .env.local
 .env.*.local
+.env.example
 
 # IDE
 .vscode/
 .idea/
+.claude/
+.cursor/
 *.swp
 *.swo
 
@@ -93,3 +98,26 @@ check_docs.py
 # Build and deployment scripts
 build_and_upload.sh
 build_and_upload_test.sh
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+node_modules/
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 

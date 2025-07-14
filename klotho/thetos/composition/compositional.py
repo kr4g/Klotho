@@ -164,8 +164,8 @@ class CompositionalUnit(TemporalUnit):
         """
         pt = ParameterTree(self._rt.meas.numerator, self._rt._subdivisions)
         
-        for node in pt.graph.nodes():
-            node_data = pt.graph.nodes[node]
+        for node in pt.nodes:
+            node_data = pt[node]
             node_data.clear()
         
         if pfields is not None:

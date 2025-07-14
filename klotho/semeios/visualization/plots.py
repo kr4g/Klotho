@@ -52,7 +52,7 @@ def plot(obj, **kwargs):
                 case Lattice():
                     return _plot_lattice(obj, **kwargs)
                 case _:
-                    return _plot_graph(obj.graph, **kwargs)
+                    return _plot_graph(obj._graph, **kwargs)
         case CombinationSet():
             match obj:
                 case CombinationProductSet():
@@ -60,7 +60,7 @@ def plot(obj, **kwargs):
                 case _:
                     return _plot_cs(obj, **kwargs)
         case PartitionSet():
-            return _plot_graph(obj.graph, **kwargs)
+            return _plot_graph(obj.graph._graph, **kwargs)
         case DynamicRange():
             return _plot_dynamic_range(obj, **kwargs)
         case Envelope():
@@ -184,7 +184,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
         
         return max(nodes_by_level.values()) if nodes_by_level else 1
     
-    G = tree.graph
+    G = tree._graph
     root = tree.root
     height_scale = figsize[1] / 1.5
     pos = _hierarchy_pos(G, root, height=height_scale, inverted=invert)
@@ -339,7 +339,7 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                 nodes_by_parent[parent].append(node)
             
             for node in nodes:
-                node_data = rt.graph.nodes[node]
+                node_data = rt._graph.nodes[node]
                 ratio = node_data.get('metric_duration', None)
                 proportion = node_data.get('proportion', None)
                 
@@ -353,15 +353,15 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                     width = 1
                 else:
                     siblings = nodes_by_parent[parent]
-                    parent_data = rt.graph.nodes[parent]
+                    parent_data = rt._graph.nodes[parent]
                     
-                    total_proportion = sum(abs(rt.graph.nodes[sib].get('proportion', 1)) for sib in siblings)
+                    total_proportion = sum(abs(rt._graph.nodes[sib].get('proportion', 1)) for sib in siblings)
                     
                     preceding_proportion = 0
                     for sib in siblings:
                         if sib == node:
                             break
-                        preceding_proportion += abs(rt.graph.nodes[sib].get('proportion', 1))
+                        preceding_proportion += abs(rt._graph.nodes[sib].get('proportion', 1))
                     
                     parent_x_start = parent_data.get('_x_start', 0)
                     parent_width = parent_data.get('_width', 1)
@@ -369,15 +369,15 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                     x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
                     width = (abs(proportion) / total_proportion) * parent_width
                 
-                rt.graph.nodes[node]['_x_start'] = x_start
-                rt.graph.nodes[node]['_width'] = width
+                rt._graph.nodes[node]['_x_start'] = x_start
+                rt._graph.nodes[node]['_width'] = width
                 
                 x_center = x_start + width / 2
                 positions[node] = (x_center, y_pos)
         
         return positions, 1.0
     
-    G = rt.graph
+    G = rt._graph
     root = rt.root
     height_scale = figsize[1] / 1.5
     
@@ -658,7 +658,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
         
         return max(nodes_by_level.values()) if nodes_by_level else 1
     
-    G = tree.graph
+    G = tree._graph
     root = tree.root
     pos = _hierarchy_pos(G, root, inverted=invert)
     
@@ -1147,15 +1147,15 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         
         def get_node_scaling(node, rt, min_scale=0.5):
             """Calculate the height scaling for a node based on its position in the tree."""
-            if rt.graph.out_degree(node) == 0:
+            if rt._graph.out_degree(node) == 0:
                 return min_scale
             
             current_depth = rt.depth_of(node)
             
             # Find the maximum depth of any leaf descendant from this 
             max_descendant_depth = current_depth
-            for descendant in nx.descendants(rt.graph, node):
-                if rt.graph.out_degree(descendant) == 0:  # If it's a leaf
+            for descendant in nx.descendants(rt._graph, node):
+                if rt._graph.out_degree(descendant) == 0:  # If it's a leaf
                     descendant_depth = rt.depth_of(descendant)
                     max_descendant_depth = max(max_descendant_depth, descendant_depth)
             
@@ -1219,7 +1219,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                 nodes_by_parent[parent].append(node)
             
             for node in nodes:
-                node_data = rt.graph.nodes[node]
+                node_data = rt._graph.nodes[node]
                 ratio = node_data.get('metric_duration', None)
                 proportion = node_data.get('proportion', None)
                 
@@ -1236,7 +1236,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                             x_start = i / rt.span
                             width = 1 / rt.span
                             
-                            is_leaf = rt.graph.out_degree(node) == 0
+                            is_leaf = rt._graph.out_degree(node) == 0
                             is_rest = Fraction(str(ratio)) < 0
                             
                             if is_rest:
@@ -1256,8 +1256,8 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                                    fontweight='bold' if is_leaf else 'normal')
                         
                         # Store position info for child nodes
-                        rt.graph.nodes[node]['_x_start'] = 0
-                        rt.graph.nodes[node]['_width'] = 1
+                        rt._graph.nodes[node]['_x_start'] = 0
+                        rt._graph.nodes[node]['_width'] = 1
                         continue
                     else:
                         x_start = 0
@@ -1266,18 +1266,18 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                         is_last_child = True
                 else:
                     siblings = nodes_by_parent[parent]
-                    parent_data = rt.graph.nodes[parent]
+                    parent_data = rt._graph.nodes[parent]
                     
                     is_first_child = siblings[0] == node
                     is_last_child = siblings[-1] == node
                     
-                    total_proportion = sum(abs(rt.graph.nodes[sib].get('proportion', 1)) for sib in siblings)
+                    total_proportion = sum(abs(rt._graph.nodes[sib].get('proportion', 1)) for sib in siblings)
                     
                     preceding_proportion = 0
                     for sib in siblings:
                         if sib == node:
                             break
-                        preceding_proportion += abs(rt.graph.nodes[sib].get('proportion', 1))
+                        preceding_proportion += abs(rt._graph.nodes[sib].get('proportion', 1))
                     
                     parent_x_start = parent_data.get('_x_start', 0)
                     parent_width = parent_data.get('_width', 1)
@@ -1285,10 +1285,10 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                     x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
                     width = (abs(proportion) / total_proportion) * parent_width
                 
-                rt.graph.nodes[node]['_x_start'] = x_start
-                rt.graph.nodes[node]['_width'] = width
+                rt._graph.nodes[node]['_x_start'] = x_start
+                rt._graph.nodes[node]['_width'] = width
                 
-                is_leaf = rt.graph.out_degree(node) == 0
+                is_leaf = rt._graph.out_degree(node) == 0
                 
                 # Assign color based on node type and ratio sign
                 is_rest = Fraction(str(ratio)) < 0
@@ -1475,7 +1475,7 @@ def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12),
     ax.set_facecolor('black')
     plt.gcf().set_facecolor('black')
     
-    G = cs.graph
+    G = cs.graph._graph
     pos = nx.circular_layout(G)
     
     # Draw edges with low alpha since it's a complete graph
@@ -1554,7 +1554,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
     relationship_angles = MASTER_SETS[master_set_name]
-    G = cps.graph
+    G = cps.graph._graph
     
     combo_to_node = {}
     node_to_combo = {}
@@ -1901,8 +1901,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     if target_dims not in [2, 3]:
         raise ValueError(f"target_dims must be 2 or 3, got {target_dims}")
     
-    coords = lattice.coords()
-    G = lattice.graph
+    coords = lattice.coords
+    G = lattice._graph
     original_coords = coords
     
     if lattice.dimensionality > 3:

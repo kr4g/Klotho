@@ -115,7 +115,7 @@ class Field(Lattice):
             Gradient vector at the coordinate.
         """
         gradient = np.zeros(self.dimensionality)
-        neighbors = self.get_neighbors(coordinate)
+        neighbors = list(self.neighbors(coordinate))
         center_value = self.get_field_value(coordinate)
         
         for neighbor_coord in neighbors:
@@ -142,7 +142,7 @@ class Field(Lattice):
         float
             Laplacian value at the coordinate.
         """
-        neighbors = self.get_neighbors(coordinate)
+        neighbors = list(self.neighbors(coordinate))
         center_value = self.get_field_value(coordinate)
         neighbor_sum = sum(self.get_field_value(neighbor) for neighbor in neighbors)
         

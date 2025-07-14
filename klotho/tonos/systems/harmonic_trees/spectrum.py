@@ -68,9 +68,9 @@ class Spectrum():
     def _init_data(self):
         df_data = []
         for node in self._ht.nodes:
-            harmonic = self._ht.graph.nodes[node]['harmonic']
+            harmonic = self._ht[node]['harmonic']
             pitch = Pitch.from_freq(self._fundamental.freq * harmonic, harmonic)
-            self._ht.graph.nodes[node]['pitch'] = pitch
+            self._ht[node]['pitch'] = pitch
 
             if node in self._ht.leaf_nodes:
                 df_data.append({

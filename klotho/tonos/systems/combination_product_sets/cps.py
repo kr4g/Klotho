@@ -3,10 +3,10 @@ from math import prod
 from fractions import Fraction
 import sympy as sp
 import math
-import networkx as nx
 from tabulate import tabulate
 
 from klotho.topos.collections import CombinationSet as CS
+from klotho.topos.graphs import Graph
 from klotho.tonos.utils.interval_normalization import equave_reduce
 from .master_sets import ALPHA_SYMBOLS, MASTER_SETS
 
@@ -47,9 +47,11 @@ class CombinationProductSet(CS):
     
   def _populate_graph(self):
     """Populate graph nodes with combo, product, ratio, and alias information."""
-    
-    self._graph = self._graph.to_directed()
-    self._graph.clear_edges()
+    directed_graph = self._graph.to_directed()
+    # for node, attrs in self._graph.nodes(data=True):
+        # directed_graph[node].update(attrs)
+    directed_graph._graph.clear_edges()
+    self._graph = directed_graph
     
     for node, attrs in self._graph.nodes(data=True):
       if 'combo' in attrs:

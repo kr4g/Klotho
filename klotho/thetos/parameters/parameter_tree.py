@@ -6,20 +6,21 @@ from functools import lru_cache
 
 class ParameterTree(Tree):
     def __init__(self, root, children:tuple):
-        super().__init__(root, children)
-        for node in self.graph.nodes:
-            self.graph.nodes[node].pop('label', None)
-        self._meta['pfields'] = set()
+        # Initialize parameter-specific attributes before calling super()
+        # since super().__init__() may call _invalidate_caches()
+        self._parameter_version = 0
+        self._governing_node_cache = {}
+        self._active_instrument_cache = {}
+        self._active_items_cache = {}
         self._node_instruments = {}
         self._subtree_muted_pfields = {}
         self._slurs = {}
         self._next_slur_id = 0
         
-        # PT-specific caches for performance optimization
-        self._governing_node_cache = {}
-        self._active_instrument_cache = {}
-        self._active_items_cache = {}
-        self._parameter_version = 0
+        super().__init__(root, children)
+        for node in self.nodes:
+            self._graph.nodes[node].pop('label', None)
+        self._meta['pfields'] = set()
     
     def __deepcopy__(self, memo):
         new_pt = super().__deepcopy__(memo)
@@ -79,7 +80,7 @@ class ParameterTree(Tree):
         affected_nodes = [node] + list(self.descendants(node))
         
         for affected_node in affected_nodes:
-            node_data = self.graph.nodes[affected_node]
+            node_data = self._graph.nodes[affected_node]
             node_data.update(kwargs)
         
         self._invalidate_parameter_caches()
@@ -107,13 +108,13 @@ class ParameterTree(Tree):
         
         existing_pfields = set()
         for n in subtree_nodes:
-            existing_pfields.update(self.graph.nodes[n].keys())
+            existing_pfields.update(self._graph.nodes[n].keys())
         
         non_instrument_pfields = existing_pfields - instrument_pfields
         self._subtree_muted_pfields[node] = non_instrument_pfields
         
         for n in subtree_nodes:
-            node_data = self.graph.nodes[n]
+            node_data = self._graph.nodes[n]
             for key in instrument.keys():
                 if key in exclude:
                     node_data[key] = instrument[key]
@@ -183,17 +184,17 @@ class ParameterTree(Tree):
         return slur_id
         
     def get(self, node, key):
-        return self.graph.nodes[node].get(key)
+        return self._graph.nodes[node].get(key)
     
     def clear(self, node=None):
         if node is None:
-            for n in self.graph.nodes:
-                self.graph.nodes[n].clear()
+            for n in self.nodes:
+                self._graph.nodes[n].clear()
             self._slurs.clear()
         else:
-            self.graph.nodes[node].clear()
+            self._graph.nodes[node].clear()
             for descendant in self.descendants(node):
-                self.graph.nodes[descendant].clear()
+                self._graph.nodes[descendant].clear()
             
             affected_descendants = {node}.union(set(self.descendants(node)))
             to_remove = []
@@ -206,7 +207,7 @@ class ParameterTree(Tree):
         self._invalidate_parameter_caches()
             
     def items(self, node):
-        return dict(self.graph.nodes[node])
+        return dict(self._graph.nodes[node])
     
 
 

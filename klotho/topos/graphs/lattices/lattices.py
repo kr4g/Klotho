@@ -1,5 +1,4 @@
 from typing import Tuple, List, Union
-import networkx as nx
 import pandas as pd
 from ..graphs import Graph
 
@@ -45,10 +44,10 @@ class Lattice(Graph):
         else:
             dims = [range(0, res + 1) for res in self._resolution]
         
-        lattice_graph = nx.grid_graph(dims, periodic=periodic)
+        lattice_graph = Graph.grid_graph(dims, periodic=periodic)
         
         # Initialize Graph components manually since coordinate tuples aren't integers
-        self._graph = lattice_graph
+        self._graph = lattice_graph._graph
         self._meta = pd.DataFrame(index=[''])
         self._next_id = 0  # Not used since we use coordinate tuples as node IDs
     
@@ -89,29 +88,7 @@ class Lattice(Graph):
         """
         return self._bipolar  
     
-    def get_neighbors(self, coordinate: Tuple[int, ...]) -> List[Tuple[int, ...]]:
-        """
-        Get the neighboring coordinates of a given coordinate.
-        
-        Parameters
-        ----------
-        coordinate : tuple of int
-            The lattice coordinate.
-            
-        Returns
-        -------
-        list of tuple of int
-            List of neighboring coordinates.
-            
-        Raises
-        ------
-        KeyError
-            If coordinate is not in lattice.
-        """
-        if coordinate not in self.nodes:
-            raise KeyError(f"Coordinate {coordinate} not in lattice")
-        return list(self.graph.neighbors(coordinate))
-    
+    @property
     def coords(self) -> List[Tuple[int, ...]]:
         """
         Get all coordinates in the lattice.
@@ -121,7 +98,7 @@ class Lattice(Graph):
         list of tuple of int
             List of all lattice coordinates.
         """
-        return list(self.nodes)    
+        return list(self.nodes)  
     
     def __str__(self) -> str:
         """String representation of the lattice."""

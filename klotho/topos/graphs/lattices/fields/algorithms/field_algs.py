@@ -15,7 +15,7 @@ import random
     
 #     for _ in range(steps - 1):
 #         current_point = path[-1][0]
-#         neighbors = field.get_neighbors(current_point)
+#         neighbors = list(field.neighbors(current_point))
 #         unvisited_neighbors = [p for p in neighbors if p not in visited]
         
 #         if unvisited_neighbors:

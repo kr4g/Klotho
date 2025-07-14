@@ -16,7 +16,6 @@ from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms
 
 from enum import Enum
 import pandas as pd
-import networkx as nx
 import copy
 
 class ProlatioTypes(Enum):
@@ -160,11 +159,11 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def onsets(self):
-        return tuple(self._rt.graph.nodes[n]['real_onset'] for n in self._rt.leaf_nodes)
+        return tuple(self._rt[n]['real_onset'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
-        return tuple(self._rt.graph.nodes[n]['real_duration'] for n in self._rt.leaf_nodes)
+        return tuple(self._rt[n]['real_duration'] for n in self._rt.leaf_nodes)
 
     @property
     def duration(self):
