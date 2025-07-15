@@ -153,10 +153,6 @@ class RhythmTree(Tree):
     #     if self._meta['type'] is None:
     #         self._meta['type'] = self._set_type()
     #     return self._meta['type']
-
-    def subtree(self, node, renumber=True):
-        tree_subtree = super().subtree(node, renumber)
-        return self.__class__.from_tree(tree_subtree, 1)
     
     def _cast_subdivs(self, children):
         def convert_to_tuple(item):
@@ -274,8 +270,3 @@ class RhythmTree(Tree):
 
     def __repr__(self):
         return self.__str__()
-        
-
-
-
-

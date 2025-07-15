@@ -84,14 +84,6 @@ Trees
    :undoc-members:
    :show-inheritance:
 
-Tree Algorithms
-^^^^^^^^^^^^^^^
-
-.. automodule:: klotho.topos.graphs.trees.algorithms
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Lattices
 ~~~~~~~~
 

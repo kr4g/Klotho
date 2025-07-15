@@ -69,6 +69,7 @@ class Tree(Graph):
         parents = list(self.predecessors(node))
         return parents[0] if parents else None
 
+    @lru_cache(maxsize=None)
     def branch(self, node):
         """Return all nodes on the branch from the root to the given node.
         
@@ -218,10 +219,8 @@ class Tree(Graph):
         if node == self.root:
             raise ValueError("Cannot remove the root node")
         
-        # Get all nodes in subtree
         subtree_nodes = [node] + list(self.descendants(node))
         
-        # Remove all nodes
         for n in subtree_nodes:
             super().remove_node(n)
 
@@ -333,6 +332,35 @@ class Tree(Graph):
         
         # Add edge to new parent
         super().add_edge(new_parent, node)
+        
+        self._invalidate_caches()
+
+    def prune_to_depth(self, max_depth):
+        """Prune the tree to a maximum depth, removing all nodes beyond that depth."""
+        if max_depth < 0:
+            raise ValueError("max_depth must be non-negative")
+        
+        depths = nx.single_source_shortest_path_length(self._graph, self.root)
+        nodes_to_remove = [n for n, depth in depths.items() if depth > max_depth]
+        
+        for node in nodes_to_remove:
+            super().remove_node(node)
+        
+        self._invalidate_caches()
+
+    def prune_leaves(self, n):
+        """Prune n levels from each branch, starting from the leaves."""
+        if n < 0:
+            raise ValueError("n must be non-negative")
+        if n == 0:
+            return
+        
+        for _ in range(n):
+            leaves = [node for node in self._graph.nodes() if self.out_degree(node) == 0]
+            for leaf in leaves:
+                super().remove_node(leaf)
+            if len(self._graph) == 1:
+                break
         
         self._invalidate_caches()
 
