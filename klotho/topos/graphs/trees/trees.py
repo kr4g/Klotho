@@ -1,14 +1,16 @@
 from ..graphs import Graph
-import networkx as nx
+import rustworkx as rx
 from functools import cached_property, lru_cache
-# from ....utils.data_structures.group import Group
 from klotho.utils.data_structures import Group
+import copy
 
 
 class Tree(Graph):
     def __init__(self, root, children:tuple):
-        super().__init__(nx.DiGraph())
+        super().__init__(Graph.digraph()._graph)
+        self._building_tree = True
         self._root = self._build_tree(root, children)
+        self._building_tree = False
         self._list = Group((root, children))
     
     @property
@@ -31,7 +33,28 @@ class Tree(Graph):
     @cached_property
     def depth(self):
         """Maximum depth of the tree"""
-        return max(nx.single_source_shortest_path_length(self._graph, self._root).values())
+        if not hasattr(self, '_root') or self._root is None:
+            return 0
+        root_idx = self._get_node_index(self._root)
+        if root_idx is None:
+            return 0
+        
+        distances = {}
+        visited = set()
+        queue = [(root_idx, 0)]
+        
+        while queue:
+            node_idx, dist = queue.pop(0)
+            if node_idx in visited:
+                continue
+            visited.add(node_idx)
+            distances[node_idx] = dist
+            
+            for successor_idx in self._graph.successor_indices(node_idx):
+                if successor_idx not in visited:
+                    queue.append((successor_idx, dist + 1))
+        
+        return max(distances.values()) if distances else 0
     
     @cached_property
     def k(self):
@@ -40,8 +63,24 @@ class Tree(Graph):
     
     @cached_property
     def leaf_nodes(self):
-        """Returns leaf nodes (nodes with no successors)"""
-        return tuple(n for n in nx.dfs_preorder_nodes(self._graph) if self.out_degree(n) == 0)
+        """Returns leaf nodes (nodes with no successors) in sorted order"""
+        root_idx = self._get_node_index(self._root)
+        dfs_edges = rx.dfs_edges(self._graph, root_idx)
+        visited_nodes = {root_idx}
+        
+        for src, tgt in dfs_edges:
+            visited_nodes.add(src)
+            visited_nodes.add(tgt)
+        
+        leaf_indices = []
+        for idx in visited_nodes:
+            if self._graph.out_degree(idx) == 0:
+                leaf_indices.append(idx)
+        
+        # Sort leaf indices to ensure consistent left-to-right ordering
+        leaf_indices.sort()
+        
+        return tuple(self._get_node_object(idx) for idx in leaf_indices)
 
     def depth_of(self, node):
         """Returns the depth of a node in the tree.
@@ -52,9 +91,34 @@ class Tree(Graph):
         Returns:
             int: The depth of the node
         """
-        if node not in self._graph:
+        if node not in self:
             raise ValueError(f"Node {node} not found in tree")
-        return nx.shortest_path_length(self._graph, self.root, node)
+        
+        root_idx = self._get_node_index(self._root)
+        node_idx = self._get_node_index(node)
+        
+        if root_idx == node_idx:
+            return 0
+        
+        distances = {}
+        visited = set()
+        queue = [(root_idx, 0)]
+        
+        while queue:
+            current_idx, dist = queue.pop(0)
+            if current_idx in visited:
+                continue
+            visited.add(current_idx)
+            distances[current_idx] = dist
+            
+            if current_idx == node_idx:
+                return dist
+            
+            for successor_idx in self._graph.successor_indices(current_idx):
+                if successor_idx not in visited:
+                    queue.append((successor_idx, dist + 1))
+        
+        return distances.get(node_idx, 0)
 
     @lru_cache(maxsize=None)
     def parent(self, node):
@@ -79,14 +143,44 @@ class Tree(Graph):
         Returns:
             tuple: All nodes from root to the given node (inclusive)
         """
-        if node not in self._graph:
+        if node not in self:
             raise ValueError(f"Node {node} not found in tree")
             
-        if node == self.root:
-            return (self.root,)
+        if node == self._root:
+            return (self._root,)
         
-        path = nx.shortest_path(self._graph, self.root, node)
-        return tuple(path)
+        root_idx = self._get_node_index(self._root)
+        node_idx = self._get_node_index(node)
+        
+        parent_map = {}
+        visited = set()
+        queue = [root_idx]
+        
+        while queue:
+            current_idx = queue.pop(0)
+            if current_idx in visited:
+                continue
+            visited.add(current_idx)
+            
+            if current_idx == node_idx:
+                break
+                
+            for successor_idx in self._graph.successor_indices(current_idx):
+                if successor_idx not in visited:
+                    parent_map[successor_idx] = current_idx
+                    queue.append(successor_idx)
+        
+        if node_idx not in visited:
+            return tuple()
+        
+        path_indices = []
+        current = node_idx
+        while current is not None:
+            path_indices.append(current)
+            current = parent_map.get(current)
+        path_indices.reverse()
+        
+        return tuple(self._get_node_object(idx) for idx in path_indices)
 
     def siblings(self, node):
         """Returns the siblings of a node (nodes with the same parent)."""
@@ -107,33 +201,68 @@ class Tree(Graph):
         Returns:
             list: Nodes satisfying the depth condition
         """
-        depth_dict = nx.single_source_shortest_path_length(self._graph, self.root)
+        root_idx = self._get_node_index(self._root)
         
+        depth_dict = {}
+        visited = set()
+        queue = [(root_idx, 0)]
+        
+        while queue:
+            node_idx, depth = queue.pop(0)
+            if node_idx in visited:
+                continue
+            visited.add(node_idx)
+            depth_dict[node_idx] = depth
+            
+            for successor_idx in self._graph.successor_indices(node_idx):
+                if successor_idx not in visited:
+                    queue.append((successor_idx, depth + 1))
+        
+        node_indices = []
         if operator == '==':
-            nodes_at_depth = [node for node, depth in depth_dict.items() if depth == n]
+            node_indices = [idx for idx, depth in depth_dict.items() if depth == n]
         elif operator == '>=':
-            nodes_at_depth = [node for node, depth in depth_dict.items() if depth >= n]
+            node_indices = [idx for idx, depth in depth_dict.items() if depth >= n]
         elif operator == '<=':
-            nodes_at_depth = [node for node, depth in depth_dict.items() if depth <= n]
+            node_indices = [idx for idx, depth in depth_dict.items() if depth <= n]
         elif operator == '<':
-            nodes_at_depth = [node for node, depth in depth_dict.items() if depth < n]
+            node_indices = [idx for idx, depth in depth_dict.items() if depth < n]
         elif operator == '>':
-            nodes_at_depth = [node for node, depth in depth_dict.items() if depth > n]
+            node_indices = [idx for idx, depth in depth_dict.items() if depth > n]
         else:
             raise ValueError(f"Unsupported operator: {operator}")
         
-        # Sort by breadth-first order to maintain consistent ordering
-        bfs_order = list(nx.bfs_tree(self._graph, self.root).nodes())
-        nodes_at_depth.sort(key=lambda x: bfs_order.index(x))
+        bfs_indices = [root_idx]
+        queue = [root_idx]
+        visited_for_order = set()
         
-        return nodes_at_depth
+        while queue:
+            current = queue.pop(0)
+            if current in visited_for_order:
+                continue
+            visited_for_order.add(current)
+            
+            # Use sorted successors for consistent left-to-right ordering
+            successor_indices = sorted(self._graph.successor_indices(current))
+            for successor_idx in successor_indices:
+                if successor_idx not in visited_for_order and successor_idx not in bfs_indices:
+                    bfs_indices.append(successor_idx)
+                    queue.append(successor_idx)
+        
+        node_indices.sort(key=lambda x: bfs_indices.index(x) if x in bfs_indices else len(bfs_indices))
+        
+        return [self._get_node_object(idx) for idx in node_indices]
 
     def add_node(self, **attr):
         """Add a node to the tree"""
+        if getattr(self, '_building_tree', False):
+            return Graph.add_node(self, **attr)
         raise NotImplementedError("Use add_child() to add nodes to a tree")
 
     def add_edge(self, u, v, **attr):
         """Add an edge to the tree"""
+        if getattr(self, '_building_tree', False):
+            return Graph.add_edge(self, u, v, **attr)
         raise NotImplementedError("Use add_child() to add edges to a tree")
 
     def remove_node(self, node):
@@ -155,9 +284,13 @@ class Tree(Graph):
         Returns:
             int: The new child node ID
         """
-        child_id = super().add_node(**attr)
-        super().add_edge(parent, child_id)
-        return child_id
+        self._building_tree = True
+        try:
+            child_id = super().add_node(**attr)
+            super().add_edge(parent, child_id)
+            return child_id
+        finally:
+            self._building_tree = False
 
     def add_subtree(self, parent, subtree, index=None):
         """Add a subtree as a child of a parent node.
@@ -175,18 +308,15 @@ class Tree(Graph):
         
         node_mapping = {}
         
-        # Add all nodes from subtree
         for node in subtree.nodes:
-            new_id = super().add_node(**subtree[node])
+            new_id = Graph.add_node(self, **subtree[node])
             node_mapping[node] = new_id
         
-        # Add all edges from subtree
         for u, v in subtree.edges:
-            super().add_edge(node_mapping[u], node_mapping[v])
+            Graph.add_edge(self, node_mapping[u], node_mapping[v])
         
-        # Connect subtree root to parent
         subtree_root = node_mapping[subtree.root]
-        super().add_edge(parent, subtree_root)
+        Graph.add_edge(self, parent, subtree_root)
         
         self._invalidate_caches()
         return subtree_root
@@ -203,12 +333,10 @@ class Tree(Graph):
         parent = self.parent(node)
         children = list(self.successors(node))
         
-        # Connect children to grandparent
         for child in children:
-            super().add_edge(parent, child)
+            Graph.add_edge(self, parent, child)
         
-        # Remove the node
-        super().remove_node(node)
+        Graph.remove_node(self, node)
 
     def remove_subtree(self, node):
         """Remove a node and its entire subtree.
@@ -222,7 +350,7 @@ class Tree(Graph):
         subtree_nodes = [node] + list(self.descendants(node))
         
         for n in subtree_nodes:
-            super().remove_node(n)
+            Graph.remove_node(self, n)
 
     def replace_node(self, old_node, **attr):
         """Replace a node with new attributes while preserving structure.
@@ -237,22 +365,17 @@ class Tree(Graph):
         parent = self.parent(old_node)
         children = list(self.successors(old_node))
         
-        # Create new node
-        new_node = super().add_node(**attr)
+        new_node = Graph.add_node(self, **attr)
         
-        # Connect to parent (if exists)
         if parent is not None:
-            super().add_edge(parent, new_node)
+            Graph.add_edge(self, parent, new_node)
         else:
-            # This is the root node
             self._root = new_node
         
-        # Connect to children
         for child in children:
-            super().add_edge(new_node, child)
+            Graph.add_edge(self, new_node, child)
         
-        # Remove old node
-        super().remove_node(old_node)
+        Graph.remove_node(self, old_node)
         
         return new_node
 
@@ -277,38 +400,31 @@ class Tree(Graph):
         
         parent = self.parent(node)
         
-        # Add the subtree
         if parent is not None:
             new_root = self.add_subtree(parent, subtree)
             
             if children and handle_children == 'adopt':
-                # Move children to appropriate node in subtree
                 for child in children:
-                    super().add_edge(new_root, child)
+                    Graph.add_edge(self, new_root, child)
             
-            # Remove original node
-            super().remove_node(node)
+            Graph.remove_node(self, node)
         else:
-            # Replacing root
             node_mapping = {}
             
-            # Add all nodes from subtree
             for n in subtree.nodes:
-                new_id = super().add_node(**subtree[n])
+                new_id = Graph.add_node(self, **subtree[n])
                 node_mapping[n] = new_id
             
-            # Add all edges from subtree
             for u, v in subtree.edges:
-                super().add_edge(node_mapping[u], node_mapping[v])
+                Graph.add_edge(self, node_mapping[u], node_mapping[v])
             
             new_root = node_mapping[subtree.root]
             
             if children and handle_children == 'adopt':
                 for child in children:
-                    super().add_edge(new_root, child)
+                    Graph.add_edge(self, new_root, child)
             
-            # Remove original root and update
-            super().remove_node(node)
+            Graph.remove_node(self, node)
             self._root = new_root
         
         self._invalidate_caches()
@@ -327,11 +443,9 @@ class Tree(Graph):
         
         old_parent = self.parent(node)
         
-        # Remove edge from old parent
-        super().remove_edge(old_parent, node)
+        Graph.remove_edge(self, old_parent, node)
         
-        # Add edge to new parent
-        super().add_edge(new_parent, node)
+        Graph.add_edge(self, new_parent, node)
         
         self._invalidate_caches()
 
@@ -340,11 +454,28 @@ class Tree(Graph):
         if max_depth < 0:
             raise ValueError("max_depth must be non-negative")
         
-        depths = nx.single_source_shortest_path_length(self._graph, self.root)
-        nodes_to_remove = [n for n, depth in depths.items() if depth > max_depth]
+        root_idx = self._get_node_index(self._root)
         
-        for node in nodes_to_remove:
-            super().remove_node(node)
+        depths = {}
+        visited = set()
+        queue = [(root_idx, 0)]
+        
+        while queue:
+            node_idx, depth = queue.pop(0)
+            if node_idx in visited:
+                continue
+            visited.add(node_idx)
+            depths[node_idx] = depth
+            
+            for successor_idx in self._graph.successor_indices(node_idx):
+                if successor_idx not in visited:
+                    queue.append((successor_idx, depth + 1))
+        
+        indices_to_remove = [idx for idx, depth in depths.items() if depth > max_depth]
+        
+        for idx in indices_to_remove:
+            node_obj = self._get_node_object(idx)
+            Graph.remove_node(self, node_obj)
         
         self._invalidate_caches()
 
@@ -356,14 +487,35 @@ class Tree(Graph):
             return
         
         for _ in range(n):
-            leaves = [node for node in self._graph.nodes() if self.out_degree(node) == 0]
-            for leaf in leaves:
-                super().remove_node(leaf)
-            if len(self._graph) == 1:
+            leaf_indices = [idx for idx in self._graph.node_indices() if self._graph.out_degree(idx) == 0]
+            for idx in leaf_indices:
+                node_obj = self._get_node_object(idx)
+                Graph.remove_node(self, node_obj)
+            if self._graph.num_nodes() == 1:
                 break
         
         self._invalidate_caches()
 
+    def __deepcopy__(self, memo):
+        """Create a deep copy of the tree including Tree-specific attributes."""
+        new_tree = self.__class__.__new__(self.__class__)
+        
+        # Copy Graph attributes
+        new_tree._graph = self._graph.copy()
+        new_tree._meta = copy.deepcopy(self._meta, memo)
+        new_tree._structure_version = 0
+        new_tree._next_id = self._next_id
+        
+        # Copy Tree-specific attributes
+        new_tree._root = self._root
+        new_tree._list = copy.deepcopy(self._list, memo)
+        
+        # Copy any building state if it exists
+        if hasattr(self, '_building_tree'):
+            new_tree._building_tree = self._building_tree
+        
+        return new_tree
+    
     def _build_tree(self, root, children):
         """Build the tree structure from nested tuples."""
         root_id = super().add_node(label=root)
@@ -388,34 +540,42 @@ class Tree(Graph):
     
     @classmethod
     def _from_graph(cls, G, clear_attributes=False, renumber=True):
-        """Create a Tree from a networkx graph.
+        """Create a Tree from a RustworkX graph.
         
         Args:
-            G: NetworkX DiGraph
+            G: RustworkX PyDiGraph or Graph instance
             clear_attributes: Whether to clear node attributes
             renumber: Whether to renumber nodes
             
         Returns:
             Tree: New Tree instance
         """
-        if not isinstance(G, nx.DiGraph):
+        if isinstance(G, Graph):
+            graph = G
+        else:
+            graph = Graph(G)
+        
+        if not hasattr(graph._graph, 'in_degree'):
             raise TypeError("Tree graphs must be directed")
         
-        def _build_children_list(node_id):
-            children = list(G.successors(node_id))
-            if not children:
-                root_label = None if clear_attributes else G.nodes[node_id].get('label')
-                return root_label if root_label is not None else node_id
+        def _build_children_list(node_obj):
+            child_objects = list(graph.successors(node_obj))
+            if not child_objects:
+                node_data = graph[node_obj]
+                root_label = None if clear_attributes else node_data.get('label')
+                return root_label if root_label is not None else node_obj
             
-            root_label = None if clear_attributes else G.nodes[node_id].get('label')
-            root_label = root_label if root_label is not None else node_id
+            node_data = graph[node_obj]
+            root_label = None if clear_attributes else node_data.get('label')
+            root_label = root_label if root_label is not None else node_obj
             
             child_structures = []
-            for child_id in children:
-                child_label = None if clear_attributes else G.nodes[child_id].get('label')
-                child_label = child_label if child_label is not None else child_id
+            for child_obj in child_objects:
+                child_data = graph[child_obj]
+                child_label = None if clear_attributes else child_data.get('label')
+                child_label = child_label if child_label is not None else child_obj
                 
-                child_structure = _build_children_list(child_id)
+                child_structure = _build_children_list(child_obj)
                 if isinstance(child_structure, tuple):
                     child_structures.append(child_structure)
                 else:
@@ -423,13 +583,13 @@ class Tree(Graph):
             
             return (root_label, *child_structures)
         
-        # Find root (node with no incoming edges)
-        root_candidates = [n for n in G.nodes() if G.in_degree(n) == 0]
-        if len(root_candidates) != 1:
-            raise ValueError(f"Graph must have exactly one root node, found {len(root_candidates)}")
+        root_objects = [node for node in graph if graph.in_degree(node) == 0]
+        if len(root_objects) != 1:
+            raise ValueError(f"Graph must have exactly one root node, found {len(root_objects)}")
         
-        root = root_candidates[0]
-        root_label = None if clear_attributes else G.nodes[root].get('label')
+        root = root_objects[0]
+        root_data = graph[root]
+        root_label = None if clear_attributes else root_data.get('label')
         children_structure = _build_children_list(root)
         
         if isinstance(children_structure, tuple):

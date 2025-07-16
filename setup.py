@@ -21,6 +21,7 @@ setup(
         'matplotlib',
         'tabulate',
         'networkx',
+        'rustworkx',
         'hypernetx',
         'scipy',
         'python-osc',

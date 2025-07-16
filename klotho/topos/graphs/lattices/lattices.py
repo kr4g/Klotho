@@ -46,10 +46,47 @@ class Lattice(Graph):
         
         lattice_graph = Graph.grid_graph(dims, periodic=periodic)
         
-        # Initialize Graph components manually since coordinate tuples aren't integers
+        # Create coordinate mapping for lattice nodes
+        # RustworkX grid_graph creates integer indices, but we need coordinate tuples
+        import itertools
+        if self._bipolar:
+            coord_ranges = [range(-res, res + 1) for res in self._resolution]
+        else:
+            coord_ranges = [range(0, res + 1) for res in self._resolution]
+        
+        # Generate all coordinate combinations
+        all_coords = list(itertools.product(*coord_ranges))
+        
+        # Create a new Graph with coordinate tuples as nodes
         self._graph = lattice_graph._graph
+        self._coord_to_index = {coord: i for i, coord in enumerate(all_coords)}
+        self._index_to_coord = {i: coord for i, coord in enumerate(all_coords)}
+        
+        # Initialize Graph components
         self._meta = pd.DataFrame(index=[''])
-        self._next_id = 0  # Not used since we use coordinate tuples as node IDs
+        self._next_id = 0
+    
+    def _get_node_object(self, idx):
+        """Override to return coordinate tuples instead of integer indices."""
+        return self._index_to_coord.get(idx, idx)
+    
+    def _get_node_index(self, node):
+        """Override to map coordinate tuples to integer indices."""
+        if isinstance(node, tuple):
+            return self._coord_to_index.get(node, node)
+        return node
+    
+    @property
+    def coords(self) -> List[Tuple[int, ...]]:
+        """
+        Get all coordinates in the lattice.
+        
+        Returns
+        -------
+        list of tuple of int
+            List of all lattice coordinates.
+        """
+        return [self._get_node_object(idx) for idx in self._graph.node_indices()]
     
     @property
     def dimensionality(self) -> int:
@@ -88,24 +125,12 @@ class Lattice(Graph):
         """
         return self._bipolar  
     
-    @property
-    def coords(self) -> List[Tuple[int, ...]]:
-        """
-        Get all coordinates in the lattice.
-        
-        Returns
-        -------
-        list of tuple of int
-            List of all lattice coordinates.
-        """
-        return list(self.nodes)  
-    
     def __str__(self) -> str:
         """String representation of the lattice."""
         return (f"Lattice(dimensionality={self._dimensionality}, "
                 f"resolution={self._resolution}, "
                 f"bipolar={self._bipolar}, "
-                f"coordinates={len(self.nodes)})")
+                f"coordinates={len(self.coords)})")
     
     def __repr__(self) -> str:
         return self.__str__() 

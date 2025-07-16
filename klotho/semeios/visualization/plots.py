@@ -13,7 +13,16 @@ from klotho.dynatos.envelopes import Envelope
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 
-import networkx as nx
+import rustworkx as rx
+# Temporary compatibility imports for visualization
+try:
+    import networkx as nx
+except ImportError:
+    # If NetworkX not available, create a minimal compatibility layer
+    class _NetworkXCompat:
+        def __getattr__(self, name):
+            raise ImportError(f"NetworkX function '{name}' not available. Visualization may be limited.")
+    nx = _NetworkXCompat()
 import matplotlib.pyplot as plt
 from fractions import Fraction
 import numpy as np
@@ -75,7 +84,8 @@ def plot(obj, **kwargs):
                     raise NotImplementedError("Plotting for temporal blocks not yet implemented")
                 case _:
                     raise NotImplementedError("Must be a TemporalUnit, TemporalUnitSequence, or TemporalBlock")
-        case nx.Graph():
+        case _ if hasattr(obj, 'nodes') and hasattr(obj, 'edges'):
+            # Handle NetworkX graphs or other graph-like objects
             return _plot_graph(obj, **kwargs)
         case _:
             raise TypeError(f"Unsupported object type for plotting: {type(obj)}")
@@ -107,9 +117,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
             y = (height - (depth * vert_gap)) if inverted else (depth * vert_gap)
             pos[root] = (xcenter, y)
         
-        children = list(G.neighbors(root))
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+        children = _get_children(G, root, parent)
         
         if children:
             chain_depths = {child: _get_max_depth(G, child, parent=root) for child in children}
@@ -142,9 +150,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
         return pos
     
     def _count_leaves(G, node, parent=None):
-        children = list(G.neighbors(node))
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+        children = _get_children(G, node, parent)
         
         if not children:
             return 1
@@ -152,9 +158,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
         return sum(_count_leaves(G, child, node) for child in children)
     
     def _get_max_depth(G, node, parent=None, current_depth=0):
-        children = list(G.neighbors(node))
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+        children = _get_children(G, node, parent)
         
         if not children:
             return current_depth
@@ -169,9 +173,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
                 nodes_by_level[level] = 0
             nodes_by_level[level] += 1
             
-            children = list(G.neighbors(node))
-            if parent is not None and parent in children:
-                children.remove(parent)
+            children = _get_children(G, node, parent)
             
             for child in children:
                 _count_by_level(child, level+1, node)
@@ -187,7 +189,15 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
     
     fig = go.Figure()
     
-    for u, v in G.edges():
+    # Handle edge iteration for both wrapped and raw RustworkX graphs
+    if hasattr(G, 'edge_list') and str(type(G)).find('rustworkx') != -1:
+        # Raw RustworkX graph - use edge_list() for (u, v) pairs
+        edges = G.edge_list()
+    else:
+        # Wrapped graph or NetworkX - use edges() method
+        edges = G.edges()
+    
+    for u, v in edges:
         if u in pos and v in pos:
             x1, y1 = pos[u]
             x2, y2 = pos[v]
@@ -206,7 +216,15 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
     node_symbols = []
     node_text = []
     
-    for node in G.nodes():
+    # Handle node iteration for both wrapped and raw RustworkX graphs
+    if hasattr(G, 'node_indices') and str(type(G)).find('rustworkx') != -1:
+        # Raw RustworkX graph - use node_indices() for node IDs
+        nodes = G.node_indices()
+    else:
+        # Wrapped graph or NetworkX - use nodes() method
+        nodes = G.nodes()
+    
+    for node in nodes:
         if node in pos:
             x, y = pos[node]
             node_x.append(x)
@@ -221,7 +239,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
             node_text.append(display_text)
             
             if attributes is None:
-                label_text = str(G.nodes[node].get('label', node)) if G.nodes[node].get('label') is not None else str(node)
+                label_text = str(G[node].get('label', node)) if G[node].get('label') is not None else str(node)
             else:
                 label_parts = []
                 for attr in attributes:
@@ -334,8 +352,14 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                     nodes_by_parent[parent] = []
                 nodes_by_parent[parent].append(node)
             
+            # Sort siblings by their order in parent's successors to ensure correct left-to-right positioning
+            for parent, siblings in nodes_by_parent.items():
+                if parent is not None:
+                    parent_successors = list(rt.successors(parent))
+                    siblings.sort(key=lambda x: parent_successors.index(x) if x in parent_successors else 0)
+            
             for node in nodes:
-                node_data = rt._graph.nodes[node]
+                node_data = rt[node]
                 ratio = node_data.get('metric_duration', None)
                 proportion = node_data.get('proportion', None)
                 
@@ -349,15 +373,15 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                     width = 1
                 else:
                     siblings = nodes_by_parent[parent]
-                    parent_data = rt._graph.nodes[parent]
+                    parent_data = rt[parent]
                     
-                    total_proportion = sum(abs(rt._graph.nodes[sib].get('proportion', 1)) for sib in siblings)
+                    total_proportion = sum(abs(rt[sib].get('proportion', 1)) for sib in siblings)
                     
                     preceding_proportion = 0
                     for sib in siblings:
                         if sib == node:
                             break
-                        preceding_proportion += abs(rt._graph.nodes[sib].get('proportion', 1))
+                        preceding_proportion += abs(rt[sib].get('proportion', 1))
                     
                     parent_x_start = parent_data.get('_x_start', 0)
                     parent_width = parent_data.get('_width', 1)
@@ -365,15 +389,15 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                     x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
                     width = (abs(proportion) / total_proportion) * parent_width
                 
-                rt._graph.nodes[node]['_x_start'] = x_start
-                rt._graph.nodes[node]['_width'] = width
+                rt[node]['_x_start'] = x_start
+                rt[node]['_width'] = width
                 
                 x_center = x_start + width / 2
                 positions[node] = (x_center, y_pos)
         
         return positions, 1.0
     
-    G = rt._graph
+    G = rt
     root = rt.root
     height_scale = figsize[1] / 1.5
     
@@ -449,7 +473,7 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
             node_x.append(x)
             node_y.append(y)
             
-            node_data = G.nodes[node]
+            node_data = G[node]
             
             display_text = ""
             if attributes is None:
@@ -601,14 +625,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
         return pos
     
     def _count_leaves(G, node, parent=None):
-        """
-        Count the number of leaf nodes in the subtree rooted at node.
-        
-        A leaf node is defined as a node with no children.
-        """
-        children = list(G.neighbors(node))
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+        children = _get_children(G, node, parent)
         
         if not children:
             return 1
@@ -616,14 +633,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
         return sum(_count_leaves(G, child, node) for child in children)
     
     def _get_max_depth(G, node, parent=None, current_depth=0):
-        """
-        Calculate the maximum depth of the tree or subtree.
-        
-        Returns the longest path length from the given node to any leaf.
-        """
-        children = list(G.neighbors(node))
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+        children = _get_children(G, node, parent)
         
         if not children:
             return current_depth
@@ -643,9 +653,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
                 nodes_by_level[level] = 0
             nodes_by_level[level] += 1
             
-            children = list(G.neighbors(node))
-            if parent is not None and parent in children:
-                children.remove(parent)
+            children = _get_children(G, node, parent)
             
             for child in children:
                 _count_by_level(child, level+1, node)
@@ -666,14 +674,14 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     
     for node, (x, y) in pos.items():
         if attributes is None:
-            label_text = str(G.nodes[node].get('label', node)) if G.nodes[node].get('label') is not None else str(node)
+            label_text = str(G[node].get('label', node)) if G[node].get('label') is not None else str(node)
         else:
             label_parts = []
             for attr in attributes:
                 if attr in {"node_id", "node", "id"}:
                     label_parts.append(str(node))
-                elif attr in G.nodes[node]:
-                    value = G.nodes[node][attr]
+                elif attr in G[node]:
+                    value = G[node][attr]
                     label_parts.append(str(value) if value is not None else '')
             label_text = "\n".join(label_parts)
         
@@ -746,7 +754,160 @@ def _plot_ratios(ratios, figsize=(20, 1), output_file=None):
     else:
         plt.show()
 
-def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10), 
+def _get_children(G, node, parent=None):
+    """Helper function to get children of a node in tree-like graphs."""
+    if hasattr(G, 'successors') and not str(type(G)).find('rustworkx') != -1:
+        # For our wrapped Graph/Tree classes
+        return list(G.successors(node))
+    elif hasattr(G, 'successor_indices'):
+        # For raw RustworkX graphs - use successor_indices to get node indices, not data
+        return list(G.successor_indices(node))
+    elif hasattr(G, 'neighbors'):
+        # For NetworkX graphs (both directed and undirected)
+        children = list(G.neighbors(node))
+        if parent is not None and parent in children:
+            children.remove(parent)
+        return children
+    else:
+        return []
+
+def _is_leaf(G, node):
+    """Helper function to check if a node is a leaf."""
+    return len(_get_children(G, node)) == 0
+
+def _get_graph_layout(G, layout='spring', k=1, dim=2):
+    """
+    Get node positions using RustworkX layouts when possible, fallback to NetworkX.
+    """
+    import rustworkx as rx
+    
+    # Check if this is a RustworkX graph
+    is_rustworkx = hasattr(G, 'node_indices') or str(type(G)).find('rustworkx') != -1
+    
+    try:
+        # Try RustworkX layouts first for better performance
+        if hasattr(G, '_graph') and hasattr(G._graph, 'node_indices'):
+            # This is our Graph class wrapping RustworkX
+            rx_graph = G._graph
+            if layout == 'spring':
+                return rx.spring_layout(rx_graph, k=k, dim=dim)
+            elif layout == 'circular':
+                pos_2d = rx.circular_layout(rx_graph)
+                if dim == 3:
+                    return {node: (*coords, 0) for node, coords in pos_2d.items()}
+                return pos_2d
+            elif layout == 'random':
+                return rx.random_layout(rx_graph, dim=dim)
+        elif is_rustworkx:
+            # This is a raw RustworkX graph - use RustworkX layouts directly
+            rx_graph = G
+            if layout == 'spring':
+                return rx.spring_layout(rx_graph, k=k, dim=dim)
+            elif layout == 'circular':
+                pos_2d = rx.circular_layout(rx_graph)
+                if dim == 3:
+                    return {node: (*coords, 0) for node, coords in pos_2d.items()}
+                return pos_2d
+            elif layout == 'random':
+                return rx.random_layout(rx_graph, dim=dim)
+    except Exception:
+        pass
+    
+    # Fallback to NetworkX layouts - convert RustworkX to NetworkX if needed
+    try:
+        nx_graph = G
+        
+        # Convert RustworkX to NetworkX if needed
+        if is_rustworkx:
+            import networkx as nx
+            nx_graph = nx.DiGraph() if hasattr(G, 'in_degree') else nx.Graph()
+            
+            # Preserve original node indices and data for semantic meaning
+            for node_idx in G.node_indices():
+                try:
+                    node_data = G[node_idx] if hasattr(G, '__getitem__') else {}
+                    nx_graph.add_node(node_idx, **node_data)
+                except:
+                    nx_graph.add_node(node_idx)
+            
+            # Add edges with their data
+            try:
+                for edge in G.edge_list():
+                    src, dst = edge
+                    try:
+                        edge_data = G.get_edge_data(src, dst) if hasattr(G, 'get_edge_data') else {}
+                        if edge_data is None:
+                            edge_data = {}
+                        nx_graph.add_edge(src, dst, **edge_data)
+                    except:
+                        nx_graph.add_edge(src, dst)
+            except:
+                # If edge_list fails, try to add edges without data
+                try:
+                    edges = [(i, j) for i in G.node_indices() for j in G.node_indices() 
+                            if G.has_edge(i, j)]
+                    nx_graph.add_edges_from(edges)
+                except:
+                    pass
+        
+        if layout == 'spring':
+            pos = nx.spring_layout(nx_graph, k=k, dim=dim)
+        elif layout == 'random':
+            pos = nx.random_layout(nx_graph, dim=dim)
+        elif layout == 'kamada_kawai':
+            pos = nx.kamada_kawai_layout(nx_graph, dim=dim)
+        elif layout == 'spectral':
+            if dim == 3:
+                try:
+                    pos = nx.spectral_layout(nx_graph, dim=3)
+                except (ValueError, Exception):
+                    pos_2d = nx.spectral_layout(nx_graph, dim=2)
+                    pos = {node: (*coords, 0) for node, coords in pos_2d.items()}
+            else:
+                pos = nx.spectral_layout(nx_graph, dim=dim)
+        elif layout == 'circular':
+            pos_2d = nx.circular_layout(nx_graph)
+            if dim == 3:
+                pos = {node: (*coords, 0) for node, coords in pos_2d.items()}
+            else:
+                pos = pos_2d
+        else:
+            layout_func = getattr(nx, f'{layout}_layout')
+            pos_2d = layout_func(nx_graph)
+            if dim == 3:
+                pos = {node: (*coords, 0) for node, coords in pos_2d.items()}
+            else:
+                pos = pos_2d
+        
+        # No need to map back since we preserved original node indices
+        return pos
+        
+    except Exception:
+        # Final fallback to spring layout
+        try:
+            if is_rustworkx:
+                # For RustworkX graphs, use a simple layout
+                node_indices = list(G.node_indices())
+                return {node: (i, 0, 0) if dim == 3 else (i, 0) for i, node in enumerate(node_indices)}
+            else:
+                return nx.spring_layout(G, k=k, dim=dim)
+        except Exception:
+            # Return minimal layout if all else fails
+            try:
+                if is_rustworkx:
+                    node_indices = list(G.node_indices())
+                    nodes = node_indices
+                else:
+                    nodes = list(G.nodes()) if hasattr(G, 'nodes') else list(range(len(G)))
+                return {node: (i, 0, 0) if dim == 3 else (i, 0) for i, node in enumerate(nodes)}
+            except Exception:
+                # Ultimate fallback - create simple positions for any graph
+                if hasattr(G, '__len__'):
+                    return {i: (i, 0, 0) if dim == 3 else (i, 0) for i in range(len(G))}
+                else:
+                    return {0: (0, 0, 0) if dim == 3 else (0, 0)}
+
+def _plot_graph(G, figsize: tuple[float, float] = (10, 10), 
                node_size: float = 1000, font_size: float = 12,
                layout: str = 'spring', k: float = 1,
                show_edge_labels: bool = True,
@@ -760,32 +921,52 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
                dim: int = 2,
                output_file: str | None = None):
     
+    # Convert RustworkX graphs to NetworkX for plotting compatibility
+    original_G = G
+    is_rustworkx = hasattr(G, 'node_indices') or str(type(G)).find('rustworkx') != -1
+    
+    if is_rustworkx:
+        import networkx as nx
+        # Convert RustworkX to NetworkX for plotting functions
+        if hasattr(G, 'in_degree'):
+            G = nx.DiGraph()
+        else:
+            G = nx.Graph()
+        
+        # Add nodes with their data
+        for node_idx in original_G.node_indices():
+            try:
+                node_data = original_G[node_idx] if hasattr(original_G, '__getitem__') else {}
+                G.add_node(node_idx, **node_data)
+            except:
+                G.add_node(node_idx)
+        
+        # Add edges with their data
+        try:
+            for edge in original_G.edge_list():
+                src, dst = edge
+                try:
+                    edge_data = original_G.get_edge_data(src, dst) if hasattr(original_G, 'get_edge_data') else {}
+                    if edge_data is None:
+                        edge_data = {}
+                    G.add_edge(src, dst, **edge_data)
+                except:
+                    G.add_edge(src, dst)
+        except:
+            # If edge_list fails, try to add edges without data
+            try:
+                edges = [(i, j) for i in original_G.node_indices() for j in original_G.node_indices() 
+                        if original_G.has_edge(i, j)]
+                G.add_edges_from(edges)
+            except:
+                pass
+    
     if dim not in [2, 3]:
         raise ValueError(f"dim must be 2 or 3, got {dim}")
     
-    try:
-        if layout == 'spring':
-            pos = nx.spring_layout(G, k=k, dim=dim)
-        elif layout == 'random':
-            pos = nx.random_layout(G, dim=dim)
-        elif layout == 'kamada_kawai':
-            pos = nx.kamada_kawai_layout(G, dim=dim)
-        elif layout == 'spectral':
-            if dim == 3:
-                try:
-                    pos = nx.spectral_layout(G, dim=3)
-                except (ValueError, Exception):
-                    pos = nx.spectral_layout(G, dim=2)
-                    pos = {node: (*coords, 0) for node, coords in pos.items()}
-            else:
-                pos = nx.spectral_layout(G, dim=dim)
-        else:
-            layout_func = getattr(nx, f'{layout}_layout')
-            pos = layout_func(G)
-            if dim == 3:
-                pos = {node: (*coords, 0) for node, coords in pos.items()}
-    except (ValueError, Exception):
-        pos = nx.spring_layout(G, k=k, dim=dim)
+    # Use original RustworkX graph for layout if possible, otherwise use converted graph
+    layout_graph = original_G if is_rustworkx else G
+    pos = _get_graph_layout(layout_graph, layout=layout, k=k, dim=dim)
     
     is_directed = isinstance(G, nx.DiGraph)
     
@@ -844,8 +1025,8 @@ def _plot_graph(G: nx.Graph, figsize: tuple[float, float] = (10, 10),
                 for attr in attributes:
                     if attr in {"node_id", "node", "id"}:
                         label_parts.append(str(node))
-                    elif attr in G.nodes[node]:
-                        value = G.nodes[node][attr]
+                    elif attr in G[node]:
+                        value = G[node][attr]
                         label_parts.append(str(value) if value is not None else '')
                 if dim == 3:
                     label_text = "<br>".join(label_parts)
@@ -1143,7 +1324,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         
         def get_node_scaling(node, rt, min_scale=0.5):
             """Calculate the height scaling for a node based on its position in the tree."""
-            if rt._graph.out_degree(node) == 0:
+            if rt.out_degree(node) == 0:
                 return min_scale
             
             current_depth = rt.depth_of(node)
@@ -1214,8 +1395,14 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                     nodes_by_parent[parent] = []
                 nodes_by_parent[parent].append(node)
             
+            # Sort siblings by their order in parent's successors to ensure correct left-to-right positioning
+            for parent, siblings in nodes_by_parent.items():
+                if parent is not None:
+                    parent_successors = list(rt.successors(parent))
+                    siblings.sort(key=lambda x: parent_successors.index(x) if x in parent_successors else 0)
+            
             for node in nodes:
-                node_data = rt._graph.nodes[node]
+                node_data = rt[node]
                 ratio = node_data.get('metric_duration', None)
                 proportion = node_data.get('proportion', None)
                 
@@ -1252,8 +1439,8 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                                    fontweight='bold' if is_leaf else 'normal')
                         
                         # Store position info for child nodes
-                        rt._graph.nodes[node]['_x_start'] = 0
-                        rt._graph.nodes[node]['_width'] = 1
+                        rt[node]['_x_start'] = 0
+                        rt[node]['_width'] = 1
                         continue
                     else:
                         x_start = 0
@@ -1262,18 +1449,18 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                         is_last_child = True
                 else:
                     siblings = nodes_by_parent[parent]
-                    parent_data = rt._graph.nodes[parent]
+                    parent_data = rt[parent]
                     
                     is_first_child = siblings[0] == node
                     is_last_child = siblings[-1] == node
                     
-                    total_proportion = sum(abs(rt._graph.nodes[sib].get('proportion', 1)) for sib in siblings)
+                    total_proportion = sum(abs(rt[sib].get('proportion', 1)) for sib in siblings)
                     
                     preceding_proportion = 0
                     for sib in siblings:
                         if sib == node:
                             break
-                        preceding_proportion += abs(rt._graph.nodes[sib].get('proportion', 1))
+                        preceding_proportion += abs(rt[sib].get('proportion', 1))
                     
                     parent_x_start = parent_data.get('_x_start', 0)
                     parent_width = parent_data.get('_width', 1)
@@ -1281,8 +1468,8 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
                     x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
                     width = (abs(proportion) / total_proportion) * parent_width
                 
-                rt._graph.nodes[node]['_x_start'] = x_start
-                rt._graph.nodes[node]['_width'] = width
+                rt[node]['_x_start'] = x_start
+                rt[node]['_width'] = width
                 
                 is_leaf = rt._graph.out_degree(node) == 0
                 
@@ -1471,7 +1658,26 @@ def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12),
     ax.set_facecolor('black')
     plt.gcf().set_facecolor('black')
     
-    G = cs.graph._graph
+    # Convert RustworkX graph to NetworkX for visualization
+    rx_graph = cs.graph._graph
+    G = nx.Graph()
+    
+    # Add nodes with data
+    for node_idx in rx_graph.node_indices():
+        node_data = rx_graph.get_node_data(node_idx)
+        if isinstance(node_data, dict):
+            G.add_node(node_idx, **node_data)
+        else:
+            G.add_node(node_idx)
+    
+    # Add edges with data  
+    for src, tgt in rx_graph.edge_list():
+        edge_data = rx_graph.get_edge_data(src, tgt)
+        if edge_data is not None and isinstance(edge_data, dict):
+            G.add_edge(src, tgt, **edge_data)
+        else:
+            G.add_edge(src, tgt)
+    
     pos = nx.circular_layout(G)
     
     # Draw edges with low alpha since it's a complete graph
@@ -1550,7 +1756,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
     relationship_angles = MASTER_SETS[master_set_name]
-    G = cps.graph._graph
+    G = cps.graph  # Use the Graph wrapper, not the internal _graph
     
     combo_to_node = {}
     node_to_combo = {}
@@ -1570,7 +1776,9 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
         node_positions = {}
     
-    components = list(nx.strongly_connected_components(G))
+    # Convert our Graph wrapper to NetworkX for compatibility with NetworkX algorithms
+    nx_graph = G.to_networkx()
+    components = list(nx.strongly_connected_components(nx_graph))
     
     for component in components:
         start_node = next(iter(component))
@@ -1898,7 +2106,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         raise ValueError(f"target_dims must be 2 or 3, got {target_dims}")
     
     coords = lattice.coords
-    G = lattice._graph
+    G = lattice  # Lattice inherits from Graph, so use it directly
     original_coords = coords
     
     if lattice.dimensionality > 3:

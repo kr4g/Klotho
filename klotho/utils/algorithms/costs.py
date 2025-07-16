@@ -1,6 +1,5 @@
 from typing import List, Callable, TypeVar, Any, Tuple
 import numpy as np
-import networkx as nx
 
 T = TypeVar('T')
 

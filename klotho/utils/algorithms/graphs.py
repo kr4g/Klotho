@@ -1,7 +1,6 @@
 from typing import List, Callable, Optional
-import networkx as nx
-from networkx.algorithms.approximation import greedy_tsp
 import random
+from ...topos.graphs import Graph
 
 __all__ = [
     'minimum_cost_path',
@@ -14,8 +13,66 @@ __all__ = [
     'weighted_dfs_traversal'
 ]
 
+def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
+    """
+    Simple greedy TSP approximation algorithm.
+    
+    Parameters
+    ----------
+    G : Graph
+        Weighted graph
+    source : node, optional
+        Starting node. If None, uses first node.
+    **kwargs
+        Additional parameters (ignored)
+        
+    Returns
+    -------
+    List[int]
+        Approximate TSP tour
+    """
+    if not G.nodes:
+        return []
+    
+    if source is None:
+        source = next(iter(G.nodes))
+    
+    if source not in G:
+        raise ValueError(f"Source node {source} not in graph")
+    
+    unvisited = set(G.nodes) - {source}
+    tour = [source]
+    current = source
+    
+    while unvisited:
+        min_weight = float('inf')
+        next_node = None
+        
+        for node in unvisited:
+            if G.has_edge(current, node):
+                try:
+                    weight = G[current][node].get('weight', 1.0)
+                    if weight < min_weight:
+                        min_weight = weight
+                        next_node = node
+                except (KeyError, TypeError):
+                    if 1.0 < min_weight:
+                        min_weight = 1.0
+                        next_node = node
+        
+        if next_node is None:
+            # No direct edge, find nearest unvisited node
+            next_node = unvisited.pop()
+        else:
+            unvisited.remove(next_node)
+        
+        tour.append(next_node)
+        current = next_node
+    
+    return tour
+
 def minimum_cost_path(
-    G: nx.Graph,
+    G: Graph,
     traversal_func: Optional[Callable] = None,
     **kwargs
 ) -> List[int]:
@@ -28,12 +85,11 @@ def minimum_cost_path(
 
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         Weighted graph with numeric edge weights representing costs.
     traversal_func : Callable, optional
         Function to use for graph traversal. Receives the graph as first
-        argument and all other parameters via kwargs. Defaults to greedy_tsp
-        from networkx.
+        argument and all other parameters via kwargs. Defaults to greedy_tsp.
     **kwargs
         All parameters for the traversal function. If using the default
         greedy_tsp and 'source' is not provided, defaults to the first node.
@@ -53,9 +109,11 @@ def minimum_cost_path(
     --------
     Use default greedy TSP with automatic source:
     
-    >>> import networkx as nx
-    >>> G = nx.Graph()
-    >>> G.add_weighted_edges_from([(0, 1, 1), (1, 2, 2), (0, 2, 4)])
+    >>> from klotho.topos.graphs import Graph
+    >>> G = Graph.digraph()
+    >>> G.add_edge(0, 1, weight=1)
+    >>> G.add_edge(1, 2, weight=2) 
+    >>> G.add_edge(0, 2, weight=4)
     >>> path = minimum_cost_path(G)  # Uses first node as source
     
     Use default greedy TSP with specified source:
@@ -65,14 +123,14 @@ def minimum_cost_path(
     Use custom traversal function:
     
     >>> def custom_dfs(graph, source, depth_limit=None):
-    ...     return list(nx.dfs_preorder_nodes(graph, source, depth_limit=depth_limit))
+    ...     return list(graph.descendants(source))[:depth_limit]
     >>> path = minimum_cost_path(G, traversal_func=custom_dfs, source=0, depth_limit=2)
 
     Notes
     -----
     This function provides maximum flexibility by accepting any traversal function
     and passing all parameters via kwargs. When no traversal function is specified,
-    it uses NetworkX's greedy_tsp algorithm which finds an approximate solution
+    it uses a greedy TSP algorithm which finds an approximate solution
     to the traveling salesman problem.
     """
     if traversal_func is None:
@@ -300,7 +358,7 @@ def prim_order_traversal(G, source, weight: str = 'weight', **kwargs) -> List[in
     visited = set([source])
     path = [source]
     
-    while len(visited) < len(G.nodes()):
+    while len(visited) < G.number_of_nodes():
         min_edge = None
         min_weight = float('inf')
         next_node = None
@@ -359,7 +417,7 @@ def greedy_nearest_unvisited(G, source, weight: str = 'weight', **kwargs) -> Lis
     path = [source]
     current = source
     
-    while len(visited) < len(G.nodes()):
+    while len(visited) < G.number_of_nodes():
         min_neighbor = None
         min_weight = float('inf')
         
@@ -448,7 +506,7 @@ def dijkstra_order_traversal(G, source, weight: str = 'weight', **kwargs) -> Lis
     path = []
     heap = [(0, source)]
     
-    while heap and len(visited) < len(G.nodes()):
+    while heap and len(visited) < G.number_of_nodes():
         current_dist, current_node = heapq.heappop(heap)
         
         if current_node in visited:
