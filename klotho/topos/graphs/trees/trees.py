@@ -32,29 +32,27 @@ class Tree(Graph):
     
     @cached_property
     def depth(self):
-        """Maximum depth of the tree"""
+        """Maximum depth of the tree.
+        
+        Returns
+        -------
+        int
+            The maximum depth of any node in the tree
+        """
         if not hasattr(self, '_root') or self._root is None:
             return 0
         root_idx = self._get_node_index(self._root)
         if root_idx is None:
             return 0
         
-        distances = {}
-        visited = set()
-        queue = [(root_idx, 0)]
+        def edge_cost_fn(edge_data):
+            return 1.0
         
-        while queue:
-            node_idx, dist = queue.pop(0)
-            if node_idx in visited:
-                continue
-            visited.add(node_idx)
-            distances[node_idx] = dist
-            
-            for successor_idx in self._graph.successor_indices(node_idx):
-                if successor_idx not in visited:
-                    queue.append((successor_idx, dist + 1))
+        distances = rx.digraph_dijkstra_shortest_path_lengths(
+            self._graph, root_idx, edge_cost_fn
+        )
         
-        return max(distances.values()) if distances else 0
+        return int(max(distances.values())) if distances else 0
     
     @cached_property
     def k(self):
@@ -63,33 +61,39 @@ class Tree(Graph):
     
     @cached_property
     def leaf_nodes(self):
-        """Returns leaf nodes (nodes with no successors) in sorted order"""
-        root_idx = self._get_node_index(self._root)
-        dfs_edges = rx.dfs_edges(self._graph, root_idx)
-        visited_nodes = {root_idx}
+        """Return leaf nodes (nodes with no successors) in sorted order.
         
-        for src, tgt in dfs_edges:
-            visited_nodes.add(src)
-            visited_nodes.add(tgt)
+        Returns
+        -------
+        tuple
+            All leaf nodes in the tree, sorted for consistent ordering
+        """
+        leaf_indices = [idx for idx in self._graph.node_indices() 
+                       if self._graph.out_degree(idx) == 0]
         
-        leaf_indices = []
-        for idx in visited_nodes:
-            if self._graph.out_degree(idx) == 0:
-                leaf_indices.append(idx)
-        
-        # Sort leaf indices to ensure consistent left-to-right ordering
         leaf_indices.sort()
         
         return tuple(self._get_node_object(idx) for idx in leaf_indices)
 
     def depth_of(self, node):
-        """Returns the depth of a node in the tree.
+        """Return the depth of a node in the tree.
         
-        Args:
-            node: The node to get the depth of
+        The depth is the length of the path from the root to the node.
+        
+        Parameters
+        ----------
+        node : int
+            The node to get the depth of
             
-        Returns:
-            int: The depth of the node
+        Returns
+        -------
+        int
+            The depth of the node (0 for root)
+            
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree
         """
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
@@ -100,25 +104,17 @@ class Tree(Graph):
         if root_idx == node_idx:
             return 0
         
-        distances = {}
-        visited = set()
-        queue = [(root_idx, 0)]
+        def edge_cost_fn(edge_data):
+            return 1.0
         
-        while queue:
-            current_idx, dist = queue.pop(0)
-            if current_idx in visited:
-                continue
-            visited.add(current_idx)
-            distances[current_idx] = dist
-            
-            if current_idx == node_idx:
-                return dist
-            
-            for successor_idx in self._graph.successor_indices(current_idx):
-                if successor_idx not in visited:
-                    queue.append((successor_idx, dist + 1))
+        distances = rx.digraph_dijkstra_shortest_path_lengths(
+            self._graph, root_idx, edge_cost_fn, goal=node_idx
+        )
         
-        return distances.get(node_idx, 0)
+        try:
+            return int(distances[node_idx])
+        except KeyError:
+            raise ValueError(f"Node {node} is not reachable from root")
 
     @lru_cache(maxsize=None)
     def parent(self, node):
@@ -134,14 +130,99 @@ class Tree(Graph):
         return parents[0] if parents else None
 
     @lru_cache(maxsize=None)
+    def ancestors(self, node):
+        """Return all ancestors of a node in the tree.
+        
+        Parameters
+        ----------
+        node : int
+            The node whose ancestors to return
+            
+        Returns
+        -------
+        tuple
+            All ancestors from root to parent (excluding the node itself)
+            
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+            
+        if node == self._root:
+            return tuple()
+        
+        root_idx = self._get_node_index(self._root)
+        node_idx = self._get_node_index(node)
+        
+        paths = rx.digraph_dijkstra_shortest_paths(
+            self._graph, root_idx, target=node_idx, default_weight=1.0
+        )
+        
+        if node_idx in paths:
+            path_indices = paths[node_idx]
+            ancestor_indices = path_indices[:-1]
+            return tuple(self._get_node_object(ai) for ai in ancestor_indices)
+        else:
+            raise ValueError(f"Node {node} is not reachable from root")
+
+    @lru_cache(maxsize=None)
+    def descendants(self, node):
+        """Return all descendants of a node in depth-first order.
+        
+        Parameters
+        ----------
+        node : int
+            The node whose descendants to return
+            
+        Returns
+        -------
+        tuple
+            All descendants of the node in depth-first order
+            
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+        
+        node_idx = self._get_node_index(node)
+        
+        dfs_edges = rx.dfs_edges(self._graph, node_idx)
+        
+        descendant_indices = []
+        visited = {node_idx}
+        
+        for src, tgt in dfs_edges:
+            if src == node_idx or src in visited:
+                if tgt not in visited:
+                    descendant_indices.append(tgt)
+                    visited.add(tgt)
+        
+        return tuple(self._get_node_object(di) for di in descendant_indices)
+
+    @lru_cache(maxsize=None)
     def branch(self, node):
         """Return all nodes on the branch from the root to the given node.
         
-        Args:
-            node: The target node
+        Parameters
+        ----------
+        node : int
+            The target node
             
-        Returns:
-            tuple: All nodes from root to the given node (inclusive)
+        Returns
+        -------
+        tuple
+            All nodes from root to the given node (inclusive)
+            
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree
         """
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
@@ -152,35 +233,15 @@ class Tree(Graph):
         root_idx = self._get_node_index(self._root)
         node_idx = self._get_node_index(node)
         
-        parent_map = {}
-        visited = set()
-        queue = [root_idx]
+        paths = rx.digraph_dijkstra_shortest_paths(
+            self._graph, root_idx, target=node_idx, default_weight=1.0
+        )
         
-        while queue:
-            current_idx = queue.pop(0)
-            if current_idx in visited:
-                continue
-            visited.add(current_idx)
-            
-            if current_idx == node_idx:
-                break
-                
-            for successor_idx in self._graph.successor_indices(current_idx):
-                if successor_idx not in visited:
-                    parent_map[successor_idx] = current_idx
-                    queue.append(successor_idx)
-        
-        if node_idx not in visited:
+        if node_idx in paths:
+            path_indices = paths[node_idx]
+            return tuple(self._get_node_object(idx) for idx in path_indices)
+        else:
             return tuple()
-        
-        path_indices = []
-        current = node_idx
-        while current is not None:
-            path_indices.append(current)
-            current = parent_map.get(current)
-        path_indices.reverse()
-        
-        return tuple(self._get_node_object(idx) for idx in path_indices)
 
     def siblings(self, node):
         """Returns the siblings of a node (nodes with the same parent)."""
@@ -188,70 +249,87 @@ class Tree(Graph):
         return tuple(n for n in self.successors(parent) if n != node) if parent else tuple()
 
     def subtree(self, node, renumber=True):
-        """Extract a subtree rooted at the given node."""
-        return super().subgraph(node, renumber=renumber)
+        """Extract a tree subtree rooted at the given node.
+        
+        Parameters
+        ----------
+        node : int
+            The node to use as the root of the subtree
+        renumber : bool, optional
+            Whether to renumber the nodes in the new tree (default: True)
+            
+        Returns
+        -------
+        Graph
+            A new Graph object representing the subtree containing the node 
+            and all its descendants
+            
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+
+        descendants = [node] + list(self.descendants(node))
+        descendant_indices = [self._get_node_index(n) for n in descendants]
+
+        subgraph_rx = self._graph.subgraph(descendant_indices)
+        
+        return self._from_graph(subgraph_rx, renumber=renumber)
 
     def at_depth(self, n, operator='=='):
         """Return nodes at a specific depth.
         
-        Args:
-            n: The depth level to query
-            operator: Comparison operator ('==', '>=', '<=', '<', '>')
+        Parameters
+        ----------
+        n : int
+            The depth level to query
+        operator : str, optional
+            Comparison operator ('==', '>=', '<=', '<', '>'), default is '=='
             
-        Returns:
-            list: Nodes satisfying the depth condition
+        Returns
+        -------
+        list
+            Nodes satisfying the depth condition in breadth-first order
+            
+        Raises
+        ------
+        ValueError
+            If operator is not supported
         """
         root_idx = self._get_node_index(self._root)
         
-        depth_dict = {}
-        visited = set()
-        queue = [(root_idx, 0)]
+        def edge_cost_fn(edge_data):
+            return 1.0
         
-        while queue:
-            node_idx, depth = queue.pop(0)
-            if node_idx in visited:
-                continue
-            visited.add(node_idx)
-            depth_dict[node_idx] = depth
-            
-            for successor_idx in self._graph.successor_indices(node_idx):
-                if successor_idx not in visited:
-                    queue.append((successor_idx, depth + 1))
+        distances_mapping = rx.digraph_dijkstra_shortest_path_lengths(
+            self._graph, root_idx, edge_cost_fn
+        )
         
-        node_indices = []
+        # Convert to dict and ensure root is included at distance 0
+        distances = dict(distances_mapping)
+        distances[root_idx] = 0
+        
+        matching_indices = []
         if operator == '==':
-            node_indices = [idx for idx, depth in depth_dict.items() if depth == n]
+            matching_indices = [idx for idx, dist in distances.items() if dist == n]
         elif operator == '>=':
-            node_indices = [idx for idx, depth in depth_dict.items() if depth >= n]
+            matching_indices = [idx for idx, dist in distances.items() if dist >= n]
         elif operator == '<=':
-            node_indices = [idx for idx, depth in depth_dict.items() if depth <= n]
+            matching_indices = [idx for idx, dist in distances.items() if dist <= n]
         elif operator == '<':
-            node_indices = [idx for idx, depth in depth_dict.items() if depth < n]
+            matching_indices = [idx for idx, dist in distances.items() if dist < n]
         elif operator == '>':
-            node_indices = [idx for idx, depth in depth_dict.items() if depth > n]
+            matching_indices = [idx for idx, dist in distances.items() if dist > n]
         else:
             raise ValueError(f"Unsupported operator: {operator}")
         
-        bfs_indices = [root_idx]
-        queue = [root_idx]
-        visited_for_order = set()
+        # Sort indices for consistent ordering
+        matching_indices.sort()
         
-        while queue:
-            current = queue.pop(0)
-            if current in visited_for_order:
-                continue
-            visited_for_order.add(current)
-            
-            # Use sorted successors for consistent left-to-right ordering
-            successor_indices = sorted(self._graph.successor_indices(current))
-            for successor_idx in successor_indices:
-                if successor_idx not in visited_for_order and successor_idx not in bfs_indices:
-                    bfs_indices.append(successor_idx)
-                    queue.append(successor_idx)
-        
-        node_indices.sort(key=lambda x: bfs_indices.index(x) if x in bfs_indices else len(bfs_indices))
-        
-        return [self._get_node_object(idx) for idx in node_indices]
+        return [self._get_node_object(idx) for idx in matching_indices]
 
     def add_node(self, **attr):
         """Add a node to the tree"""
@@ -499,18 +577,14 @@ class Tree(Graph):
     def __deepcopy__(self, memo):
         """Create a deep copy of the tree including Tree-specific attributes."""
         new_tree = self.__class__.__new__(self.__class__)
-        
-        # Copy Graph attributes
+
         new_tree._graph = self._graph.copy()
         new_tree._meta = copy.deepcopy(self._meta, memo)
         new_tree._structure_version = 0
-        new_tree._next_id = self._next_id
-        
-        # Copy Tree-specific attributes
+
         new_tree._root = self._root
         new_tree._list = copy.deepcopy(self._list, memo)
-        
-        # Copy any building state if it exists
+
         if hasattr(self, '_building_tree'):
             new_tree._building_tree = self._building_tree
         
