@@ -14,31 +14,20 @@ class Graph:
         Args:
             graph: Optional existing graph to copy from (RustworkX graph, Graph instance, or None)
         """
-        # Initialize metadata
         self._meta = {}
         self._structure_version = 0
         
-        # Initialize the underlying RustworkX graph
         if graph is None:
             self._graph = rx.PyGraph()
         elif isinstance(graph, Graph):
-            # Copy from another Graph instance
             self._graph = graph._graph.copy()
             self._meta = copy.deepcopy(graph._meta)
             self._structure_version = 0
         elif isinstance(graph, (rx.PyGraph, rx.PyDiGraph)):
-            # Copy from RustworkX graph
             self._graph = graph.copy()
         else:
-            raise TypeError(f"Unsupported graph type: {type(graph)}")
+            raise TypeError(f"Unsupported graph type: {type(graph)}")   
         
-        # Handle case where nodes are not integers (e.g., tuples in lattices)
-        try:
-            integer_nodes = [n for n in self._graph.node_indices() if isinstance(n, int)]
-            self._next_id = max(integer_nodes, default=-1) + 1
-        except (TypeError, ValueError):
-            self._next_id = 0
-   
     @property
     def nodes(self):
         """Return a view of the nodes that can be subscripted."""
@@ -56,12 +45,7 @@ class Graph:
         node_data = self._graph.get_node_data(node)
         
         if not isinstance(node_data, dict):
-            # Node has no data or wrong type, replace with empty dict
-            # This happens with generator functions that create nodes with None data
             empty_dict = {}
-            # Since we can't update the node data directly, we'll store a reference
-            # but first let's try the simple approach of just returning an empty dict
-            # and see if it works with the mutable reference system
             return empty_dict
         
         return node_data
@@ -98,35 +82,46 @@ class Graph:
         if hasattr(self, 'predecessors'):
             self.predecessors.cache_clear()
     
-    def _get_node_index(self, node) -> int:
-        """Get the RustworkX index for a node object."""
-        return node
-    
-    def _get_node_object(self, idx: int):
-        """Get the node object for a RustworkX index."""
-        return idx
-    
     def out_degree(self, node):
         """Get the out-degree of a node"""
-        idx = self._get_node_index(node)
         if hasattr(self._graph, 'out_degree'):
-            return self._graph.out_degree(idx)
+            return self._graph.out_degree(node)
         else:
-            return self._graph.degree(idx)
+            return self._graph.degree(node)
     
     def in_degree(self, node):
         """Get the in-degree of a node"""
-        idx = self._get_node_index(node)
         if hasattr(self._graph, 'in_degree'):
-            return self._graph.in_degree(idx)
+            return self._graph.in_degree(node)
         else:
-            return self._graph.degree(idx)
+            return self._graph.degree(node)
+    
+    def _get_node_object(self, index):
+        """Convert RustworkX node index to node object.
+        
+        For the base Graph class, nodes are just their indices.
+        Subclasses can override this for different node representations.
+        """
+        return index
+    
+    def _get_node_index(self, node):
+        """Convert node object to RustworkX index.
+        
+        For the base Graph class, nodes are just their indices.
+        Subclasses can override this for different node representations.
+        """
+        return node
+    
+    @classmethod
+    def digraph(cls):
+        """Create a new directed graph instance."""
+        graph = cls()
+        graph._graph = rx.PyDiGraph()
+        return graph
     
     def neighbors(self, node):
         """Get neighbors of a node"""
-        idx = self._get_node_index(node)
-        neighbor_indices = self._graph.neighbors(idx)
-        return [self._get_node_object(ni) for ni in neighbor_indices]
+        return list(self._graph.neighbors(node))
     
     @lru_cache(maxsize=None)
     def predecessors(self, node):
@@ -139,10 +134,8 @@ class Graph:
             tuple: All predecessors of the node
         """
         _ = self._structure_version
-        idx = self._get_node_index(node)
         if hasattr(self._graph, 'predecessor_indices'):
-            pred_indices = self._graph.predecessor_indices(idx)
-            return tuple(self._get_node_object(pi) for pi in pred_indices)
+            return tuple(self._graph.predecessor_indices(node))
         else:
             return tuple(self.neighbors(node))
     
@@ -157,51 +150,31 @@ class Graph:
             tuple: All successors of the node in sorted order (left-to-right)
         """
         _ = self._structure_version
-        idx = self._get_node_index(node)
         if hasattr(self._graph, 'successor_indices'):
-            succ_indices = self._graph.successor_indices(idx)
-            successors = [self._get_node_object(si) for si in succ_indices]
-            return tuple(sorted(successors))  # Ensure consistent left-to-right ordering
+            succ_indices = self._graph.successor_indices(node)
+            return tuple(sorted(succ_indices))
         else:
             return tuple(sorted(self.neighbors(node)))
     
     @lru_cache(maxsize=None)
     def descendants(self, node):
-        """Returns all descendants of a node in depth-first order.
+        """Returns all descendants of a node using native RustworkX algorithm.
         
         Args:
             node: The node whose descendants to return
             
         Returns:
-            tuple: All descendants of the node in depth-first order
+            tuple: All descendants of the node
         """
         _ = self._structure_version
-        idx = self._get_node_index(node)
-        
-        dfs_edges = rx.dfs_edges(self._graph, idx)
-        
-        descendant_indices = set()
-        for src, tgt in dfs_edges:
-            if src == idx or src in descendant_indices:
-                descendant_indices.add(tgt)
-        
-        ordered_descendants = []
-        visited = {idx}
-        
-        def dfs_visit(current_idx):
-            for src, tgt in dfs_edges:
-                if src == current_idx and tgt not in visited:
-                    visited.add(tgt)
-                    ordered_descendants.append(tgt)
-                    dfs_visit(tgt)
-        
-        dfs_visit(idx)
-        
-        return tuple(self._get_node_object(di) for di in ordered_descendants)
+        try:
+            return tuple(rx.descendants(self._graph, node))
+        except Exception:
+            return tuple()
     
     @lru_cache(maxsize=None)
     def ancestors(self, node):
-        """Returns all ancestors of a node.
+        """Returns all ancestors of a node using native RustworkX algorithm.
         
         Args:
             node: The node whose ancestors to return
@@ -211,21 +184,8 @@ class Graph:
         """
         _ = self._structure_version
         try:
-            if not self.root_nodes:
-                return tuple()
-            root = self.root_nodes[0]
-            root_idx = self._get_node_index(root)
-            node_idx = self._get_node_index(node)
-            
-            # Use Dijkstra to find shortest path
-            paths = rx.dijkstra_shortest_paths(self._graph, root_idx, node_idx)
-            if node_idx in paths:
-                path_indices = paths[node_idx]
-                # Remove the target node (last element)
-                ancestor_indices = path_indices[:-1]
-                return tuple(self._get_node_object(ai) for ai in ancestor_indices)
-            return tuple()
-        except (Exception, KeyError, IndexError):
+            return tuple(rx.ancestors(self._graph, node))
+        except Exception:
             return tuple()
     
     def topological_sort(self):
@@ -235,13 +195,11 @@ class Graph:
             generator: Nodes in topological order
         """
         if hasattr(self._graph, 'out_degree'):
-            # For directed graphs, use topological sort
             indices = rx.topological_sort(self._graph)
         else:
-            # For undirected graphs, just use node indices
             indices = self._graph.node_indices()
         
-        return (self._get_node_object(idx) for idx in indices)
+        return (idx for idx in indices)
     
     def to_directed(self):
         """Return a directed version of this graph.
@@ -262,7 +220,6 @@ class Graph:
         new_graph._graph = directed_rx
         new_graph._meta = copy.deepcopy(self._meta)
         new_graph._structure_version = 0
-        new_graph._next_id = self._next_id
         
         return new_graph
     
@@ -293,12 +250,11 @@ class Graph:
         """
         if data:
             for idx in self._graph.node_indices():
-                node_obj = self._get_node_object(idx)
                 node_data = self._graph.get_node_data(idx)
-                yield (node_obj, node_data if isinstance(node_data, dict) else {})
+                yield (idx, node_data if isinstance(node_data, dict) else {})
         else:
             for idx in self._graph.node_indices():
-                yield self._get_node_object(idx)
+                yield idx
     
     def subgraph(self, node, renumber=True):
         """Extract a subgraph starting from a given node.
@@ -314,12 +270,9 @@ class Graph:
             raise ValueError(f"Node {node} not found in graph")
             
         descendants = [node] + list(self.descendants(node))
-        descendant_indices = [self._get_node_index(n) for n in descendants]
         
-        # Create subgraph using RustworkX
-        subgraph_rx = self._graph.subgraph(descendant_indices)
+        subgraph_rx = self._graph.subgraph(descendants)
         
-        # Create new Graph instance
         return self._from_graph(subgraph_rx, renumber=renumber)
     
     @property
@@ -341,13 +294,9 @@ class Graph:
                 if min_deg_nodes:
                     root_indices = [min(min_deg_nodes)]
         
-        return tuple(self._get_node_object(idx) for idx in root_indices)
+        return tuple(root_indices)
     
-    def get_next_id(self):
-        """Get next available integer ID (for compatibility)"""
-        next_id = self._next_id
-        self._next_id += 1
-        return next_id
+
         
     def add_node(self, **attr):
         """Add a node to the graph.
@@ -372,37 +321,25 @@ class Graph:
         if not self._graph.has_node(node):
             raise KeyError(f"Node {node} not found in graph")
         
-        # Get existing data and update it
         existing_data = self._graph.get_node_data(node)
         if existing_data is None:
-            # Node has no data, create a new dict
             new_data = attr.copy()
-            # We need to replace the node data entirely
-            # RustworkX doesn't have a direct way to set node data, so we have to rebuild
-            # For now, let's modify this approach
-            # Create a new dict and store it directly
             node_data = {}
             node_data.update(attr)
-            # This is a workaround - we'll store the reference in the graph's internal structure
-            # But RustworkX might not support this directly, so let's try a different approach
-            # Let's replace None with an empty dict first
             self._graph.remove_node(node)
             new_node_id = self._graph.add_node(attr)
             if new_node_id != node:
                 raise RuntimeError(f"Expected node ID {node}, got {new_node_id}")
         elif not isinstance(existing_data, dict):
-            # If the node data isn't a dict, we'll create a new dict with the attributes
             raise ValueError(f"Cannot update non-dict node data for node {node}. Node data type: {type(existing_data)}")
         else:
-            # The returned dict is a mutable reference, so we can modify it directly
             existing_data.update(attr)
         
         self._invalidate_caches()
     
     def remove_node(self, node):
         """Remove a node from the graph."""
-        idx = self._get_node_index(node)
-        self._graph.remove_node(idx)
+        self._graph.remove_node(node)
         self._invalidate_caches()
         
     def add_edge(self, u, v, **attr):
@@ -421,9 +358,7 @@ class Graph:
         
     def remove_edge(self, u, v):
         """Remove an edge from the graph."""
-        u_idx = self._get_node_index(u)
-        v_idx = self._get_node_index(v)
-        self._graph.remove_edge(u_idx, v_idx)
+        self._graph.remove_edge(u, v)
         self._invalidate_caches()
         
     def update(self, edges=None, nodes=None):
@@ -450,13 +385,11 @@ class Graph:
     def clear(self):
         """Remove all nodes and edges from the graph."""
         self._graph.clear()
-        self._next_id = 0
         self._invalidate_caches()
     
     def set_node_attributes(self, node, attributes):
         """Set attributes for a node."""
-        idx = self._get_node_index(node)
-        current_data = self._graph.get_node_data(idx)
+        current_data = self._graph.get_node_data(node)
         if not isinstance(current_data, dict):
             current_data = {}
         current_data.update(attributes)
@@ -470,8 +403,7 @@ class Graph:
         nodes_to_clear = nodes if nodes is not None else self._graph.node_indices()
         for node in nodes_to_clear:
             if node in self:
-                idx = self._get_node_index(node)
-                self._graph[idx] = {}
+                self._graph[node] = {}
         
     def renumber_nodes(self, method='default'):
         """Renumber the nodes in the graph to consecutive integers.
@@ -504,7 +436,7 @@ class Graph:
     
     def is_multigraph(self):
         """Return True if graph is a multigraph, False otherwise."""
-        return False  # RustworkX graphs are not multigraphs by default
+        return False
     
     def to_networkx(self):
         """Convert this Graph to a NetworkX graph for compatibility with NetworkX functions.
@@ -519,11 +451,9 @@ class Graph:
         else:
             nx_graph = nx.Graph()
         
-        # Add nodes with data
         for node, attrs in self.nodes(data=True):
             nx_graph.add_node(node, **attrs)
         
-        # Add edges with data
         for u, v, attrs in self.edges(data=True):
             nx_graph.add_edge(u, v, **attrs)
         
@@ -544,48 +474,85 @@ class Graph:
     
     @classmethod
     def grid_graph(cls, dims, periodic=False):
-        """Create a grid graph.
+        """Create a grid graph with dimensions specified in dims.
         
-        Args:
-            dims: List/tuple of dimensions or ranges for each axis
-            periodic: Whether to create periodic boundary conditions
+        Creates a grid graph where nodes are numbered sequentially 0, 1, 2, ...
+        and node data contains the coordinate as a tuple.
+        
+        Parameters
+        ----------
+        dims : list or tuple
+            List of ranges or iterables defining the coordinate space for each dimension.
+        periodic : bool, optional
+            Whether to create periodic boundary conditions (default is False)
             
-        Returns:
-            Graph: A new Graph instance with grid structure
+        Returns
+        -------
+        Graph
+            A new Graph instance with grid structure and coordinate data in nodes
         """
-        if len(dims) == 2:
-            # Convert range objects to integers (dimensions)
-            dim0 = len(dims[0]) if hasattr(dims[0], '__len__') else dims[0]
-            dim1 = len(dims[1]) if hasattr(dims[1], '__len__') else dims[1]
-            rx_graph = rx.generators.grid_graph(dim0, dim1)
-        else:
-            # For higher dimensions, create nodes and edges manually
+        if not dims or len(dims) == 0:
+            return cls()
+        
+        dims = [list(d) for d in dims]
+        
+        if len(dims) == 1:
+            if periodic:
+                rx_graph = rx.generators.cycle_graph(len(dims[0]))
+            else:
+                rx_graph = rx.generators.path_graph(len(dims[0]))
+            for i, coord_val in enumerate(dims[0]):
+                rx_graph[i] = {'coord': (coord_val,)}
+        elif len(dims) == 2 and not periodic:
+            rows, cols = len(dims[0]), len(dims[1])
+            rx_graph = rx.generators.grid_graph(rows, cols)
             import itertools
+            for i, coord in enumerate(itertools.product(dims[0], dims[1])):
+                rx_graph[i] = {'coord': coord}
+        else:
             rx_graph = rx.PyGraph()
             
-            # Generate all coordinate combinations
+            import itertools
             all_coords = list(itertools.product(*dims))
-            coord_to_index = {}
             
-            # Add nodes
-            for i, coord in enumerate(all_coords):
-                coord_to_index[coord] = rx_graph.add_node(coord)
+            node_indices = rx_graph.add_nodes_from([{'coord': coord} for coord in all_coords])
+            coord_to_index = {coord: i for i, coord in enumerate(all_coords)}
             
-            # Add edges between adjacent nodes
+            edge_list = []
             for coord in all_coords:
-                node_idx = coord_to_index[coord]
+                coord_idx = coord_to_index[coord]
                 
-                # Check all dimensions for neighbors
-                for dim in range(len(coord)):
-                    # Forward neighbor
-                    neighbor_coord = list(coord)
-                    if neighbor_coord[dim] < len(dims[dim]) - 1:
-                        neighbor_coord[dim] += 1
+                for dim_idx in range(len(coord)):
+                    for direction in [-1, 1]:
+                        neighbor_coord = list(coord)
+                        neighbor_coord[dim_idx] += direction
                         neighbor_coord = tuple(neighbor_coord)
+                        
                         if neighbor_coord in coord_to_index:
                             neighbor_idx = coord_to_index[neighbor_coord]
-                            if not rx_graph.has_edge(node_idx, neighbor_idx):
-                                rx_graph.add_edge(node_idx, neighbor_idx, {})
+                            if coord_idx < neighbor_idx:
+                                edge_list.append((coord_idx, neighbor_idx))
+                        elif periodic:
+                            dim_values = dims[dim_idx]
+                            if direction == 1 and coord[dim_idx] == dim_values[-1]:
+                                wrap_coord = list(coord)
+                                wrap_coord[dim_idx] = dim_values[0]
+                                wrap_coord = tuple(wrap_coord)
+                                if wrap_coord in coord_to_index:
+                                    wrap_idx = coord_to_index[wrap_coord]
+                                    if coord_idx < wrap_idx:
+                                        edge_list.append((coord_idx, wrap_idx))
+                            elif direction == -1 and coord[dim_idx] == dim_values[0]:
+                                wrap_coord = list(coord)
+                                wrap_coord[dim_idx] = dim_values[-1]
+                                wrap_coord = tuple(wrap_coord)
+                                if wrap_coord in coord_to_index:
+                                    wrap_idx = coord_to_index[wrap_coord]
+                                    if coord_idx < wrap_idx:
+                                        edge_list.append((coord_idx, wrap_idx))
+            
+            if edge_list:
+                rx_graph.extend_from_edge_list(edge_list)
         
         return cls(rx_graph)
     
@@ -599,18 +566,14 @@ class Graph:
         Returns:
             Graph: A new Graph instance with complete structure
         """
-        # Create the graph structure first
         rx_graph = rx.generators.complete_graph(n_nodes)
         graph = cls(rx_graph)
         
-        # Ensure all nodes have dictionary data for proper interface compatibility
         for node in range(n_nodes):
             if not isinstance(graph._graph.get_node_data(node), dict):
-                # Replace None node data with empty dict
                 graph._graph.remove_node(node)
                 graph._graph.add_node({})
                 
-        # Recreate edges since we removed/added nodes
         for i in range(n_nodes):
             for j in range(i + 1, n_nodes):
                 graph._graph.add_edge(i, j, {})
@@ -628,7 +591,6 @@ class Graph:
         new_graph._graph = rx.PyDiGraph()
         new_graph._meta = {}
         new_graph._structure_version = 0
-        new_graph._next_id = 0
         return new_graph
     
     @classmethod
@@ -669,14 +631,20 @@ class Graph:
         """
         graph = cls()
         
-        for i, item in enumerate(items):
-            graph.add_node(item, value=item)
+        node_list = []
+        for item in items:
+            node_id = graph.add_node(value=item)
+            node_list.append((node_id, {'value': item}))
         
+        edge_list = []
         for i in range(len(items)):
             for j in range(i + 1, len(items)):
                 cost = cost_matrix[i, j]
                 if cost > 0:
-                    graph.add_edge(items[i], items[j], weight=cost)
+                    edge_list.append((node_list[i][0], node_list[j][0], {'weight': cost}))
+        
+        if edge_list:
+            graph._graph.add_edges_from(edge_list)
         
         return graph
     
@@ -686,7 +654,6 @@ class Graph:
         new_graph._graph = self._graph.copy()
         new_graph._meta = copy.deepcopy(self._meta, memo)
         new_graph._structure_version = 0
-        new_graph._next_id = self._next_id
         
         return new_graph
 
@@ -707,20 +674,18 @@ class GraphNodeView:
         return self._graph._graph.has_node(node)
     
     def __getitem__(self, node):
-        idx = self._graph._get_node_index(node)
-        node_data = self._graph._graph.get_node_data(idx)
+        node_data = self._graph._graph.get_node_data(node)
         return node_data if isinstance(node_data, dict) else {}
     
     def __call__(self, data=False):
         """Return nodes with optional data."""
         if data:
             for idx in self._graph._graph.node_indices():
-                node_obj = self._graph._get_node_object(idx)
                 node_data = self._graph._graph.get_node_data(idx)
-                yield (node_obj, node_data if isinstance(node_data, dict) else {})
+                yield (idx, node_data if isinstance(node_data, dict) else {})
         else:
             for idx in self._graph._graph.node_indices():
-                yield self._graph._get_node_object(idx)
+                yield idx
 
 
 class GraphEdgeView:
@@ -732,9 +697,7 @@ class GraphEdgeView:
     def __iter__(self):
         for edge_data in self._graph._graph.edge_list():
             src_idx, tgt_idx = edge_data
-            src_obj = self._graph._get_node_object(src_idx)
-            tgt_obj = self._graph._get_node_object(tgt_idx)
-            yield (src_obj, tgt_obj)
+            yield (src_idx, tgt_idx)
     
     def __len__(self):
         return self._graph.number_of_edges()
@@ -743,21 +706,15 @@ class GraphEdgeView:
         """Return edges with optional data."""
         if data:
             for src_idx, tgt_idx in self._graph._graph.edge_list():
-                src_obj = self._graph._get_node_object(src_idx)
-                tgt_obj = self._graph._get_node_object(tgt_idx)
                 edge_data = self._graph._graph.get_edge_data(src_idx, tgt_idx)
-                yield (src_obj, tgt_obj, edge_data if isinstance(edge_data, dict) else {})
+                yield (src_idx, tgt_idx, edge_data if isinstance(edge_data, dict) else {})
         else:
             for src_idx, tgt_idx in self._graph._graph.edge_list():
-                src_obj = self._graph._get_node_object(src_idx)
-                tgt_obj = self._graph._get_node_object(tgt_idx)
-                yield (src_obj, tgt_obj)
+                yield (src_idx, tgt_idx)
     
     def __getitem__(self, edge):
         """Get edge data for a given edge (u, v)."""
         u, v = edge
-        u_idx = self._graph._get_node_index(u)
-        v_idx = self._graph._get_node_index(v)
-        edge_data = self._graph._graph.get_edge_data(u_idx, v_idx)
+        edge_data = self._graph._graph.get_edge_data(u, v)
         return edge_data if isinstance(edge_data, dict) else {}
     
