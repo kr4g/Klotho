@@ -211,7 +211,6 @@ class ParameterTree(Tree):
         return dict(self.nodes[node])
     
 
-
 class ParameterNode:
     def __init__(self, tree, node):
         self._tree = tree

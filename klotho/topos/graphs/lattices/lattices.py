@@ -251,67 +251,35 @@ class Lattice(Graph):
         else:
             return list(self._coord_to_node.keys())
     
-    def get_sample_coords(self, max_coords: int = 1000) -> List[Tuple[int, ...]]:
+    def _get_plot_coords(self, max_resolution: int) -> List[Tuple[int, ...]]:
         """
-        Get a representative sample of coordinates for visualization.
-        
-        For lazy lattices, this materializes a structured sample.
-        For regular lattices, returns all coordinates.
+        Get coordinates for plotting, limited by max resolution from origin.
         
         Args:
-            max_coords: Maximum number of coordinates to return
+            max_resolution: Maximum distance from origin in any dimension
             
         Returns:
-            List of coordinate tuples
+            List of coordinate tuples within the resolution limit
         """
-        if not self._is_lazy:
-            return self.coords
-        
-        if len(self._materialized_coords) >= max_coords:
-            return list(self._materialized_coords)
-        
         import itertools
-        import random
         
-        coords_to_materialize = set()
+        if self._bipolar:
+            plot_ranges = [range(-max_resolution, max_resolution + 1) for _ in range(self._dimensionality)]
+        else:
+            plot_ranges = [range(0, max_resolution + 1) for _ in range(self._dimensionality)]
         
-        if all(0 in dim for dim in self._dims):
-            origin = tuple(0 for _ in self._dims)
-            coords_to_materialize.add(origin)
+        limited_ranges = []
+        for plot_range, lattice_range in zip(plot_ranges, self._dims):
+            limited_range = [val for val in plot_range if val in lattice_range]
+            limited_ranges.append(limited_range)
         
-        step_size = max(1, max(len(dim) for dim in self._dims) // 5)
+        plot_coords = list(itertools.product(*limited_ranges))
         
-        sample_ranges = []
-        for dim in self._dims:
-            dim_list = list(dim)
-            if len(dim_list) <= 10:
-                sample_ranges.append(dim_list)
-            else:
-                sampled = dim_list[::step_size]
-                if dim_list[-1] not in sampled:
-                    sampled.append(dim_list[-1])
-                sample_ranges.append(sampled)
+        if self._is_lazy:
+            for coord in plot_coords:
+                self._materialize_coord(coord)
         
-        structured_coords = list(itertools.product(*sample_ranges))
-        coords_to_materialize.update(structured_coords[:max_coords//2])
-        
-        if len(coords_to_materialize) < max_coords:
-            remaining = max_coords - len(coords_to_materialize)
-            all_coords = list(itertools.product(*self._dims))
-            available_coords = [c for c in all_coords if c not in coords_to_materialize]
-            
-            if available_coords:
-                random.seed(42)
-                additional_coords = random.sample(
-                    available_coords, 
-                    min(remaining, len(available_coords))
-                )
-                coords_to_materialize.update(additional_coords)
-        
-        for coord in coords_to_materialize:
-            self._materialize_coord(coord)
-        
-        return list(self._materialized_coords)
+        return plot_coords
     
     @property
     def edges(self):

@@ -704,7 +704,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     else:
         plt.show()
 
-def _plot_ratios(ratios, figsize=(20, 1), output_file=None):
+def _plot_ratios(ratios, figsize=(20, 0.667), output_file=None):
     """
     Plot ratios as horizontal bars with thin white borders.
     
@@ -1316,7 +1316,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     elif layout == 'ratios':
         if figsize is None:
             figsize = (20, 1)
-        return _plot_ratios(rt.durations, figsize=figsize, output_file=output_file)
+        return _plot_ratios(rt.durations, output_file=output_file)
     
     elif layout == 'containers':
         if figsize is None:
@@ -2105,7 +2105,28 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     if target_dims not in [2, 3]:
         raise ValueError(f"target_dims must be 2 or 3, got {target_dims}")
     
-    coords = lattice.coords
+    if lattice.dimensionality <= 2:
+        max_resolution = 5
+    elif lattice.dimensionality == 3:
+        max_resolution = 2
+    else:
+        if target_dims == 3:
+            max_resolution = 1
+        else:
+            max_resolution = 3
+    
+    expected_total = 1
+    for dim in lattice._dims:
+        expected_total *= len(dim)
+        if expected_total > 10000:
+            expected_total = float('inf')
+            break
+    
+    if lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
+        coords = lattice._get_plot_coords(max_resolution)
+    else:
+        coords = lattice.coords
+    
     G = lattice  # Lattice inherits from Graph, so use it directly
     original_coords = coords
     
@@ -2117,7 +2138,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             reduced_coords = reducer.fit_transform(coord_matrix)
         elif dim_reduction == 'spectral':
             if spectral_affinity == 'precomputed':
-                adjacency_matrix = nx.adjacency_matrix(G, nodelist=coords).toarray()
+                # Build adjacency matrix from the sampled coordinates
+                coord_to_idx = {coord: i for i, coord in enumerate(coords)}
+                n = len(coords)
+                adjacency_matrix = np.zeros((n, n))
+                
+                # Check adjacency based on lattice structure (neighbors differ by 1 in exactly one dimension)
+                for i, coord1 in enumerate(coords):
+                    for j, coord2 in enumerate(coords):
+                        if i != j:
+                            diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                            same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                            if diff_count == 1 and same_count == len(coord1) - 1:
+                                adjacency_matrix[i, j] = 1
+                
                 reducer = SpectralEmbedding(n_components=target_dims, affinity='precomputed', random_state=42)
                 reduced_coords = reducer.fit_transform(adjacency_matrix)
             else:
@@ -2134,10 +2168,17 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         G_reduced = nx.Graph()
         G_reduced.add_nodes_from(coords)
         
-        for u, v in G.edges():
-            u_reduced = coord_mapping[u]
-            v_reduced = coord_mapping[v]
-            G_reduced.add_edge(u_reduced, v_reduced)
+        # Build edges based on lattice adjacency structure
+        for i, coord1 in enumerate(original_coords):
+            for j, coord2 in enumerate(original_coords):
+                if i < j:
+                    # Check if coordinates are adjacent (differ by 1 in exactly one dimension)
+                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                    if diff_count == 1 and same_count == len(coord1) - 1:
+                        u_reduced = coord_mapping[coord1]
+                        v_reduced = coord_mapping[coord2]
+                        G_reduced.add_edge(u_reduced, v_reduced)
         
         G = G_reduced
     else:

@@ -64,8 +64,8 @@ class Chronon(metaclass=TemporalMeta):
             'end': [self.end],
             'is_rest': [self.is_rest],
             'proportion': [self.proportion],
-            'metric_duration': [self.metric_duration],
             'metric_onset': [self.metric_onset],
+            'metric_duration': [self.metric_duration],
         }, index=['']).__str__()
     
     def __repr__(self):
@@ -96,7 +96,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
         return cls(span     = rt.span,
                    tempus   = rt.meas,
-                   prolatio = rt._subdivisions,
+                   prolatio = rt.subdivisions,
                    beat     = beat,
                    bpm      = bpm)
     
@@ -113,7 +113,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def prolationis(self):        
         """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
-        return self._rt._subdivisions
+        return self._rt.subdivisions
     
     # @prolationis.setter
     # def prolationis(self, prolatio: Union[tuple, str]):
@@ -187,8 +187,8 @@ class TemporalUnit(metaclass=TemporalMeta):
             'end': c.end,
             'is_rest': c.is_rest,
             's': c.proportion,
-            'metric_duration': c.metric_duration,
             'metric_onset': c.metric_onset,
+            'metric_duration': c.metric_duration,
         } for c in self._events], index=range(len(self._events)))
         
     @offset.setter

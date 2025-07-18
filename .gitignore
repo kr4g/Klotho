@@ -7,6 +7,7 @@ gui
 ut_plotter/
 .taskmaster/
 CLAUDE.md
+benchmarks/
 
 # Keep examples directory tracked but empty for now
 !examples/

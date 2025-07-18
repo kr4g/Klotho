@@ -132,7 +132,7 @@ class CompositionalUnit(TemporalUnit):
     def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None):
         return cls(span     = rt.span,
                    tempus   = rt.meas,
-                   prolatio = rt._subdivisions,
+                   prolatio = rt.subdivisions,
                    beat     = beat,
                    bpm      = bpm,
                    offset   = 0,
@@ -162,7 +162,7 @@ class CompositionalUnit(TemporalUnit):
         ParameterTree
             A parameter tree matching the rhythm tree structure with clean nodes
         """
-        pt = ParameterTree(self._rt.meas.numerator, self._rt._subdivisions)
+        pt = ParameterTree(self._rt.meas.numerator, self._rt.subdivisions)
         
         for node in pt.nodes:
             node_data = pt[node]

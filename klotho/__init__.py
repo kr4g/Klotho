@@ -21,8 +21,8 @@ from . import thetos
 from . import semeios
 from . import utils
 
+from .topos.graphs import Graph, Tree, Lattice
 from .topos.collections import Pattern, CombinationSet, PartitionSet
-from .topos.graphs import trees, Graph, Tree, Lattice
 
 from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
@@ -37,10 +37,11 @@ from .semeios.visualization.plots import plot
 from .semeios.notelists.supercollider import Scheduler
 from .semeios.midi import midi as export_midi
 
+from .utils.data_structures import Group
 from .utils.playback.player import play, pause, stop, sync
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
 ]
 
-__version__ = '3.8.0'
+__version__ = '3.9.0'

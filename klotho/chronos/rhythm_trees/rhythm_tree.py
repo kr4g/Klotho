@@ -21,6 +21,7 @@ from tabulate import tabulate
 
 from klotho.topos.graphs import Tree
 from klotho.utils.algorithms.groups import print_subdivisions
+from klotho.utils.data_structures import Group
 from .meas import Meas
 from .algorithms import sum_proportions, measure_complexity, ratios_to_subdivs
 from ..utils.beat import calc_onsets
@@ -65,15 +66,15 @@ class RhythmTree(Tree):
                  meas:Union[Meas,Fraction,str] = '1/1',
                  subdivisions:Tuple            = (1,1)):
         
-        super().__init__(Meas(meas).numerator, subdivisions)
+        super().__init__(Meas(meas).numerator * span, subdivisions)
         
         self._meta['span'] = span
         self._meta['meas'] = str(Meas(meas))
         self._meta['type'] = None
-        self._subdivisions = self._cast_subdivs(subdivisions)
+        self._list = Group((Meas(meas).numerator * span, self._cast_subdivs(subdivisions)))
         
         self._evaluate()
-    
+
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
         return cls(span = span, meas = Meas(tree[tree.root]['metric_duration']), subdivisions = tree.group.S)
@@ -84,6 +85,8 @@ class RhythmTree(Tree):
         S = ratios_to_subdivs(ratios)
         meas = Meas(sum(abs(r) for r in ratios))
         return cls(span = span, meas = meas, subdivisions = S)
+    
+
 
     @property
     def span(self):
@@ -95,8 +98,52 @@ class RhythmTree(Tree):
 
     @property
     def subdivisions(self):
-        return self._subdivisions
+        return self._list.S
 
+    def _cast_subdivs(self, children):
+        def convert_to_tuple(item):
+            if isinstance(item, RhythmTree):
+                return (item.meas.numerator * item.span, item.subdivisions)
+            if isinstance(item, tuple):
+                return tuple(convert_to_tuple(x) for x in item)
+            return item
+        
+        return tuple(convert_to_tuple(child) for child in children)
+
+    def _build_subdivisions(self, root_node=None):
+        """Build subdivisions structure from the current graph state.
+        
+        Parameters
+        ----------
+        root_node : int, optional
+            The node to start building from (default: self.root)
+            
+        Returns
+        -------
+        tuple
+            Nested tuple structure representing subdivisions
+        """
+        if root_node is None:
+            root_node = self.root
+        
+        def get_node_value(node):
+            return self[node].get('proportion', self[node].get('label', 1))
+        
+        def get_children(node):
+            return list(self.successors(node))
+        
+        return self._build_nested_structure(root_node, get_node_value, get_children)
+    
+    def _update_group_structure(self):
+        """Update the Group structure, preserving D and updating S."""
+        if hasattr(self, '_list'):
+            new_subdivisions = self._build_subdivisions()
+            if isinstance(new_subdivisions, tuple) and len(new_subdivisions) > 1:
+                new_s = new_subdivisions[1]
+            else:
+                new_s = (1,)
+            self._list = Group((self._list.D, new_s))
+    
     @property
     def durations(self):
         return tuple(self.nodes[n]['metric_duration'] for n in self.leaf_nodes)
@@ -154,16 +201,6 @@ class RhythmTree(Tree):
     #         self._meta['type'] = self._set_type()
     #     return self._meta['type']
     
-    def _cast_subdivs(self, children):
-        def convert_to_tuple(item):
-            if isinstance(item, RhythmTree):
-                return (item.meas.numerator * item.span, item.subdivisions)
-            if isinstance(item, tuple):
-                return tuple(convert_to_tuple(x) for x in item)
-            return item
-        
-        return tuple(convert_to_tuple(child) for child in children)
-    
     def _evaluate(self):
         """
         Evaluate the rhythm tree to compute metric durations and onsets.
@@ -171,10 +208,8 @@ class RhythmTree(Tree):
         This method processes the tree in two phases:
         1. Computation of metric durations and proportions for all nodes
         2. Computation of metric onsets based on durations
-        
-        The evaluation uses optimized algorithms with our Graph/Tree caching.
         """
-        self[self.root]['metric_duration'] = self.meas
+        self[self.root]['metric_duration'] = self.meas * self.span
         
         def _process_child_durations(child, div, parent_ratio):
             """
@@ -236,7 +271,7 @@ class RhythmTree(Tree):
                              self[c]['meta']['span'] if 'meta' in self[c]
                              else self[c]['label']) 
                          for c in children))
-            
+                        
             for child in children:
                 _process_child_durations(child, div, parent_ratio)
             
@@ -270,3 +305,57 @@ class RhythmTree(Tree):
 
     def __repr__(self):
         return self.__str__()
+    
+    def subtree(self, node, renumber=True):
+        """Extract a rhythm subtree rooted at the given node.
+        
+        The subtree becomes a new RhythmTree with:
+        - span = 1
+        - meas = metric_duration of the selected node
+        - subdivisions = reconstructed from the subtree structure
+        
+        Parameters
+        ----------
+        node : int
+            The node to use as the root of the subtree
+        renumber : bool, optional
+            Whether to renumber the nodes in the new tree (default: True)
+            
+        Returns
+        -------
+        RhythmTree
+            A new RhythmTree representing the subtree
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+
+        subdivisions_structure = self._build_subdivisions(node)
+        if isinstance(subdivisions_structure, tuple) and len(subdivisions_structure) > 1:
+            subdivisions = subdivisions_structure[1]
+        else:
+            subdivisions = (1,)
+        
+        node_duration = self[node].get('metric_duration')
+        if node_duration is None:
+            meas = '1/1'
+        else:
+            meas = Meas(node_duration)
+        
+        new_rt = RhythmTree(span=1, meas=meas, subdivisions=subdivisions)
+        
+        if renumber:
+            new_rt.renumber_nodes()
+        
+        return new_rt
+    
+    def graft_subtree(self, target_node, subtree, mode='replace'):
+        """Graft a subtree and re-evaluate the rhythm tree."""
+        result = super().graft_subtree(target_node, subtree, mode)
+        
+        for node in self.nodes:
+            node_data = self[node]
+            if 'label' not in node_data:
+                node_data['label'] = node_data.get('proportion', 1)
+        
+        self._evaluate()
+        return result
