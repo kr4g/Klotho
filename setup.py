@@ -22,7 +22,6 @@ setup(
         'tabulate',
         'networkx',
         'rustworkx',
-        'hypernetx',
         'scipy',
         'python-osc',
         'abjad',
