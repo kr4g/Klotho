@@ -1,5 +1,4 @@
 from mido import Message, MidiFile, MidiTrack, MetaMessage
-from midi2audio import FluidSynth
 from IPython.display import Audio
 import os
 import tempfile
@@ -8,6 +7,13 @@ import subprocess
 import sys
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
+
+# Optional imports for different environments
+try:
+    from midi2audio import FluidSynth
+    HAS_FLUIDSYNTH = True
+except ImportError:
+    HAS_FLUIDSYNTH = False
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
@@ -19,6 +25,14 @@ TICKS_PER_BEAT = 480
 
 SOUNDFONT_URL = "https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/MuseScore_General.sf3"
 SOUNDFONT_PATH = os.path.expanduser("~/.fluidsynth/default_sound_font.sf2")
+
+def _is_colab():
+    """Check if we're running in Google Colab."""
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
 
 def _ensure_soundfont():
     """Download and install a SoundFont if none exists."""
@@ -37,9 +51,16 @@ def _ensure_soundfont():
     
     return SOUNDFONT_PATH
 
+
+
 def play_midi(obj, **kwargs):
     """
     Play a musical object as MIDI audio in Jupyter/Colab notebooks.
+    
+    Automatically detects the environment and uses appropriate MIDI synthesis:
+    - Google Colab: Uses timidity (install with: !apt install timidity fluid-soundfont-gm)
+    - Local Jupyter: Uses FluidSynth if available
+    - Fallback: Returns MIDI file for download
     
     Parameters
     ----------
@@ -51,8 +72,14 @@ def play_midi(obj, **kwargs):
         
     Returns
     -------
-    IPython.display.Audio
-        Audio widget for playback in Jupyter notebooks
+    IPython.display.Audio or IPython.display.FileLink
+        Audio widget for playback in Jupyter notebooks, or file link 
+        if audio synthesis is unavailable
+        
+    Notes
+    -----
+    For Google Colab, run this first in a cell:
+    !apt install timidity fluid-soundfont-gm
     """
     if isinstance(obj, (TemporalUnitSequence, TemporalBlock)):
         midi_file = _create_midi_from_collection(obj)
@@ -290,14 +317,49 @@ def _collect_events_from_unit(unit, all_events):
 
 def _midi_to_audio(midi_file):
     """Convert MIDI file to audio for playback."""
-    soundfont = _ensure_soundfont()
-    
     with tempfile.NamedTemporaryFile(suffix='.mid', delete=False) as midi_temp:
         midi_file.save(midi_temp.name)
         midi_path = midi_temp.name
     
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as audio_temp:
         audio_path = audio_temp.name
+    
+    try:
+        if _is_colab():
+            return _midi_to_audio_colab(midi_path, audio_path)
+        elif HAS_FLUIDSYNTH:
+            return _midi_to_audio_fluidsynth(midi_path, audio_path)
+        else:
+            return _midi_to_audio_fallback(midi_path)
+        
+    finally:
+        try:
+            os.unlink(midi_path)
+            if os.path.exists(audio_path):
+                os.unlink(audio_path)
+        except OSError:
+            pass
+
+def _midi_to_audio_colab(midi_path, audio_path):
+    """Convert MIDI to audio in Google Colab using timidity."""
+    try:
+        # Use timidity to convert MIDI to WAV
+        subprocess.run([
+            'timidity', midi_path, 
+            '-Ow', '-o', audio_path,
+            '--quiet'
+        ], check=True, capture_output=True)
+        
+        audio_widget = Audio(audio_path, autoplay=False)
+        return audio_widget
+        
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print("Timidity not found. Install it first with: !apt install timidity fluid-soundfont-gm")
+        return _midi_to_audio_fallback(midi_path)
+
+def _midi_to_audio_fluidsynth(midi_path, audio_path):
+    """Convert MIDI to audio using FluidSynth (original method)."""
+    soundfont = _ensure_soundfont()
     
     try:
         # Create FluidSynth instance
@@ -322,12 +384,23 @@ def _midi_to_audio(midi_file):
                 os.close(old_stderr)
         
         audio_widget = Audio(audio_path, autoplay=False)
-        
         return audio_widget
         
-    finally:
-        try:
-            os.unlink(midi_path)
-            os.unlink(audio_path)
-        except OSError:
-            pass
+    except Exception as e:
+        print(f"FluidSynth conversion failed: {e}")
+        return _midi_to_audio_fallback(midi_path)
+
+def _midi_to_audio_fallback(midi_path):
+    """Fallback method that returns the MIDI file directly."""
+    print("Audio synthesis not available. Returning MIDI file for download.")
+    print(f"MIDI file available at: {midi_path}")
+    
+    # Return an Audio widget that points to the MIDI file
+    # This won't play in most browsers, but at least won't crash
+    try:
+        # Try to return as a download link if possible
+        from IPython.display import FileLink
+        return FileLink(midi_path)
+    except ImportError:
+        # Fallback to basic Audio widget
+        return Audio(midi_path, autoplay=False)
