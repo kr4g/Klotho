@@ -27,6 +27,8 @@ setup(
         'python-osc',
         'abjad',
         'mido',
+        'midi2audio',
+        'IPython',
         'panel',
         'bokeh',
         'jupyter_bokeh',

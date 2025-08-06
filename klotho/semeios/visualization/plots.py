@@ -402,7 +402,7 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
     height_scale = figsize[1] / 1.5
     
     base_node_size = 25
-    base_text_size = 18
+    base_text_size = 15
     
     pos, scale_factor = _proportional_tree_layout(rt, height=height_scale, inverted=invert)
     

@@ -39,9 +39,10 @@ from .semeios.midi import midi as export_midi
 
 from .utils.data_structures import Group
 from .utils.playback.player import play, pause, stop, sync
+from .utils.playback.midi_player import play_midi
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
 ]
 
-__version__ = '3.9.0'
+__version__ = '3.9.1'
