@@ -325,11 +325,21 @@ def _midi_to_audio(midi_file):
         audio_path = audio_temp.name
     
     try:
+        # Always try Colab method first if we're in Colab
         if _is_colab():
+            print("Detected Google Colab environment, using timidity...")
             return _midi_to_audio_colab(midi_path, audio_path)
-        elif HAS_FLUIDSYNTH:
-            return _midi_to_audio_fluidsynth(midi_path, audio_path)
+        
+        # Try FluidSynth for local environments
+        if HAS_FLUIDSYNTH:
+            print("Using FluidSynth for MIDI synthesis...")
+            try:
+                return _midi_to_audio_fluidsynth(midi_path, audio_path)
+            except Exception as e:
+                print(f"FluidSynth failed ({e}), trying fallback...")
+                return _midi_to_audio_fallback(midi_path)
         else:
+            print("No MIDI synthesis available, using fallback...")
             return _midi_to_audio_fallback(midi_path)
         
     finally:
@@ -361,34 +371,29 @@ def _midi_to_audio_fluidsynth(midi_path, audio_path):
     """Convert MIDI to audio using FluidSynth (original method)."""
     soundfont = _ensure_soundfont()
     
-    try:
-        # Create FluidSynth instance
-        if soundfont and os.path.exists(soundfont):
-            fs = FluidSynth(sound_font=soundfont)
-        else:
-            fs = FluidSynth()
+    # Create FluidSynth instance
+    if soundfont and os.path.exists(soundfont):
+        fs = FluidSynth(sound_font=soundfont)
+    else:
+        fs = FluidSynth()
+    
+    # Suppress output by redirecting to devnull at subprocess level
+    with open(os.devnull, 'w') as devnull:
+        old_stdout = os.dup(1)
+        old_stderr = os.dup(2)
+        os.dup2(devnull.fileno(), 1)
+        os.dup2(devnull.fileno(), 2)
         
-        # Suppress output by redirecting to devnull at subprocess level
-        with open(os.devnull, 'w') as devnull:
-            old_stdout = os.dup(1)
-            old_stderr = os.dup(2)
-            os.dup2(devnull.fileno(), 1)
-            os.dup2(devnull.fileno(), 2)
-            
-            try:
-                fs.midi_to_audio(midi_path, audio_path)
-            finally:
-                os.dup2(old_stdout, 1)
-                os.dup2(old_stderr, 2)
-                os.close(old_stdout)
-                os.close(old_stderr)
-        
-        audio_widget = Audio(audio_path, autoplay=False)
-        return audio_widget
-        
-    except Exception as e:
-        print(f"FluidSynth conversion failed: {e}")
-        return _midi_to_audio_fallback(midi_path)
+        try:
+            fs.midi_to_audio(midi_path, audio_path)
+        finally:
+            os.dup2(old_stdout, 1)
+            os.dup2(old_stderr, 2)
+            os.close(old_stdout)
+            os.close(old_stderr)
+    
+    audio_widget = Audio(audio_path, autoplay=False)
+    return audio_widget
 
 def _midi_to_audio_fallback(midi_path):
     """Fallback method that returns the MIDI file directly."""
