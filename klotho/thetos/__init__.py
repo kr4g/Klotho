@@ -10,7 +10,7 @@ from . import parameters
 from . import composition
 
 from .parameters import ParameterTree
-from .instruments import Instrument
+from .instruments import Instrument, SynthDefInstrument, MidiInstrument
 from .composition import CompositionalUnit
 from .types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 

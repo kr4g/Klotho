@@ -17,6 +17,7 @@ except ImportError:
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.thetos.instruments.instrument import MidiInstrument
 
 BASS_DRUM_NOTE = 37
 PERCUSSION_CHANNEL = 9
@@ -153,11 +154,20 @@ def _create_midi_from_compositional_unit(compositional_unit):
     events = []
     for event in compositional_unit:
         if not event.is_rest:
-            # Get parameter values with defaults
-            program = event.get_parameter('program', 0)  # Default to piano
-            is_drum = event.get_parameter('is_drum', False)
-            note = event.get_parameter('note', BASS_DRUM_NOTE if is_drum else 60)  # Default middle C or bass drum
-            velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
+            # Get instrument information from the parameter tree
+            instrument = event._pt.get_active_instrument(event._node_id)
+            
+            if isinstance(instrument, MidiInstrument):
+                is_drum = instrument.is_Drum
+                program = 0 if is_drum else instrument.prgm
+                note = event.get_parameter('note', instrument['note'])
+                velocity = event.get_parameter('velocity', instrument['velocity'])
+            else:
+                # Fallback for non-MidiInstrument cases
+                is_drum = event.get_parameter('is_drum', False)
+                program = 0 if is_drum else event.get_parameter('program', 0)
+                note = event.get_parameter('note', BASS_DRUM_NOTE if is_drum else 60)
+                velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
             
             # Determine channel based on is_drum
             channel = PERCUSSION_CHANNEL if is_drum else 0
@@ -294,10 +304,20 @@ def _collect_events_from_unit(unit, all_events):
         # CompositionalUnit with parameters
         for event in unit:
             if not event.is_rest:
-                program = event.get_parameter('program', 0)
-                is_drum = event.get_parameter('is_drum', False)
-                note = event.get_parameter('note', BASS_DRUM_NOTE if is_drum else 60)
-                velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
+                # Get instrument information from the parameter tree
+                instrument = event._pt.get_active_instrument(event._node_id)
+                
+                if isinstance(instrument, MidiInstrument):
+                    is_drum = instrument.is_Drum
+                    program = 0 if is_drum else instrument.prgm
+                    note = event.get_parameter('note', instrument['note'])
+                    velocity = event.get_parameter('velocity', instrument['velocity'])
+                else:
+                    # Fallback for non-MidiInstrument cases
+                    is_drum = event.get_parameter('is_drum', False)
+                    program = 0 if is_drum else event.get_parameter('program', 0)
+                    note = event.get_parameter('note', BASS_DRUM_NOTE if is_drum else 60)
+                    velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
                 
                 channel = PERCUSSION_CHANNEL if is_drum else 0
                 start_time = event.start
