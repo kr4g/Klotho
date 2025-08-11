@@ -589,9 +589,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
             y = (1 - (depth * vert_gap)) if inverted else (depth * vert_gap)
             pos[root] = (xcenter, y)
         
-        children = list(G.neighbors(root))
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+        children = _get_children(G, root, parent)
         
         if children:
             if len(children) == 1:
@@ -662,9 +660,39 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
         
         return max(nodes_by_level.values()) if nodes_by_level else 1
     
-    G = tree._graph
+    original_G = tree._graph
     root = tree.root
-    pos = _hierarchy_pos(G, root, inverted=invert)
+    
+    # Use original_G for our custom tree operations
+    pos = _hierarchy_pos(tree, root, inverted=invert)
+    
+    # Convert to NetworkX for matplotlib plotting
+    is_rustworkx = hasattr(original_G, 'node_indices') or str(type(original_G)).find('rustworkx') != -1
+    
+    if is_rustworkx:
+        import networkx as nx
+        if hasattr(original_G, 'in_degree'):
+            G = nx.DiGraph()
+        else:
+            G = nx.Graph()
+        
+        # Add nodes with their data
+        for node_idx in original_G.node_indices():
+            try:
+                node_data = tree[node_idx] if hasattr(tree, '__getitem__') else {}
+                G.add_node(node_idx, **node_data)
+            except:
+                G.add_node(node_idx)
+        
+        # Add edges
+        try:
+            for edge in original_G.edge_list():
+                src, dst = edge
+                G.add_edge(src, dst)
+        except:
+            pass
+    else:
+        G = original_G
     
     plt.figure(figsize=figsize)
     ax = plt.gca()
@@ -674,14 +702,14 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     
     for node, (x, y) in pos.items():
         if attributes is None:
-            label_text = str(G[node].get('label', node)) if G[node].get('label') is not None else str(node)
+            label_text = str(tree[node].get('label', node)) if tree[node].get('label') is not None else str(node)
         else:
             label_parts = []
             for attr in attributes:
                 if attr in {"node_id", "node", "id"}:
                     label_parts.append(str(node))
-                elif attr in G[node]:
-                    value = G[node][attr]
+                elif attr in tree[node]:
+                    value = tree[node][attr]
                     label_parts.append(str(value) if value is not None else '')
             label_text = "\n".join(label_parts)
         
