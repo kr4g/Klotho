@@ -19,7 +19,7 @@ from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSeq
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import MidiInstrument
 
-BASS_DRUM_NOTE = 37
+BASS_DRUM_NOTE = 35
 PERCUSSION_CHANNEL = 9
 DEFAULT_VELOCITY = 100
 TICKS_PER_BEAT = 480
@@ -127,13 +127,13 @@ def _create_midi_from_temporal_unit(temporal_unit):
         if event_type == 'note_on':
             track.append(Message('note_on', 
                                channel=PERCUSSION_CHANNEL, 
-                               note=BASS_DRUM_NOTE, 
+                               note=60, 
                                velocity=DEFAULT_VELOCITY, 
                                time=delta_ticks))
         else:
             track.append(Message('note_off', 
                                channel=PERCUSSION_CHANNEL, 
-                               note=BASS_DRUM_NOTE, 
+                               note=60, 
                                velocity=0, 
                                time=delta_ticks))
         

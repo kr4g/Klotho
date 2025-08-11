@@ -142,7 +142,7 @@ class MidiInstrument(Instrument):
             pfields (dict or SafeDict): Parameter fields with default values
         """
         if pfields is None:
-            pfields = {'note': 60, 'velocity': 100}
+            pfields = {'note': 60 if not is_Drum else 35, 'velocity': 100}
         
         super().__init__(name=name, pfields=pfields)
         
