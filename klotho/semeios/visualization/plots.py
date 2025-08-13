@@ -1748,7 +1748,7 @@ def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12),
 
 def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
              node_size: int = 30, text_size: int = 12, show_labels: bool = True,
-             title: str = None, output_file: str = None) -> go.Figure:
+             title: str = None, output_file: str = None, nodes: list = None) -> go.Figure:
     """
     Plot a Combination Product Set as an interactive network diagram based on its master set.
     
@@ -1768,6 +1768,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         show_labels: Whether to show labels on the nodes
         title: Title for the plot (default is derived from CPS if None)
         output_file: Path to save the figure (if None, display instead)
+        nodes: List of node IDs to highlight in pale green
         
     Returns:
         Plotly figure object that can be displayed or further customized
@@ -1784,6 +1785,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
     relationship_angles = MASTER_SETS[master_set_name]
+    
     G = cps.graph  # Use the Graph wrapper, not the internal _graph
     
     combo_to_node = {}
@@ -1847,22 +1849,46 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
     fig = go.Figure()
     
+    highlight_nodes = set(nodes) if nodes else set()
+    
+    regular_edges = []
+    highlighted_edges = []
+    
     for u, v, data in G.edges(data=True):
         if u in node_positions and v in node_positions:
-            x1, y1 = node_positions[u]
-            x2, y2 = node_positions[v]
-            fig.add_trace(
-                go.Scatter(
-                    x=[x1, x2], y=[y1, y2],
-                    mode='lines',
-                    line=dict(color='#808080', width=1),
-                    showlegend=False,
-                    hoverinfo='none'
-                )
+            if u in highlight_nodes and v in highlight_nodes:
+                highlighted_edges.append((u, v))
+            else:
+                regular_edges.append((u, v))
+    
+    for u, v in regular_edges:
+        x1, y1 = node_positions[u]
+        x2, y2 = node_positions[v]
+        fig.add_trace(
+            go.Scatter(
+                x=[x1, x2], y=[y1, y2],
+                mode='lines',
+                line=dict(color='#808080', width=1),
+                showlegend=False,
+                hoverinfo='none'
             )
+        )
+    
+    for u, v in highlighted_edges:
+        x1, y1 = node_positions[u]
+        x2, y2 = node_positions[v]
+        fig.add_trace(
+            go.Scatter(
+                x=[x1, x2], y=[y1, y2],
+                mode='lines',
+                line=dict(color='#90EE90', width=2),
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
     
     node_x, node_y = [], []
-    node_text, hover_data = [], []
+    node_text, hover_data, node_colors = [], [], []
     
     for node, attrs in G.nodes(data=True):
         if node in node_positions and 'combo' in attrs:
@@ -1878,8 +1904,13 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             product = attrs['product']
             ratio = attrs['ratio']
             
-            hover_info = f"Combo: {combo_str}<br>Product: {product}<br>Ratio: {ratio}"
+            hover_info = f"Node: {node}<br>Combo: {combo_str}<br>Product: {product}<br>Ratio: {ratio}"
             hover_data.append(hover_info)
+            
+            if node in highlight_nodes:
+                node_colors.append('#90EE90')
+            else:
+                node_colors.append('white')
     
     fig.add_trace(
         go.Scatter(
@@ -1887,13 +1918,14 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             mode='markers+text' if show_labels else 'markers',
             marker=dict(
                 size=node_size,
-                color='white',
+                color=node_colors,
                 line=dict(color='white', width=2)
             ),
             text=node_text,
             textposition='middle center',
             textfont=dict(color='black', size=text_size, family='Arial Black', weight='bold'),
             hovertemplate='%{customdata}<extra></extra>',
+            hoverlabel=dict(bgcolor='white', font_color='black'),
             customdata=hover_data,
             showlegend=False
         )

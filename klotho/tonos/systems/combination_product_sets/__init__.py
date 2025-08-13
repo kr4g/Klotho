@@ -1,5 +1,6 @@
 from .cps import CombinationProductSet
 from .nkany import Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany
+from .algorithms import match_pattern
 
 __all__ = [
     'CombinationProductSet',
@@ -8,4 +9,5 @@ __all__ = [
     'Pentadekany',
     'Eikosany',
     'Hebdomekontany',
+    'match_pattern',
 ]

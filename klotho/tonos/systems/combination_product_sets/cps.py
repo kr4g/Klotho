@@ -96,7 +96,11 @@ class CombinationProductSet(CS):
           sym_ratio = sp.simplify(alias1 / alias2)
           
           if sym_ratio in relationship_dict:
-            self._graph.add_edge(node1, node2, relation=sym_ratio)
+            rel_data = relationship_dict[sym_ratio]
+            self._graph.add_edge(node1, node2, 
+                               relation=sym_ratio,
+                               angle=rel_data['angle'],
+                               distance=rel_data['distance'])
 
   @property
   def master_set(self):
