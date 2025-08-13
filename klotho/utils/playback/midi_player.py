@@ -533,8 +533,6 @@ def _get_microtonal_channel_and_note(pitch, channel_assignments=None):
     channel = available_channels[channel_index]
     _get_microtonal_channel_and_note._channel_counter += 1
     
-    print(f"DEBUG: target_midi={target_midi:.3f} -> note={nearest_midi}, channel={channel}, cents={cents_offset:.1f}¢, pitch_bend={pitch_bend_value}")
-    
     return channel, nearest_midi, pitch_bend_value
 
 def _reset_microtonal_counter():
