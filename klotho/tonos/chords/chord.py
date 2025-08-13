@@ -22,6 +22,9 @@ class AddressedChord(AddressedPitchCollection):
         >>> c_major[2]
         G4
     """
+    pass
+    
+
     def _calculate_pitch(self, index: int) -> 'Pitch':
         interval = self._collection[index]
         
@@ -89,7 +92,7 @@ class Chord(EquaveCyclicCollection[IntervalType]):
     
     def __neg__(self: PC) -> PC:
         return self.__invert__()
-        
+    
     def root(self, other: Union[Pitch, str]) -> 'AddressedChord':
         if isinstance(other, str):
             other = Pitch(other)

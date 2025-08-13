@@ -108,7 +108,10 @@ class Pitch:
     
     @property
     def midi(self):
-        return self.midicent / 100
+        midi_value = float(self.midicent / 100)
+        if abs(self.cents_offset) < 0.01:
+            return float(round(midi_value))
+        return midi_value
     
     @property
     def virtual_fundamental(self):
