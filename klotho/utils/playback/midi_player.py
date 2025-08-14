@@ -23,7 +23,7 @@ from klotho.tonos.pitch.pitch import Pitch
 from klotho.tonos.scales.scale import Scale, AddressedScale
 from klotho.tonos.chords.chord import Chord, AddressedChord
 
-BASS_DRUM_NOTE = 35
+DEFAULT_DRUM_NOTE = 37
 PERCUSSION_CHANNEL = 9
 DEFAULT_VELOCITY = 100
 TICKS_PER_BEAT = 480
@@ -199,7 +199,7 @@ def _create_midi_from_compositional_unit(compositional_unit):
                 # Fallback for non-MidiInstrument cases
                 is_drum = event.get_parameter('is_drum', False)
                 program = 0 if is_drum else event.get_parameter('program', 0)
-                note_param = event.get_parameter('note', BASS_DRUM_NOTE if is_drum else 60)
+                note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
                 velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
             
             start_time = event.start
@@ -209,7 +209,7 @@ def _create_midi_from_compositional_unit(compositional_unit):
             if is_drum:
                 # Drums always go to percussion channel
                 channel = PERCUSSION_CHANNEL
-                midi_note = int(note_param) if note_param else BASS_DRUM_NOTE
+                midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
                 # Add note events - no pitch bend for drums
                 events.append((start_time, 'note_on', channel, midi_note, velocity, program))
                 events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
@@ -352,7 +352,7 @@ def _collect_events_from_unit(unit, all_events):
                     # Fallback for non-MidiInstrument cases
                     is_drum = event.get_parameter('is_drum', False)
                     program = 0 if is_drum else event.get_parameter('program', 0)
-                    note_param = event.get_parameter('note', BASS_DRUM_NOTE if is_drum else 60)
+                    note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
                     velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
                 
                 start_time = event.start
@@ -362,7 +362,7 @@ def _collect_events_from_unit(unit, all_events):
                 if is_drum:
                     # Drums always go to percussion channel
                     channel = PERCUSSION_CHANNEL
-                    midi_note = int(note_param) if note_param else BASS_DRUM_NOTE
+                    midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
                     # Add note events - no pitch bend for drums
                     all_events.append((start_time, 'note_on', channel, midi_note, velocity, program))
                     all_events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
@@ -399,8 +399,8 @@ def _collect_events_from_unit(unit, all_events):
                 start_time = chronon.start
                 duration = abs(chronon.duration)
                 
-                all_events.append((start_time, 'note_on', PERCUSSION_CHANNEL, BASS_DRUM_NOTE, DEFAULT_VELOCITY, 0))
-                all_events.append((start_time + duration, 'note_off', PERCUSSION_CHANNEL, BASS_DRUM_NOTE, 0, 0))
+                all_events.append((start_time, 'note_on', PERCUSSION_CHANNEL, DEFAULT_DRUM_NOTE, DEFAULT_VELOCITY, 0))
+                all_events.append((start_time + duration, 'note_off', PERCUSSION_CHANNEL, DEFAULT_DRUM_NOTE, 0, 0))
 
 def _midi_to_audio(midi_file):
     """Convert MIDI file to audio for playback."""

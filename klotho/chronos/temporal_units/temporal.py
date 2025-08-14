@@ -54,7 +54,7 @@ class Chronon(metaclass=TemporalMeta):
     @property
     def node_id(self): return self._node_id
     @property
-    def is_rest(self): return self._rt[self._node_id]['real_duration'] < 0
+    def is_rest(self): return self._rt[self._node_id]['proportion'] < 0
     
     def __str__(self):
         return pd.DataFrame({
