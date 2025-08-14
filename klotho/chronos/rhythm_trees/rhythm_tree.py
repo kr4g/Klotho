@@ -389,3 +389,6 @@ class RhythmTree(Tree):
             node_data = self[n]
             if 'proportion' in node_data and node_data['proportion'] > 0:
                 node_data['proportion'] = -abs(node_data['proportion'])
+                node_data['metric_duration'] = -abs(node_data['metric_duration'])
+        
+        self._update_group_structure()
