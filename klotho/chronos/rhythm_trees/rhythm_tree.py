@@ -235,6 +235,8 @@ class RhythmTree(Tree):
                 s = -s
             
             ratio = Fraction(s, div) * parent_ratio
+            if s < 0:
+                ratio = -abs(ratio)
             self[child]['metric_duration'] = ratio
             self[child]['proportion'] = s
             if self.out_degree(child) > 0:
