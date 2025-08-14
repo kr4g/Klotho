@@ -269,18 +269,18 @@ def _create_midi_from_collection(collection):
     # For TemporalUnitSequence: units are sequential
     # For TemporalBlock: units are parallel (multiple rows)
     if isinstance(collection, TemporalUnitSequence):
-        # Sequential units - each has its own offset
+        # Sequential units - each unit has its own offset already built in
         for unit in collection:
-            _collect_events_from_unit(unit, all_events)
+            _collect_events_from_unit_with_offset(unit, all_events, 0.0)
     elif isinstance(collection, TemporalBlock):
-        # Parallel units - iterate through rows
+        # Parallel units - all rows start at the same time (time 0)
         for row in collection:
             if isinstance(row, (TemporalUnit, CompositionalUnit)):
-                _collect_events_from_unit(row, all_events)
+                _collect_events_from_unit_with_offset(row, all_events, 0.0)
             elif isinstance(row, TemporalUnitSequence):
                 # TemporalBlock can contain TemporalUnitSequences
                 for unit in row:
-                    _collect_events_from_unit(unit, all_events)
+                    _collect_events_from_unit_with_offset(unit, all_events, 0.0)
             # Could also contain nested TemporalBlocks, but keep it simple for now
     
     # Sort all events by time
@@ -334,8 +334,8 @@ def _create_midi_from_collection(collection):
     
     return midi_file
 
-def _collect_events_from_unit(unit, all_events):
-    """Helper function to collect events from a single temporal unit."""
+def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
+    """Helper function to collect events from a single temporal unit with time offset."""
     if isinstance(unit, CompositionalUnit):
         # CompositionalUnit with parameters
         for event in unit:
@@ -355,7 +355,7 @@ def _collect_events_from_unit(unit, all_events):
                     note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
                     velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
                 
-                start_time = event.start
+                start_time = event.start + time_offset
                 duration = abs(event.duration)
                 
                 # Handle microtonal MIDI float values directly like CompositionalUnit
@@ -396,7 +396,7 @@ def _collect_events_from_unit(unit, all_events):
         # Regular TemporalUnit - use defaults
         for chronon in unit:
             if not chronon.is_rest:
-                start_time = chronon.start
+                start_time = chronon.start + time_offset
                 duration = abs(chronon.duration)
                 
                 all_events.append((start_time, 'note_on', PERCUSSION_CHANNEL, DEFAULT_DRUM_NOTE, DEFAULT_VELOCITY, 0))
