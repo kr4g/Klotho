@@ -85,8 +85,6 @@ class RhythmTree(Tree):
         S = ratios_to_subdivs(ratios)
         meas = Meas(sum(abs(r) for r in ratios))
         return cls(span = span, meas = meas, subdivisions = S)
-    
-
 
     @property
     def span(self):
@@ -211,7 +209,7 @@ class RhythmTree(Tree):
         """
         self[self.root]['metric_duration'] = self.meas * self.span
         
-        def _process_child_durations(child, div, parent_ratio):
+        def _process_child_durations(child, div, parent_ratio, parent_is_negative=False):
             """
             Process duration and proportion for a single child node.
             
@@ -223,6 +221,8 @@ class RhythmTree(Tree):
                 Sum of all proportions at this level.
             parent_ratio : Fraction
                 Parent node's metric duration ratio.
+            parent_is_negative : bool, optional
+                Whether the parent node has a negative proportion.
             """
             child_data = self[child]
             
@@ -230,6 +230,10 @@ class RhythmTree(Tree):
             if 'meta' in child_data:
                 s = s * child_data['meta']['span']
             s = int(s) if isinstance(s, float) else s
+            
+            if parent_is_negative and s > 0:
+                s = -s
+            
             ratio = Fraction(s, div) * parent_ratio
             self[child]['metric_duration'] = ratio
             self[child]['proportion'] = s
@@ -271,9 +275,11 @@ class RhythmTree(Tree):
                              self[c]['meta']['span'] if 'meta' in self[c]
                              else self[c]['label']) 
                          for c in children))
+            
+            node_is_negative = label_value < 0
                         
             for child in children:
-                _process_child_durations(child, div, parent_ratio)
+                _process_child_durations(child, div, parent_ratio, node_is_negative)
             
             self[node].pop('label', None)
         
@@ -359,3 +365,27 @@ class RhythmTree(Tree):
         
         self._evaluate()
         return result
+
+    def make_rest(self, node):
+        """
+        Make a node and all its descendants into rests by setting their proportions to negative.
+        
+        Parameters
+        ----------
+        node : int
+            The node ID to make into a rest along with all its descendants.
+            
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree.
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+        
+        descendants_to_modify = [node] + list(self.descendants(node))
+        
+        for n in descendants_to_modify:
+            node_data = self[n]
+            if 'proportion' in node_data and node_data['proportion'] > 0:
+                node_data['proportion'] = -abs(node_data['proportion'])
