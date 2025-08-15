@@ -219,6 +219,22 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._bpm = new_bpm
         self._events = None
 
+    def make_rest(self, node: int) -> None:
+        """
+        Make a node and all its descendants into rests by setting their proportions to negative.
+        
+        This method calls the RhythmTree's make_rest method and then re-evaluates the
+        TemporalUnit to update the timing information.
+        
+        Args:
+            node: The node ID to make into a rest along with all its descendants
+            
+        Raises:
+            ValueError: If the node is not found in the rhythm tree
+        """
+        self._rt.make_rest(node)
+        self._events = None
+
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         match prolatio:
             case tuple():
