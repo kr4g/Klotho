@@ -157,13 +157,13 @@ def _create_midi_from_temporal_unit(temporal_unit):
         if event_type == 'note_on':
             track.append(Message('note_on', 
                                channel=PERCUSSION_CHANNEL, 
-                               note=60, 
+                               note=DEFAULT_DRUM_NOTE, 
                                velocity=DEFAULT_VELOCITY, 
                                time=delta_ticks))
         else:
             track.append(Message('note_off', 
                                channel=PERCUSSION_CHANNEL, 
-                               note=60, 
+                               note=DEFAULT_DRUM_NOTE, 
                                velocity=0, 
                                time=delta_ticks))
         
