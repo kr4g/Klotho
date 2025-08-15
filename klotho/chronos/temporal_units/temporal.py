@@ -459,6 +459,17 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
         self._seq[index] = ut.copy()
         self._set_offsets()
+        
+    def extend(self, other_seq: 'TemporalUnitSequence') -> None:
+        """
+        Extend the sequence by appending all TemporalUnits from another sequence.
+        
+        Args:
+            other_seq: The TemporalUnitSequence to extend from
+        """
+        for ut in other_seq:
+            self._seq.append(ut.copy())
+        self._set_offsets()
 
     def __getitem__(self, idx: int) -> TemporalUnit:
         return self._seq[idx]
@@ -731,6 +742,17 @@ class TemporalBlock(metaclass=TemporalMeta):
             raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
         
         self._rows[index] = row.copy()
+        self._align_rows()
+        
+    def extend(self, other_block: 'TemporalBlock') -> None:
+        """
+        Extend the block by appending all rows from another block.
+        
+        Args:
+            other_block: The TemporalBlock to extend from
+        """
+        for row in other_block:
+            self._rows.append(row.copy())
         self._align_rows()
 
     def __getitem__(self, idx: int) -> Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']:
