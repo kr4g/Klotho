@@ -39,7 +39,7 @@ def decompose(ut: TemporalUnit, prolatio: Union[tuple, str, None] = None, depth:
         return TemporalUnitSequence([
             TemporalUnit(
                 span     = 1,
-                tempus   = subtree[subtree.root]['ratio'],
+                tempus   = subtree[subtree.root]['metric_duration'],
                 prolatio = subtree.group.S if not prolatio else next(prolatio_cycle),
                 beat     = ut._beat,
                 bpm      = ut._bpm
