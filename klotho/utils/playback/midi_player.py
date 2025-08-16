@@ -263,6 +263,9 @@ def _create_midi_from_collection(collection):
     
     track.append(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm)))
     
+    # Reset microtonal channel counter for this new file
+    _reset_microtonal_counter()
+    
     # Collect all events from all units in the collection
     all_events = []
     
@@ -336,9 +339,12 @@ def _create_midi_from_collection(collection):
 
 def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
     """Helper function to collect events from a single temporal unit with time offset."""
-    if isinstance(unit, CompositionalUnit):
+    # Create a temporary copy to avoid modifying the original unit's state
+    unit_copy = unit.copy()
+    
+    if isinstance(unit_copy, CompositionalUnit):
         # CompositionalUnit with parameters
-        for event in unit:
+        for event in unit_copy:
             if not event.is_rest:
                 # Get instrument information from the parameter tree
                 instrument = event._pt.get_active_instrument(event._node_id)
@@ -394,7 +400,7 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
                     all_events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
     else:
         # Regular TemporalUnit - use defaults
-        for chronon in unit:
+        for chronon in unit_copy:
             if not chronon.is_rest:
                 start_time = chronon.start + time_offset
                 duration = abs(chronon.duration)
