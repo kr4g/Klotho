@@ -464,6 +464,7 @@ def _midi_to_audio_colab(midi_path, audio_path):
         subprocess.run([
             'timidity', midi_path, 
             '-Ow', '-o', audio_path,
+            '--preserve-silence',  # Prevent dropping initial/trailing rests
             '--quiet'
         ], check=True, capture_output=True)
         
@@ -471,8 +472,21 @@ def _midi_to_audio_colab(midi_path, audio_path):
         return audio_widget
         
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print("Timidity not found. Install it first with: !apt install timidity fluid-soundfont-gm")
-        return _midi_to_audio_fallback(midi_path)
+        # If --preserve-silence option failed, try without it
+        try:
+            print("--preserve-silence option not supported, trying without it...")
+            subprocess.run([
+                'timidity', midi_path, 
+                '-Ow', '-o', audio_path,
+                '--quiet'
+            ], check=True, capture_output=True)
+            
+            audio_widget = Audio(audio_path, autoplay=False)
+            return audio_widget
+            
+        except (subprocess.CalledProcessError, FileNotFoundError) as e2:
+            print("Timidity not found. Install it first with: !apt install timidity fluid-soundfont-gm")
+            return _midi_to_audio_fallback(midi_path)
 
 def _midi_to_audio_fluidsynth(midi_path, audio_path):
     """Convert MIDI to audio using FluidSynth (original method)."""
