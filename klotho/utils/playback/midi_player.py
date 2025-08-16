@@ -464,7 +464,7 @@ def _midi_to_audio_colab(midi_path, audio_path):
         subprocess.run([
             'timidity', midi_path, 
             '-Ow', '-o', audio_path,
-            '--preserve-silence',  # Prevent dropping initial/trailing rests
+            # '--preserve-silence',  # Prevent dropping initial/trailing rests
             '--quiet'
         ], check=True, capture_output=True)
         
