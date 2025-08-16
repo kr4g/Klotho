@@ -169,6 +169,10 @@ def _create_midi_from_temporal_unit(temporal_unit):
         
         current_time = event_time
     
+    # Ensure MIDI file duration matches the TemporalUnit's total duration
+    # This handles trailing rests that would otherwise be cut off
+    _ensure_midi_duration(track, temporal_unit.duration, bpm)
+    
     return midi_file
 
 def _create_midi_from_compositional_unit(compositional_unit):
@@ -242,6 +246,10 @@ def _create_midi_from_compositional_unit(compositional_unit):
     
     # Use the exact same event processing as pitch collections
     _events_to_midi_messages(events, track, bpm)
+    
+    # Ensure MIDI file duration matches the CompositionalUnit's total duration
+    # This handles trailing rests that would otherwise be cut off
+    _ensure_midi_duration(track, compositional_unit.duration, bpm)
     
     return midi_file
 
@@ -334,6 +342,12 @@ def _create_midi_from_collection(collection):
                                    time=delta_ticks))
         
         current_time = event_time
+    
+    # Ensure MIDI file duration matches the collection's total duration
+    # This handles trailing rests that would otherwise be cut off
+    if isinstance(collection, TemporalUnitSequence):
+        total_duration = collection.duration
+        _ensure_midi_duration(track, total_duration, bpm)
     
     return midi_file
 
@@ -545,6 +559,48 @@ def _reset_microtonal_counter():
     """Reset the global channel counter for new MIDI files."""
     if hasattr(_get_microtonal_channel_and_note, '_channel_counter'):
         _get_microtonal_channel_and_note._channel_counter = 1
+
+def _ensure_midi_duration(track, target_duration_seconds, bpm):
+    """
+    Ensure MIDI track duration matches target duration by adding silent padding if needed.
+    
+    This handles cases where the temporal structure ends with rests, ensuring
+    the MIDI file doesn't cut off prematurely and allows reverb/sustain to play out.
+    
+    Parameters
+    ----------
+    track : MidiTrack
+        The MIDI track to extend
+    target_duration_seconds : float
+        The target duration in seconds
+    bpm : float
+        Beats per minute for timing calculations
+    """
+    if not track:
+        return
+    
+    # Calculate current track duration
+    current_time_ticks = 0
+    for msg in track:
+        current_time_ticks += msg.time
+    
+    # Convert to seconds
+    beat_duration = 60.0 / bpm
+    current_duration_seconds = current_time_ticks * beat_duration / TICKS_PER_BEAT
+    
+    # If we need more duration, add a silent padding message
+    if target_duration_seconds > current_duration_seconds:
+        missing_duration = target_duration_seconds - current_duration_seconds
+        missing_ticks = int(missing_duration / beat_duration * TICKS_PER_BEAT)
+        
+        # Add a silent message (could be a control change or just a dummy note off)
+        # Using a note off with velocity 0 on a silent channel as padding
+        from mido import Message
+        track.append(Message('note_off', 
+                           channel=15,  # Use channel 15 for silent padding
+                           note=127,    # High note that won't interfere
+                           velocity=0, 
+                           time=missing_ticks))
 
 def _create_midi_from_pitch_collection(collection, dur=0.5, bpm=120, prgm=0):
     """Create a MIDI file from a PitchCollection (sequential playback)."""
