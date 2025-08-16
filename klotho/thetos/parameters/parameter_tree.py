@@ -23,6 +23,32 @@ class ParameterTree(Tree):
             super().__getitem__(node).pop('label', None)
         self._meta['pfields'] = set()
     
+    def _ensure_parameter_attributes(self):
+        """Ensure all parameter-specific attributes are initialized"""
+        if not hasattr(self, '_parameter_version'):
+            self._parameter_version = 0
+        if not hasattr(self, '_governing_node_cache'):
+            self._governing_node_cache = {}
+        if not hasattr(self, '_active_instrument_cache'):
+            self._active_instrument_cache = {}
+        if not hasattr(self, '_active_items_cache'):
+            self._active_items_cache = {}
+        if not hasattr(self, '_node_instruments'):
+            self._node_instruments = {}
+        if not hasattr(self, '_subtree_muted_pfields'):
+            self._subtree_muted_pfields = {}
+        if not hasattr(self, '_slurs'):
+            self._slurs = {}
+        if not hasattr(self, '_next_slur_id'):
+            self._next_slur_id = 0
+    
+    def subtree(self, node, renumber=True):
+        """Override Tree.subtree to ensure ParameterTree-specific attributes are initialized"""
+        result = super().subtree(node, renumber)
+        if isinstance(result, ParameterTree):
+            result._ensure_parameter_attributes()
+        return result
+    
     def __deepcopy__(self, memo):
         new_pt = super().__deepcopy__(memo)
         new_pt._node_instruments = copy.deepcopy(self._node_instruments, memo)
@@ -255,6 +281,14 @@ class ParameterNode:
         self._tree._active_items_cache[cache_key] = result
         return result
     
+    def copy(self):
+        """Create a copy of the node's data as a dict"""
+        return dict(self._tree.items(self._node))
+    
+    def get(self, key, default=None):
+        """Get a value with optional default"""
+        return self._tree.get(self._node, key) or default
+        
     def __dict__(self):
         return self._tree.items(self._node)
         

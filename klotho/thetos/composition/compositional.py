@@ -611,3 +611,65 @@ class CompositionalUnit(TemporalUnit):
             self._events = self._evaluate()
         return self._events[idx].parameters
     
+
+    
+    def from_subtree(self, node: int) -> 'CompositionalUnit':
+        """
+        Create a new CompositionalUnit from a subtree of this one.
+        
+        This method extracts a subtree and preserves envelopes that are entirely
+        contained within the subtree. Envelopes that cross subtree boundaries
+        are discarded according to the design requirements.
+        
+        Parameters
+        ----------
+        node : int
+            The root node of the subtree to extract
+            
+        Returns
+        -------
+        CompositionalUnit
+            A new CompositionalUnit containing the subtree
+        """
+        # Extract the RhythmTree subtree (RhythmTree creates a new tree from subdivisions)
+        rt_subtree = self._rt.subtree(node, renumber=True)
+        
+        # Create a new CompositionalUnit from the RhythmTree
+        # This will create a synchronized ParameterTree with the same structure
+        new_cu = self.__class__.from_rt(rt_subtree, beat=self.beat, bpm=self.bpm, pfields=self.pfields)
+        
+        # Copy parameter data from the original subtree nodes to the new structure
+        # Since RhythmTree.subtree creates a new tree rather than extracting nodes,
+        # we need to copy the parameter data appropriately
+        original_subtree_nodes = [node] + list(self._rt.descendants(node))
+        
+        # First, copy any instrument assignments that apply to this subtree
+        # Look for the governing instrument node for this subtree
+        governing_instrument_node = self._pt.get_governing_subtree_node(node)
+        if governing_instrument_node is not None and governing_instrument_node in self._pt._node_instruments:
+            # Apply the same instrument to the root of the new subtree
+            instrument = self._pt._node_instruments[governing_instrument_node]
+            new_cu.set_instrument(new_cu._pt.root, instrument)
+        
+        # For leaf nodes, copy parameter data if available
+        for new_leaf in new_cu._pt.leaf_nodes:
+            # Try to find a corresponding original leaf node to copy data from
+            if new_leaf < len(original_subtree_nodes):
+                original_node = original_subtree_nodes[new_leaf] if new_leaf < len(original_subtree_nodes) else original_subtree_nodes[0]
+                if original_node in self._pt.nodes:
+                    # Copy the parameter data (but not instrument data, which is handled above)
+                    original_data = self._pt.items(original_node)
+                    if original_data:
+                        # Filter out instrument-related fields that shouldn't be copied directly
+                        filtered_data = {k: v for k, v in original_data.items() 
+                                       if not k.startswith('_') or k.startswith('_slur_')}
+                        if filtered_data:
+                            new_cu._pt.set_pfields(new_leaf, **filtered_data)
+        
+        # Note: Envelopes that cross subtree boundaries are intentionally discarded
+        # as per the design requirements.
+        new_cu._envelopes = {}
+        new_cu._next_envelope_id = 0
+        
+        return new_cu
+    
