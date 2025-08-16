@@ -434,12 +434,12 @@ def _midi_to_audio(midi_file):
     try:
         # Always try Colab method first if we're in Colab
         if _is_colab():
-            print("Detected Google Colab environment, using timidity...")
+            # print("Detected Google Colab environment, using timidity...")
             return _midi_to_audio_colab(midi_path, audio_path)
         
         # Try FluidSynth for local environments
         if HAS_FLUIDSYNTH:
-            print("Using FluidSynth for MIDI synthesis...")
+            # print("Using FluidSynth for MIDI synthesis...")
             try:
                 return _midi_to_audio_fluidsynth(midi_path, audio_path)
             except Exception as e:
