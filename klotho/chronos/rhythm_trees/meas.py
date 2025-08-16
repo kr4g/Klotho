@@ -191,6 +191,9 @@ class Meas:
     
     def __abs__(self):
         return Meas(abs(self._numerator), abs(self._denominator))
+    
+    def __neg__(self):
+        return Meas(-self._numerator, self._denominator)
 
     def is_equivalent(self, other) -> bool:
         """Check if two time signatures represent the same metric proportion"""

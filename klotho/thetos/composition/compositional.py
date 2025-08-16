@@ -638,6 +638,14 @@ class CompositionalUnit(TemporalUnit):
         # This will create a synchronized ParameterTree with the same structure
         new_cu = self.__class__.from_rt(rt_subtree, beat=self.beat, bpm=self.bpm, pfields=self.pfields)
         
+        # Preserve rest information from the original subtree
+        # The from_rt method creates a new RhythmTree which loses rest info, so we need to restore it
+        for orig_node, new_node in zip(rt_subtree.nodes, new_cu._rt.nodes):
+            orig_proportion = rt_subtree[orig_node].get('proportion')
+            if orig_proportion is not None and orig_proportion < 0:
+                # This was a rest in the original subtree, make it a rest in the new tree
+                new_cu.make_rest(new_node)
+        
         # Copy parameter data from the original subtree nodes to the new structure
         # Since RhythmTree.subtree creates a new tree rather than extracting nodes,
         # we need to copy the parameter data appropriately
@@ -651,20 +659,27 @@ class CompositionalUnit(TemporalUnit):
             instrument = self._pt._node_instruments[governing_instrument_node]
             new_cu.set_instrument(new_cu._pt.root, instrument)
         
-        # For leaf nodes, copy parameter data if available
-        for new_leaf in new_cu._pt.leaf_nodes:
-            # Try to find a corresponding original leaf node to copy data from
-            if new_leaf < len(original_subtree_nodes):
-                original_node = original_subtree_nodes[new_leaf] if new_leaf < len(original_subtree_nodes) else original_subtree_nodes[0]
+        # Copy parameter data from all nodes in the original subtree to corresponding nodes in the new tree
+        # Since RhythmTree.subtree creates a completely new tree structure with renumbered nodes,
+        # we need to map the parameter data appropriately
+        original_subtree_nodes = [node] + list(self._rt.descendants(node))
+        new_tree_nodes = list(new_cu._pt.nodes)
+        
+        # Create a mapping based on tree structure position
+        # Both trees should have the same relative structure
+        for i, new_node in enumerate(new_tree_nodes):
+            if i < len(original_subtree_nodes):
+                original_node = original_subtree_nodes[i]
                 if original_node in self._pt.nodes:
-                    # Copy the parameter data (but not instrument data, which is handled above)
                     original_data = self._pt.items(original_node)
                     if original_data:
-                        # Filter out instrument-related fields that shouldn't be copied directly
+                        # Filter out instrument-related fields (handled separately above)
                         filtered_data = {k: v for k, v in original_data.items() 
                                        if not k.startswith('_') or k.startswith('_slur_')}
                         if filtered_data:
-                            new_cu._pt.set_pfields(new_leaf, **filtered_data)
+                            # Set the data on the corresponding new node
+                            for key, value in filtered_data.items():
+                                new_cu._pt.set_pfields(new_node, **{key: value})
         
         # Note: Envelopes that cross subtree boundaries are intentionally discarded
         # as per the design requirements.
