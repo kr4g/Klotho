@@ -23,9 +23,9 @@ from klotho.tonos.pitch.pitch import Pitch
 from klotho.tonos.scales.scale import Scale, AddressedScale
 from klotho.tonos.chords.chord import Chord, AddressedChord
 
-DEFAULT_DRUM_NOTE = 75
+DEFAULT_DRUM_NOTE = 77
 PERCUSSION_CHANNEL = 9
-DEFAULT_VELOCITY = 110
+DEFAULT_VELOCITY = 120
 TICKS_PER_BEAT = 480
 
 # Exact Microtonal Configuration
