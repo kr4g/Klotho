@@ -70,14 +70,15 @@ class Chord(EquaveCyclicCollection[IntervalType]):
     """
     
     def __init__(self, degrees: IntervalList = ["1/1", "5/4", "3/2"], 
-                 equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
-        super().__init__(degrees, equave)
+                 equave: Optional[Union[float, Fraction, int, str]] = "2/1",
+                 interval_type: str = "ratios"):
+        super().__init__(degrees, equave, interval_type)
     
     def __invert__(self: PC) -> PC:
         if len(self._degrees) <= 1:
-            return Chord(self._degrees.copy(), self._equave)
+            return Chord(self._degrees.copy(), self._equave, self._interval_type_mode)
         
-        if self.interval_type == float:
+        if self._interval_type_mode == "cents":
             new_degrees = [self._degrees[0]]
             for i in range(len(self._degrees) - 1, 0, -1):
                 interval_difference = self._degrees[i] - self._degrees[i-1]
@@ -88,7 +89,7 @@ class Chord(EquaveCyclicCollection[IntervalType]):
                 interval_ratio = self._degrees[i] / self._degrees[i-1]
                 new_degrees.append(new_degrees[-1] * interval_ratio)
         
-        return Chord(new_degrees, self._equave)
+        return Chord(new_degrees, self._equave, self._interval_type_mode)
     
     def __neg__(self: PC) -> PC:
         return self.__invert__()

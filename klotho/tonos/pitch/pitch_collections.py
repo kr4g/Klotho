@@ -35,7 +35,11 @@ class PitchCollection(Generic[IntervalType]):
     """
     
     def __init__(self, degrees: IntervalList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], 
-                 equave: Optional[Union[float, Fraction, int, str]] = "2/1"):
+                 equave: Optional[Union[float, Fraction, int, str]] = "2/1",
+                 interval_type: str = "ratios"):
+        if interval_type not in ["ratios", "cents"]:
+            raise ValueError("interval_type must be 'ratios' or 'cents'")
+        self._interval_type_mode = interval_type
         self._equave = self._convert_value(equave if equave is not None else "2/1")
         self._degrees = self._process_degrees(degrees)
         self._intervals = self._compute_intervals()
@@ -45,17 +49,20 @@ class PitchCollection(Generic[IntervalType]):
             return []
         
         converted = [self._convert_value(i) for i in degrees]
-        self._interval_type = float if any(isinstance(i, float) for i in converted) else Fraction
         
-        if self._interval_type == float:
+        if self._interval_type_mode == "cents":
+            self._interval_type = float
             converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
+            if not isinstance(self._equave, float):
+                if self._equave == Fraction(2, 1):
+                    self._equave = 1200.0
+                else:
+                    self._equave = float(self._equave)
         else:
+            self._interval_type = Fraction
             converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
-        
-        if converted and isinstance(converted[0], float) and not isinstance(self._equave, float):
-            self._equave = float(self._equave)
-        elif converted and isinstance(converted[0], Fraction) and isinstance(self._equave, float):
-            self._equave = Fraction.from_float(self._equave)
+            if isinstance(self._equave, float):
+                self._equave = Fraction.from_float(self._equave)
         
         return cast(List[IntervalType], converted)
     
@@ -265,15 +272,13 @@ class PitchCollection(Generic[IntervalType]):
         return _addressed_collection_cache[cache_key]
     
     @classmethod
-    def from_intervals(cls, intervals: IntervalList) -> PC:
+    def from_intervals(cls, intervals: IntervalList, interval_type: str = "ratios") -> PC:
         """Create a pitch collection from a list of intervals"""
         if not intervals:
-            return cls()
+            return cls(interval_type=interval_type)
             
-        is_cents = any('.' in str(i) for i in intervals if isinstance(i, (str, float)))
-        
         degrees = []
-        if is_cents:
+        if interval_type == "cents":
             current = 0.0
             degrees = [current]
             for interval in intervals:
@@ -286,7 +291,7 @@ class PitchCollection(Generic[IntervalType]):
                 current *= Fraction(interval)
                 degrees.append(current)
                 
-        return cls(degrees)
+        return cls(degrees, interval_type=interval_type)
     
     def __invert__(self: PC) -> PC:
         raise NotImplementedError("Subclasses must implement __invert__")
@@ -330,13 +335,23 @@ class EquaveCyclicCollection(PitchCollection[IntervalType]):
             return []
         
         converted = [self._convert_value(i) for i in degrees]
-        is_float = any(isinstance(i, float) for i in converted)
         
-        if is_float:
-            converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
+        if self._interval_type_mode == "cents":
             self._interval_type = float
+            converted = [float(i) if isinstance(i, Fraction) else i for i in converted]
+            if not isinstance(self._equave, float):
+                if self._equave == Fraction(2, 1):
+                    self._equave = 1200.0
+                else:
+                    self._equave = float(self._equave)
             
-            reduced_degrees = [float(equave_reduce(i, self._equave)) for i in converted]
+            reduced_degrees = []
+            for i in converted:
+                while i >= self._equave:
+                    i -= self._equave
+                while i < 0:
+                    i += self._equave
+                reduced_degrees.append(i)
             
             unique_degrees = []
             for i in reduced_degrees:
@@ -345,16 +360,13 @@ class EquaveCyclicCollection(PitchCollection[IntervalType]):
             
             unique_degrees.sort()
         else:
-            converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
             self._interval_type = Fraction
+            converted = [i if isinstance(i, Fraction) else Fraction(i) for i in converted]
+            if isinstance(self._equave, float):
+                self._equave = Fraction.from_float(self._equave)
             
             reduced_degrees = [equave_reduce(i, self._equave) for i in converted]
             unique_degrees = sorted(list(set(reduced_degrees)))
-        
-        if converted and isinstance(converted[0], float) and not isinstance(self._equave, float):
-            self._equave = float(self._equave)
-        elif converted and isinstance(converted[0], Fraction) and isinstance(self._equave, float):
-            self._equave = Fraction.from_float(self._equave)
         
         return cast(List[IntervalType], unique_degrees)
     

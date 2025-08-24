@@ -68,6 +68,7 @@ def _find_complex_matches(cps, node_ids: List[int], ref_distances: List[float], 
     """Find matches for complex shapes using connectivity + angle verification."""
     matches = []
     all_nodes = list(cps.graph.nodes())
+    tolerance = 1e-8
     
     for candidate_nodes in combinations(all_nodes, len(node_ids)):
         if set(candidate_nodes) == set(node_ids):
@@ -77,6 +78,7 @@ def _find_complex_matches(cps, node_ids: List[int], ref_distances: List[float], 
         
         if (len(ref_distances) == len(cand_distances) and 
             ref_edge_count == cand_edge_count and
+            all(abs(r - c) <= tolerance for r, c in zip(ref_distances, cand_distances)) and
             _same_connectivity_and_angles(cps, node_ids, list(candidate_nodes))):
             matches.append(candidate_nodes)
     
@@ -92,8 +94,13 @@ def _same_connectivity_and_angles(cps, nodes1: List[int], nodes2: List[int]) -> 
     if not _graph_isomorphic(cps, nodes1, nodes2):
         return False
     
-    # Finally verify angle signatures match
-    return _angle_signatures_match(cps, nodes1, nodes2)
+    # Use angle signatures for complex patterns that need extra discrimination
+    # Simple 4-node Hexany patterns work with graph isomorphism alone
+    # All other complex patterns (5+ nodes, 6+ nodes, complex 4-node Eikosany) need angle signatures
+    if len(nodes1) >= 5 or (len(nodes1) == 4 and len(list(cps.graph.nodes())) > 6):
+        return _angle_signatures_match(cps, nodes1, nodes2)
+    
+    return True
 
 def _same_degree_sequence(cps, nodes1: List[int], nodes2: List[int]) -> bool:
     """Quick check if two node groups have the same degree sequence."""
@@ -148,12 +155,11 @@ def _angle_signatures_match(cps, nodes1: List[int], nodes2: List[int]) -> bool:
     if len(sig1) != len(sig2):
         return False
     
-    tolerance = 1e-4
+    tolerance = 1e-10
     return all(abs(a1 - a2) <= tolerance for a1, a2 in zip(sig1, sig2))
 
 def _get_angle_signature(cps, nodes: List[int]) -> List[float]:
     """Generate rotation-invariant angle signature for a node group."""
-    # Extract angles from edges within the group
     angles = []
     for u, v, data in cps.graph.edges(data=True):
         if u in nodes and v in nodes and 'angle' in data:
@@ -164,13 +170,12 @@ def _get_angle_signature(cps, nodes: List[int]) -> List[float]:
     
     angles.sort()
     
-    # Calculate pairwise angle differences (rotation-invariant)
+    # Use pairwise differences for good discrimination
     relative_angles = []
     for i in range(len(angles)):
         for j in range(i + 1, len(angles)):
             diff = abs(angles[j] - angles[i])
-            # Normalize to [0, π] range
-            diff = min(diff, 2 * math.pi - diff)
+            diff = min(diff, 2 * math.pi - diff)  # Normalize to [0, π]
             relative_angles.append(round(diff, 5))
     
     return sorted(relative_angles)
