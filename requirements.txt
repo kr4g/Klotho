@@ -10,7 +10,8 @@ scipy
 python-osc
 abjad
 mido
-midi2audio
+pyfluidsynth
+soundfile
 IPython
 panel
 bokeh

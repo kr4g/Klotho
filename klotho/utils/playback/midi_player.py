@@ -145,7 +145,8 @@ def _create_midi_from_temporal_unit(temporal_unit):
             events.append((start_time, 'note_on'))
             events.append((start_time + duration, 'note_off'))
     
-    events.sort(key=lambda x: x[0])
+    event_priority = {"note_on": 0, "note_off": 1}
+    events.sort(key=lambda x: (x[0], event_priority.get(x[1], 2)))
     
     current_time = 0.0
     for event_time, event_type in events:
@@ -220,9 +221,7 @@ def _create_midi_from_compositional_unit(compositional_unit):
             elif isinstance(note_param, Pitch):
                 # Use the same logic as pitch collections
                 channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(note_param)
-                # Add pitch bend if needed
-                if pitch_bend != 8192:
-                    events.append((start_time, 'pitch_bend', channel, pitch_bend))
+                events.append((start_time, 'pitch_bend', channel, pitch_bend))
                 # Add note events
                 events.append((start_time, 'note_on', channel, midi_note, velocity, program))
                 events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
@@ -230,9 +229,7 @@ def _create_midi_from_compositional_unit(compositional_unit):
                 # Microtonal MIDI float - convert to Pitch and use same logic
                 pitch = Pitch.from_midi(note_param)
                 channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
-                # Add pitch bend if needed
-                if pitch_bend != 8192:
-                    events.append((start_time, 'pitch_bend', channel, pitch_bend))
+                events.append((start_time, 'pitch_bend', channel, pitch_bend))
                 # Add note events
                 events.append((start_time, 'note_on', channel, midi_note, velocity, program))
                 events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
@@ -295,7 +292,8 @@ def _create_midi_from_collection(collection):
             # Could also contain nested TemporalBlocks, but keep it simple for now
     
     # Sort all events by time
-    all_events.sort(key=lambda x: x[0])
+    event_priority = {"pitch_bend": 0, "note_on": 1, "note_off": 2}
+    all_events.sort(key=lambda x: (x[0], event_priority.get(x[1], 3)))
     
     # Track program changes per channel
     current_programs = {}
@@ -311,11 +309,9 @@ def _create_midi_from_collection(collection):
         
         if event_type == 'pitch_bend':
             channel, pitch_bend_value = event_data[2], event_data[3]
-            # Only add pitch bend if it's not the center position
-            if pitch_bend_value != 8192:
-                # MIDI pitchwheel expects values in range -8192 to 8191, not 0 to 16383
-                pitch_value = pitch_bend_value - 8192
-                track.append(Message('pitchwheel', channel=channel, pitch=pitch_value, time=delta_ticks))
+            # MIDI pitchwheel expects values in range -8192 to 8191, not 0 to 16383
+            pitch_value = pitch_bend_value - 8192
+            track.append(Message('pitchwheel', channel=channel, pitch=pitch_value, time=delta_ticks))
         elif event_type in ('note_on', 'note_off'):
             channel, note, velocity, program = event_data[2], event_data[3], event_data[4], event_data[5]
             
@@ -389,9 +385,7 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
                 elif isinstance(note_param, Pitch):
                     # Use the same logic as pitch collections
                     channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(note_param)
-                    # Add pitch bend if needed
-                    if pitch_bend != 8192:
-                        all_events.append((start_time, 'pitch_bend', channel, pitch_bend))
+                    all_events.append((start_time, 'pitch_bend', channel, pitch_bend))
                     # Add note events
                     all_events.append((start_time, 'note_on', channel, midi_note, velocity, program))
                     all_events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
@@ -399,9 +393,7 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
                     # Microtonal MIDI float - convert to Pitch and use same logic
                     pitch = Pitch.from_midi(note_param)
                     channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
-                    # Add pitch bend if needed
-                    if pitch_bend != 8192:
-                        all_events.append((start_time, 'pitch_bend', channel, pitch_bend))
+                    all_events.append((start_time, 'pitch_bend', channel, pitch_bend))
                     # Add note events
                     all_events.append((start_time, 'note_on', channel, midi_note, velocity, program))
                     all_events.append((start_time + duration, 'note_off', channel, midi_note, 0, program))
@@ -643,9 +635,7 @@ def _create_midi_from_pitch_collection(collection, dur=0.5, bpm=120, prgm=0):
         # Get the best 144-TET channel and note approximation
         channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
         
-        # Add pitch bend if needed (should be rare with this system)
-        if pitch_bend != 8192:
-            events.append((current_time, 'pitch_bend', channel, pitch_bend))
+        events.append((current_time, 'pitch_bend', channel, pitch_bend))
         
         # Add note events
         events.append((current_time, 'note_on', channel, midi_note, DEFAULT_VELOCITY, prgm))
@@ -686,9 +676,7 @@ def _create_midi_from_scale(scale, dur=0.5, bpm=120, prgm=0):
         # Get the best 144-TET channel and note approximation
         channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
         
-        # Add pitch bend if needed (should be rare with this system)
-        if pitch_bend != 8192:
-            events.append((current_time, 'pitch_bend', channel, pitch_bend))
+        events.append((current_time, 'pitch_bend', channel, pitch_bend))
         
         # Add note events
         events.append((current_time, 'note_on', channel, midi_note, DEFAULT_VELOCITY, prgm))
@@ -703,9 +691,7 @@ def _create_midi_from_scale(scale, dur=0.5, bpm=120, prgm=0):
         # Get the best 144-TET channel and note approximation
         channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
         
-        # Add pitch bend if needed (should be rare with this system)
-        if pitch_bend != 8192:
-            events.append((current_time, 'pitch_bend', channel, pitch_bend))
+        events.append((current_time, 'pitch_bend', channel, pitch_bend))
         
         # Add note events
         events.append((current_time, 'note_on', channel, midi_note, DEFAULT_VELOCITY, prgm))
@@ -747,9 +733,7 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, bpm=120, prgm=0):
             # Get the best 144-TET channel and note approximation
             channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
             
-            # Add pitch bend if needed (should be rare with this system)
-            if pitch_bend != 8192:
-                events.append((current_time, 'pitch_bend', channel, pitch_bend))
+            events.append((current_time, 'pitch_bend', channel, pitch_bend))
             
             # Add note events
             events.append((current_time, 'note_on', channel, midi_note, DEFAULT_VELOCITY, prgm))
@@ -764,9 +748,7 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, bpm=120, prgm=0):
             # Get the best 144-TET channel and note approximation
             channel, midi_note, pitch_bend = _get_microtonal_channel_and_note(pitch)
             
-            # Add pitch bend if needed (should be rare with this system)
-            if pitch_bend != 8192:
-                events.append((0.0, 'pitch_bend', channel, pitch_bend))
+            events.append((0.0, 'pitch_bend', channel, pitch_bend))
             
             # Add note events
             events.append((0.0, 'note_on', channel, midi_note, DEFAULT_VELOCITY, prgm))
@@ -779,7 +761,9 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, bpm=120, prgm=0):
 
 def _events_to_midi_messages(events, track, bpm):
     """Convert time-based events to MIDI messages with proper timing."""
-    events.sort(key=lambda x: x[0])
+    # Sort by time, then by event type priority (pitch_bend before note_on/note_off)
+    event_priority = {"pitch_bend": 0, "note_on": 1, "note_off": 2}
+    events.sort(key=lambda x: (x[0], event_priority.get(x[1], 3)))
     
     current_time = 0.0
     beat_duration = 60.0 / bpm
@@ -795,11 +779,9 @@ def _events_to_midi_messages(events, track, bpm):
         
         if event_type == 'pitch_bend':
             channel, pitch_bend_value = event[2], event[3]
-            # Only add pitch bend if it's not the center position
-            if pitch_bend_value != 8192:
-                # MIDI pitchwheel expects values in range -8192 to 8191, not 0 to 16383
-                pitch_value = pitch_bend_value - 8192
-                track.append(Message('pitchwheel', channel=channel, pitch=pitch_value, time=delta_ticks))
+            # MIDI pitchwheel expects values in range -8192 to 8191, not 0 to 16383
+            pitch_value = pitch_bend_value - 8192
+            track.append(Message('pitchwheel', channel=channel, pitch=pitch_value, time=delta_ticks))
         elif event_type == 'note_on':
             channel, note, velocity, program = event[2], event[3], event[4], event[5]
             
