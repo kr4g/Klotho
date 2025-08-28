@@ -63,7 +63,8 @@ def _find_simple_matches(cps, node_ids: List[int], ref_distances: List[float], r
             all(abs(d1 - d2) <= tolerance for d1, d2 in zip(ref_distances, cand_distances))):
             matches.append(candidate_nodes)
     
-    return matches
+    # Post-process: sort matches by rotational relationship to target
+    return _sort_matches_by_rotation(cps, node_ids, matches)
 
 def _find_complex_matches(cps, node_ids: List[int], ref_distances: List[float], ref_edge_count: int) -> List[Tuple[int, ...]]:
     """Find matches for complex shapes using connectivity + angle verification."""
@@ -80,10 +81,11 @@ def _find_complex_matches(cps, node_ids: List[int], ref_distances: List[float], 
         if (len(ref_distances) == len(cand_distances) and 
             ref_edge_count == cand_edge_count and
             all(abs(r - c) <= tolerance for r, c in zip(ref_distances, cand_distances)) and
-            _same_connectivity_and_angles(cps, node_ids, list(candidate_nodes))):
+                         _same_connectivity_and_angles(cps, node_ids, list(candidate_nodes))):
                 matches.append(candidate_nodes)
     
-    return matches
+    # Post-process: sort matches by rotational relationship to target
+    return _sort_matches_by_rotation(cps, node_ids, matches)
 
 def _same_connectivity_and_angles(cps, nodes1: List[int], nodes2: List[int]) -> bool:
     """Check if two node groups have same connectivity and angle patterns."""
@@ -460,6 +462,185 @@ def _find_consistent_rotation(target_angles: List[float], candidate_angles: List
             return True
     
     return False
+
+def _sort_matches_by_rotation(cps, target_nodes: List[int], matches: List[Tuple[int, ...]]) -> List[Tuple[int, ...]]:
+    """Sort matches by their rotational relationship to the target pattern."""
+    if not matches:
+        return matches
+    
+    # Calculate rotation offset for each match
+    match_rotations = []
+    for match in matches:
+        rotation_offset = _calculate_rotation_offset(cps, target_nodes, list(match))
+        match_rotations.append((match, rotation_offset))
+    
+    # Sort by rotation offset (consistent rotational progression)
+    match_rotations.sort(key=lambda x: x[1])
+    
+    # Return just the matches in rotational order
+    return [match[0] for match in match_rotations]
+
+def _calculate_rotation_offset(cps, target_nodes: List[int], candidate_nodes: List[int]) -> float:
+    """Calculate the rotational offset of candidate relative to target."""
+    target_connectivity = _get_connectivity_pattern_simple(cps, target_nodes)
+    
+    # Try all valid permutations and find the one with the most meaningful rotation
+    best_rotation = 0.0
+    best_quality = -1
+    
+    for perm in permutations(candidate_nodes):
+        candidate_connectivity = _get_connectivity_pattern_simple(cps, list(perm))
+        if candidate_connectivity == target_connectivity:
+            # This permutation preserves connectivity, now check rotation quality
+            rotation, quality = _calculate_permutation_rotation_quality(cps, target_nodes, list(perm))
+            
+            if quality > best_quality:
+                best_quality = quality
+                best_rotation = rotation
+    
+    return best_rotation
+
+def _calculate_permutation_rotation_quality(cps, target_nodes: List[int], candidate_perm: List[int]) -> tuple:
+    """Calculate rotation and quality score for a specific permutation."""
+    target_edges = []
+    candidate_edges = []
+    
+    # Collect edge angles from this specific permutation
+    for i in range(len(target_nodes)):
+        for j in range(i + 1, len(target_nodes)):
+            target_has_edge = cps.graph.has_edge(target_nodes[i], target_nodes[j])
+            candidate_has_edge = cps.graph.has_edge(candidate_perm[i], candidate_perm[j])
+            
+            if target_has_edge and candidate_has_edge:
+                try:
+                    target_data = cps.graph.edges[target_nodes[i], target_nodes[j]]
+                    candidate_data = cps.graph.edges[candidate_perm[i], candidate_perm[j]]
+                    
+                    target_angle = target_data.get('angle', 0.0)
+                    candidate_angle = candidate_data.get('angle', 0.0)
+                    
+                    target_edges.append(target_angle)
+                    candidate_edges.append(candidate_angle)
+                except (KeyError, TypeError):
+                    continue
+    
+    if not target_edges:
+        return 0.0, 0  # No edges to compare
+    
+    # Check if this can be aligned by rotation only (not reflection)
+    if not _can_align_by_rotation_only(cps, target_nodes, candidate_perm):
+        return 0.0, -1  # Mark as invalid (reflection required)
+    
+    # Find the rotation and calculate quality
+    rotation_offset, match_count, total_error = _find_rotation_offset_with_quality(target_edges, candidate_edges)
+    
+    # Quality is based on how many edges match and how small the total error is
+    quality = match_count * 1000 - total_error  # Higher match count beats lower error
+    
+    return rotation_offset, quality
+
+def _can_align_by_rotation_only(cps, target_nodes: List[int], candidate_perm: List[int]) -> bool:
+    """Check if candidate can be aligned with target by rotation alone (no reflection)."""
+    # Get the "orientation" or "handedness" of both patterns
+    target_orientation = _get_pattern_orientation(cps, target_nodes)
+    candidate_orientation = _get_pattern_orientation(cps, candidate_perm)
+    
+    # If orientations have same sign, can align by rotation only
+    # If orientations have opposite sign, would need reflection
+    return (target_orientation > 0) == (candidate_orientation > 0)
+
+def _get_pattern_orientation(cps, nodes: List[int]) -> float:
+    """Calculate the orientation (handedness) of the pattern using edge angle sequences."""
+    if len(nodes) < 3:
+        return 1.0  # Default for patterns too small to have orientation
+    
+    # Calculate orientation using the sequence of edge angles around the pattern
+    # This detects whether the pattern has clockwise or counterclockwise "handedness"
+    
+    # Get all edge angles in the pattern
+    edge_angles = []
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            if cps.graph.has_edge(nodes[i], nodes[j]):
+                try:
+                    edge_data = cps.graph.edges[nodes[i], nodes[j]]
+                    angle = edge_data.get('angle', 0.0)
+                    edge_angles.append(angle)
+                except:
+                    continue
+    
+    if len(edge_angles) < 2:
+        return 1.0  # Not enough edges to determine orientation
+    
+    # Sort angles and look at the "spiral" direction
+    edge_angles.sort()
+    
+    # Calculate the "twist" or accumulated angular change
+    # This captures the handedness of the pattern
+    total_twist = 0.0
+    for i in range(len(edge_angles)):
+        next_i = (i + 1) % len(edge_angles)
+        angle_diff = edge_angles[next_i] - edge_angles[i]
+        
+        # Normalize to [-π, π]
+        while angle_diff > math.pi:
+            angle_diff -= 2 * math.pi
+        while angle_diff < -math.pi:
+            angle_diff += 2 * math.pi
+            
+        total_twist += angle_diff
+    
+    return total_twist  # Positive = one handedness, negative = opposite
+
+def _find_rotation_offset_with_quality(target_angles: List[float], candidate_angles: List[float]) -> tuple:
+    """Find the rotation offset that best aligns candidate with target, returning rotation, match_count, and total_error."""
+    if not target_angles or not candidate_angles:
+        return 0.0, 0, 0.0
+    
+    # For fine-grained rotation detection, try small increments
+    best_rotation = 0.0
+    best_match_count = 0
+    best_total_error = float('inf')
+    tolerance = 0.1  # radians
+    
+    # Generate fine-grained rotations (every 2.5 degrees)
+    rotation_set = set()
+    for i in range(144):  # 144 * 2.5° = 360°
+        rotation_angle = i * math.pi / 72  # π/72 rad = 2.5°
+        rotation_set.add(rotation_angle)
+    
+    # Also include common musical intervals for robustness
+    for semitones in range(12):
+        rotation_angle = semitones * math.pi / 6  # π/6 rad = 30° per semitone  
+        rotation_set.add(rotation_angle)
+        
+    for rotation in rotation_set:
+        match_count = 0
+        total_error = 0.0
+        
+        for target_angle, candidate_angle in zip(target_angles, candidate_angles):
+            # Check if candidate_angle + rotation ≈ target_angle (mod 2π)
+            rotated_candidate = (candidate_angle + rotation) % (2 * math.pi)
+            diff = abs(target_angle - rotated_candidate)
+            diff = min(diff, 2 * math.pi - diff)  # Handle wraparound
+            
+            if diff <= tolerance:
+                match_count += 1
+                total_error += diff
+        
+        # Prefer rotations with more matches, and among ties, prefer lower total error
+        if (match_count > best_match_count or 
+            (match_count == best_match_count and match_count > 0 and total_error < best_total_error)):
+            best_match_count = match_count
+            best_rotation = rotation
+            best_total_error = total_error if match_count > 0 else float('inf')
+    
+    return best_rotation, best_match_count, best_total_error
+
+def _find_rotation_offset(target_angles: List[float], candidate_angles: List[float]) -> float:
+    """Find the rotation offset that best aligns candidate with target."""
+    rotation, _, _ = _find_rotation_offset_with_quality(target_angles, candidate_angles)
+    return rotation
 
 def _angles_match_with_rotation(cps, target_angle: float, candidate_angle: float, tolerance: float) -> bool:
     """Check if two angles match after applying any of the discrete rotations found in the graph."""

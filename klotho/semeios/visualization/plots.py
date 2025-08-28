@@ -1,11 +1,17 @@
-from klotho.topos.graphs import Graph, Tree, Lattice
+from klotho.topos.graphs import Graph, Tree
 from klotho.topos.collections.sets import CombinationSet, PartitionSet
+from klotho.topos.graphs.lattices import Lattice
+from klotho.topos.graphs.lattices.fields import Field
 
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
+from klotho.tonos.scales import Scale
+from klotho.tonos.chords import Chord
+from klotho.tonos.scales.scale import AddressedScale
+from klotho.tonos.chords.chord import AddressedChord
 
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
@@ -54,6 +60,8 @@ def plot(obj, **kwargs):
                             return _plot_parameter_tree(obj, **kwargs)
                         case _:
                             return _plot_tree(obj, **kwargs)
+                case Field():
+                    return _plot_field(obj, **kwargs)
                 case Lattice():
                     return _plot_lattice(obj, **kwargs)
                 case _:
@@ -64,6 +72,8 @@ def plot(obj, **kwargs):
                     return _plot_cps(obj, **kwargs)
                 case _:
                     return _plot_cs(obj, **kwargs)
+        case Scale() | Chord() | AddressedScale() | AddressedChord():
+            return _plot_scale_chord(obj, **kwargs)
         case PartitionSet():
             return _plot_graph(obj.graph._graph, **kwargs)
         case DynamicRange():
@@ -1925,7 +1935,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             textposition='middle center',
             textfont=dict(color='black', size=text_size, family='Arial Black', weight='bold'),
             hovertemplate='%{customdata}<extra></extra>',
-            hoverlabel=dict(bgcolor='white', font_color='black'),
+            hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
             customdata=hover_data,
             showlegend=False
         )
@@ -1953,6 +1963,250 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             showgrid=False, zeroline=False, showticklabels=False,
             scaleanchor="x", scaleratio=1,
             range=[min(node_y)-1, max(node_y)+1]
+        ),
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0),
+    )
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
+
+def _plot_scale_chord(obj, figsize: tuple = (12, 12), 
+                     node_size: int = 30, text_size: int = 12, show_labels: bool = True,
+                     title: str = None, output_file: str = None, nodes: list = None) -> go.Figure:
+    """
+    Plot a Scale or Chord as a circular clock-like diagram.
+    
+    Args:
+        obj: Scale or Chord instance to visualize
+        figsize: Size of the figure as (width, height) in inches
+        node_size: Size of the nodes in the plot
+        text_size: Size of the text labels
+        show_labels: Whether to show labels on the nodes
+        title: Title for the plot (default is derived from object type if None)
+        output_file: Path to save the figure (if None, display instead)
+        nodes: List of node IDs to highlight and connect with edges
+        
+    Returns:
+        Plotly figure object that can be displayed or further customized
+    """
+    degrees = obj.degrees
+    if not degrees:
+        raise ValueError(f"{type(obj).__name__} has no degrees to plot")
+    
+    n_degrees = len(degrees)
+    
+    # For addressed objects, use the underlying collection for calculations
+    calc_obj = obj._collection if isinstance(obj, (AddressedScale, AddressedChord)) else obj
+    calc_degrees = calc_obj.degrees
+    
+    fig = go.Figure()
+    
+    node_x, node_y = [], []
+    node_text, hover_data, node_colors = [], [], []
+    
+    for i, degree in enumerate(degrees):
+        # Use the underlying collection's degrees for angle calculation
+        calc_degree = calc_degrees[i]
+        
+        if calc_obj._interval_type_mode == "cents":
+            equave_value = calc_obj._equave if isinstance(calc_obj._equave, float) else 1200.0
+            proportion = calc_degree / equave_value
+        else:
+            equave_value = float(calc_obj._equave)
+            proportion = math.log(float(calc_degree)) / math.log(equave_value)
+        
+        angle = -2 * math.pi * proportion + math.pi / 2
+        x = math.cos(angle)
+        y = math.sin(angle)
+        node_x.append(x)
+        node_y.append(y)
+        
+        # Handle addressed vs non-addressed objects
+        if isinstance(obj, (AddressedScale, AddressedChord)):
+            # For addressed objects, use the underlying collection for display
+            calc_degree = calc_degrees[i]
+            if calc_obj._interval_type_mode == "cents":
+                display_text = f"{calc_degree:.1f}¢"
+                base_hover = f"{calc_degree:.1f} cents"
+            else:
+                display_text = f"{calc_degree}"
+                base_hover = f"{calc_degree}"
+            
+            # Extract note name (no octave) and cent offset from pitch object
+            note_name = degree.pitchclass
+            cents_offset = degree.cents_offset
+            
+            # Format cent offset if significant
+            cent_info = ""
+            if abs(cents_offset) > 0.01:
+                cent_info = f" ({cents_offset:+.2f}¢)"
+            
+            hover_info = f"Node {i}<br>{base_hover}<br>{note_name}{cent_info}"
+        elif calc_obj._interval_type_mode == "cents":
+            display_text = f"{degree:.1f}¢"
+            hover_info = f"Node {i}<br>{degree:.1f} cents"
+        else:
+            display_text = f"{degree}"
+            hover_info = f"Node {i}<br>{degree}"
+        
+        node_text.append(display_text if show_labels else "")
+        hover_data.append(hover_info)
+        
+        rainbow_color = plt.cm.hsv(i / n_degrees)
+        color_hex = '#%02x%02x%02x' % (int(rainbow_color[0]*255), int(rainbow_color[1]*255), int(rainbow_color[2]*255))
+        
+        if nodes:
+            # Handle both single list and list of lists
+            all_highlighted_nodes = set()
+            if isinstance(nodes[0], list):
+                for node_list in nodes:
+                    all_highlighted_nodes.update(node_list)
+            else:
+                all_highlighted_nodes = set(nodes)
+            
+            if i in all_highlighted_nodes:
+                node_colors.append(color_hex)
+            else:
+                dimmed_color_hex = '#%02x%02x%02x' % (int(rainbow_color[0]*128), int(rainbow_color[1]*128), int(rainbow_color[2]*128))
+                node_colors.append(dimmed_color_hex)
+        else:
+            node_colors.append(color_hex)
+    
+    for i in range(n_degrees):
+        for j in range(i + 1, n_degrees):
+            x1, y1 = node_x[i], node_y[i]
+            x2, y2 = node_x[j], node_y[j]
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color='#444444', width=1),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+    
+    if nodes:
+        # Handle both single list and list of lists
+        if isinstance(nodes[0], list):
+            # Multiple shapes - use viridis color scheme
+            viridis_colors = plt.cm.viridis(np.linspace(0, 1, len(nodes)))
+            for shape_idx, node_list in enumerate(nodes):
+                sorted_nodes = sorted(node_list)
+                viridis_color = viridis_colors[shape_idx]
+                color_hex = '#%02x%02x%02x' % (int(viridis_color[0]*255), int(viridis_color[1]*255), int(viridis_color[2]*255))
+                
+                for i in range(len(sorted_nodes)):
+                    current_idx = sorted_nodes[i]
+                    next_idx = sorted_nodes[(i + 1) % len(sorted_nodes)]
+                    
+                    if current_idx < len(node_x) and next_idx < len(node_x):
+                        x1, y1 = node_x[current_idx], node_y[current_idx]
+                        x2, y2 = node_x[next_idx], node_y[next_idx]
+                        fig.add_trace(
+                            go.Scatter(
+                                x=[x1, x2], y=[y1, y2],
+                                mode='lines',
+                                line=dict(color=color_hex, width=3),
+                                showlegend=False,
+                                hoverinfo='none'
+                            )
+                        )
+        else:
+            # Single shape - use white
+            sorted_nodes = sorted(nodes)
+            for i in range(len(sorted_nodes)):
+                current_idx = sorted_nodes[i]
+                next_idx = sorted_nodes[(i + 1) % len(sorted_nodes)]
+                
+                if current_idx < len(node_x) and next_idx < len(node_x):
+                    x1, y1 = node_x[current_idx], node_y[current_idx]
+                    x2, y2 = node_x[next_idx], node_y[next_idx]
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color='white', width=3),
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=node_x, y=node_y,
+            mode='markers+text' if show_labels else 'markers',
+            marker=dict(
+                size=node_size,
+                color=node_colors,
+                line=dict(color='white', width=2)
+            ),
+            text=node_text,
+            textposition='middle center',
+            textfont=dict(color='white', size=text_size, family='Arial', weight='bold'),
+            hovertemplate='%{customdata}<extra></extra>',
+            hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
+            customdata=hover_data,
+            showlegend=False
+        )
+    )
+    
+    if calc_obj._interval_type_mode == "cents":
+        equave_value = calc_obj._equave if isinstance(calc_obj._equave, float) else 1200.0
+        equave_text = f"Equave: {equave_value:.1f}¢"
+    else:
+        equave_text = f"Equave: {calc_obj._equave}"
+    
+    fig.add_annotation(
+        x=0, y=1.3,
+        text=equave_text,
+        showarrow=False,
+        font=dict(color='white', size=text_size),
+        align='center'
+    )
+    
+    if title is None:
+        if isinstance(obj, (AddressedScale, AddressedChord)):
+            obj_type = type(obj).__name__.replace('Addressed', '')
+            interval_type = "cents" if calc_obj._interval_type_mode == "cents" else "ratios"
+            
+            # Format root pitch with note name (no octave) and cent offset
+            root_pitch = obj.reference_pitch
+            root_note = root_pitch.pitchclass
+            if abs(root_pitch.cents_offset) > 0.01:
+                root_note += f" ({root_pitch.cents_offset:+.2f}¢)"
+            
+            title = f"{obj_type} ({interval_type}) - Root: {root_note}"
+        else:
+            obj_type = type(obj).__name__
+            if calc_obj._interval_type_mode == "cents":
+                title = f"{obj_type} (cents)"
+            else:
+                title = f"{obj_type} (ratios)"
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        xaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[-1.5, 1.5]
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            scaleanchor="x", scaleratio=1,
+            range=[-1.5, 1.5]
         ),
         hovermode='closest',
         margin=dict(l=0, r=0, t=50, b=0),
@@ -2134,7 +2388,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  output_file: str = None, 
                  dim_reduction: str = None, target_dims: int = 3,
                  mds_metric: bool = True, mds_max_iter: int = 300,
-                 spectral_affinity: str = 'rbf', spectral_gamma: float = None) -> go.Figure:
+                 spectral_affinity: str = 'rbf', spectral_gamma: float = None,
+                 nodes: list = None, path_mode: str = 'adjacent') -> go.Figure:
+    import networkx as nx
     """
     Plot a Lattice as a 2D or 3D grid visualization.
     
@@ -2151,6 +2407,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         mds_max_iter: Maximum iterations for MDS algorithm
         spectral_affinity: Kernel for spectral embedding ('rbf', 'nearest_neighbors', etc.)
         spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
+        nodes: List of coordinate tuples to highlight, e.g. [(0,0,0), (-3,2,0), (2,-1,1)]
+               Highlights selected coordinates and draws edges based on path_mode
+        path_mode: Edge drawing mode when nodes are selected. Options:
+                  'adjacent' - Only show edges between selected nodes that are adjacent (default)
+                  'origin' - Show shortest paths from origin (0,0,0...) to each selected node
         
     Returns:
         go.Figure: Plotly figure object
@@ -2182,12 +2443,69 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             expected_total = float('inf')
             break
     
-    if lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
+    # If nodes are specified, use minimal resolution to just fit the selected nodes (for ALL lattices)
+    if nodes:
+        # Find the exact range needed for each dimension
+        coord_ranges = []
+        for dim in range(lattice.dimensionality):
+            dim_vals = [coord[dim] for coord in nodes if coord in lattice]
+            if dim_vals:
+                min_val, max_val = min(dim_vals), max(dim_vals)
+                # Add small buffer (1 coordinate) around the selection
+                coord_ranges.append((min_val - 1, max_val + 1))
+            else:
+                coord_ranges.append((-1, 1))
+        
+        # Use custom coordinate range instead of resolution
+        coords = []
+        import itertools
+        ranges = [range(start, end + 1) for start, end in coord_ranges]
+        coords = list(itertools.product(*ranges))
+        
+        # Filter to only coordinates that exist in the lattice
+        coords = [coord for coord in coords if coord in lattice]
+    elif lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
         coords = lattice._get_plot_coords(max_resolution)
     else:
         coords = lattice.coords
     
-    G = lattice  # Lattice inherits from Graph, so use it directly
+    # For reduced coordinate plotting, we need to build a reduced graph
+    # to avoid iterating over thousands of edges in the full lattice
+    if nodes or lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
+        # Build reduced graph with only the plotting coordinates
+        G_reduced = nx.Graph()
+        G_reduced.add_nodes_from(coords)
+        
+        # Add edges between coordinates that are adjacent in lattice structure
+        for i, coord1 in enumerate(coords):
+            for j, coord2 in enumerate(coords):
+                if i < j:
+                    # Check if coordinates are adjacent (differ by 1 in exactly one dimension)
+                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                    if diff_count == 1 and same_count == len(coord1) - 1:
+                        G_reduced.add_edge(coord1, coord2)
+        
+        G = G_reduced
+    else:
+        G = lattice  # Use full lattice for small coordinate sets
+    
+    # Handle origin inclusion for path_mode='origin' before setting original_coords
+    if nodes and path_mode == 'origin':
+        origin = tuple(0 for _ in range(lattice.dimensionality))
+        if origin not in coords:
+            coords.append(origin)
+            # Update the reduced graph if we're using one
+            if hasattr(G, 'add_node'):
+                G.add_node(origin)
+                # Add edges from origin to adjacent coordinates
+                for coord in coords:
+                    if coord != origin:
+                        diff_count = sum(1 for a, b in zip(origin, coord) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(origin, coord) if a == b)
+                        if diff_count == 1 and same_count == len(coord) - 1:
+                            G.add_edge(origin, coord)
+    
     original_coords = coords
     
     if lattice.dimensionality > 3:
@@ -2252,35 +2570,123 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         else:
             title = f"{lattice.dimensionality}D Lattice ({resolution_str}, {bipolar_str})"
     
+    # Handle edge highlighting for selected coordinates
+    # Only include nodes that actually exist in the plotting coordinate set
+    if nodes:
+        valid_coords = set(coords) if lattice.dimensionality <= 3 else set(original_coords)
+        highlighted_coords = set(coord for coord in nodes if coord in valid_coords)
+    else:
+        highlighted_coords = set()
+    
+    # Determine if we should use dimmed appearance (whenever nodes are selected)
+    use_dimmed = nodes is not None and len(nodes) > 0
+    
     fig = go.Figure()
     
     if effective_dimensionality == 1:
+        
+        # Draw all background edges (slightly dimmed when nodes are selected)
+        edge_color = '#555555' if use_dimmed else '#808080'
+        edge_width = 1 if use_dimmed else 3
+        
         for u, v in G.edges():
             x1, y1 = u[0], 0
             x2, y2 = v[0], 0
+            
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
                     mode='lines',
-                    line=dict(color='#808080', width=3),
+                    line=dict(color=edge_color, width=edge_width),
                     showlegend=False,
                     hoverinfo='none'
                 )
             )
         
+        # Draw highlighted edges based on path_mode
+        if nodes and len(highlighted_coords) >= 1:
+            highlighted_list = list(highlighted_coords)
+            
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                # Original behavior: only edges between adjacent selected nodes
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        
+                        # Check if these coordinates are adjacent in the lattice structure
+                        # (differ by 1 in exactly one dimension)
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
+                        
+                        if is_lattice_adjacent:
+                            x1, x2 = coord1[0], coord2[0]
+                            y1, y2 = 0, 0
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=[x1, x2], y=[y1, y2],
+                                    mode='lines',
+                                    line=dict(color='white', width=4),
+                                    showlegend=False,
+                                    hoverinfo='none'
+                                )
+                            )
+            
+            elif path_mode == 'origin':
+                # New behavior: shortest paths from origin to each selected node
+                origin = tuple(0 for _ in range(lattice.dimensionality))
+                
+                for target_coord in highlighted_list:
+                    if target_coord != origin:
+                        try:
+                            # Find shortest path from origin to this target
+                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
+                                path_coords = nx.shortest_path(G, origin, target_coord)
+                                
+                                # Draw path edges
+                                for k in range(len(path_coords) - 1):
+                                    pc1, pc2 = path_coords[k], path_coords[k + 1]
+                                    x1, x2 = pc1[0], pc2[0]
+                                    y1, y2 = 0, 0
+                                    fig.add_trace(
+                                        go.Scatter(
+                                            x=[x1, x2], y=[y1, y2],
+                                            mode='lines',
+                                            line=dict(color='white', width=4),
+                                            showlegend=False,
+                                            hoverinfo='none'
+                                        )
+                                    )
+                        except (KeyError, nx.NetworkXNoPath):
+                            # Skip if path not found
+                            continue
+        
         node_x, node_y = [], []
         hover_data = []
+        node_colors = []
         
         for i, coord in enumerate(coords):
             x = coord[0]
             node_x.append(x)
             node_y.append(0)
+            
+            # Get original coordinate for comparison
+            orig_coord = coord if lattice.dimensionality <= 3 else original_coords[i]
+            
             if lattice.dimensionality > 3:
                 orig_coord_str = str(original_coords[i]).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f})"
                 hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
             else:
                 hover_data.append(f"Coordinate: ({x})")
+            
+            # Set node color based on highlighting
+            if nodes and orig_coord in highlighted_coords:
+                node_colors.append('white')
+            elif use_dimmed:
+                node_colors.append('#111111')  # WAY more dimmed for non-selected nodes
+            else:
+                node_colors.append('white')  # Default color when no highlighting
         
         fig.add_trace(
             go.Scatter(
@@ -2288,7 +2694,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 mode='markers',
                 marker=dict(
                     size=node_size * 2,
-                    color='white',
+                    color=node_colors,
                     line=dict(color='white', width=2)
                 ),
                 hovertemplate='%{text}<extra></extra>',
@@ -2305,32 +2711,108 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         )
     
     elif effective_dimensionality == 2:
+        # Draw all background edges (slightly dimmed when nodes are selected)
+        edge_color = '#555555' if use_dimmed else '#808080'
+        edge_width = 1 if use_dimmed else 2
+        
         for u, v in G.edges():
             x1, y1 = u
             x2, y2 = v
+            
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
                     mode='lines',
-                    line=dict(color='#808080', width=2),
+                    line=dict(color=edge_color, width=edge_width),
                     showlegend=False,
                     hoverinfo='none'
                 )
             )
         
+        # Draw highlighted edges based on path_mode
+        if nodes and len(highlighted_coords) >= 1:
+            highlighted_list = list(highlighted_coords)
+            
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                # Original behavior: only edges between adjacent selected nodes
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        
+                        # Check if these coordinates are adjacent in the lattice structure
+                        # (differ by 1 in exactly one dimension)
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
+                        
+                        if is_lattice_adjacent:
+                            x1, y1 = coord1
+                            x2, y2 = coord2
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=[x1, x2], y=[y1, y2],
+                                    mode='lines',
+                                    line=dict(color='white', width=4),
+                                    showlegend=False,
+                                    hoverinfo='none'
+                                )
+                            )
+            
+            elif path_mode == 'origin':
+                # New behavior: shortest paths from origin to each selected node
+                origin = tuple(0 for _ in range(lattice.dimensionality))
+                
+                for target_coord in highlighted_list:
+                    if target_coord != origin:
+                        try:
+                            # Find shortest path from origin to this target
+                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
+                                path_coords = nx.shortest_path(G, origin, target_coord)
+                                
+                                # Draw path edges
+                                for k in range(len(path_coords) - 1):
+                                    pc1, pc2 = path_coords[k], path_coords[k + 1]
+                                    x1, y1 = pc1
+                                    x2, y2 = pc2
+                                    fig.add_trace(
+                                        go.Scatter(
+                                            x=[x1, x2], y=[y1, y2],
+                                            mode='lines',
+                                            line=dict(color='white', width=4),
+                                            showlegend=False,
+                                            hoverinfo='none'
+                                        )
+                                    )
+                        except (KeyError, nx.NetworkXNoPath):
+                            # Skip if path not found
+                            continue
+        
         node_x, node_y = [], []
         hover_data = []
+        node_colors = []
         
         for i, coord in enumerate(coords):
             x, y = coord
             node_x.append(x)
             node_y.append(y)
+            
+            # Get original coordinate for comparison
+            orig_coord = coord if lattice.dimensionality <= 3 else original_coords[i]
+            
             if lattice.dimensionality > 3:
                 orig_coord_str = str(original_coords[i]).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f}, {y:.2f})"
                 hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
             else:
                 hover_data.append(f"Coordinate: ({x}, {y})")
+            
+            # Set node color based on highlighting
+            if nodes and orig_coord in highlighted_coords:
+                node_colors.append('white')
+            elif use_dimmed:
+                node_colors.append('#111111')  # WAY more dimmed for non-selected nodes
+            else:
+                node_colors.append('white')  # Default color when no highlighting
         
         fig.add_trace(
             go.Scatter(
@@ -2338,7 +2820,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 mode='markers',
                 marker=dict(
                     size=node_size * 2,
-                    color='white',
+                    color=node_colors,
                     line=dict(color='white', width=2)
                 ),
                 hovertemplate='%{text}<extra></extra>',
@@ -2354,33 +2836,114 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         )
     
     elif effective_dimensionality == 3:
+        # Draw all background edges (slightly dimmed when nodes are selected)
+        edge_color = '#555555' if use_dimmed else '#808080'
+        edge_width = 1 if use_dimmed else 3
+        
         for u, v in G.edges():
-            x1, y1, z1 = u
-            x2, y2, z2 = v
+            x1, y1, z1 = (u[0], u[1], u[2]) if len(u) >= 3 else (u[0], u[1] if len(u) >= 2 else 0, 0)
+            x2, y2, z2 = (v[0], v[1], v[2]) if len(v) >= 3 else (v[0], v[1] if len(v) >= 2 else 0, 0)
+            
             fig.add_trace(
                 go.Scatter3d(
                     x=[x1, x2], y=[y1, y2], z=[z1, z2],
                     mode='lines',
-                    line=dict(color='#808080', width=3),
+                    line=dict(color=edge_color, width=edge_width),
                     showlegend=False,
                     hoverinfo='none'
                 )
             )
         
+        # Draw highlighted edges based on path_mode
+        if nodes and len(highlighted_coords) >= 1:
+            highlighted_list = list(highlighted_coords)
+            
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                # Original behavior: only edges between adjacent selected nodes
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        
+                        # Check if these coordinates are adjacent in the lattice structure
+                        # (differ by 1 in exactly one dimension)
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
+                        
+                        if is_lattice_adjacent:
+                            x1, y1, z1 = (coord1[0], coord1[1], coord1[2]) if len(coord1) >= 3 else (coord1[0], coord1[1] if len(coord1) >= 2 else 0, 0)
+                            x2, y2, z2 = (coord2[0], coord2[1], coord2[2]) if len(coord2) >= 3 else (coord2[0], coord2[1] if len(coord2) >= 2 else 0, 0)
+                            fig.add_trace(
+                                go.Scatter3d(
+                                    x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                                    mode='lines',
+                                    line=dict(color='white', width=4),
+                                    showlegend=False,
+                                    hoverinfo='none'
+                                )
+                            )
+            
+            elif path_mode == 'origin':
+                # New behavior: shortest paths from origin to each selected node
+                origin = tuple(0 for _ in range(lattice.dimensionality))
+                
+                for target_coord in highlighted_list:
+                    if target_coord != origin:
+                        try:
+                            # Find shortest path from origin to this target
+                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
+                                path_coords = nx.shortest_path(G, origin, target_coord)
+                                
+                                # Draw path edges
+                                for k in range(len(path_coords) - 1):
+                                    pc1, pc2 = path_coords[k], path_coords[k + 1]
+                                    x1, y1, z1 = (pc1[0], pc1[1], pc1[2]) if len(pc1) >= 3 else (pc1[0], pc1[1] if len(pc1) >= 2 else 0, 0)
+                                    x2, y2, z2 = (pc2[0], pc2[1], pc2[2]) if len(pc2) >= 3 else (pc2[0], pc2[1] if len(pc2) >= 2 else 0, 0)
+                                    fig.add_trace(
+                                        go.Scatter3d(
+                                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                                            mode='lines',
+                                            line=dict(color='white', width=4),
+                                            showlegend=False,
+                                            hoverinfo='none'
+                                        )
+                                    )
+                        except (KeyError, nx.NetworkXNoPath):
+                            # Skip if path not found
+                            continue
+        
         node_x, node_y, node_z = [], [], []
         hover_data = []
+        node_colors = []
         
         for i, coord in enumerate(coords):
-            x, y, z = coord
+            if len(coord) >= 3:
+                x, y, z = coord[0], coord[1], coord[2]
+            elif len(coord) == 2:
+                x, y, z = coord[0], coord[1], 0
+            else:
+                x, y, z = coord[0], 0, 0
             node_x.append(x)
             node_y.append(y) 
             node_z.append(z)
+            
+            # Get original coordinate for comparison
+            orig_coord = coord if lattice.dimensionality <= 3 else original_coords[i]
+            
             if lattice.dimensionality > 3:
                 orig_coord_str = str(original_coords[i]).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
                 hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
             else:
                 hover_data.append(f"Coordinate: ({x}, {y}, {z})")
+            
+            # Set node color based on highlighting
+            if nodes and orig_coord in highlighted_coords:
+                node_colors.append('white')
+            elif use_dimmed:
+                node_colors.append('#111111')  # WAY more dimmed for non-selected nodes
+            else:
+                node_colors.append('white')  # Default color when no highlighting
         
         fig.add_trace(
             go.Scatter3d(
@@ -2388,7 +2951,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 mode='markers',
                 marker=dict(
                     size=node_size,
-                    color='white',
+                    color=node_colors,
                     line=dict(color='white', width=2)
                 ),
                 hovertemplate='%{text}<extra></extra>',
@@ -2538,6 +3101,836 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                     bgcolor='black'
                 )
             ))
+    
+    fig.update_layout(**layout_dict)
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
+
+
+def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
+               node_size: float = 8, title: str = None, 
+               output_file: str = None, 
+               dim_reduction: str = None, target_dims: int = 3,
+               mds_metric: bool = True, mds_max_iter: int = 300,
+               spectral_affinity: str = 'rbf', spectral_gamma: float = None,
+               nodes: list = None, path_mode: str = 'adjacent',
+               colormap: str = 'coolwarm', show_colorbar: bool = False) -> go.Figure:
+    """
+    Plot a Field as a 2D or 3D grid visualization with node colors representing field values.
+    
+    Args:
+        field: Field instance to visualize
+        figsize: Width and height of the output figure in inches
+        node_size: Size of the nodes in the plot
+        title: Title for the plot (auto-generated if None)
+        output_file: Path to save the visualization (displays plot if None)
+        dim_reduction: Dimensionality reduction method for high-dimensional fields.
+                      Options: 'mds', 'spectral', or None (raises error for dim > 3)
+        target_dims: Target dimensionality for reduction (2 or 3, default 3)
+        mds_metric: Whether to use metric MDS (True) or non-metric MDS (False)
+        mds_max_iter: Maximum iterations for MDS algorithm
+        spectral_affinity: Kernel for spectral embedding ('rbf', 'nearest_neighbors', etc.)
+        spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
+        nodes: List of coordinate tuples to highlight, e.g. [(0,0,0), (-3,2,0), (2,-1,1)]
+               Highlights selected coordinates and draws edges based on path_mode
+        path_mode: Edge drawing mode when nodes are selected. Options:
+                  'adjacent' - Only show edges between selected nodes that are adjacent (default)
+                  'origin' - Show shortest paths from origin (0,0,0...) to each selected node
+        colormap: Matplotlib colormap name for field values (default: 'hot')
+        show_colorbar: Whether to show the colorbar (default: False)
+        
+    Returns:
+        go.Figure: Plotly figure object
+        
+    Raises:
+        ValueError: If field dimensionality > 3 and dim_reduction is None
+    """
+    import networkx as nx
+    import matplotlib.pyplot as plt
+    from sklearn.manifold import MDS, SpectralEmbedding
+    
+    if field.dimensionality > 3 and dim_reduction is None:
+        raise ValueError(f"Plotting dimensionality > 3 requires dim_reduction. Got dimensionality={field.dimensionality}. "
+                        f"Use dim_reduction='mds' or 'spectral'")
+    
+    if target_dims not in [2, 3]:
+        raise ValueError(f"target_dims must be 2 or 3, got {target_dims}")
+    
+    if field.dimensionality <= 2:
+        max_resolution = 5
+    elif field.dimensionality == 3:
+        max_resolution = 2
+    else:
+        if target_dims == 3:
+            max_resolution = 1
+        else:
+            max_resolution = 3
+    
+    expected_total = 1
+    for dim in field._dims:
+        expected_total *= len(dim)
+        if expected_total > 10000:
+            expected_total = float('inf')
+            break
+    
+    if nodes:
+        coord_ranges = []
+        for dim in range(field.dimensionality):
+            dim_vals = [coord[dim] for coord in nodes if coord in field]
+            if dim_vals:
+                min_val, max_val = min(dim_vals), max(dim_vals)
+                coord_ranges.append((min_val - 1, max_val + 1))
+            else:
+                coord_ranges.append((-1, 1))
+        
+        coords = []
+        import itertools
+        ranges = [range(start, end + 1) for start, end in coord_ranges]
+        coords = list(itertools.product(*ranges))
+        
+        coords = [coord for coord in coords if coord in field]
+    elif field.dimensionality > 3 or field._is_lazy or expected_total > 1000:
+        coords = field._get_plot_coords(max_resolution)
+    else:
+        coords = field.coords
+    
+    if nodes or field.dimensionality > 3 or field._is_lazy or expected_total > 1000:
+        G_reduced = nx.Graph()
+        G_reduced.add_nodes_from(coords)
+        
+        for i, coord1 in enumerate(coords):
+            for j, coord2 in enumerate(coords):
+                if i < j:
+                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                    if diff_count == 1 and same_count == len(coord1) - 1:
+                        G_reduced.add_edge(coord1, coord2)
+        
+        G = G_reduced
+    else:
+        G = field
+    
+    if nodes and path_mode == 'origin':
+        origin = tuple(0 for _ in range(field.dimensionality))
+        if origin not in coords:
+            coords.append(origin)
+            if hasattr(G, 'add_node'):
+                G.add_node(origin)
+                for coord in coords:
+                    if coord != origin:
+                        diff_count = sum(1 for a, b in zip(origin, coord) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(origin, coord) if a == b)
+                        if diff_count == 1 and same_count == len(coord) - 1:
+                            G.add_edge(origin, coord)
+    
+    original_coords = coords
+    
+    if field.dimensionality > 3:
+        coord_matrix = np.array([list(coord) for coord in coords])
+        
+        if dim_reduction == 'mds':
+            reducer = MDS(n_components=target_dims, metric=mds_metric, max_iter=mds_max_iter, random_state=42)
+            reduced_coords = reducer.fit_transform(coord_matrix)
+        elif dim_reduction == 'spectral':
+            if spectral_affinity == 'precomputed':
+                coord_to_idx = {coord: i for i, coord in enumerate(coords)}
+                n = len(coords)
+                adjacency_matrix = np.zeros((n, n))
+                
+                for i, coord1 in enumerate(coords):
+                    for j, coord2 in enumerate(coords):
+                        if i != j:
+                            diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                            same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                            if diff_count == 1 and same_count == len(coord1) - 1:
+                                adjacency_matrix[i, j] = 1
+                
+                reducer = SpectralEmbedding(n_components=target_dims, affinity='precomputed', random_state=42)
+                reduced_coords = reducer.fit_transform(adjacency_matrix)
+            else:
+                reducer = SpectralEmbedding(n_components=target_dims, affinity=spectral_affinity, 
+                                          gamma=spectral_gamma, random_state=42)
+                reduced_coords = reducer.fit_transform(coord_matrix)
+        else:
+            raise ValueError(f"Unknown dim_reduction method: {dim_reduction}. Use 'mds' or 'spectral'")
+        
+        coords = [tuple(reduced_coords[i]) for i in range(len(coords))]
+        effective_dimensionality = target_dims
+        
+        coord_mapping = {original_coords[i]: coords[i] for i in range(len(coords))}
+        G_reduced = nx.Graph()
+        G_reduced.add_nodes_from(coords)
+        
+        for i, coord1 in enumerate(original_coords):
+            for j, coord2 in enumerate(original_coords):
+                if i < j:
+                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                    if diff_count == 1 and same_count == len(coord1) - 1:
+                        u_reduced = coord_mapping[coord1]
+                        v_reduced = coord_mapping[coord2]
+                        G_reduced.add_edge(u_reduced, v_reduced)
+        
+        G = G_reduced
+    else:
+        effective_dimensionality = field.dimensionality
+    
+    field_values = []
+    for coord in original_coords:
+        try:
+            field_values.append(field.get_field_value(coord))
+        except KeyError:
+            field_values.append(0.0)
+    
+    field_values = np.array(field_values)
+    
+    if len(field_values) > 0:
+        vmin, vmax = field_values.min(), field_values.max()
+        if vmax == vmin:
+            vmax = vmin + 1e-10
+    else:
+        vmin, vmax = 0, 1
+    
+    cmap = plt.get_cmap(colormap)
+    normalized_values = (field_values - vmin) / (vmax - vmin)
+    colors = [cmap(val) for val in normalized_values]
+    color_hex = ['#%02x%02x%02x' % (int(c[0]*255), int(c[1]*255), int(c[2]*255)) for c in colors]
+    
+    # Map matplotlib colormap names to plotly colormap names
+    plotly_colormap_mapping = {
+        'viridis': 'viridis',
+        'plasma': 'plasma', 
+        'inferno': 'inferno',
+        'magma': 'magma',
+        'coolwarm': 'rdbu',
+        'hot': 'hot',
+        'cool': 'blues',
+        'spring': 'greens',
+        'summer': 'ylgnbu',
+        'autumn': 'orrd',
+        'winter': 'blues',
+        'copper': 'burg',
+        'gray': 'greys',
+        'grey': 'greys',
+        'jet': 'jet',
+        'hsv': 'hsv',
+        'rainbow': 'rainbow',
+        'seismic': 'rdbu',
+        'terrain': 'earth',
+        'spectral': 'spectral',
+        'RdYlBu': 'rdylbu',
+        'RdBu': 'rdbu',
+        'PiYG': 'piyg',
+        'PRGn': 'prgn',
+        'BrBG': 'brbg',
+        'RdGy': 'rdgy',
+        'PuOr': 'puor'
+    }
+    
+    plotly_colormap = plotly_colormap_mapping.get(colormap, 'viridis')
+    
+    if title is None:
+        resolution_str = 'x'.join(str(r) for r in field.resolution)
+        bipolar_str = "bipolar" if field.bipolar else "unipolar"
+        if field.dimensionality > 3:
+            title = f"{field.dimensionality}D→{target_dims}D Field ({resolution_str}, {bipolar_str}, {dim_reduction})"
+        else:
+            title = f"{field.dimensionality}D Field ({resolution_str}, {bipolar_str})"
+    
+    if nodes:
+        valid_coords = set(coords) if field.dimensionality <= 3 else set(original_coords)
+        highlighted_coords = set(coord for coord in nodes if coord in valid_coords)
+    else:
+        highlighted_coords = set()
+    
+    use_dimmed = nodes is not None and len(nodes) > 0
+    
+    fig = go.Figure()
+    
+    if effective_dimensionality == 1:
+        
+        # Draw edges with gradient colors based on field values
+        for u, v in G.edges():
+            x1, y1 = u[0], 0
+            x2, y2 = v[0], 0
+            
+            # Get field values at both nodes
+            u_idx = coords.index(u) if u in coords else -1
+            v_idx = coords.index(v) if v in coords else -1
+            
+            if u_idx >= 0 and v_idx >= 0 and u_idx < len(field_values) and v_idx < len(field_values):
+                u_val = field_values[u_idx]
+                v_val = field_values[v_idx]
+                
+                # Create gradient color between the two values
+                avg_val = (u_val + v_val) / 2
+                normalized_avg = (avg_val - vmin) / (vmax - vmin) if vmax != vmin else 0.5
+                avg_color = cmap(normalized_avg)
+                edge_color_hex = '#%02x%02x%02x' % (int(avg_color[0]*255), int(avg_color[1]*255), int(avg_color[2]*255))
+                
+                # Dim the edge color slightly
+                edge_color_dimmed = '#%02x%02x%02x' % (
+                    int(int(edge_color_hex[1:3], 16) * 0.7),
+                    int(int(edge_color_hex[3:5], 16) * 0.7),
+                    int(int(edge_color_hex[5:7], 16) * 0.7)
+                )
+            else:
+                edge_color_dimmed = '#555555'
+            
+            edge_width = 1 if use_dimmed else 2
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color=edge_color_dimmed, width=edge_width),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+        
+        if nodes and len(highlighted_coords) >= 1:
+            highlighted_list = list(highlighted_coords)
+            
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
+                        
+                        if is_lattice_adjacent:
+                            x1, x2 = coord1[0], coord2[0]
+                            y1, y2 = 0, 0
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=[x1, x2], y=[y1, y2],
+                                    mode='lines',
+                                    line=dict(color='white', width=4),
+                                    showlegend=False,
+                                    hoverinfo='none'
+                                )
+                            )
+            
+            elif path_mode == 'origin':
+                origin = tuple(0 for _ in range(field.dimensionality))
+                
+                for target_coord in highlighted_list:
+                    if target_coord != origin:
+                        try:
+                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
+                                path_coords = nx.shortest_path(G, origin, target_coord)
+                                
+                                for k in range(len(path_coords) - 1):
+                                    pc1, pc2 = path_coords[k], path_coords[k + 1]
+                                    x1, x2 = pc1[0], pc2[0]
+                                    y1, y2 = 0, 0
+                                    fig.add_trace(
+                                        go.Scatter(
+                                            x=[x1, x2], y=[y1, y2],
+                                            mode='lines',
+                                            line=dict(color='white', width=4),
+                                            showlegend=False,
+                                            hoverinfo='none'
+                                        )
+                                    )
+                        except (KeyError, nx.NetworkXNoPath):
+                            continue
+        
+        node_x, node_y = [], []
+        hover_data = []
+        node_colors = []
+        
+        for i, coord in enumerate(coords):
+            x = coord[0]
+            node_x.append(x)
+            node_y.append(0)
+            
+            orig_coord = coord if field.dimensionality <= 3 else original_coords[i]
+            field_val = field_values[i] if i < len(field_values) else 0.0
+            
+            if field.dimensionality > 3:
+                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                reduced_coord_str = f"({x:.2f})"
+                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}<br>Value: {field_val:.4f}")
+            else:
+                hover_data.append(f"Coordinate: ({x})<br>Value: {field_val:.4f}")
+            
+            if nodes and orig_coord in highlighted_coords:
+                node_colors.append('white')
+            elif use_dimmed:
+                node_colors.append('#111111')
+            else:
+                node_colors.append(color_hex[i] if i < len(color_hex) else '#FFFFFF')
+        
+        fig.add_trace(
+            go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers',
+                marker=dict(
+                    size=node_size * 2,
+                    color=node_colors,
+                    line=dict(color='white', width=2)
+                ),
+                hovertemplate='%{text}<extra></extra>',
+                text=hover_data,
+                showlegend=False
+            )
+        )
+        
+        fig.update_layout(
+            yaxis=dict(
+                showgrid=False, zeroline=False, showticklabels=False,
+                range=[-0.5, 0.5]
+            )
+        )
+    
+    elif effective_dimensionality == 2:
+        # Draw edges with gradient colors based on field values
+        for u, v in G.edges():
+            x1, y1 = u
+            x2, y2 = v
+            
+            # Get field values at both nodes
+            u_idx = coords.index(u) if u in coords else -1
+            v_idx = coords.index(v) if v in coords else -1
+            
+            if u_idx >= 0 and v_idx >= 0 and u_idx < len(field_values) and v_idx < len(field_values):
+                u_val = field_values[u_idx]
+                v_val = field_values[v_idx]
+                
+                # Create gradient color between the two values
+                avg_val = (u_val + v_val) / 2
+                normalized_avg = (avg_val - vmin) / (vmax - vmin) if vmax != vmin else 0.5
+                avg_color = cmap(normalized_avg)
+                edge_color_hex = '#%02x%02x%02x' % (int(avg_color[0]*255), int(avg_color[1]*255), int(avg_color[2]*255))
+                
+                # Dim the edge color slightly
+                edge_color_dimmed = '#%02x%02x%02x' % (
+                    int(int(edge_color_hex[1:3], 16) * 0.7),
+                    int(int(edge_color_hex[3:5], 16) * 0.7),
+                    int(int(edge_color_hex[5:7], 16) * 0.7)
+                )
+            else:
+                edge_color_dimmed = '#555555'
+            
+            edge_width = 1 if use_dimmed else 2
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=[x1, x2], y=[y1, y2],
+                    mode='lines',
+                    line=dict(color=edge_color_dimmed, width=edge_width),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+        
+        if nodes and len(highlighted_coords) >= 1:
+            highlighted_list = list(highlighted_coords)
+            
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
+                        
+                        if is_lattice_adjacent:
+                            x1, y1 = coord1
+                            x2, y2 = coord2
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=[x1, x2], y=[y1, y2],
+                                    mode='lines',
+                                    line=dict(color='white', width=4),
+                                    showlegend=False,
+                                    hoverinfo='none'
+                                )
+                            )
+            
+            elif path_mode == 'origin':
+                origin = tuple(0 for _ in range(field.dimensionality))
+                
+                for target_coord in highlighted_list:
+                    if target_coord != origin:
+                        try:
+                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
+                                path_coords = nx.shortest_path(G, origin, target_coord)
+                                
+                                for k in range(len(path_coords) - 1):
+                                    pc1, pc2 = path_coords[k], path_coords[k + 1]
+                                    x1, y1 = pc1
+                                    x2, y2 = pc2
+                                    fig.add_trace(
+                                        go.Scatter(
+                                            x=[x1, x2], y=[y1, y2],
+                                            mode='lines',
+                                            line=dict(color='white', width=4),
+                                            showlegend=False,
+                                            hoverinfo='none'
+                                        )
+                                    )
+                        except (KeyError, nx.NetworkXNoPath):
+                            continue
+        
+        node_x, node_y = [], []
+        hover_data = []
+        node_colors = []
+        
+        for i, coord in enumerate(coords):
+            x, y = coord
+            node_x.append(x)
+            node_y.append(y)
+            
+            orig_coord = coord if field.dimensionality <= 3 else original_coords[i]
+            field_val = field_values[i] if i < len(field_values) else 0.0
+            
+            if field.dimensionality > 3:
+                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                reduced_coord_str = f"({x:.2f}, {y:.2f})"
+                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}<br>Value: {field_val:.4f}")
+            else:
+                hover_data.append(f"Coordinate: ({x}, {y})<br>Value: {field_val:.4f}")
+            
+            if nodes and orig_coord in highlighted_coords:
+                node_colors.append('white')
+            elif use_dimmed:
+                node_colors.append('#111111')
+            else:
+                node_colors.append(color_hex[i] if i < len(color_hex) else '#FFFFFF')
+        
+        fig.add_trace(
+            go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers',
+                marker=dict(
+                    size=node_size * 2,
+                    color=node_colors,
+                    line=dict(color='white', width=2)
+                ),
+                hovertemplate='%{text}<extra></extra>',
+                text=hover_data,
+                showlegend=False
+            )
+        )
+        
+        fig.update_layout(
+            yaxis=dict(
+                scaleanchor="x", scaleratio=1
+            )
+        )
+    
+    elif effective_dimensionality == 3:
+        # Draw edges with gradient colors based on field values
+        for u, v in G.edges():
+            x1, y1, z1 = (u[0], u[1], u[2]) if len(u) >= 3 else (u[0], u[1] if len(u) >= 2 else 0, 0)
+            x2, y2, z2 = (v[0], v[1], v[2]) if len(v) >= 3 else (v[0], v[1] if len(v) >= 2 else 0, 0)
+            
+            # Get field values at both nodes
+            u_idx = coords.index(u) if u in coords else -1
+            v_idx = coords.index(v) if v in coords else -1
+            
+            if u_idx >= 0 and v_idx >= 0 and u_idx < len(field_values) and v_idx < len(field_values):
+                u_val = field_values[u_idx]
+                v_val = field_values[v_idx]
+                
+                # Create gradient color between the two values
+                avg_val = (u_val + v_val) / 2
+                normalized_avg = (avg_val - vmin) / (vmax - vmin) if vmax != vmin else 0.5
+                avg_color = cmap(normalized_avg)
+                edge_color_hex = '#%02x%02x%02x' % (int(avg_color[0]*255), int(avg_color[1]*255), int(avg_color[2]*255))
+                
+                # Dim the edge color slightly
+                edge_color_dimmed = '#%02x%02x%02x' % (
+                    int(int(edge_color_hex[1:3], 16) * 0.7),
+                    int(int(edge_color_hex[3:5], 16) * 0.7),
+                    int(int(edge_color_hex[5:7], 16) * 0.7)
+                )
+            else:
+                edge_color_dimmed = '#555555'
+            
+            edge_width = 1 if use_dimmed else 2
+            
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                    mode='lines',
+                    line=dict(color=edge_color_dimmed, width=edge_width),
+                    showlegend=False,
+                    hoverinfo='none'
+                )
+            )
+        
+        if nodes and len(highlighted_coords) >= 1:
+            highlighted_list = list(highlighted_coords)
+            
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
+                        
+                        if is_lattice_adjacent:
+                            x1, y1, z1 = (coord1[0], coord1[1], coord1[2]) if len(coord1) >= 3 else (coord1[0], coord1[1] if len(coord1) >= 2 else 0, 0)
+                            x2, y2, z2 = (coord2[0], coord2[1], coord2[2]) if len(coord2) >= 3 else (coord2[0], coord2[1] if len(coord2) >= 2 else 0, 0)
+                            fig.add_trace(
+                                go.Scatter3d(
+                                    x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                                    mode='lines',
+                                    line=dict(color='white', width=4),
+                                    showlegend=False,
+                                    hoverinfo='none'
+                                )
+                            )
+            
+            elif path_mode == 'origin':
+                origin = tuple(0 for _ in range(field.dimensionality))
+                
+                for target_coord in highlighted_list:
+                    if target_coord != origin:
+                        try:
+                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
+                                path_coords = nx.shortest_path(G, origin, target_coord)
+                                
+                                for k in range(len(path_coords) - 1):
+                                    pc1, pc2 = path_coords[k], path_coords[k + 1]
+                                    x1, y1, z1 = (pc1[0], pc1[1], pc1[2]) if len(pc1) >= 3 else (pc1[0], pc1[1] if len(pc1) >= 2 else 0, 0)
+                                    x2, y2, z2 = (pc2[0], pc2[1], pc2[2]) if len(pc2) >= 3 else (pc2[0], pc2[1] if len(pc2) >= 2 else 0, 0)
+                                    fig.add_trace(
+                                        go.Scatter3d(
+                                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                                            mode='lines',
+                                            line=dict(color='white', width=4),
+                                            showlegend=False,
+                                            hoverinfo='none'
+                                        )
+                                    )
+                        except (KeyError, nx.NetworkXNoPath):
+                            continue
+        
+        node_x, node_y, node_z = [], [], []
+        hover_data = []
+        node_colors = []
+        
+        for i, coord in enumerate(coords):
+            if len(coord) >= 3:
+                x, y, z = coord[0], coord[1], coord[2]
+            elif len(coord) == 2:
+                x, y, z = coord[0], coord[1], 0
+            else:
+                x, y, z = coord[0], 0, 0
+            node_x.append(x)
+            node_y.append(y) 
+            node_z.append(z)
+            
+            orig_coord = coord if field.dimensionality <= 3 else original_coords[i]
+            field_val = field_values[i] if i < len(field_values) else 0.0
+            
+            if field.dimensionality > 3:
+                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                reduced_coord_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
+                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}<br>Value: {field_val:.4f}")
+            else:
+                hover_data.append(f"Coordinate: ({x}, {y}, {z})<br>Value: {field_val:.4f}")
+            
+            if nodes and orig_coord in highlighted_coords:
+                node_colors.append('white')
+            elif use_dimmed:
+                node_colors.append('#111111')
+            else:
+                node_colors.append(color_hex[i] if i < len(color_hex) else '#FFFFFF')
+        
+        fig.add_trace(
+            go.Scatter3d(
+                x=node_x, y=node_y, z=node_z,
+                mode='markers',
+                marker=dict(
+                    size=node_size,
+                    color=node_colors,
+                    line=dict(color='white', width=2)
+                ),
+                hovertemplate='%{text}<extra></extra>',
+                text=hover_data,
+                showlegend=False
+            )
+        )
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    x_coords = [coord[0] for coord in coords]
+    x_min, x_max = min(x_coords), max(x_coords)
+    
+    if effective_dimensionality >= 2:
+        y_coords = [coord[1] for coord in coords]
+        y_min, y_max = min(y_coords), max(y_coords)
+    
+    if effective_dimensionality == 3:
+        z_coords = [coord[2] for coord in coords]
+        z_min, z_max = min(z_coords), max(z_coords)
+    
+    if field.dimensionality > 3:
+        x_ticks = np.linspace(x_min, x_max, min(10, int(x_max - x_min) + 1))
+        x_ticks = [round(t, 1) for t in x_ticks]
+        if effective_dimensionality >= 2:
+            y_ticks = np.linspace(y_min, y_max, min(10, int(y_max - y_min) + 1))
+            y_ticks = [round(t, 1) for t in y_ticks]
+        if effective_dimensionality == 3:
+            z_ticks = np.linspace(z_min, z_max, min(10, int(z_max - z_min) + 1))
+            z_ticks = [round(t, 1) for t in z_ticks]
+    else:
+        x_ticks = list(range(int(x_min), int(x_max) + 1))
+        if effective_dimensionality >= 2:
+            y_ticks = list(range(int(y_min), int(y_max) + 1))
+        if effective_dimensionality == 3:
+            z_ticks = list(range(int(z_min), int(z_max) + 1))
+    
+    layout_dict = dict(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0)
+    )
+    
+    if effective_dimensionality <= 2:
+        if field.dimensionality > 3:
+            layout_dict.update(dict(
+                xaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, title=dict(text='', font=dict(color='white'))
+                ),
+                yaxis=dict(
+                    showgrid=False, zeroline=False, showticklabels=False,
+                    showline=False, title=dict(text='', font=dict(color='white'))
+                )
+            ))
+        else:
+            x_title = 'X'
+            y_title = 'Y' if effective_dimensionality == 2 else ''
+            
+            layout_dict.update(dict(
+                xaxis=dict(
+                    title=dict(text=x_title, font=dict(color='white')),
+                    tickfont=dict(color='white'),
+                    gridcolor='#555555',
+                    zerolinecolor='#555555',
+                    tickmode='array',
+                    tickvals=x_ticks,
+                    ticktext=[str(t) for t in x_ticks]
+                ),
+                yaxis=dict(
+                    title=dict(text=y_title, font=dict(color='white')),
+                    tickfont=dict(color='white'),
+                    gridcolor='#555555',
+                    zerolinecolor='#555555',
+                    tickmode='array',
+                    tickvals=y_ticks if effective_dimensionality == 2 else [0],
+                    ticktext=[str(t) for t in y_ticks] if effective_dimensionality == 2 else ['']
+                )
+            ))
+    else:
+        if field.dimensionality > 3:
+            layout_dict.update(dict(
+                scene=dict(
+                    camera=dict(
+                        eye=dict(x=1.5, y=1.5, z=1.5),
+                        center=dict(x=0, y=0, z=0)
+                    ),
+                    xaxis=dict(
+                        showgrid=False, zeroline=False, showticklabels=False,
+                        showline=False, showbackground=False,
+                        title=dict(text='', font=dict(color='white'))
+                    ),
+                    yaxis=dict(
+                        showgrid=False, zeroline=False, showticklabels=False,
+                        showline=False, showbackground=False,
+                        title=dict(text='', font=dict(color='white'))
+                    ),
+                    zaxis=dict(
+                        showgrid=False, zeroline=False, showticklabels=False,
+                        showline=False, showbackground=False,
+                        title=dict(text='', font=dict(color='white'))
+                    ),
+                    bgcolor='black'
+                )
+            ))
+        else:
+            layout_dict.update(dict(
+                scene=dict(
+                    camera=dict(
+                        eye=dict(x=1.5, y=1.5, z=1.5),
+                        center=dict(x=0, y=0, z=0)
+                    ),
+                    xaxis=dict(
+                        title=dict(text='X', font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        gridcolor='#555555',
+                        zerolinecolor='#555555',
+                        backgroundcolor='black',
+                        tickmode='array',
+                        tickvals=x_ticks,
+                        ticktext=[str(t) for t in x_ticks]
+                    ),
+                    yaxis=dict(
+                        title=dict(text='Y', font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        gridcolor='#555555',
+                        zerolinecolor='#555555',
+                        backgroundcolor='black',
+                        tickmode='array',
+                        tickvals=y_ticks,
+                        ticktext=[str(t) for t in y_ticks]
+                    ),
+                    zaxis=dict(
+                        title=dict(text='Z', font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        gridcolor='#555555',
+                        zerolinecolor='#555555',
+                        backgroundcolor='black',
+                        tickmode='array',
+                        tickvals=z_ticks,
+                        ticktext=[str(t) for t in z_ticks]
+                    ),
+                    bgcolor='black'
+                )
+            ))
+    
+    if show_colorbar and len(field_values) > 0 and vmax != vmin:
+        fig.add_trace(
+            go.Scatter(
+                x=[None], y=[None],
+                mode='markers',
+                marker=dict(
+                    colorscale=plotly_colormap,
+                    cmin=vmin,
+                    cmax=vmax,
+                    colorbar=dict(
+                        title=dict(text="Field Value", font=dict(color='white')),
+                        tickfont=dict(color='white'),
+                        x=1.02
+                    ),
+                    showscale=True
+                ),
+                showlegend=False,
+                hoverinfo='skip'
+            )
+        )
     
     fig.update_layout(**layout_dict)
     

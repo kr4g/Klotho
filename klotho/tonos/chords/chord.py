@@ -2,6 +2,7 @@ from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union
 from ..pitch import EquaveCyclicCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
 import numpy as np
+from ...topos.graphs import Graph
 
 PC = TypeVar('PC', bound='Chord')
 
@@ -73,6 +74,23 @@ class Chord(EquaveCyclicCollection[IntervalType]):
                  equave: Optional[Union[float, Fraction, int, str]] = "2/1",
                  interval_type: str = "ratios"):
         super().__init__(degrees, equave, interval_type)
+        self._graph = self._generate_graph()
+    
+    def _generate_graph(self):
+        """Generate a complete graph with chord degrees as nodes."""
+        n_nodes = len(self._degrees)
+        if n_nodes == 0:
+            return Graph()
+        
+        G = Graph.complete_graph(n_nodes)
+        for i, degree in enumerate(self._degrees):
+            G.set_node_data(i, degree=degree, index=i)
+        return G
+    
+    @property
+    def graph(self):
+        """A complete graph with chord degrees as nodes."""
+        return self._graph
     
     def __invert__(self: PC) -> PC:
         if len(self._degrees) <= 1:

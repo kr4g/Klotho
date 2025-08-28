@@ -3,6 +3,7 @@ from typing import TypeVar, cast, Optional, Union, List
 from ..pitch import EquaveCyclicCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
 import numpy as np
 from ..utils.interval_normalization import equave_reduce
+from ...topos.graphs import Graph
 
 PC = TypeVar('PC', bound='Scale')
 
@@ -58,6 +59,7 @@ class Scale(EquaveCyclicCollection[IntervalType]):
                  interval_type: str = "ratios"):
         super().__init__(degrees, equave, interval_type)
         self._mode_cache = {}
+        self._graph = self._generate_graph()
         
     def _process_degrees(self, degrees: IntervalList) -> List[IntervalType]:
         processed = super()._process_degrees(degrees)
@@ -73,6 +75,22 @@ class Scale(EquaveCyclicCollection[IntervalType]):
                 processed.insert(0, Fraction(1, 1))
         
         return processed
+    
+    def _generate_graph(self):
+        """Generate a complete graph with scale degrees as nodes."""
+        n_nodes = len(self._degrees)
+        if n_nodes == 0:
+            return Graph()
+        
+        G = Graph.complete_graph(n_nodes)
+        for i, degree in enumerate(self._degrees):
+            G.set_node_data(i, degree=degree, index=i)
+        return G
+    
+    @property
+    def graph(self):
+        """A complete graph with scale degrees as nodes."""
+        return self._graph
         
     def mode(self, mode_number: int) -> 'Scale':
         if mode_number in self._mode_cache:
