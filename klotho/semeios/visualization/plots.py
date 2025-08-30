@@ -2389,7 +2389,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  dim_reduction: str = None, target_dims: int = 3,
                  mds_metric: bool = True, mds_max_iter: int = 300,
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
-                 nodes: list = None, path_mode: str = 'adjacent') -> go.Figure:
+                 nodes: list = None, path_mode: str = 'adjacent',
+                 mute_background: bool = False) -> go.Figure:
     import networkx as nx
     """
     Plot a Lattice as a 2D or 3D grid visualization.
@@ -2561,6 +2562,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         G = G_reduced
     else:
         effective_dimensionality = lattice.dimensionality
+        coord_mapping = {}
     
     if title is None:
         resolution_str = 'x'.join(str(r) for r in lattice.resolution)
@@ -2579,29 +2581,30 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         highlighted_coords = set()
     
     # Determine if we should use dimmed appearance (whenever nodes are selected)
-    use_dimmed = nodes is not None and len(nodes) > 0
+    use_dimmed = nodes is not None and len(nodes) > 0 and not mute_background
     
     fig = go.Figure()
+    bounds_coords_override = None
     
     if effective_dimensionality == 1:
         
-        # Draw all background edges (slightly dimmed when nodes are selected)
-        edge_color = '#555555' if use_dimmed else '#808080'
-        edge_width = 1 if use_dimmed else 3
-        
-        for u, v in G.edges():
-            x1, y1 = u[0], 0
-            x2, y2 = v[0], 0
+        if not (nodes and mute_background):
+            edge_color = '#555555' if use_dimmed else '#808080'
+            edge_width = 1 if use_dimmed else 3
             
-            fig.add_trace(
-                go.Scatter(
-                    x=[x1, x2], y=[y1, y2],
-                    mode='lines',
-                    line=dict(color=edge_color, width=edge_width),
-                    showlegend=False,
-                    hoverinfo='none'
+            for u, v in G.edges():
+                x1, y1 = u[0], 0
+                x2, y2 = v[0], 0
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=[x1, x2], y=[y1, y2],
+                        mode='lines',
+                        line=dict(color=edge_color, width=edge_width),
+                        showlegend=False,
+                        hoverinfo='none'
+                    )
                 )
-            )
         
         # Draw highlighted edges based on path_mode
         if nodes and len(highlighted_coords) >= 1:
@@ -2664,29 +2667,45 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         node_x, node_y = [], []
         hover_data = []
         node_colors = []
+        drawn_nodes = []
         
-        for i, coord in enumerate(coords):
+        # If we only want the sublattice, derive node iteration from drawn edges
+        if nodes and mute_background:
+            # Collect coordinates that are in highlighted edges or are highlighted nodes themselves
+            drawn_set = set()
+            if path_mode == 'adjacent' and len(highlighted_coords) > 1:
+                for i in range(len(highlighted_list)):
+                    for j in range(i + 1, len(highlighted_list)):
+                        coord1, coord2 = highlighted_list[i], highlighted_list[j]
+                        diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
+                        same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
+                        if diff_count == 1 and same_count == len(coord1) - 1:
+                            drawn_set.add(coord1)
+                            drawn_set.add(coord2)
+            else:
+                drawn_set.update(highlighted_coords)
+            coords_iter = [(c[0],) for c in drawn_set]
+        else:
+            coords_iter = coords
+        
+        for i, coord in enumerate(coords_iter):
             x = coord[0]
             node_x.append(x)
             node_y.append(0)
             
-            # Get original coordinate for comparison
-            orig_coord = coord if lattice.dimensionality <= 3 else original_coords[i]
-            
             if lattice.dimensionality > 3:
-                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+                orig_coord_str = str(original_coords[i]).replace(',)', ')') if coords_iter is coords else 'selected'
                 reduced_coord_str = f"({x:.2f})"
                 hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
             else:
                 hover_data.append(f"Coordinate: ({x})")
             
-            # Set node color based on highlighting
-            if nodes and orig_coord in highlighted_coords:
+            if nodes and ((coords_iter is coords and original_coords[i] in highlighted_coords) or (coords_iter is not coords and (x,) in coords_iter)):
                 node_colors.append('white')
             elif use_dimmed:
-                node_colors.append('#111111')  # WAY more dimmed for non-selected nodes
+                node_colors.append('#111111')
             else:
-                node_colors.append('white')  # Default color when no highlighting
+                node_colors.append('white')
         
         fig.add_trace(
             go.Scatter(
@@ -2711,23 +2730,24 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         )
     
     elif effective_dimensionality == 2:
-        # Draw all background edges (slightly dimmed when nodes are selected)
-        edge_color = '#555555' if use_dimmed else '#808080'
-        edge_width = 1 if use_dimmed else 2
-        
-        for u, v in G.edges():
-            x1, y1 = u
-            x2, y2 = v
+        drawn_nodes = set()
+        if not (nodes and mute_background):
+            edge_color = '#555555' if use_dimmed else '#808080'
+            edge_width = 1 if use_dimmed else 2
             
-            fig.add_trace(
-                go.Scatter(
-                    x=[x1, x2], y=[y1, y2],
-                    mode='lines',
-                    line=dict(color=edge_color, width=edge_width),
-                    showlegend=False,
-                    hoverinfo='none'
+            for u, v in G.edges():
+                x1, y1 = u
+                x2, y2 = v
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=[x1, x2], y=[y1, y2],
+                        mode='lines',
+                        line=dict(color=edge_color, width=edge_width),
+                        showlegend=False,
+                        hoverinfo='none'
+                    )
                 )
-            )
         
         # Draw highlighted edges based on path_mode
         if nodes and len(highlighted_coords) >= 1:
@@ -2746,8 +2766,19 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
                         
                         if is_lattice_adjacent:
-                            x1, y1 = coord1
-                            x2, y2 = coord2
+                            if lattice.dimensionality > 3:
+                                if coord1 in coord_mapping and coord2 in coord_mapping:
+                                    plot_coord1 = coord_mapping[coord1]
+                                    plot_coord2 = coord_mapping[coord2]
+                                else:
+                                    continue
+                            else:
+                                plot_coord1 = coord1
+                                plot_coord2 = coord2
+                            x1, y1 = plot_coord1[0], plot_coord1[1]
+                            x2, y2 = plot_coord2[0], plot_coord2[1]
+                            drawn_nodes.add((x1, y1))
+                            drawn_nodes.add((x2, y2))
                             fig.add_trace(
                                 go.Scatter(
                                     x=[x1, x2], y=[y1, y2],
@@ -2761,19 +2792,23 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             elif path_mode == 'origin':
                 # New behavior: shortest paths from origin to each selected node
                 origin = tuple(0 for _ in range(lattice.dimensionality))
+                origin_plot = coord_mapping.get(origin, origin) if lattice.dimensionality > 3 else origin
                 
                 for target_coord in highlighted_list:
                     if target_coord != origin:
                         try:
                             # Find shortest path from origin to this target
-                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
-                                path_coords = nx.shortest_path(G, origin, target_coord)
+                            target_plot = coord_mapping.get(target_coord, target_coord) if lattice.dimensionality > 3 else target_coord
+                            if hasattr(G, 'has_node') and G.has_node(origin_plot) and G.has_node(target_plot):
+                                path_coords = nx.shortest_path(G, origin_plot, target_plot)
                                 
                                 # Draw path edges
                                 for k in range(len(path_coords) - 1):
                                     pc1, pc2 = path_coords[k], path_coords[k + 1]
                                     x1, y1 = pc1
                                     x2, y2 = pc2
+                                    drawn_nodes.add((x1, y1))
+                                    drawn_nodes.add((x2, y2))
                                     fig.add_trace(
                                         go.Scatter(
                                             x=[x1, x2], y=[y1, y2],
@@ -2791,16 +2826,24 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         hover_data = []
         node_colors = []
         
-        for i, coord in enumerate(coords):
+        reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
+        coords_iter = coords
+        if nodes and mute_background and len(drawn_nodes) > 0:
+            coords_iter = list(drawn_nodes)
+            bounds_coords_override = coords_iter
+        
+        for i, coord in enumerate(coords_iter):
             x, y = coord
             node_x.append(x)
             node_y.append(y)
             
-            # Get original coordinate for comparison
-            orig_coord = coord if lattice.dimensionality <= 3 else original_coords[i]
+            if lattice.dimensionality <= 3 or len(reverse_coord_mapping) == 0:
+                orig_coord = coord
+            else:
+                orig_coord = reverse_coord_mapping.get(coord, None)
             
-            if lattice.dimensionality > 3:
-                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+            if lattice.dimensionality > 3 and orig_coord is not None:
+                orig_coord_str = str(orig_coord).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f}, {y:.2f})"
                 hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
             else:
@@ -2836,23 +2879,24 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         )
     
     elif effective_dimensionality == 3:
-        # Draw all background edges (slightly dimmed when nodes are selected)
-        edge_color = '#555555' if use_dimmed else '#808080'
-        edge_width = 1 if use_dimmed else 3
-        
-        for u, v in G.edges():
-            x1, y1, z1 = (u[0], u[1], u[2]) if len(u) >= 3 else (u[0], u[1] if len(u) >= 2 else 0, 0)
-            x2, y2, z2 = (v[0], v[1], v[2]) if len(v) >= 3 else (v[0], v[1] if len(v) >= 2 else 0, 0)
+        drawn_nodes = set()
+        if not (nodes and mute_background):
+            edge_color = '#555555' if use_dimmed else '#808080'
+            edge_width = 1 if use_dimmed else 3
             
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                    mode='lines',
-                    line=dict(color=edge_color, width=edge_width),
-                    showlegend=False,
-                    hoverinfo='none'
+            for u, v in G.edges():
+                x1, y1, z1 = (u[0], u[1], u[2]) if len(u) >= 3 else (u[0], u[1] if len(u) >= 2 else 0, 0)
+                x2, y2, z2 = (v[0], v[1], v[2]) if len(v) >= 3 else (v[0], v[1] if len(v) >= 2 else 0, 0)
+                
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                        mode='lines',
+                        line=dict(color=edge_color, width=edge_width),
+                        showlegend=False,
+                        hoverinfo='none'
+                    )
                 )
-            )
         
         # Draw highlighted edges based on path_mode
         if nodes and len(highlighted_coords) >= 1:
@@ -2871,8 +2915,19 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         is_lattice_adjacent = diff_count == 1 and same_count == len(coord1) - 1
                         
                         if is_lattice_adjacent:
-                            x1, y1, z1 = (coord1[0], coord1[1], coord1[2]) if len(coord1) >= 3 else (coord1[0], coord1[1] if len(coord1) >= 2 else 0, 0)
-                            x2, y2, z2 = (coord2[0], coord2[1], coord2[2]) if len(coord2) >= 3 else (coord2[0], coord2[1] if len(coord2) >= 2 else 0, 0)
+                            if lattice.dimensionality > 3:
+                                if coord1 in coord_mapping and coord2 in coord_mapping:
+                                    plot_coord1 = coord_mapping[coord1]
+                                    plot_coord2 = coord_mapping[coord2]
+                                else:
+                                    continue
+                            else:
+                                plot_coord1 = coord1
+                                plot_coord2 = coord2
+                            x1, y1, z1 = (plot_coord1[0], plot_coord1[1], plot_coord1[2]) if len(plot_coord1) >= 3 else (plot_coord1[0], plot_coord1[1] if len(plot_coord1) >= 2 else 0, 0)
+                            x2, y2, z2 = (plot_coord2[0], plot_coord2[1], plot_coord2[2]) if len(plot_coord2) >= 3 else (plot_coord2[0], plot_coord2[1] if len(plot_coord2) >= 2 else 0, 0)
+                            drawn_nodes.add((x1, y1, z1))
+                            drawn_nodes.add((x2, y2, z2))
                             fig.add_trace(
                                 go.Scatter3d(
                                     x=[x1, x2], y=[y1, y2], z=[z1, z2],
@@ -2886,19 +2941,23 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             elif path_mode == 'origin':
                 # New behavior: shortest paths from origin to each selected node
                 origin = tuple(0 for _ in range(lattice.dimensionality))
+                origin_plot = coord_mapping.get(origin, origin) if lattice.dimensionality > 3 else origin
                 
                 for target_coord in highlighted_list:
                     if target_coord != origin:
                         try:
                             # Find shortest path from origin to this target
-                            if hasattr(G, 'has_node') and G.has_node(origin) and G.has_node(target_coord):
-                                path_coords = nx.shortest_path(G, origin, target_coord)
+                            target_plot = coord_mapping.get(target_coord, target_coord) if lattice.dimensionality > 3 else target_coord
+                            if hasattr(G, 'has_node') and G.has_node(origin_plot) and G.has_node(target_plot):
+                                path_coords = nx.shortest_path(G, origin_plot, target_plot)
                                 
                                 # Draw path edges
                                 for k in range(len(path_coords) - 1):
                                     pc1, pc2 = path_coords[k], path_coords[k + 1]
                                     x1, y1, z1 = (pc1[0], pc1[1], pc1[2]) if len(pc1) >= 3 else (pc1[0], pc1[1] if len(pc1) >= 2 else 0, 0)
                                     x2, y2, z2 = (pc2[0], pc2[1], pc2[2]) if len(pc2) >= 3 else (pc2[0], pc2[1] if len(pc2) >= 2 else 0, 0)
+                                    drawn_nodes.add((x1, y1, z1))
+                                    drawn_nodes.add((x2, y2, z2))
                                     fig.add_trace(
                                         go.Scatter3d(
                                             x=[x1, x2], y=[y1, y2], z=[z1, z2],
@@ -2916,7 +2975,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         hover_data = []
         node_colors = []
         
-        for i, coord in enumerate(coords):
+        reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
+        coords_iter = coords
+        if nodes and mute_background and len(drawn_nodes) > 0:
+            coords_iter = list(drawn_nodes)
+            bounds_coords_override = coords_iter
+        
+        for i, coord in enumerate(coords_iter):
             if len(coord) >= 3:
                 x, y, z = coord[0], coord[1], coord[2]
             elif len(coord) == 2:
@@ -2927,11 +2992,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             node_y.append(y) 
             node_z.append(z)
             
-            # Get original coordinate for comparison
-            orig_coord = coord if lattice.dimensionality <= 3 else original_coords[i]
+            if lattice.dimensionality <= 3 or len(reverse_coord_mapping) == 0:
+                orig_coord = coord
+            else:
+                orig_coord = reverse_coord_mapping.get(coord, None)
             
-            if lattice.dimensionality > 3:
-                orig_coord_str = str(original_coords[i]).replace(',)', ')')
+            if lattice.dimensionality > 3 and orig_coord is not None:
+                orig_coord_str = str(orig_coord).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
                 hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
             else:
@@ -2962,15 +3029,16 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
     
-    x_coords = [coord[0] for coord in coords]
+    bounds_coords = bounds_coords_override if (bounds_coords_override is not None and len(bounds_coords_override) > 0) else coords
+    x_coords = [coord[0] for coord in bounds_coords]
     x_min, x_max = min(x_coords), max(x_coords)
     
     if effective_dimensionality >= 2:
-        y_coords = [coord[1] for coord in coords]
+        y_coords = [coord[1] for coord in bounds_coords]
         y_min, y_max = min(y_coords), max(y_coords)
     
     if effective_dimensionality == 3:
-        z_coords = [coord[2] for coord in coords]
+        z_coords = [coord[2] for coord in bounds_coords]
         z_min, z_max = min(z_coords), max(z_coords)
     
     if lattice.dimensionality > 3:
@@ -3076,7 +3144,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         backgroundcolor='black',
                         tickmode='array',
                         tickvals=x_ticks,
-                        ticktext=[str(t) for t in x_ticks]
+                        ticktext=[str(t) for t in x_ticks],
+                        range=[x_min - max(1, (x_max - x_min) * 0.05), x_max + max(1, (x_max - x_min) * 0.05)]
                     ),
                     yaxis=dict(
                         title=dict(text='Y', font=dict(color='white')),
@@ -3086,7 +3155,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         backgroundcolor='black',
                         tickmode='array',
                         tickvals=y_ticks,
-                        ticktext=[str(t) for t in y_ticks]
+                        ticktext=[str(t) for t in y_ticks],
+                        range=[y_min - max(1, (y_max - y_min) * 0.05), y_max + max(1, (y_max - y_min) * 0.05)]
                     ),
                     zaxis=dict(
                         title=dict(text='Z', font=dict(color='white')),
@@ -3096,7 +3166,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         backgroundcolor='black',
                         tickmode='array',
                         tickvals=z_ticks,
-                        ticktext=[str(t) for t in z_ticks]
+                        ticktext=[str(t) for t in z_ticks],
+                        range=[z_min - max(1, (z_max - z_min) * 0.05), z_max + max(1, (z_max - z_min) * 0.05)]
                     ),
                     bgcolor='black'
                 )
