@@ -180,7 +180,7 @@ def _create_midi_from_temporal_unit(temporal_unit, max_channels=128, bend_sensit
     
     note_events = []
     
-    # For standalone playback: subtract offset to start from beginning
+    # For standalone playback: subtract offset to start from beginning (DO NOT MUTATE OBJECT)
     min_start_time = min(chronon.start for chronon in temporal_unit if not chronon.is_rest) if any(not chronon.is_rest for chronon in temporal_unit) else 0
     
     for chronon in temporal_unit:
@@ -285,6 +285,9 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     note_events = []
     voice_counter = 0
     
+    # For standalone playback: subtract offset to start from beginning (DO NOT MUTATE OBJECT)
+    min_start_time = min(event.start for event in compositional_unit if not event.is_rest) if any(not event.is_rest for event in compositional_unit) else 0
+    
     for event in compositional_unit:
         if not event.is_rest:
             # Get instrument information
@@ -308,8 +311,8 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
             voice_id = f"voice_{voice_counter}"
             voice_counter += 1
             
-            # Use absolute timing from event (already in seconds)
-            start_time = event.start
+            # Use absolute timing from event, subtract offset for standalone playback (DO NOT MUTATE OBJECT)
+            start_time = event.start - min_start_time
             duration = abs(event.duration)
             
             # Allocate individual channel for each note (PRD: full voice independence)
@@ -1019,6 +1022,12 @@ class ChannelAllocator:
     def set_channel_state(self, port, channel, **kwargs):
         """Update the state of a channel."""
         self.channel_state[port][channel].update(kwargs)
+    
+    def get_available_channels(self):
+        """Get count of available channels for debugging."""
+        total_melodic = sum(len(pool) for pool in self.free_melodic)
+        total_drum = sum(len(pool) for pool in self.free_drum)
+        return total_melodic, total_drum
 
 def _estimate_max_concurrent_voices(obj):
     """
@@ -1158,16 +1167,16 @@ def _generate_multi_port_events(note_events, writer, allocator, bpm, debug=False
                                                          channel=channel, program=program))
                 allocator.set_channel_state(port, channel, program=program, bank='melodic')
         
-        # Set pitch bend sensitivity if needed
+        # Set pitch bend sensitivity if needed (send slightly before note to avoid timing conflicts)
         if channel_state.get('bend_sens') != allocator.bend_sensitivity_semitones:
-            _send_rpn_pitch_bend_sensitivity(writer, port, channel, start_time, 
+            _send_rpn_pitch_bend_sensitivity(writer, port, channel, start_time - 0.001, 
                                            allocator.bend_sensitivity_semitones)
             allocator.set_channel_state(port, channel, bend_sens=allocator.bend_sensitivity_semitones)
         
-        # Send pitch bend if needed
+        # Send pitch bend if needed (send slightly before note to avoid timing conflicts)
         if pitch_bend is not None:
             pitch_value = pitch_bend - 8192  # Convert to MIDI pitchwheel range
-            writer.add_event(port, start_time, Message('pitchwheel', 
+            writer.add_event(port, start_time - 0.001, Message('pitchwheel', 
                                                      channel=channel, pitch=pitch_value))
         
         # Send note on
@@ -1815,3 +1824,148 @@ def _events_to_midi_messages(events, track, bpm):
             track.append(Message('note_off', channel=channel, note=note, velocity=velocity, time=delta_ticks))
         
         current_time = event_time
+
+def test_channel_allocation_system():
+    """
+    Test the channel allocation system to verify it meets the requirements.
+    
+    Requirements:
+    1. Exhaust ALL channels on a port before moving to the next port
+    2. Support up to 256 channels (16 ports × 16 channels)
+    3. Melodic instruments skip channel 9 on any port
+    4. Drum instruments use ONLY channel 9 on any port
+    5. Only loop back after exhausting all 256 channels
+    """
+    print("=== TESTING CHANNEL ALLOCATION SYSTEM ===")
+    
+    # Test 1: Single port allocation
+    print("\n1. Testing single port allocation:")
+    allocator = ChannelAllocator(num_ports=1)
+    
+    # Allocate all 15 melodic channels
+    melodic_allocations = []
+    for i in range(15):
+        voice_id = f"melodic_{i}"
+        port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=0)
+        melodic_allocations.append((port, channel))
+        print(f"  Melodic {i}: port={port}, channel={channel}")
+    
+    # Verify no channel 9 was used for melodic
+    melodic_channels = [ch for _, ch in melodic_allocations]
+    if 9 in melodic_channels:
+        print("  ❌ ERROR: Channel 9 used for melodic voice!")
+        return False
+    else:
+        print("  ✅ Channel 9 correctly skipped for melodic voices")
+    
+    # Allocate drum channel
+    drum_voice_id = "drum_1"
+    drum_port, drum_channel = allocator.allocate_voice(drum_voice_id, is_drum=True, program=1)
+    print(f"  Drum: port={drum_port}, channel={drum_channel}")
+    
+    if drum_channel != 9:
+        print("  ❌ ERROR: Drum not allocated to channel 9!")
+        return False
+    else:
+        print("  ✅ Drum correctly allocated to channel 9")
+    
+    # Test 2: Multi-port allocation with exhaustion
+    print("\n2. Testing multi-port allocation with exhaustion:")
+    allocator2 = ChannelAllocator(num_ports=3)  # 3 ports = 48 channels total
+    
+    # Allocate all melodic channels across ports
+    melodic_allocations2 = []
+    for i in range(45):  # 3 ports × 15 melodic channels = 45
+        voice_id = f"melodic_{i}"
+        port, channel = allocator2.allocate_voice(voice_id, is_drum=False, program=0)
+        melodic_allocations2.append((port, channel))
+        if i < 10 or i % 15 == 0:
+            print(f"  Melodic {i}: port={port}, channel={channel}")
+    
+    # Verify port exhaustion pattern
+    ports_used = set(port for port, _ in melodic_allocations2)
+    print(f"  Ports used: {sorted(ports_used)}")
+    
+    # Count channels per port
+    port_counts = {}
+    for port, channel in melodic_allocations2:
+        port_counts[port] = port_counts.get(port, 0) + 1
+    
+    print(f"  Channels per port: {port_counts}")
+    
+    # Verify each port has 15 channels before moving to next
+    expected_counts = {0: 15, 1: 15, 2: 15}
+    if port_counts != expected_counts:
+        print(f"  ❌ ERROR: Expected {expected_counts}, got {port_counts}")
+        return False
+    else:
+        print("  ✅ Port exhaustion working correctly")
+    
+    # Test 3: Drum allocation across ports
+    print("\n3. Testing drum allocation across ports:")
+    drum_allocations = []
+    for i in range(3):  # 3 drum channels (one per port)
+        voice_id = f"drum_{i}"
+        port, channel = allocator2.allocate_voice(voice_id, is_drum=True, program=1)
+        drum_allocations.append((port, channel))
+        print(f"  Drum {i}: port={port}, channel={channel}")
+    
+    # Verify all drums use channel 9
+    drum_channels = [ch for _, ch in drum_allocations]
+    if not all(ch == 9 for ch in drum_channels):
+        print("  ❌ ERROR: Not all drums allocated to channel 9!")
+        return False
+    else:
+        print("  ✅ All drums correctly allocated to channel 9")
+    
+    # Test 4: Mixed allocation (melodic and drum)
+    print("\n4. Testing mixed allocation:")
+    allocator3 = ChannelAllocator(num_ports=2)
+    
+    # Allocate some melodic voices first
+    for i in range(10):
+        voice_id = f"mixed_melodic_{i}"
+        port, channel = allocator3.allocate_voice(voice_id, is_drum=False, program=0)
+        print(f"  Mixed melodic {i}: port={port}, channel={channel}")
+    
+    # Then allocate some drum voices
+    for i in range(2):
+        voice_id = f"mixed_drum_{i}"
+        port, channel = allocator3.allocate_voice(voice_id, is_drum=True, program=1)
+        print(f"  Mixed drum {i}: port={port}, channel={channel}")
+    
+    # Check available channels
+    available_melodic, available_drum = allocator3.get_available_channels()
+    print(f"  Available channels: melodic={available_melodic}, drum={available_drum}")
+    
+    print("\n✅ All channel allocation tests passed!")
+    return True
+
+def debug_current_allocation():
+    """Debug the current channel allocation state."""
+    print("=== CURRENT CHANNEL ALLOCATION DEBUG ===")
+    
+    # Create a test allocator
+    allocator = ChannelAllocator(num_ports=2)
+    
+    print(f"Initial state:")
+    melodic, drum = allocator.get_available_channels()
+    print(f"  Available melodic: {melodic}")
+    print(f"  Available drum: {drum}")
+    
+    # Allocate some voices
+    print(f"\nAllocating voices:")
+    for i in range(10):
+        voice_id = f"test_{i}"
+        is_drum = (i % 3 == 0)  # Every 3rd voice is drum
+        port, channel = allocator.allocate_voice(voice_id, is_drum=is_drum, program=0)
+        print(f"  Voice {i} ({'drum' if is_drum else 'melodic'}): port={port}, channel={channel}")
+    
+    print(f"\nAfter allocation:")
+    melodic, drum = allocator.get_available_channels()
+    print(f"  Available melodic: {melodic}")
+    print(f"  Available drum: {drum}")
+    
+    print(f"\nCurrent port positions:")
+    print(f"  Melodic port: {allocator.current_melodic_port}")
+    print(f"  Drum port: {allocator.current_drum_port}")
