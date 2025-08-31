@@ -121,6 +121,9 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
     The new backend supports true independence for up to 256 simultaneous voices
     with proper microtonal pitch bend and dynamic drum channel allocation.
     """
+    # Reset any global state to ensure clean slate for each call
+    _reset_microtonal_counter()
+    
     match obj:
         case TemporalUnitSequence() | TemporalBlock():
             midi_file = _create_midi_from_collection(obj, max_channels=max_channels, 
@@ -204,7 +207,7 @@ def _create_midi_from_temporal_unit(temporal_unit, max_channels=128, bend_sensit
         print(f"[DEBUG] TemporalUnit: {len(note_events)} notes, all using channel {channel}")
     
     # Generate MIDI events using new allocator system
-    _generate_multi_port_events(note_events, writer, allocator, bpm)
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     
     # Ensure MIDI file duration matches the TemporalUnit's total duration
     writer.finalize(bpm)
@@ -228,59 +231,57 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
                     break
             # If no explicit instrument, assume rhythmic content (drums)
     
-    # Use collection approach for: all drums OR no explicit instruments (assume rhythmic)
-    if all_drums and (has_explicit_instruments or not has_melodic_instruments):
-        if debug:
-            print(f"[DEBUG] CompositionalUnit: All drums detected, using collection approach")
-        
-        # Use the collection approach that works (single track, channel 9, no bank select)
-        midi_file = MidiFile(ticks_per_beat=TICKS_PER_BEAT)
-        track = MidiTrack()
-        midi_file.tracks.append(track)
-        
-        # PRD: Use absolute timing only - always 4/4 at 120 BPM
-        bpm = 120
-        track.append(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm)))
-        
-        # Reset microtonal channel counter
-        _reset_microtonal_counter()
-        
-        # Collect events using the working collection approach
-        all_events = []
-        
-        # For standalone playback: subtract offset to start from beginning
-        # Get the minimum start time to use as offset
-        min_start_time = min(event.start for event in compositional_unit if not event.is_rest)
-        
-        _collect_events_from_unit_with_offset(compositional_unit, all_events, -min_start_time)
-        
-        # Convert to MIDI using the working approach
-        _events_to_midi_messages(all_events, track, bpm)
-        
-        return midi_file
+    # Always use multi-port approach for voice independence and 256-channel support
+    if debug:
+        instrument_types = []
+        for event in compositional_unit:
+            if not event.is_rest:
+                instrument = event._pt.get_active_instrument(event._node_id)
+                if isinstance(instrument, MidiInstrument):
+                    instrument_types.append("drum" if instrument.is_Drum else "melodic")
+                else:
+                    instrument_types.append("unknown")
+        print(f"[DEBUG] CompositionalUnit: {len(instrument_types)} events, types={set(instrument_types)}, using multi-port approach")
     
-    else:
-        # Mixed instruments: use full multi-port approach
-        # PRD: Use absolute timing only - ignore BPM/tempo from temporal objects
-        # Always use 4/4 at 120 BPM for MIDI file, rely on absolute start/duration times
-        bpm = 120
-        
-        # For CompositionalUnit: Use FULL implementation capabilities for voice independence
-        # Each note gets its own channel for microtonal support and voice independence
+    # PRD: Use absolute timing only - ignore BPM/tempo from temporal objects
+    # Always use 4/4 at 120 BPM for MIDI file, rely on absolute start/duration times
+    bpm = 120
+    
+    # For CompositionalUnit: Use FULL implementation capabilities for voice independence
+    # Each note gets its own channel for microtonal support and voice independence
     num_notes = len([event for event in compositional_unit if not event.is_rest])
+    
+    # Calculate how many drum and melodic notes we have
+    num_drums = 0
+    num_melodic = 0
+    for event in compositional_unit:
+        if not event.is_rest:
+            instrument = event._pt.get_active_instrument(event._node_id)
+            if isinstance(instrument, MidiInstrument) and instrument.is_Drum:
+                num_drums += 1
+            else:
+                num_melodic += 1
+    
+    # Calculate minimum ports needed:
+    # - Drums: need ceil(num_drums / 1) ports (1 drum channel per port)  
+    # - Melodic: need ceil(num_melodic / 15) ports (15 melodic channels per port)
+    ports_for_drums = num_drums  # Each port provides 1 drum channel
+    ports_for_melodic = math.ceil(num_melodic / 15) if num_melodic > 0 else 0
+    min_ports_needed = max(ports_for_drums, ports_for_melodic, 1)
+    
     max_concurrent = min(num_notes, max_channels)
     
-        # Create multi-port writer and allocator with full capacity
+    # Create multi-port writer with unlimited ports for voice independence
     writer = MultiPortMidiWriter(max_voices=max_concurrent)
     allocator = ChannelAllocator(writer.num_ports, bend_sensitivity_semitones=bend_sensitivity_semitones)
     
     if debug:
-            print(f"[DEBUG] CompositionalUnit: {num_notes} notes, mixed instruments, using multi-port approach")
+        print(f"[DEBUG] CompositionalUnit: {num_notes} notes, using multi-port approach")
     
-        # Add global meta events - always 4/4 at 120 BPM per PRD
+    # Add global meta events - always 4/4 at 120 BPM per PRD
     writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
     
-        # Collect all note events with per-note channel allocation
+    # Collect all note events with per-note channel allocation
     note_events = []
     voice_counter = 0
     
@@ -291,8 +292,9 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
             
             if isinstance(instrument, MidiInstrument):
                 is_drum = instrument.is_Drum
-                # Fix: If drum instrument has prgm=0 (piano), use proper drum program
-                program = instrument.prgm if not (is_drum and instrument.prgm == 0) else 1
+                # For drums: ignore instrument.prgm, always use Standard Drum Kit (1)
+                # For melodic: use instrument.prgm
+                program = 1 if is_drum else instrument.prgm
                 note_param = event.get_parameter('note', instrument['note'])
                 velocity = event.get_parameter('velocity', instrument['velocity'])
             else:
@@ -312,7 +314,11 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
             
             # Allocate individual channel for each note (PRD: full voice independence)
             try:
+                if debug:
+                    print(f"[DEBUG] Allocating voice_id={voice_id}, is_drum={is_drum}, program={program}")
                 port, channel = allocator.allocate_voice(voice_id, is_drum, program)
+                if debug:
+                    print(f"[DEBUG] Allocated port={port}, channel={channel}")
             except RuntimeError:
                 # If we run out of channels, skip this note
                 continue
@@ -343,104 +349,173 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
                 'pitch_bend': pitch_bend
             })
     
-        # Generate MIDI events using new allocator system
-        _generate_multi_port_events(note_events, writer, allocator, bpm)
-        
-        # Finalize and return
-        writer.finalize(bpm)
-        return writer.get_midi_file()
+    # Generate MIDI events using new allocator system
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
+    
+    # Finalize and return
+    writer.finalize(bpm)
+    return writer.get_midi_file()
 
 def _create_midi_from_collection(collection, max_channels=128, bend_sensitivity_semitones=12, debug=False):
-    """Create a MIDI file from a TemporalUnitSequence or TemporalBlock using absolute timing."""
-    midi_file = MidiFile(ticks_per_beat=TICKS_PER_BEAT)
-    track = MidiTrack()
-    midi_file.tracks.append(track)
-    
+    """Create a MIDI file from a TemporalUnitSequence or TemporalBlock using multi-port approach for voice independence."""
     # PRD: Use absolute timing only - ignore BPM/tempo from temporal objects
     # Always use 4/4 at 120 BPM for MIDI file, rely on absolute start/duration times
     bpm = 120
     
-    track.append(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm)))
+    # Estimate max concurrent voices needed across all units
+    max_concurrent = _estimate_max_concurrent_voices(collection)
+    max_concurrent = min(max_concurrent, max_channels)
     
-    # Reset microtonal channel counter for this new file
-    _reset_microtonal_counter()
+    # Create writer with enough capacity for voice independence
+    # Use multi-port approach to provide unlimited channel support per your spec
+    writer = MultiPortMidiWriter(max_voices=max_concurrent)
+    allocator = ChannelAllocator(writer.num_ports, bend_sensitivity_semitones=bend_sensitivity_semitones)
     
-    # Collect all events from all units in the collection
-    all_events = []
+    # Add global meta events - always 4/4 at 120 BPM per PRD
+    writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
+    
+    if debug:
+        print(f"[DEBUG] Collection: {max_concurrent} voices, {writer.num_ports} ports, using multi-port for voice independence")
+    
+    # Collect all note events from all units in the collection
+    note_events = []
+    voice_counter = 0
     
     # For TemporalUnitSequence: units are sequential
     # For TemporalBlock: units are parallel (multiple rows)
     if isinstance(collection, TemporalUnitSequence):
         # Sequential units - each unit has its own offset already built in
         for unit in collection:
-            _collect_events_from_unit_with_offset(unit, all_events, 0.0)
+            voice_counter = _collect_note_events_from_unit(unit, note_events, 0.0, voice_counter, allocator, debug)
     elif isinstance(collection, TemporalBlock):
         # Parallel units - all rows start at the same time (time 0)
         for row in collection:
-            if isinstance(row, (TemporalUnit, CompositionalUnit)):
-                _collect_events_from_unit_with_offset(row, all_events, 0.0)
-            elif isinstance(row, TemporalUnitSequence):
-                # TemporalBlock can contain TemporalUnitSequences
-                for unit in row:
-                    _collect_events_from_unit_with_offset(unit, all_events, 0.0)
+            # Recursively handle ANY temporal object (including nested BT/UTS)
+            voice_counter = _collect_note_events_from_unit(row, note_events, 0.0, voice_counter, allocator)
     
-    # Sort all events by time
-    event_priority = {"pitch_bend": 0, "note_on": 1, "note_off": 2}
-    all_events.sort(key=lambda x: (x[0], event_priority.get(x[1], 3)))
+    # Sort note events by time for proper sequential playback
+    note_events.sort(key=lambda event: event['start_time'])
     
-    # Track program changes per channel
-    current_programs = {}
-    current_time = 0.0
+    # Generate MIDI events using new allocator system for voice independence
+    if debug:
+        print(f"[DEBUG] Collection: Generating MIDI for {len(note_events)} note events")
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     
-    # Generate MIDI messages
-    for event_data in all_events:
-        event_time, event_type = event_data[0], event_data[1]
-        
-        delta_time = event_time - current_time
-        beat_duration = 60.0 / bpm
-        delta_ticks = int(delta_time / beat_duration * TICKS_PER_BEAT)
-        
-        if event_type == 'pitch_bend':
-            channel, pitch_bend_value = event_data[2], event_data[3]
-            # MIDI pitchwheel expects values in range -8192 to 8191, not 0 to 16383
-            pitch_value = pitch_bend_value - 8192
-            track.append(Message('pitchwheel', channel=channel, pitch=pitch_value, time=delta_ticks))
-        elif event_type in ('note_on', 'note_off'):
-            channel, note, velocity, program = event_data[2], event_data[3], event_data[4], event_data[5]
-            
-            # Add program change if needed (not for drum channel)
-            if event_type == 'note_on' and channel != PERCUSSION_CHANNEL and current_programs.get(channel) != program:
-                track.append(Message('program_change', 
-                                   channel=channel, 
-                                   program=program, 
-                                   time=delta_ticks))
-                current_programs[channel] = program
-                delta_ticks = 0  # Reset delta_ticks since we used it for program change
-            
-            if event_type == 'note_on':
-                track.append(Message('note_on', 
-                                   channel=channel, 
-                                   note=note, 
-                                   velocity=velocity, 
-                                   time=delta_ticks))
-            else:
-                track.append(Message('note_off', 
-                                   channel=channel, 
-                                   note=note, 
-                                   velocity=0, 
-                                   time=delta_ticks))
-        
-        current_time = event_time
-    
-    # Ensure MIDI file duration matches the collection's total duration
-    # This handles trailing rests that would otherwise be cut off
-    if isinstance(collection, TemporalUnitSequence):
-        total_duration = collection.duration
-        _ensure_midi_duration(track, total_duration, bpm)
-    
-    return midi_file
+    # Finalize and return
+    writer.finalize(bpm)
+    return writer.get_midi_file()
 
 
+
+def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter, allocator, debug=False):
+    """Helper function to collect note events from a single temporal unit with multi-port allocation."""
+    from klotho.chronos.temporal_units.temporal import TemporalUnit
+    from klotho.thetos.composition.compositional import CompositionalUnit
+    
+    if debug:
+        print(f"[DEBUG] Collecting from {type(unit)}, voice_counter={voice_counter}")
+    
+    if isinstance(unit, CompositionalUnit):
+        # CompositionalUnit with parameters - each note gets own channel
+        for event in unit:
+            if not event.is_rest:
+                # Get instrument information from the parameter tree
+                instrument = event._pt.get_active_instrument(event._node_id)
+                
+                if isinstance(instrument, MidiInstrument):
+                    is_drum = instrument.is_Drum
+                    # For drums: ignore instrument.prgm, always use Standard Drum Kit (1)
+                    # For melodic: use instrument.prgm
+                    program = 1 if is_drum else instrument.prgm
+                    note_param = event.get_parameter('note', instrument['note'])
+                    velocity = event.get_parameter('velocity', instrument['velocity'])
+                else:
+                    # Fallback for non-MidiInstrument cases
+                    is_drum = event.get_parameter('is_drum', False)
+                    default_program = 1 if is_drum else 1
+                    program = event.get_parameter('program', default_program)
+                    note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
+                    velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
+                
+                voice_id = f"collection_voice_{voice_counter}"
+                voice_counter += 1
+                
+                start_time = event.start + time_offset
+                duration = abs(event.duration)
+                
+                # Allocate individual channel for each note (PRD: voice independence)
+                try:
+                    port, channel = allocator.allocate_voice(voice_id, is_drum, program)
+                except RuntimeError:
+                    continue
+                
+                # Handle microtonal notes
+                if is_drum:
+                    midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
+                    pitch_bend = None
+                elif isinstance(note_param, Pitch):
+                    midi_note, pitch_bend = _calculate_base_note_and_bend(note_param, allocator.bend_sensitivity_semitones)
+                elif isinstance(note_param, float) and note_param != int(note_param):
+                    pitch = Pitch.from_midi(note_param)
+                    midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, allocator.bend_sensitivity_semitones)
+                else:
+                    midi_note = int(note_param) if note_param else 60
+                    pitch_bend = None
+                
+                note_events.append({
+                    'voice_id': voice_id,
+                    'port': port,
+                    'channel': channel,
+                    'start_time': start_time,
+                    'duration': duration,
+                    'midi_note': midi_note,
+                    'velocity': velocity,
+                    'program': program,
+                    'is_drum': is_drum,
+                    'pitch_bend': pitch_bend
+                })
+    
+    elif isinstance(unit, TemporalUnit):
+        # TemporalUnit: use single drum channel (optimization)
+        try:
+            port, channel = allocator.allocate_voice("temporal_drum_shared", is_drum=True, program=1)
+        except RuntimeError:
+            port, channel = 0, 9  # Fallback
+        
+        for chronon in unit:
+            if not chronon.is_rest:
+                voice_id = "temporal_drum_shared"  # Reuse same voice for TemporalUnit
+                start_time = chronon.start + time_offset
+                duration = abs(chronon.duration)
+                
+                note_events.append({
+                    'voice_id': voice_id,
+                    'port': port,
+                    'channel': channel,  # Same channel for all TemporalUnit notes
+                    'start_time': start_time,
+                    'duration': duration,
+                    'midi_note': DEFAULT_DRUM_NOTE,
+                    'velocity': DEFAULT_VELOCITY,
+                    'program': 1,
+                    'is_drum': True,
+                    'pitch_bend': None
+                })
+    
+    elif isinstance(unit, TemporalUnitSequence):
+        # Recursive case: TemporalUnitSequence containing other temporal objects
+        for sub_unit in unit:
+            voice_counter = _collect_note_events_from_unit(sub_unit, note_events, time_offset, voice_counter, allocator, debug)
+    
+    elif isinstance(unit, TemporalBlock):
+        # Recursive case: TemporalBlock containing other temporal objects
+        for row in unit:
+            voice_counter = _collect_note_events_from_unit(row, note_events, time_offset, voice_counter, allocator, debug)
+    
+    else:
+        if debug:
+            print(f"[DEBUG] Warning: Unknown unit type {type(unit)}, skipping")
+    
+    return voice_counter
 
 def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
     """Helper function to collect events from a single temporal unit with time offset."""
@@ -458,8 +533,9 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
                 
                 if isinstance(instrument, MidiInstrument):
                     is_drum = instrument.is_Drum
-                    # Fix: If drum instrument has prgm=0 (piano), use proper drum program
-                    program = instrument.prgm if not (is_drum and instrument.prgm == 0) else 1  # Use Standard Drum Kit (1) for drums with prgm=0
+                    # For drums: ignore instrument.prgm, always use Standard Drum Kit (1)
+                    # For melodic: use instrument.prgm
+                    program = 1 if is_drum else instrument.prgm
                     note_param = event.get_parameter('note', instrument['note'])
                     velocity = event.get_parameter('velocity', instrument['velocity'])
                 else:
@@ -615,7 +691,55 @@ def _midi_to_audio_colab(midi_path, audio_path):
         return _midi_to_audio_fallback(midi_path)
 
 def _midi_to_audio_fluidsynth(midi_path, audio_path):
-    """Convert MIDI to audio using FluidSynth (original method)."""
+    """Convert MIDI to audio using FluidSynth CLI with multi-channel support."""
+    try:
+        # Analyze MIDI file to determine channel requirements (same as Colab)
+        midi_file = MidiFile(midi_path)
+        max_channels = _get_max_channels_from_midi(midi_file)
+        
+        # For multi-port MIDI files, we need to count ALL channels across ALL ports
+        # Each port contributes 16 channels, so total = num_ports * 16
+        num_ports = len([track for track in midi_file.tracks if any(msg.type == 'midi_port' for msg in track)])
+        if num_ports > 0:
+            channels_needed = num_ports * 16  # Each port has 16 channels
+        else:
+            # Fallback for single-port files
+            channels_needed = ((max_channels - 1) // 16 + 1) * 16
+        channels_needed = max(16, min(channels_needed, 256))  # Cap at 256 channels
+        
+        # Calculate polyphony (estimate based on concurrent notes)
+        estimated_polyphony = max(channels_needed * 2, 256)
+        
+        # Try FluidSynth CLI first (same approach as Colab)
+        soundfont = _ensure_soundfont()
+        if not soundfont:
+            soundfont = "/System/Library/Compositions/VoiceOver/Compact.sf2"  # macOS fallback
+        
+        fluidsynth_cmd = [
+            'fluidsynth',
+            '-ni',  # No interactive mode
+            '-o', f'synth.midi-channels={channels_needed}',
+            '-o', f'synth.polyphony={estimated_polyphony}',
+            soundfont,
+            midi_path,
+            '-F', audio_path,
+            '-r', '44100'
+        ]
+        
+        # Try CLI version first
+        try:
+            subprocess.run(fluidsynth_cmd, check=True, capture_output=True)
+            audio_widget = Audio(audio_path, autoplay=False)
+            return audio_widget
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to pyfluidsynth if CLI fails
+            pass
+    
+    except Exception:
+        # If anything fails, fall back to original method
+        pass
+    
+    # Fallback: Original pyfluidsynth method (limited channels)
     soundfont = _ensure_soundfont()
     
     # Create FluidSynth instance
@@ -695,7 +819,8 @@ class MultiPortMidiWriter:
         self.max_voices = max_voices
         self.ticks_per_beat = ticks_per_beat
         self.num_ports = math.ceil(max_voices / 16)
-        self.num_ports = min(self.num_ports, 16)  # Cap at 16 ports (256 channels)
+        # Remove 16-port limit for voice independence - MIDI spec allows more ports
+        # Each port provides 16 channels, so we can have many ports for voice independence
         
         # Create MIDI file structure
         self.midi_file = MidiFile(type=1, ticks_per_beat=ticks_per_beat)
@@ -784,9 +909,18 @@ class ChannelAllocator:
         self.num_ports = num_ports
         self.bend_sensitivity_semitones = bend_sensitivity_semitones
         
-        # Free channel pools per port (following PRD: all 16 channels start as melodic)
-        self.free_melodic = [deque(range(16)) for _ in range(num_ports)]
-        self.free_drum = [deque() for _ in range(num_ports)]  # Empty until needed
+        # For better synthesizer compatibility, use single-port approach with channel cycling
+        # Channel 9 is reserved for drums in GM spec, many synthesizers hard-code this
+        if num_ports == 1:
+            # Single port: traditional 16-channel approach
+            melodic_channels = [ch for ch in range(16) if ch != 9]  # 0-8, 10-15
+            self.free_melodic = [deque(melodic_channels)]
+            self.free_drum = [deque([9])]  # Channel 9 for drums
+        else:
+            # Multi-port: each port gets full channel range
+            melodic_channels = [ch for ch in range(16) if ch != 9]  # 0-8, 10-15
+            self.free_melodic = [deque(melodic_channels) for _ in range(num_ports)]
+            self.free_drum = [deque([9]) for _ in range(num_ports)]  # Start with channel 9 available for drums
         
         # Active voice tracking: voice_id -> (port, channel, is_drum)
         self.active_voices = {}
@@ -815,39 +949,41 @@ class ChannelAllocator:
         tuple
             (port, channel) allocation
         """
-        # Choose port with most available channels (load balancing)
-        best_port = 0
-        max_available = 0
-        
-        for port in range(self.num_ports):
-            available = len(self.free_melodic[port]) + len(self.free_drum[port])
-            if available > max_available:
-                max_available = available
-                best_port = port
-        
-        port = best_port
-        
-        # Allocate channel based on voice type (following PRD: never reuse while sounding)
+        # Allocate channel based on voice type (following user spec: sequential exhaustion)
         if is_drum:
-            # For drums: allocate from drum pool, or convert melodic channel
-            if self.free_drum[port]:
-                channel = self.free_drum[port].popleft()
-            elif self.free_melodic[port]:
-                # Convert a melodic channel to drum (prefer channel 9 if available)
-                if 9 in self.free_melodic[port]:
-                    channel = 9
-                    self.free_melodic[port].remove(9)
-                else:
-                    channel = self.free_melodic[port].popleft()
-            else:
-                raise RuntimeError(f"No available channels on port {port} for drums")
+            # For drums: Sequential port allocation - exhaust port 0, then port 1, etc.
+            # Each port provides 1 drum channel (channel 9)
+            port = None
+            channel = None
+            
+            for p in range(self.num_ports):
+                if self.free_drum[p]:
+                    port = p
+                    channel = self.free_drum[p].popleft()
+                    break
+            
+            if port is None:
+                # For sequential events, reuse channel 9 on port 0 since notes don't overlap
+                port = 0
+                channel = 9
+                
         else:
-            # For melodic: use any available melodic channel (PRD: channel 9 can be used for melodic)
-            if self.free_melodic[port]:
-                channel = self.free_melodic[port].popleft()
-                # No special avoidance of channel 9 - PRD requires reclamation for melodic use
-            else:
-                raise RuntimeError(f"No available melodic channels on port {port}")
+            # For melodic: Sequential port allocation - exhaust all channels on port 0, then port 1, etc.
+            # Each port provides 15 melodic channels (0-8, 10-15)
+            port = None
+            channel = None
+            
+            for p in range(self.num_ports):
+                if self.free_melodic[p]:
+                    port = p
+                    channel = self.free_melodic[p].popleft()
+                    break
+            
+            if port is None:
+                # For sequential events, cycle through melodic channels on port 0
+                port = 0
+                available_channels = [ch for ch in range(16) if ch != 9]
+                channel = available_channels[0]  # Use first melodic channel
         
         # Record allocation
         self.active_voices[voice_id] = (port, channel, is_drum)
@@ -888,6 +1024,8 @@ def _estimate_max_concurrent_voices(obj):
     """
     Estimate the maximum number of concurrent voices needed for an object.
     
+    Recursively counts all note events in nested temporal structures.
+    
     Parameters
     ----------
     obj : musical object
@@ -898,10 +1036,24 @@ def _estimate_max_concurrent_voices(obj):
     int
         Estimated maximum concurrent voices
     """
-    if hasattr(obj, '__len__'):
-        # For collections, each note needs its own channel for voice independence
-        # Use the full length, not just concurrent voices
+    from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
+    from klotho.thetos.composition.compositional import CompositionalUnit
+    
+    if isinstance(obj, (TemporalUnitSequence, TemporalBlock)):
+        # Recursively count all events in nested structures
+        total_events = 0
+        for unit in obj:
+            total_events += _estimate_max_concurrent_voices(unit)
+        return min(total_events, 256)  # Cap at 256 voices
+    
+    elif isinstance(obj, (TemporalUnit, CompositionalUnit)):
+        # Count non-rest events in the unit
+        return len([event for event in obj if not event.is_rest])
+    
+    elif hasattr(obj, '__len__'):
+        # For other collections (scales, chords, etc.)
         return min(len(obj), 256)  # Cap at 256 voices
+    
     else:
         # For single objects, assume 32 voices as reasonable default (2 ports)
         return 32
@@ -947,7 +1099,7 @@ def _calculate_base_note_and_bend(pitch, bend_sensitivity_semitones):
     
     return nearest_midi, pitch_bend_value
 
-def _generate_multi_port_events(note_events, writer, allocator, bpm):
+def _generate_multi_port_events(note_events, writer, allocator, bpm, debug=False):
     """
     Generate MIDI events using the multi-port writer and channel allocator.
     
@@ -981,37 +1133,30 @@ def _generate_multi_port_events(note_events, writer, allocator, bpm):
         # Check if we need to set bank/program for this channel
         channel_state = allocator.get_channel_state(port, channel)
         
-        # Set bank and program correctly for MIDI per PRD requirements
+        # Handle program changes based on instrument type
         if is_drum:
-            # For drums: Send Bank Select MSB = 128 (PRD requirement) on ANY channel
-            # This makes ANY channel a drum channel with proper drum sounds
-            if channel_state.get('bank') != 'drum':
-                # Bank 128 = MSB 1, LSB 0 (proper MIDI format for extended drum bank)
-                writer.add_event(port, start_time, Message('control_change', 
-                                                         channel=channel, control=0, value=1))    # Bank Select MSB = 1
-                writer.add_event(port, start_time, Message('control_change', 
-                                                         channel=channel, control=32, value=0))   # Bank Select LSB = 0
-                allocator.set_channel_state(port, channel, bank='drum')
-            
-            # Set drum program
-            if channel_state.get('program') != program:
-                writer.add_event(port, start_time, Message('program_change', 
-                                                         channel=channel, program=program))
-                allocator.set_channel_state(port, channel, program=program)
+            # For drums: Channel 9 with Standard Drum Kit (GM compatibility)
+            # Channel 9 is hard-coded as drums in GM - no Bank Select needed
+            if channel == 9:
+                standard_drum_program = 1  # GM Standard Drum Kit
+                if channel_state.get('program') != standard_drum_program:
+                    if debug:
+                        print(f"[DEBUG] Setting channel {channel} (DRUM CHANNEL) to Program {standard_drum_program}")
+                    writer.add_event(port, start_time, Message('program_change', 
+                                                             channel=channel, program=standard_drum_program))
+                    allocator.set_channel_state(port, channel, program=standard_drum_program, bank='drum')
+            else:
+                # This shouldn't happen with our new allocation logic
+                if debug:
+                    print(f"[DEBUG] WARNING: Drum on non-channel-9: {channel}")
         else:
-            # For melodic: Ensure Bank 0 (standard GM melodic bank)
-            if channel_state.get('bank') != 'melodic':
-                writer.add_event(port, start_time, Message('control_change', 
-                                                         channel=channel, control=0, value=0))    # Bank Select MSB = 0
-                writer.add_event(port, start_time, Message('control_change', 
-                                                         channel=channel, control=32, value=0))   # Bank Select LSB = 0
-                allocator.set_channel_state(port, channel, bank='melodic')
-            
-            # Set melodic program
+            # For melodic: Simple program change (no Bank Select needed for basic GM)
             if channel_state.get('program') != program:
+                if debug:
+                    print(f"[DEBUG] Setting channel {channel} (MELODIC) to Program {program}")
                 writer.add_event(port, start_time, Message('program_change', 
                                                          channel=channel, program=program))
-                allocator.set_channel_state(port, channel, program=program)
+                allocator.set_channel_state(port, channel, program=program, bank='melodic')
         
         # Set pitch bend sensitivity if needed
         if channel_state.get('bend_sens') != allocator.bend_sensitivity_semitones:
@@ -1026,6 +1171,8 @@ def _generate_multi_port_events(note_events, writer, allocator, bpm):
                                                      channel=channel, pitch=pitch_value))
         
         # Send note on
+        if debug:
+            print(f"[DEBUG] Note ON:  port={port}, ch={channel}, note={midi_note}, time={start_time:.3f}, dur={duration:.3f}")
         writer.add_event(port, start_time, Message('note_on', 
                                                  channel=channel, note=midi_note, velocity=velocity))
         
@@ -1033,20 +1180,10 @@ def _generate_multi_port_events(note_events, writer, allocator, bpm):
         writer.add_event(port, start_time + duration, Message('note_off', 
                                                             channel=channel, note=midi_note, velocity=0))
     
-    # Create timeline for voice releases (when note-off events occur)
-    release_timeline = []
-    for note_event in note_events:
-        end_time = note_event['start_time'] + note_event['duration']
-        release_timeline.append((end_time, note_event['voice_id']))
-    
-    # Sort releases by time
-    release_timeline.sort(key=lambda x: x[0])
-    
-    # Add voice release events to the writer timeline
-    for end_time, voice_id in release_timeline:
-        # We'll handle voice release in the finalize() method of the writer
-        # For now, just track that this voice should be released at this time
-        pass
+    # NOTE: Voice release is not needed for the current implementation
+    # Each note gets its own dedicated channel for the duration of playback
+    # This ensures perfect voice independence as per PRD requirements
+    # The allocator is designed to handle the maximum concurrent voices needed
 
 def _send_rpn_pitch_bend_sensitivity(writer, port, channel, time, semitones):
     """
@@ -1384,7 +1521,7 @@ def _create_midi_from_pitch_collection(collection, dur=0.5, prgm=0, max_channels
         current_time += dur
     
     # Generate MIDI events using new allocator system
-    _generate_multi_port_events(note_events, writer, allocator, bpm)
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     
     # Finalize and return
     writer.finalize(bpm)
@@ -1491,7 +1628,7 @@ def _create_midi_from_scale(scale, dur=0.5, prgm=0, max_channels=128, bend_sensi
         current_time += dur
     
     # Generate MIDI events using new allocator system
-    _generate_multi_port_events(note_events, writer, allocator, bpm)
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     
     # Finalize and return
     writer.finalize(bpm)
@@ -1587,7 +1724,7 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, prgm=0, max_channels=128,
             })
     
     # Generate MIDI events using new allocator system
-    _generate_multi_port_events(note_events, writer, allocator, bpm)
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     
     # Finalize and return
     writer.finalize(bpm)

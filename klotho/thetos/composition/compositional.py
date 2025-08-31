@@ -688,3 +688,5 @@ class CompositionalUnit(TemporalUnit):
         
         return new_cu
     
+    def copy(self):
+        return self.from_subtree(self.rt.root)
