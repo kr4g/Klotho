@@ -26,7 +26,7 @@ from .topos.collections import Pattern, CombinationSet, PartitionSet
 
 from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
-from .tonos import Pitch, Scale, Chord
+from .tonos import Pitch, Scale, Chord, Motive
 
 from .dynatos import Envelope, DynamicRange
 

@@ -159,3 +159,59 @@ class Scale(EquaveCyclicCollection[IntervalType]):
             _addressed_collection_cache[cache_key] = AddressedScale(self, other)
         return _addressed_collection_cache[cache_key] 
     
+    @classmethod
+    def n_edo(cls, n: int = 12, equave: float = 1200.0) -> 'Scale':
+        """
+        Create an n-tone equal division of the equave (n-EDO).
+        
+        Args:
+            n: Number of equal divisions
+            equave: Size of the equave in cents (default 1200.0 for octave)
+            
+        Returns:
+            Scale with n equal divisions
+            
+        Examples:
+            >>> Scale.n_edo(12)  # 12-tone equal temperament
+            >>> Scale.n_edo(24, 1200)  # Quarter-tone scale
+            >>> Scale.n_edo(31, 1200)  # 31-EDO
+        """
+        step_size = equave / n
+        degrees = [i * step_size for i in range(n)]
+        return cls(degrees, equave, 'cents')
+    
+    @classmethod
+    def ionian(cls) -> 'Scale':
+        """Create the Ionian mode (major scale) in just intonation."""
+        return cls(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
+    
+    @classmethod
+    def dorian(cls) -> 'Scale':
+        """Create the Dorian mode in just intonation."""
+        return cls.ionian().mode(1)
+    
+    @classmethod
+    def phrygian(cls) -> 'Scale':
+        """Create the Phrygian mode in just intonation."""
+        return cls.ionian().mode(2)
+    
+    @classmethod
+    def lydian(cls) -> 'Scale':
+        """Create the Lydian mode in just intonation."""
+        return cls.ionian().mode(3)
+    
+    @classmethod
+    def mixolydian(cls) -> 'Scale':
+        """Create the Mixolydian mode in just intonation."""
+        return cls.ionian().mode(4)
+    
+    @classmethod
+    def aeolian(cls) -> 'Scale':
+        """Create the Aeolian mode (natural minor) in just intonation."""
+        return cls.ionian().mode(5)
+    
+    @classmethod
+    def locrian(cls) -> 'Scale':
+        """Create the Locrian mode in just intonation."""
+        return cls.ionian().mode(6)
+    

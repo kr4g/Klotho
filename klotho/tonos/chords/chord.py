@@ -34,7 +34,7 @@ class AddressedChord(AddressedPitchCollection):
         
         lowest_interval = self._collection.degrees[0]
         
-        if self._collection.interval_type == float:
+        if self._collection.interval_type == float or (hasattr(self._collection, '_interval_type_mode') and self._collection._interval_type_mode == "cents"):
             freq_ratio = 2**((interval - lowest_interval)/1200)
             return Pitch.from_freq(self._reference_pitch.freq * freq_ratio)
         else:

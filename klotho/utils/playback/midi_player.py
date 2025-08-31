@@ -874,10 +874,11 @@ class MultiPortMidiWriter:
             track = self.port_tracks[port]
             
             # Sort events by time, then by message type priority
+            # Proper MIDI setup order: Bank Select -> Program Change -> Pitch Bend -> Note On
             message_priority = {
-                'pitchwheel': 0,
-                'control_change': 1, 
-                'program_change': 2,
+                'control_change': 0,  # Bank Select (CC0) and RPN messages
+                'program_change': 1,
+                'pitchwheel': 2,      # Pitch bend after program setup
                 'note_on': 3,
                 'note_off': 4
             }
@@ -963,12 +964,16 @@ class ChannelAllocator:
                 if self.free_drum[p]:
                     port = p
                     channel = self.free_drum[p].popleft()
+                    # Clear channel state for newly allocated channel
+                    self.channel_state[port][channel] = {}
                     break
             
             if port is None:
                 # For sequential events, reuse channel 9 on port 0 since notes don't overlap
                 port = 0
                 channel = 9
+                # Clear channel state for reused channel
+                self.channel_state[port][channel] = {}
                 
         else:
             # For melodic: Sequential port allocation - exhaust all channels on port 0, then port 1, etc.
@@ -980,6 +985,8 @@ class ChannelAllocator:
                 if self.free_melodic[p]:
                     port = p
                     channel = self.free_melodic[p].popleft()
+                    # Clear channel state for newly allocated channel
+                    self.channel_state[port][channel] = {}
                     break
             
             if port is None:
@@ -987,6 +994,8 @@ class ChannelAllocator:
                 port = 0
                 available_channels = [ch for ch in range(16) if ch != 9]
                 channel = available_channels[0]  # Use first melodic channel
+                # Clear channel state for reused channel
+                self.channel_state[port][channel] = {}
         
         # Record allocation
         self.active_voices[voice_id] = (port, channel, is_drum)
@@ -1139,44 +1148,43 @@ def _generate_multi_port_events(note_events, writer, allocator, bpm, debug=False
         is_drum = note_event['is_drum']
         pitch_bend = note_event['pitch_bend']
         
-        # Check if we need to set bank/program for this channel
-        channel_state = allocator.get_channel_state(port, channel)
+        # Always set up channel for new voice allocation (ensures clean state)
+        # Send setup messages at note time but rely on MIDI writer's event sorting for proper order
         
-        # Handle program changes based on instrument type
+        # Handle bank/program setup based on instrument type
         if is_drum:
-            # For drums: Channel 9 with Standard Drum Kit (GM compatibility)
-            # Channel 9 is hard-coded as drums in GM - no Bank Select needed
-            if channel == 9:
-                standard_drum_program = 1  # GM Standard Drum Kit
-                if channel_state.get('program') != standard_drum_program:
-                    if debug:
-                        print(f"[DEBUG] Setting channel {channel} (DRUM CHANNEL) to Program {standard_drum_program}")
-                    writer.add_event(port, start_time, Message('program_change', 
-                                                             channel=channel, program=standard_drum_program))
-                    allocator.set_channel_state(port, channel, program=standard_drum_program, bank='drum')
-            else:
-                # This shouldn't happen with our new allocation logic
-                if debug:
-                    print(f"[DEBUG] WARNING: Drum on non-channel-9: {channel}")
+            # For drums: Use Bank 0 (GM standard) + Program Change
+            # In GM, drums use channel 9 with standard programs, no special bank needed
+            if debug:
+                print(f"[DEBUG] Setting up DRUM channel {channel}: Bank 0, Program {program}")
+            writer.add_event(port, start_time, Message('control_change', 
+                                                     channel=channel, control=0, value=0))  # Bank Select MSB
+            writer.add_event(port, start_time, Message('program_change', 
+                                                     channel=channel, program=program))
+            allocator.set_channel_state(port, channel, program=program, bank=0)
         else:
-            # For melodic: Simple program change (no Bank Select needed for basic GM)
-            if channel_state.get('program') != program:
-                if debug:
-                    print(f"[DEBUG] Setting channel {channel} (MELODIC) to Program {program}")
-                writer.add_event(port, start_time, Message('program_change', 
-                                                         channel=channel, program=program))
-                allocator.set_channel_state(port, channel, program=program, bank='melodic')
+            # For melodic: Always send Bank Select 0 + Program Change
+            if debug:
+                print(f"[DEBUG] Setting up MELODIC channel {channel}: Bank 0, Program {program}")
+            writer.add_event(port, start_time, Message('control_change', 
+                                                     channel=channel, control=0, value=0))  # Bank Select MSB
+            writer.add_event(port, start_time, Message('program_change', 
+                                                     channel=channel, program=program))
+            allocator.set_channel_state(port, channel, program=program, bank=0)
         
-        # Set pitch bend sensitivity if needed (send slightly before note to avoid timing conflicts)
-        if channel_state.get('bend_sens') != allocator.bend_sensitivity_semitones:
-            _send_rpn_pitch_bend_sensitivity(writer, port, channel, start_time - 0.001, 
-                                           allocator.bend_sensitivity_semitones)
-            allocator.set_channel_state(port, channel, bend_sens=allocator.bend_sensitivity_semitones)
+        # Always set pitch bend sensitivity for new voice
+        _send_rpn_pitch_bend_sensitivity(writer, port, channel, start_time, 
+                                       allocator.bend_sensitivity_semitones)
+        allocator.set_channel_state(port, channel, bend_sens=allocator.bend_sensitivity_semitones)
         
-        # Send pitch bend if needed (send slightly before note to avoid timing conflicts)
+        # Always reset pitch bend to center for new voice
+        writer.add_event(port, start_time, Message('pitchwheel', 
+                                                 channel=channel, pitch=0))  # Center pitch bend
+        
+        # Send pitch bend if needed (same time as note, sorted by message priority)
         if pitch_bend is not None:
             pitch_value = pitch_bend - 8192  # Convert to MIDI pitchwheel range
-            writer.add_event(port, start_time - 0.001, Message('pitchwheel', 
+            writer.add_event(port, start_time, Message('pitchwheel', 
                                                      channel=channel, pitch=pitch_value))
         
         # Send note on
@@ -1427,6 +1435,13 @@ def test_midi_backend():
     print(f"\n{'🎉 ALL TESTS PASSED' if all_passed else '❌ SOME TESTS FAILED'}")
     
     return all_passed
+
+def debug_play_midi(obj, debug=True, **kwargs):
+    """
+    Debug version of play_midi that shows detailed channel allocation and MIDI events.
+    """
+    print("=== DEBUG MIDI PLAYBACK ===")
+    return play_midi(obj, debug=debug, **kwargs)
 
 def _ensure_midi_duration(track, target_duration_seconds, bpm):
     """

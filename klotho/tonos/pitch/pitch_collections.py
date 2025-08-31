@@ -77,7 +77,11 @@ class PitchCollection(Generic[IntervalType]):
                 result.append(self._degrees[i] - self._degrees[i-1])
         else:
             for i in range(1, len(self._degrees)):
-                result.append(self._degrees[i] / self._degrees[i-1])
+                prev_degree = self._degrees[i-1]
+                if prev_degree == 0 or (isinstance(prev_degree, Fraction) and prev_degree.numerator == 0):
+                    result.append(Fraction(0, 1))
+                else:
+                    result.append(self._degrees[i] / prev_degree)
                 
         return result
     
@@ -126,11 +130,11 @@ class PitchCollection(Generic[IntervalType]):
             start, stop, step = index.indices(len(self._degrees))
             indices = list(range(start, stop, step))
             selected_degrees = [self._degrees[i] for i in indices]
-            return PitchCollection(selected_degrees, self._equave)
+            return PitchCollection(selected_degrees, self._equave, self._interval_type_mode)
             
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_degrees = [self[int(i) if not isinstance(i, int) else i] for i in index]
-            return PitchCollection(selected_degrees, self._equave)
+            return PitchCollection(selected_degrees, self._equave, self._interval_type_mode)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer, slice, or sequence of integers")
@@ -407,22 +411,22 @@ class EquaveCyclicCollection(PitchCollection[IntervalType]):
         if isinstance(index, slice):
             size = len(self._degrees)
             if size == 0:
-                return PitchCollection([], self._equave)
+                return PitchCollection([], self._equave, self._interval_type_mode)
                 
             start, stop, step = index.indices(size)
             
             if index.stop is None or (index.stop is not None and abs(index.stop) <= size):
                 indices = list(range(start, stop, step))
                 selected_degrees = [self._degrees[i] for i in indices]
-                return PitchCollection(selected_degrees, self._equave)
+                return PitchCollection(selected_degrees, self._equave, self._interval_type_mode)
             else:
                 indices = list(range(index.start or 0, index.stop, step))
                 selected_degrees = [self[i] for i in indices]
-                return PitchCollection(selected_degrees, self._equave)
+                return PitchCollection(selected_degrees, self._equave, self._interval_type_mode)
             
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_degrees = [self[int(i) if not isinstance(i, int) else i] for i in index]
-            return PitchCollection(selected_degrees, self._equave)
+            return PitchCollection(selected_degrees, self._equave, self._interval_type_mode)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer, slice, or sequence of integers")
@@ -538,7 +542,7 @@ class AddressedPitchCollection:
     def _calculate_pitch(self, index: int) -> 'Pitch':
         interval = self._collection[index]
         
-        if self._collection.interval_type == float:
+        if self._collection.interval_type == float or (hasattr(self._collection, '_interval_type_mode') and self._collection._interval_type_mode == "cents"):
             return Pitch.from_freq(self._reference_pitch.freq * (2**(float(interval)/1200)))
         else:
             return Pitch.from_freq(self._reference_pitch.freq * float(interval), partial=interval)
@@ -558,7 +562,8 @@ class AddressedPitchCollection:
                     interval = Fraction(pitch.freq / self._reference_pitch.freq)
                 selected_intervals.append(interval)
             
-            new_collection = PitchCollection(selected_intervals, self._collection.equave)
+            interval_type_mode = "cents" if self._collection.interval_type == float else "ratios"
+            new_collection = PitchCollection(selected_intervals, self._collection.equave, interval_type_mode)
             return AddressedPitchCollection(new_collection, self._reference_pitch)
         
         if not isinstance(index, int):

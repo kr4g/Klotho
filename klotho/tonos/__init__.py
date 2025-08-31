@@ -25,6 +25,7 @@ from . import utils
 from . import systems
 from . import scales
 from . import chords
+from . import motives
 from . import pitch
 
 combination_product_sets = systems.combination_product_sets
@@ -33,6 +34,7 @@ harmonic_trees = systems.harmonic_trees
 from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection
 from .scales import Scale
 from .chords import Chord
+from .motives import Motive
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
@@ -58,6 +60,7 @@ __all__ = [
     'systems',
     'scales',
     'chords',
+    'motives',
     'pitch',
     'combination_product_sets',
     'harmonic_trees',
@@ -69,6 +72,7 @@ __all__ = [
     'AddressedPitchCollection',
     'Scale',
     'Chord',
+    'Motive',
     'CombinationProductSet',
     'Hexany',
     'Dekany',
