@@ -23,7 +23,7 @@ from klotho.thetos.instruments.instrument import MidiInstrument
 from klotho.tonos.pitch.pitch_collections import PitchCollection, EquaveCyclicCollection, AddressedPitchCollection
 from klotho.tonos.pitch.pitch import Pitch
 from klotho.tonos.scales.scale import Scale, AddressedScale
-from klotho.tonos.chords.chord import Chord, AddressedChord
+from klotho.tonos.chords.chord import Chord, AddressedChord, Sonority, AddressedSonority, ChordSequence
 
 DEFAULT_DRUM_NOTE = 77
 PERCUSSION_CHANNEL = 9
@@ -80,16 +80,19 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, or Chord
+          PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, 
+          Sonority, or ChordSequence
         The musical object to play. Different object types have different playback behaviors:
         - RhythmTree/TemporalUnit: Rhythmic playback with default pitch
         - PitchCollection/AddressedPitchCollection: Sequential pitch playback
         - Scale/AddressedScale: Ascending then descending playback
-        - Chord/AddressedChord: Block chord or arpeggiated playback
+        - Chord/AddressedChord/Sonority/AddressedSonority: Block chord or arpeggiated playback
+        - ChordSequence: Sequential playback of chords/sonorities
     dur : float, optional
         Duration in seconds. Defaults depend on object type:
         - PitchCollection/Scale: 0.5 seconds per note
-        - Chord: 3.0 seconds total (or per note if arpeggiated)
+        - Chord/Sonority: 3.0 seconds total (or per note if arpeggiated)
+        - ChordSequence: 3.0 seconds per chord
     arp : bool, optional
         For chords only: if True, arpeggiate the chord (default False)
     prgm : int, optional
@@ -138,18 +141,21 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
             temporal_unit = TemporalUnit.from_rt(obj)
             midi_file = _create_midi_from_temporal_unit(temporal_unit, max_channels=max_channels, 
                                                       bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case ChordSequence():
+            midi_file = _create_midi_from_chord_sequence(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
+                                                       max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
         case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
             if isinstance(obj, (Scale, AddressedScale)):
                 midi_file = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, AddressedChord)):
+            elif isinstance(obj, (Chord, AddressedChord, Sonority, AddressedSonority)):
                 midi_file = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
                 midi_file = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
                                                              max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, AddressedScale, Chord, AddressedChord.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, AddressedScale, Chord, AddressedChord, Sonority, AddressedSonority, ChordSequence.")
     
     return _midi_to_audio(midi_file, soundfont_path=soundfont_path, max_polyphony=max_polyphony)
 
@@ -1751,6 +1757,99 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, prgm=0, max_channels=128,
     _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     
     # Finalize and return
+    writer.finalize(bpm)
+    return writer.get_midi_file()
+
+def _create_midi_from_chord_sequence(chord_sequence, dur=3.0, arp=False, prgm=0, max_channels=128, bend_sensitivity_semitones=12, debug=False):
+    """Create a MIDI file from a ChordSequence (sequential chord playback) using absolute timing."""
+    bpm = 120
+    
+    if not chord_sequence.chords:
+        writer = MultiPortMidiWriter(max_voices=1)
+        writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
+        writer.finalize(bpm)
+        return writer.get_midi_file()
+    
+    total_notes = sum(len(chord) for chord in chord_sequence.chords if hasattr(chord, '__len__'))
+    max_concurrent = min(total_notes, max_channels)
+    
+    writer = MultiPortMidiWriter(max_voices=max_concurrent)
+    allocator = ChannelAllocator(writer.num_ports, bend_sensitivity_semitones=bend_sensitivity_semitones)
+    
+    writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
+    
+    if debug:
+        print(f"[DEBUG] ChordSequence: {len(chord_sequence.chords)} chords, {max_concurrent} voices, {writer.num_ports} ports")
+    
+    note_events = []
+    current_time = 0.0
+    voice_counter = 0
+    
+    for chord_idx, chord in enumerate(chord_sequence.chords):
+        if isinstance(chord, AddressedPitchCollection):
+            addressed = chord
+        else:
+            from klotho.tonos.pitch.pitch import Pitch
+            addressed = chord.root(Pitch("C4"))
+        
+        if arp:
+            chord_start_time = current_time
+            for i in range(len(addressed)):
+                pitch = addressed[i]
+                voice_id = f"chord_seq_voice_{voice_counter}"
+                voice_counter += 1
+                
+                try:
+                    port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=prgm)
+                except RuntimeError:
+                    continue
+                
+                midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, bend_sensitivity_semitones)
+                
+                note_events.append({
+                    'voice_id': voice_id,
+                    'port': port,
+                    'channel': channel,
+                    'start_time': current_time,
+                    'duration': dur,
+                    'midi_note': midi_note,
+                    'velocity': DEFAULT_VELOCITY,
+                    'program': prgm,
+                    'is_drum': False,
+                    'pitch_bend': pitch_bend
+                })
+                
+                current_time += dur
+        else:
+            for i in range(len(addressed)):
+                pitch = addressed[i]
+                voice_id = f"chord_seq_voice_{voice_counter}"
+                voice_counter += 1
+                
+                try:
+                    port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=prgm)
+                except RuntimeError:
+                    continue
+                
+                midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, bend_sensitivity_semitones)
+                
+                note_events.append({
+                    'voice_id': voice_id,
+                    'port': port,
+                    'channel': channel,
+                    'start_time': current_time,
+                    'duration': dur,
+                    'midi_note': midi_note,
+                    'velocity': DEFAULT_VELOCITY,
+                    'program': prgm,
+                    'is_drum': False,
+                    'pitch_bend': pitch_bend
+                })
+            
+            current_time += dur
+    
+    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
+    
     writer.finalize(bpm)
     return writer.get_midi_file()
 

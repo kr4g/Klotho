@@ -33,13 +33,13 @@ harmonic_trees = systems.harmonic_trees
 
 from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection
 from .scales import Scale
-from .chords import Chord
+from .chords import Chord, Sonority, ChordSequence
 from .motives import Motive
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
 from .scales.scale import AddressedScale
-from .chords.chord import AddressedChord
+from .chords.chord import AddressedChord, AddressedSonority
 
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
 from .utils.intervals import split_interval, harmonic_mean, arithmetic_mean, logarithmic_distance
@@ -72,6 +72,8 @@ __all__ = [
     'AddressedPitchCollection',
     'Scale',
     'Chord',
+    'Sonority',
+    'ChordSequence',
     'Motive',
     'CombinationProductSet',
     'Hexany',
@@ -82,6 +84,7 @@ __all__ = [
     'Spectrum',
     'AddressedScale',
     'AddressedChord',
+    'AddressedSonority',
     
     # Interval utilities
     'ratio_to_cents',
