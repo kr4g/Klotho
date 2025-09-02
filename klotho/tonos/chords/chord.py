@@ -33,14 +33,12 @@ class AddressedChord(AddressedPitchCollection):
         if len(self._collection.degrees) == 0:
             return self._reference_pitch
         
-        lowest_interval = self._collection.degrees[0]
-        
         if self._collection.interval_type == float or (hasattr(self._collection, '_interval_type_mode') and self._collection._interval_type_mode == "cents"):
-            freq_ratio = 2**((interval - lowest_interval)/1200)
+            freq_ratio = 2**(float(interval)/1200)
             return Pitch.from_freq(self._reference_pitch.freq * freq_ratio)
         else:
-            freq_ratio = interval / lowest_interval
-            return Pitch.from_freq(self._reference_pitch.freq * float(freq_ratio))
+            freq_ratio = float(interval)
+            return Pitch.from_freq(self._reference_pitch.freq * freq_ratio, partial=interval)
 
 class Chord(EquaveCyclicCollection[IntervalType]):
     """
@@ -136,6 +134,8 @@ class Chord(EquaveCyclicCollection[IntervalType]):
         """A complete graph with chord degrees as nodes."""
         return self._graph
     
+
+    
     def __invert__(self: PC) -> PC:
         if len(self._degrees) <= 1:
             return Chord(self._degrees.copy(), self._equave, self._interval_type_mode)
@@ -172,6 +172,35 @@ class Chord(EquaveCyclicCollection[IntervalType]):
             normalized_degrees = [degree / lowest for degree in self._degrees]
         
         return Chord(normalized_degrees, self._equave, self._interval_type_mode)
+    
+    @classmethod
+    def from_collection(cls, collection: Union[PitchCollection, EquaveCyclicCollection, AddressedPitchCollection]) -> 'Chord':
+        """
+        Create a Chord from any pitch collection, automatically detecting interval type.
+        
+        Args:
+            collection: Any PitchCollection, EquaveCyclicCollection, or AddressedPitchCollection
+            
+        Returns:
+            New Chord with intervals from the collection
+            
+        Examples:
+            >>> from klotho.tonos import Scale, Motive
+            >>> scale = Scale.n_edo(24, 1200)
+            >>> motive = Motive([0, 3, 6, 9])
+            >>> collection = scale[motive]
+            >>> chord = Chord.from_collection(collection)
+        """
+        if isinstance(collection, AddressedPitchCollection):
+            underlying_collection = collection._collection
+        else:
+            underlying_collection = collection
+        
+        interval_type_mode = getattr(underlying_collection, '_interval_type_mode', 'ratios')
+        equave = underlying_collection.equave
+        degrees = underlying_collection.degrees
+        
+        return cls(degrees, equave, interval_type_mode)
     
     def root(self, other: Union[Pitch, str]) -> 'AddressedChord':
         if isinstance(other, str):
@@ -352,6 +381,35 @@ class Sonority(PitchCollection[IntervalType]):
                 pass
         
         return Sonority(new_degrees, self._equave, self._interval_type_mode)
+    
+    @classmethod
+    def from_collection(cls, collection: Union[PitchCollection, EquaveCyclicCollection, AddressedPitchCollection]) -> 'Sonority':
+        """
+        Create a Sonority from any pitch collection, automatically detecting interval type.
+        
+        Args:
+            collection: Any PitchCollection, EquaveCyclicCollection, or AddressedPitchCollection
+            
+        Returns:
+            New Sonority with intervals from the collection
+            
+        Examples:
+            >>> from klotho.tonos import Scale, Motive
+            >>> scale = Scale.n_edo(24, 1200)
+            >>> motive = Motive([0, 3, 6, 9])
+            >>> collection = scale[motive]
+            >>> sonority = Sonority.from_collection(collection)
+        """
+        if isinstance(collection, AddressedPitchCollection):
+            underlying_collection = collection._collection
+        else:
+            underlying_collection = collection
+        
+        interval_type_mode = getattr(underlying_collection, '_interval_type_mode', 'ratios')
+        equave = underlying_collection.equave
+        degrees = underlying_collection.degrees
+        
+        return cls(degrees, equave, interval_type_mode)
     
     def root(self, other: Union[Pitch, str]) -> 'AddressedSonority':
         """Create an addressed sonority with the given root pitch."""

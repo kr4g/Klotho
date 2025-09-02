@@ -11,7 +11,7 @@ from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SET
 from klotho.tonos.scales import Scale
 from klotho.tonos.chords import Chord
 from klotho.tonos.scales.scale import AddressedScale
-from klotho.tonos.chords.chord import AddressedChord
+from klotho.tonos.chords.chord import AddressedChord, Sonority, AddressedSonority
 
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
@@ -72,7 +72,7 @@ def plot(obj, **kwargs):
                     return _plot_cps(obj, **kwargs)
                 case _:
                     return _plot_cs(obj, **kwargs)
-        case Scale() | Chord() | AddressedScale() | AddressedChord():
+        case Scale() | Chord() | AddressedScale() | AddressedChord() | Sonority() | AddressedSonority():
             return _plot_scale_chord(obj, **kwargs)
         case PartitionSet():
             return _plot_graph(obj.graph._graph, **kwargs)
@@ -214,7 +214,8 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
-                    mode='lines',
+                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                     line=dict(color='#808080', width=2),
                     showlegend=False,
                     hoverinfo='none'
@@ -465,7 +466,8 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
-                    mode='lines',
+                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                     line=dict(color='#808080', width=2),
                     showlegend=False,
                     hoverinfo='none'
@@ -1088,7 +1090,8 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                     fig.add_trace(
                         go.Scatter3d(
                             x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                            mode='lines',
+                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                             line=dict(color=colors[i], width=widths[i]),
                             opacity=0.5,
                             showlegend=False,
@@ -1106,7 +1109,8 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                     fig.add_trace(
                         go.Scatter3d(
                             x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                            mode='lines',
+                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                             line=dict(color=color_hex, width=6),
                             showlegend=False,
                             hoverinfo='none'
@@ -1121,7 +1125,8 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                 fig.add_trace(
                     go.Scatter3d(
                         x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                        mode='lines',
+                        mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                         line=dict(color=colors[i], width=widths[i]),
                         showlegend=False,
                         hoverinfo='none'
@@ -1877,7 +1882,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         fig.add_trace(
             go.Scatter(
                 x=[x1, x2], y=[y1, y2],
-                mode='lines',
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                 line=dict(color='#808080', width=1),
                 showlegend=False,
                 hoverinfo='none'
@@ -1890,7 +1896,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         fig.add_trace(
             go.Scatter(
                 x=[x1, x2], y=[y1, y2],
-                mode='lines',
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                 line=dict(color='#90EE90', width=2),
                 showlegend=False,
                 hoverinfo='none'
@@ -1978,19 +1985,24 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
 
 def _plot_scale_chord(obj, figsize: tuple = (12, 12), 
                      node_size: int = 30, text_size: int = 12, show_labels: bool = True,
-                     title: str = None, output_file: str = None, nodes: list = None) -> go.Figure:
+                     title: str = None, output_file: str = None, nodes: list = None, 
+                     layout: str = 'circle') -> go.Figure:
     """
-    Plot a Scale or Chord as a circular clock-like diagram.
+    Plot a Scale or Chord with different visualizations based on interval type.
+    
+    For cents-based scales/chords: Circular clock-like diagram with nodes
+    For ratio-based scales/chords: Proportional segments showing interval sizes
     
     Args:
         obj: Scale or Chord instance to visualize
         figsize: Size of the figure as (width, height) in inches
-        node_size: Size of the nodes in the plot
+        node_size: Size of the nodes in the plot (cents mode only)
         text_size: Size of the text labels
-        show_labels: Whether to show labels on the nodes
+        show_labels: Whether to show labels on the segments/nodes
         title: Title for the plot (default is derived from object type if None)
         output_file: Path to save the figure (if None, display instead)
-        nodes: List of node IDs to highlight and connect with edges
+        nodes: List of node IDs to highlight (cents mode only)
+        layout: 'circle' (default) or 'line' for ratio-based visualization
         
     Returns:
         Plotly figure object that can be displayed or further customized
@@ -2002,11 +2014,23 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
     n_degrees = len(degrees)
     
     # For addressed objects, use the underlying collection for calculations
-    calc_obj = obj._collection if isinstance(obj, (AddressedScale, AddressedChord)) else obj
+    calc_obj = obj._collection if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)) else obj
     calc_degrees = calc_obj.degrees
     
     fig = go.Figure()
     
+    # Branch based on interval type
+    if calc_obj._interval_type_mode == "cents":
+        return _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize, 
+                                     node_size, text_size, show_labels, title, output_file, nodes)
+    else:
+        return _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, figsize,
+                                            text_size, show_labels, title, output_file, layout)
+
+def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize, 
+                           node_size, text_size, show_labels, title, output_file, nodes):
+    """Plot cents-based scales/chords as circular node diagrams."""
+    n_degrees = len(degrees)
     node_x, node_y = [], []
     node_text, hover_data, node_colors = [], [], []
     
@@ -2028,7 +2052,7 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
         node_y.append(y)
         
         # Handle addressed vs non-addressed objects
-        if isinstance(obj, (AddressedScale, AddressedChord)):
+        if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
             # For addressed objects, use the underlying collection for display
             calc_degree = calc_degrees[i]
             if calc_obj._interval_type_mode == "cents":
@@ -2061,13 +2085,46 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
         rainbow_color = plt.cm.hsv(i / n_degrees)
         color_hex = '#%02x%02x%02x' % (int(rainbow_color[0]*255), int(rainbow_color[1]*255), int(rainbow_color[2]*255))
         
-        if nodes:
-            # Handle both single list and list of lists
+        if nodes is not None:
+            # Handle both single list and list of lists, plus numpy arrays and Motive objects
             all_highlighted_nodes = set()
-            if isinstance(nodes[0], list):
-                for node_list in nodes:
-                    all_highlighted_nodes.update(node_list)
+            
+            # Convert nodes to a list if it's a single numpy array or Motive
+            if hasattr(nodes, 'to_numpy'):  # Motive object
+                nodes = nodes.to_numpy().tolist()
+            elif hasattr(nodes, 'tolist') and hasattr(nodes, 'shape'):  # numpy array
+                nodes = nodes.tolist()
+            
+            # Check if it's a list of lists/arrays/motives
+            if isinstance(nodes, list) and len(nodes) > 0:
+                first_item = nodes[0]
+                # Check if first item is a container (list, array, motive) rather than a scalar
+                is_container_list = False
+                try:
+                    is_container_list = (
+                        hasattr(first_item, 'to_numpy') or  # Motive
+                        (hasattr(first_item, 'tolist') and hasattr(first_item, 'shape')) or   # numpy array
+                        (isinstance(first_item, list))  # list
+                    )
+                except:
+                    is_container_list = False
+                
+                if is_container_list:
+                    # Handle list of lists/arrays/motives
+                    for node_list in nodes:
+                        if hasattr(node_list, 'to_numpy'):  # Motive object
+                            all_highlighted_nodes.update(node_list.to_numpy().tolist())
+                        elif hasattr(node_list, 'tolist') and hasattr(node_list, 'shape'):  # numpy array
+                            all_highlighted_nodes.update(node_list.tolist())
+                        elif hasattr(node_list, '__iter__') and not isinstance(node_list, str):  # regular list
+                            all_highlighted_nodes.update(node_list)
+                        else:  # single value
+                            all_highlighted_nodes.add(node_list)
+                else:
+                    # Single list of scalar nodes
+                    all_highlighted_nodes = set(nodes)
             else:
+                # Single list of nodes (already converted above if needed)
                 all_highlighted_nodes = set(nodes)
             
             if i in all_highlighted_nodes:
@@ -2086,19 +2143,57 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
-                    mode='lines',
+                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                     line=dict(color='#444444', width=1),
                     showlegend=False,
                     hoverinfo='none'
                 )
             )
     
-    if nodes:
-        # Handle both single list and list of lists
-        if isinstance(nodes[0], list):
+    if nodes is not None:
+        # Convert nodes to consistent format for edge drawing
+        def convert_to_list(item):
+            """Convert any node container to a plain list."""
+            if hasattr(item, 'to_numpy'):  # Motive object
+                return item.to_numpy().tolist()
+            elif hasattr(item, 'tolist') and hasattr(item, 'shape'):  # numpy array
+                return item.tolist()
+            elif isinstance(item, list):
+                return item
+            else:
+                return [item]
+        
+        # Convert main nodes structure
+        if hasattr(nodes, 'to_numpy') or (hasattr(nodes, 'tolist') and hasattr(nodes, 'shape')):
+            # Single Motive or numpy array
+            processed_nodes = convert_to_list(nodes)
+            is_container_list = False
+        elif isinstance(nodes, list) and len(nodes) > 0:
+            first_item = nodes[0]
+            # Check if it's a list of containers
+            try:
+                is_container_list = (
+                    hasattr(first_item, 'to_numpy') or  # Motive
+                    (hasattr(first_item, 'tolist') and hasattr(first_item, 'shape')) or   # numpy array
+                    isinstance(first_item, list)  # list
+                )
+            except:
+                is_container_list = False
+            
+            if is_container_list:
+                processed_nodes = [convert_to_list(item) for item in nodes]
+            else:
+                processed_nodes = nodes
+                is_container_list = False
+        else:
+            processed_nodes = nodes
+            is_container_list = False
+        
+        if is_container_list:
             # Multiple shapes - use viridis color scheme
-            viridis_colors = plt.cm.viridis(np.linspace(0, 1, len(nodes)))
-            for shape_idx, node_list in enumerate(nodes):
+            viridis_colors = plt.cm.viridis(np.linspace(0, 1, len(processed_nodes)))
+            for shape_idx, node_list in enumerate(processed_nodes):
                 sorted_nodes = sorted(node_list)
                 viridis_color = viridis_colors[shape_idx]
                 color_hex = '#%02x%02x%02x' % (int(viridis_color[0]*255), int(viridis_color[1]*255), int(viridis_color[2]*255))
@@ -2113,7 +2208,8 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
                         fig.add_trace(
                             go.Scatter(
                                 x=[x1, x2], y=[y1, y2],
-                                mode='lines',
+                                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                 line=dict(color=color_hex, width=3),
                                 showlegend=False,
                                 hoverinfo='none'
@@ -2121,7 +2217,7 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
                         )
         else:
             # Single shape - use white
-            sorted_nodes = sorted(nodes)
+            sorted_nodes = sorted(processed_nodes)
             for i in range(len(sorted_nodes)):
                 current_idx = sorted_nodes[i]
                 next_idx = sorted_nodes[(i + 1) % len(sorted_nodes)]
@@ -2132,7 +2228,8 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
                     fig.add_trace(
                         go.Scatter(
                             x=[x1, x2], y=[y1, y2],
-                            mode='lines',
+                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                             line=dict(color='white', width=3),
                             showlegend=False,
                             hoverinfo='none'
@@ -2173,7 +2270,7 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
     )
     
     if title is None:
-        if isinstance(obj, (AddressedScale, AddressedChord)):
+        if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
             obj_type = type(obj).__name__.replace('Addressed', '')
             interval_type = "cents" if calc_obj._interval_type_mode == "cents" else "ratios"
             
@@ -2599,7 +2696,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 fig.add_trace(
                     go.Scatter(
                         x=[x1, x2], y=[y1, y2],
-                        mode='lines',
+                        mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                         line=dict(color=edge_color, width=edge_width),
                         showlegend=False,
                         hoverinfo='none'
@@ -2628,7 +2726,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             fig.add_trace(
                                 go.Scatter(
                                     x=[x1, x2], y=[y1, y2],
-                                    mode='lines',
+                                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                     line=dict(color='white', width=4),
                                     showlegend=False,
                                     hoverinfo='none'
@@ -2654,7 +2753,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                                     fig.add_trace(
                                         go.Scatter(
                                             x=[x1, x2], y=[y1, y2],
-                                            mode='lines',
+                                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                             line=dict(color='white', width=4),
                                             showlegend=False,
                                             hoverinfo='none'
@@ -2742,7 +2842,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 fig.add_trace(
                     go.Scatter(
                         x=[x1, x2], y=[y1, y2],
-                        mode='lines',
+                        mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                         line=dict(color=edge_color, width=edge_width),
                         showlegend=False,
                         hoverinfo='none'
@@ -2782,7 +2883,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             fig.add_trace(
                                 go.Scatter(
                                     x=[x1, x2], y=[y1, y2],
-                                    mode='lines',
+                                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                     line=dict(color='white', width=4),
                                     showlegend=False,
                                     hoverinfo='none'
@@ -2812,7 +2914,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                                     fig.add_trace(
                                         go.Scatter(
                                             x=[x1, x2], y=[y1, y2],
-                                            mode='lines',
+                                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                             line=dict(color='white', width=4),
                                             showlegend=False,
                                             hoverinfo='none'
@@ -2891,7 +2994,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 fig.add_trace(
                     go.Scatter3d(
                         x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                        mode='lines',
+                        mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                         line=dict(color=edge_color, width=edge_width),
                         showlegend=False,
                         hoverinfo='none'
@@ -2931,7 +3035,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             fig.add_trace(
                                 go.Scatter3d(
                                     x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                                    mode='lines',
+                                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                     line=dict(color='white', width=4),
                                     showlegend=False,
                                     hoverinfo='none'
@@ -2961,7 +3066,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                                     fig.add_trace(
                                         go.Scatter3d(
                                             x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                                            mode='lines',
+                                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                             line=dict(color='white', width=4),
                                             showlegend=False,
                                             hoverinfo='none'
@@ -3459,7 +3565,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
-                    mode='lines',
+                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                     line=dict(color=edge_color_dimmed, width=edge_width),
                     showlegend=False,
                     hoverinfo='none'
@@ -3484,7 +3591,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                             fig.add_trace(
                                 go.Scatter(
                                     x=[x1, x2], y=[y1, y2],
-                                    mode='lines',
+                                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                     line=dict(color='white', width=4),
                                     showlegend=False,
                                     hoverinfo='none'
@@ -3507,7 +3615,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                                     fig.add_trace(
                                         go.Scatter(
                                             x=[x1, x2], y=[y1, y2],
-                                            mode='lines',
+                                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                             line=dict(color='white', width=4),
                                             showlegend=False,
                                             hoverinfo='none'
@@ -3598,7 +3707,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
-                    mode='lines',
+                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                     line=dict(color=edge_color_dimmed, width=edge_width),
                     showlegend=False,
                     hoverinfo='none'
@@ -3623,7 +3733,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                             fig.add_trace(
                                 go.Scatter(
                                     x=[x1, x2], y=[y1, y2],
-                                    mode='lines',
+                                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                     line=dict(color='white', width=4),
                                     showlegend=False,
                                     hoverinfo='none'
@@ -3646,7 +3757,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                                     fig.add_trace(
                                         go.Scatter(
                                             x=[x1, x2], y=[y1, y2],
-                                            mode='lines',
+                                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                             line=dict(color='white', width=4),
                                             showlegend=False,
                                             hoverinfo='none'
@@ -3736,7 +3848,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             fig.add_trace(
                 go.Scatter3d(
                     x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                    mode='lines',
+                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                     line=dict(color=edge_color_dimmed, width=edge_width),
                     showlegend=False,
                     hoverinfo='none'
@@ -3761,7 +3874,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                             fig.add_trace(
                                 go.Scatter3d(
                                     x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                                    mode='lines',
+                                    mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                     line=dict(color='white', width=4),
                                     showlegend=False,
                                     hoverinfo='none'
@@ -3784,7 +3898,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                                     fig.add_trace(
                                         go.Scatter3d(
                                             x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                                            mode='lines',
+                                            mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
                                             line=dict(color='white', width=4),
                                             showlegend=False,
                                             hoverinfo='none'
@@ -4004,6 +4119,770 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
         )
     
     fig.update_layout(**layout_dict)
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
+def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsize,
+                               text_size, show_labels, title, output_file, layout):
+    """Plot ratio-based scales/chords as proportional segments."""
+    n_degrees = len(degrees)
+    
+    if n_degrees < 2:
+        raise ValueError("Need at least 2 degrees to plot intervals")
+    
+    # Get the complete intervals (including final interval to equave)
+    if hasattr(calc_obj, 'complete_intervals'):
+        interval_ratios = calc_obj.complete_intervals
+    else:
+        # Fallback for other types
+        interval_ratios = list(calc_obj.intervals)
+        if calc_obj._degrees:
+            final_interval = calc_obj._equave / calc_obj._degrees[-1]
+            interval_ratios.append(final_interval)
+    
+    # Convert interval ratios to log sizes for proportional display
+    intervals = [math.log(float(ratio)) for ratio in interval_ratios]
+    n_segments = len(interval_ratios)
+    
+    total_log_size = sum(intervals)
+    
+    if layout == 'circle':
+        current_angle = math.pi / 2
+        # Color based on distance from unison (1/1)
+        colors = []
+        for i in range(n_segments):
+            if i < len(calc_degrees):
+                # Distance from unison in log space
+                distance = abs(math.log(float(calc_degrees[i])))
+                hue = min(distance / 2.0, 1.0)  # Normalize and cap at 1.0
+            else:
+                # Final interval - use distance based on equave
+                distance = abs(math.log(float(calc_obj._equave)))
+                hue = min(distance / 2.0, 1.0)
+            colors.append(plt.cm.hsv(hue))
+        
+        for i, (interval_size, interval_ratio) in enumerate(zip(intervals, interval_ratios)):
+            if interval_size <= 0:
+                continue
+                
+            proportion = interval_size / total_log_size
+            angle_span = 2 * math.pi * proportion
+            
+            num_points = max(50, int(angle_span * 50))
+            angles = np.linspace(current_angle, current_angle - angle_span, num_points)
+            
+            inner_radius = 0.85
+            outer_radius = 1.0
+            
+            x_outer = outer_radius * np.cos(angles)
+            y_outer = outer_radius * np.sin(angles)
+            x_inner = inner_radius * np.cos(angles)
+            y_inner = inner_radius * np.sin(angles)
+            
+            x_coords = np.concatenate([x_outer, x_inner[::-1], [x_outer[0]]])
+            y_coords = np.concatenate([y_outer, y_inner[::-1], [y_outer[0]]])
+            
+            color = colors[i]
+            color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+            
+            if i < len(degrees):
+                degree = degrees[i]
+                calc_degree = calc_degrees[i]
+                
+                if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
+                    note_name = degree.pitchclass
+                    cents_offset = degree.cents_offset
+                    cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
+                    hover_text = f"Degree {i}<br>{calc_degree}<br>{note_name}{cent_info}"
+                    label_text = f"{calc_degree}" if show_labels else ""
+                else:
+                    hover_text = f"Degree {i}<br>{calc_degree}"
+                    label_text = f"{calc_degree}" if show_labels else ""
+            else:
+                hover_text = f"To Equave<br>{calc_obj._equave}"
+                label_text = f"{calc_obj._equave}" if show_labels else ""
+            
+            fig.add_trace(go.Scatter(
+                x=x_coords, y=y_coords,
+                fill='toself',
+                fillcolor=color_hex,
+                line=dict(color='white', width=1),
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
+                showlegend=False,
+                hovertemplate=f'{hover_text}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            if show_labels and label_text:
+                mid_angle = current_angle - angle_span / 2
+                label_radius = 0.85
+                label_x = label_radius * math.cos(mid_angle)
+                label_y = label_radius * math.sin(mid_angle)
+                
+                fig.add_trace(go.Scatter(
+                    x=[label_x], y=[label_y],
+                    mode='text',
+                    text=[label_text],
+                    textfont=dict(color='white', size=text_size, family='Arial', weight='bold'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            current_angle -= angle_span
+        
+        fig.update_layout(
+            xaxis=dict(
+                range=[-1.2, 1.2],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            yaxis=dict(
+                range=[-1.2, 1.2], 
+                scaleanchor="x", 
+                scaleratio=1,
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            )
+        )
+    
+    else:
+        current_pos = 0
+        # Color based on distance from unison (1/1)
+        colors = []
+        for i in range(n_segments):
+            if i < len(calc_degrees):
+                # Distance from unison in log space
+                distance = abs(math.log(float(calc_degrees[i])))
+                hue = min(distance / 2.0, 1.0)  # Normalize and cap at 1.0
+            else:
+                # Final interval - use distance based on equave
+                distance = abs(math.log(float(calc_obj._equave)))
+                hue = min(distance / 2.0, 1.0)
+            colors.append(plt.cm.hsv(hue))
+        y_center = 0
+        bar_height = 0.3
+        
+        for i, interval_size in enumerate(intervals):
+            if interval_size <= 0:
+                continue
+                
+            proportion = interval_size / total_log_size
+            segment_width = proportion * 2.0
+            
+            x_coords = [current_pos, current_pos + segment_width, current_pos + segment_width, current_pos, current_pos]
+            y_coords = [y_center - bar_height/2, y_center - bar_height/2, y_center + bar_height/2, y_center + bar_height/2, y_center - bar_height/2]
+            
+            color = colors[i]
+            color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+            
+            if i < len(degrees):
+                degree = degrees[i]
+                calc_degree = calc_degrees[i]
+                
+                if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
+                    note_name = degree.pitchclass
+                    cents_offset = degree.cents_offset
+                    cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
+                    hover_text = f"Degree {i}<br>{calc_degree}<br>{note_name}{cent_info}"
+                    label_text = f"{calc_degree}" if show_labels else ""
+                else:
+                    hover_text = f"Degree {i}<br>{calc_degree}"
+                    label_text = f"{calc_degree}" if show_labels else ""
+            else:
+                hover_text = f"To Equave<br>{calc_obj._equave}"
+                label_text = f"{calc_obj._equave}" if show_labels else ""
+            
+            fig.add_trace(go.Scatter(
+                x=x_coords, y=y_coords,
+                fill='toself',
+                fillcolor=color_hex,
+                line=dict(color='white', width=1),
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
+                showlegend=False,
+                hovertemplate=f'{hover_text}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            if show_labels and label_text:
+                label_x = current_pos + segment_width / 2
+                label_y = y_center
+                
+                fig.add_trace(go.Scatter(
+                    x=[label_x], y=[label_y],
+                    mode='text',
+                    text=[label_text],
+                    textfont=dict(color='white', size=text_size, family='Arial', weight='bold'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            current_pos += segment_width
+        
+        fig.update_layout(
+            xaxis=dict(
+                range=[-0.1, 2.1],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            yaxis=dict(
+                range=[-0.5, 0.5],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            )
+        )
+    
+    if title is None:
+        title = repr(obj)
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0),
+    )
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
+def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, figsize,
+                                 text_size, show_labels, title, output_file, layout):
+    """Plot ratio-based scales/chords as proportional segments."""
+    n_degrees = len(degrees)
+    
+    if n_degrees < 2:
+        raise ValueError("Need at least 2 degrees to plot intervals")
+    
+    # Use the intervals property (Scale now includes final interval)
+    interval_ratios = calc_obj.intervals
+    
+    # Convert interval ratios to log sizes for proportional display
+    intervals = [math.log(float(ratio)) for ratio in interval_ratios]
+    n_segments = len(interval_ratios)
+    total_log_size = sum(intervals)
+    
+    if layout == 'circle':
+        current_angle = math.pi / 2
+        # Color based on distance from unison (1/1)
+        colors = []
+        for i in range(n_segments):
+            if i < len(calc_degrees):
+                # Distance from unison in log space
+                distance = abs(math.log(float(calc_degrees[i])))
+                hue = min(distance / 2.0, 1.0)  # Normalize and cap at 1.0
+            else:
+                # Final interval - use distance based on equave
+                distance = abs(math.log(float(calc_obj._equave)))
+                hue = min(distance / 2.0, 1.0)
+            colors.append(plt.cm.hsv(hue))
+        
+        # Add degree labels at borders first
+        if show_labels:
+            for i, calc_degree in enumerate(calc_degrees):
+                degree_angle = current_angle
+                for j in range(i):
+                    degree_angle -= 2 * math.pi * (intervals[j] / total_log_size)
+                
+                degree_radius = 1.1
+                degree_x = degree_radius * math.cos(degree_angle)
+                degree_y = degree_radius * math.sin(degree_angle)
+                
+                fig.add_trace(go.Scatter(
+                     x=[degree_x], y=[degree_y],
+                     mode='text',
+                     text=[f"{calc_degree}"],
+                     textfont=dict(color='white', size=text_size+2, family='Arial'),
+                     showlegend=False,
+                     hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                     hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+                 ))
+            
+            # Add equave label at the end
+            equave_x = 1.1 * math.cos(math.pi / 2)
+            equave_y = 1.1 * math.sin(math.pi / 2)
+            fig.add_trace(go.Scatter(
+                 x=[equave_x], y=[equave_y],
+                 mode='text',
+                 text=["1/1"],
+                 textfont=dict(color='white', size=text_size+2, family='Arial'),
+                 showlegend=False,
+                 hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                 hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+             ))
+        
+        # Draw interval segments
+        for i, (interval_size, interval_ratio) in enumerate(zip(intervals, interval_ratios)):
+            if interval_size <= 0:
+                continue
+                
+            proportion = interval_size / total_log_size
+            angle_span = 2 * math.pi * proportion
+            
+            num_points = max(50, int(angle_span * 50))
+            angles = np.linspace(current_angle, current_angle - angle_span, num_points)
+            
+            inner_radius = 0.85
+            outer_radius = 1.0
+            
+            x_outer = outer_radius * np.cos(angles)
+            y_outer = outer_radius * np.sin(angles)
+            x_inner = inner_radius * np.cos(angles)
+            y_inner = inner_radius * np.sin(angles)
+            
+            x_coords = np.concatenate([x_outer, x_inner[::-1], [x_outer[0]]])
+            y_coords = np.concatenate([y_outer, y_inner[::-1], [y_outer[0]]])
+            
+            color = colors[i]
+            color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+            
+            # Hover text for the interval segment
+            hover_text = f"Interval: {interval_ratio}"
+            
+            fig.add_trace(go.Scatter(
+                x=x_coords, y=y_coords,
+                fill='toself',
+                fillcolor=color_hex,
+                line=dict(color='white', width=1),
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
+                showlegend=False,
+                hovertemplate=f'{hover_text}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            # Add interval label inside the segment
+            if show_labels:
+                mid_angle = current_angle - angle_span / 2
+                label_radius = 0.925
+                label_x = label_radius * math.cos(mid_angle)
+                label_y = label_radius * math.sin(mid_angle)
+                
+                fig.add_trace(go.Scatter(
+                    x=[label_x], y=[label_y],
+                    mode='text',
+                    text=[f"{interval_ratio}"],
+                    textfont=dict(color='black', size=text_size+2, family='Arial', weight='bold'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            current_angle -= angle_span
+        
+        fig.update_layout(
+            xaxis=dict(
+                range=[-1.2, 1.2],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            yaxis=dict(
+                range=[-1.2, 1.2], 
+                scaleanchor="x", 
+                scaleratio=1,
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            )
+        )
+    
+    else:  # line layout
+        current_pos = 0
+        # Color based on distance from unison (1/1)
+        colors = []
+        for i in range(n_segments):
+            if i < len(calc_degrees):
+                # Distance from unison in log space
+                distance = abs(math.log(float(calc_degrees[i])))
+                hue = min(distance / 2.0, 1.0)  # Normalize and cap at 1.0
+            else:
+                # Final interval - use distance based on equave
+                distance = abs(math.log(float(calc_obj._equave)))
+                hue = min(distance / 2.0, 1.0)
+            colors.append(plt.cm.hsv(hue))
+        y_center = 0
+        bar_height = 0.3
+        
+        # Add degree labels at borders
+        if show_labels:
+            for i, calc_degree in enumerate(calc_degrees):
+                degree_pos = current_pos
+                for j in range(i):
+                    degree_pos += (intervals[j] / total_log_size) * 2.0
+                
+                fig.add_trace(go.Scatter(
+                    x=[degree_pos], y=[y_center + bar_height/2 + 0.1],
+                    mode='text',
+                    text=[f"{calc_degree}"],
+                    textfont=dict(color='white', size=text_size+2, family='Arial'),
+                    showlegend=False,
+                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                    hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+                ))
+            
+            # Add equave label at the end
+            fig.add_trace(go.Scatter(
+                x=[2.0], y=[y_center + bar_height/2 + 0.1],
+                mode='text',
+                text=["1/1"],
+                textfont=dict(color='white', size=text_size+2, family='Arial'),
+                showlegend=False,
+                hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+        
+        # Draw interval segments
+        for i, (interval_size, interval_ratio) in enumerate(zip(intervals, interval_ratios)):
+            if interval_size <= 0:
+                continue
+                
+            proportion = interval_size / total_log_size
+            segment_width = proportion * 2.0
+            
+            x_coords = [current_pos, current_pos + segment_width, current_pos + segment_width, current_pos, current_pos]
+            y_coords = [y_center - bar_height/2, y_center - bar_height/2, y_center + bar_height/2, y_center + bar_height/2, y_center - bar_height/2]
+            
+            color = colors[i]
+            color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+            
+            # Hover text for the interval segment
+            hover_text = f"Interval: {interval_ratio}"
+            
+            fig.add_trace(go.Scatter(
+                x=x_coords, y=y_coords,
+                fill='toself',
+                fillcolor=color_hex,
+                line=dict(color='white', width=1),
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
+                showlegend=False,
+                hovertemplate=f'{hover_text}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            # Add interval label inside the segment
+            if show_labels:
+                label_x = current_pos + segment_width / 2
+                label_y = y_center
+                
+                fig.add_trace(go.Scatter(
+                    x=[label_x], y=[label_y],
+                    mode='text',
+                    text=[f"{interval_ratio}"],
+                    textfont=dict(color='black', size=text_size+2, family='Arial', weight='bold'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            current_pos += segment_width
+        
+        fig.update_layout(
+            xaxis=dict(
+                range=[-0.1, 2.1],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            yaxis=dict(
+                range=[-0.5, 0.5],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            )
+        )
+    
+    if title is None:
+        title = repr(obj)
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0),
+    )
+    
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+    
+    return fig
+def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, figsize,
+                                 text_size, show_labels, title, output_file, layout):
+    """Plot ratio-based scales/chords as proportional segments."""
+    n_degrees = len(degrees)
+    
+    if n_degrees < 2:
+        raise ValueError("Need at least 2 degrees to plot intervals")
+    
+    # Use the intervals property (Scale now includes final interval)
+    interval_ratios = calc_obj.intervals
+    
+    # Convert interval ratios to log sizes for proportional display
+    intervals = [math.log(float(ratio)) for ratio in interval_ratios]
+    n_segments = len(interval_ratios)
+    total_log_size = sum(intervals)
+    
+    # Generate distinct colors for each segment
+    colors = plt.cm.Set1(np.linspace(0, 1, n_segments))
+    
+    if layout == 'circle':
+        current_angle = math.pi / 2
+        
+        # Add degree labels at borders first
+        if show_labels:
+            for i, calc_degree in enumerate(calc_degrees):
+                degree_angle = current_angle
+                for j in range(i):
+                    degree_angle -= 2 * math.pi * (intervals[j] / total_log_size)
+                
+                degree_radius = 1.1
+                degree_x = degree_radius * math.cos(degree_angle)
+                degree_y = degree_radius * math.sin(degree_angle)
+                
+                fig.add_trace(go.Scatter(
+                    x=[degree_x], y=[degree_y],
+                    mode='text',
+                    text=[f"{calc_degree}"],
+                    textfont=dict(color='white', size=text_size+2, family='Arial'),
+                    showlegend=False,
+                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                    hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+                ))
+            
+            # Add equave label at the end
+            equave_x = 1.1 * math.cos(math.pi / 2)
+            equave_y = 1.1 * math.sin(math.pi / 2)
+            fig.add_trace(go.Scatter(
+                x=[equave_x], y=[equave_y],
+                mode='text',
+                text=["1/1"],
+                textfont=dict(color='white', size=text_size+2, family='Arial'),
+                showlegend=False,
+                hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+        
+        # Draw interval segments
+        for i, (interval_size, interval_ratio) in enumerate(zip(intervals, interval_ratios)):
+            if interval_size <= 0:
+                continue
+                
+            proportion = interval_size / total_log_size
+            angle_span = 2 * math.pi * proportion
+            
+            num_points = max(50, int(angle_span * 50))
+            angles = np.linspace(current_angle, current_angle - angle_span, num_points)
+            
+            inner_radius = 0.85
+            outer_radius = 1.0
+            
+            x_outer = outer_radius * np.cos(angles)
+            y_outer = outer_radius * np.sin(angles)
+            x_inner = inner_radius * np.cos(angles)
+            y_inner = inner_radius * np.sin(angles)
+            
+            x_coords = np.concatenate([x_outer, x_inner[::-1], [x_outer[0]]])
+            y_coords = np.concatenate([y_outer, y_inner[::-1], [y_outer[0]]])
+            
+            color = colors[i]
+            color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+            
+            # Hover text for the interval segment
+            hover_text = f"Interval: {interval_ratio}"
+            
+            fig.add_trace(go.Scatter(
+                x=x_coords, y=y_coords,
+                fill='toself',
+                fillcolor=color_hex,
+                line=dict(color='white', width=1),
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
+                showlegend=False,
+                hovertemplate=f'{hover_text}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            # Add interval label inside the segment
+            if show_labels:
+                mid_angle = current_angle - angle_span / 2
+                label_radius = 0.925
+                label_x = label_radius * math.cos(mid_angle)
+                label_y = label_radius * math.sin(mid_angle)
+                
+                fig.add_trace(go.Scatter(
+                    x=[label_x], y=[label_y],
+                    mode='text',
+                    text=[f"{interval_ratio}"],
+                    textfont=dict(color='black', size=text_size+2, family='Arial', weight='bold'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            current_angle -= angle_span
+        
+        fig.update_layout(
+            xaxis=dict(
+                range=[-1.2, 1.2],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            yaxis=dict(
+                range=[-1.2, 1.2], 
+                scaleanchor="x", 
+                scaleratio=1,
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            )
+        )
+    
+    else:  # line layout
+        # Use better dimensions for line layout
+        figsize = (20, 1.5)
+        current_pos = 0
+        y_center = 0
+        bar_height = 0.2
+        
+        # Add degree labels at borders
+        if show_labels:
+            # First degree (1/1)
+            fig.add_trace(go.Scatter(
+                x=[0], y=[y_center + bar_height/2 + 0.05],
+                mode='text',
+                text=["1/1"],
+                textfont=dict(color='white', size=text_size+2, family='Arial'),
+                showlegend=False,
+                hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            # Other degrees
+            for i, calc_degree in enumerate(calc_degrees[1:], 1):
+                degree_pos = 0
+                for j in range(i):
+                    degree_pos += (intervals[j] / total_log_size) * 2.0
+                
+                fig.add_trace(go.Scatter(
+                    x=[degree_pos], y=[y_center + bar_height/2 + 0.05],
+                    mode='text',
+                    text=[f"{calc_degree}"],
+                    textfont=dict(color='white', size=text_size+2, family='Arial'),
+                    showlegend=False,
+                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                    hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+                ))
+            
+            # Add equave label at the end
+            fig.add_trace(go.Scatter(
+                x=[2.0], y=[y_center + bar_height/2 + 0.05],
+                mode='text',
+                text=[f"{calc_obj._equave}"],
+                textfont=dict(color='white', size=text_size+2, family='Arial'),
+                showlegend=False,
+                hovertemplate=f'Node {len(calc_degrees)}<br>Degree: {calc_obj._equave}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+        
+        # Draw interval segments
+        for i, (interval_size, interval_ratio) in enumerate(zip(intervals, interval_ratios)):
+            if interval_size <= 0:
+                continue
+                
+            proportion = interval_size / total_log_size
+            segment_width = proportion * 2.0
+            
+            x_coords = [current_pos, current_pos + segment_width, current_pos + segment_width, current_pos, current_pos]
+            y_coords = [y_center - bar_height/2, y_center - bar_height/2, y_center + bar_height/2, y_center + bar_height/2, y_center - bar_height/2]
+            
+            color = colors[i]
+            color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+            
+            # Hover text for the interval segment
+            hover_text = f"Interval: {interval_ratio}"
+            
+            fig.add_trace(go.Scatter(
+                x=x_coords, y=y_coords,
+                fill='toself',
+                fillcolor=color_hex,
+                line=dict(color='white', width=1),
+                mode='lines+markers',
+                marker=dict(size=0.1, opacity=0),
+                showlegend=False,
+                hovertemplate=f'{hover_text}<extra></extra>',
+                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
+            ))
+            
+            # Add interval label inside the segment
+            if show_labels:
+                label_x = current_pos + segment_width / 2
+                label_y = y_center
+                
+                fig.add_trace(go.Scatter(
+                    x=[label_x], y=[label_y],
+                    mode='text',
+                    text=[f"{interval_ratio}"],
+                    textfont=dict(color='black', size=text_size+2, family='Arial', weight='bold'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            current_pos += segment_width
+        
+        fig.update_layout(
+            xaxis=dict(
+                range=[-0.05, 2.05],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            yaxis=dict(
+                range=[-0.2, 0.2],
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            )
+        )
+    
+    if title is None:
+        title = repr(obj)
+    
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0),
+    )
     
     if output_file:
         if output_file.endswith('.html'):

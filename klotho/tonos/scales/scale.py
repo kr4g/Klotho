@@ -91,6 +91,20 @@ class Scale(EquaveCyclicCollection[IntervalType]):
     def graph(self):
         """A complete graph with scale degrees as nodes."""
         return self._graph
+    
+    @property
+    def intervals(self) -> List[IntervalType]:
+        """
+        Returns the intervals between consecutive degrees plus final interval to equave.
+        """
+        base_intervals = super().intervals
+        if self._degrees:
+            if self._interval_type_mode == "cents":
+                final_interval = self._equave - self._degrees[-1]
+            else:
+                final_interval = self._equave / self._degrees[-1]
+            return base_intervals + [final_interval]
+        return base_intervals
         
     def mode(self, mode_number: int) -> 'Scale':
         if mode_number in self._mode_cache:
