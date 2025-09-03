@@ -2486,7 +2486,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  dim_reduction: str = None, target_dims: int = 3,
                  mds_metric: bool = True, mds_max_iter: int = 300,
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
-                 nodes: list = None, path_mode: str = 'adjacent',
+                 nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                  mute_background: bool = False) -> go.Figure:
     import networkx as nx
     """
@@ -2507,6 +2507,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
         nodes: List of coordinate tuples to highlight, e.g. [(0,0,0), (-3,2,0), (2,-1,1)]
                Highlights selected coordinates and draws edges based on path_mode
+        path: List of coordinate tuples representing a path, e.g. [(0,0,0), (1,0,0), (1,1,0)]
+              Draws edges between successive coordinates with viridis coloring for time progression
         path_mode: Edge drawing mode when nodes are selected. Options:
                   'adjacent' - Only show edges between selected nodes that are adjacent (default)
                   'origin' - Show shortest paths from origin (0,0,0...) to each selected node
@@ -2535,6 +2537,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 converted_nodes.append(node)
         nodes = converted_nodes
     
+    # Convert path parameter to tuples if needed (safety mechanism for all lattice types)
+    if path is not None:
+        converted_path = []
+        for coord in path:
+            if isinstance(coord, (list, tuple)):
+                converted_path.append(tuple(coord))
+            elif hasattr(coord, 'tolist'):  # numpy array
+                converted_path.append(tuple(coord.tolist()))
+            elif hasattr(coord, '__iter__') and not isinstance(coord, str):
+                converted_path.append(tuple(coord))
+            else:
+                converted_path.append(coord)
+        path = converted_path
+    
     if lattice.dimensionality > 3 and dim_reduction is None:
         raise ValueError(f"Plotting dimensionality > 3 requires dim_reduction. Got dimensionality={lattice.dimensionality}. "
                         f"Use dim_reduction='mds' or 'spectral'")
@@ -2559,30 +2575,48 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             expected_total = float('inf')
             break
     
-    # If nodes are specified, use minimal resolution to just fit the selected nodes (for ALL lattices)
-    if nodes:
+    # If nodes or path are specified, use minimal resolution to just fit the selected coordinates
+    if nodes or path:
         # Find the exact range needed for each dimension
         coord_ranges = []
-        for dim in range(lattice.dimensionality):
-            dim_vals = [coord[dim] for coord in nodes if coord in lattice]
-            if dim_vals:
-                min_val, max_val = min(dim_vals), max(dim_vals)
-                # Add small buffer (1 coordinate) around the selection
-                coord_ranges.append((min_val - 1, max_val + 1))
-            else:
-                coord_ranges.append((-1, 1))
+        all_coords_to_fit = []
         
-        # Use custom coordinate range instead of resolution
-        coords = []
-        import itertools
-        ranges = [range(start, end + 1) for start, end in coord_ranges]
-        coords = list(itertools.product(*ranges))
+        if nodes:
+            all_coords_to_fit.extend(coord for coord in nodes if coord in lattice)
+        if path:
+            all_coords_to_fit.extend(coord for coord in path if coord in lattice)
         
-        # Filter to only coordinates that exist in the lattice
-        coords = [coord for coord in coords if coord in lattice]
+        if all_coords_to_fit:
+            for dim in range(lattice.dimensionality):
+                dim_vals = [coord[dim] for coord in all_coords_to_fit]
+                if dim_vals:
+                    min_val, max_val = min(dim_vals), max(dim_vals)
+                    # Add small buffer (1 coordinate) around the selection
+                    coord_ranges.append((min_val - 1, max_val + 1))
+                else:
+                    coord_ranges.append((-1, 1))
+            
+            # Use custom coordinate range instead of resolution
+            coords = []
+            import itertools
+            ranges = [range(start, end + 1) for start, end in coord_ranges]
+            coords = list(itertools.product(*ranges))
+            
+            # Filter to only coordinates that exist in the lattice
+            coords = [coord for coord in coords if coord in lattice]
+        else:
+            # Fallback if no valid coordinates found
+            coords = lattice.coords
 
     elif lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
         coords = lattice._get_plot_coords(max_resolution)
+        # Ensure all path coordinates are included in plotting set
+        if path:
+            path_coords_set = set(path)
+            coords_set = set(coords)
+            missing_path_coords = path_coords_set - coords_set
+            if missing_path_coords:
+                coords.extend(list(missing_path_coords))
     else:
         coords = lattice.coords
     
@@ -2690,21 +2724,24 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     # Handle edge highlighting for selected coordinates
     # Only include nodes that actually exist in the plotting coordinate set
-    if nodes:
-        valid_coords = set(coords) if lattice.dimensionality <= 3 else set(original_coords)
-        highlighted_coords = set(coord for coord in nodes if coord in valid_coords)
-    else:
-        highlighted_coords = set()
+    valid_coords = set(coords) if lattice.dimensionality <= 3 else set(original_coords)
+    highlighted_coords = set()
     
-    # Determine if we should use dimmed appearance (whenever nodes are selected)
-    use_dimmed = nodes is not None and len(nodes) > 0 and not mute_background
+    if nodes:
+        highlighted_coords.update(coord for coord in nodes if coord in valid_coords)
+    
+    if path:
+        highlighted_coords.update(coord for coord in path if coord in valid_coords)
+    
+    # Determine if we should use dimmed appearance (whenever nodes or path are provided)
+    use_dimmed = ((nodes is not None and len(nodes) > 0) or (path is not None and len(path) > 0)) and not mute_background
     
     fig = go.Figure()
     bounds_coords_override = None
     
     if effective_dimensionality == 1:
         
-        if not (nodes and mute_background):
+        if not ((nodes or path) and mute_background):
             edge_color = '#555555' if use_dimmed else '#808080'
             edge_width = 1 if use_dimmed else 3
             
@@ -2783,13 +2820,46 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
+        # Draw path edges with viridis coloring for time progression
+        if path and len(path) > 1:
+            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
+            for i in range(len(path) - 1):
+                coord1, coord2 = path[i], path[i + 1]
+                if coord1 in coords and coord2 in coords:
+                    x1, y1 = coord1[0], coord1[1]
+                    x2, y2 = coord2[0], coord2[1]
+                    color = viridis_colors[i]
+                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    # Add path edge with enhanced visibility
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color=path_color_hex, width=8),
+                            opacity=0.9,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+                    # Add subtle white outline for better contrast
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color='white', width=10),
+                            opacity=0.3,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
         node_x, node_y = [], []
         hover_data = []
         node_colors = []
         drawn_nodes = []
         
         # If we only want the sublattice, derive node iteration from drawn edges
-        if nodes and mute_background:
+        if (nodes or path) and mute_background:
             # Collect coordinates that are in highlighted edges or are highlighted nodes themselves
             drawn_set = set()
             if path_mode == 'adjacent' and len(highlighted_coords) > 1:
@@ -2803,6 +2873,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             drawn_set.add(coord2)
             else:
                 drawn_set.update(highlighted_coords)
+            
+            # Also add path coordinates when mute_background is enabled
+            if path:
+                drawn_set.update(coord for coord in path if coord in valid_coords)
+            
             coords_iter = [(c[0],) for c in drawn_set]
         else:
             coords_iter = coords
@@ -2861,7 +2936,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     elif effective_dimensionality == 2:
         drawn_nodes = set()
-        if not (nodes and mute_background):
+        if not ((nodes or path) and mute_background):
             edge_color = '#555555' if use_dimmed else '#808080'
             edge_width = 1 if use_dimmed else 2
             
@@ -2955,13 +3030,59 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
+        # Draw path edges with viridis coloring for time progression
+        if path and len(path) > 1:
+            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
+            for i in range(len(path) - 1):
+                coord1, coord2 = path[i], path[i + 1]
+                
+                if lattice.dimensionality > 3:
+                    if coord1 in coord_mapping and coord2 in coord_mapping:
+                        plot_coord1 = coord_mapping[coord1]
+                        plot_coord2 = coord_mapping[coord2]
+                    else:
+                        continue
+                else:
+                    plot_coord1 = coord1
+                    plot_coord2 = coord2
+                
+                if plot_coord1 in coords and plot_coord2 in coords:
+                    x1, y1 = plot_coord1[0], plot_coord1[1]
+                    x2, y2 = plot_coord2[0], plot_coord2[1]
+                    drawn_nodes.add((x1, y1))
+                    drawn_nodes.add((x2, y2))
+                    color = viridis_colors[i]
+                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    # Add path edge with enhanced visibility
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color=path_color_hex, width=8),
+                            opacity=0.9,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+                    # Add subtle white outline for better contrast
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color='white', width=10),
+                            opacity=0.3,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
         node_x, node_y = [], []
         hover_data = []
         node_colors = []
         
         reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
         coords_iter = coords
-        if nodes and mute_background and len(drawn_nodes) > 0:
+        if (nodes or path) and mute_background and len(drawn_nodes) > 0:
             coords_iter = list(drawn_nodes)
             bounds_coords_override = coords_iter
         
@@ -3024,7 +3145,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     elif effective_dimensionality == 3:
         drawn_nodes = set()
-        if not (nodes and mute_background):
+        if not ((nodes or path) and mute_background):
             edge_color = '#555555' if use_dimmed else '#808080'
             edge_width = 1 if use_dimmed else 3
             
@@ -3118,13 +3239,59 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
+        # Draw path edges with viridis coloring for time progression
+        if path and len(path) > 1:
+            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
+            for i in range(len(path) - 1):
+                coord1, coord2 = path[i], path[i + 1]
+                
+                if lattice.dimensionality > 3:
+                    if coord1 in coord_mapping and coord2 in coord_mapping:
+                        plot_coord1 = coord_mapping[coord1]
+                        plot_coord2 = coord_mapping[coord2]
+                    else:
+                        continue
+                else:
+                    plot_coord1 = coord1
+                    plot_coord2 = coord2
+                
+                if plot_coord1 in coords and plot_coord2 in coords:
+                    x1, y1, z1 = (plot_coord1[0], plot_coord1[1], plot_coord1[2]) if len(plot_coord1) >= 3 else (plot_coord1[0], plot_coord1[1] if len(plot_coord1) >= 2 else 0, 0)
+                    x2, y2, z2 = (plot_coord2[0], plot_coord2[1], plot_coord2[2]) if len(plot_coord2) >= 3 else (plot_coord2[0], plot_coord2[1] if len(plot_coord2) >= 2 else 0, 0)
+                    drawn_nodes.add((x1, y1, z1))
+                    drawn_nodes.add((x2, y2, z2))
+                    color = viridis_colors[i]
+                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    # Add path edge with enhanced visibility
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                            mode='lines',
+                            line=dict(color=path_color_hex, width=8),
+                            opacity=0.9,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+                    # Add subtle white outline for better contrast
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                            mode='lines',
+                            line=dict(color='white', width=10),
+                            opacity=0.3,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
         node_x, node_y, node_z = [], [], []
         hover_data = []
         node_colors = []
         
         reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
         coords_iter = coords
-        if nodes and mute_background and len(drawn_nodes) > 0:
+        if (nodes or path) and mute_background and len(drawn_nodes) > 0:
             coords_iter = list(drawn_nodes)
             bounds_coords_override = coords_iter
         
@@ -3345,8 +3512,8 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                dim_reduction: str = None, target_dims: int = 3,
                mds_metric: bool = True, mds_max_iter: int = 300,
                spectral_affinity: str = 'rbf', spectral_gamma: float = None,
-               nodes: list = None, path_mode: str = 'adjacent',
-               colormap: str = 'coolwarm', show_colorbar: bool = False) -> go.Figure:
+               nodes: list = None, path: list = None, path_mode: str = 'adjacent',
+               mute_background: bool = False, colormap: str = 'coolwarm', show_colorbar: bool = False) -> go.Figure:
     """
     Plot a Field as a 2D or 3D grid visualization with node colors representing field values.
     
@@ -3365,9 +3532,12 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
         spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
         nodes: List of coordinate tuples to highlight, e.g. [(0,0,0), (-3,2,0), (2,-1,1)]
                Highlights selected coordinates and draws edges based on path_mode
+        path: List of coordinate tuples representing a path, e.g. [(0,0,0), (1,0,0), (1,1,0)]
+              Draws edges between successive coordinates with viridis coloring for time progression
         path_mode: Edge drawing mode when nodes are selected. Options:
                   'adjacent' - Only show edges between selected nodes that are adjacent (default)
                   'origin' - Show shortest paths from origin (0,0,0...) to each selected node
+        mute_background: If True, only show highlighted nodes/path coordinates (default: False)
         colormap: Matplotlib colormap name for field values (default: 'hot')
         show_colorbar: Whether to show the colorbar (default: False)
         
@@ -3380,6 +3550,34 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
     import networkx as nx
     import matplotlib.pyplot as plt
     from sklearn.manifold import MDS, SpectralEmbedding
+    
+    # Convert nodes parameter to tuples if needed (safety mechanism for all lattice types)
+    if nodes is not None:
+        converted_nodes = []
+        for node in nodes:
+            if isinstance(node, (list, tuple)):
+                converted_nodes.append(tuple(node))
+            elif hasattr(node, 'tolist'):  # numpy array
+                converted_nodes.append(tuple(node.tolist()))
+            elif hasattr(node, '__iter__') and not isinstance(node, str):
+                converted_nodes.append(tuple(node))
+            else:
+                converted_nodes.append(node)
+        nodes = converted_nodes
+    
+    # Convert path parameter to tuples if needed (safety mechanism for all lattice types)
+    if path is not None:
+        converted_path = []
+        for coord in path:
+            if isinstance(coord, (list, tuple)):
+                converted_path.append(tuple(coord))
+            elif hasattr(coord, 'tolist'):  # numpy array
+                converted_path.append(tuple(coord.tolist()))
+            elif hasattr(coord, '__iter__') and not isinstance(coord, str):
+                converted_path.append(tuple(coord))
+            else:
+                converted_path.append(coord)
+        path = converted_path
     
     if field.dimensionality > 3 and dim_reduction is None:
         raise ValueError(f"Plotting dimensionality > 3 requires dim_reduction. Got dimensionality={field.dimensionality}. "
@@ -3405,24 +3603,41 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             expected_total = float('inf')
             break
     
-    if nodes:
+    if nodes or path:
         coord_ranges = []
-        for dim in range(field.dimensionality):
-            dim_vals = [coord[dim] for coord in nodes if coord in field]
-            if dim_vals:
-                min_val, max_val = min(dim_vals), max(dim_vals)
-                coord_ranges.append((min_val - 1, max_val + 1))
-            else:
-                coord_ranges.append((-1, 1))
+        all_coords_to_fit = []
         
-        coords = []
-        import itertools
-        ranges = [range(start, end + 1) for start, end in coord_ranges]
-        coords = list(itertools.product(*ranges))
+        if nodes:
+            all_coords_to_fit.extend(coord for coord in nodes if coord in field)
+        if path:
+            all_coords_to_fit.extend(coord for coord in path if coord in field)
         
-        coords = [coord for coord in coords if coord in field]
+        if all_coords_to_fit:
+            for dim in range(field.dimensionality):
+                dim_vals = [coord[dim] for coord in all_coords_to_fit]
+                if dim_vals:
+                    min_val, max_val = min(dim_vals), max(dim_vals)
+                    coord_ranges.append((min_val - 1, max_val + 1))
+                else:
+                    coord_ranges.append((-1, 1))
+            
+            coords = []
+            import itertools
+            ranges = [range(start, end + 1) for start, end in coord_ranges]
+            coords = list(itertools.product(*ranges))
+            
+            coords = [coord for coord in coords if coord in field]
+        else:
+            coords = field.coords
     elif field.dimensionality > 3 or field._is_lazy or expected_total > 1000:
         coords = field._get_plot_coords(max_resolution)
+        # Ensure all path coordinates are included in plotting set
+        if path:
+            path_coords_set = set(path)
+            coords_set = set(coords)
+            missing_path_coords = path_coords_set - coords_set
+            if missing_path_coords:
+                coords.extend(list(missing_path_coords))
     else:
         coords = field.coords
     
@@ -3569,13 +3784,16 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
         else:
             title = f"{field.dimensionality}D Field ({resolution_str}, {bipolar_str})"
     
-    if nodes:
-        valid_coords = set(coords) if field.dimensionality <= 3 else set(original_coords)
-        highlighted_coords = set(coord for coord in nodes if coord in valid_coords)
-    else:
-        highlighted_coords = set()
+    valid_coords = set(coords) if field.dimensionality <= 3 else set(original_coords)
+    highlighted_coords = set()
     
-    use_dimmed = nodes is not None and len(nodes) > 0
+    if nodes:
+        highlighted_coords.update(coord for coord in nodes if coord in valid_coords)
+    
+    if path:
+        highlighted_coords.update(coord for coord in path if coord in valid_coords)
+    
+    use_dimmed = ((nodes is not None and len(nodes) > 0) or (path is not None and len(path) > 0)) and not mute_background
     
     fig = go.Figure()
     
@@ -3674,6 +3892,39 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                         except (KeyError, nx.NetworkXNoPath):
                             continue
         
+        # Draw path edges with viridis coloring for time progression
+        if path and len(path) > 1:
+            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
+            for i in range(len(path) - 1):
+                coord1, coord2 = path[i], path[i + 1]
+                if coord1 in coords and coord2 in coords:
+                    x1, y1 = coord1[0], coord1[1]
+                    x2, y2 = coord2[0], coord2[1]
+                    color = viridis_colors[i]
+                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    # Add path edge with enhanced visibility
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color=path_color_hex, width=8),
+                            opacity=0.9,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+                    # Add subtle white outline for better contrast
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color='white', width=10),
+                            opacity=0.3,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
         node_x, node_y = [], []
         hover_data = []
         node_colors = []
@@ -3698,7 +3949,12 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             elif use_dimmed:
                 node_colors.append('#111111')
             else:
-                node_colors.append(color_hex[i] if i < len(color_hex) else '#FFFFFF')
+                try:
+                    coord_idx = original_coords.index(orig_coord) if orig_coord in original_coords else i
+                    color = color_hex[coord_idx] if coord_idx < len(color_hex) else '#FFFFFF'
+                    node_colors.append(color)
+                except (ValueError, IndexError):
+                    node_colors.append('#FFFFFF')
         
         fig.add_trace(
             go.Scatter(
@@ -3816,6 +4072,39 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                         except (KeyError, nx.NetworkXNoPath):
                             continue
         
+        # Draw path edges with viridis coloring for time progression
+        if path and len(path) > 1:
+            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
+            for i in range(len(path) - 1):
+                coord1, coord2 = path[i], path[i + 1]
+                if coord1 in coords and coord2 in coords:
+                    x1, y1 = coord1
+                    x2, y2 = coord2
+                    color = viridis_colors[i]
+                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    # Add path edge with enhanced visibility
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color=path_color_hex, width=8),
+                            opacity=0.9,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+                    # Add subtle white outline for better contrast
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines',
+                            line=dict(color='white', width=10),
+                            opacity=0.3,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
         node_x, node_y = [], []
         hover_data = []
         node_colors = []
@@ -3840,7 +4129,12 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             elif use_dimmed:
                 node_colors.append('#111111')
             else:
-                node_colors.append(color_hex[i] if i < len(color_hex) else '#FFFFFF')
+                try:
+                    coord_idx = original_coords.index(orig_coord) if orig_coord in original_coords else i
+                    color = color_hex[coord_idx] if coord_idx < len(color_hex) else '#FFFFFF'
+                    node_colors.append(color)
+                except (ValueError, IndexError):
+                    node_colors.append('#FFFFFF')
         
         fig.add_trace(
             go.Scatter(
@@ -3957,6 +4251,39 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                         except (KeyError, nx.NetworkXNoPath):
                             continue
         
+        # Draw path edges with viridis coloring for time progression
+        if path and len(path) > 1:
+            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
+            for i in range(len(path) - 1):
+                coord1, coord2 = path[i], path[i + 1]
+                if coord1 in coords and coord2 in coords:
+                    x1, y1, z1 = (coord1[0], coord1[1], coord1[2]) if len(coord1) >= 3 else (coord1[0], coord1[1] if len(coord1) >= 2 else 0, 0)
+                    x2, y2, z2 = (coord2[0], coord2[1], coord2[2]) if len(coord2) >= 3 else (coord2[0], coord2[1] if len(coord2) >= 2 else 0, 0)
+                    color = viridis_colors[i]
+                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
+                    # Add path edge with enhanced visibility
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                            mode='lines',
+                            line=dict(color=path_color_hex, width=8),
+                            opacity=0.9,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+                    # Add subtle white outline for better contrast
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                            mode='lines',
+                            line=dict(color='white', width=10),
+                            opacity=0.3,
+                            showlegend=False,
+                            hoverinfo='none'
+                        )
+                    )
+        
         node_x, node_y, node_z = [], [], []
         hover_data = []
         node_colors = []
@@ -3987,7 +4314,12 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
             elif use_dimmed:
                 node_colors.append('#111111')
             else:
-                node_colors.append(color_hex[i] if i < len(color_hex) else '#FFFFFF')
+                try:
+                    coord_idx = original_coords.index(orig_coord) if orig_coord in original_coords else i
+                    color = color_hex[coord_idx] if coord_idx < len(color_hex) else '#FFFFFF'
+                    node_colors.append(color)
+                except (ValueError, IndexError):
+                    node_colors.append('#FFFFFF')
         
         fig.add_trace(
             go.Scatter3d(

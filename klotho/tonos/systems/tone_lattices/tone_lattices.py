@@ -78,7 +78,13 @@ class ToneLattice(Lattice):
     
     def _populate_ratio_data(self):
         """Populate nodes with ratio data based on their coordinates."""
-        pass
+        if not self._is_lazy:
+            # For non-lazy lattices, populate all nodes with ratio data
+            for coord in self.coords:
+                node_id = self._get_node_for_coord(coord)
+                if node_id is not None:
+                    ratio = self._coord_to_ratio(coord)
+                    self[coord]['ratio'] = ratio
     
     def _coord_to_ratio(self, coord: Tuple[int, ...]) -> Fraction:
         """Convert lattice coordinates to musical ratio."""
@@ -95,6 +101,17 @@ class ToneLattice(Lattice):
             ratio = self._custom_equave_reduce(ratio)
         
         return ratio
+    
+    def __getitem__(self, coord):
+        """Get node data for a coordinate, ensuring ratio is included."""
+        node_data = super().__getitem__(coord)
+        
+        # Ensure ratio is in the node data
+        if 'ratio' not in node_data:
+            ratio = self._coord_to_ratio(coord)
+            node_data['ratio'] = ratio
+        
+        return node_data
     
     def get_ratio(self, coord: Tuple[int, ...]) -> Fraction:
         """
