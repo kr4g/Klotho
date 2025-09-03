@@ -38,6 +38,7 @@ from .motives import Motive
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
+from .systems.tone_lattices import ToneLattice
 from .scales.scale import AddressedScale
 from .chords.chord import AddressedChord, AddressedSonority
 
@@ -82,6 +83,7 @@ __all__ = [
     'Eikosany',
     'HarmonicTree',
     'Spectrum',
+    'ToneLattice',
     'AddressedScale',
     'AddressedChord',
     'AddressedSonority',

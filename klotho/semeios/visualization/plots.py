@@ -2517,6 +2517,24 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     Raises:
         ValueError: If lattice dimensionality > 3 and dim_reduction is None
     """
+    
+    # Check if this is a ToneLattice for enhanced hover information
+    is_tone_lattice = hasattr(lattice, '_coord_to_ratio')
+    
+    # Convert nodes parameter to tuples if needed (safety mechanism for all lattice types)
+    if nodes is not None:
+        converted_nodes = []
+        for node in nodes:
+            if isinstance(node, (list, tuple)):
+                converted_nodes.append(tuple(node))
+            elif hasattr(node, 'tolist'):  # numpy array
+                converted_nodes.append(tuple(node.tolist()))
+            elif hasattr(node, '__iter__') and not isinstance(node, str):
+                converted_nodes.append(tuple(node))
+            else:
+                converted_nodes.append(node)
+        nodes = converted_nodes
+    
     if lattice.dimensionality > 3 and dim_reduction is None:
         raise ValueError(f"Plotting dimensionality > 3 requires dim_reduction. Got dimensionality={lattice.dimensionality}. "
                         f"Use dim_reduction='mds' or 'spectral'")
@@ -2562,6 +2580,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         
         # Filter to only coordinates that exist in the lattice
         coords = [coord for coord in coords if coord in lattice]
+
     elif lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
         coords = lattice._get_plot_coords(max_resolution)
     else:
@@ -2796,9 +2815,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             if lattice.dimensionality > 3:
                 orig_coord_str = str(original_coords[i]).replace(',)', ')') if coords_iter is coords else 'selected'
                 reduced_coord_str = f"({x:.2f})"
-                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
+                hover_text = f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}"
             else:
-                hover_data.append(f"Coordinate: ({x})")
+                hover_text = f"Coordinate: ({x})"
+            
+            # Add ratio information for ToneLattice
+            if is_tone_lattice:
+                try:
+                    coord_to_use = original_coords[i] if coords_iter is coords and i < len(original_coords) else coord
+                    ratio = lattice._coord_to_ratio(coord_to_use)
+                    hover_text += f"<br>Ratio: {ratio}"
+                except (KeyError, AttributeError, IndexError):
+                    pass
+            
+            hover_data.append(hover_text)
             
             if nodes and ((coords_iter is coords and original_coords[i] in highlighted_coords) or (coords_iter is not coords and (x,) in coords_iter)):
                 node_colors.append('white')
@@ -2948,9 +2978,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             if lattice.dimensionality > 3 and orig_coord is not None:
                 orig_coord_str = str(orig_coord).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f}, {y:.2f})"
-                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
+                hover_text = f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}"
             else:
-                hover_data.append(f"Coordinate: ({x}, {y})")
+                hover_text = f"Coordinate: ({x}, {y})"
+            
+            # Add ratio information for ToneLattice
+            if is_tone_lattice:
+                try:
+                    coord_to_use = orig_coord if orig_coord is not None else coord
+                    ratio = lattice._coord_to_ratio(coord_to_use)
+                    hover_text += f"<br>Ratio: {ratio}"
+                except (KeyError, AttributeError):
+                    pass
+            
+            hover_data.append(hover_text)
             
             # Set node color based on highlighting
             if nodes and orig_coord in highlighted_coords:
@@ -3106,9 +3147,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             if lattice.dimensionality > 3 and orig_coord is not None:
                 orig_coord_str = str(orig_coord).replace(',)', ')')
                 reduced_coord_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
-                hover_data.append(f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}")
+                hover_text = f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}"
             else:
-                hover_data.append(f"Coordinate: ({x}, {y}, {z})")
+                hover_text = f"Coordinate: ({x}, {y}, {z})"
+            
+            # Add ratio information for ToneLattice
+            if is_tone_lattice:
+                try:
+                    coord_to_use = orig_coord if orig_coord is not None else coord
+                    ratio = lattice._coord_to_ratio(coord_to_use)
+                    hover_text += f"<br>Ratio: {ratio}"
+                except (KeyError, AttributeError):
+                    pass
+            
+            hover_data.append(hover_text)
             
             # Set node color based on highlighting
             if nodes and orig_coord in highlighted_coords:
@@ -3174,7 +3226,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     )
     
     if effective_dimensionality <= 2:
-        if lattice.dimensionality > 3:
+        if lattice.dimensionality > 2:
             layout_dict.update(dict(
                 xaxis=dict(
                     showgrid=False, zeroline=False, showticklabels=False,
@@ -3250,8 +3302,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         backgroundcolor='black',
                         tickmode='array',
                         tickvals=x_ticks,
-                        ticktext=[str(t) for t in x_ticks],
-                        range=[x_min - max(1, (x_max - x_min) * 0.05), x_max + max(1, (x_max - x_min) * 0.05)]
+                        ticktext=[str(t) for t in x_ticks]
                     ),
                     yaxis=dict(
                         title=dict(text='Y', font=dict(color='white')),
@@ -3261,8 +3312,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         backgroundcolor='black',
                         tickmode='array',
                         tickvals=y_ticks,
-                        ticktext=[str(t) for t in y_ticks],
-                        range=[y_min - max(1, (y_max - y_min) * 0.05), y_max + max(1, (y_max - y_min) * 0.05)]
+                        ticktext=[str(t) for t in y_ticks]
                     ),
                     zaxis=dict(
                         title=dict(text='Z', font=dict(color='white')),
@@ -3272,8 +3322,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         backgroundcolor='black',
                         tickmode='array',
                         tickvals=z_ticks,
-                        ticktext=[str(t) for t in z_ticks],
-                        range=[z_min - max(1, (z_max - z_min) * 0.05), z_max + max(1, (z_max - z_min) * 0.05)]
+                        ticktext=[str(t) for t in z_ticks]
                     ),
                     bgcolor='black'
                 )
