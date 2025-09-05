@@ -244,17 +244,27 @@ def _create_midi_from_temporal_unit(temporal_unit, max_channels=128, bend_sensit
     # Always use 4/4 at 120 BPM for MIDI file, rely on absolute start/duration times
     bpm = 120
     
-    # For TemporalUnit: Each note gets its own drum channel to avoid conflicts
-    # This ensures proper note separation and prevents overlapping MIDI messages
-    num_notes = len([chronon for chronon in temporal_unit if not chronon.is_rest])
-    writer = MultiPortMidiWriter(max_voices=num_notes)
+    # For TemporalUnit: Use SINGLE drum channel for all notes (ORIGINAL BEHAVIOR)
+    # TemporalUnit represents rhythmic patterns - all notes should use drum channel 9
+    # Same drum note, same velocity, same channel - exactly as original
+    writer = MultiPortMidiWriter(max_voices=1)  # Only need 1 voice for single channel
     allocator = ChannelAllocator(writer.num_ports, bend_sensitivity_semitones=bend_sensitivity_semitones)
     
     # Add global meta events - always 4/4 at 120 BPM per PRD
     writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
     
+    # Allocate ONE drum channel for the entire TemporalUnit (ORIGINAL BEHAVIOR)
+    try:
+        port, channel = allocator.allocate_voice("temporal_drum_channel", is_drum=True, program=1)
+        if debug:
+            print(f"[DEBUG] TemporalUnit: Using single drum channel - port={port}, channel={channel}")
+    except RuntimeError as e:
+        if debug:
+            print(f"[DEBUG] Failed to allocate drum channel: {e}")
+        # Fallback: use channel 9 directly
+        port, channel = 0, 9
+    
     note_events = []
-    voice_counter = 0
     
     # For standalone playback: subtract offset to start from beginning (DO NOT MUTATE OBJECT)
     min_start_time = min(chronon.start for chronon in temporal_unit if not chronon.is_rest) if any(not chronon.is_rest for chronon in temporal_unit) else 0
@@ -265,41 +275,25 @@ def _create_midi_from_temporal_unit(temporal_unit, max_channels=128, bend_sensit
             start_time = chronon.start - min_start_time
             duration = abs(chronon.duration)
             
-            # Each note gets its own drum channel to avoid conflicts
-            voice_id = f"temporal_drum_voice_{voice_counter}"
-            voice_counter += 1
-            
-            try:
-                # Use melodic channels for TemporalUnit notes to avoid conflicts
-                # This allows multiple drum sounds to play simultaneously
-                port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=1)
-                if debug:
-                    print(f"[DEBUG] TemporalUnit note {voice_counter}: port={port}, channel={channel} (using melodic channel for drums)")
-            except RuntimeError as e:
-                if debug:
-                    print(f"[DEBUG] Failed to allocate channel for note {voice_counter}: {e}")
-                # Fallback: use channel 0
-                port, channel = 0, 0
-            
+            # All notes use the SAME drum channel (ORIGINAL BEHAVIOR RESTORED)
             note_events.append({
-                'voice_id': voice_id,
+                'voice_id': "temporal_drum_channel",
                 'port': port,
-                'channel': channel,  # Each note gets its own channel
+                'channel': channel,  # Same channel for all notes - ORIGINAL BEHAVIOR
                 'start_time': start_time,
                 'duration': duration,
-                'midi_note': DEFAULT_DRUM_NOTE,
-                'velocity': DEFAULT_VELOCITY,
-                'program': 1,  # GM Standard Drum Kit - works on any channel
-                'is_drum': False,  # Use melodic channel allocation but with drum sounds
+                'midi_note': DEFAULT_DRUM_NOTE,  # Same drum note - ORIGINAL BEHAVIOR
+                'velocity': DEFAULT_VELOCITY,   # Same velocity - ORIGINAL BEHAVIOR
+                'program': 1,  # GM Standard Drum Kit
+                'is_drum': True,
                 'pitch_bend': None
             })
     
     if debug:
-        channels_used = [event['channel'] for event in note_events]
-        print(f"[DEBUG] TemporalUnit: {len(note_events)} notes using channels {channels_used}")
+        print(f"[DEBUG] TemporalUnit: {len(note_events)} notes, all using channel {channel}")
     
-    # Generate MIDI events using new allocator system
-    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
+    # Generate MIDI events with special handling for same-channel overlapping notes
+    _generate_temporal_unit_events(note_events, writer, allocator, bpm, debug)
     
     # Ensure MIDI file duration matches the TemporalUnit's total duration
     writer.finalize(bpm)
@@ -1208,6 +1202,55 @@ def _calculate_base_note_and_bend(pitch, bend_sensitivity_semitones):
     pitch_bend_value = max(0, min(16383, pitch_bend_value))
     
     return nearest_midi, pitch_bend_value
+
+def _generate_temporal_unit_events(note_events, writer, allocator, bpm, debug=False):
+    """
+    Generate MIDI events for TemporalUnit with special handling for same-channel overlapping notes.
+    
+    This function handles the case where multiple notes use the same channel and note number,
+    ensuring that overlapping notes don't create timing conflicts by properly managing
+    note_on/note_off sequences.
+    
+    Parameters
+    ----------
+    note_events : list
+        List of note event dictionaries
+    writer : MultiPortMidiWriter
+        The multi-port MIDI writer
+    allocator : ChannelAllocator
+        The channel allocator
+    bpm : float
+        Beats per minute
+    debug : bool
+        Enable debug output
+    """
+    if not note_events:
+        return
+    
+    # For TemporalUnit: Simple approach - just use the original multi-port function
+    # but ensure note_off messages for adjacent notes don't conflict by slightly adjusting timing
+    
+    # Adjust note durations to avoid exact timing conflicts
+    adjusted_events = []
+    for i, note_event in enumerate(note_events):
+        adjusted_event = note_event.copy()
+        
+        # If this note would end exactly when the next note starts, shorten it slightly
+        if i < len(note_events) - 1:
+            next_event = note_events[i + 1]
+            current_end = note_event['start_time'] + note_event['duration']
+            next_start = next_event['start_time']
+            
+            if abs(current_end - next_start) < 0.001:  # They're adjacent (within 1ms)
+                # Shorten current note by 1ms to avoid conflict
+                adjusted_event['duration'] = max(0.001, note_event['duration'] - 0.001)
+                if debug:
+                    print(f"[DEBUG] Shortened note {i} duration from {note_event['duration']:.3f}s to {adjusted_event['duration']:.3f}s to avoid conflict")
+        
+        adjusted_events.append(adjusted_event)
+    
+    # Use the original multi-port function with adjusted events
+    _generate_multi_port_events(adjusted_events, writer, allocator, bpm, debug)
 
 def _generate_multi_port_events(note_events, writer, allocator, bpm, debug=False):
     """
