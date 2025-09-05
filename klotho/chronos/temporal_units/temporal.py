@@ -326,7 +326,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     """A sequence of TemporalUnit objects that represent consecutive temporal events."""
     
     def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0):
-        self._seq    = [ut for ut in ut_seq] # XXX - this needs to be ut.copy()
+        self._seq    = [ut.copy() for ut in ut_seq] # XXX - this needs to be ut.copy()
         self._offset = offset
         self._set_offsets()
     
@@ -515,7 +515,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
 
     def copy(self):
         """Create a deep copy of this TemporalUnitSequence."""
-        return copy.deepcopy(self)
+        return TemporalUnitSequence(ut_seq=[ut.copy() for ut in self._seq], offset=self._offset)
 
 
 class TemporalBlock(metaclass=TemporalMeta):
@@ -533,7 +533,7 @@ class TemporalBlock(metaclass=TemporalMeta):
             offset: Initial time offset in seconds
             sort_rows: Whether to sort rows by duration (longest at index 0)
         """
-        self._rows = [row for row in rows] if rows else [] # XXX - this needs to be row.copy()
+        self._rows = [row.copy() for row in rows] if rows else [] # XXX - this needs to be row.copy()
         self._axis = axis
         self._offset = offset
         self._sort_rows = sort_rows
@@ -795,4 +795,4 @@ class TemporalBlock(metaclass=TemporalMeta):
 
     def copy(self):
         """Create a deep copy of this TemporalBlock."""
-        return copy.deepcopy(self)
+        return TemporalBlock(rows=[row.copy() for row in self._rows], axis=self._axis, offset=self._offset, sort_rows=self._sort_rows)
