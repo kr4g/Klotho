@@ -2609,14 +2609,28 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             coords = lattice.coords
 
     elif lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
-        coords = lattice._get_plot_coords(max_resolution)
-        # Ensure all path coordinates are included in plotting set
+        # For large lattices, determine plotting area based on path extent if provided
         if path:
-            path_coords_set = set(path)
-            coords_set = set(coords)
-            missing_path_coords = path_coords_set - coords_set
-            if missing_path_coords:
-                coords.extend(list(missing_path_coords))
+            # Calculate the range needed to encompass the entire path
+            coord_ranges = []
+            for dim in range(lattice.dimensionality):
+                dim_vals = [coord[dim] for coord in path if coord in lattice]
+                if dim_vals:
+                    min_val, max_val = min(dim_vals), max(dim_vals)
+                    # Add buffer around path
+                    coord_ranges.append((min_val - 2, max_val + 2))
+                else:
+                    coord_ranges.append((-max_resolution, max_resolution))
+            
+            # Generate coordinates for the path-encompassing area
+            coords = []
+            import itertools
+            ranges = [range(start, end + 1) for start, end in coord_ranges]
+            coords = list(itertools.product(*ranges))
+            coords = [coord for coord in coords if coord in lattice]
+        else:
+            # No path provided, use default reduced coordinates
+            coords = lattice._get_plot_coords(max_resolution)
     else:
         coords = lattice.coords
     
@@ -3630,14 +3644,28 @@ def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
         else:
             coords = field.coords
     elif field.dimensionality > 3 or field._is_lazy or expected_total > 1000:
-        coords = field._get_plot_coords(max_resolution)
-        # Ensure all path coordinates are included in plotting set
+        # For large fields, determine plotting area based on path extent if provided
         if path:
-            path_coords_set = set(path)
-            coords_set = set(coords)
-            missing_path_coords = path_coords_set - coords_set
-            if missing_path_coords:
-                coords.extend(list(missing_path_coords))
+            # Calculate the range needed to encompass the entire path
+            coord_ranges = []
+            for dim in range(field.dimensionality):
+                dim_vals = [coord[dim] for coord in path if coord in field]
+                if dim_vals:
+                    min_val, max_val = min(dim_vals), max(dim_vals)
+                    # Add buffer around path
+                    coord_ranges.append((min_val - 2, max_val + 2))
+                else:
+                    coord_ranges.append((-max_resolution, max_resolution))
+            
+            # Generate coordinates for the path-encompassing area
+            coords = []
+            import itertools
+            ranges = [range(start, end + 1) for start, end in coord_ranges]
+            coords = list(itertools.product(*ranges))
+            coords = [coord for coord in coords if coord in field]
+        else:
+            # No path provided, use default reduced coordinates
+            coords = field._get_plot_coords(max_resolution)
     else:
         coords = field.coords
     

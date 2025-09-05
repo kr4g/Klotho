@@ -159,32 +159,102 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
     
     return _midi_to_audio(midi_file, soundfont_path=soundfont_path, max_polyphony=max_polyphony)
 
+def create_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=None, 
+                bend_sensitivity_semitones=12, debug=False, **kwargs):
+    """
+    Create a MIDI file from a musical object without audio synthesis.
+    
+    This function creates the exact same MIDI file as play_midi() but returns
+    the MidiFile object directly instead of converting to audio.
+    
+    Parameters
+    ----------
+    obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
+          PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, 
+          Sonority, or ChordSequence
+        The musical object to convert to MIDI. Same as play_midi().
+    dur : float, optional
+        Duration in seconds. Same as play_midi().
+    arp : bool, optional
+        For chords only: if True, arpeggiate the chord. Same as play_midi().
+    prgm : int, optional
+        MIDI program number (0-127) for instrument sound. Same as play_midi().
+    max_channels : int, optional
+        Maximum number of MIDI channels to allocate. Same as play_midi().
+    max_polyphony : int, optional
+        Unused in MIDI creation, kept for API compatibility.
+    bend_sensitivity_semitones : int, optional
+        Pitch bend range in semitones. Same as play_midi().
+    debug : bool, optional
+        Enable debug logging. Same as play_midi().
+    **kwargs
+        Additional arguments. Same as play_midi().
+        
+    Returns
+    -------
+    MidiFile
+        The MIDI file object that can be saved with midi_file.save('filename.mid')
+        
+    Examples
+    --------
+    >>> from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
+    >>> rt = RhythmTree([1, [1, 1], 1])
+    >>> midi_file = create_midi(rt)
+    >>> midi_file.save('my_rhythm.mid')
+    """
+    # Reset any global state to ensure clean slate for each call
+    _reset_microtonal_counter()
+    
+    # Use the exact same logic as play_midi() for MIDI creation
+    match obj:
+        case TemporalUnitSequence() | TemporalBlock():
+            midi_file = _create_midi_from_collection(obj, max_channels=max_channels, 
+                                                   bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case CompositionalUnit():
+            midi_file = _create_midi_from_compositional_unit(obj, max_channels=max_channels, 
+                                                           bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case TemporalUnit():
+            midi_file = _create_midi_from_temporal_unit(obj, max_channels=max_channels, 
+                                                      bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case RhythmTree():
+            temporal_unit = TemporalUnit.from_rt(obj)
+            midi_file = _create_midi_from_temporal_unit(temporal_unit, max_channels=max_channels, 
+                                                      bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case ChordSequence():
+            midi_file = _create_midi_from_chord_sequence(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
+                                                       max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
+            if isinstance(obj, (Scale, AddressedScale)):
+                midi_file = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
+                                                  max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+            elif isinstance(obj, (Chord, AddressedChord, Sonority, AddressedSonority)):
+                midi_file = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
+                                                  max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+            else:
+                midi_file = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
+                                                             max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case _:
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, AddressedScale, Chord, AddressedChord, Sonority, AddressedSonority, ChordSequence.")
+    
+    return midi_file
+
 def _create_midi_from_temporal_unit(temporal_unit, max_channels=128, bend_sensitivity_semitones=12, debug=False):
     """Create a MIDI file from a TemporalUnit using absolute timing."""
     # PRD: Use absolute timing only - ignore BPM/tempo from temporal objects
     # Always use 4/4 at 120 BPM for MIDI file, rely on absolute start/duration times
     bpm = 120
     
-    # For TemporalUnit: Use SINGLE drum channel for all notes (PRD requirement)
-    # TemporalUnit represents rhythmic patterns - all notes should use drum channel 9
-    writer = MultiPortMidiWriter(max_voices=1)  # Only need 1 voice for single channel
+    # For TemporalUnit: Each note gets its own drum channel to avoid conflicts
+    # This ensures proper note separation and prevents overlapping MIDI messages
+    num_notes = len([chronon for chronon in temporal_unit if not chronon.is_rest])
+    writer = MultiPortMidiWriter(max_voices=num_notes)
     allocator = ChannelAllocator(writer.num_ports, bend_sensitivity_semitones=bend_sensitivity_semitones)
     
     # Add global meta events - always 4/4 at 120 BPM per PRD
     writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
     
-    # Allocate ONE drum channel for the entire TemporalUnit
-    try:
-        port, channel = allocator.allocate_voice("temporal_drum_channel", is_drum=True, program=1)
-        if debug:
-            print(f"[DEBUG] TemporalUnit: Using single drum channel - port={port}, channel={channel}")
-    except RuntimeError as e:
-        if debug:
-            print(f"[DEBUG] Failed to allocate drum channel: {e}")
-        # Fallback: use channel 9 directly
-        port, channel = 0, 9
-    
     note_events = []
+    voice_counter = 0
     
     # For standalone playback: subtract offset to start from beginning (DO NOT MUTATE OBJECT)
     min_start_time = min(chronon.start for chronon in temporal_unit if not chronon.is_rest) if any(not chronon.is_rest for chronon in temporal_unit) else 0
@@ -195,22 +265,38 @@ def _create_midi_from_temporal_unit(temporal_unit, max_channels=128, bend_sensit
             start_time = chronon.start - min_start_time
             duration = abs(chronon.duration)
             
-            # All notes use the SAME drum channel (PRD requirement)
+            # Each note gets its own drum channel to avoid conflicts
+            voice_id = f"temporal_drum_voice_{voice_counter}"
+            voice_counter += 1
+            
+            try:
+                # Use melodic channels for TemporalUnit notes to avoid conflicts
+                # This allows multiple drum sounds to play simultaneously
+                port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=1)
+                if debug:
+                    print(f"[DEBUG] TemporalUnit note {voice_counter}: port={port}, channel={channel} (using melodic channel for drums)")
+            except RuntimeError as e:
+                if debug:
+                    print(f"[DEBUG] Failed to allocate channel for note {voice_counter}: {e}")
+                # Fallback: use channel 0
+                port, channel = 0, 0
+            
             note_events.append({
-                'voice_id': "temporal_drum_channel",
+                'voice_id': voice_id,
                 'port': port,
-                'channel': channel,  # Same channel for all notes
+                'channel': channel,  # Each note gets its own channel
                 'start_time': start_time,
                 'duration': duration,
                 'midi_note': DEFAULT_DRUM_NOTE,
                 'velocity': DEFAULT_VELOCITY,
-                'program': 1,  # GM Standard Drum Kit
-                'is_drum': True,
+                'program': 1,  # GM Standard Drum Kit - works on any channel
+                'is_drum': False,  # Use melodic channel allocation but with drum sounds
                 'pitch_bend': None
             })
     
     if debug:
-        print(f"[DEBUG] TemporalUnit: {len(note_events)} notes, all using channel {channel}")
+        channels_used = [event['channel'] for event in note_events]
+        print(f"[DEBUG] TemporalUnit: {len(note_events)} notes using channels {channels_used}")
     
     # Generate MIDI events using new allocator system
     _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
@@ -1448,6 +1534,200 @@ def debug_play_midi(obj, debug=True, **kwargs):
     """
     print("=== DEBUG MIDI PLAYBACK ===")
     return play_midi(obj, debug=debug, **kwargs)
+
+def compare_midi_files(obj, **kwargs):
+    """
+    Compare MIDI files generated by play_midi() vs create_midi() to debug differences.
+    
+    This function creates MIDI files using both methods and compares their contents
+    to help identify any discrepancies.
+    
+    Parameters
+    ----------
+    obj : musical object
+        The object to test with both functions
+    **kwargs
+        Arguments passed to both functions
+        
+    Returns
+    -------
+    dict
+        Comparison results with detailed information
+    """
+    import tempfile
+    import os
+    
+    print("=== COMPARING MIDI FILES ===")
+    
+    # Create MIDI using create_midi()
+    print("Creating MIDI using create_midi()...")
+    midi_from_create = create_midi(obj, **kwargs)
+    
+    # Create MIDI using play_midi() by intercepting the file before audio conversion
+    print("Creating MIDI using play_midi() internal logic...")
+    # Reset global state
+    _reset_microtonal_counter()
+    
+    # Use same logic as play_midi() to create MIDI
+    dur = kwargs.get('dur')
+    arp = kwargs.get('arp', False)
+    prgm = kwargs.get('prgm', 0)
+    max_channels = kwargs.get('max_channels', 128)
+    bend_sensitivity_semitones = kwargs.get('bend_sensitivity_semitones', 12)
+    debug = kwargs.get('debug', False)
+    
+    match obj:
+        case TemporalUnitSequence() | TemporalBlock():
+            midi_from_play = _create_midi_from_collection(obj, max_channels=max_channels, 
+                                                   bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case CompositionalUnit():
+            midi_from_play = _create_midi_from_compositional_unit(obj, max_channels=max_channels, 
+                                                           bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case TemporalUnit():
+            midi_from_play = _create_midi_from_temporal_unit(obj, max_channels=max_channels, 
+                                                      bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case RhythmTree():
+            temporal_unit = TemporalUnit.from_rt(obj)
+            midi_from_play = _create_midi_from_temporal_unit(temporal_unit, max_channels=max_channels, 
+                                                      bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case ChordSequence():
+            midi_from_play = _create_midi_from_chord_sequence(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
+                                                       max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
+            if isinstance(obj, (Scale, AddressedScale)):
+                midi_from_play = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
+                                                  max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+            elif isinstance(obj, (Chord, AddressedChord, Sonority, AddressedSonority)):
+                midi_from_play = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
+                                                  max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+            else:
+                midi_from_play = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
+                                                             max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
+        case _:
+            raise TypeError(f"Unsupported object type: {type(obj)}")
+    
+    # Save both files temporarily for comparison
+    with tempfile.NamedTemporaryFile(suffix='_create.mid', delete=False) as f1:
+        create_path = f1.name
+        midi_from_create.save(create_path)
+    
+    with tempfile.NamedTemporaryFile(suffix='_play.mid', delete=False) as f2:
+        play_path = f2.name
+        midi_from_play.save(play_path)
+    
+    # Compare file sizes
+    create_size = os.path.getsize(create_path)
+    play_size = os.path.getsize(play_path)
+    
+    # Compare track counts
+    create_tracks = len(midi_from_create.tracks)
+    play_tracks = len(midi_from_play.tracks)
+    
+    # Compare total ticks
+    create_ticks = midi_from_create.ticks_per_beat
+    play_ticks = midi_from_play.ticks_per_beat
+    
+    # Count messages in each file
+    create_msg_count = sum(len(track) for track in midi_from_create.tracks)
+    play_msg_count = sum(len(track) for track in midi_from_play.tracks)
+    
+    # Cleanup
+    try:
+        os.unlink(create_path)
+        os.unlink(play_path)
+    except OSError:
+        pass
+    
+    results = {
+        'files_identical': create_size == play_size,
+        'create_midi_size': create_size,
+        'play_midi_size': play_size,
+        'create_tracks': create_tracks,
+        'play_tracks': play_tracks,
+        'create_ticks_per_beat': create_ticks,
+        'play_ticks_per_beat': play_ticks,
+        'create_message_count': create_msg_count,
+        'play_message_count': play_msg_count,
+        'create_midi_file': midi_from_create,
+        'play_midi_file': midi_from_play
+    }
+    
+    print(f"Files identical: {results['files_identical']}")
+    print(f"File sizes - create_midi: {create_size}, play_midi: {play_size}")
+    print(f"Track counts - create_midi: {create_tracks}, play_midi: {play_tracks}")
+    print(f"Ticks per beat - create_midi: {create_ticks}, play_midi: {play_ticks}")
+    print(f"Message counts - create_midi: {create_msg_count}, play_midi: {play_msg_count}")
+    
+    if not results['files_identical']:
+        print("⚠️  FILES ARE DIFFERENT!")
+    else:
+        print("✅ Files are identical")
+    
+    return results
+
+def debug_temporal_unit_chronons(temporal_unit):
+    """
+    Debug function to examine chronon timing values in a TemporalUnit.
+    
+    This helps identify why some notes might be very short in MIDI files.
+    
+    Parameters
+    ----------
+    temporal_unit : TemporalUnit
+        The temporal unit to examine
+        
+    Returns
+    -------
+    dict
+        Information about each chronon
+    """
+    print("=== DEBUGGING TEMPORAL UNIT CHRONONS ===")
+    
+    chronon_info = []
+    min_start_time = min(chronon.start for chronon in temporal_unit if not chronon.is_rest) if any(not chronon.is_rest for chronon in temporal_unit) else 0
+    
+    print(f"min_start_time: {min_start_time}")
+    print(f"Total chronons: {len(temporal_unit)}")
+    
+    for i, chronon in enumerate(temporal_unit):
+        info = {
+            'index': i,
+            'is_rest': chronon.is_rest,
+            'raw_start': chronon.start,
+            'raw_duration': chronon.duration,
+            'abs_duration': abs(chronon.duration),
+            'adjusted_start': chronon.start - min_start_time if not chronon.is_rest else None,
+            'end_time': chronon.start + chronon.duration if not chronon.is_rest else None,
+            'proportion': getattr(chronon, 'proportion', 'N/A')
+        }
+        chronon_info.append(info)
+        
+        status = "REST" if chronon.is_rest else "NOTE"
+        if not chronon.is_rest:
+            print(f"Chronon {i} ({status}): start={chronon.start:.6f}, duration={chronon.duration:.6f}, abs_duration={abs(chronon.duration):.6f}")
+            print(f"    -> adjusted_start={info['adjusted_start']:.6f}, end_time={info['end_time']:.6f}")
+            if abs(chronon.duration) < 0.01:  # Very short note
+                print(f"    ⚠️  WARNING: Very short duration ({abs(chronon.duration):.6f} seconds)")
+        else:
+            print(f"Chronon {i} ({status}): start={chronon.start:.6f}, duration={chronon.duration:.6f}")
+    
+    # Check for overlapping notes
+    non_rest_chronons = [info for info in chronon_info if not info['is_rest']]
+    for i in range(len(non_rest_chronons) - 1):
+        current = non_rest_chronons[i]
+        next_chronon = non_rest_chronons[i + 1]
+        
+        current_end = current['raw_start'] + abs(current['raw_duration'])
+        next_start = next_chronon['raw_start']
+        
+        if current_end > next_start:
+            overlap = current_end - next_start
+            print(f"⚠️  OVERLAP detected between chronon {current['index']} and {next_chronon['index']}: {overlap:.6f} seconds")
+        elif current_end < next_start:
+            gap = next_start - current_end
+            print(f"ℹ️  GAP between chronon {current['index']} and {next_chronon['index']}: {gap:.6f} seconds")
+    
+    return chronon_info
 
 def _ensure_midi_duration(track, target_duration_seconds, bpm):
     """
