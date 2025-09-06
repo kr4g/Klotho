@@ -652,17 +652,34 @@ class CompositionalUnit(TemporalUnit):
         original_subtree_nodes = [node] + list(self._rt.descendants(node))
         
         # First, copy any instrument assignments that apply to this subtree
-        # Look for the governing instrument node for this subtree
-        governing_instrument_node = self._pt.get_governing_subtree_node(node)
-        if governing_instrument_node is not None and governing_instrument_node in self._pt._node_instruments:
-            # Apply the same instrument to the root of the new subtree
-            instrument = self._pt._node_instruments[governing_instrument_node]
-            new_cu.set_instrument(new_cu._pt.root, instrument)
+        # When copying the full tree (node == root), preserve ALL instruments
+        # When copying a subtree, only preserve the governing instrument
+        if node == self._rt.root:
+            # Full tree copy - preserve ALL instruments with proper node mapping
+            old_to_new_mapping = {}
+            old_nodes = [node] + list(self._rt.descendants(node))
+            new_nodes = list(new_cu._pt.nodes)
+            
+            # Create mapping based on tree structure (breadth-first traversal order)
+            for i, old_node in enumerate(old_nodes):
+                if i < len(new_nodes):
+                    old_to_new_mapping[old_node] = new_nodes[i]
+            
+            # Copy all instruments using the mapping
+            for old_node, instrument in self._pt._node_instruments.items():
+                if old_node in old_to_new_mapping:
+                    new_node = old_to_new_mapping[old_node]
+                    new_cu.set_instrument(new_node, instrument)
+        else:
+            # Subtree copy - only preserve governing instrument (original behavior)
+            governing_instrument_node = self._pt.get_governing_subtree_node(node)
+            if governing_instrument_node is not None and governing_instrument_node in self._pt._node_instruments:
+                instrument = self._pt._node_instruments[governing_instrument_node]
+                new_cu.set_instrument(new_cu._pt.root, instrument)
         
         # Copy parameter data from all nodes in the original subtree to corresponding nodes in the new tree
         # Since RhythmTree.subtree creates a completely new tree structure with renumbered nodes,
         # we need to map the parameter data appropriately
-        original_subtree_nodes = [node] + list(self._rt.descendants(node))
         new_tree_nodes = list(new_cu._pt.nodes)
         
         # Create a mapping based on tree structure position

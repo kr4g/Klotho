@@ -389,7 +389,7 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
             else:
                 # Fallback for CompositionalUnit without explicit instruments
                 is_drum = event.get_parameter('is_drum', False)
-                default_program = 1 if is_drum else 1  # Default to Standard Drum Kit for rhythmic content
+                default_program = 1 if is_drum else 0  # Drums=Standard Kit(1), Melodic=Piano(0)
                 program = event.get_parameter('program', default_program)
                 note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
                 velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
@@ -405,6 +405,8 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
             try:
                 if debug:
                     print(f"[DEBUG] Allocating voice_id={voice_id}, is_drum={is_drum}, program={program}")
+                    if isinstance(instrument, MidiInstrument):
+                        print(f"[DEBUG]   -> Instrument: {instrument.name}, is_Drum={instrument.is_Drum}, prgm={instrument.prgm}")
                 port, channel = allocator.allocate_voice(voice_id, is_drum, program)
                 if debug:
                     print(f"[DEBUG] Allocated port={port}, channel={channel}")
@@ -480,7 +482,7 @@ def _create_midi_from_collection(collection, max_channels=128, bend_sensitivity_
         # Parallel units - all rows start at the same time (time 0)
         for row in collection:
             # Recursively handle ANY temporal object (including nested BT/UTS)
-            voice_counter = _collect_note_events_from_unit(row, note_events, 0.0, voice_counter, allocator)
+            voice_counter = _collect_note_events_from_unit(row, note_events, 0.0, voice_counter, allocator, debug)
     
     # Sort note events by time for proper sequential playback
     note_events.sort(key=lambda event: event['start_time'])
@@ -503,13 +505,27 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
     
     if debug:
         print(f"[DEBUG] Collecting from {type(unit)}, voice_counter={voice_counter}")
+        print(f"[DEBUG] isinstance(unit, CompositionalUnit): {isinstance(unit, CompositionalUnit)}")
+        print(f"[DEBUG] isinstance(unit, TemporalUnit): {isinstance(unit, TemporalUnit)}")
     
     if isinstance(unit, CompositionalUnit):
         # CompositionalUnit with parameters - each note gets own channel
+        if debug:
+            print(f"[DEBUG] Processing as CompositionalUnit: {type(unit)}")
         for event in unit:
             if not event.is_rest:
                 # Get instrument information from the parameter tree
-                instrument = event._pt.get_active_instrument(event._node_id)
+                # First check if this specific node has an instrument (leaf override)
+                if event._node_id in event._pt._node_instruments:
+                    instrument = event._pt._node_instruments[event._node_id]
+                else:
+                    # Fall back to hierarchy traversal
+                    instrument = event._pt.get_active_instrument(event._node_id)
+                
+                if debug:
+                    print(f"[DEBUG] Collection event node {event._node_id}: instrument={instrument.name if instrument else 'None'}, is_Drum={instrument.is_Drum if instrument else 'N/A'}")
+                    print(f"[DEBUG]   _node_instruments keys: {list(event._pt._node_instruments.keys())}")
+                    print(f"[DEBUG]   Node {event._node_id} in _node_instruments: {event._node_id in event._pt._node_instruments}")
                 
                 if isinstance(instrument, MidiInstrument):
                     is_drum = instrument.is_Drum
@@ -521,7 +537,7 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
                 else:
                     # Fallback for non-MidiInstrument cases
                     is_drum = event.get_parameter('is_drum', False)
-                    default_program = 1 if is_drum else 1
+                    default_program = 1 if is_drum else 0  # Drums=Standard Kit(1), Melodic=Piano(0)
                     program = event.get_parameter('program', default_program)
                     note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
                     velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
@@ -566,6 +582,8 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
     
     elif isinstance(unit, TemporalUnit):
         # TemporalUnit: use single drum channel (optimization)
+        if debug:
+            print(f"[DEBUG] Processing as TemporalUnit: {type(unit)}")
         try:
             port, channel = allocator.allocate_voice("temporal_drum_shared", is_drum=True, program=1)
         except RuntimeError:
@@ -1018,8 +1036,10 @@ class ChannelAllocator:
         # Channel state per port: [port][channel] -> {bank, program, bend_sens}
         self.channel_state = [[{} for _ in range(16)] for _ in range(num_ports)]
         
-        # Round-robin port selection
+        # Round-robin allocation tracking
         self.next_port = 0
+        self.next_melodic_channel = 0  # Global melodic channel counter
+        self.next_drum_channel = 0     # Global drum channel counter
     
     def allocate_voice(self, voice_id, is_drum=False, program=0):
         """
@@ -1039,49 +1059,38 @@ class ChannelAllocator:
         tuple
             (port, channel) allocation
         """
-        # Allocate channel based on voice type (following user spec: sequential exhaustion)
+        # Use round-robin allocation to cycle through ALL available channels
         if is_drum:
-            # For drums: Sequential port allocation - exhaust port 0, then port 1, etc.
-            # Each port provides 1 drum channel (channel 9)
-            port = None
-            channel = None
+            # For drums: Use channel 9 on each port in round-robin fashion
+            # Total drum channels available: num_ports (one channel 9 per port)
+            port = self.next_drum_channel % self.num_ports
+            channel = 9
+            self.next_drum_channel += 1
             
-            for p in range(self.num_ports):
-                if self.free_drum[p]:
-                    port = p
-                    channel = self.free_drum[p].popleft()
-                    # Clear channel state for newly allocated channel
-                    self.channel_state[port][channel] = {}
-                    break
-            
-            if port is None:
-                # For sequential events, reuse channel 9 on port 0 since notes don't overlap
-                port = 0
-                channel = 9
-                # Clear channel state for reused channel
-                self.channel_state[port][channel] = {}
+            # Clear channel state for this allocation
+            self.channel_state[port][channel] = {}
                 
         else:
-            # For melodic: Sequential port allocation - exhaust all channels on port 0, then port 1, etc.
-            # Each port provides 15 melodic channels (0-8, 10-15)
-            port = None
-            channel = None
+            # For melodic: Use round-robin across ALL melodic channels on ALL ports
+            # Total melodic channels available: num_ports * 15 (channels 0-8, 10-15 per port)
+            melodic_channels_per_port = 15
+            total_melodic_channels = self.num_ports * melodic_channels_per_port
             
-            for p in range(self.num_ports):
-                if self.free_melodic[p]:
-                    port = p
-                    channel = self.free_melodic[p].popleft()
-                    # Clear channel state for newly allocated channel
-                    self.channel_state[port][channel] = {}
-                    break
+            # Calculate which port and channel to use
+            global_channel_index = self.next_melodic_channel % total_melodic_channels
+            port = global_channel_index // melodic_channels_per_port
             
-            if port is None:
-                # For sequential events, cycle through melodic channels on port 0
-                port = 0
-                available_channels = [ch for ch in range(16) if ch != 9]
-                channel = available_channels[0]  # Use first melodic channel
-                # Clear channel state for reused channel
-                self.channel_state[port][channel] = {}
+            # Map to actual channel number (skip channel 9)
+            local_channel_index = global_channel_index % melodic_channels_per_port
+            if local_channel_index >= 9:
+                channel = local_channel_index + 1  # Skip channel 9: 0-8, then 10-15
+            else:
+                channel = local_channel_index       # Use channels 0-8
+            
+            self.next_melodic_channel += 1
+            
+            # Clear channel state for this allocation  
+            self.channel_state[port][channel] = {}
         
         # Record allocation
         self.active_voices[voice_id] = (port, channel, is_drum)
@@ -1332,10 +1341,23 @@ def _generate_multi_port_events(note_events, writer, allocator, bpm, debug=False
         writer.add_event(port, start_time + duration, Message('note_off', 
                                                             channel=channel, note=midi_note, velocity=0))
     
-    # NOTE: Voice release is not needed for the current implementation
-    # Each note gets its own dedicated channel for the duration of playback
-    # This ensures perfect voice independence as per PRD requirements
-    # The allocator is designed to handle the maximum concurrent voices needed
+    # Implement proper voice lifetime tracking as per PRD requirements
+    # Track when notes end and release channels back to the pool
+    # This prevents channel exhaustion and enables true 256-channel support
+    
+    # Create a list of (end_time, voice_id) pairs for voice release
+    voice_releases = []
+    for note_event in note_events:
+        end_time = note_event['start_time'] + note_event['duration']
+        voice_releases.append((end_time, note_event['voice_id']))
+    
+    # Sort voice releases by time
+    voice_releases.sort(key=lambda x: x[0])
+    
+    # Add voice release events to the MIDI writer
+    for end_time, voice_id in voice_releases:
+        # Release the voice back to the allocator pool
+        allocator.release_voice(voice_id)
 
 def _send_rpn_pitch_bend_sensitivity(writer, port, channel, time, semitones):
     """
