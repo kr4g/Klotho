@@ -319,7 +319,8 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     def copy(self):
         """Create a deep copy of this TemporalUnit."""
-        return copy.deepcopy(self)
+        # return copy.deepcopy(self)
+        return TemporalUnit(span=self.span, tempus=self.tempus, prolatio=self.prolationis, beat=self.beat, bpm=self.bpm, offset=self.offset)
 
 
 class TemporalUnitSequence(metaclass=TemporalMeta):

@@ -545,7 +545,7 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
                 voice_id = f"collection_voice_{voice_counter}"
                 voice_counter += 1
                 
-                start_time = event.start + time_offset
+                start_time = event.start  # Events already have absolute timing
                 duration = abs(event.duration)
                 
                 # Allocate individual channel for each note (PRD: voice independence)
@@ -592,7 +592,7 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
         for chronon in unit:
             if not chronon.is_rest:
                 voice_id = "temporal_drum_shared"  # Reuse same voice for TemporalUnit
-                start_time = chronon.start + time_offset
+                start_time = chronon.start  # Events already have absolute timing
                 duration = abs(chronon.duration)
                 
                 note_events.append({
@@ -654,7 +654,7 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
                     note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
                     velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
                 
-                start_time = event.start + time_offset
+                start_time = event.start  # Events already have absolute timing
                 duration = abs(event.duration)
                 
                 # Handle microtonal MIDI float values directly like CompositionalUnit
@@ -693,7 +693,7 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
         unit_copy = unit.copy()
         for chronon in unit_copy:
             if not chronon.is_rest:
-                start_time = chronon.start + time_offset
+                start_time = chronon.start  # Events already have absolute timing
                 duration = abs(chronon.duration)
                 
                 # TemporalUnit should use drum sounds, not piano (program 1, not 0)
