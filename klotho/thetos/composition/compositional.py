@@ -118,9 +118,16 @@ class CompositionalUnit(TemporalUnit):
                  beat     : Union[None, Fraction, int, float, str] = None,
                  bpm      : Union[None, int, float]                = None,
                  offset   : float                                  = 0,
+                 inst     : Union[Instrument, None]                = None,
+                 mfields  : Union[dict, list, None]                = None,
                  pfields  : Union[dict, list, None]                = None):
         
         super().__init__(span, tempus, prolatio, beat, bpm, offset)
+        
+        if mfields is None:
+            mfields = {}
+        if 'group' not in mfields:
+            mfields['group'] = 'default'
         
         self._pt = self._create_synchronized_parameter_tree(pfields)
         
@@ -129,24 +136,26 @@ class CompositionalUnit(TemporalUnit):
         self._envelope_offset = offset
     
     @classmethod
-    def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None):
+    def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None):
         return cls(span     = rt.span,
                    tempus   = rt.meas,
                    prolatio = rt.subdivisions,
                    beat     = beat,
                    bpm      = bpm,
                    offset   = 0,
-                   pfields  = pfields)
+                   pfields  = pfields,
+                   mfields  = mfields)
         
     @classmethod
-    def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None):
+    def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None):
         return cls(span     = ut.span,
                    tempus   = ut.tempus,
                    prolatio = ut.prolationis,
                    beat     = ut.beat,
                    bpm      = ut.bpm,
                    offset   = ut.offset,
-                   pfields  = pfields)
+                   pfields  = pfields,
+                   mfields  = mfields)
     
     def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None]) -> ParameterTree:
         """
@@ -270,6 +279,18 @@ class CompositionalUnit(TemporalUnit):
         return self._pt.pfields
     
     @property
+    def mfields(self) -> list:
+        """
+        List of all available meta field names.
+        
+        Returns
+        -------
+        list of str
+            Sorted list of meta field names
+        """
+        return self._pt.mfields
+    
+    @property
     def events(self):
         """
         Enhanced events DataFrame including both temporal and parameter data.
@@ -363,6 +384,24 @@ class CompositionalUnit(TemporalUnit):
                 }
         
         self._evaluate_envelopes()
+
+    def set_mfields(self, node: Union[int, list], **kwargs) -> None:
+        """
+        Set meta field values for a specific node(s) and their descendants.
+        
+        Meta fields are static metadata that don't support envelope automation.
+        
+        Parameters
+        ----------
+        node : Union[int, list]
+            The node ID(s) to set meta fields for
+        **kwargs
+            Meta field names and values to set
+        """
+        nodes = [node] if not isinstance(node, (list, tuple, set)) else list(node)
+        
+        for n in nodes:
+            self._pt.set_mfields(n, **kwargs)
 
     def apply_envelope(self, level: Union[int, str], range_span: Union[tuple, int, None], envelope: Envelope, pfields: Union[str, list], endpoint: bool = True) -> int:
         """
@@ -610,8 +649,6 @@ class CompositionalUnit(TemporalUnit):
         if self._events is None:
             self._events = self._evaluate()
         return self._events[idx].parameters
-    
-
     
     def from_subtree(self, node: int) -> 'CompositionalUnit':
         """

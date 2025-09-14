@@ -19,6 +19,7 @@ class Scheduler:
         self.events = []
         self.total_events = 0
         self.event_counter = 0  # sorting for final tiebreaker
+        self.meta = {}
         
     def new_node(self, synth_name: str, start: float = 0, dur: Union[float, None] = None, group: str = None, **pfields):
         uid = str(uuid4()).replace('-', '')
@@ -140,6 +141,35 @@ class Scheduler:
                 if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ('sustained', 'sus'):
                     self.release_node(uid, start=event.end)
             
+    def add_group(self, groups):
+        if 'groups' not in self.meta:
+            self.meta['groups'] = []
+        
+        if isinstance(groups, str):
+            groups = [groups]
+        
+        for group in groups:
+            if group == "main":
+                raise ValueError("Group name 'main' is not allowed")
+            if group not in self.meta['groups']:
+                self.meta['groups'].append(group)
+    
+    def add_inserts(self, inserts):
+        if 'groups' not in self.meta:
+            raise ValueError("Must add groups before adding inserts")
+        
+        if 'inserts' not in self.meta:
+            self.meta['inserts'] = []
+        
+        if isinstance(inserts, dict):
+            inserts = [inserts]
+        
+        for insert in inserts:
+            for group_name in insert.keys():
+                if group_name not in self.meta['groups'] and group_name != "main":
+                    raise ValueError(f"Group '{group_name}' not found in groups list")
+            self.meta['inserts'].append(insert)
+    
     def clear_events(self):
         self.events = []
         self.total_events = 0
@@ -161,10 +191,15 @@ class Scheduler:
                 new_start = (start + time_shift) * time_scale
                 event["start"] = new_start
                 sorted_events.append(event)
-            
+        
+        output_data = {
+            "meta": self.meta,
+            "events": sorted_events
+        }
+        
         try:
             with open(filepath, 'w') as f:
-                json.dump(sorted_events, f, indent=2)
+                json.dump(output_data, f, indent=2)
             print(f"Successfully wrote {self.total_events} events to {os.path.abspath(filepath)}")
         except Exception as e:
             print(f"Error writing to {filepath}: {e}")

@@ -14,6 +14,7 @@ class ParameterTree(Tree):
         self._active_items_cache = {}
         self._node_instruments = {}
         self._subtree_muted_pfields = {}
+        self._subtree_muted_mfields = {}
         self._slurs = {}
         self._next_slur_id = 0
         
@@ -22,6 +23,7 @@ class ParameterTree(Tree):
             # Access raw node data directly from Graph class, not through ParameterNode wrapper
             super().__getitem__(node).pop('label', None)
         self._meta['pfields'] = set()
+        self._meta['mfields'] = set()
     
     def _ensure_parameter_attributes(self):
         """Ensure all parameter-specific attributes are initialized"""
@@ -37,6 +39,8 @@ class ParameterTree(Tree):
             self._node_instruments = {}
         if not hasattr(self, '_subtree_muted_pfields'):
             self._subtree_muted_pfields = {}
+        if not hasattr(self, '_subtree_muted_mfields'):
+            self._subtree_muted_mfields = {}
         if not hasattr(self, '_slurs'):
             self._slurs = {}
         if not hasattr(self, '_next_slur_id'):
@@ -53,6 +57,7 @@ class ParameterTree(Tree):
         new_pt = super().__deepcopy__(memo)
         new_pt._node_instruments = copy.deepcopy(self._node_instruments, memo)
         new_pt._subtree_muted_pfields = copy.deepcopy(self._subtree_muted_pfields, memo)
+        new_pt._subtree_muted_mfields = copy.deepcopy(self._subtree_muted_mfields, memo)
         new_pt._slurs = copy.deepcopy(self._slurs, memo)
         new_pt._next_slur_id = self._next_slur_id
         
@@ -82,6 +87,10 @@ class ParameterTree(Tree):
     def pfields(self):
         return sorted(self._meta['pfields'])
     
+    @property
+    def mfields(self):
+        return sorted(self._meta['mfields'])
+    
     def _traverse_to_instrument_node(self, node):
         """Cached instrument node traversal"""
         cache_key = (node, self._parameter_version)
@@ -103,6 +112,18 @@ class ParameterTree(Tree):
     def set_pfields(self, node, **kwargs):
         """Optimized parameter setting with cache invalidation"""
         self._meta['pfields'].update(kwargs.keys())
+        
+        affected_nodes = [node] + list(self.descendants(node))
+        
+        for affected_node in affected_nodes:
+            node_data = self.nodes[affected_node]
+            node_data.update(kwargs)
+        
+        self._invalidate_parameter_caches()
+    
+    def set_mfields(self, node, **kwargs):
+        """Optimized meta field setting with cache invalidation"""
+        self._meta['mfields'].update(kwargs.keys())
         
         affected_nodes = [node] + list(self.descendants(node))
         
@@ -139,6 +160,9 @@ class ParameterTree(Tree):
         
         non_instrument_pfields = existing_pfields - instrument_pfields
         self._subtree_muted_pfields[node] = non_instrument_pfields
+        
+        # For mfields, we don't mute any since instruments don't define mfields
+        self._subtree_muted_mfields[node] = set()
         
         for n in subtree_nodes:
             node_data = self.nodes[n]
@@ -252,6 +276,9 @@ class ParameterNode:
     
     def set_pfields(self, **kwargs):
         self._tree.set_pfields(self._node, **kwargs)
+    
+    def set_mfields(self, **kwargs):
+        self._tree.set_mfields(self._node, **kwargs)
         
     def set_instrument(self, instrument, exclude=None):
         self._tree.set_instrument(self._node, instrument, exclude=exclude)
@@ -275,8 +302,9 @@ class ParameterNode:
             result = all_items
         else:
             muted_pfields = self._tree._subtree_muted_pfields.get(governing_subtree_node, set())
+            muted_mfields = self._tree._subtree_muted_mfields.get(governing_subtree_node, set())
             result = {k: v for k, v in all_items.items() 
-                     if k not in muted_pfields or k.startswith('_slur_')}
+                     if (k not in muted_pfields and k not in muted_mfields) or k.startswith('_slur_')}
         
         self._tree._active_items_cache[cache_key] = result
         return result
