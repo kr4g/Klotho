@@ -141,7 +141,7 @@ class Scheduler:
                 if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ('sustained', 'sus'):
                     self.release_node(uid, start=event.end)
             
-    def add_group(self, groups):
+    def synth_groups(self, groups):
         if 'groups' not in self.meta:
             self.meta['groups'] = []
         
@@ -154,21 +154,23 @@ class Scheduler:
             if group not in self.meta['groups']:
                 self.meta['groups'].append(group)
     
-    def add_inserts(self, inserts):
-        if 'groups' not in self.meta:
-            raise ValueError("Must add groups before adding inserts")
+    def group_inserts(self, inserts):
+        # if 'groups' not in self.meta:
+        #     raise ValueError("Must add groups before adding inserts")
+        self.synth_groups(inserts.keys())
         
         if 'inserts' not in self.meta:
             self.meta['inserts'] = []
+
+        self.meta['inserts'] = inserts
+        # if isinstance(inserts, dict):
+        #     inserts = [inserts]
         
-        if isinstance(inserts, dict):
-            inserts = [inserts]
-        
-        for insert in inserts:
-            for group_name in insert.keys():
-                if group_name not in self.meta['groups'] and group_name != "main":
-                    raise ValueError(f"Group '{group_name}' not found in groups list")
-            self.meta['inserts'].append(insert)
+        # for insert in inserts:
+        #     for group_name in insert.keys():
+        #         if group_name not in self.meta['groups'] and group_name != "main":
+        #             raise ValueError(f"Group '{group_name}' not found in groups list")
+        #     self.meta['inserts'].append(insert)
     
     def clear_events(self):
         self.events = []

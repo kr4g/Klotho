@@ -129,14 +129,14 @@ class CompositionalUnit(TemporalUnit):
         if 'group' not in mfields:
             mfields['group'] = 'default'
         
-        self._pt = self._create_synchronized_parameter_tree(pfields)
+        self._pt = self._create_synchronized_parameter_tree(pfields, inst, mfields)
         
         self._envelopes = {}
         self._next_envelope_id = 0
         self._envelope_offset = offset
     
     @classmethod
-    def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None):
+    def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
         return cls(span     = rt.span,
                    tempus   = rt.meas,
                    prolatio = rt.subdivisions,
@@ -144,10 +144,11 @@ class CompositionalUnit(TemporalUnit):
                    bpm      = bpm,
                    offset   = 0,
                    pfields  = pfields,
-                   mfields  = mfields)
+                   mfields  = mfields,
+                   inst     = inst)
         
     @classmethod
-    def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None):
+    def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
         return cls(span     = ut.span,
                    tempus   = ut.tempus,
                    prolatio = ut.prolationis,
@@ -155,9 +156,10 @@ class CompositionalUnit(TemporalUnit):
                    bpm      = ut.bpm,
                    offset   = ut.offset,
                    pfields  = pfields,
-                   mfields  = mfields)
+                   mfields  = mfields,
+                   inst     = inst)
     
-    def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None]) -> ParameterTree:
+    def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None], inst: Union[Instrument, None] = None, mfields: Union[dict, list, None] = None) -> ParameterTree:
         """
         Create a ParameterTree with identical structure to the RhythmTree but blank node data.
         
@@ -165,6 +167,10 @@ class CompositionalUnit(TemporalUnit):
         ----------
         pfields : Union[dict, list, None]
             Parameter fields to initialize
+        inst : Union[Instrument, None], optional
+            Instrument to set on the root node
+        mfields : Union[dict, list, None], optional
+            Meta fields to initialize
             
         Returns
         -------
@@ -179,6 +185,12 @@ class CompositionalUnit(TemporalUnit):
         
         if pfields is not None:
             self._initialize_parameter_fields(pt, pfields)
+        
+        if inst is not None:
+            pt.set_instrument(pt.root, inst)
+        
+        if mfields is not None:
+            self._initialize_meta_fields(pt, mfields)
         
         return pt
     
@@ -198,6 +210,23 @@ class CompositionalUnit(TemporalUnit):
         elif isinstance(pfields, list):
             default_values = {field: 0.0 for field in pfields}
             pt.set_pfields(pt.root, **default_values)
+
+    def _initialize_meta_fields(self, pt: ParameterTree, mfields: Union[dict, list]):
+        """
+        Initialize meta fields across all nodes in the parameter tree.
+        
+        Parameters
+        ----------
+        pt : ParameterTree
+            The parameter tree to initialize
+        mfields : Union[dict, list]
+            Meta fields to set
+        """
+        if isinstance(mfields, dict):
+            pt.set_mfields(pt.root, **mfields)
+        elif isinstance(mfields, list):
+            default_values = {field: '' for field in mfields}
+            pt.set_mfields(pt.root, **default_values)
 
     def _validate_non_overlapping_subtrees(self, nodes):
         """Ensure no node is a descendant of another in the list"""
