@@ -14,6 +14,11 @@ from typing import Union
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 
+ENV_TYPES = {
+    'gated': ('sustained', 'sus', 'asr', 'adsr'),
+    'ungated': ('standard', 'std', 'perc', 'linen'),
+}
+
 class Scheduler:
     def __init__(self):
         self.events = []
@@ -104,7 +109,7 @@ class Scheduler:
                 instrument = uc._pt.get_active_instrument(event.node_id)
                 if instrument:
                     env_type = getattr(instrument, 'env_type', None) or ''
-                    if env_type and env_type.lower() in ('standard', 'std'):
+                    if env_type and env_type.lower() in ENV_TYPES['ungated']:
                         sustain_param = None
                         for param in ['sustaintime', 'releasetime']:
                             if param in [k.lower() for k in instrument.keys()]:
@@ -129,7 +134,7 @@ class Scheduler:
                     instrument = uc._pt.get_active_instrument(event.node_id)
                     if instrument and hasattr(instrument, 'env_type'):
                         env_type = getattr(instrument, 'env_type', '') or ''
-                        if env_type.lower() in ('sustained', 'sus'):
+                        if env_type.lower() in ENV_TYPES['gated']:
                             self.set_node(slur_uids[slur_id], start=event.end, gate=0)
             else:
                 uid = self.new_node(
@@ -138,7 +143,7 @@ class Scheduler:
                     group=event_group,
                     **pfields
                 )
-                if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ('sustained', 'sus'):
+                if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ENV_TYPES['gated']:
                     self.release_node(uid, start=event.end)
             
     def synth_groups(self, groups):
@@ -155,9 +160,9 @@ class Scheduler:
                 self.meta['groups'].append(group)
     
     def group_inserts(self, inserts):
-        # if 'groups' not in self.meta:
-        #     raise ValueError("Must add groups before adding inserts")
-        self.synth_groups(inserts.keys())
+        if 'groups' not in self.meta:
+            raise ValueError("Must add groups before adding inserts")
+        # self.synth_groups(inserts.keys())
         
         if 'inserts' not in self.meta:
             self.meta['inserts'] = []
