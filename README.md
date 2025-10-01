@@ -58,6 +58,14 @@ pip install klotho-cac[dev]
     pip install -r requirements.txt
     ```
 
+## Integration with SuperCollider
+
+To use Klotho with SuperCollider, clone or download the `Klotho-SC` extension package (<a href="https://github.com/kr4g/Klotho-SC.git" target="_blank">https://github.com/kr4g/Klotho-SC.git</a>) and place it in your SuperCollider extensions directory. You can find the extensions directory by evaluating the following line in the SuperCollider code editor:
+
+```
+Platform.userExtensionDir
+```
+
 ## Documentation
 
 **📖 Online Documentation:** <a href="https://klotho.readthedocs.io/" target="_blank">https://klotho.readthedocs.io/</a>
