@@ -123,6 +123,8 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def rt(self):
         """The RhythmTree of the TemporalUnit (returns a copy)."""
+        if self._events is None:
+            self._events = self._evaluate()
         return self._rt.copy()
 
     @property

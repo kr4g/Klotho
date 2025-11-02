@@ -21,8 +21,8 @@ class HarmonicTree(Tree):
         self._evaluate()
 
     def _evaluate(self):
-        self[0]['multiple'] = self._graph.nodes[self.root]['label']
-        self[0]['harmonic'] = self._graph.nodes[self.root]['label']
+        self[0]['multiple'] = self[self.root]['label']
+        self[0]['harmonic'] = self[self.root]['label']
         def process_subtree(node=0, factor=1):
             value = self[node]['label']
             self[node]['multiple'] = value if value > 0 else Fraction(1, abs(value))
