@@ -1,9 +1,9 @@
 from pythonosc import udp_client, osc_bundle_builder, osc_message_builder
 import time
 import threading
-from klotho.tonos import Pitch, PitchCollection, EquaveCyclicCollection, Scale, Chord, AddressedPitchCollection
-from klotho.tonos.chords.chord import AddressedChord
-from klotho.tonos.scales.scale import AddressedScale
+from klotho.tonos import Pitch, PitchCollection, EquaveCyclicCollection, Scale, Chord, InstancedPitchCollection
+from klotho.tonos.chords.chord import InstancedChord
+from klotho.tonos.scales.scale import InstancedScale
 from klotho.tonos.systems.harmonic_trees import Spectrum
 from klotho.dynatos.dynamics import freq_amp_scale, ampdb
 from klotho.chronos.temporal_units.temporal import TemporalUnit
@@ -95,10 +95,10 @@ def _execute_play(obj, verbose=False, start_time=None, **kwargs):
         case Spectrum():
             _play_spectrum(obj, verbose, start_time)
         
-        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
-            if isinstance(obj, (Scale, AddressedScale)):
+        case PitchCollection() | EquaveCyclicCollection() | InstancedPitchCollection():
+            if isinstance(obj, (Scale, InstancedScale)):
                 _play_scale(obj, verbose, start_time)
-            elif isinstance(obj, (Chord, AddressedChord)):
+            elif isinstance(obj, (Chord, InstancedChord)):
                 _play_chord(obj, verbose, start_time)
             else:
                 _play_pitch_collection(obj, verbose, start_time)
@@ -113,8 +113,8 @@ def _execute_play(obj, verbose=False, start_time=None, **kwargs):
             raise TypeError(f"Unsupported object type: {type(obj)}")
 
 def _get_addressed_collection(obj):
-    """Get an addressed version of a pitch collection."""
-    if hasattr(obj, 'freq') or isinstance(obj, (AddressedPitchCollection, AddressedScale, AddressedChord)):
+    """Get an instanced version of a pitch collection."""
+    if hasattr(obj, 'freq') or isinstance(obj, (InstancedPitchCollection, InstancedScale, InstancedChord)):
         return obj
     else:
         return obj.root("C4")
@@ -344,7 +344,7 @@ def _extract_frequencies(freq_obj):
     if isinstance(freq_obj, Spectrum):
         return [row['pitch'].freq for _, row in freq_obj.data.iterrows()]
     
-    if isinstance(freq_obj, (PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, AddressedScale, AddressedChord)):
+    if isinstance(freq_obj, (PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, Chord, InstancedScale, InstancedChord)):
         addressed_collection = _get_addressed_collection(freq_obj)
         return [addressed_collection[i].freq for i in range(len(addressed_collection))]
     

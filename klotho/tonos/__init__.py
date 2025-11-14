@@ -31,7 +31,7 @@ from . import pitch
 combination_product_sets = systems.combination_product_sets
 harmonic_trees = systems.harmonic_trees
 
-from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection
+from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection
 from .scales import Scale
 from .chords import Chord, Sonority, ChordSequence
 from .motives import Motive
@@ -39,8 +39,8 @@ from .systems.combination_product_sets import CombinationProductSet, Hexany, Dek
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
 from .systems.tone_lattices import ToneLattice
-from .scales.scale import AddressedScale
-from .chords.chord import AddressedChord, AddressedSonority
+from .scales.scale import InstancedScale
+from .chords.chord import InstancedChord, InstancedSonority
 
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
 from .utils.intervals import split_partial, harmonic_mean, arithmetic_mean, logarithmic_distance
@@ -70,7 +70,7 @@ __all__ = [
     'Pitch',
     'PitchCollection', 
     'EquaveCyclicCollection',
-    'AddressedPitchCollection',
+    'InstancedPitchCollection',
     'Scale',
     'Chord',
     'Sonority',
@@ -84,9 +84,9 @@ __all__ = [
     'HarmonicTree',
     'Spectrum',
     'ToneLattice',
-    'AddressedScale',
-    'AddressedChord',
-    'AddressedSonority',
+    'InstancedScale',
+    'InstancedChord',
+    'InstancedSonority',
     
     # Interval utilities
     'ratio_to_cents',

@@ -20,10 +20,10 @@ from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import MidiInstrument
-from klotho.tonos.pitch.pitch_collections import PitchCollection, EquaveCyclicCollection, AddressedPitchCollection
+from klotho.tonos.pitch.pitch_collections import PitchCollection, EquaveCyclicCollection, InstancedPitchCollection
 from klotho.tonos.pitch.pitch import Pitch
-from klotho.tonos.scales.scale import Scale, AddressedScale
-from klotho.tonos.chords.chord import Chord, AddressedChord, Sonority, AddressedSonority, ChordSequence
+from klotho.tonos.scales.scale import Scale, InstancedScale
+from klotho.tonos.chords.chord import Chord, InstancedChord, Sonority, InstancedSonority, ChordSequence
 
 DEFAULT_DRUM_NOTE = 77
 PERCUSSION_CHANNEL = 9
@@ -80,13 +80,13 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, 
+          PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, Chord, 
           Sonority, or ChordSequence
         The musical object to play. Different object types have different playback behaviors:
         - RhythmTree/TemporalUnit: Rhythmic playback with default pitch
-        - PitchCollection/AddressedPitchCollection: Sequential pitch playback
-        - Scale/AddressedScale: Ascending then descending playback
-        - Chord/AddressedChord/Sonority/AddressedSonority: Block chord or arpeggiated playback
+        - PitchCollection/InstancedPitchCollection: Sequential pitch playback
+        - Scale/InstancedScale: Ascending then descending playback
+        - Chord/InstancedChord/Sonority/InstancedSonority: Block chord or arpeggiated playback
         - ChordSequence: Sequential playback of chords/sonorities
     dur : float, optional
         Duration in seconds. Defaults depend on object type:
@@ -144,18 +144,18 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
         case ChordSequence():
             midi_file = _create_midi_from_chord_sequence(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                        max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
-            if isinstance(obj, (Scale, AddressedScale)):
+        case PitchCollection() | EquaveCyclicCollection() | InstancedPitchCollection():
+            if isinstance(obj, (Scale, InstancedScale)):
                 midi_file = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, AddressedChord, Sonority, AddressedSonority)):
+            elif isinstance(obj, (Chord, InstancedChord, Sonority, InstancedSonority)):
                 midi_file = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
                 midi_file = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
                                                              max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, AddressedScale, Chord, AddressedChord, Sonority, AddressedSonority, ChordSequence.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, InstancedScale, Chord, InstancedChord, Sonority, InstancedSonority, ChordSequence.")
     
     return _midi_to_audio(midi_file, soundfont_path=soundfont_path, max_polyphony=max_polyphony)
 
@@ -170,7 +170,7 @@ def create_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphon
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, 
+          PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, Chord, 
           Sonority, or ChordSequence
         The musical object to convert to MIDI. Same as play_midi().
     dur : float, optional
@@ -223,18 +223,18 @@ def create_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphon
         case ChordSequence():
             midi_file = _create_midi_from_chord_sequence(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                        max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
-            if isinstance(obj, (Scale, AddressedScale)):
+        case PitchCollection() | EquaveCyclicCollection() | InstancedPitchCollection():
+            if isinstance(obj, (Scale, InstancedScale)):
                 midi_file = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, AddressedChord, Sonority, AddressedSonority)):
+            elif isinstance(obj, (Chord, InstancedChord, Sonority, InstancedSonority)):
                 midi_file = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
                 midi_file = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
                                                              max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, AddressedScale, Chord, AddressedChord, Sonority, AddressedSonority, ChordSequence.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, InstancedScale, Chord, InstancedChord, Sonority, InstancedSonority, ChordSequence.")
     
     return midi_file
 
@@ -1658,11 +1658,11 @@ def compare_midi_files(obj, **kwargs):
         case ChordSequence():
             midi_from_play = _create_midi_from_chord_sequence(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                        max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
-            if isinstance(obj, (Scale, AddressedScale)):
+        case PitchCollection() | EquaveCyclicCollection() | InstancedPitchCollection():
+            if isinstance(obj, (Scale, InstancedScale)):
                 midi_from_play = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, AddressedChord, Sonority, AddressedSonority)):
+            elif isinstance(obj, (Chord, InstancedChord, Sonority, InstancedSonority)):
                 midi_from_play = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
@@ -1855,19 +1855,19 @@ def _create_midi_from_pitch_collection(collection, dur=0.5, prgm=0, max_channels
     if debug:
         print(f"[DEBUG] PitchCollection: {max_concurrent} voices, {writer.num_ports} ports")
     
-    # For non-addressed collections, create addressed version with C4 root
-    if isinstance(collection, AddressedPitchCollection):
-        addressed = collection
+    # For non-instanced collections, create instanced version with C4 root
+    if isinstance(collection, InstancedPitchCollection):
+        instanced = collection
     else:
         from klotho.tonos.pitch.pitch import Pitch
-        addressed = collection.root(Pitch("C4"))
+        instanced = collection.root(Pitch("C4"))
     
     note_events = []
     current_time = 0.0
     voice_counter = 0
     
-    for i in range(len(addressed)):
-        pitch = addressed[i]
+    for i in range(len(instanced)):
+        pitch = instanced[i]
         voice_id = f"pitch_voice_{voice_counter}"
         voice_counter += 1
         
@@ -1921,12 +1921,12 @@ def _create_midi_from_scale(scale, dur=0.5, prgm=0, max_channels=128, bend_sensi
     if debug:
         print(f"[DEBUG] Scale: {max_concurrent} voices, {writer.num_ports} ports")
     
-    # For non-addressed scales, create addressed version with C4 root
-    if isinstance(scale, AddressedPitchCollection):
-        addressed = scale
+    # For non-instanced scales, create instanced version with C4 root
+    if isinstance(scale, InstancedPitchCollection):
+        instanced = scale
     else:
         from klotho.tonos.pitch.pitch import Pitch
-        addressed = scale.root(Pitch("C4"))
+        instanced = scale.root(Pitch("C4"))
     
     # For scales: allocate channels per note for ascending (microtones), reuse for descending
     note_events = []
@@ -1935,9 +1935,9 @@ def _create_midi_from_scale(scale, dur=0.5, prgm=0, max_channels=128, bend_sensi
     # Track channel assignments for reuse during descending
     pitch_to_channel = {}  # Maps pitch to (port, channel, voice_id)
     
-    # Play ascending (including the equave at index len(addressed))
-    for i in range(len(addressed) + 1):
-        pitch = addressed[i]
+    # Play ascending (including the equave at index len(instanced))
+    for i in range(len(instanced) + 1):
+        pitch = instanced[i]
         pitch_key = str(pitch)  # Use string representation as key
         
         # Allocate new channel for each unique pitch (microtonal support)
@@ -1968,8 +1968,8 @@ def _create_midi_from_scale(scale, dur=0.5, prgm=0, max_channels=128, bend_sensi
         current_time += dur
     
     # Play descending (reuse channels from ascending for same pitches)
-    for i in range(len(addressed) - 1, -1, -1):
-        pitch = addressed[i]
+    for i in range(len(instanced) - 1, -1, -1):
+        pitch = instanced[i]
         pitch_key = str(pitch)
         
         # Reuse channel if we have it, otherwise allocate new
@@ -2028,12 +2028,12 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, prgm=0, max_channels=128,
     if debug:
         print(f"[DEBUG] Chord: {max_concurrent} voices, {writer.num_ports} ports")
     
-    # For non-addressed chords, create addressed version with C4 root
-    if isinstance(chord, AddressedPitchCollection):
-        addressed = chord
+    # For non-instanced chords, create instanced version with C4 root
+    if isinstance(chord, InstancedPitchCollection):
+        instanced = chord
     else:
         from klotho.tonos.pitch.pitch import Pitch
-        addressed = chord.root(Pitch("C4"))
+        instanced = chord.root(Pitch("C4"))
     
     note_events = []
     voice_counter = 0
@@ -2041,8 +2041,8 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, prgm=0, max_channels=128,
     if arp:
         # Arpeggiated: each note gets dur duration
         current_time = 0.0
-        for i in range(len(addressed)):
-            pitch = addressed[i]
+        for i in range(len(instanced)):
+            pitch = instanced[i]
             voice_id = f"chord_voice_{voice_counter}"
             voice_counter += 1
             
@@ -2071,8 +2071,8 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, prgm=0, max_channels=128,
             current_time += dur
     else:
         # Block chord: all notes start at once, last for dur
-        for i in range(len(addressed)):
-            pitch = addressed[i]
+        for i in range(len(instanced)):
+            pitch = instanced[i]
             voice_id = f"chord_voice_{voice_counter}"
             voice_counter += 1
             
@@ -2131,16 +2131,16 @@ def _create_midi_from_chord_sequence(chord_sequence, dur=3.0, arp=False, prgm=0,
     voice_counter = 0
     
     for chord_idx, chord in enumerate(chord_sequence.chords):
-        if isinstance(chord, AddressedPitchCollection):
-            addressed = chord
+        if isinstance(chord, InstancedPitchCollection):
+            instanced = chord
         else:
             from klotho.tonos.pitch.pitch import Pitch
-            addressed = chord.root(Pitch("C4"))
+            instanced = chord.root(Pitch("C4"))
         
         if arp:
             chord_start_time = current_time
-            for i in range(len(addressed)):
-                pitch = addressed[i]
+            for i in range(len(instanced)):
+                pitch = instanced[i]
                 voice_id = f"chord_seq_voice_{voice_counter}"
                 voice_counter += 1
                 
@@ -2166,8 +2166,8 @@ def _create_midi_from_chord_sequence(chord_sequence, dur=3.0, arp=False, prgm=0,
                 
                 current_time += dur
         else:
-            for i in range(len(addressed)):
-                pitch = addressed[i]
+            for i in range(len(instanced)):
+                pitch = instanced[i]
                 voice_id = f"chord_seq_voice_{voice_counter}"
                 voice_counter += 1
                 

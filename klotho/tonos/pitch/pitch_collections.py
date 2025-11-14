@@ -10,7 +10,7 @@ ECC = TypeVar('ECC', bound='EquaveCyclicCollection')
 IntervalType = TypeVar('IntervalType', float, Fraction)
 IntervalList = Union[List[float], List[Fraction], List[int], List[str]]
 
-_addressed_collection_cache = {}
+_instanced_collection_cache = {}
 
 class PitchCollection(Generic[IntervalType]):
     """
@@ -265,15 +265,15 @@ class PitchCollection(Generic[IntervalType]):
         
         raise ValueError(f"Interval {value} not found in collection")
     
-    def root(self, pitch: Union[Pitch, str]) -> 'AddressedPitchCollection':
-        """Create an addressed pitch collection with the given root pitch"""
+    def root(self, pitch: Union[Pitch, str]) -> 'InstancedPitchCollection':
+        """Create an instanced pitch collection with the given root pitch"""
         if isinstance(pitch, str):
             pitch = Pitch(pitch)
             
         cache_key = (id(self), id(pitch))
-        if cache_key not in _addressed_collection_cache:
-            _addressed_collection_cache[cache_key] = AddressedPitchCollection(self, pitch)
-        return _addressed_collection_cache[cache_key]
+        if cache_key not in _instanced_collection_cache:
+            _instanced_collection_cache[cache_key] = InstancedPitchCollection(self, pitch)
+        return _instanced_collection_cache[cache_key]
     
     @classmethod
     def from_intervals(cls, intervals: IntervalList, interval_type: str = "ratios") -> PC:
@@ -499,11 +499,11 @@ class EquaveCyclicCollection(PitchCollection[IntervalType]):
         raise ValueError(f"Interval {value} not found in collection")
 
 
-class AddressedPitchCollection:
+class InstancedPitchCollection:
     """
     A pitch collection bound to a specific reference pitch.
     
-    AddressedPitchCollection wraps any PitchCollection with a reference pitch,
+    InstancedPitchCollection wraps any PitchCollection with a reference pitch,
     allowing access to actual Pitch objects rather than abstract intervals.
     This enables working with concrete frequencies and pitch names.
     
@@ -514,14 +514,14 @@ class AddressedPitchCollection:
     Examples:
         >>> from klotho.tonos import Scale, Pitch
         >>> scale = Scale(["1/1", "9/8", "5/4"])
-        >>> addressed = scale.root("C4")
-        >>> addressed[0]
+        >>> instanced = scale.root("C4")
+        >>> instanced[0]
         C4
-        >>> addressed[1] 
+        >>> instanced[1] 
         D4
         
-        >>> addressed[[0, 1, 2]]  # Returns AddressedPitchCollection
-        AddressedPitchCollection([C4, D4, E4], equave=2)
+        >>> instanced[[0, 1, 2]]  # Returns InstancedPitchCollection
+        InstancedPitchCollection([C4, D4, E4], equave=2)
     """
     
     def __init__(self, collection: PitchCollection, reference_pitch: 'Pitch'):
@@ -531,7 +531,7 @@ class AddressedPitchCollection:
     
     @property
     def reference_pitch(self) -> 'Pitch':
-        """The reference pitch for this addressed collection"""
+        """The reference pitch for this instanced collection"""
         return self._reference_pitch
     
     @property
@@ -547,10 +547,10 @@ class AddressedPitchCollection:
         else:
             return Pitch.from_freq(self._reference_pitch.freq * float(interval), partial=interval)
     
-    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'AddressedPitchCollection']:
+    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'InstancedPitchCollection']:
         if isinstance(index, slice):
             interval_collection = self._collection[index]
-            return AddressedPitchCollection(interval_collection, self._reference_pitch)
+            return InstancedPitchCollection(interval_collection, self._reference_pitch)
             
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected_pitches = [self[int(i) if not isinstance(i, int) else i] for i in index]
@@ -564,14 +564,14 @@ class AddressedPitchCollection:
             
             interval_type_mode = "cents" if self._collection.interval_type == float else "ratios"
             new_collection = PitchCollection(selected_intervals, self._collection.equave, interval_type_mode)
-            return AddressedPitchCollection(new_collection, self._reference_pitch)
+            return InstancedPitchCollection(new_collection, self._reference_pitch)
         
         if not isinstance(index, int):
             raise TypeError("Index must be an integer, slice, or sequence of integers")
         
         return self._get_pitch(index)
     
-    def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', 'AddressedPitchCollection']:
+    def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', 'InstancedPitchCollection']:
         return self[index]
     
     def __len__(self):

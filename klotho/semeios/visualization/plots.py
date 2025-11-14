@@ -10,8 +10,8 @@ from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
 from klotho.tonos.scales import Scale
 from klotho.tonos.chords import Chord
-from klotho.tonos.scales.scale import AddressedScale
-from klotho.tonos.chords.chord import AddressedChord, Sonority, AddressedSonority
+from klotho.tonos.scales.scale import InstancedScale
+from klotho.tonos.chords.chord import InstancedChord, Sonority, InstancedSonority
 
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
@@ -72,7 +72,7 @@ def plot(obj, **kwargs):
                     return _plot_cps(obj, **kwargs)
                 case _:
                     return _plot_cs(obj, **kwargs)
-        case Scale() | Chord() | AddressedScale() | AddressedChord() | Sonority() | AddressedSonority():
+        case Scale() | Chord() | InstancedScale() | InstancedChord() | Sonority() | InstancedSonority():
             return _plot_scale_chord(obj, **kwargs)
         case PartitionSet():
             return _plot_graph(obj.graph._graph, **kwargs)
@@ -2013,8 +2013,8 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
     
     n_degrees = len(degrees)
     
-    # For addressed objects, use the underlying collection for calculations
-    calc_obj = obj._collection if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)) else obj
+    # For instanced objects, use the underlying collection for calculations
+    calc_obj = obj._collection if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)) else obj
     calc_degrees = calc_obj.degrees
     
     fig = go.Figure()
@@ -2051,9 +2051,9 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
         node_x.append(x)
         node_y.append(y)
         
-        # Handle addressed vs non-addressed objects
-        if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
-            # For addressed objects, use the underlying collection for display
+        # Handle instanced vs non-instanced objects
+        if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
+            # For instanced objects, use the underlying collection for display
             calc_degree = calc_degrees[i]
             if calc_obj._interval_type_mode == "cents":
                 display_text = f"{calc_degree:.1f}¢"
@@ -2270,8 +2270,8 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
     )
     
     if title is None:
-        if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
-            obj_type = type(obj).__name__.replace('Addressed', '')
+        if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
+            obj_type = type(obj).__name__.replace('Instanced', '')
             interval_type = "cents" if calc_obj._interval_type_mode == "cents" else "ratios"
             
             # Format root pitch with note name (no octave) and cent offset
@@ -4603,7 +4603,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                 degree = degrees[i]
                 calc_degree = calc_degrees[i]
                 
-                if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
+                if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
                     note_name = degree.pitchclass
                     cents_offset = degree.cents_offset
                     cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
@@ -4696,7 +4696,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                 degree = degrees[i]
                 calc_degree = calc_degrees[i]
                 
-                if isinstance(obj, (AddressedScale, AddressedChord, AddressedSonority)):
+                if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
                     note_name = degree.pitchclass
                     cents_offset = degree.cents_offset
                     cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""

@@ -1,17 +1,17 @@
 from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union, List
-from ..pitch import EquaveCyclicCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
+from ..pitch import EquaveCyclicCollection, InstancedPitchCollection, IntervalType, _instanced_collection_cache, IntervalList, Pitch
 import numpy as np
 from ..utils.interval_normalization import equave_reduce
 from ...topos.graphs import Graph
 
 PC = TypeVar('PC', bound='Scale')
 
-class AddressedScale(AddressedPitchCollection):
+class InstancedScale(InstancedPitchCollection):
     """
     A scale bound to a specific root pitch.
     
-    AddressedScale provides access to the actual pitches of a scale when rooted
+    InstancedScale provides access to the actual pitches of a scale when rooted
     at a specific pitch, enabling work with concrete frequencies and pitch names
     rather than abstract intervals.
     
@@ -164,14 +164,14 @@ class Scale(EquaveCyclicCollection[IntervalType]):
     def __neg__(self: PC) -> PC:
         return self.__invert__()
         
-    def root(self, other: Union[Pitch, str]) -> 'AddressedScale':
+    def root(self, other: Union[Pitch, str]) -> 'InstancedScale':
         if isinstance(other, str):
             other = Pitch(other)
             
         cache_key = (id(self), id(other))
-        if cache_key not in _addressed_collection_cache:
-            _addressed_collection_cache[cache_key] = AddressedScale(self, other)
-        return _addressed_collection_cache[cache_key] 
+        if cache_key not in _instanced_collection_cache:
+            _instanced_collection_cache[cache_key] = InstancedScale(self, other)
+        return _instanced_collection_cache[cache_key] 
     
     @classmethod
     def n_edo(cls, n: int = 12, equave: float = 1200.0) -> 'Scale':

@@ -1,17 +1,17 @@
 from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union, List, Sequence
-from ..pitch import PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, IntervalType, _addressed_collection_cache, IntervalList, Pitch
+from ..pitch import PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, IntervalType, _instanced_collection_cache, IntervalList, Pitch
 from ..utils.interval_normalization import equave_reduce
 import numpy as np
 from ...topos.graphs import Graph
 
 PC = TypeVar('PC', bound='Chord')
 
-class AddressedChord(AddressedPitchCollection):
+class InstancedChord(InstancedPitchCollection):
     """
     A chord bound to a specific root pitch.
     
-    AddressedChord provides access to the actual pitches of a chord when rooted
+    InstancedChord provides access to the actual pitches of a chord when rooted
     at a specific pitch, enabling work with concrete frequencies and pitch names
     rather than abstract intervals.
     
@@ -174,12 +174,12 @@ class Chord(EquaveCyclicCollection[IntervalType]):
         return Chord(normalized_degrees, self._equave, self._interval_type_mode)
     
     @classmethod
-    def from_collection(cls, collection: Union[PitchCollection, EquaveCyclicCollection, AddressedPitchCollection]) -> 'Chord':
+    def from_collection(cls, collection: Union[PitchCollection, EquaveCyclicCollection, InstancedPitchCollection]) -> 'Chord':
         """
         Create a Chord from any pitch collection, automatically detecting interval type.
         
         Args:
-            collection: Any PitchCollection, EquaveCyclicCollection, or AddressedPitchCollection
+            collection: Any PitchCollection, EquaveCyclicCollection, or InstancedPitchCollection
             
         Returns:
             New Chord with intervals from the collection
@@ -191,7 +191,7 @@ class Chord(EquaveCyclicCollection[IntervalType]):
             >>> collection = scale[motive]
             >>> chord = Chord.from_collection(collection)
         """
-        if isinstance(collection, AddressedPitchCollection):
+        if isinstance(collection, InstancedPitchCollection):
             underlying_collection = collection._collection
         else:
             underlying_collection = collection
@@ -202,21 +202,21 @@ class Chord(EquaveCyclicCollection[IntervalType]):
         
         return cls(degrees, equave, interval_type_mode)
     
-    def root(self, other: Union[Pitch, str]) -> 'AddressedChord':
+    def root(self, other: Union[Pitch, str]) -> 'InstancedChord':
         if isinstance(other, str):
             other = Pitch(other)
             
         cache_key = (id(self), id(other))
-        if cache_key not in _addressed_collection_cache:
-            _addressed_collection_cache[cache_key] = AddressedChord(self, other)
-        return _addressed_collection_cache[cache_key] 
+        if cache_key not in _instanced_collection_cache:
+            _instanced_collection_cache[cache_key] = InstancedChord(self, other)
+        return _instanced_collection_cache[cache_key] 
 
 
-class AddressedSonority(AddressedPitchCollection):
+class InstancedSonority(InstancedPitchCollection):
     """
     A sonority bound to a specific root pitch.
     
-    AddressedSonority provides access to the actual pitches of a sonority when rooted
+    InstancedSonority provides access to the actual pitches of a sonority when rooted
     at a specific pitch, enabling work with concrete frequencies and pitch names
     rather than abstract intervals.
     
@@ -383,12 +383,12 @@ class Sonority(PitchCollection[IntervalType]):
         return Sonority(new_degrees, self._equave, self._interval_type_mode)
     
     @classmethod
-    def from_collection(cls, collection: Union[PitchCollection, EquaveCyclicCollection, AddressedPitchCollection]) -> 'Sonority':
+    def from_collection(cls, collection: Union[PitchCollection, EquaveCyclicCollection, InstancedPitchCollection]) -> 'Sonority':
         """
         Create a Sonority from any pitch collection, automatically detecting interval type.
         
         Args:
-            collection: Any PitchCollection, EquaveCyclicCollection, or AddressedPitchCollection
+            collection: Any PitchCollection, EquaveCyclicCollection, or InstancedPitchCollection
             
         Returns:
             New Sonority with intervals from the collection
@@ -400,7 +400,7 @@ class Sonority(PitchCollection[IntervalType]):
             >>> collection = scale[motive]
             >>> sonority = Sonority.from_collection(collection)
         """
-        if isinstance(collection, AddressedPitchCollection):
+        if isinstance(collection, InstancedPitchCollection):
             underlying_collection = collection._collection
         else:
             underlying_collection = collection
@@ -411,15 +411,15 @@ class Sonority(PitchCollection[IntervalType]):
         
         return cls(degrees, equave, interval_type_mode)
     
-    def root(self, other: Union[Pitch, str]) -> 'AddressedSonority':
-        """Create an addressed sonority with the given root pitch."""
+    def root(self, other: Union[Pitch, str]) -> 'InstancedSonority':
+        """Create an instanced sonority with the given root pitch."""
         if isinstance(other, str):
             other = Pitch(other)
             
         cache_key = (id(self), id(other))
-        if cache_key not in _addressed_collection_cache:
-            _addressed_collection_cache[cache_key] = AddressedSonority(self, other)
-        return _addressed_collection_cache[cache_key]
+        if cache_key not in _instanced_collection_cache:
+            _instanced_collection_cache[cache_key] = InstancedSonority(self, other)
+        return _instanced_collection_cache[cache_key]
 
 
 SC = TypeVar('SC', bound='ChordSequence')

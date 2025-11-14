@@ -16,10 +16,10 @@ from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import MidiInstrument
-from klotho.tonos.pitch.pitch_collections import PitchCollection, EquaveCyclicCollection, AddressedPitchCollection
+from klotho.tonos.pitch.pitch_collections import PitchCollection, EquaveCyclicCollection, InstancedPitchCollection
 from klotho.tonos.pitch.pitch import Pitch
-from klotho.tonos.scales.scale import Scale, AddressedScale
-from klotho.tonos.chords.chord import Chord, AddressedChord
+from klotho.tonos.scales.scale import Scale, InstancedScale
+from klotho.tonos.chords.chord import Chord, InstancedChord
 
 DEFAULT_DRUM_NOTE = 77
 PERCUSSION_CHANNEL = 9
@@ -74,12 +74,12 @@ def play_midi(obj, dur=None, arp=False, prgm=0, **kwargs):
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, or Chord
+          PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, or Chord
         The musical object to play. Different object types have different playback behaviors:
         - RhythmTree/TemporalUnit: Rhythmic playback with default pitch
-        - PitchCollection/AddressedPitchCollection: Sequential pitch playback
-        - Scale/AddressedScale: Ascending then descending playback
-        - Chord/AddressedChord: Block chord or arpeggiated playback
+        - PitchCollection/InstancedPitchCollection: Sequential pitch playback
+        - Scale/InstancedScale: Ascending then descending playback
+        - Chord/InstancedChord: Block chord or arpeggiated playback
     dur : float, optional
         Duration in seconds. Defaults depend on object type:
         - PitchCollection/Scale: 0.5 seconds per note
@@ -117,15 +117,15 @@ def _extract_events_from_object(obj, dur=None, arp=False, prgm=0):
         case RhythmTree():
             temporal_unit = TemporalUnit.from_rt(obj)
             return _extract_events_from_temporal_unit(temporal_unit)
-        case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
-            if isinstance(obj, (Scale, AddressedScale)):
+        case PitchCollection() | EquaveCyclicCollection() | InstancedPitchCollection():
+            if isinstance(obj, (Scale, InstancedScale)):
                 return _extract_events_from_scale(obj, dur=dur or 0.3, prgm=prgm)
-            elif isinstance(obj, (Chord, AddressedChord)):
+            elif isinstance(obj, (Chord, InstancedChord)):
                 return _extract_events_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm)
             else:
                 return _extract_events_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, AddressedScale, Chord, AddressedChord.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, InstancedScale, Chord, InstancedChord.")
     
 def _create_sequencer_audio(events, bpm, total_duration):
     """Create audio using FluidSynth sequencer for precise timing."""
@@ -515,17 +515,17 @@ def _reset_microtonal_counter():
 
 def _extract_events_from_pitch_collection(collection, dur=0.5, bpm=120, prgm=0):
     """Extract events from a PitchCollection (sequential playback)."""
-    if isinstance(collection, AddressedPitchCollection):
-        addressed = collection
+    if isinstance(collection, InstancedPitchCollection):
+        instanced = collection
     else:
         from klotho.tonos.pitch.pitch import Pitch
-        addressed = collection.root(Pitch("C4"))
+        instanced = collection.root(Pitch("C4"))
     
     events = []
     current_time = 0.0
     
-    for i in range(len(addressed)):
-        pitch = addressed[i]
+    for i in range(len(instanced)):
+        pitch = instanced[i]
         
         channel, midi_note, pitch_bend = _get_exact_microtonal_channel(pitch)
         
@@ -541,18 +541,18 @@ def _extract_events_from_pitch_collection(collection, dur=0.5, bpm=120, prgm=0):
 
 def _extract_events_from_scale(scale, dur=0.5, bpm=120, prgm=0):
     """Extract events from a Scale (ascending then descending)."""
-    if isinstance(scale, AddressedPitchCollection):
-        addressed = scale
+    if isinstance(scale, InstancedPitchCollection):
+        instanced = scale
     else:
         from klotho.tonos.pitch.pitch import Pitch
-        addressed = scale.root(Pitch("C4"))
+        instanced = scale.root(Pitch("C4"))
     
     events = []
     current_time = 0.0
     
-    # Play ascending (including the equave at index len(addressed))
-    for i in range(len(addressed) + 1):
-        pitch = addressed[i]
+    # Play ascending (including the equave at index len(instanced))
+    for i in range(len(instanced) + 1):
+        pitch = instanced[i]
         
         channel, midi_note, pitch_bend = _get_exact_microtonal_channel(pitch)
         
@@ -565,8 +565,8 @@ def _extract_events_from_scale(scale, dur=0.5, bpm=120, prgm=0):
         current_time += dur
     
     # Play descending (skip the equave to avoid repetition, stop at index 0)
-    for i in range(len(addressed) - 1, -1, -1):
-        pitch = addressed[i]
+    for i in range(len(instanced) - 1, -1, -1):
+        pitch = instanced[i]
         
         channel, midi_note, pitch_bend = _get_exact_microtonal_channel(pitch)
         
@@ -582,19 +582,19 @@ def _extract_events_from_scale(scale, dur=0.5, bpm=120, prgm=0):
 
 def _extract_events_from_chord(chord, dur=3.0, arp=False, bpm=120, prgm=0):
     """Extract events from a Chord (block chord or arpeggiated)."""
-    if isinstance(chord, AddressedPitchCollection):
-        addressed = chord
+    if isinstance(chord, InstancedPitchCollection):
+        instanced = chord
     else:
         from klotho.tonos.pitch.pitch import Pitch
-        addressed = chord.root(Pitch("C4"))
+        instanced = chord.root(Pitch("C4"))
     
     events = []
     
     if arp:
         # Arpeggiated: each note gets dur duration
         current_time = 0.0
-        for i in range(len(addressed)):
-            pitch = addressed[i]
+        for i in range(len(instanced)):
+            pitch = instanced[i]
             
             channel, midi_note, pitch_bend = _get_exact_microtonal_channel(pitch)
             
@@ -608,8 +608,8 @@ def _extract_events_from_chord(chord, dur=3.0, arp=False, bpm=120, prgm=0):
         total_duration = current_time
     else:
         # Block chord: all notes start at once, last for dur
-        for i in range(len(addressed)):
-            pitch = addressed[i]
+        for i in range(len(instanced)):
+            pitch = instanced[i]
             
             channel, midi_note, pitch_bend = _get_exact_microtonal_channel(pitch)
             
