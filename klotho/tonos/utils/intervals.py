@@ -16,7 +16,7 @@ __all__ = [
     'cents_to_ratio',
     'cents_to_setclass',
     'ratio_to_setclass',
-    'split_interval',
+    'split_partial',
     'harmonic_mean',
     'arithmetic_mean',
     'logarithmic_distance',
@@ -77,7 +77,7 @@ def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int =
   '''
   return cents_to_setclass(ratio_to_cents(ratio), n_tet, round_to)
 
-def split_interval(interval:Union[int, float, Fraction, str], n:int = 2):
+def split_partial(interval:Union[int, float, Fraction, str], n:int = 2):
     '''
     Find the smallest sequence of n+1 integers that form n equal subdivisions of a given interval ratio.
     
@@ -91,7 +91,7 @@ def split_interval(interval:Union[int, float, Fraction, str], n:int = 2):
         b. If d is an integer:
             - Generate sequence [k, k+d, k+2d, ..., k+nd]
             - If sequence[n]/sequence[0] equals target ratio:
-                return sequence and k
+                return harmonics and k
         c. Increment k
     
     Args:
@@ -100,23 +100,23 @@ def split_interval(interval:Union[int, float, Fraction, str], n:int = 2):
         
     Returns:
         A named tuple containing:
-            - sequence: List of n+1 integers forming the subdivisions
+            - harmonics: List of n+1 integers forming the subdivisions
             - k: The smallest starting value that produces valid subdivisions
             
     Example:
-        split_interval('3/2', 2) returns sequence [4, 5, 6] and k=4
+        split_partial('3/2', 2) returns harmonics [4, 5, 6] and k=4
         because 5/4 = 6/5 = √(3/2)
     '''
-    result = namedtuple('result', ['sequence', 'k'])
+    result = namedtuple('result', ['harmonics', 'k'])
 
     multiplier = Fraction(interval)
     k = 1
     while True:
         d = ((multiplier-1) * k) / n
         if d.denominator == 1:
-            sequence = [k + i*int(d) for i in range(n+1)]
-            if Fraction(sequence[-1], sequence[0]) == multiplier:
-                return result(sequence, k)
+            harmonics = [k + i*int(d) for i in range(n+1)]
+            if Fraction(harmonics[-1], harmonics[0]) == multiplier:
+                return result(harmonics, k)
         k += 1
 
 def harmonic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str]) -> Fraction:

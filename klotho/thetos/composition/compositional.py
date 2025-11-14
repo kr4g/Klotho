@@ -638,7 +638,8 @@ class CompositionalUnit(TemporalUnit):
         Any
             The parameter value or default
         """
-        return self._pt.get(node, key) or default
+        value = self._pt.get(node, key)
+        return value if value is not None else default
     
     def clear_parameters(self, node: int = None) -> None:
         """

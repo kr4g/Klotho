@@ -296,8 +296,6 @@ class Graph:
         
         return tuple(root_indices)
     
-
-        
     def add_node(self, **attr):
         """Add a node to the graph.
         

@@ -43,7 +43,7 @@ from .scales.scale import AddressedScale
 from .chords.chord import AddressedChord, AddressedSonority
 
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
-from .utils.intervals import split_interval, harmonic_mean, arithmetic_mean, logarithmic_distance
+from .utils.intervals import split_partial, harmonic_mean, arithmetic_mean, logarithmic_distance
 from .utils.intervals import interval_cost, n_tet, ratios_n_tet
 
 from .utils.frequency_conversion import freq_to_midicents, midicents_to_freq
@@ -93,7 +93,7 @@ __all__ = [
     'cents_to_ratio',
     'cents_to_setclass',
     'ratio_to_setclass',
-    'split_interval',
+    'split_partial',
     'harmonic_mean',
     'arithmetic_mean',
     'logarithmic_distance',

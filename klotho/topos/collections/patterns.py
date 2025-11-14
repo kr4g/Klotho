@@ -9,7 +9,7 @@ General functions for generating and transforming sequences in a topological man
 from math import prod
 
 __all__ = [
-    'permut_list',
+    'permute_list',
     'autoref',
     'autoref_rotmat',
     'iso_pairs',
@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 # Algorithm 4: PermutList
-def permut_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
+def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     '''
     Algorithm 4: PermutList with optional sign preservation
     
@@ -59,7 +59,7 @@ def autoref(*args, preserve_signs:bool=False):
     if len(lst1) != len(lst2):
         raise ValueError('The tuples must be of equal length.')
 
-    return tuple((elt, permut_list(lst2, n + 1, preserve_signs)) 
+    return tuple((elt, permute_list(lst2, n + 1, preserve_signs)) 
                  for n, elt in enumerate(lst1))
 
 # AutoRef Matrices
@@ -84,17 +84,17 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
 
     match mode.upper():
         case 'G':
-            return tuple(autoref(permut_list(lst1, i, preserve_signs), 
-                               permut_list(lst2, i, preserve_signs), 
+            return tuple(autoref(permute_list(lst1, i, preserve_signs), 
+                               permute_list(lst2, i, preserve_signs), 
                                preserve_signs=preserve_signs) 
                         for i in range(len(lst1)))
         case 'S':
-            return tuple(tuple((lst1[j], permut_list(lst2, i + j + 1, preserve_signs)) 
+            return tuple(tuple((lst1[j], permute_list(lst2, i + j + 1, preserve_signs)) 
                              for j in range(len(lst1))) 
                         for i in range(len(lst1)))
         case 'D':
             return tuple(tuple((elem, autoref(lst2, preserve_signs=preserve_signs)[j][1]) 
-                             for j, elem in enumerate(permut_list(lst1, i, preserve_signs))) 
+                             for j, elem in enumerate(permute_list(lst1, i, preserve_signs))) 
                         for i in range(len(lst1)))
         case 'C':
             return None

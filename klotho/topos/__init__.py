@@ -27,7 +27,7 @@ from . import formal_grammars
 from . import graphs
 
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
-from .collections import autoref, autoref_rotmat, permut_list
+from .collections import autoref, autoref_rotmat, permute_list
 
 from .formal_grammars import alphabets, grammars
 
@@ -39,7 +39,7 @@ __all__ = [
     'Tree', 'Graph', 'Lattice', 'Field',
     
     # Functions
-    'autoref', 'autoref_rotmat', 'permut_list',
+    'autoref', 'autoref_rotmat', 'permute_list',
     'patterns', 'sequences', 'sets',
     'alphabets', 'grammars',
     'trees',

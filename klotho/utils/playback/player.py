@@ -4,6 +4,7 @@ import threading
 from klotho.tonos import Pitch, PitchCollection, EquaveCyclicCollection, Scale, Chord, AddressedPitchCollection
 from klotho.tonos.chords.chord import AddressedChord
 from klotho.tonos.scales.scale import AddressedScale
+from klotho.tonos.systems.harmonic_trees import Spectrum
 from klotho.dynatos.dynamics import freq_amp_scale, ampdb
 from klotho.chronos.temporal_units.temporal import TemporalUnit
 
@@ -76,7 +77,7 @@ def stop():
     client.send_message("/g_deepFree", [0])
 
 def play(obj, verbose=False, **kwargs):
-    """Play a musical object (Pitch, PitchCollection, Scale, or Chord)."""
+    """Play a musical object (Pitch, PitchCollection, Scale, Chord, or Spectrum)."""
     if _sync_player.in_sync_mode:
         _sync_player.add_play(obj, verbose, **kwargs)
     else:
@@ -90,6 +91,9 @@ def _execute_play(obj, verbose=False, start_time=None, **kwargs):
     match obj:
         case Pitch():
             _play_pitch(obj, verbose, start_time)
+        
+        case Spectrum():
+            _play_spectrum(obj, verbose, start_time)
         
         case PitchCollection() | EquaveCyclicCollection() | AddressedPitchCollection():
             if isinstance(obj, (Scale, AddressedScale)):
@@ -227,6 +231,35 @@ def _play_chord(obj, verbose=False, start_time=None):
     _send_bundle(chord_start_bundle.build())
     _send_bundle(chord_release_bundle.build())
 
+def _play_spectrum(obj, verbose=False, start_time=None):
+    """Play a spectrum with all partials sounding simultaneously."""
+    if start_time is None:
+        start_time = time.time() + BUFFER_TIME
+    
+    num_partials = len(obj.data)
+    
+    max_total_amp = 0.5
+    base_amp = max_total_amp / (num_partials * 0.7)
+    
+    spectrum_start_bundle = osc_bundle_builder.OscBundleBuilder(start_time)
+    spectrum_release_bundle = osc_bundle_builder.OscBundleBuilder(start_time + 2.0)
+    
+    for i, row in obj.data.iterrows():
+        pitch = row['pitch']
+        taper_factor = 1.0 - (i / num_partials) * 0.6
+        amp = base_amp * taper_factor
+        
+        node_id = _node_id_gen.get_id(2000)
+        
+        spectrum_start_bundle.add_content(_create_synth_message("default", node_id, pitch.freq, amp))
+        spectrum_release_bundle.add_content(_create_free_message(node_id))
+        
+        if verbose:
+            print(f"Scheduling OSC: /s_new ['default', {node_id}, 0, 0, 'freq', {pitch.freq}, 'amp', {amp:.3f}] at {start_time} (partial {row['partial']}, {i+1}/{num_partials})")
+    
+    _send_bundle(spectrum_start_bundle.build())
+    _send_bundle(spectrum_release_bundle.build())
+
 def _play_temporal_unit(temporal_unit, verbose=False, start_time=None):
     """Play a TemporalUnit by scheduling each individual Chronon event."""
     if start_time is None:
@@ -307,6 +340,9 @@ def _extract_frequencies(freq_obj):
     
     if isinstance(freq_obj, Pitch):
         return [freq_obj.freq]
+    
+    if isinstance(freq_obj, Spectrum):
+        return [row['pitch'].freq for _, row in freq_obj.data.iterrows()]
     
     if isinstance(freq_obj, (PitchCollection, EquaveCyclicCollection, AddressedPitchCollection, Scale, Chord, AddressedScale, AddressedChord)):
         addressed_collection = _get_addressed_collection(freq_obj)
