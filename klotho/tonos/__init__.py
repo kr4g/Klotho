@@ -31,9 +31,9 @@ from . import pitch
 combination_product_sets = systems.combination_product_sets
 harmonic_trees = systems.harmonic_trees
 
-from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection
+from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, FreePitchCollection
 from .scales import Scale
-from .chords import Chord, Sonority, ChordSequence
+from .chords import Chord, Sonority, ChordSequence, FreeSonority
 from .motives import Motive
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
@@ -71,10 +71,12 @@ __all__ = [
     'PitchCollection', 
     'EquaveCyclicCollection',
     'InstancedPitchCollection',
+    'FreePitchCollection',
     'Scale',
     'Chord',
     'Sonority',
     'ChordSequence',
+    'FreeSonority',
     'Motive',
     'CombinationProductSet',
     'Hexany',

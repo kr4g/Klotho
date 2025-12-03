@@ -1,6 +1,6 @@
 from fractions import Fraction
 from typing import TypeVar, cast, Optional, Union, List, Sequence
-from ..pitch import PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, IntervalType, _instanced_collection_cache, IntervalList, Pitch
+from ..pitch import PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, FreePitchCollection, IntervalType, _instanced_collection_cache, IntervalList, Pitch
 from ..utils.interval_normalization import equave_reduce
 import numpy as np
 from ...topos.graphs import Graph
@@ -468,4 +468,48 @@ class ChordSequence:
     
     def __str__(self) -> str:
         return f"ChordSequence({len(self._chords)} chords)"
+
+
+class FreeSonority(FreePitchCollection):
+    """
+    A sonority of free Pitch objects without interval structure.
+    
+    FreeSonority stores Pitch objects directly without deriving them from
+    intervals and a reference pitch. Unlike FreePitchCollection which implies
+    sequential playback, FreeSonority represents simultaneous pitches (a chord).
+    
+    Args:
+        pitches: List of Pitch objects or pitch strings (e.g., "C4", "D#5")
+        
+    Examples:
+        >>> from klotho.tonos import Pitch
+        >>> fs = FreeSonority([Pitch("C4"), Pitch("E4"), Pitch("G4")])
+        >>> fs[0]
+        C4
+        >>> fs[1]
+        E4
+        
+        >>> fs = FreeSonority(["C4", "E4", "G4"])  # Also accepts strings
+        >>> len(fs)
+        3
+        
+        >>> fs[[0, 2]]  # Returns new FreeSonority
+        FreeSonority([C4, G4])
+    """
+    
+    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'FreeSonority']:
+        if isinstance(index, slice):
+            return FreeSonority(self._pitches[index])
+        
+        if hasattr(index, '__iter__') and not isinstance(index, str):
+            selected = [self._pitches[int(i) if not isinstance(i, int) else i] for i in index]
+            return FreeSonority(selected)
+        
+        if not isinstance(index, int):
+            raise TypeError("Index must be an integer, slice, or sequence of integers")
+        
+        return self._pitches[index]
+    
+    def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', 'FreeSonority']:
+        return self[index]
     

@@ -3,6 +3,7 @@ from .pitch_collections import (
     PitchCollection, 
     EquaveCyclicCollection, 
     InstancedPitchCollection,
+    FreePitchCollection,
     IntervalType,
     IntervalList,
     _instanced_collection_cache
@@ -13,6 +14,7 @@ __all__ = [
     'PitchCollection',
     'EquaveCyclicCollection', 
     'InstancedPitchCollection',
+    'FreePitchCollection',
     'IntervalType',
     'IntervalList',
     '_instanced_collection_cache'

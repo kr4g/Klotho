@@ -499,6 +499,85 @@ class EquaveCyclicCollection(PitchCollection[IntervalType]):
         raise ValueError(f"Interval {value} not found in collection")
 
 
+class FreePitchCollection:
+    """
+    A collection of free Pitch objects without interval structure.
+    
+    FreePitchCollection stores Pitch objects directly without deriving them
+    from intervals and a reference pitch. This is useful for arbitrary pitch
+    sets that don't follow a scale or chord pattern.
+    
+    Args:
+        pitches: List of Pitch objects or pitch strings (e.g., "C4", "D#5")
+        
+    Examples:
+        >>> from klotho.tonos import Pitch
+        >>> fpc = FreePitchCollection([Pitch("C4"), Pitch("E4"), Pitch("G4")])
+        >>> fpc[0]
+        C4
+        >>> fpc[1]
+        E4
+        
+        >>> fpc = FreePitchCollection(["C4", "E4", "G4"])  # Also accepts strings
+        >>> len(fpc)
+        3
+        
+        >>> fpc[[0, 2]]  # Returns new FreePitchCollection
+        FreePitchCollection([C4, G4])
+    """
+    
+    def __init__(self, pitches: List[Union['Pitch', str]]):
+        self._pitches = []
+        for p in pitches:
+            if isinstance(p, str):
+                self._pitches.append(Pitch(p))
+            elif isinstance(p, Pitch):
+                self._pitches.append(p)
+            else:
+                raise TypeError(f"Expected Pitch or str, got {type(p)}")
+    
+    @property
+    def degrees(self) -> List['Pitch']:
+        return list(self._pitches)
+    
+    @property
+    def pitches(self) -> List['Pitch']:
+        return list(self._pitches)
+    
+    def __getitem__(self, index: Union[int, slice, Sequence[int], 'np.ndarray']) -> Union['Pitch', 'FreePitchCollection']:
+        if isinstance(index, slice):
+            return FreePitchCollection(self._pitches[index])
+        
+        if hasattr(index, '__iter__') and not isinstance(index, str):
+            selected = [self._pitches[int(i) if not isinstance(i, int) else i] for i in index]
+            return FreePitchCollection(selected)
+        
+        if not isinstance(index, int):
+            raise TypeError("Index must be an integer, slice, or sequence of integers")
+        
+        return self._pitches[index]
+    
+    def __call__(self, index: Union[int, Sequence[int]]) -> Union['Pitch', 'FreePitchCollection']:
+        return self[index]
+    
+    def __len__(self):
+        return len(self._pitches)
+    
+    def __iter__(self):
+        return iter(self._pitches)
+    
+    def __repr__(self):
+        pitches = []
+        for pitch in self._pitches:
+            if abs(pitch.cents_offset) > 0.01:
+                pitches.append(f"{pitch.pitchclass}{pitch.octave} ({pitch.cents_offset:+.1f}¢)")
+            else:
+                pitches.append(f"{pitch.pitchclass}{pitch.octave}")
+        
+        pitches_str = ', '.join(pitches)
+        return f"{self.__class__.__name__}([{pitches_str}])"
+
+
 class InstancedPitchCollection:
     """
     A pitch collection bound to a specific reference pitch.

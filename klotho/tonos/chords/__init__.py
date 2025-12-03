@@ -1,1 +1,1 @@
-from .chord import Chord, InstancedChord, Sonority, InstancedSonority, ChordSequence 
+from .chord import Chord, InstancedChord, Sonority, InstancedSonority, ChordSequence, FreeSonority 
