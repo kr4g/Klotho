@@ -9,8 +9,8 @@ from . import instruments
 from . import parameters
 from . import composition
 
-from .parameters import ParameterTree, ParametricField
-from .instruments import Instrument, SynthDefInstrument, MidiInstrument, JsInstrument
+from .parameters import ParameterTree
+from .instruments import Instrument, SynthDefInstrument, MidiInstrument
 from .composition import CompositionalUnit
 from .types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
@@ -19,7 +19,6 @@ __all__ = [
     'parameters',
     'composition',
     'ParameterTree',
-    'ParametricField',
     'Instrument',
     'CompositionalUnit',
     'frequency', 

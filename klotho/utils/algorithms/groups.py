@@ -1,11 +1,10 @@
 __all__ = [
-    'Group',
     'factor_children',
     'refactor_children',
     'get_signs',
     'get_abs',
     'rotate_children',
-    'format_subdivisions',
+    'print_subdivisions',
 ]
 
 def factor_children(subdivs:tuple) -> tuple:
@@ -73,43 +72,9 @@ def rotate_children(subdivs: tuple, n: int = 1, preserve_signs: bool = False) ->
     
     return refactor_children(subdivs, tuple(signed_values))
 
-def format_subdivisions(subdivs):
+def print_subdivisions(subdivs):
     """Format nested tuple structure removing commas."""
     if isinstance(subdivs, (tuple, list)):
-        inner = ' '.join(str(format_subdivisions(x)) for x in subdivs)
+        inner = ' '.join(str(print_subdivisions(x)) for x in subdivs)
         return f"({inner})"
-    return str(subdivs)
-
-
-class Group(tuple):
-    def __new__(cls, G):
-        if isinstance(G, tuple):
-            D = G[0]
-            S = G[1]
-            
-            if isinstance(S, tuple):
-                processed_S = []
-                for item in S:
-                    if isinstance(item, tuple):
-                        processed_S.append(Group(item))
-                    else:
-                        processed_S.append(item)
-                S = tuple(processed_S)
-            
-            G = (D, S)
-        
-        return super(Group, cls).__new__(cls, G)
-    
-    @property
-    def D(self):
-        return self[0]
-    
-    @property
-    def S(self):
-        return self[1]
-    
-    def __str__(self) -> str:
-        return f"Group(({self.D} {format_subdivisions(self.S)}))"
-    
-    def __repr__(self) -> str:
-        return self.__str__()
+    return str(subdivs) 

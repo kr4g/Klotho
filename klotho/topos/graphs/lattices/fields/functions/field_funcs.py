@@ -57,6 +57,7 @@ class FieldFunction(ABC):
         '''Set parameters of the function.'''
         self.parameters.update(kwargs)
 
+# -------------------------------------------
 
 class Identity(FieldFunction):
     '''Identity function.'''

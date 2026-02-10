@@ -25,6 +25,8 @@ class ToneLattice(Lattice):
     bipolar : bool, optional
         If True, coordinates range from -resolution to +resolution. 
         If False, coordinates range from 0 to resolution (default is True).
+    periodic : bool, optional
+        Whether to use periodic boundary conditions (default is False).
     equave_reduce : bool, optional
         If True, ignore the 2-prime dimension for plotting and equave-reduce all ratios.
         If False, include all prime dimensions (default is True).
@@ -34,7 +36,7 @@ class ToneLattice(Lattice):
                  dimensionality: int = 2, 
                  resolution: Union[int, List[int]] = 10, 
                  bipolar: bool = True,
-                #  periodic: bool = False,
+                 periodic: bool = False,
                  equave_reduce: bool = True,
                  equave: Union[int, float, Fraction, str] = 2):
         
@@ -45,7 +47,7 @@ class ToneLattice(Lattice):
             dimensionality=dimensionality,
             resolution=resolution,
             bipolar=bipolar,
-            periodic=False
+            periodic=periodic
         )
         
         if equave_reduce:
@@ -71,7 +73,9 @@ class ToneLattice(Lattice):
             interval /= equave
         
         return interval
-        
+    
+
+    
     def _populate_ratio_data(self):
         """Populate nodes with ratio data based on their coordinates."""
         if not self._is_lazy:
@@ -162,7 +166,9 @@ class ToneLattice(Lattice):
         if coord in self:
             return coord
         return None
-        
+    
+
+    
     @property
     def primes(self) -> List[int]:
         """List of prime numbers used in this lattice."""

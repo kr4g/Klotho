@@ -1,14 +1,14 @@
 from typing import Callable, Union, List, Tuple, Optional
 import numpy as np
 import pandas as pd
-from klotho.topos.graphs.lattices import Lattice
+from ..lattices import Lattice
 
 
-class ParametricField(Lattice):
+class Field(Lattice):
     """
-    A parametric field is a lattice with a function evaluated at each coordinate.
+    A field is a lattice with a function evaluated at each coordinate.
     
-    Parametric fields inherit all lattice functionality while providing field-specific
+    Fields inherit all lattice functionality while providing field-specific
     methods for function evaluation and field manipulation. The function is
     evaluated lazily as coordinates are materialized in the lattice.
     
@@ -293,9 +293,9 @@ class ParametricField(Lattice):
     @classmethod
     def from_lattice(cls, lattice: Lattice, 
                      function: Callable[[np.ndarray], np.ndarray],
-                     ranges: Optional[Union[Tuple[float, float], List[Tuple[float, float]]]] = None) -> 'ParametricField':
+                     ranges: Optional[Union[Tuple[float, float], List[Tuple[float, float]]]] = None) -> 'Field':
         """
-        Create a ParametricField from an existing Lattice.
+        Create a Field from an existing Lattice.
         
         Parameters
         ----------
@@ -308,8 +308,8 @@ class ParametricField(Lattice):
             
         Returns
         -------
-        ParametricField
-            A new ParametricField instance with the same structure.
+        Field
+            A new Field instance with the same structure.
         """
         field = cls.__new__(cls)
         
@@ -353,7 +353,7 @@ class ParametricField(Lattice):
         else:
             coord_count = str(len(self.coords))
         
-        return (f"ParametricField(dimensionality={self._dimensionality}, "
+        return (f"Field(dimensionality={self._dimensionality}, "
                 f"resolution={self._resolution}, "
                 f"bipolar={self._bipolar}, "
                 f"coordinates={coord_count})")

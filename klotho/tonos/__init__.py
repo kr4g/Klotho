@@ -25,28 +25,22 @@ from . import utils
 from . import systems
 from . import scales
 from . import chords
+from . import motives
 from . import pitch
 
 combination_product_sets = systems.combination_product_sets
 harmonic_trees = systems.harmonic_trees
 
-from .pitch import (
-    Pitch,
-    PitchCollection,
-    PitchCollectionBase,
-    RelativePitchCollection,
-    AbsolutePitchCollection,
-    RootedPitchCollection,
-)
+from .pitch import Pitch, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, FreePitchCollection
 from .scales import Scale
-from .scales.scale import InstancedScale
-from .chords import Chord, Voicing, Sonority, ChordSequence, FreeSonority
-from .chords.chord import InstancedChord, InstancedVoicing
-from .pitch import Contour
+from .chords import Chord, Sonority, ChordSequence, FreeSonority
+from .motives import Motive
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
 from .systems.tone_lattices import ToneLattice
+from .scales.scale import InstancedScale
+from .chords.chord import InstancedChord, InstancedSonority
 
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
 from .utils.intervals import split_partial, harmonic_mean, arithmetic_mean, logarithmic_distance
@@ -67,33 +61,23 @@ __all__ = [
     'systems',
     'scales',
     'chords',
+    'motives',
     'pitch',
     'combination_product_sets',
     'harmonic_trees',
     
-    # Pitch Collection Classes
+    # Classes
     'Pitch',
-    'PitchCollection',
-    'PitchCollectionBase',
-    'RelativePitchCollection',
-    'AbsolutePitchCollection',
-    'RootedPitchCollection',
+    'PitchCollection', 
+    'EquaveCyclicCollection',
+    'InstancedPitchCollection',
+    'FreePitchCollection',
     'Scale',
     'Chord',
-    'Voicing',
     'Sonority',
-    'FreeSonority',
-    
-    # Sequences
     'ChordSequence',
-    
-    # Instanced Pitch Collection Classes
-    'InstancedScale',
-    'InstancedChord',
-    'InstancedVoicing',
-    
-    # Other Classes
-    'Contour',
+    'FreeSonority',
+    'Motive',
     'CombinationProductSet',
     'Hexany',
     'Dekany',
@@ -102,6 +86,9 @@ __all__ = [
     'HarmonicTree',
     'Spectrum',
     'ToneLattice',
+    'InstancedScale',
+    'InstancedChord',
+    'InstancedSonority',
     
     # Interval utilities
     'ratio_to_cents',

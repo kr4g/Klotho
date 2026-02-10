@@ -1,7 +1,7 @@
 from ..graphs import Graph
 import rustworkx as rx
 from functools import cached_property, lru_cache
-from .group import Group
+from klotho.utils.data_structures import Group
 import copy
 
 
@@ -322,8 +322,10 @@ class Tree(Graph):
             
             structure = build_group_structure(node)
             if isinstance(structure, tuple) and len(structure) > 1:
+                from klotho.utils.data_structures import Group
                 new_tree._list = Group(structure)
             else:
+                from klotho.utils.data_structures import Group  
                 new_tree._list = Group((structure, tuple()))
         
         if renumber:

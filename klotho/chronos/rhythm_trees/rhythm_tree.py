@@ -19,7 +19,9 @@ from fractions import Fraction
 from typing import Union, Tuple
 from tabulate import tabulate
 
-from klotho.topos.graphs import Tree, Group, format_subdivisions
+from klotho.topos.graphs import Tree
+from klotho.utils.algorithms.groups import print_subdivisions
+from klotho.utils.data_structures import Group
 from .meas import Meas
 from .algorithms import sum_proportions, measure_complexity, ratios_to_subdivs
 from ..utils.beat import calc_onsets
@@ -172,7 +174,7 @@ class RhythmTree(Tree):
         
         content = [
             meta_str,
-            f"Subdivs: {format_subdivisions(self.subdivisions)}",
+            f"Subdivs: {print_subdivisions(self.subdivisions)}",
             onsets_line,
             durations_line
         ]
@@ -307,7 +309,7 @@ class RhythmTree(Tree):
         return len(self.durations)
 
     def __str__(self):
-        return f"RhythmTree(span={self.span}, meas={self.meas}, subdivisions={format_subdivisions(self.subdivisions)})"
+        return f"RhythmTree(span={self.span}, meas={self.meas}, subdivisions={print_subdivisions(self.subdivisions)})"
 
     def __repr__(self):
         return self.__str__()

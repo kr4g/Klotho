@@ -1,7 +1,7 @@
 from klotho.topos.graphs import Graph, Tree
 from klotho.topos.collections.sets import CombinationSet, PartitionSet
 from klotho.topos.graphs.lattices import Lattice
-from klotho.thetos.parameters.parametric_fields import ParametricField
+from klotho.topos.graphs.lattices.fields import Field
 
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
@@ -9,7 +9,9 @@ from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUn
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
 from klotho.tonos.scales import Scale
-from klotho.tonos.chords import Chord, Voicing
+from klotho.tonos.chords import Chord
+from klotho.tonos.scales.scale import InstancedScale
+from klotho.tonos.chords.chord import InstancedChord, Sonority, InstancedSonority
 
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
@@ -58,7 +60,7 @@ def plot(obj, **kwargs):
                             return _plot_parameter_tree(obj, **kwargs)
                         case _:
                             return _plot_tree(obj, **kwargs)
-                case ParametricField():
+                case Field():
                     return _plot_field(obj, **kwargs)
                 case Lattice():
                     return _plot_lattice(obj, **kwargs)
@@ -70,7 +72,7 @@ def plot(obj, **kwargs):
                     return _plot_cps(obj, **kwargs)
                 case _:
                     return _plot_cs(obj, **kwargs)
-        case Scale() | Chord() | Voicing():
+        case Scale() | Chord() | InstancedScale() | InstancedChord() | Sonority() | InstancedSonority():
             return _plot_scale_chord(obj, **kwargs)
         case PartitionSet():
             return _plot_graph(obj.graph._graph, **kwargs)
@@ -2005,18 +2007,15 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
     Returns:
         Plotly figure object that can be displayed or further customized
     """
-    if obj.is_relative:
-        calc_degrees = list(obj._degrees)
-    else:
-        calc_degrees = list(obj._pitches)
-    
-    if not calc_degrees:
+    degrees = obj.degrees
+    if not degrees:
         raise ValueError(f"{type(obj).__name__} has no degrees to plot")
     
-    n_degrees = len(calc_degrees)
+    n_degrees = len(degrees)
     
-    degrees = obj.degrees
-    calc_obj = obj
+    # For instanced objects, use the underlying collection for calculations
+    calc_obj = obj._collection if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)) else obj
+    calc_degrees = calc_obj.degrees
     
     fig = go.Figure()
     
@@ -2052,24 +2051,28 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
         node_x.append(x)
         node_y.append(y)
         
-        if obj.is_instanced:
+        # Handle instanced vs non-instanced objects
+        if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
+            # For instanced objects, use the underlying collection for display
             calc_degree = calc_degrees[i]
-            if obj._interval_type_mode == "cents":
+            if calc_obj._interval_type_mode == "cents":
                 display_text = f"{calc_degree:.1f}¢"
                 base_hover = f"{calc_degree:.1f} cents"
             else:
                 display_text = f"{calc_degree}"
                 base_hover = f"{calc_degree}"
             
+            # Extract note name (no octave) and cent offset from pitch object
             note_name = degree.pitchclass
             cents_offset = degree.cents_offset
             
+            # Format cent offset if significant
             cent_info = ""
             if abs(cents_offset) > 0.01:
                 cent_info = f" ({cents_offset:+.2f}¢)"
             
             hover_info = f"Node {i}<br>{base_hover}<br>{note_name}{cent_info}"
-        elif obj._interval_type_mode == "cents":
+        elif calc_obj._interval_type_mode == "cents":
             display_text = f"{degree:.1f}¢"
             hover_info = f"Node {i}<br>{degree:.1f} cents"
         else:
@@ -2267,10 +2270,11 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
     )
     
     if title is None:
-        if obj.is_instanced:
-            obj_type = type(obj).__name__
-            interval_type = "cents" if obj._interval_type_mode == "cents" else "ratios"
+        if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
+            obj_type = type(obj).__name__.replace('Instanced', '')
+            interval_type = "cents" if calc_obj._interval_type_mode == "cents" else "ratios"
             
+            # Format root pitch with note name (no octave) and cent offset
             root_pitch = obj.reference_pitch
             root_note = root_pitch.pitchclass
             if abs(root_pitch.cents_offset) > 0.01:
@@ -2423,22 +2427,26 @@ def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(
         plt.show()
 
 def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True,
-                  show_grid: bool = True, title: str = None, output_file: str = None,
-                  resolution: int = 1000):
+                  show_grid: bool = True, title: str = None, output_file: str = None):
     plt.figure(figsize=figsize)
     ax = plt.gca()
     
     ax.set_facecolor('black')
     plt.gcf().set_facecolor('black')
     
-    x = np.linspace(0, envelope.total_time, resolution)
-    y = np.array([envelope.at_time(t) for t in x])
+    x = envelope.time_points
+    y = np.array(envelope)
     
     ax.plot(x, y, color='#e6e6e6', linewidth=2.5)
     
     if show_points:
-        point_times = envelope.breakpoint_times
-        point_values = envelope.values
+        point_times = [0]
+        current_time = 0
+        for duration in envelope._times:
+            current_time += duration * envelope._time_scale
+            point_times.append(current_time)
+        
+        point_values = envelope._values
         ax.scatter(point_times, point_values, color='white', s=80, 
                   zorder=5, edgecolor='black', linewidth=2)
         
@@ -3512,7 +3520,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     return fig
 
 
-def _plot_field(field: ParametricField, figsize: tuple[float, float] = (12, 12),
+def _plot_field(field: Field, figsize: tuple[float, float] = (12, 12),
                node_size: float = 8, title: str = None, 
                output_file: str = None, 
                dim_reduction: str = None, target_dims: int = 3,
@@ -3521,10 +3529,10 @@ def _plot_field(field: ParametricField, figsize: tuple[float, float] = (12, 12),
                nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                mute_background: bool = False, colormap: str = 'coolwarm', show_colorbar: bool = False) -> go.Figure:
     """
-    Plot a ParametricField as a 2D or 3D grid visualization with node colors representing field values.
+    Plot a Field as a 2D or 3D grid visualization with node colors representing field values.
     
     Args:
-        field: ParametricField instance to visualize
+        field: Field instance to visualize
         figsize: Width and height of the output figure in inches
         node_size: Size of the nodes in the plot
         title: Title for the plot (auto-generated if None)
@@ -4595,7 +4603,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                 degree = degrees[i]
                 calc_degree = calc_degrees[i]
                 
-                if obj.is_instanced:
+                if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
                     note_name = degree.pitchclass
                     cents_offset = degree.cents_offset
                     cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
@@ -4688,7 +4696,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                 degree = degrees[i]
                 calc_degree = calc_degrees[i]
                 
-                if obj.is_instanced:
+                if isinstance(obj, (InstancedScale, InstancedChord, InstancedSonority)):
                     note_name = degree.pitchclass
                     cents_offset = degree.cents_offset
                     cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""

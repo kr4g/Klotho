@@ -6,10 +6,16 @@ provides tools for visualizing and notating musical structures.
 """
 from .notelists import *
 
+from . import animation
+from . import notation
 from . import visualization
 from . import notelists
+from . import midi
+from . import maquettes
 
 from .visualization import plots
 from .visualization.plots import *
 
-__all__ = []
+from .midi import midi as export_midi
+
+__all__ = ['export_midi']
