@@ -391,14 +391,10 @@ class CompositionalUnit(TemporalUnit):
                 
                 envelope_duration = end_time - start_time
                 scaled_envelope = Envelope(
-                    values=envelope._original_values,
-                    times=envelope._original_times,
+                    values=envelope.values,
+                    times=envelope.times,
                     curve=envelope._curve,
-                    normalize_values=envelope._normalize_values,
-                    normalize_times=envelope._normalize_times,
-                    value_scale=envelope._value_scale,
-                    time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0,
-                    resolution=envelope._resolution
+                    time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0
                 )
                 
                 envelope_id = self._next_envelope_id
@@ -511,14 +507,10 @@ class CompositionalUnit(TemporalUnit):
         envelope_duration = end_time - start_time
         
         scaled_envelope = Envelope(
-            values=envelope._original_values,
-            times=envelope._original_times,
+            values=envelope.values,
+            times=envelope.times,
             curve=envelope._curve,
-            normalize_values=envelope._normalize_values,
-            normalize_times=envelope._normalize_times,
-            value_scale=envelope._value_scale,
-            time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0,
-            resolution=envelope._resolution
+            time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0
         )
         
         envelope_id = self._next_envelope_id

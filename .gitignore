@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Archive (local backups, not for Git or PyPI)
+.archive/
+
 # Project specific
 projects/
 gui
@@ -123,3 +126,4 @@ node_modules/
 # Task files
 # tasks.json
 # tasks/ 
+.archive/

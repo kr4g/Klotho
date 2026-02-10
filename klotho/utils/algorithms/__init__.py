@@ -3,14 +3,16 @@ from .costs import *
 from .graphs import *
 from .lists import *
 from .random import *
-from .groups import *
+from .ratios import *
+from .basis import *
 
 from . import costs
 from . import factors
 from . import graphs
 from . import lists
 from . import random
-from . import groups
+from . import ratios
+from . import basis
 
 __all__ = [
     'normalize_sum',
@@ -24,10 +26,16 @@ __all__ = [
     'cost_matrix',
     'minimum_cost_path',
     'diverse_sample',
-    'factor_children',
-    'refactor_children',
-    'get_signs',
-    'get_abs',
-    'rotate_children',
-    'print_subdivisions',
+    'is_superparticular',
+    'superparticular_base',
+    'validate_primes',
+    'monzo_from_ratio',
+    'ratio_from_monzo',
+    'basis_matrix',
+    'is_unimodular',
+    'change_of_basis',
+    'prime_to_generator_coords',
+    'generator_to_prime_coords',
+    'ratio_from_prime_coords',
+    'ratio_from_generator_coords',
 ]

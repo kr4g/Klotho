@@ -89,7 +89,7 @@ class Cent(Unit):
 
 class Amplitude(Unit):
     def __init__(self, magnitude):
-        super().__init__(magnitude, 'amplitude', 'lin')
+        super().__init__(magnitude, 'amplitude', 'gain')
     
     @property
     def decibel(self):
@@ -118,7 +118,7 @@ class MetricOnset(Unit):
             magnitude = np.array(magnitude).reshape(np.asarray(magnitude).shape)
         else:
             magnitude = Fraction(magnitude)
-        super().__init__(magnitude, 'metric_onset', 'beats')
+        super().__init__(magnitude, 'metric_onset', 'note')
 
 class MetricDuration(Unit):
     def __init__(self, magnitude):
@@ -127,7 +127,7 @@ class MetricDuration(Unit):
             magnitude = np.array(magnitude).reshape(np.asarray(magnitude).shape)
         else:
             magnitude = Fraction(magnitude)
-        super().__init__(magnitude, 'metric_duration', 'beats')
+        super().__init__(magnitude, 'metric_duration', 'note')
 
 def frequency(value):
     return Frequency(value)

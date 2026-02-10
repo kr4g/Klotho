@@ -1,21 +1,21 @@
 from .pitch import Pitch
 from .pitch_collections import (
-    PitchCollection, 
-    EquaveCyclicCollection, 
-    InstancedPitchCollection,
-    FreePitchCollection,
+    AbsolutePitchCollection,
     IntervalType,
-    IntervalList,
-    _instanced_collection_cache
+    PitchCollection,
+    PitchCollectionBase,
+    RelativePitchCollection,
+    RootedPitchCollection,
 )
+from .contour import Contour
 
 __all__ = [
     'Pitch',
     'PitchCollection',
-    'EquaveCyclicCollection', 
-    'InstancedPitchCollection',
-    'FreePitchCollection',
+    'PitchCollectionBase',
+    'RelativePitchCollection',
+    'AbsolutePitchCollection',
+    'RootedPitchCollection',
     'IntervalType',
-    'IntervalList',
-    '_instanced_collection_cache'
+    'Contour',
 ] 

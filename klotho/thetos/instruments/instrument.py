@@ -1,7 +1,9 @@
 from klotho.dynatos.dynamics import Dynamic, DynamicRange
 from klotho.tonos.pitch import Pitch
 from klotho.utils.data_structures.dictionaries import SafeDict
+from klotho.thetos.instruments.presets import TONEJS_PRESETS
 from typing import List, Dict, TypeVar, Union
+import copy
 
 class Instrument():
     
@@ -45,7 +47,6 @@ class Instrument():
     
     def __repr__(self):
         return self.__str__()
-
 
 class SynthDefInstrument(Instrument):
     
@@ -123,7 +124,6 @@ class SynthDefInstrument(Instrument):
     def __str__(self):
         return f"SynthDefInstrument(name='{self._name}', pfields={dict(self._pfields)})"
 
-
 class MidiInstrument(Instrument):
     
     def __init__(self,
@@ -159,3 +159,281 @@ class MidiInstrument(Instrument):
     
     def __str__(self):
         return f"MidiInstrument(name='{self._name}', prgm={self._prgm}, is_Drum={self._is_Drum}, pfields={dict(self._pfields)})"
+
+class JsInstrument(Instrument):
+    def __init__(self,
+                 name          = 'default',
+                 tonejs_class  = 'Synth',
+                 pfields       = None
+        ):
+        if pfields is None:
+            pfields = {}
+        base_pfields = dict(pfields)
+        if 'freq' not in base_pfields:
+            base_pfields['freq'] = 440.0
+        if 'vel' in base_pfields:
+            vel = base_pfields['vel']
+        elif 'amp' in base_pfields:
+            vel = base_pfields['amp']
+        else:
+            vel = 0.6
+        base_pfields['vel'] = vel
+        base_pfields.pop('amp', None)
+        safe_pfields = SafeDict(base_pfields, aliases={'amp': 'vel'})
+        
+        super().__init__(name=name, pfields=safe_pfields)
+        self._tonejs_class = tonejs_class
+    
+    @property
+    def tonejs_class(self):
+        return self._tonejs_class
+    
+    def __str__(self):
+        return f"JsInstrument(name='{self._name}', tonejs_class='{self._tonejs_class}', pfields={dict(self._pfields)})"
+    
+    @classmethod
+    def from_preset(cls, preset_name: str, name: str = None):
+        preset = TONEJS_PRESETS[preset_name]
+        pfields = copy.deepcopy(preset['pfields'])
+        return cls(name=name or preset_name, tonejs_class=preset['tonejs_class'], pfields=pfields)
+    
+    @classmethod
+    def Harmonics(cls, name=None):
+        return cls.from_preset('Harmonics', name=name)
+    
+    @classmethod
+    def Tiny(cls, name=None):
+        return cls.from_preset('Tiny', name=name)
+    
+    @classmethod
+    def ElectricCello(cls, name=None):
+        return cls.from_preset('ElectricCello', name=name)
+    
+    @classmethod
+    def Kalimba(cls, name=None):
+        return cls.from_preset('Kalimba', name=name)
+    
+    @classmethod
+    def ThinSaws(cls, name=None):
+        return cls.from_preset('ThinSaws', name=name)
+    
+    @classmethod
+    def Bah(cls, name=None):
+        return cls.from_preset('Bah', name=name)
+    
+    @classmethod
+    def BassGuitar(cls, name=None):
+        return cls.from_preset('BassGuitar', name=name)
+    
+    @classmethod
+    def Bassy(cls, name=None):
+        return cls.from_preset('Bassy', name=name)
+    
+    @classmethod
+    def BrassCircuit(cls, name=None):
+        return cls.from_preset('BrassCircuit', name=name)
+    
+    @classmethod
+    def CoolGuy(cls, name=None):
+        return cls.from_preset('CoolGuy', name=name)
+    
+    @classmethod
+    def Pianoetta(cls, name=None):
+        return cls.from_preset('Pianoetta', name=name)
+    
+    @classmethod
+    def Pizz(cls, name=None):
+        return cls.from_preset('Pizz', name=name)
+    
+    @classmethod
+    def Gravel(cls, name=None):
+        return cls.from_preset('Gravel', name=name)
+    
+    @classmethod
+    def Slap(cls, name=None):
+        return cls.from_preset('Slap', name=name)
+    
+    @classmethod
+    def Swoosh(cls, name=None):
+        return cls.from_preset('Swoosh', name=name)
+    
+    @classmethod
+    def Train(cls, name=None):
+        return cls.from_preset('Train', name=name)
+    
+    @classmethod
+    def AlienChorus(cls, name=None):
+        return cls.from_preset('AlienChorus', name=name)
+    
+    @classmethod
+    def DelicateWindPart(cls, name=None):
+        return cls.from_preset('DelicateWindPart', name=name)
+    
+    @classmethod
+    def DropPulse(cls, name=None):
+        return cls.from_preset('DropPulse', name=name)
+    
+    @classmethod
+    def Lectric(cls, name=None):
+        return cls.from_preset('Lectric', name=name)
+    
+    @classmethod
+    def Marimba(cls, name=None):
+        return cls.from_preset('Marimba', name=name)
+    
+    @classmethod
+    def Steelpan(cls, name=None):
+        return cls.from_preset('Steelpan', name=name)
+    
+    @classmethod
+    def SuperSaw(cls, name=None):
+        return cls.from_preset('SuperSaw', name=name)
+    
+    @classmethod
+    def TreeTrunk(cls, name=None):
+        return cls.from_preset('TreeTrunk', name=name)
+
+    @classmethod
+    def Kick(cls, name=None):
+        return cls(
+            name=name or 'Kick',
+            tonejs_class='Kick',
+            pfields={
+                'freq': 52,
+                'vel': 0.9,
+                'tuneHz': 52,
+                'decay': 0.35,
+                'pitchDecay': 0.02,
+                'punch': 6,
+                'click': 0.25
+            }
+        )
+
+    @classmethod
+    def Snare(cls, name=None):
+        return cls(
+            name=name or 'Snare',
+            tonejs_class='Snare',
+            pfields={
+                'freq': 190,
+                'vel': 0.85,
+                'tuneHz': 190,
+                'decay': 0.18,
+                'snap': 0.9,
+                'body': 0.45,
+                'toneHz': 1800
+            }
+        )
+
+    @classmethod
+    def TomLow(cls, name=None):
+        return cls(
+            name=name or 'TomLow',
+            tonejs_class='TomLow',
+            pfields={
+                'freq': 110,
+                'vel': 0.75,
+                'tuneHz': 110,
+                'decay': 0.35,
+                'pitchDecay': 0.01,
+                'punch': 4
+            }
+        )
+
+    @classmethod
+    def TomMid(cls, name=None):
+        return cls(
+            name=name or 'TomMid',
+            tonejs_class='TomMid',
+            pfields={
+                'freq': 160,
+                'vel': 0.75,
+                'tuneHz': 160,
+                'decay': 0.35,
+                'pitchDecay': 0.01,
+                'punch': 4
+            }
+        )
+
+    @classmethod
+    def TomHigh(cls, name=None):
+        return cls(
+            name=name or 'TomHigh',
+            tonejs_class='TomHigh',
+            pfields={
+                'freq': 220,
+                'vel': 0.75,
+                'tuneHz': 220,
+                'decay': 0.35,
+                'pitchDecay': 0.01,
+                'punch': 4
+            }
+        )
+
+    @classmethod
+    def HatClosed(cls, name=None):
+        return cls(
+            name=name or 'HatClosed',
+            tonejs_class='HatClosed',
+            pfields={
+                'freq': 420,
+                'vel': 0.55,
+                'decay': 0.05,
+                'resonance': 5200,
+                'harmonicity': 5.1,
+                'modulationIndex': 32,
+                'frequency': 420,
+                'octaves': 1.5
+            }
+        )
+
+    @classmethod
+    def HatOpen(cls, name=None):
+        return cls(
+            name=name or 'HatOpen',
+            tonejs_class='HatOpen',
+            pfields={
+                'freq': 420,
+                'vel': 0.45,
+                'decay': 0.45,
+                'resonance': 5200,
+                'harmonicity': 5.1,
+                'modulationIndex': 32,
+                'frequency': 420,
+                'octaves': 1.5
+            }
+        )
+
+    @classmethod
+    def Crash(cls, name=None):
+        return cls(
+            name=name or 'Crash',
+            tonejs_class='Crash',
+            pfields={
+                'freq': 320,
+                'vel': 0.55,
+                'decay': 2.8,
+                'resonance': 5200,
+                'harmonicity': 3.7,
+                'modulationIndex': 18,
+                'frequency': 320,
+                'octaves': 2.2
+            }
+        )
+
+    @classmethod
+    def Ride(cls, name=None):
+        return cls(
+            name=name or 'Ride',
+            tonejs_class='Ride',
+            pfields={
+                'freq': 280,
+                'vel': 0.35,
+                'decay': 1.7,
+                'resonance': 4500,
+                'harmonicity': 4.2,
+                'modulationIndex': 12,
+                'frequency': 280,
+                'octaves': 2.0
+            }
+        )
