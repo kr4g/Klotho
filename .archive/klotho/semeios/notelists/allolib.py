@@ -6,7 +6,6 @@
 Notation and visualization tools.
 --------------------------------------------------------------------------------------
 '''
-from klotho.thetos.parameters.instruments import PFIELDS
 from klotho.utils.data_structures.dictionaries import SafeDict
 
 import numpy as np
@@ -146,73 +145,16 @@ def notelist_to_synthSeq(notelist, filepath):
       f.write('@ ' + ' '.join(map(str, row.values())) + '\n')
 
 def make_notelist(pfields: dict = {}, loop_param: str = 'max'):
-  
-  # if `pfields` is empty or incomplete, use default values
-  if not pfields:
-    pfields = getattr(PFIELDS, 'SineEnv', None).value.copy()
-  elif 'synthName' not in pfields.keys():
-    pfields['synthName'] = ['SineEnv']
-  
-  if loop_param == 'max':
-    seq_len = max(len(value) if isinstance(value, list) else 1 for value in pfields.values())
-  elif loop_param == 'min':
-    seq_len = min(len(value) if isinstance(value, list) else 1 for value in pfields.values())
-  elif loop_param in pfields.keys():
-    seq_len = len(pfields[loop_param]) if isinstance(pfields[loop_param], list) else 1
-  else:
-    seq_len = 8
-
-  pfields['start'] = 0.167 if 'start' not in pfields.keys() else pfields['start']
-  pfields['dur']   = [1.0] if 'dur' not in pfields.keys() else pfields['dur'] if isinstance(pfields['dur'], list) else [pfields['dur']]
-  pfields['dc']    = [1.0] if 'dc' not in pfields.keys() else pfields['dc'] if isinstance(pfields['dc'], list) else [pfields['dc']]
-
-  note_list = []
-  if not isinstance(pfields['synthName'], list):
-    pfields['synthName'] = [pfields['synthName']]
-  for i_syn, synthName in enumerate(pfields['synthName']):
-    start = pfields['start'][0] if isinstance(pfields['start'], list) else pfields['start']
-    for i in range(seq_len):
-      new_row = getattr(PFIELDS, synthName, None).value.copy()
-      new_row['start'] = start
-      for key in pfields.keys():
-        pfield = pfields[key] if isinstance(pfields[key], list) else [pfields[key]]
-        plen = len(pfield)
-        pidx = i % len(pfields[key]) if isinstance(pfields[key], list) else 0
-
-        if key in ['start', 'synthName']:  # ignore these keys
-          continue
-
-        if key not in new_row.keys():  # check for name variations
-          if key == 'amplitude':
-            new_row['amp'] = pfields[key][pidx]
-          if key == 'amp':
-            new_row['amplitude'] = pfields[key][pidx]          
-          if key == 'frequency':
-            new_row['freq'] = pfields[key][pidx]
-          if key == 'freq':
-            new_row['frequency'] = pfields[key][pidx]
-          continue
-        
-        # Get the pfield value
-        if key == 'dur':
-          new_row[key] = pfield[i % plen] * pfields['dc'][i % len(pfields['dc'])]  # apply duty cycle to duration
-        else:
-          new_row[key] = pfield[i % plen]  # set pfield value
-      
-      if new_row['dur'] > 0:                                       # negative durations mean rest (skip)
-        note_list.append(new_row)                                  # append new row to the notelist
-      if isinstance(pfields['start'], list):                       # if start is a list,
-        start = pfields['start'][(i + 1) % len(pfields['start'])]  # get the next start time
-      else:                                                        # otherwise,
-        start += abs(pfields['dur'][i % len(pfields['dur'])])      # increment start time by the current duration
-
-  return note_list
+  raise NotImplementedError(
+    "make_notelist() has been deprecated. "
+    "The required PFIELDS dependency has been archived."
+  )
 
 def play(pfields: dict = {}, loop_param: str = 'max', filename: str = 'play.synthSequence', inst: str = 'Integrated'):
-  notelist = make_notelist(pfields=pfields, loop_param=loop_param)
-  filepath = set_score_path(inst)
-  notelist_to_synthSeq(notelist, os.path.join(filepath, filename))
-  print(f'created "{filename}" in {filepath}...\n')
+  raise NotImplementedError(
+    "play() has been deprecated. "
+    "The required PFIELDS dependency has been archived."
+  )
 
 def make_row(rows_list: list, new_row: dict):
   '''

@@ -16,10 +16,10 @@ from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import MidiInstrument
-from klotho.tonos.pitch.pitch_collections import PitchCollection, EquaveCyclicCollection, InstancedPitchCollection
+from klotho.tonos.pitch.pitch_collections import PitchCollection
 from klotho.tonos.pitch.pitch import Pitch
-from klotho.tonos.scales.scale import Scale, InstancedScale
-from klotho.tonos.chords.chord import Chord, InstancedChord
+from klotho.tonos.scales.scale import Scale
+from klotho.tonos.chords.chord import Chord
 
 DEFAULT_DRUM_NOTE = 77
 PERCUSSION_CHANNEL = 9
@@ -74,12 +74,12 @@ def play_midi(obj, dur=None, arp=False, prgm=0, **kwargs):
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, or Chord
+          PitchCollection, Scale, or Chord
         The musical object to play. Different object types have different playback behaviors:
         - RhythmTree/TemporalUnit: Rhythmic playback with default pitch
-        - PitchCollection/InstancedPitchCollection: Sequential pitch playback
-        - Scale/InstancedScale: Ascending then descending playback
-        - Chord/InstancedChord: Block chord or arpeggiated playback
+        - PitchCollection: Sequential pitch playback
+        - Scale: Ascending then descending playback
+        - Chord: Block chord or arpeggiated playback
     dur : float, optional
         Duration in seconds. Defaults depend on object type:
         - PitchCollection/Scale: 0.5 seconds per note
@@ -117,15 +117,15 @@ def _extract_events_from_object(obj, dur=None, arp=False, prgm=0):
         case RhythmTree():
             temporal_unit = TemporalUnit.from_rt(obj)
             return _extract_events_from_temporal_unit(temporal_unit)
-        case PitchCollection() | EquaveCyclicCollection() | InstancedPitchCollection():
-            if isinstance(obj, (Scale, InstancedScale)):
+        case PitchCollection():
+            if isinstance(obj, Scale):
                 return _extract_events_from_scale(obj, dur=dur or 0.3, prgm=prgm)
-            elif isinstance(obj, (Chord, InstancedChord)):
+            elif isinstance(obj, Chord):
                 return _extract_events_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm)
             else:
                 return _extract_events_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, EquaveCyclicCollection, InstancedPitchCollection, Scale, InstancedScale, Chord, InstancedChord.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, Scale, Chord.")
     
 def _create_sequencer_audio(events, bpm, total_duration):
     """Create audio using FluidSynth sequencer for precise timing."""
@@ -515,7 +515,9 @@ def _reset_microtonal_counter():
 
 def _extract_events_from_pitch_collection(collection, dur=0.5, bpm=120, prgm=0):
     """Extract events from a PitchCollection (sequential playback)."""
-    if isinstance(collection, InstancedPitchCollection):
+    if hasattr(collection, 'is_instanced') and collection.is_instanced:
+        instanced = collection
+    elif hasattr(collection, 'is_relative') and not collection.is_relative:
         instanced = collection
     else:
         from klotho.tonos.pitch.pitch import Pitch
@@ -541,7 +543,9 @@ def _extract_events_from_pitch_collection(collection, dur=0.5, bpm=120, prgm=0):
 
 def _extract_events_from_scale(scale, dur=0.5, bpm=120, prgm=0):
     """Extract events from a Scale (ascending then descending)."""
-    if isinstance(scale, InstancedPitchCollection):
+    if hasattr(scale, 'is_instanced') and scale.is_instanced:
+        instanced = scale
+    elif hasattr(scale, 'is_relative') and not scale.is_relative:
         instanced = scale
     else:
         from klotho.tonos.pitch.pitch import Pitch
@@ -582,7 +586,9 @@ def _extract_events_from_scale(scale, dur=0.5, bpm=120, prgm=0):
 
 def _extract_events_from_chord(chord, dur=3.0, arp=False, bpm=120, prgm=0):
     """Extract events from a Chord (block chord or arpeggiated)."""
-    if isinstance(chord, InstancedPitchCollection):
+    if hasattr(chord, 'is_instanced') and chord.is_instanced:
+        instanced = chord
+    elif hasattr(chord, 'is_relative') and not chord.is_relative:
         instanced = chord
     else:
         from klotho.tonos.pitch.pitch import Pitch
