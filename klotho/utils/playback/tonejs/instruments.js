@@ -292,7 +292,7 @@ const makeMetal = (opts) => ({
       harmonicity: opts.harmonicity, modulationIndex: opts.modulationIndex,
       resonance: opts.resonance, octaves: opts.octaves
     });
-    const output = new Tone.Gain(1);
+    const output = new Tone.Gain(0.5);
     metal.connect(output);
     return { metal, output };
   },

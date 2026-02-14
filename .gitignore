@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Archive (local backups, not for Git or PyPI)
+.archive/
+
 # Project specific
 projects/
 gui

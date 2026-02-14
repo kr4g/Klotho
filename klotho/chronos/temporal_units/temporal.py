@@ -100,6 +100,28 @@ class TemporalUnit(metaclass=TemporalMeta):
                    beat     = beat,
                    bpm      = bpm)
     
+    _RT_QUERY_METHODS = frozenset({
+        'leaf_nodes', 'at_depth', 'subtree_leaves', 'successors',
+        'descendants', 'ancestors', 'parent', 'depth', 'depth_of',
+        'k', 'root', 'out_degree', 'topological_sort', 'branch',
+    })
+
+    @property
+    def nodes(self):
+        return self._rt.nodes
+
+    def __getattr__(self, name):
+        if name in TemporalUnit._RT_QUERY_METHODS:
+            try:
+                rt = object.__getattribute__(self, '_rt')
+            except AttributeError:
+                raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+            return getattr(rt, name)
+        raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+
+    def __dir__(self):
+        return list(super().__dir__()) + list(self._RT_QUERY_METHODS) + ['nodes']
+
     @property
     def span(self):
         """The number of measures that the TemporalUnit spans."""
@@ -237,6 +259,28 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._rt.make_rest(node)
         self._events = None
 
+    def sparsify(self, probability, node=None):
+        import numpy as _np
+        if node is None:
+            targets = list(self._rt.leaf_nodes)
+        elif isinstance(node, int):
+            targets = list(self._rt.subtree_leaves(node))
+        else:
+            seen = set()
+            targets = []
+            for n in node:
+                for leaf in self._rt.subtree_leaves(n):
+                    if leaf not in seen:
+                        seen.add(leaf)
+                        targets.append(leaf)
+
+        targets = [n for n in targets
+                   if self._rt[n].get('proportion', 1) >= 0]
+
+        for leaf in targets:
+            if _np.random.uniform() < probability:
+                self.make_rest(leaf)
+
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
         match prolatio:
             case tuple():
@@ -318,6 +362,11 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     def __repr__(self):
         return self.__str__()
+
+    def repeat(self, n):
+        uts = TemporalUnitSequence()
+        uts.extend([self] * n)
+        return uts
 
     def copy(self):
         """Create a deep copy of this TemporalUnit."""
@@ -409,14 +458,16 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
         self._set_offsets()
         
-    def append(self, ut: TemporalUnit) -> None:
+    def append(self, ut: TemporalUnit, repeat: int = 1) -> None:
         """
         Append a TemporalUnit to the end of the sequence.
         
         Args:
             ut: The TemporalUnit to append
+            repeat: Number of independent copies to append (default 1)
         """
-        self._seq.append(ut.copy())
+        for _ in range(repeat):
+            self._seq.append(ut.copy())
         self._set_offsets()
         
     def prepend(self, ut: TemporalUnit) -> None:
@@ -479,15 +530,17 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         self._seq[index] = ut.copy()
         self._set_offsets()
         
-    def extend(self, other_seq: 'TemporalUnitSequence') -> None:
+    def extend(self, other_seq, repeat: int = 1) -> None:
         """
         Extend the sequence by appending all TemporalUnits from another sequence.
         
         Args:
-            other_seq: The TemporalUnitSequence to extend from
+            other_seq: The TemporalUnitSequence or iterable of TemporalUnits to extend from
+            repeat: Number of times to repeat the extension (default 1)
         """
-        for ut in other_seq:
-            self._seq.append(ut.copy())
+        for _ in range(repeat):
+            for ut in other_seq:
+                self._seq.append(ut.copy())
         self._set_offsets()
 
     def __getitem__(self, idx: int) -> TemporalUnit:

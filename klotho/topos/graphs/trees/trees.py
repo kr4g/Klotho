@@ -1,7 +1,7 @@
 from ..graphs import Graph
 import rustworkx as rx
 from functools import cached_property, lru_cache
-from klotho.utils.data_structures import Group
+from .group import Group
 import copy
 
 
@@ -79,6 +79,39 @@ class Tree(Graph):
         
         collect_leaves(self.root)
         return tuple(leaf_nodes_list)
+
+    def subtree_leaves(self, node):
+        """Return leaf nodes of the subtree rooted at the given node, in left-right order.
+
+        Parameters
+        ----------
+        node : int
+            The root of the subtree whose leaves to return
+
+        Returns
+        -------
+        tuple
+            Leaf nodes of the subtree in left-right traversal order
+
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+
+        leaves = []
+
+        def collect_leaves(n):
+            if self.out_degree(n) == 0:
+                leaves.append(n)
+            else:
+                for child in self.successors(n):
+                    collect_leaves(child)
+
+        collect_leaves(node)
+        return tuple(leaves)
 
     def depth_of(self, node):
         """Return the depth of a node in the tree.
@@ -322,10 +355,8 @@ class Tree(Graph):
             
             structure = build_group_structure(node)
             if isinstance(structure, tuple) and len(structure) > 1:
-                from klotho.utils.data_structures import Group
                 new_tree._list = Group(structure)
             else:
-                from klotho.utils.data_structures import Group  
                 new_tree._list = Group((structure, tuple()))
         
         if renumber:

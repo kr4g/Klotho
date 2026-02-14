@@ -1,7 +1,8 @@
 from ..utils.frequency_conversion import pitchclass_to_freq, freq_to_pitchclass, freq_to_midicents, midicents_to_freq, A4_Hz, A4_MIDI
 from ..utils.harmonics import partial_to_fundamental
+from fractions import Fraction
+from typing import Union
 
-import pandas as pd
 import numpy as np
 
 class Pitch:
@@ -16,7 +17,7 @@ class Pitch:
         pitch_input: Pitch class name (e.g., "C", "F#") or pitch with octave (e.g., "C4", "Bb-1")
         octave: Octave number (default 4 for middle octave)
         cents_offset: Deviation from equal temperament in cents (default 0.0)
-        partial: Partial number for harmonic series (default 1 for fundamental)
+        partial: Partial number or frequency ratio (int, float, or Fraction). Default 1 for fundamental.
         
     Examples:
         >>> p = Pitch("C4")
@@ -36,6 +37,8 @@ class Pitch:
         'A5'
     """
     
+    __slots__ = ('_pitchclass', '_octave', '_cents_offset', '_partial', '_freq')
+    
     def __init__(self, pitch_input=None, octave=4, cents_offset=0.0, partial=1):
         if isinstance(pitch_input, str) and len(pitch_input) >= 1:
             pitchclass = ""
@@ -52,55 +55,51 @@ class Pitch:
             else:
                 octave = octave_from_str
             
-            self._data = pd.DataFrame([{
-                'pitchclass': pitchclass,
-                'octave': octave,
-                'cents_offset': cents_offset,
-                'partial': partial,
-                'freq': pitchclass_to_freq(pitchclass, octave, cents_offset)
-            }]).set_index(pd.Index(['']))
+            self._pitchclass = pitchclass
+            self._octave = octave
+            self._cents_offset = cents_offset
+            self._partial = partial
+            self._freq = pitchclass_to_freq(pitchclass, octave, cents_offset)
         else:
-            self._data = pd.DataFrame([{
-                'pitchclass': pitch_input or 'A',
-                'octave': octave,
-                'cents_offset': cents_offset,
-                'partial': partial,
-                'freq': pitchclass_to_freq(pitch_input or 'A', octave, cents_offset)
-            }]).set_index(pd.Index(['']))
+            self._pitchclass = pitch_input or 'A'
+            self._octave = octave
+            self._cents_offset = cents_offset
+            self._partial = partial
+            self._freq = pitchclass_to_freq(pitch_input or 'A', octave, cents_offset)
     
     @classmethod
-    def from_freq(cls, freq: float, partial: int = 1):
+    def from_freq(cls, freq: float, partial: Union[int, float, Fraction] = 1):
         return cls(*freq_to_pitchclass(freq), partial=partial)
     
     @classmethod
-    def from_midi(cls, midi_note: float, partial: int = 1):
+    def from_midi(cls, midi_note: float, partial: Union[int, float, Fraction] = 1):
         midicents = midi_note * 100
         return cls.from_midicent(midicents, partial)
     
     @classmethod
-    def from_midicent(cls, midicent_value: float, partial: int = 1):
+    def from_midicent(cls, midicent_value: float, partial: Union[int, float, Fraction] = 1):
         freq = midicents_to_freq(midicent_value)
         return cls.from_freq(freq, partial)
     
     @property
     def pitchclass(self):
-        return self._data['pitchclass'].iloc[0]
+        return self._pitchclass
     
     @property
     def octave(self):
-        return self._data['octave'].iloc[0]
+        return self._octave
     
     @property
     def cents_offset(self):
-        return self._data['cents_offset'].iloc[0]
+        return self._cents_offset
     
     @property
     def partial(self):
-        return self._data['partial'].iloc[0]
+        return self._partial
     
     @property
     def freq(self):
-        return self._data['freq'].iloc[0]
+        return self._freq
     
     @property
     def midicent(self):
@@ -159,6 +158,15 @@ class Pitch:
         if not isinstance(other, Pitch):
             raise TypeError("Can only calculate cents difference with another Pitch")
         return 1200 * np.log2(self.freq / other.freq)
+    
+    def with_partial(self, partial: Union[int, float, Fraction]) -> 'Pitch':
+        new_pitch = Pitch.__new__(Pitch)
+        new_pitch._pitchclass = self._pitchclass
+        new_pitch._octave = self._octave
+        new_pitch._cents_offset = self._cents_offset
+        new_pitch._partial = partial
+        new_pitch._freq = self._freq
+        return new_pitch
         
     def __repr__(self):
         return self.__str__()

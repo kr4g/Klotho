@@ -16,6 +16,7 @@ __all__ = [
     'cents_to_ratio',
     'cents_to_setclass',
     'ratio_to_setclass',
+    'fold_cents_symmetric',
     'split_partial',
     'harmonic_mean',
     'arithmetic_mean',
@@ -62,6 +63,46 @@ def cents_to_ratio(cents: float) -> str:
 
 def cents_to_setclass(cent_value: float = 0.0, n_tet: int = 12, round_to: int = 2) -> float:
    return round((cent_value / 100)  % n_tet, round_to)
+
+def fold_cents_symmetric(cents: float) -> float:
+    """
+    Fold a cents value into the range [0, 600].
+    
+    This implements interval class equivalence, treating intervals
+    and their inversions as equivalent. A minor third (~316 cents)
+    and a major sixth (~884 cents) both fold to ~316 cents.
+    
+    The folding works by:
+    1. Taking the absolute value
+    2. Reducing modulo 1200 (one octave)
+    3. If > 600, reflecting: 1200 - value
+
+    Parameters
+    ----------
+    cents : float
+        Cents value to fold.
+
+    Returns
+    -------
+    float
+        Folded cents value in range [0, 600].
+
+    Examples
+    --------
+    >>> fold_cents_symmetric(316.0)  # minor third
+    316.0
+    
+    >>> fold_cents_symmetric(884.0)  # major sixth (inversion of m3)
+    316.0
+    
+    >>> fold_cents_symmetric(702.0)  # fifth
+    498.0
+    
+    >>> fold_cents_symmetric(-316.0)  # negative minor third
+    316.0
+    """
+    c = abs(cents) % 1200.0
+    return c if c <= 600.0 else 1200.0 - c
 
 def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int = 2) -> float:
   '''

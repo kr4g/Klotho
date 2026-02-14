@@ -1,5 +1,7 @@
 from typing import Union, Optional, Any
 from fractions import Fraction
+from dataclasses import dataclass
+import inspect
 import pandas as pd
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
@@ -7,6 +9,25 @@ from klotho.chronos.temporal_units.temporal import Chronon
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
 from klotho.dynatos.envelopes import Envelope
+from klotho.topos.collections.sequences import Pattern
+
+
+@dataclass
+class PFieldContext:
+    index: int
+    total: int
+    node: int
+    is_rest: bool
+    params: dict
+
+
+def _callable_arity(fn):
+    try:
+        sig = inspect.signature(fn)
+        return len([p for p in sig.parameters.values()
+                    if p.default is inspect.Parameter.empty])
+    except (ValueError, TypeError):
+        return 0
 
 
 class Event(Chronon):
@@ -282,7 +303,7 @@ class CompositionalUnit(TemporalUnit):
         self._evaluate_envelopes()
         leaf_nodes = self._rt.leaf_nodes
         return tuple(Event(node_id, self._rt, self._pt) for node_id in leaf_nodes)
-    
+
     @property
     def pt(self) -> ParameterTree:
         """
@@ -347,90 +368,96 @@ class CompositionalUnit(TemporalUnit):
         
         return pd.DataFrame(base_data, index=range(len(self._events)))
     
-    def set_pfields(self, node: Union[int, list], endpoint: bool = True, **kwargs) -> None:
+    def _distribute_to_targets(self, targets, fields, include_rests, setter='pfields'):
+        if not include_rests:
+            targets = [n for n in targets
+                       if self._rt[n].get('proportion', 1) >= 0]
+
+        total = len(targets)
+        for i, n in enumerate(targets):
+            ctx = PFieldContext(
+                index=i,
+                total=total,
+                node=n,
+                is_rest=self._rt[n].get('proportion', 1) < 0,
+                params=(self._pt[n].active_items()
+                        if hasattr(self._pt[n], 'active_items') else {})
+            )
+            resolved = {}
+            for k, v in fields.items():
+                if callable(v):
+                    arity = _callable_arity(v)
+                    resolved[k] = v(ctx) if arity >= 1 else v()
+                elif isinstance(v, Pattern):
+                    val = next(v)
+                    if val is not None:
+                        resolved[k] = val
+            if resolved:
+                if setter == 'pfields':
+                    self._pt.set_pfields(n, **resolved)
+                else:
+                    self._pt.set_mfields(n, **resolved)
+
+    def set_pfields(self, node, include_rests=False, **kwargs) -> None:
         """
-        Set parameter field values for a specific node(s) and their descendants.
+        Set parameter field values for target node(s).
         
         Parameters
         ----------
-        node : Union[int, list]
-            The node ID(s) to set parameters for
-        endpoint : bool, default=True
-            Whether envelope spans through complete duration of final nodes (True)
-            or only to their onset times (False)
+        node : int or list/tuple/set of int
+            Target node(s). Single node: value evaluated once, set on that node,
+            PT inheritance cascades. List of nodes: value evaluated once per node.
+        include_rests : bool, default=False
+            When True, rest nodes are included during callable/Pattern distribution.
         **kwargs
-            Parameter field names and values to set (can include Envelope instances)
+            Parameter field names and values. Value types:
+            - Scalar: set directly on target node(s) (includes tuples, lists, or any non-callable/non-Pattern value)
+            - Callable: evaluated once per target node (0-arg or 1-arg with PFieldContext)
+            - Pattern: next() called once per target node
         """
-        nodes = [node] if not isinstance(node, (list, tuple, set)) else list(node)
-        
-        envelope_fields = {k: v for k, v in kwargs.items() if isinstance(v, Envelope)}
-        static_fields = {k: v for k, v in kwargs.items() if not isinstance(v, Envelope)}
-        
-        if envelope_fields and len(nodes) > 1:
-            self._validate_non_overlapping_subtrees(nodes)
-        
-        for n in nodes:
+        targets = [node] if isinstance(node, int) else list(node)
+
+        distributable_fields = {k: v for k, v in kwargs.items()
+                               if callable(v) or isinstance(v, Pattern)}
+        static_fields = {k: v for k, v in kwargs.items()
+                        if k not in distributable_fields}
+
+        for n in targets:
             if static_fields:
                 self._pt.set_pfields(n, **static_fields)
-        for n in nodes:
-            for pfield, envelope in envelope_fields.items():
-                affected_nodes = set(self._pt.descendants(n))
-                if n in self._pt.leaf_nodes:
-                    affected_nodes.add(n)
-                
-                if self._events is None:
-                    self._events = self._evaluate()
-                
-                start_time = min(self._rt[desc]['real_onset'] for desc in affected_nodes)
-                
-                if endpoint:
-                    end_time = max(self._rt[desc]['real_onset'] + abs(self._rt[desc]['real_duration']) 
-                                 for desc in affected_nodes)
-                else:
-                    end_time = max(self._rt[desc]['real_onset'] for desc in affected_nodes)
-                
-                envelope_duration = end_time - start_time
-                scaled_envelope = Envelope(
-                    values=envelope._original_values,
-                    times=envelope._original_times,
-                    curve=envelope._curve,
-                    normalize_values=envelope._normalize_values,
-                    normalize_times=envelope._normalize_times,
-                    value_scale=envelope._value_scale,
-                    time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0,
-                    resolution=envelope._resolution
-                )
-                
-                envelope_id = self._next_envelope_id
-                self._next_envelope_id += 1
-                
-                self._envelopes[envelope_id] = {
-                    'envelope': scaled_envelope,
-                    'affected_nodes': affected_nodes,
-                    'pfields': [pfield],
-                    'start_time': start_time,
-                    'duration': envelope_duration
-                }
-        
-        self._evaluate_envelopes()
 
-    def set_mfields(self, node: Union[int, list], **kwargs) -> None:
+        if distributable_fields:
+            self._distribute_to_targets(targets, distributable_fields, include_rests, setter='pfields')
+
+    def set_mfields(self, node, include_rests=False, **kwargs) -> None:
         """
-        Set meta field values for a specific node(s) and their descendants.
-        
-        Meta fields are static metadata that don't support envelope automation.
+        Set meta field values for target node(s).
         
         Parameters
         ----------
-        node : Union[int, list]
-            The node ID(s) to set meta fields for
+        node : int or list/tuple/set of int
+            Target node(s). Same scoping rules as set_pfields.
+        include_rests : bool, default=False
+            When True, rest nodes are included during callable/Pattern distribution.
         **kwargs
-            Meta field names and values to set
+            Meta field names and values. Value types:
+            - Scalar: set directly on target node(s)
+            - Callable: evaluated once per target node (0-arg or 1-arg with PFieldContext)
+            - Pattern: next() called once per target node
         """
-        nodes = [node] if not isinstance(node, (list, tuple, set)) else list(node)
-        
-        for n in nodes:
-            self._pt.set_mfields(n, **kwargs)
+        targets = [node] if isinstance(node, int) else list(node)
+
+        distributable_fields = {k: v for k, v in kwargs.items()
+                               if callable(v) or isinstance(v, Pattern)}
+        static_fields = {k: v for k, v in kwargs.items()
+                        if k not in distributable_fields}
+
+        for n in targets:
+            if static_fields:
+                self._pt.set_mfields(n, **static_fields)
+
+        if distributable_fields:
+            self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
 
     def apply_envelope(self, level: Union[int, str], range_span: Union[tuple, int, None], envelope: Envelope, pfields: Union[str, list], endpoint: bool = True) -> int:
         """
@@ -511,14 +538,10 @@ class CompositionalUnit(TemporalUnit):
         envelope_duration = end_time - start_time
         
         scaled_envelope = Envelope(
-            values=envelope._original_values,
-            times=envelope._original_times,
+            values=envelope.values,
+            times=envelope.times,
             curve=envelope._curve,
-            normalize_values=envelope._normalize_values,
-            normalize_times=envelope._normalize_times,
-            value_scale=envelope._value_scale,
-            time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0,
-            resolution=envelope._resolution
+            time_scale=envelope_duration / envelope.total_time if envelope.total_time > 0 else 1.0
         )
         
         envelope_id = self._next_envelope_id
@@ -605,21 +628,89 @@ class CompositionalUnit(TemporalUnit):
         
         return self._pt.add_slur(affected_nodes, self._rt, self._events)
     
-    def set_instrument(self, node: int, instrument: Instrument, exclude: Union[str, list, set, None] = None) -> None:
+    def set_instrument(self, node, instrument, exclude=None) -> None:
         """
-        Set an instrument for a specific node, applying its parameter fields.
+        Set an instrument for target node(s).
         
         Parameters
         ----------
-        node : int
-            The node ID to set the instrument for
-        instrument : Instrument
-            The instrument to apply
-        exclude : Union[str, list, set, None], optional
-            Parameter fields to exclude from application
+        node : int or list/tuple of int
+            Target node(s). Single node: instrument set on that node, inherits
+            to descendants. List of nodes: instrument evaluated once per node.
+        instrument : Instrument, Pattern, or callable
+            - Instrument: set directly on node (current behavior)
+            - Pattern: next() called once per target node
+            - Callable: evaluated once per target node (0-arg or 1-arg with PFieldContext)
+        exclude : str, list, set, or None, optional
+            Parameter fields to exclude from instrument application
         """
-        self._pt.set_instrument(node, instrument, exclude)
-    
+        targets = [node] if isinstance(node, int) else list(node)
+
+        if isinstance(instrument, Instrument):
+            for n in targets:
+                self._pt.set_instrument(n, instrument, exclude)
+        elif callable(instrument) or isinstance(instrument, Pattern):
+            total = len(targets)
+            for i, n in enumerate(targets):
+                if isinstance(instrument, Pattern):
+                    inst = next(instrument)
+                else:
+                    ctx = PFieldContext(
+                        index=i,
+                        total=total,
+                        node=n,
+                        is_rest=self._rt[n].get('proportion', 1) < 0,
+                        params=(self._pt[n].active_items()
+                                if hasattr(self._pt[n], 'active_items') else {})
+                    )
+                    arity = _callable_arity(instrument)
+                    inst = instrument(ctx) if arity >= 1 else instrument()
+                if inst is not None:
+                    self._pt.set_instrument(n, inst, exclude)
+
+    def set(self, node, inst=None, mfields=None, pfields=None,
+            exclude=None, include_rests=False):
+        if inst is not None:
+            self.set_instrument(node, inst, exclude=exclude)
+        if mfields is not None:
+            self.set_mfields(node, include_rests=include_rests, **mfields)
+        if pfields is not None:
+            self.set_pfields(node, include_rests=include_rests, **pfields)
+
+    def sparsify(self, probability, node=None):
+        if not callable(probability):
+            super().sparsify(probability, node)
+            return
+
+        import numpy as _np
+        if node is None:
+            targets = list(self._rt.leaf_nodes)
+        elif isinstance(node, int):
+            targets = list(self._rt.subtree_leaves(node))
+        else:
+            seen = set()
+            targets = []
+            for n in node:
+                for leaf in self._rt.subtree_leaves(n):
+                    if leaf not in seen:
+                        seen.add(leaf)
+                        targets.append(leaf)
+
+        targets = [n for n in targets
+                   if self._rt[n].get('proportion', 1) >= 0]
+
+        total = len(targets)
+        for i, leaf in enumerate(targets):
+            ctx = PFieldContext(
+                index=i, total=total, node=leaf,
+                is_rest=False,
+                params=(self._pt[leaf].active_items()
+                        if hasattr(self._pt[leaf], 'active_items')
+                        else {})
+            )
+            if probability(ctx):
+                self.make_rest(leaf)
+
     def get_parameter(self, node: int, key: str, default=None):
         """
         Get a parameter value for a specific node.

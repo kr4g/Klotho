@@ -1,1 +1,1 @@
-from .instrument import Instrument, SynthDefInstrument, MidiInstrument
+from .instrument import Instrument, SynthDefInstrument, MidiInstrument, JsInstrument
