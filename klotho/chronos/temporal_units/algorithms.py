@@ -1,6 +1,7 @@
 from typing import Union, TYPE_CHECKING
 from fractions import Fraction
 from itertools import cycle
+import copy
 from .temporal import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
 from klotho.chronos.utils import beat_duration
 from klotho.chronos.rhythm_trees.algorithms import segment
@@ -82,11 +83,9 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
                     pfields  = ut.pfields
                 )
                 
-                # Copy instrument information from the original CompositionalUnit
-                # Look for the governing instrument node for the root
-                governing_instrument_node = ut._pt.get_governing_subtree_node(ut._rt.root)
-                if governing_instrument_node is not None and governing_instrument_node in ut._pt._node_instruments:
-                    instrument = ut._pt._node_instruments[governing_instrument_node]
+                governing_instrument_node = ut._resolve_governing_instrument_node(ut._rt.root)
+                if governing_instrument_node is not None and governing_instrument_node in ut._node_instruments:
+                    instrument = ut._node_instruments[governing_instrument_node]
                     unit.set_instrument(unit._pt.root, instrument)
             else:
                 # Original behavior for TemporalUnit
@@ -146,9 +145,13 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
         )
         # Copy the parameter tree data
         new_cu._pt = ut._pt.copy()
-        # Copy envelopes
-        new_cu._envelopes = ut._envelopes.copy()
-        new_cu._next_envelope_id = ut._next_envelope_id
+        new_cu._node_instruments = ut._node_instruments.copy()
+        new_cu._instrument_exclusions = {k: v.copy() for k, v in ut._instrument_exclusions.items()}
+        new_cu._invalidate_instrument_cache()
+        new_cu._env_specs = copy.deepcopy(ut._env_specs)
+        new_cu._next_env_id = ut._next_env_id
+        new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
+        new_cu._next_slur_id = ut._next_slur_id
         return new_cu
     else:
         return TemporalUnit(
@@ -191,9 +194,13 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
         )
         # Copy the parameter tree data
         new_cu._pt = ut._pt.copy()
-        # Copy envelopes
-        new_cu._envelopes = ut._envelopes.copy()
-        new_cu._next_envelope_id = ut._next_envelope_id
+        new_cu._node_instruments = ut._node_instruments.copy()
+        new_cu._instrument_exclusions = {k: v.copy() for k, v in ut._instrument_exclusions.items()}
+        new_cu._invalidate_instrument_cache()
+        new_cu._env_specs = copy.deepcopy(ut._env_specs)
+        new_cu._next_env_id = ut._next_env_id
+        new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
+        new_cu._next_slur_id = ut._next_slur_id
         return new_cu
     else:
         return TemporalUnit(

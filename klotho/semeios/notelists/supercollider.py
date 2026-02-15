@@ -106,7 +106,7 @@ class Scheduler:
                       if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
             
             if is_slur_start:
-                instrument = uc._pt.get_active_instrument(event.node_id)
+                instrument = uc.get_active_instrument(event.node_id)
                 if instrument:
                     env_type = getattr(instrument, 'env_type', None) or ''
                     if env_type and env_type.lower() in ENV_TYPES['ungated']:
@@ -131,7 +131,7 @@ class Scheduler:
             elif slur_id is not None:
                 self.set_node(slur_uids[slur_id], start=event.start, **pfields)
                 if is_slur_end:
-                    instrument = uc._pt.get_active_instrument(event.node_id)
+                    instrument = uc.get_active_instrument(event.node_id)
                     if instrument and hasattr(instrument, 'env_type'):
                         env_type = getattr(instrument, 'env_type', '') or ''
                         if env_type.lower() in ENV_TYPES['gated']:
@@ -143,7 +143,9 @@ class Scheduler:
                     group=event_group,
                     **pfields
                 )
-                if getattr(uc._pt.get_active_instrument(event.node_id), 'env_type').lower() in ENV_TYPES['gated']:
+                instrument = uc.get_active_instrument(event.node_id)
+                env_type = getattr(instrument, 'env_type', '') if instrument is not None else ''
+                if env_type.lower() in ENV_TYPES['gated']:
                     self.release_node(uid, start=event.end)
             
     def synth_groups(self, groups):

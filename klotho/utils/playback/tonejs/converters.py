@@ -101,7 +101,7 @@ def compositional_unit_to_events(obj):
     for event in obj:
         if event.is_rest:
             continue
-        instrument = event._pt.get_active_instrument(event.node_id)
+        instrument = obj.get_active_instrument(event.node_id)
         if not isinstance(instrument, JsInstrument):
             continue
 
