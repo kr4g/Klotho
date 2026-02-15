@@ -7,7 +7,7 @@ import copy
 
 class Tree(Graph):
     def __init__(self, root, children:tuple):
-        super().__init__(Graph.digraph()._graph)
+        super().__init__(directed=True)
         self._building_tree = True
         self._root = self._build_tree(root, children)
         self._building_tree = False
@@ -791,7 +791,7 @@ class Tree(Graph):
         if isinstance(G, Graph):
             graph = G
         else:
-            graph = Graph(G)
+            graph = Graph.from_rustworkx(G)
         
         if not hasattr(graph._graph, 'in_degree'):
             raise TypeError("Tree graphs must be directed")

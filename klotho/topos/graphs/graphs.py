@@ -8,25 +8,11 @@ T = TypeVar('T')
 
 
 class Graph:
-    def __init__(self, graph: Union[rx.PyGraph, rx.PyDiGraph, 'Graph', None] = None):
-        """Initialize a Graph with optional existing graph data.
-        
-        Args:
-            graph: Optional existing graph to copy from (RustworkX graph, Graph instance, or None)
-        """
+    def __init__(self, directed: bool = False):
+        """Initialize an empty Klotho graph."""
         self._meta = {}
         self._structure_version = 0
-        
-        if graph is None:
-            self._graph = rx.PyGraph()
-        elif isinstance(graph, Graph):
-            self._graph = graph._graph.copy()
-            self._meta = copy.deepcopy(graph._meta)
-            self._structure_version = 0
-        elif isinstance(graph, (rx.PyGraph, rx.PyDiGraph)):
-            self._graph = graph.copy()
-        else:
-            raise TypeError(f"Unsupported graph type: {type(graph)}")   
+        self._graph = rx.PyDiGraph() if directed else rx.PyGraph()
         
     @property
     def nodes(self):
@@ -111,13 +97,267 @@ class Graph:
         Subclasses can override this for different node representations.
         """
         return node
-    
+
+    @classmethod
+    def directed(cls):
+        """Create an empty directed graph."""
+        return cls(directed=True)
+
     @classmethod
     def digraph(cls):
-        """Create a new directed graph instance."""
-        graph = cls()
-        graph._graph = rx.PyDiGraph()
+        """Alias for directed graph creation."""
+        return cls.directed()
+
+    @classmethod
+    def from_rustworkx(cls, graph: Union[rx.PyGraph, rx.PyDiGraph], copy_graph: bool = True):
+        """Create a Graph from an existing RustworkX graph."""
+        if not isinstance(graph, (rx.PyGraph, rx.PyDiGraph)):
+            raise TypeError(f"Expected rustworkx graph, got: {type(graph)}")
+
+        new_graph = cls.__new__(cls)
+        new_graph._graph = graph.copy() if copy_graph else graph
+        new_graph._meta = {}
+        new_graph._structure_version = 0
+        return new_graph
+
+    @classmethod
+    def from_networkx(cls, graph, copy_graph: bool = True):
+        """Create a Graph from a NetworkX graph."""
+        import networkx as nx
+
+        if not isinstance(graph, (nx.Graph, nx.DiGraph)):
+            raise TypeError(f"Expected networkx.Graph or networkx.DiGraph, got: {type(graph)}")
+
+        nx_graph = graph.copy() if copy_graph else graph
+        directed = nx_graph.is_directed()
+        new_graph = cls(directed=directed)
+
+        node_index_map = {}
+        for node, attrs in nx_graph.nodes(data=True):
+            node_attrs = dict(attrs) if isinstance(attrs, dict) else {}
+            node_index_map[node] = new_graph._graph.add_node(node_attrs)
+
+        for u, v, attrs in nx_graph.edges(data=True):
+            edge_attrs = dict(attrs) if isinstance(attrs, dict) else {}
+            new_graph._graph.add_edge(node_index_map[u], node_index_map[v], edge_attrs)
+
+        return new_graph
+
+    @classmethod
+    def from_nodes_edges(
+        cls,
+        nodes: Optional[List[Any]] = None,
+        edges: Optional[List[Tuple[Any, ...]]] = None,
+        directed: bool = False,
+        node_mode: str = 'label',
+        node_key: str = 'label',
+    ):
+        """Create a graph from node and edge iterables."""
+        graph = cls(directed=directed)
+        node_lookup: Dict[Any, int] = {}
+
+        if node_mode not in {'label', 'id'}:
+            raise ValueError("node_mode must be 'label' or 'id'")
+
+        def ensure_node(node_value, attrs=None):
+            attrs = dict(attrs) if isinstance(attrs, dict) else {}
+            if node_mode == 'id':
+                if not isinstance(node_value, int):
+                    raise TypeError("node_mode='id' requires integer node values")
+                while graph.number_of_nodes() <= node_value:
+                    graph.add_node()
+                graph.set_node_data(node_value, **attrs)
+                return node_value
+
+            if node_value in node_lookup:
+                node_id = node_lookup[node_value]
+                if attrs:
+                    graph.set_node_data(node_id, **attrs)
+                return node_id
+
+            node_attrs = {node_key: node_value}
+            node_attrs.update(attrs)
+            node_id = graph.add_node(**node_attrs)
+            node_lookup[node_value] = node_id
+            return node_id
+
+        if nodes:
+            for node_entry in nodes:
+                if isinstance(node_entry, tuple) and len(node_entry) == 2 and isinstance(node_entry[1], dict):
+                    ensure_node(node_entry[0], node_entry[1])
+                else:
+                    ensure_node(node_entry)
+
+        if edges:
+            for edge in edges:
+                if len(edge) == 2:
+                    u_label, v_label = edge
+                    edge_attrs = {}
+                elif len(edge) == 3:
+                    u_label, v_label, edge_attrs = edge
+                    edge_attrs = dict(edge_attrs) if isinstance(edge_attrs, dict) else {}
+                else:
+                    raise ValueError("Edges must be (u, v) or (u, v, attrs)")
+
+                u = ensure_node(u_label)
+                v = ensure_node(v_label)
+                graph.add_edge(u, v, **edge_attrs)
+
         return graph
+
+    @classmethod
+    def from_edges(
+        cls,
+        edges: List[Tuple[Any, ...]],
+        directed: bool = False,
+        node_mode: str = 'label',
+        node_key: str = 'label',
+    ):
+        """Create a graph from an edge list."""
+        return cls.from_nodes_edges(
+            nodes=None,
+            edges=edges,
+            directed=directed,
+            node_mode=node_mode,
+            node_key=node_key,
+        )
+
+    @classmethod
+    def empty_graph(
+        cls,
+        n_nodes: int = 0,
+        labels: Optional[List[Any]] = None,
+        directed: bool = False,
+        node_key: str = 'label',
+    ):
+        """Create an empty graph with optional labeled nodes."""
+        if n_nodes < 0:
+            raise ValueError("n_nodes must be >= 0")
+        resolved_labels = cls._resolve_labels(n_nodes, labels)
+        return cls.from_nodes_edges(
+            nodes=[(label, {node_key: label}) for label in resolved_labels],
+            edges=[],
+            directed=directed,
+            node_mode='label',
+            node_key=node_key,
+        )
+
+    @classmethod
+    def path_graph(
+        cls,
+        n_nodes: int,
+        labels: Optional[List[Any]] = None,
+        directed: bool = False,
+        node_key: str = 'label',
+    ):
+        """Create a path graph with optional labels."""
+        if n_nodes < 0:
+            raise ValueError("n_nodes must be >= 0")
+        resolved_labels = cls._resolve_labels(n_nodes, labels)
+        edges = [(resolved_labels[i], resolved_labels[i + 1]) for i in range(max(0, n_nodes - 1))]
+        return cls.from_nodes_edges(
+            nodes=[(label, {node_key: label}) for label in resolved_labels],
+            edges=edges,
+            directed=directed,
+            node_mode='label',
+            node_key=node_key,
+        )
+
+    @classmethod
+    def cycle_graph(
+        cls,
+        n_nodes: int,
+        labels: Optional[List[Any]] = None,
+        directed: bool = False,
+        node_key: str = 'label',
+    ):
+        """Create a cycle graph with optional labels."""
+        if n_nodes < 0:
+            raise ValueError("n_nodes must be >= 0")
+        resolved_labels = cls._resolve_labels(n_nodes, labels)
+        edges = [(resolved_labels[i], resolved_labels[i + 1]) for i in range(max(0, n_nodes - 1))]
+        if n_nodes > 2:
+            edges.append((resolved_labels[-1], resolved_labels[0]))
+        return cls.from_nodes_edges(
+            nodes=[(label, {node_key: label}) for label in resolved_labels],
+            edges=edges,
+            directed=directed,
+            node_mode='label',
+            node_key=node_key,
+        )
+
+    @classmethod
+    def star_graph(
+        cls,
+        n_nodes: int,
+        center: int = 0,
+        labels: Optional[List[Any]] = None,
+        directed: bool = False,
+        node_key: str = 'label',
+    ):
+        """Create a star graph with optional labels."""
+        if n_nodes < 0:
+            raise ValueError("n_nodes must be >= 0")
+        if n_nodes == 0:
+            return cls.empty_graph(0, directed=directed, node_key=node_key)
+        if center < 0 or center >= n_nodes:
+            raise ValueError("center must be a valid node index")
+        resolved_labels = cls._resolve_labels(n_nodes, labels)
+        center_label = resolved_labels[center]
+        edges = [(center_label, resolved_labels[i]) for i in range(n_nodes) if i != center]
+        return cls.from_nodes_edges(
+            nodes=[(label, {node_key: label}) for label in resolved_labels],
+            edges=edges,
+            directed=directed,
+            node_mode='label',
+            node_key=node_key,
+        )
+
+    @classmethod
+    def random_graph(
+        cls,
+        n_nodes: int,
+        p: float = 0.3,
+        labels: Optional[List[Any]] = None,
+        directed: bool = False,
+        seed: Optional[int] = None,
+        node_key: str = 'label',
+    ):
+        """Create a random Erdos-Renyi style graph with optional labels."""
+        if n_nodes < 0:
+            raise ValueError("n_nodes must be >= 0")
+        if p < 0 or p > 1:
+            raise ValueError("p must be between 0 and 1")
+        resolved_labels = cls._resolve_labels(n_nodes, labels)
+        rng = np.random.default_rng(seed)
+        edges: List[Tuple[Any, Any]] = []
+        if directed:
+            for i in range(n_nodes):
+                for j in range(n_nodes):
+                    if i == j:
+                        continue
+                    if rng.random() < p:
+                        edges.append((resolved_labels[i], resolved_labels[j]))
+        else:
+            for i in range(n_nodes):
+                for j in range(i + 1, n_nodes):
+                    if rng.random() < p:
+                        edges.append((resolved_labels[i], resolved_labels[j]))
+        return cls.from_nodes_edges(
+            nodes=[(label, {node_key: label}) for label in resolved_labels],
+            edges=edges,
+            directed=directed,
+            node_mode='label',
+            node_key=node_key,
+        )
+
+    @staticmethod
+    def _resolve_labels(n_nodes: int, labels: Optional[List[Any]] = None) -> List[Any]:
+        if labels is None:
+            return list(range(n_nodes))
+        if len(labels) != n_nodes:
+            raise ValueError(f"Expected {n_nodes} labels, got {len(labels)}")
+        return list(labels)
     
     def neighbors(self, node):
         """Get neighbors of a node"""
@@ -468,7 +708,13 @@ class Graph:
         Returns:
             Graph: A new Graph instance
         """
-        return cls(G)
+        if isinstance(G, Graph):
+            new_graph = cls.from_rustworkx(G._graph)
+            new_graph._meta = copy.deepcopy(G._meta)
+            return new_graph
+        if isinstance(G, (rx.PyGraph, rx.PyDiGraph)):
+            return cls.from_rustworkx(G)
+        raise TypeError(f"Unsupported graph type: {type(G)}")
     
     @classmethod
     def grid_graph(cls, dims, periodic=False):
@@ -552,10 +798,10 @@ class Graph:
             if edge_list:
                 rx_graph.extend_from_edge_list(edge_list)
         
-        return cls(rx_graph)
+        return cls.from_rustworkx(rx_graph)
     
     @classmethod
-    def complete_graph(cls, n_nodes):
+    def complete_graph(cls, n_nodes, labels: Optional[List[Any]] = None, directed: bool = False, node_key: str = 'label'):
         """Create a complete graph.
         
         Args:
@@ -564,32 +810,26 @@ class Graph:
         Returns:
             Graph: A new Graph instance with complete structure
         """
-        rx_graph = rx.generators.complete_graph(n_nodes)
-        graph = cls(rx_graph)
-        
-        for node in range(n_nodes):
-            if not isinstance(graph._graph.get_node_data(node), dict):
-                graph._graph.remove_node(node)
-                graph._graph.add_node({})
-                
-        for i in range(n_nodes):
-            for j in range(i + 1, n_nodes):
-                graph._graph.add_edge(i, j, {})
-        
-        return graph
-    
-    @classmethod
-    def digraph(cls):
-        """Create a directed graph.
-        
-        Returns:
-            Graph: A new Graph instance with directed structure
-        """
-        new_graph = cls.__new__(cls)
-        new_graph._graph = rx.PyDiGraph()
-        new_graph._meta = {}
-        new_graph._structure_version = 0
-        return new_graph
+        if n_nodes < 0:
+            raise ValueError("n_nodes must be >= 0")
+        resolved_labels = cls._resolve_labels(n_nodes, labels)
+        edges: List[Tuple[Any, Any]] = []
+        if directed:
+            for i in range(n_nodes):
+                for j in range(n_nodes):
+                    if i != j:
+                        edges.append((resolved_labels[i], resolved_labels[j]))
+        else:
+            for i in range(n_nodes):
+                for j in range(i + 1, n_nodes):
+                    edges.append((resolved_labels[i], resolved_labels[j]))
+        return cls.from_nodes_edges(
+            nodes=[(label, {node_key: label}) for label in resolved_labels],
+            edges=edges,
+            directed=directed,
+            node_mode='label',
+            node_key=node_key,
+        )
     
     @classmethod
     def from_cost_matrix(cls, cost_matrix: np.ndarray, items: List[T]):

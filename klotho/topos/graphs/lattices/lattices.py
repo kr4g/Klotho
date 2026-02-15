@@ -59,7 +59,8 @@ class Lattice(Graph):
             self._seed_initial_coords()
         else:
             lattice_graph = Graph.grid_graph(self._dims, periodic=periodic)
-            super().__init__(lattice_graph)
+            super().__init__()
+            self._graph = lattice_graph._graph.copy()
             self._is_lazy = False
             self._build_coordinate_mapping()
         

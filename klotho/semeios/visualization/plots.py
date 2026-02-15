@@ -1052,10 +1052,22 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                 colors.append('#808080')
         
         return widths, colors
+
+    def get_edge_rad(u, v):
+        if not is_directed:
+            return 0.0
+        if u == v:
+            return 0.24
+        if G.has_edge(v, u):
+            pair_key = tuple(sorted((repr(u), repr(v))))
+            pair_sign = 1 if (sum(ord(ch) for ch in ''.join(pair_key)) % 2 == 0) else -1
+            return 0.28 * pair_sign
+        return 0.06
     
     def get_node_labels():
         labels = {}
         for node in G.nodes():
+            node_attrs = G.nodes[node] if hasattr(G, 'nodes') else {}
             if attributes is None:
                 label_text = str(node)
             else:
@@ -1063,9 +1075,11 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                 for attr in attributes:
                     if attr in {"node_id", "node", "id"}:
                         label_parts.append(str(node))
-                    elif attr in G[node]:
-                        value = G[node][attr]
+                    elif attr in node_attrs:
+                        value = node_attrs[attr]
                         label_parts.append(str(value) if value is not None else '')
+                if not label_parts or all(part == '' for part in label_parts):
+                    label_parts = [str(node)]
                 if dim == 3:
                     label_text = "<br>".join(label_parts)
                 else:
@@ -1143,7 +1157,7 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                 node_y.append(y)
                 node_z.append(z)
                 
-                node_text.append(str(node))
+                node_text.append(labels[node])
                 hover_data.append(labels[node])
                 
                 if path and node in path:
@@ -1246,9 +1260,20 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
             if non_path_edges:
                 widths, colors = get_edge_props(non_path_edges)
                 if is_directed:
-                    nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
-                                         width=widths, alpha=0.5, arrows=True,
-                                         connectionstyle="arc3,rad=0.1")
+                    for i, (u, v) in enumerate(non_path_edges):
+                        rad = get_edge_rad(u, v)
+                        nx.draw_networkx_edges(
+                            G,
+                            pos,
+                            edgelist=[(u, v)],
+                            edge_color=[colors[i]],
+                            width=widths[i],
+                            alpha=0.5,
+                            arrows=True,
+                            arrowstyle='-|>',
+                            arrowsize=24,
+                            connectionstyle=f"arc3,rad={rad}",
+                        )
                 else:
                     nx.draw_networkx_edges(G, pos, edgelist=non_path_edges, edge_color=colors, 
                                          width=widths, alpha=0.5)
@@ -1257,9 +1282,11 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                 path_colors = plt.cm.viridis(np.linspace(0, 1, len(path_edges)))
                 for (u, v), color in zip(path_edges, path_colors):
                     if is_directed:
+                        rad = get_edge_rad(u, v)
                         nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
                                              width=3, arrows=True,
-                                             connectionstyle="arc3,rad=0.1")
+                                             arrowstyle='-|>', arrowsize=24,
+                                             connectionstyle=f"arc3,rad={rad}")
                     else:
                         nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], edge_color=[color], 
                                              width=3)
@@ -1267,8 +1294,19 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
             edge_list = list(G.edges())
             widths, colors = get_edge_props(edge_list)
             if is_directed:
-                nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths,
-                                     arrows=True, connectionstyle="arc3,rad=0.1")
+                for i, (u, v) in enumerate(edge_list):
+                    rad = get_edge_rad(u, v)
+                    nx.draw_networkx_edges(
+                        G,
+                        pos,
+                        edgelist=[(u, v)],
+                        edge_color=[colors[i]],
+                        width=widths[i],
+                        arrows=True,
+                        arrowstyle='-|>',
+                        arrowsize=24,
+                        connectionstyle=f"arc3,rad={rad}",
+                    )
             else:
                 nx.draw_networkx_edges(G, pos, edge_color=colors, width=widths)
         
@@ -1285,7 +1323,14 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                                  edgecolors='white', linewidths=2)
         
         labels = get_node_labels()
-        nx.draw_networkx_labels(G, pos, labels=labels, font_color='white', font_size=font_size)
+        nx.draw_networkx_labels(
+            G,
+            pos,
+            labels=labels,
+            font_color='white',
+            font_size=font_size,
+            bbox=dict(facecolor='black', edgecolor='none', alpha=0.4),
+        )
         
         if show_edge_labels:
             edge_weights = {(u,v): f'{w:.2f}' for (u,v), w in nx.get_edge_attributes(G, 'weight').items()}
@@ -1293,20 +1338,18 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                 for (u, v), weight in edge_weights.items():
                     x1, y1 = pos[u]
                     x2, y2 = pos[v]
-                    
-                    mid_x = (x1 + x2) / 2
-                    mid_y = (y1 + y2) / 2
-                    
                     dx = x2 - x1
                     dy = y2 - y1
                     length = (dx**2 + dy**2)**0.5
+                    mid_x = (x1 + x2) / 2
+                    mid_y = (y1 + y2) / 2
                     if length > 0:
-                        curve_rad = 0.1
-                        offset_x = -dy / length * curve_rad
-                        offset_y = dx / length * curve_rad
-                        
-                        curve_mid_x = mid_x + offset_x
-                        curve_mid_y = mid_y + offset_y
+                        rad = get_edge_rad(u, v)
+                        perp_x = -dy / length
+                        perp_y = dx / length
+                        offset = rad * length * 0.6
+                        curve_mid_x = mid_x + perp_x * offset
+                        curve_mid_y = mid_y + perp_y * offset
                     else:
                         curve_mid_x, curve_mid_y = mid_x, mid_y
                     
