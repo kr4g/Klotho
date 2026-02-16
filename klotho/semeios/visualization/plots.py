@@ -99,9 +99,9 @@ def plot(obj, **kwargs):
                 case TemporalUnit():
                     match obj:
                         case CompositionalUnit():
-                            return _show(_plot_rt(obj._rt, **kwargs))
+                            return _show(_plot_rt(obj._rt, audio_source=obj, **kwargs))
                         case _:
-                            return _show(_plot_rt(obj._rt, **kwargs))
+                            return _show(_plot_rt(obj._rt, audio_source=obj, **kwargs))
                 case TemporalUnitSequence():
                     raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
                 case TemporalBlock():
@@ -471,35 +471,31 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
     text_size = max(6, base_text_size / density_factor)
     
     fig = go.Figure()
-    
+    node_to_traces = {}
+
     for u, v in G.edges():
         if u in pos and v in pos:
             x1, y1 = pos[u]
             x2, y2 = pos[v]
+            trace_idx = len(fig.data)
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
                     mode='lines+markers',
-                marker=dict(size=0.1, opacity=0),
+                    marker=dict(size=0.1, opacity=0),
                     line=dict(color='#808080', width=2),
                     showlegend=False,
                     hoverinfo='none'
                 )
             )
-    
-    node_x, node_y = [], []
-    hover_data = []
-    node_symbols = []
-    node_text = []
-    
+            node_to_traces.setdefault(u, []).append(trace_idx)
+            node_to_traces.setdefault(v, []).append(trace_idx)
+
     for node in G.nodes():
         if node in pos:
             x, y = pos[node]
-            node_x.append(x)
-            node_y.append(y)
-            
             node_data = G[node]
-            
+
             display_text = ""
             if attributes is None:
                 if 'proportion' in node_data:
@@ -513,43 +509,45 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                         label_parts.append(str(node))
                     elif attr in node_data:
                         value = node_data[attr]
-                        # label_parts.append(f"{attr}: {value}" if value is not None else f"{attr}: None")
                         label_parts.append(str(value))
                 display_text = "<br>".join(label_parts)
-            
-            node_text.append(display_text)
-            
+
+            proportion = node_data.get('proportion', None)
+            is_rest = proportion is not None and proportion < 0
+            depth = rt.depth_of(node)
+
             hover_parts = [f"Node: {node}"]
-            if 'proportion' in node_data:
-                hover_parts.append(f"Proportion: {node_data['proportion']}")
+            if proportion is not None:
+                hover_parts.append(f"Proportion: {proportion}")
             if 'metric_duration' in node_data:
                 hover_parts.append(f"Duration: {node_data['metric_duration']}")
             if 'metric_onset' in node_data:
                 hover_parts.append(f"Onset: {node_data['metric_onset']}")
-            
-            hover_data.append("<br>".join(hover_parts))
-            
+            hover_parts.append(f"Depth: {depth}")
+            hover_parts.append(f"Rest: {'Yes' if is_rest else 'No'}")
+            hover_text = "<br>".join(hover_parts)
+
             is_leaf = len(list(G.neighbors(node))) == 0
-            node_symbols.append('square' if is_leaf else 'circle')
-    
-    fig.add_trace(
-        go.Scatter(
-            x=node_x, y=node_y,
-            mode='markers+text',
-            marker=dict(
-                size=node_size,
-                color='white',
-                line=dict(color='white', width=2),
-                symbol=node_symbols
-            ),
-            text=node_text,
-            textposition='middle center',
-            textfont=dict(color='#404040', size=text_size, family='Arial', weight='bold'),
-            hovertemplate='%{customdata}<extra></extra>',
-            customdata=hover_data,
-            showlegend=False
-        )
-    )
+
+            trace_idx = len(fig.data)
+            fig.add_trace(
+                go.Scatter(
+                    x=[x], y=[y],
+                    mode='markers+text',
+                    marker=dict(
+                        size=node_size,
+                        color='white',
+                        line=dict(color='white', width=2),
+                        symbol='square' if is_leaf else 'circle'
+                    ),
+                    text=[display_text],
+                    textposition='middle center',
+                    textfont=dict(color='#404040', size=text_size, family='Arial', weight='bold'),
+                    hovertemplate=hover_text + '<extra></extra>',
+                    showlegend=False
+                )
+            )
+            node_to_traces.setdefault(node, []).append(trace_idx)
     
     width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
     
@@ -575,7 +573,8 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
             fig.write_html(output_file)
         else:
             fig.write_image(output_file)
-    
+
+    fig._node_to_traces = node_to_traces
     return fig
 
 def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
@@ -757,55 +756,413 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     else:
         plt.show()
 
-def _plot_ratios(ratios, figsize=(20, 0.667), output_file=None):
-    """
-    Plot ratios as horizontal bars with thin white borders.
-    
-    Args:
-        ratios: List of ratios (positive for white segments, negative for grey "rests")
-        output_file: Path to save the plot (if None, displays plot)
-    """
-    plt.figure(figsize=figsize)
-    ax = plt.gca()
-    
-    ax.set_facecolor('black')
-    plt.gcf().set_facecolor('black')
-    
+def _plot_ratios(rt, figsize=(20, 1), output_file=None):
+    ratios = rt.durations
+    leaf_nodes = rt.leaf_nodes
+    onsets = rt.onsets
+
     total_ratio = sum(abs(r) for r in ratios)
-    # Normalize segment widths to ensure they span the entire plot width
-    segment_widths = [abs(r) / total_ratio for r in ratios]
-    
-    positions = [0]
+    segment_widths = [float(abs(r) / total_ratio) for r in ratios]
+
+    positions = [0.0]
     for width in segment_widths[:-1]:
         positions.append(positions[-1] + width)
-    
+
     bar_height = 0.2
     border_height = 0.6
     y_offset_bar = (1 - bar_height) / 2
     y_offset_border = (1 - border_height) / 2
-    
+
+    fig = go.Figure()
+    node_to_traces = {}
+
     for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):
-        color = '#808080' if ratio < 0 else '#e6e6e6'
-        ax.add_patch(plt.Rectangle((pos, y_offset_bar), width, bar_height, 
-                                 facecolor=color,
-                                 edgecolor=None, alpha=0.4 if ratio < 0 else 1))
-    
-    for pos in positions + [1.0]:  # Use 1.0 as the final position since we normalized
-        ax.plot([pos, pos], [y_offset_border, y_offset_border + border_height], 
-                color='#aaaaaa', linewidth=2)
-    
-    ax.set_xlim(-0.01, 1.01)  # Set x-axis limits to slightly beyond [0,1]
-    ax.set_ylim(0, 1)
-    plt.axis('off')
-    
-    plt.margins(x=0)
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    
+        is_rest = ratio < 0
+        color = 'rgba(128,128,128,0.4)' if is_rest else '#e6e6e6'
+        node_id = leaf_nodes[i]
+        node_data = rt[node_id]
+
+        x0, x1 = pos, pos + width
+        y0, y1 = y_offset_bar, y_offset_bar + bar_height
+
+        proportion = node_data.get('proportion', None)
+        depth = rt.depth_of(node_id)
+        hover_text = (
+            f"Node: {node_id}<br>"
+            f"Proportion: {proportion}<br>"
+            f"Duration: {node_data.get('metric_duration', '')}<br>"
+            f"Onset: {node_data.get('metric_onset', '')}<br>"
+            f"Depth: {depth}<br>"
+            f"Rest: {'Yes' if is_rest else 'No'}"
+        )
+
+        trace_idx = len(fig.data)
+        fig.add_trace(go.Scatter(
+            x=[x0, x1, x1, x0, x0],
+            y=[y0, y0, y1, y1, y0],
+            fill='toself',
+            fillcolor=color,
+            line=dict(width=0),
+            mode='lines',
+            hovertemplate=hover_text + '<extra></extra>',
+            showlegend=False,
+        ))
+        node_to_traces.setdefault(node_id, []).append(trace_idx)
+
+    for pos in positions + [1.0]:
+        fig.add_shape(
+            type='line',
+            x0=pos, x1=pos,
+            y0=y_offset_border, y1=y_offset_border + border_height,
+            line=dict(color='#aaaaaa', width=2),
+        )
+
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    fig.update_layout(
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        xaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[-0.01, 1.01],
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[0, 1],
+            scaleanchor=None,
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        hovermode='closest',
+    )
+
     if output_file:
-        plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
-        plt.close()
-    else:
-        plt.show()
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+
+    fig._node_to_traces = node_to_traces
+    return fig
+
+def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
+                        vertical_lines=True, barlines=True,
+                        barline_color='#666666', subdivision_line_color='#aaaaaa'):
+    def get_node_scaling(node, rt, min_scale=0.5):
+        if rt.out_degree(node) == 0:
+            return min_scale
+        current_depth = rt.depth_of(node)
+        max_descendant_depth = current_depth
+        for descendant in rt.descendants(node):
+            if rt.out_degree(descendant) == 0:
+                d_depth = rt.depth_of(descendant)
+                if d_depth > max_descendant_depth:
+                    max_descendant_depth = d_depth
+        levels_to_leaf = max_descendant_depth - current_depth
+        if levels_to_leaf == 0:
+            return min_scale
+        max_levels_for_scaling = 3
+        scaling_factor = 1.0 - ((1.0 - min_scale) * min(1.0, (max_levels_for_scaling - levels_to_leaf) / max_levels_for_scaling))
+        return scaling_factor
+
+    fig = go.Figure()
+    node_to_traces = {}
+    max_depth = rt.depth
+
+    margin = 0.01
+    ratio_space = 0.15
+    usable_height = 1.0 - (2 * margin) - ratio_space
+
+    level_positions = []
+    level_height = usable_height / (max_depth + 1)
+
+    for level in range(max_depth + 1):
+        if invert:
+            y_pos = 1.0 - margin - (level * level_height) - (level_height / 2)
+        else:
+            y_pos = margin + ratio_space + (level * level_height) + (level_height / 2)
+        level_positions.append(y_pos)
+
+    vertical_line_positions = set()
+    onset_text_y = margin * 0.3
+    line_cutoff = onset_text_y + (margin * 2.0)
+
+    if rt.span > 1 and barlines:
+        top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
+        for i in range(rt.span + 1):
+            x_pos = i / rt.span
+            fig.add_shape(
+                type='line', x0=x_pos, x1=x_pos,
+                y0=level_positions[0] + top_bar_height / 2, y1=line_cutoff,
+                line=dict(color=barline_color, width=1.5, dash='dash'),
+                opacity=0.3,
+            )
+
+    for level in range(max_depth + 1):
+        nodes = rt.at_depth(level)
+        y_pos = level_positions[level]
+
+        nodes_by_parent = {}
+        for node in nodes:
+            p = rt.parent(node)
+            if p not in nodes_by_parent:
+                nodes_by_parent[p] = []
+            nodes_by_parent[p].append(node)
+
+        for p, siblings in nodes_by_parent.items():
+            if p is not None:
+                parent_successors = list(rt.successors(p))
+                siblings.sort(key=lambda x: parent_successors.index(x) if x in parent_successors else 0)
+
+        for node in nodes:
+            node_data = rt[node]
+            ratio = node_data.get('metric_duration', None)
+            proportion = node_data.get('proportion', None)
+
+            if ratio is None:
+                continue
+
+            parent = rt.parent(node)
+
+            if parent is None:
+                if rt.span > 1:
+                    for i in range(rt.span):
+                        x_start = i / rt.span
+                        w = 1 / rt.span
+
+                        is_leaf = rt.out_degree(node) == 0
+                        is_rest = Fraction(str(ratio)) < 0
+                        color = '#404040' if is_rest else ('#e6e6e6' if is_leaf else '#c8c8c8')
+                        bar_height = level_height * 0.5 * get_node_scaling(node, rt)
+
+                        bx0, bx1 = x_start, x_start + w
+                        by0, by1 = y_pos - bar_height / 2, y_pos + bar_height / 2
+
+                        depth = rt.depth_of(node)
+                        hover_text = (
+                            f"Node: {node}<br>"
+                            f"Proportion: {proportion}<br>"
+                            f"Duration: {ratio}<br>"
+                            f"Onset: {node_data.get('metric_onset', '')}<br>"
+                            f"Depth: {depth}<br>"
+                            f"Rest: {'Yes' if is_rest else 'No'}"
+                        )
+
+                        trace_idx = len(fig.data)
+                        fig.add_trace(go.Scatter(
+                            x=[bx0, bx1, bx1, bx0, bx0],
+                            y=[by0, by0, by1, by1, by0],
+                            fill='toself', fillcolor=color,
+                            line=dict(color='black', width=1),
+                            mode='lines',
+                            hovertemplate=hover_text + '<extra></extra>',
+                            showlegend=False,
+                        ))
+                        node_to_traces.setdefault(node, []).append(trace_idx)
+
+                        text_color = 'white' if is_rest else 'black'
+                        font_size = 12 * get_node_scaling(node, rt, 9 / 12)
+                        fig.add_annotation(
+                            x=x_start + w / 2, y=y_pos, text=str(rt.meas),
+                            showarrow=False, font=dict(color=text_color, size=font_size,
+                                                       family='Arial'),
+                            xanchor='center', yanchor='middle',
+                        )
+
+                    rt[node]['_x_start'] = 0
+                    rt[node]['_width'] = 1
+                    continue
+                else:
+                    x_start = 0
+                    w = 1
+                    is_first_child = True
+                    is_last_child = True
+            else:
+                siblings = nodes_by_parent[parent]
+                parent_data = rt[parent]
+
+                is_first_child = siblings[0] == node
+                is_last_child = siblings[-1] == node
+
+                total_proportion = sum(abs(rt[sib].get('proportion', 1)) for sib in siblings)
+                preceding_proportion = 0
+                for sib in siblings:
+                    if sib == node:
+                        break
+                    preceding_proportion += abs(rt[sib].get('proportion', 1))
+
+                parent_x_start = parent_data.get('_x_start', 0)
+                parent_width = parent_data.get('_width', 1)
+
+                x_start = float(parent_x_start + (preceding_proportion / total_proportion) * parent_width)
+                w = float((abs(proportion) / total_proportion) * parent_width)
+
+            rt[node]['_x_start'] = x_start
+            rt[node]['_width'] = w
+
+            is_leaf = rt.out_degree(node) == 0
+            is_rest = Fraction(str(ratio)) < 0
+            color = '#404040' if is_rest else ('#e6e6e6' if is_leaf else '#c8c8c8')
+
+            bar_height = level_height * 0.5 * get_node_scaling(node, rt)
+            bx0, bx1 = x_start, x_start + w
+            by0, by1 = y_pos - bar_height / 2, y_pos + bar_height / 2
+
+            depth = rt.depth_of(node)
+            hover_text = (
+                f"Node: {node}<br>"
+                f"Proportion: {proportion}<br>"
+                f"Duration: {ratio}<br>"
+                f"Onset: {node_data.get('metric_onset', '')}<br>"
+                f"Depth: {depth}<br>"
+                f"Rest: {'Yes' if is_rest else 'No'}"
+            )
+
+            trace_idx = len(fig.data)
+            fig.add_trace(go.Scatter(
+                x=[bx0, bx1, bx1, bx0, bx0],
+                y=[by0, by0, by1, by1, by0],
+                fill='toself', fillcolor=color,
+                line=dict(color='black', width=1),
+                mode='lines',
+                hovertemplate=hover_text + '<extra></extra>',
+                showlegend=False,
+            ))
+            node_to_traces.setdefault(node, []).append(trace_idx)
+
+            label_text = f"{ratio}" if ratio is not None else ""
+            text_color = 'white' if is_rest else 'black'
+            font_size = 12 * get_node_scaling(node, rt, 9 / 12)
+            fig.add_annotation(
+                x=x_start + w / 2, y=y_pos, text=label_text,
+                showarrow=False, font=dict(color=text_color, size=font_size,
+                                           family='Arial'),
+                xanchor='center', yanchor='middle',
+            )
+
+            if vertical_lines:
+                left_x = x_start
+                right_x = x_start + w
+
+                if not is_first_child and left_x not in vertical_line_positions:
+                    vertical_line_positions.add(left_x)
+                    fig.add_shape(
+                        type='line', x0=left_x, x1=left_x,
+                        y0=y_pos - bar_height / 2, y1=line_cutoff,
+                        line=dict(color=subdivision_line_color, width=0.8, dash='dash'),
+                        opacity=0.9,
+                    )
+
+                if not is_last_child and right_x not in vertical_line_positions:
+                    vertical_line_positions.add(right_x)
+                    fig.add_shape(
+                        type='line', x0=right_x, x1=right_x,
+                        y0=y_pos - bar_height / 2, y1=line_cutoff,
+                        line=dict(color=subdivision_line_color, width=0.8, dash='dash'),
+                        opacity=0.9,
+                    )
+
+    if vertical_lines:
+        top_y_pos = level_positions[0]
+        top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
+        top_bar_top = top_y_pos + (top_bar_height / 2) - 0.001
+
+        if 0 not in vertical_line_positions:
+            fig.add_shape(
+                type='line', x0=0, x1=0, y0=top_bar_top, y1=line_cutoff,
+                line=dict(color=barline_color, width=1.5), opacity=0.9,
+            )
+        if 1 not in vertical_line_positions:
+            fig.add_shape(
+                type='line', x0=1, x1=1, y0=top_bar_top, y1=line_cutoff,
+                line=dict(color=barline_color, width=1.5), opacity=0.9,
+            )
+
+    ratios = rt.durations
+    leaf_nodes = rt.leaf_nodes
+    total_ratio = sum(abs(r) for r in ratios)
+    segment_widths = [float(abs(r) / total_ratio) for r in ratios]
+
+    positions = [0.0]
+    for w in segment_widths[:-1]:
+        positions.append(positions[-1] + w)
+
+    ratio_bar_height = ratio_space * 0.2
+    ratio_y_center = margin + ratio_space * 0.5
+
+    for i, (pos, sw, ratio) in enumerate(zip(positions, segment_widths, ratios)):
+        color = '#404040' if ratio < 0 else '#e6e6e6'
+        ry0 = ratio_y_center - ratio_bar_height / 2
+        ry1 = ratio_y_center + ratio_bar_height / 2
+        rx0, rx1 = pos, pos + sw
+
+        leaf_id = leaf_nodes[i]
+        leaf_data = rt[leaf_id]
+        is_rest = ratio < 0
+        hover_text = (
+            f"Node: {leaf_id}<br>"
+            f"Proportion: {leaf_data.get('proportion', '')}<br>"
+            f"Duration: {ratio}<br>"
+            f"Onset: {leaf_data.get('metric_onset', '')}<br>"
+            f"Depth: {rt.depth_of(leaf_id)}<br>"
+            f"Rest: {'Yes' if is_rest else 'No'}"
+        )
+
+        trace_idx = len(fig.data)
+        fig.add_trace(go.Scatter(
+            x=[rx0, rx1, rx1, rx0, rx0],
+            y=[ry0, ry0, ry1, ry1, ry0],
+            fill='toself', fillcolor=color,
+            line=dict(width=0),
+            mode='lines',
+            hovertemplate=hover_text + '<extra></extra>',
+            showlegend=False,
+        ))
+        node_to_traces.setdefault(leaf_id, []).append(trace_idx)
+
+    for pos in positions + [1.0]:
+        fig.add_shape(
+            type='line', x0=pos, x1=pos,
+            y0=ratio_y_center - ratio_bar_height / 2,
+            y1=ratio_y_center + ratio_bar_height / 2,
+            line=dict(color=subdivision_line_color, width=2),
+        )
+
+    for i, onset in enumerate(rt.onsets):
+        if i < len(positions):
+            fig.add_annotation(
+                x=positions[i], y=margin * 0.3, text=str(onset),
+                showarrow=False, font=dict(color='white', size=10, family='Arial'),
+                xanchor='center', yanchor='middle',
+            )
+
+    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    fig.update_layout(
+        width=width_px,
+        height=height_px,
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        xaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[-0.01, 1.01],
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False, showticklabels=False,
+            range=[-0.01, 1.01],
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        hovermode='closest',
+    )
+
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+
+    fig._node_to_traces = node_to_traces
+    return fig
+
 
 def _get_children(G, node, parent=None):
     """Helper function to get children of a node in tree-like graphs."""
@@ -1391,274 +1748,67 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             invert: bool = True, output_file: str | None = None, 
             attributes: list[str] | None = None, vertical_lines: bool = True, 
             barlines: bool = True, barline_color: str = '#666666', 
-            subdivision_line_color: str = '#aaaaaa') -> None:
-    """
-    Visualize a rhythm tree with customizable layout options.
-    
-    Args:
-        rt: RhythmTree instance to visualize
-        layout: 'tree' uses the standard tree visualization, 'containers' shows proportional containers, 'ratios' shows just the ratio segmentation
-        figsize: Width and height of the output figure in inches
-        invert: When True, places root at the top; when False, root is at the bottom
-        output_file: Path to save the visualization (displays plot if None)
-        attributes: List of node attributes to display (only used with 'tree' layout)
-        vertical_lines: When True, draws vertical lines at block boundaries
-        barlines: When True, draws span division lines (when span > 1)
-        barline_color: Color for span division lines and outer borders
-        subdivision_line_color: Color for subdivision lines and ratio dividers
-    """
+            subdivision_line_color: str = '#aaaaaa',
+            animate: bool = False, dur: float = 0.5,
+            audio_source=None,
+            beat=None, bpm=None) -> None:
     if layout == 'tree':
         if figsize is None:
             figsize = (20, 5)
-        return _plot_rt_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
-    
+        fig = _plot_rt_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
     elif layout == 'ratios':
         if figsize is None:
             figsize = (20, 1)
-        return _plot_ratios(rt.durations, output_file=output_file)
-    
+        fig = _plot_ratios(rt, figsize=figsize, output_file=output_file)
     elif layout == 'containers':
         if figsize is None:
             figsize = (20, 5)
-        
-        def get_node_scaling(node, rt, min_scale=0.5):
-            """Calculate the height scaling for a node based on its position in the tree."""
-            if rt.out_degree(node) == 0:
-                return min_scale
-            
-            current_depth = rt.depth_of(node)
-            
-            # Find the maximum depth of any leaf descendant from this 
-            max_descendant_depth = current_depth
-            for descendant in nx.descendants(rt._graph, node):
-                if rt._graph.out_degree(descendant) == 0:  # If it's a leaf
-                    descendant_depth = rt.depth_of(descendant)
-                    max_descendant_depth = max(max_descendant_depth, descendant_depth)
-            
-            levels_to_leaf = max_descendant_depth - current_depth
-            
-            if levels_to_leaf == 0:  # This is a leaf
-                return min_scale
-            
-            # Scale linearly from 1.0 (at root or nodes far from leaves) to min_scale (at leaves)
-            # The more levels to a leaf, the closer to 1.0
-            # We use a maximum of 3 levels for full scaling to avoid too much variation
-            max_levels_for_scaling = 3
-            scaling_factor = 1.0 - ((1.0 - min_scale) * min(1.0, (max_levels_for_scaling - levels_to_leaf) / max_levels_for_scaling))
-            
-            return scaling_factor
-        
-        plt.figure(figsize=figsize)
-        ax = plt.gca()
-        
-        ax.set_facecolor('black')
-        plt.gcf().set_facecolor('black')
-        
-        max_depth = rt.depth
-        
-        margin = 0.01
-        ratio_space = 0.15
-        usable_height = 1.0 - (2 * margin) - ratio_space
-        
-        level_positions = []
-        level_height = usable_height / (max_depth + 1)
-        
-        for level in range(max_depth + 1):
-            if invert:
-                y_pos = 1.0 - margin - (level * level_height) - (level_height / 2)
-            else:
-                y_pos = margin + ratio_space + (level * level_height) + (level_height / 2)
-            level_positions.append(y_pos)
-        
-        vertical_line_positions = set()
-        
-        # Calculate cutoff point for vertical lines (above onset text)
-        onset_text_y = margin * 0.3
-        line_cutoff = onset_text_y + (margin * 2.0)  # Larger gap above text
-        
-        if rt.span > 1 and barlines:
-            top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
-            for i in range(rt.span + 1):
-                x_pos = i / rt.span
-                ax.plot([x_pos, x_pos], [level_positions[0] + top_bar_height/2, line_cutoff], 
-                       color=barline_color, linestyle=(0, (8, 4)), linewidth=1.5, alpha=0.3, zorder=0.5)
-        
-        for level in range(max_depth + 1):
-            nodes = rt.at_depth(level)
-            y_pos = level_positions[level]
-            
-            nodes_by_parent = {}
-            for node in nodes:
-                parent = rt.parent(node)
-                if parent not in nodes_by_parent:
-                    nodes_by_parent[parent] = []
-                nodes_by_parent[parent].append(node)
-            
-            # Sort siblings by their order in parent's successors to ensure correct left-to-right positioning
-            for parent, siblings in nodes_by_parent.items():
-                if parent is not None:
-                    parent_successors = list(rt.successors(parent))
-                    siblings.sort(key=lambda x: parent_successors.index(x) if x in parent_successors else 0)
-            
-            for node in nodes:
-                node_data = rt[node]
-                ratio = node_data.get('metric_duration', None)
-                proportion = node_data.get('proportion', None)
-                
-                # XXX - maybe not necessary
-                if ratio is None:
-                    continue
-                
-                parent = rt.parent(node)
-                
-                if parent is None:  # Root node
-                    if rt.span > 1:
-                        # Draw span divisions at the top level
-                        for i in range(rt.span):
-                            x_start = i / rt.span
-                            width = 1 / rt.span
-                            
-                            is_leaf = rt._graph.out_degree(node) == 0
-                            is_rest = Fraction(str(ratio)) < 0
-                            
-                            if is_rest:
-                                color = '#404040'
-                            else:
-                                color = '#e6e6e6' if is_leaf else '#c8c8c8'
-                            
-                            bar_height = level_height * 0.5 * get_node_scaling(node, rt)
-                            rect = plt.Rectangle((x_start, y_pos - bar_height/2), width, bar_height,
-                                                facecolor=color, edgecolor='black', linewidth=1, alpha=1, zorder=1)
-                            ax.add_patch(rect)
-                            
-                            ax.text(x_start + width/2, y_pos, 
-                                   str(rt.meas), ha='center', va='center', 
-                                   color='black' if not is_rest else 'white', 
-                                   fontsize=12 * get_node_scaling(node, rt, 9/12), 
-                                   fontweight='bold' if is_leaf else 'normal')
-                        
-                        # Store position info for child nodes
-                        rt[node]['_x_start'] = 0
-                        rt[node]['_width'] = 1
-                        continue
-                    else:
-                        x_start = 0
-                        width = 1
-                        is_first_child = True
-                        is_last_child = True
-                else:
-                    siblings = nodes_by_parent[parent]
-                    parent_data = rt[parent]
-                    
-                    is_first_child = siblings[0] == node
-                    is_last_child = siblings[-1] == node
-                    
-                    total_proportion = sum(abs(rt[sib].get('proportion', 1)) for sib in siblings)
-                    
-                    preceding_proportion = 0
-                    for sib in siblings:
-                        if sib == node:
-                            break
-                        preceding_proportion += abs(rt[sib].get('proportion', 1))
-                    
-                    parent_x_start = parent_data.get('_x_start', 0)
-                    parent_width = parent_data.get('_width', 1)
-                    
-                    x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
-                    width = (abs(proportion) / total_proportion) * parent_width
-                
-                rt[node]['_x_start'] = x_start
-                rt[node]['_width'] = width
-                
-                is_leaf = rt._graph.out_degree(node) == 0
-                
-                # Assign color based on node type and ratio sign
-                is_rest = Fraction(str(ratio)) < 0
-                if is_rest:
-                    color = '#404040'
-                else:
-                    color = '#e6e6e6' if is_leaf else '#c8c8c8'
-                
-                bar_height = level_height * 0.5 * get_node_scaling(node, rt)
-                rect = plt.Rectangle((x_start, y_pos - bar_height/2), width, bar_height,
-                                    facecolor=color, edgecolor='black', linewidth=1, alpha=1, zorder=1)
-                ax.add_patch(rect)
-                
-                label_text = f"{ratio}" if ratio is not None else ""
-                ax.text(x_start + width/2, y_pos, 
-                       label_text, ha='center', va='center', color='black' if not is_rest else 'white', fontsize=12 * get_node_scaling(node, rt, 9/12), fontweight='bold' if is_leaf else 'normal')
-                
-                if vertical_lines:
-                    left_x = x_start
-                    right_x = x_start + width
-                    
-                    if not is_first_child and left_x not in vertical_line_positions:
-                        vertical_line_positions.add(left_x)
-                        plt.plot([left_x, left_x], [y_pos - bar_height/2, line_cutoff], 
-                                color=subdivision_line_color, linestyle='--', linewidth=0.8, alpha=0.9, zorder=2)
-                    
-                    if not is_last_child and right_x not in vertical_line_positions:
-                        vertical_line_positions.add(right_x)
-                        plt.plot([right_x, right_x], [y_pos - bar_height/2, line_cutoff], 
-                                color=subdivision_line_color, linestyle='--', linewidth=0.8, alpha=0.9, zorder=2)
-        
-        if vertical_lines:
-            top_y_pos = level_positions[0]
-            top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
-            top_bar_top = top_y_pos + (top_bar_height/2) - 0.001
-            
-            # Left border (x=0) - always solid with barline properties, starts from top
-            if 0 not in vertical_line_positions:
-                plt.plot([0, 0], [top_bar_top, line_cutoff], 
-                        color=barline_color, linestyle='-', linewidth=1.5, alpha=0.9, zorder=2)
-            
-            # Right border (x=1) - always solid with barline properties, starts from top  
-            if 1 not in vertical_line_positions:
-                plt.plot([1, 1], [top_bar_top, line_cutoff], 
-                        color=barline_color, linestyle='-', linewidth=1.5, alpha=0.9, zorder=2)
-        
-        ratios = rt.durations
-        total_ratio = sum(abs(r) for r in ratios)
-        segment_widths = [abs(r) / total_ratio for r in ratios]
-        
-        positions = [0]
-        for width in segment_widths[:-1]:
-            positions.append(positions[-1] + width)
-        
-        ratio_bar_height = ratio_space * 0.2
-        ratio_y_center = margin + ratio_space * 0.5
-        
-        for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):
-            color = '#404040' if ratio < 0 else '#e6e6e6'
-            ax.add_patch(plt.Rectangle((pos, ratio_y_center - ratio_bar_height/2), width, ratio_bar_height, 
-                                     facecolor=color,
-                                     edgecolor=None, alpha=1, zorder=1))
-        
-        for pos in positions + [1.0]:
-            ax.plot([pos, pos], [ratio_y_center - ratio_bar_height/2, ratio_y_center + ratio_bar_height/2], 
-                    color=subdivision_line_color, linewidth=2, zorder=2)
-        
-        for i, onset in enumerate(rt.onsets):
-            if i < len(positions):
-                x_pos = positions[i]
-                ax.text(x_pos, margin * 0.3, str(onset), 
-                       ha='center', va='center', color='white', fontsize=10, fontweight='bold')
-        
-        plt.axis('off')
-        plt.xlim(-0.01, 1.01)
-        plt.ylim(-0.01, 1.01)
-        
-        plt.margins(x=0)
-        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        
-        if output_file:
-            plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
-            plt.close()
-        else:
-            plt.show()
-    
+        fig = _plot_rt_containers(rt, figsize=figsize, invert=invert, output_file=output_file,
+                                  vertical_lines=vertical_lines, barlines=barlines,
+                                  barline_color=barline_color, subdivision_line_color=subdivision_line_color)
     else:
         raise ValueError(f"Unknown layout: {layout}. Choose 'tree', 'containers', or 'ratios'.")
+
+    if not animate:
+        return fig
+
+    from klotho.semeios.visualization.animated import AnimatedRTFigure
+    from klotho.utils.playback.tonejs.converters import (
+        rhythm_tree_to_animation_events,
+        temporal_unit_to_animation_events,
+        compositional_unit_to_animation_events,
+    )
+    from klotho.chronos.temporal_units.temporal import TemporalUnit as _TemporalUnit
+    from klotho.thetos.composition.compositional import CompositionalUnit as _CompositionalUnit
+
+    node_to_traces = getattr(fig, '_node_to_traces', {})
+
+    leaf_nodes = rt.leaf_nodes
+    leaf_ancestors = []
+    for leaf in leaf_nodes:
+        ancestors = list(rt.ancestors(leaf))
+        leaf_ancestors.append(ancestors + [leaf])
+
+    all_animated_traces = sorted({idx for idxs in node_to_traces.values() for idx in idxs})
+
+    if audio_source is not None:
+        if isinstance(audio_source, _CompositionalUnit):
+            audio_payload = compositional_unit_to_animation_events(audio_source)
+        elif isinstance(audio_source, _TemporalUnit):
+            audio_payload = temporal_unit_to_animation_events(audio_source)
+        else:
+            audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
+    else:
+        audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
+
+    return AnimatedRTFigure(
+        fig=fig,
+        node_to_traces=node_to_traces,
+        leaf_ancestors=leaf_ancestors,
+        all_animated_traces=all_animated_traces,
+        audio_payload=audio_payload,
+        dur=dur,
+    )
 
 def _plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
                title=None, grid=True, legend=True, output_file=None):

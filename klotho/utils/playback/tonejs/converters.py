@@ -288,6 +288,120 @@ def rhythm_tree_to_events(obj, beat=None, bpm=None):
     return temporal_unit_to_events(temporal_unit, use_absolute_time=False)
 
 
+def temporal_unit_to_animation_events(obj, use_absolute_time=False):
+    events = []
+    leaf_nodes = obj._rt.leaf_nodes
+
+    if use_absolute_time:
+        time_offset = 0
+    else:
+        time_offset = min(c.start for c in obj if not c.is_rest) if any(not c.is_rest for c in obj) else 0
+
+    node_to_step = {nid: idx for idx, nid in enumerate(leaf_nodes)}
+
+    for chronon in obj:
+        start_time = chronon.start - time_offset
+        duration = abs(chronon.duration)
+        step_idx = node_to_step.get(chronon.node_id, None)
+
+        if chronon.is_rest:
+            events.append({
+                "start": start_time,
+                "duration": duration,
+                "instrument": "__rest__",
+                "pfields": {},
+                "_stepIndex": step_idx,
+            })
+        else:
+            events.append({
+                "start": start_time,
+                "duration": duration,
+                "instrument": "membrane",
+                "pfields": {
+                    "freq": DEFAULT_DRUM_FREQ,
+                    "vel": 0.85,
+                },
+                "_stepIndex": step_idx,
+            })
+
+    events.sort(key=lambda ev: ev["start"])
+    return _payload(events)
+
+
+def rhythm_tree_to_animation_events(obj, beat=None, bpm=None):
+    temporal_unit = TemporalUnit.from_rt(obj, beat=beat, bpm=bpm)
+    return temporal_unit_to_animation_events(temporal_unit, use_absolute_time=False)
+
+
+def compositional_unit_to_animation_events(obj):
+    events = []
+    instruments = {}
+    inst_id_map = {}
+    leaf_nodes = obj._rt.leaf_nodes
+    node_to_step = {nid: idx for idx, nid in enumerate(leaf_nodes)}
+
+    time_offset = min(ev.start for ev in obj if not ev.is_rest) if any(not ev.is_rest for ev in obj) else 0
+
+    for event in obj:
+        step_idx = node_to_step.get(event.node_id, None)
+        start_time = event.start - time_offset
+
+        if event.is_rest:
+            events.append({
+                "start": start_time,
+                "duration": abs(event.duration),
+                "instrument": "__rest__",
+                "pfields": {},
+                "_stepIndex": step_idx,
+            })
+            continue
+
+        instrument = obj.get_active_instrument(event.node_id)
+        if not isinstance(instrument, JsInstrument):
+            events.append({
+                "start": start_time,
+                "duration": abs(event.duration),
+                "instrument": "__rest__",
+                "pfields": {},
+                "_stepIndex": step_idx,
+            })
+            continue
+
+        inst_identity = id(instrument)
+        if inst_identity not in inst_id_map:
+            key = instrument.name
+            if key in instruments:
+                existing = instruments[key]
+                if existing['tonejs_class'] != instrument.tonejs_class or existing['preset'] != instrument.pfields:
+                    raise ValueError(
+                        f"Instrument name '{key}' is used by two different instruments. "
+                        f"Use distinct names."
+                    )
+            else:
+                instruments[key] = {
+                    'tonejs_class': instrument.tonejs_class,
+                    'preset': instrument.pfields
+                }
+            inst_id_map[inst_identity] = key
+
+        routing_key = inst_id_map[inst_identity]
+        pfields = {k: v for k, v in event.parameters.items()
+                   if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
+        pfields = _normalize_event_pfields(pfields)
+        default_pfields = instruments[routing_key].get('preset', {})
+        effective_pfields = _deep_merge(default_pfields, pfields)
+        events.append({
+            "start": start_time,
+            "duration": abs(event.duration),
+            "instrument": routing_key,
+            "pfields": effective_pfields,
+            "_stepIndex": step_idx,
+        })
+
+    events.sort(key=lambda ev: ev["start"])
+    return _payload(events, instruments)
+
+
 def _merge_sub_payload(target_events, target_instruments, sub_payload, time_offset):
     for ev in sub_payload["events"]:
         ev["start"] -= time_offset

@@ -261,3 +261,252 @@ class AnimatedFigure:
 </script>
 '''
         return html
+
+
+class AnimatedRTFigure:
+    def __init__(self, fig, node_to_traces, leaf_ancestors, all_animated_traces,
+                 audio_payload=None, dur=0.5):
+        self.fig = fig
+        self.node_to_traces = node_to_traces
+        self.leaf_ancestors = leaf_ancestors
+        self.all_animated_traces = all_animated_traces
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.widget_id = f"klotho_rt_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        global _plotly_included, _tone_included
+
+        plot_div_id = f"{self.widget_id}_plot"
+        fig_html = self.fig.to_html(
+            full_html=False,
+            include_plotlyjs=False,
+            div_id=plot_div_id,
+        )
+
+        cdn_scripts = ''
+        if not _plotly_included:
+            cdn_scripts += f'<script src="{_PLOTLY_CDN}"></script>\n'
+            _plotly_included = True
+        if not _tone_included and self.audio_payload:
+            cdn_scripts += f'<script src="{_TONEJS_CDN}"></script>\n'
+            _tone_included = True
+
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+
+        instruments_js = _INSTRUMENTS_JS_PATH.read_text() if _INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = _PLAYER_JS_PATH.read_text() if _PLAYER_JS_PATH.exists() else ""
+
+        node_to_traces_json = json.dumps({str(k): v for k, v in self.node_to_traces.items()})
+        leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in self.leaf_ancestors])
+        all_anim_json = json.dumps(self.all_animated_traces)
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+        wid = self.widget_id
+
+        html = f'''
+{cdn_scripts}
+{fig_html}
+<div id="{wid}_controls" style="
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #1a1a2e;
+    border-radius: 6px;
+    user-select: none;
+    margin-top: 4px;
+">
+    <button id="{wid}_toggle" style="
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 4px;
+        background: #16213e;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    ">
+        <span id="{wid}_icon" style="
+            width: 0;
+            height: 0;
+            border-top: 7px solid transparent;
+            border-bottom: 7px solid transparent;
+            border-left: 12px solid #4ade80;
+            margin-left: 3px;
+        "></span>
+    </button>
+    <button id="{wid}_loop" style="
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: 4px;
+        background: #16213e;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        opacity: 0.5;
+    ">
+        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2l4 4-4 4"></path>
+            <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+            <path d="M7 22l-4-4 4-4"></path>
+            <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </button>
+</div>
+{session_script}
+<script>
+{instruments_js}
+</script>
+<script>
+{player_js}
+</script>
+<script>
+(() => {{
+    const plotDiv = document.getElementById("{plot_div_id}");
+    const toggleBtn = document.getElementById("{wid}_toggle");
+    const iconEl = document.getElementById("{wid}_icon");
+    const loopBtn = document.getElementById("{wid}_loop");
+    const loopSvg = document.getElementById("{wid}_loop_svg");
+
+    const nodeToTraces = {node_to_traces_json};
+    const leafAncestors = {leaf_ancestors_json};
+    const allAnimatedTraces = {all_anim_json};
+    const audioPayload = {payload_json};
+    const totalSteps = leafAncestors.length;
+
+    let looping = false;
+    let playing = false;
+
+    function dimAll() {{
+        if (allAnimatedTraces.length > 0) {{
+            Plotly.restyle(plotDiv, {{ opacity: 0.15 }}, allAnimatedTraces);
+        }}
+    }}
+
+    function resetAll() {{
+        if (allAnimatedTraces.length > 0) {{
+            Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, allAnimatedTraces);
+        }}
+    }}
+
+    function highlightLeaf(leafIdx) {{
+        if (leafIdx < 0 || leafIdx >= leafAncestors.length) return;
+        dimAll();
+        var ancestorPath = leafAncestors[leafIdx];
+        var highlightTraces = [];
+        for (var i = 0; i < ancestorPath.length; i++) {{
+            var nodeId = ancestorPath[i];
+            var traces = nodeToTraces[nodeId];
+            if (traces) {{
+                for (var j = 0; j < traces.length; j++) {{
+                    if (highlightTraces.indexOf(traces[j]) === -1) {{
+                        highlightTraces.push(traces[j]);
+                    }}
+                }}
+            }}
+        }}
+        if (highlightTraces.length > 0) {{
+            Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, highlightTraces);
+        }}
+    }}
+
+    function finishPlayback() {{
+        playing = false;
+        resetAll();
+        setPlayIcon();
+    }}
+
+    function setPlayIcon() {{
+        iconEl.style.width = "0";
+        iconEl.style.height = "0";
+        iconEl.style.borderTop = "7px solid transparent";
+        iconEl.style.borderBottom = "7px solid transparent";
+        iconEl.style.borderLeft = "12px solid #4ade80";
+        iconEl.style.borderRight = "none";
+        iconEl.style.marginLeft = "3px";
+        iconEl.style.background = "none";
+    }}
+
+    function setStopIcon() {{
+        iconEl.style.width = "12px";
+        iconEl.style.height = "12px";
+        iconEl.style.border = "none";
+        iconEl.style.borderRadius = "2px";
+        iconEl.style.marginLeft = "0";
+        iconEl.style.background = "#ef4444";
+    }}
+
+    loopBtn.onclick = () => {{
+        looping = !looping;
+        loopBtn.style.opacity = looping ? "1" : "0.5";
+        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
+    }};
+
+    if (audioPayload && typeof Tone !== "undefined") {{
+        var events = audioPayload.events || [];
+        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        var player = KlothoPlayer.create();
+
+        toggleBtn.onclick = async () => {{
+            if (player.isPlaying()) {{
+                player.stop();
+            }} else {{
+                playing = true;
+                setStopIcon();
+                await player.play(events, instruments, {{
+                    loop: looping,
+                    onEvent: function(stepIdx) {{
+                        highlightLeaf(stepIdx);
+                    }},
+                    onStop: function() {{
+                        finishPlayback();
+                    }},
+                    onFinish: function() {{
+                        finishPlayback();
+                    }}
+                }});
+            }}
+        }};
+    }} else {{
+        var durMs = {self.dur * 1000};
+        var timerId = null;
+
+        function runAnimation(stepIdx) {{
+            if (!playing) return;
+            if (stepIdx >= totalSteps) {{
+                if (looping) {{
+                    timerId = setTimeout(function() {{ runAnimation(0); }}, durMs);
+                }} else {{
+                    finishPlayback();
+                }}
+                return;
+            }}
+            highlightLeaf(stepIdx);
+            timerId = setTimeout(function() {{
+                runAnimation(stepIdx + 1);
+            }}, durMs);
+        }}
+
+        toggleBtn.onclick = () => {{
+            if (playing) {{
+                playing = false;
+                if (timerId) {{ clearTimeout(timerId); timerId = null; }}
+                finishPlayback();
+            }} else {{
+                playing = true;
+                setStopIcon();
+                runAnimation(0);
+            }}
+        }};
+    }}
+}})();
+</script>
+'''
+        return html
