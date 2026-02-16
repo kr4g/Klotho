@@ -2559,11 +2559,14 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
                         base_arc_offset=0.15, n_bezier_points=20, cmap='viridis'):
     from collections import defaultdict
     if not path or len(path) < 2:
-        return
+        return [], [], []
 
     colors = _path_color_array(cmap, len(path) - 1)
 
     edge_counts = defaultdict(int)
+    edge_trace_data = []
+    edge_color_data = []
+    step_trace_groups = []
 
     for i in range(len(path) - 1):
         coord1, coord2 = path[i], path[i + 1]
@@ -2573,12 +2576,18 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
                 plot_coord1 = coord_mapping[coord1]
                 plot_coord2 = coord_mapping[coord2]
             else:
+                edge_trace_data.append(([0, 0], [0, 0]))
+                edge_color_data.append('#ffffff')
+                step_trace_groups.append([])
                 continue
         else:
             plot_coord1 = coord1
             plot_coord2 = coord2
 
         if plot_coord1 not in coords or plot_coord2 not in coords:
+            edge_trace_data.append(([0, 0], [0, 0]))
+            edge_color_data.append('#ffffff')
+            step_trace_groups.append([])
             continue
 
         x1, y1 = plot_coord1[0], plot_coord1[1]
@@ -2604,6 +2613,9 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
             dx, dy = x2 - x1, y2 - y1
             length = math.sqrt(dx*dx + dy*dy)
             if length < 1e-9:
+                edge_trace_data.append(([x1, x2], [y1, y2]))
+                edge_color_data.append(path_color_hex)
+                step_trace_groups.append([])
                 continue
             perp_x, perp_y = -dy / length, dx / length
 
@@ -2630,6 +2642,10 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
             tan_y = trace_y[mid_idx + 1] - trace_y[mid_idx - 1]
             arrow_angle = math.degrees(math.atan2(tan_y, tan_x))
 
+        edge_trace_data.append((list(trace_x), list(trace_y)))
+        edge_color_data.append(path_color_hex)
+
+        step_start = len(fig.data)
         fig.add_trace(
             go.Scatter(
                 x=trace_x, y=trace_y,
@@ -2666,6 +2682,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
                 hoverinfo='none'
             )
         )
+        step_trace_groups.append(list(range(step_start, len(fig.data))))
 
     start_coord = path[0]
     end_coord = path[-1]
@@ -2699,6 +2716,9 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
             hoverinfo='none'
         )
     )
+    halo_indices = [len(fig.data) - 2, len(fig.data) - 1]
+
+    return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices)
 
 
 def _rodrigues_rotate(v, axis, theta):
@@ -2712,11 +2732,14 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
                         base_arc_offset=0.15, n_bezier_points=20, cmap='viridis'):
     from collections import defaultdict
     if not path or len(path) < 2:
-        return
+        return [], [], []
 
     colors = _path_color_array(cmap, len(path) - 1)
 
     edge_counts = defaultdict(int)
+    edge_trace_data = []
+    edge_color_data = []
+    step_trace_groups = []
 
     def _unpack3(c):
         if len(c) >= 3:
@@ -2743,12 +2766,18 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
                 plot_coord1 = coord_mapping[coord1]
                 plot_coord2 = coord_mapping[coord2]
             else:
+                edge_trace_data.append(([0, 0], [0, 0], [0, 0]))
+                edge_color_data.append('#ffffff')
+                step_trace_groups.append([])
                 continue
         else:
             plot_coord1 = coord1
             plot_coord2 = coord2
 
         if plot_coord1 not in coords or plot_coord2 not in coords:
+            edge_trace_data.append(([0, 0], [0, 0], [0, 0]))
+            edge_color_data.append('#ffffff')
+            step_trace_groups.append([])
             continue
 
         x1, y1, z1 = _unpack3(plot_coord1)
@@ -2771,6 +2800,9 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
             trace_z = [z1, z2]
         else:
             if length < 1e-9:
+                edge_trace_data.append(([x1, x2], [y1, y2], [z1, z2]))
+                edge_color_data.append(path_color_hex)
+                step_trace_groups.append([])
                 continue
 
             edge_dir = np.array([dx, dy, dz]) / length
@@ -2791,6 +2823,10 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
             trace_y = by.tolist()
             trace_z = bz.tolist()
 
+        edge_trace_data.append((list(trace_x), list(trace_y), list(trace_z)))
+        edge_color_data.append(path_color_hex)
+
+        step_start = len(fig.data)
         fig.add_trace(
             go.Scatter3d(
                 x=trace_x, y=trace_y, z=trace_z,
@@ -2836,6 +2872,7 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
                 hoverinfo='none'
             )
         )
+        step_trace_groups.append(list(range(step_start, len(fig.data))))
 
     start_coord = path[0]
     end_coord = path[-1]
@@ -2872,6 +2909,9 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
             hoverinfo='none'
         )
     )
+    halo_indices = [len(fig.data) - 2, len(fig.data) - 1]
+
+    return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices)
 
 
 def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
@@ -2882,7 +2922,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                  mute_background: bool = False, fit=False, pad: int = 1,
-                 path_cmap: str = 'viridis') -> go.Figure:
+                 path_cmap: str = 'viridis',
+                 animate: bool = False, dur: float = 0.5) -> go.Figure:
     import networkx as nx
     """
     Plot a Lattice as a 2D or 3D grid visualization.
@@ -2916,6 +2957,10 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
              when ``fit`` is active. Clamped to lattice bounds. Ignored when fit is False.
         path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis').
                    Only applies when ``path`` is provided.
+        animate: If True and ``path`` is provided, returns an AnimatedFigure with
+                 playback controls instead of a static go.Figure.
+        dur: Duration in seconds between animation steps (default 0.5).
+             Only applies when ``animate`` is True.
         
     Returns:
         go.Figure: Plotly figure object
@@ -3173,6 +3218,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     else:
         effective_dimensionality = lattice.dimensionality
         coord_mapping = {}
+
+    _edge_trace_data = []
+    _edge_color_data = []
+    _path_trace_start = 0
+    _path_trace_end = 0
     
     if title is None:
         resolution_str = 'x'.join(str(r) for r in lattice.resolution)
@@ -3287,7 +3337,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
-        _draw_path_edges_2d(fig, path, coords, {}, lattice.dimensionality, set(), cmap=path_cmap)
+        _path_trace_start = len(fig.data)
+        _edge_trace_data, _edge_color_data, _anim_info = _draw_path_edges_2d(fig, path, coords, {}, lattice.dimensionality, set(), cmap=path_cmap)
+        _path_trace_end = len(fig.data)
         
         node_x, node_y = [], []
         hover_data = []
@@ -3475,7 +3527,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
-        _draw_path_edges_2d(fig, path, coords, coord_mapping, lattice.dimensionality, drawn_nodes, cmap=path_cmap)
+        _path_trace_start = len(fig.data)
+        _edge_trace_data, _edge_color_data, _anim_info = _draw_path_edges_2d(fig, path, coords, coord_mapping, lattice.dimensionality, drawn_nodes, cmap=path_cmap)
+        _path_trace_end = len(fig.data)
         
         node_x, node_y = [], []
         hover_data = []
@@ -3652,7 +3706,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
-        _draw_path_edges_3d(fig, path, coords, coord_mapping, lattice.dimensionality, drawn_nodes, cmap=path_cmap)
+        _path_trace_start = len(fig.data)
+        _edge_trace_data, _edge_color_data, _anim_info = _draw_path_edges_3d(fig, path, coords, coord_mapping, lattice.dimensionality, drawn_nodes, cmap=path_cmap)
+        _path_trace_end = len(fig.data)
         
         node_x, node_y, node_z = [], [], []
         hover_data = []
@@ -3895,6 +3951,17 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         else:
             fig.write_image(output_file)
     
+    if animate and path and len(path) > 1:
+        from .animated import AnimatedFigure
+
+        step_trace_groups, halo_indices = _anim_info
+        all_path_indices = list(range(_path_trace_start, _path_trace_end))
+
+        return AnimatedFigure(
+            fig, step_trace_groups, halo_indices, all_path_indices,
+            dur=dur, is_3d=(effective_dimensionality == 3)
+        )
+
     return fig
 
 
