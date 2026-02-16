@@ -265,11 +265,15 @@ class AnimatedFigure:
 
 class AnimatedRTFigure:
     def __init__(self, fig, node_to_traces, leaf_ancestors, all_animated_traces,
+                 leaf_x_positions=None, trace_bright_colors=None, trace_base_colors=None,
                  audio_payload=None, dur=0.5):
         self.fig = fig
         self.node_to_traces = node_to_traces
         self.leaf_ancestors = leaf_ancestors
         self.all_animated_traces = all_animated_traces
+        self.leaf_x_positions = leaf_x_positions or []
+        self.trace_bright_colors = trace_bright_colors or {}
+        self.trace_base_colors = trace_base_colors or {}
         self.audio_payload = audio_payload
         self.dur = dur
         self.widget_id = f"klotho_rt_{uuid.uuid4().hex[:8]}"
@@ -301,6 +305,9 @@ class AnimatedRTFigure:
         node_to_traces_json = json.dumps({str(k): v for k, v in self.node_to_traces.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in self.leaf_ancestors])
         all_anim_json = json.dumps(self.all_animated_traces)
+        leaf_x_json = json.dumps(self.leaf_x_positions)
+        bright_colors_json = json.dumps({str(k): v for k, v in self.trace_bright_colors.items()})
+        base_colors_json = json.dumps({str(k): v for k, v in self.trace_base_colors.items()})
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
         wid = self.widget_id
 
@@ -378,19 +385,36 @@ class AnimatedRTFigure:
     const nodeToTraces = {node_to_traces_json};
     const leafAncestors = {leaf_ancestors_json};
     const allAnimatedTraces = {all_anim_json};
+    const leafXPositions = {leaf_x_json};
+    const traceBrightColors = {bright_colors_json};
+    const traceBaseColors = {base_colors_json};
     const audioPayload = {payload_json};
     const totalSteps = leafAncestors.length;
 
     let looping = false;
     let playing = false;
+    var brightenedTraces = [];
+
+    function restoreBrightened() {{
+        for (var i = 0; i < brightenedTraces.length; i++) {{
+            var ti = brightenedTraces[i];
+            var base = traceBaseColors[String(ti)];
+            if (base) {{
+                Plotly.restyle(plotDiv, {{ 'fillcolor': base }}, [ti]);
+            }}
+        }}
+        brightenedTraces = [];
+    }}
 
     function dimAll() {{
+        restoreBrightened();
         if (allAnimatedTraces.length > 0) {{
             Plotly.restyle(plotDiv, {{ opacity: 0.15 }}, allAnimatedTraces);
         }}
     }}
 
     function resetAll() {{
+        restoreBrightened();
         if (allAnimatedTraces.length > 0) {{
             Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, allAnimatedTraces);
         }}
@@ -400,20 +424,44 @@ class AnimatedRTFigure:
         if (leafIdx < 0 || leafIdx >= leafAncestors.length) return;
         dimAll();
         var ancestorPath = leafAncestors[leafIdx];
-        var highlightTraces = [];
+        var pathTraces = [];
+        var leafNodeId = ancestorPath[ancestorPath.length - 1];
+        var leafTraces = nodeToTraces[leafNodeId] || [];
         for (var i = 0; i < ancestorPath.length; i++) {{
-            var nodeId = ancestorPath[i];
-            var traces = nodeToTraces[nodeId];
+            var traces = nodeToTraces[ancestorPath[i]];
             if (traces) {{
                 for (var j = 0; j < traces.length; j++) {{
-                    if (highlightTraces.indexOf(traces[j]) === -1) {{
-                        highlightTraces.push(traces[j]);
+                    if (pathTraces.indexOf(traces[j]) === -1) {{
+                        pathTraces.push(traces[j]);
                     }}
                 }}
             }}
         }}
-        if (highlightTraces.length > 0) {{
-            Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, highlightTraces);
+        if (pathTraces.length > 0) {{
+            Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, pathTraces);
+        }}
+        for (var k = 0; k < leafTraces.length; k++) {{
+            var ti = leafTraces[k];
+            var bright = traceBrightColors[String(ti)];
+            if (bright) {{
+                Plotly.restyle(plotDiv, {{ 'fillcolor': bright }}, [ti]);
+                brightenedTraces.push(ti);
+            }}
+        }}
+        if (leafIdx < leafXPositions.length) {{
+            try {{
+                var xax = plotDiv._fullLayout.xaxis;
+                var plotWidth = plotDiv._fullLayout.width - plotDiv._fullLayout.margin.l - plotDiv._fullLayout.margin.r;
+                var xFrac = (leafXPositions[leafIdx] - xax.range[0]) / (xax.range[1] - xax.range[0]);
+                var pxX = plotDiv._fullLayout.margin.l + xFrac * plotWidth;
+                var scroller = plotDiv.closest('.jp-OutputArea-output') || plotDiv.closest('.output_subarea') || plotDiv.parentElement;
+                if (scroller && scroller.scrollWidth > scroller.clientWidth) {{
+                    var targetLeft = pxX - scroller.clientWidth * 0.2;
+                    if (pxX < scroller.scrollLeft || pxX > scroller.scrollLeft + scroller.clientWidth) {{
+                        scroller.scrollLeft = Math.max(0, targetLeft);
+                    }}
+                }}
+            }} catch(_) {{}}
         }}
     }}
 

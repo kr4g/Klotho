@@ -477,18 +477,19 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
         if u in pos and v in pos:
             x1, y1 = pos[u]
             x2, y2 = pos[v]
+            v_prop = G[v].get('proportion', None)
+            edge_color = '#505050' if (v_prop is not None and v_prop < 0) else '#808080'
             trace_idx = len(fig.data)
             fig.add_trace(
                 go.Scatter(
                     x=[x1, x2], y=[y1, y2],
                     mode='lines+markers',
                     marker=dict(size=0.1, opacity=0),
-                    line=dict(color='#808080', width=2),
+                    line=dict(color=edge_color, width=2),
                     showlegend=False,
                     hoverinfo='none'
                 )
             )
-            node_to_traces.setdefault(u, []).append(trace_idx)
             node_to_traces.setdefault(v, []).append(trace_idx)
 
     for node in G.nodes():
@@ -529,6 +530,19 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
 
             is_leaf = len(list(G.neighbors(node))) == 0
 
+            if is_rest:
+                node_color = '#404040'
+                node_border_color = '#606060'
+                text_color = 'white'
+            elif is_leaf:
+                node_color = '#e6e6e6'
+                node_border_color = '#e6e6e6'
+                text_color = '#404040'
+            else:
+                node_color = '#c8c8c8'
+                node_border_color = '#c8c8c8'
+                text_color = '#404040'
+
             trace_idx = len(fig.data)
             fig.add_trace(
                 go.Scatter(
@@ -536,21 +550,21 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
                     mode='markers+text',
                     marker=dict(
                         size=node_size,
-                        color='white',
-                        line=dict(color='white', width=2),
+                        color=node_color,
+                        line=dict(color=node_border_color, width=2),
                         symbol='square' if is_leaf else 'circle'
                     ),
                     text=[display_text],
                     textposition='middle center',
-                    textfont=dict(color='#404040', size=text_size, family='Arial', weight='bold'),
+                    textfont=dict(color=text_color, size=text_size, family='Arial', weight='bold'),
                     hovertemplate=hover_text + '<extra></extra>',
                     showlegend=False
                 )
             )
             node_to_traces.setdefault(node, []).append(trace_idx)
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
-    
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
+
     fig.update_layout(
         width=width_px,
         height=height_px,
@@ -567,14 +581,24 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
         hovermode='closest',
         margin=dict(l=0, r=0, t=0, b=0),
     )
-    
+
     if output_file:
         if output_file.endswith('.html'):
             fig.write_html(output_file)
         else:
             fig.write_image(output_file)
 
+    leaf_x_positions = []
+    for leaf in rt.leaf_nodes:
+        if leaf in pos:
+            leaf_x_positions.append(float(pos[leaf][0]))
+        else:
+            leaf_x_positions.append(0.0)
+
     fig._node_to_traces = node_to_traces
+    fig._leaf_x_positions = leaf_x_positions
+    fig._trace_bright_colors = {}
+    fig._trace_base_colors = {}
     return fig
 
 def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
@@ -775,6 +799,8 @@ def _plot_ratios(rt, figsize=(20, 1), output_file=None):
 
     fig = go.Figure()
     node_to_traces = {}
+    trace_bright_colors = {}
+    trace_base_colors = {}
 
     for i, (pos, width, ratio) in enumerate(zip(positions, segment_widths, ratios)):
         is_rest = ratio < 0
@@ -804,10 +830,15 @@ def _plot_ratios(rt, figsize=(20, 1), output_file=None):
             fillcolor=color,
             line=dict(width=0),
             mode='lines',
+            hoveron='fills+points',
             hovertemplate=hover_text + '<extra></extra>',
             showlegend=False,
         ))
         node_to_traces.setdefault(node_id, []).append(trace_idx)
+
+        bright = '#ffffff' if not is_rest else 'rgba(160,160,160,0.6)'
+        trace_bright_colors[trace_idx] = bright
+        trace_base_colors[trace_idx] = color
 
     for pos in positions + [1.0]:
         fig.add_shape(
@@ -817,7 +848,7 @@ def _plot_ratios(rt, figsize=(20, 1), output_file=None):
             line=dict(color='#aaaaaa', width=2),
         )
 
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     fig.update_layout(
         width=width_px,
         height=height_px,
@@ -842,7 +873,12 @@ def _plot_ratios(rt, figsize=(20, 1), output_file=None):
         else:
             fig.write_image(output_file)
 
+    leaf_x_positions = [pos + sw / 2 for pos, sw in zip(positions, segment_widths)]
+
     fig._node_to_traces = node_to_traces
+    fig._leaf_x_positions = leaf_x_positions
+    fig._trace_bright_colors = trace_bright_colors
+    fig._trace_base_colors = trace_base_colors
     return fig
 
 def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
@@ -867,6 +903,8 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
 
     fig = go.Figure()
     node_to_traces = {}
+    trace_bright_colors = {}
+    trace_base_colors = {}
     max_depth = rt.depth
 
     margin = 0.01
@@ -894,7 +932,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
             fig.add_shape(
                 type='line', x0=x_pos, x1=x_pos,
                 y0=level_positions[0] + top_bar_height / 2, y1=line_cutoff,
-                line=dict(color=barline_color, width=1.5, dash='dash'),
+                line=dict(color=barline_color, width=1.5, dash='4px 6px'),
                 opacity=0.3,
             )
 
@@ -955,6 +993,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                             fill='toself', fillcolor=color,
                             line=dict(color='black', width=1),
                             mode='lines',
+                            hoveron='fills+points',
                             hovertemplate=hover_text + '<extra></extra>',
                             showlegend=False,
                         ))
@@ -1025,10 +1064,16 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                 fill='toself', fillcolor=color,
                 line=dict(color='black', width=1),
                 mode='lines',
+                hoveron='fills+points',
                 hovertemplate=hover_text + '<extra></extra>',
                 showlegend=False,
             ))
             node_to_traces.setdefault(node, []).append(trace_idx)
+
+            if is_leaf:
+                bright = '#ffffff' if not is_rest else '#707070'
+                trace_bright_colors[trace_idx] = bright
+                trace_base_colors[trace_idx] = color
 
             label_text = f"{ratio}" if ratio is not None else ""
             text_color = 'white' if is_rest else 'black'
@@ -1049,7 +1094,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                     fig.add_shape(
                         type='line', x0=left_x, x1=left_x,
                         y0=y_pos - bar_height / 2, y1=line_cutoff,
-                        line=dict(color=subdivision_line_color, width=0.8, dash='dash'),
+                        line=dict(color=subdivision_line_color, width=0.8, dash='2px 4px'),
                         opacity=0.9,
                     )
 
@@ -1058,7 +1103,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                     fig.add_shape(
                         type='line', x0=right_x, x1=right_x,
                         y0=y_pos - bar_height / 2, y1=line_cutoff,
-                        line=dict(color=subdivision_line_color, width=0.8, dash='dash'),
+                        line=dict(color=subdivision_line_color, width=0.8, dash='2px 4px'),
                         opacity=0.9,
                     )
 
@@ -1115,6 +1160,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
             fill='toself', fillcolor=color,
             line=dict(width=0),
             mode='lines',
+            hoveron='fills+points',
             hovertemplate=hover_text + '<extra></extra>',
             showlegend=False,
         ))
@@ -1136,7 +1182,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                 xanchor='center', yanchor='middle',
             )
 
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     fig.update_layout(
         width=width_px,
         height=height_px,
@@ -1160,7 +1206,12 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
         else:
             fig.write_image(output_file)
 
+    leaf_x_positions = [pos_x + sw / 2 for pos_x, sw in zip(positions, segment_widths)]
+
     fig._node_to_traces = node_to_traces
+    fig._leaf_x_positions = leaf_x_positions
+    fig._trace_bright_colors = trace_bright_colors
+    fig._trace_base_colors = trace_base_colors
     return fig
 
 
@@ -1801,11 +1852,18 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     else:
         audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
 
+    leaf_x_positions = getattr(fig, '_leaf_x_positions', [])
+    trace_bright_colors = getattr(fig, '_trace_bright_colors', {})
+    trace_base_colors = getattr(fig, '_trace_base_colors', {})
+
     return AnimatedRTFigure(
         fig=fig,
         node_to_traces=node_to_traces,
         leaf_ancestors=leaf_ancestors,
         all_animated_traces=all_animated_traces,
+        leaf_x_positions=leaf_x_positions,
+        trace_bright_colors=trace_bright_colors,
+        trace_base_colors=trace_base_colors,
         audio_payload=audio_payload,
         dur=dur,
     )

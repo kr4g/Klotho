@@ -78,6 +78,11 @@
 
       var myPart = new Tone.Part(function(time, ev) {
         if (!playing) return;
+        if (options.onEvent && ev._stepIndex != null) {
+          Tone.Draw.schedule(function() {
+            if (playing) options.onEvent(ev._stepIndex);
+          }, time);
+        }
         var spec = instruments[ev.instrument];
         var inst = myInsts[ev.instrument];
         if (!spec || !inst) return;
@@ -86,11 +91,6 @@
         var freq = pf.freq != null ? pf.freq : (spec.defaults.freq != null ? spec.defaults.freq : 440);
         spec.trigger(inst, freq, Math.max(0.01, ev.duration), time,
                      Math.max(0, Math.min(1, vel)), pf);
-        if (options.onEvent && ev._stepIndex != null) {
-          Tone.Draw.schedule(function() {
-            if (playing) options.onEvent(ev._stepIndex);
-          }, time);
-        }
       }, events.map(function(ev) { return [ev.start, ev]; }));
 
       _onStop = options.onStop || null;
