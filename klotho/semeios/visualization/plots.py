@@ -2566,6 +2566,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
     edge_counts = defaultdict(int)
     edge_trace_data = []
     edge_color_data = []
+    arrow_data = []
     step_trace_groups = []
 
     for i in range(len(path) - 1):
@@ -2578,6 +2579,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
             else:
                 edge_trace_data.append(([0, 0], [0, 0]))
                 edge_color_data.append('#ffffff')
+                arrow_data.append(None)
                 step_trace_groups.append([])
                 continue
         else:
@@ -2587,6 +2589,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
         if plot_coord1 not in coords or plot_coord2 not in coords:
             edge_trace_data.append(([0, 0], [0, 0]))
             edge_color_data.append('#ffffff')
+            arrow_data.append(None)
             step_trace_groups.append([])
             continue
 
@@ -2615,6 +2618,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
             if length < 1e-9:
                 edge_trace_data.append(([x1, x2], [y1, y2]))
                 edge_color_data.append(path_color_hex)
+                arrow_data.append(None)
                 step_trace_groups.append([])
                 continue
             perp_x, perp_y = -dy / length, dx / length
@@ -2644,6 +2648,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
 
         edge_trace_data.append((list(trace_x), list(trace_y)))
         edge_color_data.append(path_color_hex)
+        arrow_data.append((mid_x, mid_y, -(arrow_angle - 90), path_color_hex))
 
         step_start = len(fig.data)
         fig.add_trace(
@@ -2718,7 +2723,7 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
     )
     halo_indices = [len(fig.data) - 2, len(fig.data) - 1]
 
-    return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices)
+    return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices, arrow_data)
 
 
 def _rodrigues_rotate(v, axis, theta):
@@ -2739,6 +2744,7 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
     edge_counts = defaultdict(int)
     edge_trace_data = []
     edge_color_data = []
+    arrow_data = []
     step_trace_groups = []
 
     def _unpack3(c):
@@ -2768,6 +2774,7 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
             else:
                 edge_trace_data.append(([0, 0], [0, 0], [0, 0]))
                 edge_color_data.append('#ffffff')
+                arrow_data.append(None)
                 step_trace_groups.append([])
                 continue
         else:
@@ -2777,6 +2784,7 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
         if plot_coord1 not in coords or plot_coord2 not in coords:
             edge_trace_data.append(([0, 0], [0, 0], [0, 0]))
             edge_color_data.append('#ffffff')
+            arrow_data.append(None)
             step_trace_groups.append([])
             continue
 
@@ -2802,6 +2810,7 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
             if length < 1e-9:
                 edge_trace_data.append(([x1, x2], [y1, y2], [z1, z2]))
                 edge_color_data.append(path_color_hex)
+                arrow_data.append(None)
                 step_trace_groups.append([])
                 continue
 
@@ -2825,6 +2834,18 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
 
         edge_trace_data.append((list(trace_x), list(trace_y), list(trace_z)))
         edge_color_data.append(path_color_hex)
+
+        if traversal_idx == 0:
+            _amx = (x1 + x2) / 2
+            _amy = (y1 + y2) / 2
+            _amz = (z1 + z2) / 2
+        else:
+            _amid = n_bezier_points // 2
+            _amx = trace_x[_amid] if len(trace_x) > _amid else (x1 + x2) / 2
+            _amy = trace_y[_amid] if len(trace_y) > _amid else (y1 + y2) / 2
+            _amz = trace_z[_amid] if len(trace_z) > _amid else (z1 + z2) / 2
+        _anorm = length if length > 1e-9 else 1.0
+        arrow_data.append((_amx, _amy, _amz, dx / _anorm, dy / _anorm, dz / _anorm, path_color_hex))
 
         step_start = len(fig.data)
         fig.add_trace(
@@ -2911,7 +2932,7 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
     )
     halo_indices = [len(fig.data) - 2, len(fig.data) - 1]
 
-    return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices)
+    return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices, arrow_data)
 
 
 def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
@@ -3953,12 +3974,31 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     if animate and path and len(path) > 1:
         from .animated import AnimatedFigure
+        from klotho.utils.playback.tonejs.converters import freq_to_velocity
 
-        step_trace_groups, halo_indices = _anim_info
+        step_trace_groups, halo_indices, _arrow_info = _anim_info
         all_path_indices = list(range(_path_trace_start, _path_trace_end))
+
+        ref_freq = 261.63
+        audio_events = []
+        for i, coord in enumerate(path):
+            try:
+                ratio = lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
+                freq = ref_freq * float(ratio) if ratio is not None else ref_freq
+            except Exception:
+                freq = ref_freq
+            audio_events.append({
+                "start": round(i * dur, 6),
+                "duration": round(dur * 0.9, 6),
+                "instrument": "synth",
+                "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
+                "_stepIndex": i,
+            })
+        audio_payload = {"events": audio_events, "instruments": {}}
 
         return AnimatedFigure(
             fig, step_trace_groups, halo_indices, all_path_indices,
+            audio_payload=audio_payload,
             dur=dur, is_3d=(effective_dimensionality == 3)
         )
 

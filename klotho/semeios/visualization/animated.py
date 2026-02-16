@@ -1,23 +1,30 @@
 import json
 import uuid
+from pathlib import Path
 
 _PLOTLY_CDN = "https://cdn.plot.ly/plotly-3.0.0.min.js"
+_TONEJS_CDN = "https://unpkg.com/tone@14.7.77/build/Tone.js"
+_INSTRUMENTS_JS_PATH = Path(__file__).resolve().parent.parent.parent / "utils" / "playback" / "tonejs" / "instruments.js"
+_PLAYER_JS_PATH = Path(__file__).resolve().parent.parent.parent / "utils" / "playback" / "tonejs" / "player.js"
+
 _plotly_included = False
+_tone_included = False
 
 
 class AnimatedFigure:
     def __init__(self, fig, step_trace_groups, halo_indices, all_path_indices,
-                 dur=0.5, is_3d=False):
+                 audio_payload=None, dur=0.5, is_3d=False):
         self.fig = fig
         self.step_trace_groups = step_trace_groups
         self.halo_indices = halo_indices
         self.all_path_indices = all_path_indices
+        self.audio_payload = audio_payload
         self.dur = dur
         self.is_3d = is_3d
         self.widget_id = f"klotho_anim_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
-        global _plotly_included
+        global _plotly_included, _tone_included
 
         plot_div_id = f"{self.widget_id}_plot"
         fig_html = self.fig.to_html(
@@ -26,20 +33,28 @@ class AnimatedFigure:
             div_id=plot_div_id,
         )
 
+        cdn_scripts = ''
         if not _plotly_included:
-            plotly_script = f'<script src="{_PLOTLY_CDN}"></script>'
+            cdn_scripts += f'<script src="{_PLOTLY_CDN}"></script>\n'
             _plotly_included = True
-        else:
-            plotly_script = ''
+        if not _tone_included and self.audio_payload:
+            cdn_scripts += f'<script src="{_TONEJS_CDN}"></script>\n'
+            _tone_included = True
+
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+
+        instruments_js = _INSTRUMENTS_JS_PATH.read_text() if _INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = _PLAYER_JS_PATH.read_text() if _PLAYER_JS_PATH.exists() else ""
 
         steps_json = json.dumps(self.step_trace_groups)
         halos_json = json.dumps(self.halo_indices)
         all_path_json = json.dumps(self.all_path_indices)
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
         wid = self.widget_id
-        dur_ms = self.dur * 1000
 
         html = f'''
-{plotly_script}
+{cdn_scripts}
 {fig_html}
 <div id="{wid}_controls" style="
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -94,6 +109,13 @@ class AnimatedFigure:
         </svg>
     </button>
 </div>
+{session_script}
+<script>
+{instruments_js}
+</script>
+<script>
+{player_js}
+</script>
 <script>
 (() => {{
     const plotDiv = document.getElementById("{plot_div_id}");
@@ -105,12 +127,11 @@ class AnimatedFigure:
     const steps = {steps_json};
     const haloIndices = {halos_json};
     const allPathIndices = {all_path_json};
-    const durMs = {dur_ms};
+    const audioPayload = {payload_json};
     const totalSteps = steps.length;
 
     let looping = false;
     let playing = false;
-    let timerId = null;
 
     function hideAllPath() {{
         if (allPathIndices.length > 0) {{
@@ -125,44 +146,29 @@ class AnimatedFigure:
     }}
 
     function revealStep(stepIdx) {{
-        var group = steps[stepIdx];
-        if (group && group.length > 0) {{
-            Plotly.restyle(plotDiv, {{ visible: true }}, group);
+        if (stepIdx === 0) {{
+            hideAllPath();
+            if (haloIndices.length > 0) {{
+                Plotly.restyle(plotDiv, {{ visible: true }}, [haloIndices[0]]);
+            }}
+            return;
         }}
-        if (stepIdx === 0 && haloIndices.length > 0) {{
-            Plotly.restyle(plotDiv, {{ visible: true }}, [haloIndices[0]]);
+        var edgeIdx = stepIdx - 1;
+        if (edgeIdx >= 0 && edgeIdx < steps.length) {{
+            var group = steps[edgeIdx];
+            if (group && group.length > 0) {{
+                Plotly.restyle(plotDiv, {{ visible: true }}, group);
+            }}
         }}
-        if (stepIdx === totalSteps - 1 && haloIndices.length > 1) {{
+        if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && haloIndices.length > 1) {{
             Plotly.restyle(plotDiv, {{ visible: true }}, [haloIndices[1]]);
         }}
     }}
 
     function finishPlayback() {{
         playing = false;
-        if (timerId) {{ clearTimeout(timerId); timerId = null; }}
         showAllPath();
         setPlayIcon();
-    }}
-
-    function runAnimation(stepIdx) {{
-        if (!playing) return;
-        if (stepIdx >= totalSteps) {{
-            if (looping) {{
-                hideAllPath();
-                timerId = setTimeout(function() {{
-                    requestAnimationFrame(function() {{ runAnimation(0); }});
-                }}, durMs);
-            }} else {{
-                finishPlayback();
-            }}
-            return;
-        }}
-        requestAnimationFrame(function() {{
-            revealStep(stepIdx);
-            timerId = setTimeout(function() {{
-                runAnimation(stepIdx + 1);
-            }}, durMs);
-        }});
     }}
 
     function setPlayIcon() {{
@@ -191,18 +197,66 @@ class AnimatedFigure:
         loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
     }};
 
-    toggleBtn.onclick = () => {{
-        if (playing) {{
-            finishPlayback();
-        }} else {{
-            playing = true;
-            setStopIcon();
-            hideAllPath();
-            requestAnimationFrame(function() {{
-                runAnimation(0);
-            }});
+    if (audioPayload && typeof Tone !== "undefined") {{
+        var events = audioPayload.events || [];
+        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        var player = KlothoPlayer.create();
+
+        toggleBtn.onclick = async () => {{
+            if (player.isPlaying()) {{
+                player.stop();
+            }} else {{
+                playing = true;
+                setStopIcon();
+                hideAllPath();
+                await player.play(events, instruments, {{
+                    loop: looping,
+                    onEvent: function(stepIdx) {{
+                        revealStep(stepIdx);
+                    }},
+                    onStop: function() {{
+                        finishPlayback();
+                    }},
+                    onFinish: function() {{
+                        finishPlayback();
+                    }}
+                }});
+            }}
+        }};
+    }} else {{
+        var durMs = {self.dur * 1000};
+        var timerId = null;
+
+        function runAnimation(stepIdx) {{
+            if (!playing) return;
+            if (stepIdx > totalSteps) {{
+                if (looping) {{
+                    hideAllPath();
+                    timerId = setTimeout(function() {{ runAnimation(0); }}, durMs);
+                }} else {{
+                    finishPlayback();
+                }}
+                return;
+            }}
+            revealStep(stepIdx);
+            timerId = setTimeout(function() {{
+                runAnimation(stepIdx + 1);
+            }}, durMs);
         }}
-    }};
+
+        toggleBtn.onclick = () => {{
+            if (playing) {{
+                playing = false;
+                if (timerId) {{ clearTimeout(timerId); timerId = null; }}
+                finishPlayback();
+            }} else {{
+                playing = true;
+                setStopIcon();
+                hideAllPath();
+                runAnimation(0);
+            }}
+        }};
+    }}
 }})();
 </script>
 '''

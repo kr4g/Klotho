@@ -39,6 +39,7 @@
     let stopTimer = null;
     let playing = false;
     let pieceDuration = 0;
+    let _onStop = null;
 
     function stop() {
       playing = false;
@@ -55,6 +56,7 @@
       part = null;
       gain = null;
       insts = null;
+      if (_onStop) { try { _onStop(); } catch(_) {} }
     }
 
     function startPlayback(events, instruments, options) {
@@ -84,8 +86,14 @@
         var freq = pf.freq != null ? pf.freq : (spec.defaults.freq != null ? spec.defaults.freq : 440);
         spec.trigger(inst, freq, Math.max(0.01, ev.duration), time,
                      Math.max(0, Math.min(1, vel)), pf);
+        if (options.onEvent && ev._stepIndex != null) {
+          Tone.Draw.schedule(function() {
+            if (playing) options.onEvent(ev._stepIndex);
+          }, time);
+        }
       }, events.map(function(ev) { return [ev.start, ev]; }));
 
+      _onStop = options.onStop || null;
       part = myPart;
       playing = true;
 
