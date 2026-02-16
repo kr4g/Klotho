@@ -116,6 +116,7 @@
     }
 
     async function play(events, instruments, options) {
+      _onStop = null;
       stop();
       options = options || {};
 
