@@ -20,6 +20,7 @@ __all__ = [
     'split_partial',
     'harmonic_mean',
     'arithmetic_mean',
+    'harmonic_distance',
     'logarithmic_distance',
     'interval_cost',
     'n_tet',
@@ -191,6 +192,40 @@ def arithmetic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fr
     '''
     a, b = Fraction(a), Fraction(b)
     return (a + b) / 2
+
+def harmonic_distance(ratio: Union[int, float, Fraction, str]) -> float:
+    """
+    Compute the Tenney height (harmonic distance) of a ratio.
+
+    For a ratio p/q in lowest terms the Tenney height is defined as
+    log2(p * q).  Simpler ratios (small numerator and denominator)
+    yield lower values; more complex ratios yield higher values.
+
+    Parameters
+    ----------
+    ratio : int, float, Fraction, or str
+        The ratio to measure.  Strings like ``'3/2'`` are accepted.
+
+    Returns
+    -------
+    float
+        The Tenney height (base-2 logarithm of numerator * denominator).
+
+    Examples
+    --------
+    >>> harmonic_distance('3/2')
+    2.584962500721156
+
+    >>> harmonic_distance('5/4')
+    4.321928094887363
+
+    >>> harmonic_distance(Fraction(9, 8))
+    6.169925001442312
+    """
+    r = Fraction(ratio)
+    p, q = abs(r.numerator), abs(r.denominator)
+    return float(np.log2(p * q))
+
 
 def logarithmic_distance(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str], 
                          equave: Union[int, float, Fraction, str] = 2) -> float:

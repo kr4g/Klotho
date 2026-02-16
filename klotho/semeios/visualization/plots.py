@@ -3025,7 +3025,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             
             hover_data.append(hover_text)
             
-            if nodes and ((coords_iter is coords and original_coords[i] in highlighted_coords) or (coords_iter is not coords and (x,) in coords_iter)):
+            is_highlighted = False
+            if coords_iter is coords and i < len(original_coords):
+                is_highlighted = original_coords[i] in highlighted_coords
+            elif coords_iter is not coords:
+                is_highlighted = (x,) in coords_iter
+            
+            if is_highlighted:
                 node_colors.append('white')
             elif use_dimmed:
                 node_colors.append(dimmed_node_color)
@@ -3202,6 +3208,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         node_x, node_y = [], []
         hover_data = []
         node_colors = []
+        hover_bg = []
+        hover_font = []
         
         reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
         coords_iter = coords
@@ -3237,13 +3245,18 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             
             hover_data.append(hover_text)
             
-            # Set node color based on highlighting
-            if nodes and orig_coord in highlighted_coords:
+            if highlighted_coords and orig_coord in highlighted_coords:
                 node_colors.append('white')
+                hover_bg.append('white')
+                hover_font.append('black')
             elif use_dimmed:
                 node_colors.append(dimmed_node_color)
+                hover_bg.append('black')
+                hover_font.append('white')
             else:
                 node_colors.append('white')
+                hover_bg.append('white')
+                hover_font.append('black')
         
         fig.add_trace(
             go.Scatter(
@@ -3254,6 +3267,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                     color=node_colors,
                     line=dict(color='white', width=2)
                 ),
+                hoverlabel=dict(bgcolor=hover_bg, font=dict(color=hover_font)),
                 hovertemplate='%{text}<extra></extra>',
                 text=hover_data,
                 showlegend=False
@@ -3415,6 +3429,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         node_x, node_y, node_z = [], [], []
         hover_data = []
         node_colors = []
+        hover_bg = []
+        hover_font = []
         
         reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
         coords_iter = coords
@@ -3456,13 +3472,18 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             
             hover_data.append(hover_text)
             
-            # Set node color based on highlighting
-            if nodes and orig_coord in highlighted_coords:
+            if highlighted_coords and orig_coord in highlighted_coords:
                 node_colors.append('white')
+                hover_bg.append('white')
+                hover_font.append('black')
             elif use_dimmed:
                 node_colors.append(dimmed_node_color)
+                hover_bg.append('black')
+                hover_font.append('white')
             else:
                 node_colors.append('white')
+                hover_bg.append('white')
+                hover_font.append('black')
         
         fig.add_trace(
             go.Scatter3d(
@@ -3473,6 +3494,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                     color=node_colors,
                     line=dict(color='white', width=2)
                 ),
+                hoverlabel=dict(bgcolor=hover_bg, font=dict(color=hover_font)),
                 hovertemplate='%{text}<extra></extra>',
                 text=hover_data,
                 showlegend=False

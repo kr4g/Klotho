@@ -6,7 +6,8 @@ from .lattices import Lattice
 
 def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int, 
                 max_repeats: Optional[int] = None, seed: Optional[int] = None,
-                avoid_backtrack: bool = False) -> List[Tuple[int, ...]]:
+                avoid_backtrack: bool = False,
+                stuck_tolerance: int = 3) -> List[Tuple[int, ...]]:
     """
     Perform a random walk on a lattice starting from a given coordinate.
     
@@ -24,6 +25,10 @@ def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int,
         Random seed for reproducible walks.
     avoid_backtrack : bool
         If True, avoid immediately returning to the previous coordinate when possible.
+    stuck_tolerance : int
+        When the walk gets stuck (all neighbors exceed ``max_repeats``),
+        temporarily allow one extra visit up to this many times before
+        stopping.  Resets after each non-stuck step.  Default is 3.
         
     Returns
     -------
@@ -50,6 +55,7 @@ def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int,
     current_coord = start_coord
     visit_counts = {start_coord: 1}
     previous_coord = None
+    stuck_budget = stuck_tolerance
     
     for step in range(num_steps):
         neighbors = lattice.neighbors(current_coord)
@@ -70,12 +76,17 @@ def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int,
             valid_neighbors.append(neighbor)
         
         if not valid_neighbors:
-            if max_repeats is not None:
-                valid_neighbors = [n for n in neighbors 
-                                 if visit_counts.get(n, 0) <= max_repeats]
-            
-            if not valid_neighbors:
+            if max_repeats is not None and stuck_budget > 0:
+                valid_neighbors = [n for n in neighbors
+                                   if visit_counts.get(n, 0) <= max_repeats + 1]
+                if valid_neighbors:
+                    stuck_budget -= 1
+                else:
+                    break
+            else:
                 break
+        else:
+            stuck_budget = stuck_tolerance
         
         next_coord = random.choice(valid_neighbors)
         
@@ -233,3 +244,54 @@ def boundary_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int
         current_coord = next_coord
     
     return path
+
+
+def shortest_path(lattice: Lattice, start_coord: Tuple[int, ...],
+                  end_coord: Tuple[int, ...]) -> List[Tuple[int, ...]]:
+    """
+    Find the shortest path between two coordinates in a lattice.
+
+    Uses breadth-first search on the underlying graph, so every edge
+    has equal weight (one lattice step).
+
+    Parameters
+    ----------
+    lattice : Lattice
+        The lattice to search.
+    start_coord : Tuple[int, ...]
+        Starting coordinate.
+    end_coord : Tuple[int, ...]
+        Target coordinate.
+
+    Returns
+    -------
+    List[Tuple[int, ...]]
+        Ordered list of coordinates from *start_coord* to *end_coord*
+        (inclusive).
+
+    Raises
+    ------
+    KeyError
+        If either coordinate is not in the lattice.
+    ValueError
+        If no path exists between the two coordinates.
+    """
+    if start_coord not in lattice:
+        raise KeyError(f"Start coordinate {start_coord} not found in lattice")
+    if end_coord not in lattice:
+        raise KeyError(f"End coordinate {end_coord} not found in lattice")
+
+    start_node = lattice._get_node_for_coord(start_coord)
+    end_node = lattice._get_node_for_coord(end_coord)
+
+    node_paths = rx.dijkstra_shortest_paths(
+        lattice._graph, start_node, target=end_node,
+        weight_fn=lambda _: 1.0,
+    )
+
+    if end_node not in node_paths:
+        raise ValueError(
+            f"No path exists between {start_coord} and {end_coord}"
+        )
+
+    return [lattice._node_to_coord[n] for n in [start_node] + list(node_paths[end_node])]

@@ -348,5 +348,12 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     def locrian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
         return cls.ionian().mode(6).root(reference_pitch) if reference_pitch else cls.ionian().mode(6)
 
+    @classmethod
+    def bagpipes(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        return cls(
+            ['1/1', '9/8', '5/4', '4/3', '27/20', '3/2', '5/3', '7/4', '16/9', '9/5'],
+            reference_pitch=reference_pitch
+        )
+
 
 InstancedScale = Scale
