@@ -7,7 +7,7 @@ def find_navigation_path(field, steps: int = 2000, frequency: float = 0.05) -> L
     Generate a navigation path through the field.
     
     Args:
-        field: The ParametricField object to navigate
+        field: The ParameterField object to navigate
         steps: Number of steps to take in the navigation
         frequency: Frequency of oscillation for path generation
         

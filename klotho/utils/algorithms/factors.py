@@ -1,8 +1,9 @@
 from fractions import Fraction
 from sympy import factorint, prime as sympy_prime, isprime
-from typing import Union, Dict, List, Optional
+from typing import Union, Dict, List, Optional, Sequence
 from functools import lru_cache
 import numpy as np
+import sympy as sp
 
 def to_factors(value: Union[int, Fraction, str]) -> Dict[int, int]:
     """
@@ -157,11 +158,11 @@ def nth_prime(prime: int) -> int:
 
 def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int] = None) -> np.ndarray:
     """
-    Convert prime factors dictionary to lattice vector representation.
+    Convert a prime-factor dictionary to a prime-coordinate vector.
     
-    Transform a dictionary of prime factors into a vector in prime number space.
-    This function is more efficient when you already have the factors computed
-    and want to avoid recomputing them.
+    Transform a dictionary of prime factors into a vector in prime basis space.
+    This is efficient when factors are already available and factorization work
+    can be skipped.
 
     Parameters
     ----------
@@ -175,14 +176,13 @@ def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int
     Returns
     -------
     numpy.ndarray
-        Immutable vector of prime exponents with optional zero-padding to 
-        specified size. Position i corresponds to the (i+1)th prime number.
-        Supports mathematical vector operations (addition, subtraction, etc.).
+        Immutable vector of prime exponents with optional zero-padding.
+        Position ``i`` corresponds to the ``(i+1)``th prime.
 
     Raises
     ------
     ValueError
-        If vector_size is smaller than required to represent the factors.
+        If ``vector_size`` is too small to represent the highest prime.
 
     Examples
     --------
@@ -199,9 +199,7 @@ def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int
 
     Notes
     -----
-    Returned arrays are immutable to preserve mathematical integrity.
-    Vector addition corresponds to ratio multiplication:
-    lattice_vector(a) + lattice_vector(b) = lattice_vector(a * b)
+    Returned arrays are immutable.
     """
     if not factors:
         arr = np.zeros(vector_size or 1, dtype=int)
@@ -220,133 +218,164 @@ def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int
     arr.setflags(write=False)
     return arr
 
-@lru_cache(maxsize=128)
-def ratio_to_lattice_vector(ratio: Union[int, Fraction, str], vector_size: Optional[int] = None) -> np.ndarray:
+def ratio_to_coordinate(
+    ratio: Union[int, Fraction, str],
+    vector_size: Optional[int] = None,
+    generators: Optional[Sequence[Union[int, Fraction, str]]] = None,
+    basis_primes: Optional[Sequence[int]] = None,
+) -> np.ndarray:
     """
-    Convert a ratio to its prime lattice vector representation.
-    
-    Transform a rational number into a vector in prime number space,
-    where each dimension corresponds to a prime number and the value
-    represents the exponent of that prime in the factorization.
-    
-    This is a convenience function that combines factorization and vector
-    conversion. For efficiency with multiple ratios, consider using
-    ratios_to_lattice_vectors() instead.
+    Convert a ratio to a coordinate vector.
+
+    Behavior depends on ``generators``:
+    - If ``generators`` is ``None``, return prime coordinates (monzo-style) in
+      the canonical prime basis.
+    - If ``generators`` is provided, solve for integer generator coordinates
+      using ``basis_primes`` and a linear Diophantine system.
 
     Parameters
     ----------
-    ratio : int, Fraction, or str
-        The ratio to convert to prime lattice form. Can be an integer,
-        Fraction object, or string representation of a fraction.
+    ratio : int | Fraction | str
+        Ratio to convert.
     vector_size : int, optional
-        Target size for the output vector. Must be at least as large as
-        needed to represent the largest prime factor. If None, uses the
-        minimum required size. Default is None.
+        Output length. If larger than required, result is zero-padded.
+        If smaller, raises ``ValueError``.
+    generators : sequence[int | Fraction | str], optional
+        Generator basis used for coordinates. Floats are not accepted.
+    basis_primes : sequence[int], optional
+        Prime basis used to express generator monzos. If omitted, inferred from
+        the generator factorizations.
 
     Returns
     -------
     numpy.ndarray
-        Immutable vector of prime exponents, where position i corresponds 
-        to the (i+1)th prime number. Zero-padded to vector_size if specified.
-        Supports mathematical vector operations.
+        Immutable integer coordinate vector.
 
     Raises
     ------
+    TypeError
+        If generator values include floats.
     ValueError
-        If vector_size is smaller than required to represent the ratio.
-
-    Examples
-    --------
-    Simple ratio to prime lattice:
-    
-    >>> ratio_to_lattice_vector(3)
-    array([0, 1])
-    
-    Fraction with padding:
-    
-    >>> ratio_to_lattice_vector('6/5', vector_size=4)
-    array([ 1,  1, -1,  0])
-    
-    Higher primes with padding:
-    
-    >>> ratio_to_lattice_vector('7/4', vector_size=6)
-    array([-2,  0,  0,  1,  0,  0])
-
-    Notes
-    -----
-    The prime lattice representation enables geometric operations on
-    musical intervals and harmonic relationships. Vector addition 
-    corresponds to ratio multiplication, and subtraction corresponds
-    to ratio division.
-    
-    Vectors are returned as immutable NumPy arrays to preserve mathematical
-    integrity while enabling proper mathematical operations.
+        If the basis is invalid, if representation is not unique/integer, or if
+        ``vector_size`` is inconsistent.
     """
-    factors = to_factors(Fraction(ratio))
-    return factors_to_lattice_vector(factors, vector_size)
+    ratio_fraction = Fraction(ratio)
+    if generators is None:
+        factors = to_factors(ratio_fraction)
+        return factors_to_lattice_vector(factors, vector_size)
 
-def ratios_to_lattice_vectors(ratios: List[Union[int, Fraction, str]], 
-                             vector_size: Optional[int] = None) -> Dict[Union[int, Fraction, str], np.ndarray]:
+    parsed_generators: List[Fraction] = []
+    for g in generators:
+        if isinstance(g, float):
+            raise TypeError("generators must be int, Fraction, or str; floats are not supported")
+        parsed_generators.append(Fraction(g))
+    if not parsed_generators:
+        raise ValueError("generators must not be empty")
+
+    if basis_primes is None:
+        all_primes = set()
+        for g in parsed_generators:
+            all_primes.update(to_factors(g).keys())
+        primes = sorted(all_primes)
+    else:
+        primes = [int(p) for p in basis_primes]
+    if len(set(primes)) != len(primes):
+        raise ValueError("basis_primes must be unique")
+    if any(not isprime(p) for p in primes):
+        raise ValueError("basis_primes must contain only prime numbers")
+
+    ratio_factors = to_factors(ratio_fraction)
+    missing_primes = [p for p, e in ratio_factors.items() if e != 0 and p not in primes]
+    if missing_primes:
+        raise ValueError(
+            f"ratio contains primes not present in basis_primes: {sorted(missing_primes)}"
+        )
+
+    A = sp.Matrix(
+        [
+            [to_factors(g).get(p, 0) for g in parsed_generators]
+            for p in primes
+        ]
+    )
+    x = sp.Matrix([ratio_factors.get(p, 0) for p in primes])
+    y_symbols = sp.symbols(f"y0:{len(parsed_generators)}", integer=True)
+    solutions = sp.linsolve((A, x), y_symbols)
+    if not solutions:
+        raise ValueError("ratio is not representable with provided generators")
+    solution = next(iter(solutions))
+    if any(expr.free_symbols for expr in solution):
+        raise ValueError("ratio does not have a unique integer coordinate in provided generators")
+    y = sp.Matrix(solution)
+    if any(sp.denom(v) != 1 for v in y):
+        raise ValueError("ratio is not representable with integer generator coordinates")
+
+    coord = [int(v) for v in y]
+    if vector_size is not None:
+        if vector_size < len(coord):
+            raise ValueError(
+                f"vector_size ({vector_size}) must be at least {len(coord)} for provided generators"
+            )
+        if vector_size > len(coord):
+            coord = coord + [0] * (vector_size - len(coord))
+    arr = np.array(coord, dtype=int)
+    arr.setflags(write=False)
+    return arr
+
+
+def ratios_to_coordinates(
+    ratios: Sequence[Union[int, Fraction, str]],
+    vector_size: Optional[int] = None,
+    generators: Optional[Sequence[Union[int, Fraction, str]]] = None,
+    basis_primes: Optional[Sequence[int]] = None,
+) -> List[np.ndarray]:
     """
-    Convert multiple ratios to prime lattice vectors efficiently.
-    
-    Process a collection of ratios to their lattice vector representations.
-    This function is more efficient than calling ratio_to_lattice_vector()
-    multiple times because it computes factors only once per ratio and
-    can automatically determine optimal vector size for uniform output.
+    Convert multiple ratios to coordinate vectors.
+
+    This is the batch companion to ``ratio_to_coordinate`` and preserves input
+    order in the returned list.
 
     Parameters
     ----------
-    ratios : List[Union[int, Fraction, str]]
-        List of ratios to convert to prime lattice form.
+    ratios : sequence[int | Fraction | str]
+        Ratios to convert.
     vector_size : int, optional
-        Target size for all output vectors. If None, automatically
-        determines the minimum size needed to represent all ratios.
-        Default is None.
+        Target output length for each coordinate vector.
+    generators : sequence[int | Fraction | str], optional
+        Generator basis for conversion. If omitted, prime coordinates are used.
+    basis_primes : sequence[int], optional
+        Prime basis used with ``generators``.
 
     Returns
     -------
-    Dict[Union[int, Fraction, str], numpy.ndarray]
-        Dictionary mapping each input ratio to its corresponding immutable
-        prime lattice vector. All vectors have the same size and support
-        mathematical operations.
-
-    Examples
-    --------
-    Convert multiple ratios with automatic sizing:
-    
-    >>> ratios = ['3/2', '5/4', '7/4']
-    >>> vectors = ratios_to_lattice_vectors(ratios)
-    >>> print(vectors)
-    {'3/2': array([-1,  1,  0,  0]), '5/4': array([-2,  0,  1,  0]), '7/4': array([-2,  0,  0,  1])}
-    
-    Convert with specified size:
-    
-    >>> vectors = ratios_to_lattice_vectors(['3/2', '5/4'], vector_size=5)
-    >>> print(vectors)  
-    {'3/2': array([-1,  1,  0,  0,  0]), '5/4': array([-2,  0,  1,  0,  0])}
-
-    Notes
-    -----
-    This function is optimal for batch processing as it avoids redundant
-    factorization calls and ensures uniform vector sizes across all outputs.
-    
-    Vectors are returned as immutable NumPy arrays to preserve mathematical
-    integrity while enabling proper mathematical operations like addition
-    (which corresponds to ratio multiplication).
+    list[numpy.ndarray]
+        Immutable coordinate vectors aligned with input order.
     """
-    all_factors = [to_factors(Fraction(ratio)) for ratio in ratios]
-    
-    if vector_size is None:
+    ratios_list = list(ratios)
+    if generators is None and vector_size is None:
+        all_factors = [to_factors(Fraction(ratio)) for ratio in ratios_list]
         all_primes = set()
         for factors in all_factors:
             all_primes.update(factors.keys())
-        
         if all_primes:
             max_prime = max(all_primes)
-            vector_size = nth_prime(max_prime)
+            inferred_size = nth_prime(max_prime)
         else:
-            vector_size = 1
-    
-    vectors = [factors_to_lattice_vector(factors, vector_size) for factors in all_factors]
-    return dict(zip(ratios, vectors))
+            inferred_size = 1
+        return [
+            ratio_to_coordinate(
+                ratio=ratio,
+                vector_size=inferred_size,
+                generators=generators,
+                basis_primes=basis_primes,
+            )
+            for ratio in ratios_list
+        ]
+    return [
+        ratio_to_coordinate(
+            ratio=ratio,
+            vector_size=vector_size,
+            generators=generators,
+            basis_primes=basis_primes,
+        )
+        for ratio in ratios_list
+    ]

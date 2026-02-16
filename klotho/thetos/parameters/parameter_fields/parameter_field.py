@@ -4,11 +4,11 @@ import pandas as pd
 from klotho.topos.graphs.lattices import Lattice
 
 
-class ParametricField(Lattice):
+class ParameterField(Lattice):
     """
     A parametric field is a lattice with a function evaluated at each coordinate.
     
-    Parametric fields inherit all lattice functionality while providing field-specific
+    Parameter fields inherit all lattice functionality while providing field-specific
     methods for function evaluation and field manipulation. The function is
     evaluated lazily as coordinates are materialized in the lattice.
     
@@ -37,7 +37,8 @@ class ParametricField(Lattice):
                  function: Callable[[np.ndarray], np.ndarray] = None,
                  ranges: Optional[Union[Tuple[float, float], List[Tuple[float, float]]]] = None,
                  bipolar: bool = True,
-                 periodic: bool = False):
+                 periodic: bool = False,
+                 compute_all: bool = False):
         
         if function is None:
             function = lambda x: np.zeros(x.shape[0])
@@ -54,9 +55,8 @@ class ParametricField(Lattice):
             self._ranges = ranges
         
         super().__init__(dimensionality, resolution, bipolar, periodic)
-        
-        if not self._is_lazy:
-            self._evaluate_all_coordinates()
+        if compute_all:
+            self._compute_all_field_values()
     
     @property
     def function(self) -> Callable[[np.ndarray], np.ndarray]:
@@ -92,42 +92,65 @@ class ParametricField(Lattice):
         
         return np.array(spatial_points) if spatial_points else np.empty((0, self._dimensionality))
     
-    def _evaluate_coordinates(self, coords: List[Tuple[int, ...]]):
+    def _evaluate_coordinates(self, coords: List[Tuple[int, ...]], require_vectorized: bool = False):
         """Evaluate function at given coordinates and store values."""
         if not coords:
             return
         
         spatial_points = self._coordinates_to_spatial_points(coords)
-        values = self._function(spatial_points)
-        
-        if np.isscalar(values):
-            values = np.array([values])
-        elif values.ndim == 0:
-            values = np.array([values])
+        values = self._evaluate_spatial_points(spatial_points, require_vectorized=require_vectorized)
         
         for coord, value in zip(coords, values):
             node_id = self._coord_to_node[coord]
             current_data = self._graph.get_node_data(node_id) or {}
-            current_data['field_value'] = float(value)
+            field_value = float(value)
+            current_data['field_value'] = field_value
             self._graph[node_id] = current_data
     
     def _evaluate_all_coordinates(self):
         """Evaluate function at all existing coordinates."""
         coords = list(self._coord_to_node.keys())
         self._evaluate_coordinates(coords)
-    
-    def _materialize_coord(self, coord):
-        """Override to evaluate function when materializing coordinates."""
-        if not self._is_lazy or coord in self._materialized_coords:
-            return
-        
-        coords_before = set(self._materialized_coords)
-        super()._materialize_coord(coord)
-        coords_after = set(self._materialized_coords)
-        
-        new_coords = list(coords_after - coords_before)
-        if new_coords:
-            self._evaluate_coordinates(new_coords)
+
+    def _evaluate_spatial_points(self, spatial_points: np.ndarray, require_vectorized: bool = False) -> np.ndarray:
+        """Evaluate field function for a batch of spatial points."""
+        values = self._function(spatial_points)
+        values_arr = np.asarray(values)
+        n_points = spatial_points.shape[0]
+
+        if values_arr.ndim == 0:
+            if require_vectorized and n_points > 1:
+                raise ValueError("compute_all requires vectorized field functions returning one value per input row")
+            return np.full((n_points,), float(values_arr), dtype=float)
+
+        if values_arr.ndim == 1:
+            if values_arr.shape[0] != n_points:
+                raise ValueError(f"Field function must return shape ({n_points},), got {values_arr.shape}")
+            return values_arr.astype(float, copy=False)
+
+        if values_arr.ndim == 2 and values_arr.shape == (n_points, 1):
+            return values_arr[:, 0].astype(float, copy=False)
+
+        raise ValueError(f"Field function must return a scalar, ({n_points},), or ({n_points}, 1); got {values_arr.shape}")
+
+    def _populate_missing_field_data(self, coords: Optional[List[Tuple[int, ...]]] = None):
+        """Populate missing field values for provided coordinates."""
+        target_coords = self.coords if coords is None else coords
+        missing_coords = []
+        for coord in target_coords:
+            node_id = self._get_node_for_coord(coord)
+            if node_id is None:
+                continue
+            node_data = self._graph.get_node_data(node_id) or {}
+            if 'field_value' not in node_data:
+                missing_coords.append(coord)
+        if missing_coords:
+            self._evaluate_coordinates(missing_coords)
+
+    def _compute_all_field_values(self):
+        """Compute values for all lattice coordinates using vectorized contract."""
+        coords = list(self._coord_to_node.keys())
+        self._evaluate_coordinates(coords, require_vectorized=True)
     
     def get_field_value(self, coord: Tuple[int, ...]) -> float:
         """
@@ -146,9 +169,12 @@ class ParametricField(Lattice):
         node_id = self._get_node_for_coord(coord)
         if node_id is None:
             raise KeyError(f"Coordinate {coord} not found in field")
-        
         node_data = self._graph.get_node_data(node_id) or {}
-        return node_data.get('field_value', 0.0)
+        if 'field_value' in node_data:
+            return float(node_data['field_value'])
+        self._evaluate_coordinates([coord])
+        node_data = self._graph.get_node_data(node_id) or {}
+        return float(node_data.get('field_value', 0.0))
     
     def set_field_value(self, coord: Tuple[int, ...], value: float):
         """
@@ -166,10 +192,11 @@ class ParametricField(Lattice):
             raise KeyError(f"Coordinate {coord} not found in field")
         
         current_data = self._graph.get_node_data(node_id) or {}
-        current_data['field_value'] = float(value)
+        field_value = float(value)
+        current_data['field_value'] = field_value
         self._graph[node_id] = current_data
     
-    def apply_function(self, function: Callable[[np.ndarray], np.ndarray]):
+    def apply_function(self, function: Callable[[np.ndarray], np.ndarray], compute_all: bool = False):
         """
         Apply a new function to all lattice points, updating their values.
         
@@ -180,13 +207,12 @@ class ParametricField(Lattice):
             (n_points, dimensionality) and return an array of shape (n_points,).
         """
         self._function = function
-        
-        if self._is_lazy:
-            coords = list(self._materialized_coords)
-        else:
-            coords = list(self._coord_to_node.keys())
-        
-        self._evaluate_coordinates(coords)
+        for node_id in self._graph.node_indices():
+            node_data = self._graph.get_node_data(node_id)
+            if isinstance(node_data, dict) and 'field_value' in node_data:
+                del node_data['field_value']
+        if compute_all:
+            self._compute_all_field_values()
     
     def sample_field(self, points: np.ndarray) -> np.ndarray:
         """
@@ -204,10 +230,7 @@ class ParametricField(Lattice):
         """
         from scipy.interpolate import griddata
         
-        if self._is_lazy:
-            coords = list(self._materialized_coords)
-        else:
-            coords = list(self._coord_to_node.keys())
+        coords = list(self._coord_to_node.keys())
         
         if not coords:
             return np.zeros(points.shape[0])
@@ -293,9 +316,10 @@ class ParametricField(Lattice):
     @classmethod
     def from_lattice(cls, lattice: Lattice, 
                      function: Callable[[np.ndarray], np.ndarray],
-                     ranges: Optional[Union[Tuple[float, float], List[Tuple[float, float]]]] = None) -> 'ParametricField':
+                     ranges: Optional[Union[Tuple[float, float], List[Tuple[float, float]]]] = None,
+                     compute_all: bool = False) -> 'ParameterField':
         """
-        Create a ParametricField from an existing Lattice.
+        Create a ParameterField from an existing Lattice.
         
         Parameters
         ----------
@@ -308,8 +332,8 @@ class ParametricField(Lattice):
             
         Returns
         -------
-        ParametricField
-            A new ParametricField instance with the same structure.
+        ParameterField
+            A new ParameterField instance with the same structure.
         """
         field = cls.__new__(cls)
         
@@ -337,12 +361,8 @@ class ParametricField(Lattice):
                 raise ValueError(f"Ranges list length {len(ranges)} must match dimensionality {field._dimensionality}")
             field._ranges = ranges
         
-        if field._is_lazy:
-            coords = list(field._materialized_coords)
-        else:
-            coords = list(field._coord_to_node.keys())
-        
-        field._evaluate_coordinates(coords)
+        if compute_all:
+            field._compute_all_field_values()
         
         return field
     
@@ -353,7 +373,7 @@ class ParametricField(Lattice):
         else:
             coord_count = str(len(self.coords))
         
-        return (f"ParametricField(dimensionality={self._dimensionality}, "
+        return (f"ParameterField(dimensionality={self._dimensionality}, "
                 f"resolution={self._resolution}, "
                 f"bipolar={self._bipolar}, "
                 f"coordinates={coord_count})")

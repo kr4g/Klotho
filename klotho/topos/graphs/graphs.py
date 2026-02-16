@@ -754,49 +754,29 @@ class Graph:
             for i, coord in enumerate(itertools.product(dims[0], dims[1])):
                 rx_graph[i] = {'coord': coord}
         else:
-            rx_graph = rx.PyGraph()
-            
-            import itertools
-            all_coords = list(itertools.product(*dims))
-            
-            node_indices = rx_graph.add_nodes_from([{'coord': coord} for coord in all_coords])
-            coord_to_index = {coord: i for i, coord in enumerate(all_coords)}
-            
-            edge_list = []
-            for coord in all_coords:
-                coord_idx = coord_to_index[coord]
-                
-                for dim_idx in range(len(coord)):
-                    for direction in [-1, 1]:
-                        neighbor_coord = list(coord)
-                        neighbor_coord[dim_idx] += direction
-                        neighbor_coord = tuple(neighbor_coord)
-                        
-                        if neighbor_coord in coord_to_index:
-                            neighbor_idx = coord_to_index[neighbor_coord]
-                            if coord_idx < neighbor_idx:
-                                edge_list.append((coord_idx, neighbor_idx))
-                        elif periodic:
-                            dim_values = dims[dim_idx]
-                            if direction == 1 and coord[dim_idx] == dim_values[-1]:
-                                wrap_coord = list(coord)
-                                wrap_coord[dim_idx] = dim_values[0]
-                                wrap_coord = tuple(wrap_coord)
-                                if wrap_coord in coord_to_index:
-                                    wrap_idx = coord_to_index[wrap_coord]
-                                    if coord_idx < wrap_idx:
-                                        edge_list.append((coord_idx, wrap_idx))
-                            elif direction == -1 and coord[dim_idx] == dim_values[0]:
-                                wrap_coord = list(coord)
-                                wrap_coord[dim_idx] = dim_values[-1]
-                                wrap_coord = tuple(wrap_coord)
-                                if wrap_coord in coord_to_index:
-                                    wrap_idx = coord_to_index[wrap_coord]
-                                    if coord_idx < wrap_idx:
-                                        edge_list.append((coord_idx, wrap_idx))
-            
-            if edge_list:
-                rx_graph.extend_from_edge_list(edge_list)
+            factor_graphs = []
+            for dim_values in dims:
+                if periodic:
+                    factor_graph = rx.generators.cycle_graph(len(dim_values))
+                else:
+                    factor_graph = rx.generators.path_graph(len(dim_values))
+                factor_graphs.append(factor_graph)
+
+            product_graph = factor_graphs[0]
+            id_to_coord_index = {node_id: (node_id,) for node_id in product_graph.node_indices()}
+
+            for next_factor in factor_graphs[1:]:
+                product_graph, node_map = rx.graph_cartesian_product(product_graph, next_factor)
+                next_id_to_coord_index = {}
+                for (left_node, right_node), product_node in node_map.items():
+                    next_id_to_coord_index[product_node] = id_to_coord_index[left_node] + (right_node,)
+                id_to_coord_index = next_id_to_coord_index
+
+            for node_id, coord_idx_tuple in id_to_coord_index.items():
+                coord = tuple(dims[i][coord_idx_tuple[i]] for i in range(len(dims)))
+                product_graph[node_id] = {'coord': coord}
+
+            rx_graph = product_graph
         
         return cls.from_rustworkx(rx_graph)
     

@@ -1,7 +1,7 @@
 from klotho.topos.graphs import Graph, Tree
 from klotho.topos.collections.sets import CombinationSet, PartitionSet
 from klotho.topos.graphs.lattices import Lattice
-from klotho.thetos.parameters.parametric_fields import ParametricField
+from klotho.thetos.parameters.parameter_fields import ParameterField
 
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
@@ -40,6 +40,10 @@ def plot(obj, **kwargs):
     """
     Universal plot function that dispatches to appropriate plotting function based on object type.
     
+    Renders the figure via ``IPython.display.display`` so that plots
+    appear even when the call is not the last expression in a notebook
+    cell.  Returns ``None`` (like ``play``) to avoid double-rendering.
+    
     Args:
         obj: Object to plot (Tree, RhythmTree, CombinationSet, CombinationProductSet, DynamicRange, Envelope, networkx.Graph, etc.)
         **kwargs: Keyword arguments passed to the specific plotting function
@@ -47,45 +51,57 @@ def plot(obj, **kwargs):
     Raises:
         TypeError: If the object type is not supported
     """
+    def _show(fig):
+        if fig is not None:
+            try:
+                from IPython.display import display as ipy_display, HTML
+                if hasattr(fig, 'to_html'):
+                    html_str = fig.to_html(full_html=False, include_plotlyjs=True)
+                    ipy_display(HTML(html_str))
+                else:
+                    ipy_display(fig)
+            except ImportError:
+                pass
+
     match obj:
         case Graph():
             match obj:
                 case Tree():
                     match obj:
                         case RhythmTree():
-                            return _plot_rt(obj, **kwargs)
+                            return _show(_plot_rt(obj, **kwargs))
                         case ParameterTree():
-                            return _plot_parameter_tree(obj, **kwargs)
+                            return _show(_plot_parameter_tree(obj, **kwargs))
                         case _:
-                            return _plot_tree(obj, **kwargs)
-                case ParametricField():
-                    return _plot_field(obj, **kwargs)
+                            return _show(_plot_tree(obj, **kwargs))
+                case ParameterField():
+                    return _show(_plot_field(obj, **kwargs))
                 case Lattice():
-                    return _plot_lattice(obj, **kwargs)
+                    return _show(_plot_lattice(obj, **kwargs))
                 case _:
-                    return _plot_graph(obj._graph, **kwargs)
+                    return _show(_plot_graph(obj._graph, **kwargs))
         case CombinationSet():
             match obj:
                 case CombinationProductSet():
-                    return _plot_cps(obj, **kwargs)
+                    return _show(_plot_cps(obj, **kwargs))
                 case _:
-                    return _plot_cs(obj, **kwargs)
+                    return _show(_plot_cs(obj, **kwargs))
         case Scale() | Chord() | Voicing():
-            return _plot_scale_chord(obj, **kwargs)
+            return _show(_plot_scale_chord(obj, **kwargs))
         case PartitionSet():
-            return _plot_graph(obj.graph._graph, **kwargs)
+            return _show(_plot_graph(obj.graph._graph, **kwargs))
         case DynamicRange():
-            return _plot_dynamic_range(obj, **kwargs)
+            return _show(_plot_dynamic_range(obj, **kwargs))
         case Envelope():
-            return _plot_envelope(obj, **kwargs)
+            return _show(_plot_envelope(obj, **kwargs))
         case TemporalMeta():
             match obj:
                 case TemporalUnit():
                     match obj:
                         case CompositionalUnit():
-                            return _plot_rt(obj._rt, **kwargs)
+                            return _show(_plot_rt(obj._rt, **kwargs))
                         case _:
-                            return _plot_rt(obj._rt, **kwargs)
+                            return _show(_plot_rt(obj._rt, **kwargs))
                 case TemporalUnitSequence():
                     raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
                 case TemporalBlock():
@@ -93,8 +109,7 @@ def plot(obj, **kwargs):
                 case _:
                     raise NotImplementedError("Must be a TemporalUnit, TemporalUnitSequence, or TemporalBlock")
         case _ if hasattr(obj, 'nodes') and hasattr(obj, 'edges'):
-            # Handle NetworkX graphs or other graph-like objects
-            return _plot_graph(obj, **kwargs)
+            return _show(_plot_graph(obj, **kwargs))
         case _:
             raise TypeError(f"Unsupported object type for plotting: {type(obj)}")
 
@@ -2522,7 +2537,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  mds_metric: bool = True, mds_max_iter: int = 300,
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
-                 mute_background: bool = False) -> go.Figure:
+                 mute_background: bool = False, fit=False, pad: int = 1) -> go.Figure:
     import networkx as nx
     """
     Plot a Lattice as a 2D or 3D grid visualization.
@@ -2547,6 +2562,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         path_mode: Edge drawing mode when nodes are selected. Options:
                   'adjacent' - Only show edges between selected nodes that are adjacent (default)
                   'origin' - Show shortest paths from origin (0,0,0...) to each selected node
+        fit: Controls how the lattice display is cropped when nodes/path are provided.
+             False (default) shows the full lattice. Accepts a string mode or True:
+             - 'rect' or True: minimal bounding rectangle per dimension
+             - 'square': uniform bounding box (largest dimension span used for all axes)
+             - 'tight': only the selected nodes/path plus their immediate lattice neighbors
+        pad: Integer padding (default 1) added around the selection in each direction
+             when ``fit`` is active. Clamped to lattice bounds. Ignored when fit is False.
         
     Returns:
         go.Figure: Plotly figure object
@@ -2557,6 +2579,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     # Check if this is a ToneLattice for enhanced hover information
     is_tone_lattice = hasattr(lattice, '_coord_to_ratio')
+    coord_label = "Coordinate"
+    if is_tone_lattice:
+        coord_label = getattr(lattice, "coord_label", "Monzo")
     
     # Convert nodes parameter to tuples if needed (safety mechanism for all lattice types)
     if nodes is not None:
@@ -2586,6 +2611,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 converted_path.append(coord)
         path = converted_path
     
+    # Validate that all nodes/path coordinates exist in the lattice
+    if nodes is not None:
+        invalid = [c for c in nodes if c not in lattice]
+        if invalid:
+            raise ValueError(
+                f"The following node coordinates are outside the lattice bounds: {invalid}"
+            )
+    if path is not None:
+        invalid = [c for c in path if c not in lattice]
+        if invalid:
+            raise ValueError(
+                f"The following path coordinates are outside the lattice bounds: {invalid}"
+            )
+
     if lattice.dimensionality > 3 and dim_reduction is None:
         raise ValueError(f"Plotting dimensionality > 3 requires dim_reduction. Got dimensionality={lattice.dimensionality}. "
                         f"Use dim_reduction='mds' or 'spectral'")
@@ -2610,37 +2649,65 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             expected_total = float('inf')
             break
     
-    # If nodes or path are specified, use minimal resolution to just fit the selected coordinates
-    if nodes or path:
-        # Find the exact range needed for each dimension
-        coord_ranges = []
+    has_selection = (nodes is not None and len(nodes) > 0) or (path is not None and len(path) > 0)
+
+    fit_mode = None
+    if fit is True:
+        fit_mode = 'rect'
+    elif isinstance(fit, str) and fit in ('rect', 'square', 'tight'):
+        fit_mode = fit
+
+    if has_selection and fit_mode:
+        import itertools
         all_coords_to_fit = []
-        
         if nodes:
-            all_coords_to_fit.extend(coord for coord in nodes if coord in lattice)
+            all_coords_to_fit.extend(nodes)
         if path:
-            all_coords_to_fit.extend(coord for coord in path if coord in lattice)
-        
+            all_coords_to_fit.extend(path)
+
         if all_coords_to_fit:
-            for dim in range(lattice.dimensionality):
-                dim_vals = [coord[dim] for coord in all_coords_to_fit]
-                if dim_vals:
-                    min_val, max_val = min(dim_vals), max(dim_vals)
-                    # Add small buffer (1 coordinate) around the selection
-                    coord_ranges.append((min_val - 1, max_val + 1))
-                else:
-                    coord_ranges.append((-1, 1))
-            
-            # Use custom coordinate range instead of resolution
-            coords = []
-            import itertools
-            ranges = [range(start, end + 1) for start, end in coord_ranges]
-            coords = list(itertools.product(*ranges))
-            
-            # Filter to only coordinates that exist in the lattice
-            coords = [coord for coord in coords if coord in lattice]
+            ndim = lattice.dimensionality
+            p = max(0, int(pad))
+
+            if fit_mode == 'tight':
+                selection_set = set(all_coords_to_fit)
+                neighbor_shell = set()
+                for coord in selection_set:
+                    for d in range(ndim):
+                        for delta in range(-p, p + 1):
+                            if delta == 0:
+                                continue
+                            neighbor = list(coord)
+                            neighbor[d] += delta
+                            neighbor = tuple(neighbor)
+                            if neighbor in lattice:
+                                neighbor_shell.add(neighbor)
+                coords = sorted(selection_set | neighbor_shell)
+
+            else:
+                per_dim_lo = []
+                per_dim_hi = []
+                for d in range(ndim):
+                    vals = [c[d] for c in all_coords_to_fit]
+                    per_dim_lo.append(min(vals))
+                    per_dim_hi.append(max(vals))
+
+                if fit_mode == 'square':
+                    half_spans = [(hi - lo) / 2.0 for lo, hi in zip(per_dim_lo, per_dim_hi)]
+                    max_half = max(half_spans)
+                    centers = [(lo + hi) / 2.0 for lo, hi in zip(per_dim_lo, per_dim_hi)]
+                    for d in range(ndim):
+                        per_dim_lo[d] = int(centers[d] - max_half)
+                        per_dim_hi[d] = int(centers[d] + max_half) + (1 if (max_half % 1) else 0)
+
+                ranges = []
+                for d in range(ndim):
+                    lo = max(per_dim_lo[d] - p, min(lattice._dims[d]))
+                    hi = min(per_dim_hi[d] + p, max(lattice._dims[d]))
+                    ranges.append(range(lo, hi + 1))
+
+                coords = [c for c in itertools.product(*ranges) if c in lattice]
         else:
-            # Fallback if no valid coordinates found
             coords = lattice.coords
 
     elif lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
@@ -2671,20 +2738,19 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     # For reduced coordinate plotting, we need to build a reduced graph
     # to avoid iterating over thousands of edges in the full lattice
-    if nodes or lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
-        # Build reduced graph with only the plotting coordinates
+    if has_selection or lattice.dimensionality > 3 or lattice._is_lazy or expected_total > 1000:
         G_reduced = nx.Graph()
+        coord_set = set(coords)
         G_reduced.add_nodes_from(coords)
         
-        # Add edges between coordinates that are adjacent in lattice structure
-        for i, coord1 in enumerate(coords):
-            for j, coord2 in enumerate(coords):
-                if i < j:
-                    # Check if coordinates are adjacent (differ by 1 in exactly one dimension)
-                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
-                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
-                    if diff_count == 1 and same_count == len(coord1) - 1:
-                        G_reduced.add_edge(coord1, coord2)
+        ndim = lattice.dimensionality
+        for coord in coords:
+            for d in range(ndim):
+                neighbor = list(coord)
+                neighbor[d] += 1
+                neighbor = tuple(neighbor)
+                if neighbor in coord_set:
+                    G_reduced.add_edge(coord, neighbor)
         
         G = G_reduced
     else:
@@ -2716,19 +2782,19 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             reduced_coords = reducer.fit_transform(coord_matrix)
         elif dim_reduction == 'spectral':
             if spectral_affinity == 'precomputed':
-                # Build adjacency matrix from the sampled coordinates
                 coord_to_idx = {coord: i for i, coord in enumerate(coords)}
                 n = len(coords)
                 adjacency_matrix = np.zeros((n, n))
-                
-                # Check adjacency based on lattice structure (neighbors differ by 1 in exactly one dimension)
-                for i, coord1 in enumerate(coords):
-                    for j, coord2 in enumerate(coords):
-                        if i != j:
-                            diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
-                            same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
-                            if diff_count == 1 and same_count == len(coord1) - 1:
-                                adjacency_matrix[i, j] = 1
+                spec_ndim = len(coords[0]) if coords else 0
+                for coord in coords:
+                    ci = coord_to_idx[coord]
+                    for d in range(spec_ndim):
+                        neighbor = list(coord)
+                        neighbor[d] += 1
+                        neighbor = tuple(neighbor)
+                        if neighbor in coord_to_idx:
+                            adjacency_matrix[ci, coord_to_idx[neighbor]] = 1
+                            adjacency_matrix[coord_to_idx[neighbor], ci] = 1
                 
                 reducer = SpectralEmbedding(n_components=target_dims, affinity='precomputed', random_state=42)
                 reduced_coords = reducer.fit_transform(adjacency_matrix)
@@ -2746,17 +2812,15 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         G_reduced = nx.Graph()
         G_reduced.add_nodes_from(coords)
         
-        # Build edges based on lattice adjacency structure
-        for i, coord1 in enumerate(original_coords):
-            for j, coord2 in enumerate(original_coords):
-                if i < j:
-                    # Check if coordinates are adjacent (differ by 1 in exactly one dimension)
-                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
-                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
-                    if diff_count == 1 and same_count == len(coord1) - 1:
-                        u_reduced = coord_mapping[coord1]
-                        v_reduced = coord_mapping[coord2]
-                        G_reduced.add_edge(u_reduced, v_reduced)
+        orig_set = set(original_coords)
+        orig_ndim = len(original_coords[0]) if original_coords else 0
+        for coord in original_coords:
+            for d in range(orig_ndim):
+                neighbor = list(coord)
+                neighbor[d] += 1
+                neighbor = tuple(neighbor)
+                if neighbor in orig_set:
+                    G_reduced.add_edge(coord_mapping[coord], coord_mapping[neighbor])
         
         G = G_reduced
     else:
@@ -2785,13 +2849,20 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     # Determine if we should use dimmed appearance (whenever nodes or path are provided)
     use_dimmed = ((nodes is not None and len(nodes) > 0) or (path is not None and len(path) > 0)) and not mute_background
     
+    if effective_dimensionality > 2:
+        dimmed_edge_color = '#333333'
+        dimmed_node_color = '#080808'
+    else:
+        dimmed_edge_color = '#555555'
+        dimmed_node_color = '#111111'
+    
     fig = go.Figure()
     bounds_coords_override = None
     
     if effective_dimensionality == 1:
         
         if not ((nodes or path) and mute_background):
-            edge_color = '#555555' if use_dimmed else '#808080'
+            edge_color = dimmed_edge_color if use_dimmed else '#808080'
             edge_width = 1 if use_dimmed else 3
             
             for u, v in G.edges():
@@ -2941,7 +3012,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 reduced_coord_str = f"({x:.2f})"
                 hover_text = f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}"
             else:
-                hover_text = f"Coordinate: ({x})"
+                hover_text = f"{coord_label}: ({x})"
             
             # Add ratio information for ToneLattice
             if is_tone_lattice:
@@ -2957,7 +3028,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             if nodes and ((coords_iter is coords and original_coords[i] in highlighted_coords) or (coords_iter is not coords and (x,) in coords_iter)):
                 node_colors.append('white')
             elif use_dimmed:
-                node_colors.append('#111111')
+                node_colors.append(dimmed_node_color)
             else:
                 node_colors.append('white')
         
@@ -2986,18 +3057,21 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     elif effective_dimensionality == 2:
         drawn_nodes = set()
         if not ((nodes or path) and mute_background):
-            edge_color = '#555555' if use_dimmed else '#808080'
+            edge_color = dimmed_edge_color if use_dimmed else '#808080'
             edge_width = 1 if use_dimmed else 2
             
+            ex, ey = [], []
             for u, v in G.edges():
                 x1, y1 = u
                 x2, y2 = v
-                
+                ex.extend([x1, x2, None])
+                ey.extend([y1, y2, None])
+            
+            if ex:
                 fig.add_trace(
                     go.Scatter(
-                        x=[x1, x2], y=[y1, y2],
-                        mode='lines+markers',
-                marker=dict(size=0.1, opacity=0),
+                        x=ex, y=ey,
+                        mode='lines',
                         line=dict(color=edge_color, width=edge_width),
                         showlegend=False,
                         hoverinfo='none'
@@ -3150,7 +3224,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 reduced_coord_str = f"({x:.2f}, {y:.2f})"
                 hover_text = f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}"
             else:
-                hover_text = f"Coordinate: ({x}, {y})"
+                hover_text = f"{coord_label}: ({x}, {y})"
             
             # Add ratio information for ToneLattice
             if is_tone_lattice:
@@ -3167,9 +3241,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             if nodes and orig_coord in highlighted_coords:
                 node_colors.append('white')
             elif use_dimmed:
-                node_colors.append('#111111')  # WAY more dimmed for non-selected nodes
+                node_colors.append(dimmed_node_color)
             else:
-                node_colors.append('white')  # Default color when no highlighting
+                node_colors.append('white')
         
         fig.add_trace(
             go.Scatter(
@@ -3195,18 +3269,22 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     elif effective_dimensionality == 3:
         drawn_nodes = set()
         if not ((nodes or path) and mute_background):
-            edge_color = '#555555' if use_dimmed else '#808080'
+            edge_color = dimmed_edge_color if use_dimmed else '#808080'
             edge_width = 1 if use_dimmed else 3
             
+            ex, ey, ez = [], [], []
             for u, v in G.edges():
                 x1, y1, z1 = (u[0], u[1], u[2]) if len(u) >= 3 else (u[0], u[1] if len(u) >= 2 else 0, 0)
                 x2, y2, z2 = (v[0], v[1], v[2]) if len(v) >= 3 else (v[0], v[1] if len(v) >= 2 else 0, 0)
-                
+                ex.extend([x1, x2, None])
+                ey.extend([y1, y2, None])
+                ez.extend([z1, z2, None])
+            
+            if ex:
                 fig.add_trace(
                     go.Scatter3d(
-                        x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                        mode='lines+markers',
-                marker=dict(size=0.1, opacity=0),
+                        x=ex, y=ey, z=ez,
+                        mode='lines',
                         line=dict(color=edge_color, width=edge_width),
                         showlegend=False,
                         hoverinfo='none'
@@ -3365,7 +3443,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 reduced_coord_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
                 hover_text = f"Original: {orig_coord_str}<br>Reduced: {reduced_coord_str}"
             else:
-                hover_text = f"Coordinate: ({x}, {y}, {z})"
+                hover_text = f"{coord_label}: ({x}, {y}, {z})"
             
             # Add ratio information for ToneLattice
             if is_tone_lattice:
@@ -3382,9 +3460,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             if nodes and orig_coord in highlighted_coords:
                 node_colors.append('white')
             elif use_dimmed:
-                node_colors.append('#111111')  # WAY more dimmed for non-selected nodes
+                node_colors.append(dimmed_node_color)
             else:
-                node_colors.append('white')  # Default color when no highlighting
+                node_colors.append('white')
         
         fig.add_trace(
             go.Scatter3d(
@@ -3441,6 +3519,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         margin=dict(l=0, r=0, t=50, b=0)
     )
     
+    gen_labels = [str(g) for g in lattice.generators] if is_tone_lattice else []
+    x_pad = 0.5
+    y_pad = 0.5
+    z_pad = 0.5
+
     if effective_dimensionality <= 2:
         if lattice.dimensionality > 2:
             layout_dict.update(dict(
@@ -3454,27 +3537,29 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 )
             ))
         else:
-            x_title = 'X'
-            y_title = 'Y' if effective_dimensionality == 2 else ''
+            x_title = gen_labels[0] if len(gen_labels) > 0 else 'X'
+            y_title = (gen_labels[1] if len(gen_labels) > 1 else 'Y') if effective_dimensionality == 2 else ''
             
             layout_dict.update(dict(
                 xaxis=dict(
                     title=dict(text=x_title, font=dict(color='white')),
                     tickfont=dict(color='white'),
-                    gridcolor='#555555',
-                    zerolinecolor='#555555',
+                    showgrid=False,
+                    zeroline=False,
                     tickmode='array',
                     tickvals=x_ticks,
-                    ticktext=[str(t) for t in x_ticks]
+                    ticktext=[str(t) for t in x_ticks],
+                    range=[x_min - x_pad, x_max + x_pad]
                 ),
                 yaxis=dict(
                     title=dict(text=y_title, font=dict(color='white')),
                     tickfont=dict(color='white'),
-                    gridcolor='#555555',
-                    zerolinecolor='#555555',
+                    showgrid=False,
+                    zeroline=False,
                     tickmode='array',
                     tickvals=y_ticks if effective_dimensionality == 2 else [0],
-                    ticktext=[str(t) for t in y_ticks] if effective_dimensionality == 2 else ['']
+                    ticktext=[str(t) for t in y_ticks] if effective_dimensionality == 2 else [''],
+                    range=[y_min - y_pad, y_max + y_pad] if effective_dimensionality == 2 else [-0.5, 0.5]
                 )
             ))
     else:
@@ -3500,10 +3585,14 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         showline=False, showbackground=False,
                         title=dict(text='', font=dict(color='white'))
                     ),
+                    aspectmode='data',
                     bgcolor='black'
                 )
             ))
         else:
+            x3_title = gen_labels[0] if len(gen_labels) > 0 else 'X'
+            y3_title = gen_labels[1] if len(gen_labels) > 1 else 'Y'
+            z3_title = gen_labels[2] if len(gen_labels) > 2 else 'Z'
             layout_dict.update(dict(
                 scene=dict(
                     camera=dict(
@@ -3511,35 +3600,39 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                         center=dict(x=0, y=0, z=0)
                     ),
                     xaxis=dict(
-                        title=dict(text='X', font=dict(color='white')),
+                        title=dict(text=x3_title, font=dict(color='white')),
                         tickfont=dict(color='white'),
-                        gridcolor='#555555',
-                        zerolinecolor='#555555',
-                        backgroundcolor='black',
+                        showgrid=False,
+                        zeroline=False,
+                        showbackground=False,
                         tickmode='array',
                         tickvals=x_ticks,
-                        ticktext=[str(t) for t in x_ticks]
+                        ticktext=[str(t) for t in x_ticks],
+                        range=[x_min - x_pad, x_max + x_pad]
                     ),
                     yaxis=dict(
-                        title=dict(text='Y', font=dict(color='white')),
+                        title=dict(text=y3_title, font=dict(color='white')),
                         tickfont=dict(color='white'),
-                        gridcolor='#555555',
-                        zerolinecolor='#555555',
-                        backgroundcolor='black',
+                        showgrid=False,
+                        zeroline=False,
+                        showbackground=False,
                         tickmode='array',
                         tickvals=y_ticks,
-                        ticktext=[str(t) for t in y_ticks]
+                        ticktext=[str(t) for t in y_ticks],
+                        range=[y_min - y_pad, y_max + y_pad]
                     ),
                     zaxis=dict(
-                        title=dict(text='Z', font=dict(color='white')),
+                        title=dict(text=z3_title, font=dict(color='white')),
                         tickfont=dict(color='white'),
-                        gridcolor='#555555',
-                        zerolinecolor='#555555',
-                        backgroundcolor='black',
+                        showgrid=False,
+                        zeroline=False,
+                        showbackground=False,
                         tickmode='array',
                         tickvals=z_ticks,
-                        ticktext=[str(t) for t in z_ticks]
+                        ticktext=[str(t) for t in z_ticks],
+                        range=[z_min - z_pad, z_max + z_pad]
                     ),
+                    aspectmode='data',
                     bgcolor='black'
                 )
             ))
@@ -3555,7 +3648,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     return fig
 
 
-def _plot_field(field: ParametricField, figsize: tuple[float, float] = (12, 12),
+def _plot_field(field: ParameterField, figsize: tuple[float, float] = (12, 12),
                node_size: float = 8, title: str = None, 
                output_file: str = None, 
                dim_reduction: str = None, target_dims: int = 3,
@@ -3564,10 +3657,10 @@ def _plot_field(field: ParametricField, figsize: tuple[float, float] = (12, 12),
                nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                mute_background: bool = False, colormap: str = 'coolwarm', show_colorbar: bool = False) -> go.Figure:
     """
-    Plot a ParametricField as a 2D or 3D grid visualization with node colors representing field values.
+    Plot a ParameterField as a 2D or 3D grid visualization with node colors representing field values.
     
     Args:
-        field: ParametricField instance to visualize
+        field: ParameterField instance to visualize
         figsize: Width and height of the output figure in inches
         node_size: Size of the nodes in the plot
         title: Title for the plot (auto-generated if None)

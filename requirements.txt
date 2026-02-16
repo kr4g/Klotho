@@ -17,6 +17,8 @@ panel
 bokeh
 jupyter_bokeh
 diversipy
+plotly
+scikit-learn
 
 # Documentation
 sphinx>=7.0.0

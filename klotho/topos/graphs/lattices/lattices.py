@@ -1,4 +1,4 @@
-from typing import Tuple, List, Union, Iterator
+from typing import Tuple, List, Union
 import pandas as pd
 from ..graphs import Graph
 
@@ -52,17 +52,13 @@ class Lattice(Graph):
         self._materialized_coords = set()
         
         self._estimate_size()
-        
-        if self._should_use_lazy():
-            super().__init__()
-            self._is_lazy = True
-            self._seed_initial_coords()
-        else:
-            lattice_graph = Graph.grid_graph(self._dims, periodic=periodic)
-            super().__init__()
-            self._graph = lattice_graph._graph.copy()
-            self._is_lazy = False
-            self._build_coordinate_mapping()
+
+        lattice_graph = Graph.grid_graph(self._dims, periodic=periodic)
+        super().__init__()
+        self._graph = lattice_graph._graph.copy()
+        self._is_lazy = False
+        self._build_coordinate_mapping()
+        self._materialized_coords = set(self._coord_to_node.keys())
         
         self._meta = pd.DataFrame(index=[''])
     
@@ -78,15 +74,11 @@ class Lattice(Graph):
     
     def _should_use_lazy(self):
         """Determine if lazy loading should be used."""
-        return self._dimensionality >= 4 or self._estimated_size > 10_000
+        return False
     
     def _seed_initial_coords(self):
         """Create initial coordinates for lazy lattice."""
-        import itertools
-        
-        if all(0 in dim for dim in self._dims):
-            origin = tuple(0 for _ in self._dims)
-            self._materialize_coord(origin)
+        return
     
     def _build_coordinate_mapping(self):
         """Build coordinate mapping for non-lazy lattice."""
@@ -111,93 +103,14 @@ class Lattice(Graph):
     
     def _materialize_coord(self, coord):
         """Materialize a coordinate and its neighbors in lazy lattice."""
-        if not self._is_lazy or coord in self._materialized_coords:
+        if coord in self._materialized_coords:
             return
-        
-        if not self._is_valid_coord(coord):
-            return
-        
-        coords_to_add = [coord]
-        
-        for dim_idx in range(len(coord)):
-            for direction in [-1, 1]:
-                neighbor_coord = list(coord)
-                neighbor_coord[dim_idx] += direction
-                neighbor_coord = tuple(neighbor_coord)
-                
-                if self._is_valid_coord(neighbor_coord):
-                    coords_to_add.append(neighbor_coord)
-                elif self._periodic:
-                    dim_values = self._dims[dim_idx]
-                    if direction == 1 and coord[dim_idx] == dim_values[-1]:
-                        wrap_coord = list(coord)
-                        wrap_coord[dim_idx] = dim_values[0]
-                        wrap_coord = tuple(wrap_coord)
-                        if self._is_valid_coord(wrap_coord):
-                            coords_to_add.append(wrap_coord)
-                    elif direction == -1 and coord[dim_idx] == dim_values[0]:
-                        wrap_coord = list(coord)
-                        wrap_coord[dim_idx] = dim_values[-1]
-                        wrap_coord = tuple(wrap_coord)
-                        if self._is_valid_coord(wrap_coord):
-                            coords_to_add.append(wrap_coord)
-        
-        new_coords = [c for c in coords_to_add if c not in self._materialized_coords]
-        if not new_coords:
-            return
-        
-        for coord in new_coords:
-            node_id = self.add_node(coord=coord)
-            self._coord_to_node[coord] = node_id
-            self._node_to_coord[node_id] = coord
+        if self._is_valid_coord(coord) and coord in self._coord_to_node:
             self._materialized_coords.add(coord)
-        
-        edges_to_add = []
-        for coord in new_coords:
-            coord_node = self._coord_to_node[coord]
-            
-            for dim_idx in range(len(coord)):
-                for direction in [-1, 1]:
-                    neighbor_coord = list(coord)
-                    neighbor_coord[dim_idx] += direction
-                    neighbor_coord = tuple(neighbor_coord)
-                    
-                    if neighbor_coord in self._coord_to_node:
-                        neighbor_node = self._coord_to_node[neighbor_coord]
-                        if coord_node < neighbor_node:
-                            edges_to_add.append((coord_node, neighbor_node))
-                    elif self._periodic:
-                        dim_values = self._dims[dim_idx]
-                        if direction == 1 and coord[dim_idx] == dim_values[-1]:
-                            wrap_coord = list(coord)
-                            wrap_coord[dim_idx] = dim_values[0]
-                            wrap_coord = tuple(wrap_coord)
-                            if wrap_coord in self._coord_to_node:
-                                wrap_node = self._coord_to_node[wrap_coord]
-                                if coord_node < wrap_node:
-                                    edges_to_add.append((coord_node, wrap_node))
-                        elif direction == -1 and coord[dim_idx] == dim_values[0]:
-                            wrap_coord = list(coord)
-                            wrap_coord[dim_idx] = dim_values[-1]
-                            wrap_coord = tuple(wrap_coord)
-                            if wrap_coord in self._coord_to_node:
-                                wrap_node = self._coord_to_node[wrap_coord]
-                                if coord_node < wrap_node:
-                                    edges_to_add.append((coord_node, wrap_node))
-        
-        for u, v in edges_to_add:
-            super().add_edge(u, v)
     
     def _get_node_for_coord(self, coord):
         """Get node ID for coordinate, materializing if needed."""
-        if coord in self._coord_to_node:
-            return self._coord_to_node[coord]
-        
-        if self._is_lazy:
-            self._materialize_coord(coord)
-            return self._coord_to_node.get(coord)
-        
-        return None
+        return self._coord_to_node.get(coord)
     
     def __getitem__(self, coord):
         """Get node data for a coordinate tuple."""
@@ -210,11 +123,7 @@ class Lattice(Graph):
         """Check if a coordinate exists in the lattice."""
         if not self._is_valid_coord(coord):
             return False
-        
-        if self._is_lazy:
-            return True
-        else:
-            return coord in self._coord_to_node
+        return coord in self._coord_to_node
     
     def get_coordinates(self, node_id):
         """Get coordinates for a given node ID."""
@@ -237,20 +146,7 @@ class Lattice(Graph):
         list of tuple of int
             List of lattice coordinates.
         """
-        if self._is_lazy:
-            if len(self._materialized_coords) == 0:
-                if all(0 in dim for dim in self._dims):
-                    origin = tuple(0 for _ in self._dims)
-                    self._materialize_coord(origin)
-                else:
-                    import itertools
-                    first_coord = next(itertools.product(*self._dims), None)
-                    if first_coord:
-                        self._materialize_coord(first_coord)
-            
-            return list(self._materialized_coords)
-        else:
-            return list(self._coord_to_node.keys())
+        return list(self._coord_to_node.keys())
     
     def _get_plot_coords(self, max_resolution: int) -> List[Tuple[int, ...]]:
         """
@@ -276,10 +172,6 @@ class Lattice(Graph):
         
         plot_coords = list(itertools.product(*limited_ranges))
         
-        if self._is_lazy:
-            for coord in plot_coords:
-                self._materialize_coord(coord)
-        
         return plot_coords
     
     @property
@@ -304,28 +196,11 @@ class Lattice(Graph):
     
     def number_of_nodes(self):
         """Return total number of nodes in lattice."""
-        if self._is_lazy:
-            if self._estimated_size == float('inf'):
-                return float('inf')
-            return self._estimated_size
-        else:
-            return super().number_of_nodes()
+        return super().number_of_nodes()
     
     def number_of_edges(self):
         """Return total number of edges in lattice."""
-        if self._is_lazy and self._estimated_size == float('inf'):
-            return float('inf')
-        
-        if self._is_lazy:
-            total_edges = 0
-            for dim in self._dims:
-                if self._periodic:
-                    total_edges += self._estimated_size
-                else:
-                    total_edges += self._estimated_size * (len(dim) - 1) // len(dim)
-            return total_edges
-        else:
-            return super().number_of_edges()
+        return super().number_of_edges()
     
     def neighbors(self, coord):
         """Get neighbor coordinates of a coordinate."""
@@ -358,10 +233,7 @@ class Lattice(Graph):
     
     def __str__(self) -> str:
         """String representation of the lattice."""
-        if self._is_lazy:
-            coord_count = f"{len(self._materialized_coords)} materialized"
-        else:
-            coord_count = str(len(self.coords))
+        coord_count = str(len(self.coords))
         
         return (f"Lattice(dimensionality={self._dimensionality}, "
                 f"resolution={self._resolution}, "
