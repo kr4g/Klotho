@@ -2530,6 +2530,350 @@ def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True
     else:
         plt.show()
 
+
+def _bezier_2d(p0, p1, control, n_points=20):
+    ts = np.linspace(0, 1, n_points)
+    xs = (1 - ts)**2 * p0[0] + 2 * (1 - ts) * ts * control[0] + ts**2 * p1[0]
+    ys = (1 - ts)**2 * p0[1] + 2 * (1 - ts) * ts * control[1] + ts**2 * p1[1]
+    return xs, ys
+
+
+def _bezier_3d(p0, p1, control, n_points=20):
+    ts = np.linspace(0, 1, n_points)
+    xs = (1 - ts)**2 * p0[0] + 2 * (1 - ts) * ts * control[0] + ts**2 * p1[0]
+    ys = (1 - ts)**2 * p0[1] + 2 * (1 - ts) * ts * control[1] + ts**2 * p1[1]
+    zs = (1 - ts)**2 * p0[2] + 2 * (1 - ts) * ts * control[2] + ts**2 * p1[2]
+    return xs, ys, zs
+
+
+def _path_color_array(cmap_name, n):
+    cmap = plt.cm.get_cmap(cmap_name)
+    return cmap(np.linspace(0.15, 1, n))
+
+
+def _rgba_to_hex(rgba):
+    return '#%02x%02x%02x' % (int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
+
+
+def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_nodes,
+                        base_arc_offset=0.15, n_bezier_points=20, cmap='viridis'):
+    from collections import defaultdict
+    if not path or len(path) < 2:
+        return
+
+    colors = _path_color_array(cmap, len(path) - 1)
+
+    edge_counts = defaultdict(int)
+
+    for i in range(len(path) - 1):
+        coord1, coord2 = path[i], path[i + 1]
+
+        if dimensionality > 3:
+            if coord1 in coord_mapping and coord2 in coord_mapping:
+                plot_coord1 = coord_mapping[coord1]
+                plot_coord2 = coord_mapping[coord2]
+            else:
+                continue
+        else:
+            plot_coord1 = coord1
+            plot_coord2 = coord2
+
+        if plot_coord1 not in coords or plot_coord2 not in coords:
+            continue
+
+        x1, y1 = plot_coord1[0], plot_coord1[1]
+        x2, y2 = plot_coord2[0], plot_coord2[1]
+        drawn_nodes.add((x1, y1))
+        drawn_nodes.add((x2, y2))
+
+        edge_key = tuple(sorted([plot_coord1, plot_coord2]))
+        traversal_idx = edge_counts[edge_key]
+        edge_counts[edge_key] += 1
+
+        is_forward = plot_coord1 <= plot_coord2
+
+        path_color_hex = _rgba_to_hex(colors[i])
+
+        if traversal_idx == 0:
+            trace_x = [x1, x2]
+            trace_y = [y1, y2]
+            mid_x = (x1 + x2) / 2
+            mid_y = (y1 + y2) / 2
+            arrow_angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+        else:
+            dx, dy = x2 - x1, y2 - y1
+            length = math.sqrt(dx*dx + dy*dy)
+            if length < 1e-9:
+                continue
+            perp_x, perp_y = -dy / length, dx / length
+
+            side = 1 if is_forward else -1
+            if traversal_idx == 1:
+                offset_mag = base_arc_offset
+            else:
+                offset_mag = base_arc_offset * ((traversal_idx + 1) // 2)
+
+            if traversal_idx % 2 == 0:
+                side = -side
+
+            ctrl_x = (x1 + x2) / 2 + side * perp_x * offset_mag
+            ctrl_y = (y1 + y2) / 2 + side * perp_y * offset_mag
+
+            bx, by = _bezier_2d((x1, y1), (x2, y2), (ctrl_x, ctrl_y), n_bezier_points)
+            trace_x = bx.tolist()
+            trace_y = by.tolist()
+
+            mid_idx = n_bezier_points // 2
+            mid_x = trace_x[mid_idx]
+            mid_y = trace_y[mid_idx]
+            tan_x = trace_x[mid_idx + 1] - trace_x[mid_idx - 1]
+            tan_y = trace_y[mid_idx + 1] - trace_y[mid_idx - 1]
+            arrow_angle = math.degrees(math.atan2(tan_y, tan_x))
+
+        fig.add_trace(
+            go.Scatter(
+                x=trace_x, y=trace_y,
+                mode='lines',
+                line=dict(color='white', width=6),
+                opacity=0.3,
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=trace_x, y=trace_y,
+                mode='lines',
+                line=dict(color=path_color_hex, width=4),
+                opacity=0.9,
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=[mid_x], y=[mid_y],
+                mode='markers',
+                marker=dict(
+                    symbol='triangle-up',
+                    size=12,
+                    color=path_color_hex,
+                    angle=-(arrow_angle - 90),
+                    line=dict(color='white', width=1),
+                ),
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
+
+    start_coord = path[0]
+    end_coord = path[-1]
+    if dimensionality > 3:
+        start_plot = coord_mapping.get(start_coord, start_coord)
+        end_plot = coord_mapping.get(end_coord, end_coord)
+    else:
+        start_plot = start_coord
+        end_plot = end_coord
+
+    start_hex = _rgba_to_hex(colors[0])
+    end_hex = _rgba_to_hex(colors[-1])
+
+    fig.add_trace(
+        go.Scatter(
+            x=[start_plot[0]], y=[start_plot[1]],
+            mode='markers',
+            marker=dict(size=35, color=start_hex, opacity=0.4,
+                        line=dict(width=0)),
+            showlegend=False,
+            hoverinfo='none'
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[end_plot[0]], y=[end_plot[1]],
+            mode='markers',
+            marker=dict(size=35, color=end_hex, opacity=0.4,
+                        line=dict(width=0)),
+            showlegend=False,
+            hoverinfo='none'
+        )
+    )
+
+
+def _rodrigues_rotate(v, axis, theta):
+    axis = axis / np.linalg.norm(axis)
+    return (v * math.cos(theta)
+            + np.cross(axis, v) * math.sin(theta)
+            + axis * np.dot(axis, v) * (1 - math.cos(theta)))
+
+
+def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_nodes,
+                        base_arc_offset=0.15, n_bezier_points=20, cmap='viridis'):
+    from collections import defaultdict
+    if not path or len(path) < 2:
+        return
+
+    colors = _path_color_array(cmap, len(path) - 1)
+
+    edge_counts = defaultdict(int)
+
+    def _unpack3(c):
+        if len(c) >= 3:
+            return c[0], c[1], c[2]
+        elif len(c) == 2:
+            return c[0], c[1], 0
+        return c[0], 0, 0
+
+    def _get_perp(edge_dir):
+        up = np.array([0.0, 0.0, 1.0])
+        perp = np.cross(edge_dir, up)
+        perp_len = np.linalg.norm(perp)
+        if perp_len < 1e-9:
+            up = np.array([0.0, 1.0, 0.0])
+            perp = np.cross(edge_dir, up)
+            perp_len = np.linalg.norm(perp)
+        return perp / perp_len
+
+    for i in range(len(path) - 1):
+        coord1, coord2 = path[i], path[i + 1]
+
+        if dimensionality > 3:
+            if coord1 in coord_mapping and coord2 in coord_mapping:
+                plot_coord1 = coord_mapping[coord1]
+                plot_coord2 = coord_mapping[coord2]
+            else:
+                continue
+        else:
+            plot_coord1 = coord1
+            plot_coord2 = coord2
+
+        if plot_coord1 not in coords or plot_coord2 not in coords:
+            continue
+
+        x1, y1, z1 = _unpack3(plot_coord1)
+        x2, y2, z2 = _unpack3(plot_coord2)
+        drawn_nodes.add((x1, y1, z1))
+        drawn_nodes.add((x2, y2, z2))
+
+        edge_key = tuple(sorted([plot_coord1, plot_coord2]))
+        traversal_idx = edge_counts[edge_key]
+        edge_counts[edge_key] += 1
+
+        path_color_hex = _rgba_to_hex(colors[i])
+
+        dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
+        length = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+        if traversal_idx == 0:
+            trace_x = [x1, x2]
+            trace_y = [y1, y2]
+            trace_z = [z1, z2]
+        else:
+            if length < 1e-9:
+                continue
+
+            edge_dir = np.array([dx, dy, dz]) / length
+            base_perp = _get_perp(edge_dir)
+
+            rotation_angle = (math.pi / 3) * traversal_idx
+            perp = _rodrigues_rotate(base_perp, edge_dir, rotation_angle)
+
+            offset_mag = base_arc_offset * math.ceil(traversal_idx / 2)
+            if traversal_idx % 2 == 0:
+                perp = -perp
+
+            ctrl = np.array([(x1+x2)/2, (y1+y2)/2, (z1+z2)/2]) + perp * offset_mag
+
+            bx, by, bz = _bezier_3d((x1, y1, z1), (x2, y2, z2),
+                                     (ctrl[0], ctrl[1], ctrl[2]), n_bezier_points)
+            trace_x = bx.tolist()
+            trace_y = by.tolist()
+            trace_z = bz.tolist()
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=trace_x, y=trace_y, z=trace_z,
+                mode='lines',
+                line=dict(color='white', width=10),
+                opacity=0.3,
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
+        fig.add_trace(
+            go.Scatter3d(
+                x=trace_x, y=trace_y, z=trace_z,
+                mode='lines',
+                line=dict(color=path_color_hex, width=8),
+                opacity=0.9,
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
+
+        if traversal_idx == 0:
+            mid_x = (x1 + x2) / 2
+            mid_y = (y1 + y2) / 2
+            mid_z = (z1 + z2) / 2
+        else:
+            mid_idx = n_bezier_points // 2
+            mid_x = trace_x[mid_idx]
+            mid_y = trace_y[mid_idx]
+            mid_z = trace_z[mid_idx]
+
+        norm = length if length > 1e-9 else 1.0
+        fig.add_trace(
+            go.Cone(
+                x=[mid_x], y=[mid_y], z=[mid_z],
+                u=[dx / norm], v=[dy / norm], w=[dz / norm],
+                colorscale=[[0, path_color_hex], [1, path_color_hex]],
+                showscale=False,
+                sizemode='absolute',
+                sizeref=0.15,
+                anchor='center',
+                showlegend=False,
+                hoverinfo='none'
+            )
+        )
+
+    start_coord = path[0]
+    end_coord = path[-1]
+    if dimensionality > 3:
+        start_plot = coord_mapping.get(start_coord, start_coord)
+        end_plot = coord_mapping.get(end_coord, end_coord)
+    else:
+        start_plot = start_coord
+        end_plot = end_coord
+
+    sx, sy, sz = _unpack3(start_plot)
+    ex, ey, ez = _unpack3(end_plot)
+
+    start_hex = _rgba_to_hex(colors[0])
+    end_hex = _rgba_to_hex(colors[-1])
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=[sx], y=[sy], z=[sz],
+            mode='markers',
+            marker=dict(size=18, color=start_hex, opacity=0.4,
+                        line=dict(width=0)),
+            showlegend=False,
+            hoverinfo='none'
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=[ex], y=[ey], z=[ez],
+            mode='markers',
+            marker=dict(size=18, color=end_hex, opacity=0.4,
+                        line=dict(width=0)),
+            showlegend=False,
+            hoverinfo='none'
+        )
+    )
+
+
 def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  node_size: float = 8, title: str = None, 
                  output_file: str = None, 
@@ -2537,7 +2881,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  mds_metric: bool = True, mds_max_iter: int = 300,
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
-                 mute_background: bool = False, fit=False, pad: int = 1) -> go.Figure:
+                 mute_background: bool = False, fit=False, pad: int = 1,
+                 path_cmap: str = 'viridis') -> go.Figure:
     import networkx as nx
     """
     Plot a Lattice as a 2D or 3D grid visualization.
@@ -2569,6 +2914,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
              - 'tight': only the selected nodes/path plus their immediate lattice neighbors
         pad: Integer padding (default 1) added around the selection in each direction
              when ``fit`` is active. Clamped to lattice bounds. Ignored when fit is False.
+        path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis').
+                   Only applies when ``path`` is provided.
         
     Returns:
         go.Figure: Plotly figure object
@@ -2940,38 +3287,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
-        # Draw path edges with viridis coloring for time progression
-        if path and len(path) > 1:
-            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
-            for i in range(len(path) - 1):
-                coord1, coord2 = path[i], path[i + 1]
-                if coord1 in coords and coord2 in coords:
-                    x1, y1 = coord1[0], coord1[1]
-                    x2, y2 = coord2[0], coord2[1]
-                    color = viridis_colors[i]
-                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
-                    # Add path edge with enhanced visibility
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[x1, x2], y=[y1, y2],
-                            mode='lines',
-                            line=dict(color=path_color_hex, width=8),
-                            opacity=0.9,
-                            showlegend=False,
-                            hoverinfo='none'
-                        )
-                    )
-                    # Add subtle white outline for better contrast
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[x1, x2], y=[y1, y2],
-                            mode='lines',
-                            line=dict(color='white', width=10),
-                            opacity=0.3,
-                            showlegend=False,
-                            hoverinfo='none'
-                        )
-                    )
+        _draw_path_edges_2d(fig, path, coords, {}, lattice.dimensionality, set(), cmap=path_cmap)
         
         node_x, node_y = [], []
         hover_data = []
@@ -3159,51 +3475,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
-        # Draw path edges with viridis coloring for time progression
-        if path and len(path) > 1:
-            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
-            for i in range(len(path) - 1):
-                coord1, coord2 = path[i], path[i + 1]
-                
-                if lattice.dimensionality > 3:
-                    if coord1 in coord_mapping and coord2 in coord_mapping:
-                        plot_coord1 = coord_mapping[coord1]
-                        plot_coord2 = coord_mapping[coord2]
-                    else:
-                        continue
-                else:
-                    plot_coord1 = coord1
-                    plot_coord2 = coord2
-                
-                if plot_coord1 in coords and plot_coord2 in coords:
-                    x1, y1 = plot_coord1[0], plot_coord1[1]
-                    x2, y2 = plot_coord2[0], plot_coord2[1]
-                    drawn_nodes.add((x1, y1))
-                    drawn_nodes.add((x2, y2))
-                    color = viridis_colors[i]
-                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
-                    # Add path edge with enhanced visibility
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[x1, x2], y=[y1, y2],
-                            mode='lines',
-                            line=dict(color=path_color_hex, width=8),
-                            opacity=0.9,
-                            showlegend=False,
-                            hoverinfo='none'
-                        )
-                    )
-                    # Add subtle white outline for better contrast
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[x1, x2], y=[y1, y2],
-                            mode='lines',
-                            line=dict(color='white', width=10),
-                            opacity=0.3,
-                            showlegend=False,
-                            hoverinfo='none'
-                        )
-                    )
+        _draw_path_edges_2d(fig, path, coords, coord_mapping, lattice.dimensionality, drawn_nodes, cmap=path_cmap)
         
         node_x, node_y = [], []
         hover_data = []
@@ -3380,51 +3652,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                             # Skip if path not found
                             continue
         
-        # Draw path edges with viridis coloring for time progression
-        if path and len(path) > 1:
-            viridis_colors = plt.cm.viridis(np.linspace(0.15, 1, len(path) - 1))
-            for i in range(len(path) - 1):
-                coord1, coord2 = path[i], path[i + 1]
-                
-                if lattice.dimensionality > 3:
-                    if coord1 in coord_mapping and coord2 in coord_mapping:
-                        plot_coord1 = coord_mapping[coord1]
-                        plot_coord2 = coord_mapping[coord2]
-                    else:
-                        continue
-                else:
-                    plot_coord1 = coord1
-                    plot_coord2 = coord2
-                
-                if plot_coord1 in coords and plot_coord2 in coords:
-                    x1, y1, z1 = (plot_coord1[0], plot_coord1[1], plot_coord1[2]) if len(plot_coord1) >= 3 else (plot_coord1[0], plot_coord1[1] if len(plot_coord1) >= 2 else 0, 0)
-                    x2, y2, z2 = (plot_coord2[0], plot_coord2[1], plot_coord2[2]) if len(plot_coord2) >= 3 else (plot_coord2[0], plot_coord2[1] if len(plot_coord2) >= 2 else 0, 0)
-                    drawn_nodes.add((x1, y1, z1))
-                    drawn_nodes.add((x2, y2, z2))
-                    color = viridis_colors[i]
-                    path_color_hex = '#%02x%02x%02x' % (int(color[0]*255), int(color[1]*255), int(color[2]*255))
-                    # Add path edge with enhanced visibility
-                    fig.add_trace(
-                        go.Scatter3d(
-                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                            mode='lines',
-                            line=dict(color=path_color_hex, width=8),
-                            opacity=0.9,
-                            showlegend=False,
-                            hoverinfo='none'
-                        )
-                    )
-                    # Add subtle white outline for better contrast
-                    fig.add_trace(
-                        go.Scatter3d(
-                            x=[x1, x2], y=[y1, y2], z=[z1, z2],
-                            mode='lines',
-                            line=dict(color='white', width=10),
-                            opacity=0.3,
-                            showlegend=False,
-                            hoverinfo='none'
-                        )
-                    )
+        _draw_path_edges_3d(fig, path, coords, coord_mapping, lattice.dimensionality, drawn_nodes, cmap=path_cmap)
         
         node_x, node_y, node_z = [], [], []
         hover_data = []

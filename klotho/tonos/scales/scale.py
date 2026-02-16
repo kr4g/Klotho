@@ -355,5 +355,12 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             reference_pitch=reference_pitch
         )
 
+    @classmethod
+    def janus(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        return cls(
+            ['1/1', '33/32', '9/8', '7/6', '5/4', '21/16', '11/8', '3/2', '99/64', '5/3', '7/4', '15/8'],
+            reference_pitch=reference_pitch
+        )
+
 
 InstancedScale = Scale
