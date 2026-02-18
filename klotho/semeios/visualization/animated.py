@@ -592,3 +592,179 @@ class AnimatedRTFigure:
 </script>
 '''
         return html
+
+
+class AnimatedRTSvgFigure:
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False):
+        self.svg_data = svg_data
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.glow = glow
+        self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        sd = self.svg_data
+        wid = self.widget_id
+
+        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
+
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+
+        leaf_path_ids_json = json.dumps(sd.leaf_path_ids)
+        all_anim_ids_json = json.dumps(sd.all_animated_ids)
+        leaf_halo_ids_json = json.dumps(sd.leaf_halo_ids)
+        leaf_x_json = json.dumps(sd.leaf_x_positions)
+        bright_json = json.dumps(sd.leaf_bright_colors)
+        base_json = json.dumps(sd.leaf_base_colors)
+
+        node_to_ids_json = json.dumps({str(k): v for k, v in sd.node_to_ids.items()})
+        leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in sd.leaf_ancestors])
+
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+
+        html = f'''
+{cdn_html}
+{sd.svg_str}
+<div id="{wid}_controls" style="
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
+    user-select: none; margin-top: 4px;">
+    <button id="{wid}_toggle" style="
+        width: 32px; height: 32px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0;">
+        <span id="{wid}_icon" style="
+            width: 0; height: 0;
+            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
+    </button>
+    <button id="{wid}_loop" style="
+        width: 28px; height: 28px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
+        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="#a0a0a0" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </button>
+</div>
+{session_script}
+<script>{instruments_js}</script>
+<script>{player_js}</script>
+<script>
+(function() {{
+    var elCache = {{}};
+    function getEl(id) {{ if (!elCache[id]) elCache[id] = document.getElementById(id); return elCache[id]; }}
+
+    var leafPathIds = {leaf_path_ids_json};
+    var allAnimIds = {all_anim_ids_json};
+    var leafHaloIds = {leaf_halo_ids_json};
+    var leafXPositions = {leaf_x_json};
+    var brightColors = {bright_json};
+    var baseColors = {base_json};
+    var nodeToIds = {node_to_ids_json};
+    var leafAncestors = {leaf_ancestors_json};
+    var audioPayload = {payload_json};
+    var glowEnabled = {'true' if self.glow else 'false'};
+    var totalSteps = leafAncestors.length;
+
+    var toggleBtn = document.getElementById("{wid}_toggle");
+    var iconEl = document.getElementById("{wid}_icon");
+    var loopBtn = document.getElementById("{wid}_loop");
+    var loopSvg = document.getElementById("{wid}_loop_svg");
+
+    var looping = false, playing = false;
+    var prevPathSet = null, prevBrightened = [], prevHaloIds = [];
+
+    function resetAll() {{
+        for (var i = 0; i < prevBrightened.length; i++) {{ var el = getEl(prevBrightened[i].id); if (el) el.setAttribute("fill", prevBrightened[i].base); }}
+        prevBrightened = [];
+        for (var i = 0; i < prevHaloIds.length; i++) {{ var el = getEl(prevHaloIds[i]); if (el) el.style.display = "none"; }}
+        prevHaloIds = [];
+        for (var i = 0; i < allAnimIds.length; i++) {{ var el = getEl(allAnimIds[i]); if (el) el.style.opacity = ""; }}
+        prevPathSet = null;
+    }}
+
+    function highlightLeaf(leafIdx) {{
+        if (leafIdx < 0 || leafIdx >= totalSteps) return;
+        var currIds = leafPathIds[leafIdx];
+        var currSet = new Set(currIds);
+        var leafNodeId = leafAncestors[leafIdx][leafAncestors[leafIdx].length - 1];
+        var leafElIds = nodeToIds[leafNodeId] || [];
+
+        if (prevPathSet === null) {{
+            for (var i = 0; i < allAnimIds.length; i++) {{
+                var el = getEl(allAnimIds[i]);
+                if (el) el.style.opacity = currSet.has(allAnimIds[i]) ? "1" : "0.15";
+            }}
+        }} else {{
+            prevPathSet.forEach(function(eid) {{ if (!currSet.has(eid)) {{ var el = getEl(eid); if (el) el.style.opacity = "0.15"; }} }});
+            currSet.forEach(function(eid) {{ if (!prevPathSet.has(eid)) {{ var el = getEl(eid); if (el) el.style.opacity = "1"; }} }});
+        }}
+
+        for (var i = 0; i < prevBrightened.length; i++) {{ var el = getEl(prevBrightened[i].id); if (el) el.setAttribute("fill", prevBrightened[i].base); }}
+        var newBrightened = [];
+        for (var i = 0; i < leafElIds.length; i++) {{
+            var eid = leafElIds[i], bright = brightColors[eid];
+            if (bright) {{ var el = getEl(eid); if (el) {{ el.setAttribute("fill", bright); newBrightened.push({{id: eid, base: baseColors[eid]}}); }} }}
+        }}
+
+        for (var i = 0; i < prevHaloIds.length; i++) {{ var el = getEl(prevHaloIds[i]); if (el) el.style.display = "none"; }}
+        var newHaloIds = [];
+        if (leafIdx < leafHaloIds.length) {{
+            var group = leafHaloIds[leafIdx];
+            if (group && group.length > 0) {{
+                var toShow = glowEnabled ? group : [group[group.length - 1]];
+                for (var i = 0; i < toShow.length; i++) {{ var el = getEl(toShow[i]); if (el) el.style.display = ""; newHaloIds.push(toShow[i]); }}
+            }}
+        }}
+        prevPathSet = currSet; prevBrightened = newBrightened; prevHaloIds = newHaloIds;
+    }}
+
+    function finishPlayback() {{ playing = false; resetAll(); setPlayIcon(); }}
+    function setPlayIcon() {{ iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
+    function setStopIcon() {{ iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
+
+    loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
+
+    if (audioPayload && typeof Tone !== "undefined") {{
+        var events = audioPayload.events || [];
+        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        var player = KlothoPlayer.create();
+        toggleBtn.onclick = async function() {{
+            if (player.isPlaying()) {{ player.stop(); }}
+            else {{
+                playing = true; setStopIcon();
+                await player.play(events, instruments, {{
+                    loop: looping,
+                    onEvent: function(stepIdx) {{ highlightLeaf(stepIdx); }},
+                    onStop: function() {{ finishPlayback(); }},
+                    onFinish: function() {{ finishPlayback(); }}
+                }});
+            }}
+        }};
+    }} else {{
+        var durMs = {self.dur * 1000};
+        var timerId = null;
+        function runAnimation(stepIdx) {{
+            if (!playing) return;
+            if (stepIdx >= totalSteps) {{ if (looping) {{ timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
+            highlightLeaf(stepIdx);
+            timerId = setTimeout(function() {{ runAnimation(stepIdx + 1); }}, durMs);
+        }}
+        toggleBtn.onclick = function() {{
+            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
+            else {{ playing = true; setStopIcon(); runAnimation(0); }}
+        }};
+    }}
+}})();
+</script>
+'''
+        return html

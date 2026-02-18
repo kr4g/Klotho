@@ -1903,7 +1903,10 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     if not animate:
         return fig
 
-    from klotho.semeios.visualization.animated import AnimatedRTFigure
+    from klotho.semeios.visualization.animated import AnimatedRTSvgFigure
+    from klotho.semeios.visualization.svg_rt import (
+        _svg_rt_ratios, _svg_rt_containers, _svg_rt_tree,
+    )
     from klotho.utils.playback.tonejs.converters import (
         rhythm_tree_to_animation_events,
         temporal_unit_to_animation_events,
@@ -1912,22 +1915,17 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     from klotho.chronos.temporal_units.temporal import TemporalUnit as _TemporalUnit
     from klotho.thetos.composition.compositional import CompositionalUnit as _CompositionalUnit
 
-    node_to_traces = getattr(fig, '_node_to_traces', {})
-
-    leaf_nodes = rt.leaf_nodes
-    leaf_ancestors = []
-    for leaf in leaf_nodes:
-        ancestors = list(rt.ancestors(leaf))
-        leaf_ancestors.append(ancestors + [leaf])
-
-    all_animated_traces = sorted({idx for idxs in node_to_traces.values() for idx in idxs})
-
-    leaf_path_traces = []
-    for path in leaf_ancestors:
-        traces = set()
-        for node in path:
-            traces.update(node_to_traces.get(node, []))
-        leaf_path_traces.append(sorted(traces))
+    if layout == 'tree':
+        svg_data = _svg_rt_tree(rt, attributes=attributes, figsize=figsize, invert=invert,
+                                audio_source=audio_source)
+    elif layout == 'ratios':
+        svg_data = _svg_rt_ratios(rt, figsize=figsize, audio_source=audio_source)
+    elif layout == 'containers':
+        svg_data = _svg_rt_containers(rt, figsize=figsize, invert=invert,
+                                      vertical_lines=vertical_lines, barlines=barlines,
+                                      barline_color=barline_color,
+                                      subdivision_line_color=subdivision_line_color,
+                                      audio_source=audio_source)
 
     if audio_source is not None:
         if isinstance(audio_source, _CompositionalUnit):
@@ -1939,21 +1937,8 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     else:
         audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
 
-    leaf_x_positions = getattr(fig, '_leaf_x_positions', [])
-    leaf_halo_groups = getattr(fig, '_leaf_halo_groups', [])
-    trace_bright_colors = getattr(fig, '_trace_bright_colors', {})
-    trace_base_colors = getattr(fig, '_trace_base_colors', {})
-
-    return AnimatedRTFigure(
-        fig=fig,
-        node_to_traces=node_to_traces,
-        leaf_ancestors=leaf_ancestors,
-        leaf_path_traces=leaf_path_traces,
-        all_animated_traces=all_animated_traces,
-        leaf_x_positions=leaf_x_positions,
-        leaf_halo_groups=leaf_halo_groups,
-        trace_bright_colors=trace_bright_colors,
-        trace_base_colors=trace_base_colors,
+    return AnimatedRTSvgFigure(
+        svg_data=svg_data,
         audio_payload=audio_payload,
         dur=dur,
         glow=glow,
