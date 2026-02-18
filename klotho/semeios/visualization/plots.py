@@ -4295,13 +4295,22 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 svg_data=svg_data, audio_payload=audio_payload, dur=dur
             )
         else:
-            from .animated import AnimatedFigure
-            step_trace_groups, halo_indices, _arrow_info = _anim_info
-            all_path_indices = list(range(_path_trace_start, _path_trace_end))
-            return AnimatedFigure(
-                fig, step_trace_groups, halo_indices, all_path_indices,
-                audio_payload=audio_payload,
-                dur=dur, is_3d=True
+            from .threejs_lattice import _threejs_lattice_3d
+            from .animated import AnimatedLattice3dFigure
+
+            threejs_data = _threejs_lattice_3d(
+                lattice=lattice, coords=coords, G=G, path=path, nodes=nodes,
+                highlighted_coords=highlighted_coords, coord_mapping=coord_mapping,
+                original_coords=original_coords,
+                effective_dimensionality=effective_dimensionality,
+                use_dimmed=use_dimmed, mute_background=mute_background,
+                path_mode=path_mode, figsize=figsize, node_size=node_size,
+                title=title, is_tone_lattice=is_tone_lattice,
+                coord_label=coord_label, gen_labels=gen_labels,
+                path_cmap=path_cmap,
+            )
+            return AnimatedLattice3dFigure(
+                scene_data=threejs_data, audio_payload=audio_payload, dur=dur
             )
 
     return fig

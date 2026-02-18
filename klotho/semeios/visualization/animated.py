@@ -4,7 +4,446 @@ import uuid
 from klotho.utils.playback.tonejs.cdn import (
     cdn_scripts, reset_cdn_flags,
     INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
+    THREEJS_CDN, THREEJS_ORBIT_CDN,
 )
+
+
+class AnimatedLattice3dFigure:
+    def __init__(self, scene_data, audio_payload=None, dur=0.5):
+        self.scene_data = scene_data
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        sd = self.scene_data
+        wid = self.widget_id
+
+        cdn_html = cdn_scripts(
+            include_plotly=False,
+            include_tone=bool(self.audio_payload),
+            include_threejs=True,
+        )
+
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+
+        scene_json = json.dumps(sd.scene_data)
+        steps_json = json.dumps(sd.path_steps)
+        halo_json = json.dumps(sd.halo_data)
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+
+        w = sd.width_px
+        h = sd.height_px
+        title_escaped = sd.title.replace("'", "\\'").replace('"', '\\"')
+
+        threejs_cdn = THREEJS_CDN
+        orbit_cdn = THREEJS_ORBIT_CDN
+
+        html = f'''
+{cdn_html}
+<div id="{wid}_wrap" style="position:relative;width:{w}px;height:{h}px;background:black;">
+    <canvas id="{wid}_canvas" style="display:block;width:{w}px;height:{h}px;"></canvas>
+    <div id="{wid}_tooltip" style="
+        display:none;position:absolute;pointer-events:none;top:0;left:0;
+        background:rgba(30,30,30,0.92);color:white;font-family:monospace;
+        font-size:11px;padding:6px 10px;border-radius:4px;
+        white-space:pre;max-width:300px;z-index:10;
+    "></div>
+</div>
+<div id="{wid}_controls" style="
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
+    user-select: none; margin-top: 4px;">
+    <button id="{wid}_toggle" style="
+        width: 32px; height: 32px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0;">
+        <span id="{wid}_icon" style="
+            width: 0; height: 0;
+            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
+    </button>
+    <button id="{wid}_loop" style="
+        width: 28px; height: 28px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
+        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="#a0a0a0" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </button>
+</div>
+{session_script}
+<script>{instruments_js}</script>
+<script>{player_js}</script>
+<script>
+(function _klotho3dInit() {{
+    if (typeof THREE === "undefined") {{
+        if (!document.querySelector('script[data-klotho-three]')) {{
+            var s = document.createElement("script");
+            s.src = "{threejs_cdn}";
+            s.setAttribute("data-klotho-three", "1");
+            (document.head || document.documentElement).appendChild(s);
+        }}
+        setTimeout(_klotho3dInit, 100);
+        return;
+    }}
+
+    if (!THREE.OrbitControls) {{
+        if (!document.querySelector('script[data-klotho-orbit]')) {{
+            var s = document.createElement("script");
+            s.src = "{orbit_cdn}";
+            s.setAttribute("data-klotho-orbit", "1");
+            (document.head || document.documentElement).appendChild(s);
+        }}
+        setTimeout(_klotho3dInit, 100);
+        return;
+    }}
+
+    var canvas = document.getElementById("{wid}_canvas");
+    if (!canvas) {{ setTimeout(_klotho3dInit, 50); return; }}
+
+    var container = document.getElementById("{wid}_wrap");
+    var tooltip   = document.getElementById("{wid}_tooltip");
+    var toggleBtn = document.getElementById("{wid}_toggle");
+    var iconEl    = document.getElementById("{wid}_icon");
+    var loopBtn   = document.getElementById("{wid}_loop");
+    var loopSvg   = document.getElementById("{wid}_loop_svg");
+
+    var sceneData = {scene_json};
+    var pathSteps = {steps_json};
+    var haloData  = {halo_json};
+    var audioPayload = {payload_json};
+    var titleText = "{title_escaped}";
+
+    var W = {w}, H = {h};
+
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    var camera = new THREE.PerspectiveCamera(50, W / H, 0.01, 1000);
+
+    var axCfg = sceneData.axisConfig;
+    var cx = (axCfg.xRange[0] + axCfg.xRange[1]) / 2;
+    var cy = (axCfg.yRange[0] + axCfg.yRange[1]) / 2;
+    var cz = (axCfg.zRange[0] + axCfg.zRange[1]) / 2;
+
+    var span = Math.max(
+        axCfg.xRange[1] - axCfg.xRange[0],
+        axCfg.yRange[1] - axCfg.yRange[0],
+        axCfg.zRange[1] - axCfg.zRange[0]
+    );
+    camera.position.set(cx + span * 1.2, cy + span * 1.2, cz + span * 1.2);
+    camera.lookAt(cx, cy, cz);
+
+    var renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    var controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(cx, cy, cz);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.12;
+    controls.update();
+
+    if (sceneData.gridEdges.length > 0) {{
+        var gVerts = new Float32Array(sceneData.gridEdges.length * 6);
+        for (var i = 0; i < sceneData.gridEdges.length; i++) {{
+            var e = sceneData.gridEdges[i];
+            gVerts[i*6]   = e[0]; gVerts[i*6+1] = e[1]; gVerts[i*6+2] = e[2];
+            gVerts[i*6+3] = e[3]; gVerts[i*6+4] = e[4]; gVerts[i*6+5] = e[5];
+        }}
+        var gGeom = new THREE.BufferGeometry();
+        gGeom.setAttribute("position", new THREE.BufferAttribute(gVerts, 3));
+        var gMat = new THREE.LineBasicMaterial({{ color: sceneData.gridEdgeColor }});
+        scene.add(new THREE.LineSegments(gGeom, gMat));
+    }}
+
+    if (sceneData.highlightEdges.length > 0) {{
+        var hVerts = new Float32Array(sceneData.highlightEdges.length * 6);
+        for (var i = 0; i < sceneData.highlightEdges.length; i++) {{
+            var e = sceneData.highlightEdges[i];
+            hVerts[i*6]   = e[0]; hVerts[i*6+1] = e[1]; hVerts[i*6+2] = e[2];
+            hVerts[i*6+3] = e[3]; hVerts[i*6+4] = e[4]; hVerts[i*6+5] = e[5];
+        }}
+        var hGeom = new THREE.BufferGeometry();
+        hGeom.setAttribute("position", new THREE.BufferAttribute(hVerts, 3));
+        var hMat = new THREE.LineBasicMaterial({{ color: 0xffffff, linewidth: 2 }});
+        scene.add(new THREE.LineSegments(hGeom, hMat));
+    }}
+
+    var nodeCount = sceneData.nodes.length;
+    var sphereR = sceneData.nodeSize * 0.015;
+    var sphereGeo = new THREE.SphereGeometry(sphereR, 16, 12);
+    var nodeMeshes = [];
+    var nodeGroup = new THREE.Group();
+    for (var i = 0; i < nodeCount; i++) {{
+        var n = sceneData.nodes[i];
+        var mat = new THREE.MeshBasicMaterial({{ color: sceneData.nodeColors[i] }});
+        var mesh = new THREE.Mesh(sphereGeo, mat);
+        mesh.position.set(n[0], n[1], n[2]);
+        mesh.userData.nodeIdx = i;
+        nodeGroup.add(mesh);
+        nodeMeshes.push(mesh);
+    }}
+    scene.add(nodeGroup);
+
+    function makeTextSprite(text, color) {{
+        var c2 = document.createElement("canvas");
+        var ctx = c2.getContext("2d");
+        c2.width = 128; c2.height = 48;
+        ctx.fillStyle = color || "#ffffff";
+        ctx.font = "24px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 64, 24);
+        var tex = new THREE.CanvasTexture(c2);
+        var mat = new THREE.SpriteMaterial({{ map: tex, transparent: true }});
+        var sprite = new THREE.Sprite(mat);
+        sprite.scale.set(0.5, 0.2, 1);
+        return sprite;
+    }}
+
+    var labels = axCfg.labels;
+    var tickOff = 0.3;
+    if (labels[0]) {{
+        axCfg.xTicks.forEach(function(t) {{
+            var s = makeTextSprite(String(t));
+            s.position.set(t, axCfg.yRange[0] - tickOff, axCfg.zRange[0] - tickOff);
+            scene.add(s);
+        }});
+        var xl = makeTextSprite(labels[0], "#aaaaaa");
+        xl.position.set(cx, axCfg.yRange[0] - tickOff * 2.5, axCfg.zRange[0] - tickOff * 2.5);
+        xl.scale.set(0.7, 0.25, 1);
+        scene.add(xl);
+    }}
+    if (labels[1]) {{
+        axCfg.yTicks.forEach(function(t) {{
+            var s = makeTextSprite(String(t));
+            s.position.set(axCfg.xRange[0] - tickOff, t, axCfg.zRange[0] - tickOff);
+            scene.add(s);
+        }});
+        var yl = makeTextSprite(labels[1], "#aaaaaa");
+        yl.position.set(axCfg.xRange[0] - tickOff * 2.5, cy, axCfg.zRange[0] - tickOff * 2.5);
+        yl.scale.set(0.7, 0.25, 1);
+        scene.add(yl);
+    }}
+    if (labels[2]) {{
+        axCfg.zTicks.forEach(function(t) {{
+            var s = makeTextSprite(String(t));
+            s.position.set(axCfg.xRange[0] - tickOff, axCfg.yRange[0] - tickOff, t);
+            scene.add(s);
+        }});
+        var zl = makeTextSprite(labels[2], "#aaaaaa");
+        zl.position.set(axCfg.xRange[0] - tickOff * 2.5, axCfg.yRange[0] - tickOff * 2.5, cz);
+        zl.scale.set(0.7, 0.25, 1);
+        scene.add(zl);
+    }}
+
+    if (titleText) {{
+        var ts = makeTextSprite(titleText, "#ffffff");
+        ts.scale.set(1.5, 0.4, 1);
+        ts.position.set(cx, axCfg.yRange[1] + 0.8, cz);
+        scene.add(ts);
+    }}
+
+    var stepGroups = [];
+    for (var si = 0; si < pathSteps.length; si++) {{
+        var step = pathSteps[si];
+        if (!step) {{ stepGroups.push(null); continue; }}
+        var pts = step.polyline;
+        var group = [];
+
+        var verts = new Float32Array(pts.length * 3);
+        for (var k = 0; k < pts.length; k++) {{
+            verts[k*3] = pts[k][0]; verts[k*3+1] = pts[k][1]; verts[k*3+2] = pts[k][2];
+        }}
+        var lineGeom = new THREE.BufferGeometry();
+        lineGeom.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+
+        var glowLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({{
+            color: 0xffffff, transparent: true, opacity: 0.3
+        }}));
+        glowLine.visible = false;
+        scene.add(glowLine);
+        group.push(glowLine);
+
+        var colLine = new THREE.Line(lineGeom.clone(), new THREE.LineBasicMaterial({{
+            color: step.color, transparent: true, opacity: 0.9
+        }}));
+        colLine.visible = false;
+        scene.add(colLine);
+        group.push(colLine);
+
+        var coneH = 0.12, coneR = 0.04;
+        var coneGeo = new THREE.ConeGeometry(coneR, coneH, 8);
+        coneGeo.translate(0, coneH / 2, 0);
+        coneGeo.rotateX(Math.PI / 2);
+        var cone = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({{ color: step.color }}));
+        cone.position.set(step.arrow_pos[0], step.arrow_pos[1], step.arrow_pos[2]);
+        var dir = new THREE.Vector3(step.arrow_dir[0], step.arrow_dir[1], step.arrow_dir[2]).normalize();
+        var quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+        cone.setRotationFromQuaternion(quat);
+        cone.visible = false;
+        scene.add(cone);
+        group.push(cone);
+
+        stepGroups.push(group);
+    }}
+
+    var startHalo = null, endHalo = null;
+    if (haloData) {{
+        var haloGeo = new THREE.SphereGeometry(0.18, 16, 12);
+        startHalo = new THREE.Mesh(haloGeo,
+            new THREE.MeshBasicMaterial({{ color: haloData.start.color, transparent: true, opacity: 0.4 }}));
+        startHalo.position.set(haloData.start.pos[0], haloData.start.pos[1], haloData.start.pos[2]);
+        startHalo.visible = false;
+        scene.add(startHalo);
+
+        endHalo = new THREE.Mesh(haloGeo.clone(),
+            new THREE.MeshBasicMaterial({{ color: haloData.end.color, transparent: true, opacity: 0.4 }}));
+        endHalo.position.set(haloData.end.pos[0], haloData.end.pos[1], haloData.end.pos[2]);
+        endHalo.visible = false;
+        scene.add(endHalo);
+    }}
+
+    var raycaster = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+    var hoveredIdx = -1;
+
+    container.addEventListener("mousemove", function(ev) {{
+        var rect = canvas.getBoundingClientRect();
+        mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        var hits = raycaster.intersectObjects(nodeMeshes, false);
+        if (hits.length > 0) {{
+            var idx = hits[0].object.userData.nodeIdx;
+            if (idx !== hoveredIdx) {{
+                hoveredIdx = idx;
+                tooltip.textContent = sceneData.hoverData[idx];
+                tooltip.style.display = "block";
+            }}
+            tooltip.style.left = (ev.clientX - rect.left + 12) + "px";
+            tooltip.style.top  = (ev.clientY - rect.top  + 12) + "px";
+        }} else {{
+            hoveredIdx = -1;
+            tooltip.style.display = "none";
+        }}
+    }});
+    container.addEventListener("mouseleave", function() {{
+        hoveredIdx = -1;
+        tooltip.style.display = "none";
+    }});
+
+    function renderLoop() {{
+        requestAnimationFrame(renderLoop);
+        controls.update();
+        renderer.render(scene, camera);
+    }}
+    renderLoop();
+
+    var looping = false, playing = false;
+    var totalSteps = pathSteps.length;
+
+    function hideAllPath() {{
+        for (var i = 0; i < stepGroups.length; i++) {{
+            var g = stepGroups[i];
+            if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = false; }}
+        }}
+        if (startHalo) startHalo.visible = false;
+        if (endHalo) endHalo.visible = false;
+    }}
+
+    function showAllPath() {{
+        for (var i = 0; i < stepGroups.length; i++) {{
+            var g = stepGroups[i];
+            if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = true; }}
+        }}
+        if (startHalo) startHalo.visible = true;
+        if (endHalo) endHalo.visible = true;
+    }}
+
+    function revealStep(stepIdx) {{
+        if (stepIdx === 0) {{
+            hideAllPath();
+            if (startHalo) startHalo.visible = true;
+            return;
+        }}
+        var edgeIdx = stepIdx - 1;
+        if (edgeIdx >= 0 && edgeIdx < stepGroups.length) {{
+            var g = stepGroups[edgeIdx];
+            if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = true; }}
+        }}
+        if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && endHalo) {{
+            endHalo.visible = true;
+        }}
+    }}
+
+    function finishPlayback() {{
+        playing = false;
+        showAllPath();
+        setPlayIcon();
+    }}
+
+    function setPlayIcon() {{
+        iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none";
+    }}
+    function setStopIcon() {{
+        iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444";
+    }}
+
+    loopBtn.onclick = function() {{
+        looping = !looping;
+        loopBtn.style.opacity = looping ? "1" : "0.5";
+        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
+    }};
+
+    if (audioPayload && typeof Tone !== "undefined") {{
+        var events = audioPayload.events || [];
+        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        var player = KlothoPlayer.create();
+        toggleBtn.onclick = async function() {{
+            if (player.isPlaying()) {{ player.stop(); }}
+            else {{
+                playing = true; setStopIcon(); hideAllPath();
+                await player.play(events, instruments, {{
+                    loop: looping,
+                    onEvent: function(stepIdx) {{ revealStep(stepIdx); }},
+                    onStop: function() {{ finishPlayback(); }},
+                    onFinish: function() {{ finishPlayback(); }}
+                }});
+            }}
+        }};
+    }} else {{
+        var durMs = {self.dur * 1000};
+        var timerId = null;
+        function runAnimation(stepIdx) {{
+            if (!playing) return;
+            if (stepIdx > totalSteps) {{
+                if (looping) {{ hideAllPath(); timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }}
+                else {{ finishPlayback(); }}
+                return;
+            }}
+            revealStep(stepIdx);
+            timerId = setTimeout(function() {{ runAnimation(stepIdx + 1); }}, durMs);
+        }}
+        toggleBtn.onclick = function() {{
+            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
+            else {{ playing = true; setStopIcon(); hideAllPath(); runAnimation(0); }}
+        }};
+    }}
+}})();
+</script>
+'''
+        return html
 
 
 class AnimatedFigure:
