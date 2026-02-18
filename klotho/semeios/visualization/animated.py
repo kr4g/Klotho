@@ -1,14 +1,10 @@
 import json
 import uuid
-from pathlib import Path
 
-_PLOTLY_CDN = "https://cdn.plot.ly/plotly-3.0.0.min.js"
-_TONEJS_CDN = "https://unpkg.com/tone@14.7.77/build/Tone.js"
-_INSTRUMENTS_JS_PATH = Path(__file__).resolve().parent.parent.parent / "utils" / "playback" / "tonejs" / "instruments.js"
-_PLAYER_JS_PATH = Path(__file__).resolve().parent.parent.parent / "utils" / "playback" / "tonejs" / "player.js"
-
-_plotly_included = False
-_tone_included = False
+from klotho.utils.playback.tonejs.cdn import (
+    cdn_scripts, reset_cdn_flags,
+    INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
+)
 
 
 class AnimatedFigure:
@@ -24,8 +20,6 @@ class AnimatedFigure:
         self.widget_id = f"klotho_anim_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
-        global _plotly_included, _tone_included
-
         plot_div_id = f"{self.widget_id}_plot"
         fig_html = self.fig.to_html(
             full_html=False,
@@ -33,19 +27,13 @@ class AnimatedFigure:
             div_id=plot_div_id,
         )
 
-        cdn_scripts = ''
-        if not _plotly_included:
-            cdn_scripts += f'<script src="{_PLOTLY_CDN}"></script>\n'
-            _plotly_included = True
-        if not _tone_included and self.audio_payload:
-            cdn_scripts += f'<script src="{_TONEJS_CDN}"></script>\n'
-            _tone_included = True
+        cdn_html = cdn_scripts(include_plotly=True, include_tone=bool(self.audio_payload))
 
         kernel_session = uuid.uuid4().hex
         session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
 
-        instruments_js = _INSTRUMENTS_JS_PATH.read_text() if _INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = _PLAYER_JS_PATH.read_text() if _PLAYER_JS_PATH.exists() else ""
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
 
         steps_json = json.dumps(self.step_trace_groups)
         halos_json = json.dumps(self.halo_indices)
@@ -54,7 +42,7 @@ class AnimatedFigure:
         wid = self.widget_id
 
         html = f'''
-{cdn_scripts}
+{cdn_html}
 {fig_html}
 <div id="{wid}_controls" style="
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -282,8 +270,6 @@ class AnimatedRTFigure:
         self.widget_id = f"klotho_rt_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
-        global _plotly_included, _tone_included
-
         plot_div_id = f"{self.widget_id}_plot"
         fig_html = self.fig.to_html(
             full_html=False,
@@ -291,19 +277,13 @@ class AnimatedRTFigure:
             div_id=plot_div_id,
         )
 
-        cdn_scripts = ''
-        if not _plotly_included:
-            cdn_scripts += f'<script src="{_PLOTLY_CDN}"></script>\n'
-            _plotly_included = True
-        if not _tone_included and self.audio_payload:
-            cdn_scripts += f'<script src="{_TONEJS_CDN}"></script>\n'
-            _tone_included = True
+        cdn_html = cdn_scripts(include_plotly=True, include_tone=bool(self.audio_payload))
 
         kernel_session = uuid.uuid4().hex
         session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
 
-        instruments_js = _INSTRUMENTS_JS_PATH.read_text() if _INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = _PLAYER_JS_PATH.read_text() if _PLAYER_JS_PATH.exists() else ""
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
 
         node_to_traces_json = json.dumps({str(k): v for k, v in self.node_to_traces.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in self.leaf_ancestors])
@@ -316,7 +296,7 @@ class AnimatedRTFigure:
         wid = self.widget_id
 
         html = f'''
-{cdn_scripts}
+{cdn_html}
 {fig_html}
 <div id="{wid}_controls" style="
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

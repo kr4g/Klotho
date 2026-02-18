@@ -3,11 +3,10 @@ import uuid
 from pathlib import Path
 from IPython.display import HTML, display
 
-_TONEJS_CDN = "https://unpkg.com/tone@14.7.77/build/Tone.js"
-_INSTRUMENTS_JS_PATH = Path(__file__).parent / "instruments.js"
-_PLAYER_JS_PATH = Path(__file__).parent / "player.js"
+from klotho.utils.playback.tonejs.cdn import (
+    cdn_scripts, INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
+)
 
-_tone_included = False
 _KERNEL_SESSION = uuid.uuid4().hex
 
 
@@ -36,10 +35,10 @@ class ToneEngine:
         self.widget_id = f"klotho_{uuid.uuid4().hex[:8]}"
 
     def _load_instruments_js(self):
-        return _INSTRUMENTS_JS_PATH.read_text()
+        return INSTRUMENTS_JS_PATH.read_text()
 
     def _load_player_js(self):
-        return _PLAYER_JS_PATH.read_text()
+        return PLAYER_JS_PATH.read_text()
 
     def _load_user_custom_js(self):
         if self.custom_js_path and self.custom_js_path.exists():
@@ -49,18 +48,13 @@ class ToneEngine:
         return ""
 
     def _generate_html(self):
-        global _tone_included
         payload_json = json.dumps(self.events)
         user_custom_js = self._load_user_custom_js()
         instruments_js = self._load_instruments_js()
         player_js = self._load_player_js()
         scripts = "\n".join([s for s in (user_custom_js, instruments_js, player_js) if s])
 
-        if not _tone_included:
-            tone_script = f'<script src="{_TONEJS_CDN}"></script>'
-            _tone_included = True
-        else:
-            tone_script = ''
+        tone_script = cdn_scripts(include_tone=True)
 
         html = f'''
 <div id="{self.widget_id}" style="
