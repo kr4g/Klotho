@@ -298,7 +298,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
         )
     )
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     x_padding = (max(node_x) - min(node_x)) * 0.02 if node_x else 0.05
     y_padding = (max(node_y) - min(node_y)) * 0.1 if node_y else 0.2
@@ -329,8 +329,78 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
     
     return fig
 
+_HALO_NOTE_COLOR = (100, 160, 255)
+_HALO_RINGS = [
+    (1.0,  0.22),
+    (1.35, 0.13),
+    (1.8,  0.06),
+]
+
+
+def _add_halo_traces(fig, cx, cy, rx, ry, is_rest=False, n_pts=48):
+    base = _HALO_NOTE_COLOR
+    indices = []
+    for scale, alpha in reversed(_HALO_RINGS):
+        srx, sry = rx * scale, ry * scale
+        xs = [cx + srx * math.cos(2 * math.pi * i / n_pts) for i in range(n_pts + 1)]
+        ys = [cy + sry * math.sin(2 * math.pi * i / n_pts) for i in range(n_pts + 1)]
+        idx = len(fig.data)
+        fig.add_trace(go.Scatter(
+            x=xs, y=ys,
+            fill='toself',
+            fillcolor=f'rgba({base[0]},{base[1]},{base[2]},{alpha})',
+            line=dict(width=0),
+            mode='lines',
+            hoverinfo='none',
+            showlegend=False,
+            visible=False,
+        ))
+        indices.append(idx)
+    return indices
+
+
+def _rt_node_hover(rt, node_id, audio_source=None):
+    node_data = rt[node_id]
+    proportion = node_data.get('proportion', None)
+    parts = [f"Node: {node_id}"]
+    if proportion is not None:
+        parts.append(f"Proportion: {proportion}")
+    if 'metric_onset' in node_data:
+        parts.append(f"Metric Onset: {node_data['metric_onset']}")
+    if 'metric_duration' in node_data:
+        parts.append(f"Metric Duration: {node_data['metric_duration']}")
+
+    if audio_source is not None:
+        from klotho.thetos.composition.compositional import CompositionalUnit as _UC
+        from klotho.chronos.temporal_units.temporal import TemporalUnit as _UT
+        chronon_map = getattr(audio_source, '_chronon_map', None)
+        if chronon_map is None:
+            chronon_map = {}
+            for c in audio_source:
+                chronon_map[c.node_id] = c
+            audio_source._chronon_map = chronon_map
+        chronon = chronon_map.get(node_id)
+        if chronon is not None:
+            parts.append(f"Real Onset: {chronon.start:.4f}s")
+            parts.append(f"Real Duration: {abs(chronon.duration):.4f}s")
+            if isinstance(audio_source, _UC):
+                try:
+                    inst = audio_source.get_active_instrument(node_id)
+                    if inst is not None and hasattr(inst, 'name'):
+                        parts.append(f"Instrument: {inst.name}")
+                except Exception:
+                    pass
+                if hasattr(chronon, 'parameters'):
+                    skip = {'synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id'}
+                    for k, v in chronon.parameters.items():
+                        if k not in skip:
+                            parts.append(f"{k}: {v}")
+
+    return "<br>".join(parts)
+
+
 def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
-                 invert: bool = True, output_file: str | None = None) -> go.Figure:
+                 invert: bool = True, output_file: str | None = None, audio_source=None) -> go.Figure:
     """
     Visualize a RhythmTree structure with dynamic scaling to handle density.
     
@@ -515,18 +585,8 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
 
             proportion = node_data.get('proportion', None)
             is_rest = proportion is not None and proportion < 0
-            depth = rt.depth_of(node)
 
-            hover_parts = [f"Node: {node}"]
-            if proportion is not None:
-                hover_parts.append(f"Proportion: {proportion}")
-            if 'metric_duration' in node_data:
-                hover_parts.append(f"Duration: {node_data['metric_duration']}")
-            if 'metric_onset' in node_data:
-                hover_parts.append(f"Onset: {node_data['metric_onset']}")
-            hover_parts.append(f"Depth: {depth}")
-            hover_parts.append(f"Rest: {'Yes' if is_rest else 'No'}")
-            hover_text = "<br>".join(hover_parts)
+            hover_text = _rt_node_hover(rt, node, audio_source=audio_source)
 
             is_leaf = len(list(G.neighbors(node))) == 0
 
@@ -589,14 +649,32 @@ def _plot_rt_tree(rt: RhythmTree, attributes: list[str] | None = None, figsize: 
             fig.write_image(output_file)
 
     leaf_x_positions = []
+    leaf_halo_groups = []
+    x_span = x_range[1] - x_range[0]
+    y_span = y_range[1] - y_range[0]
+    px_to_x = x_span / width_px if width_px else 0.01
+    px_to_y = y_span / height_px if height_px else 0.01
+    halo_r_x = node_size * 1.1 * px_to_x
+    halo_r_y = node_size * 1.1 * px_to_y
+
     for leaf in rt.leaf_nodes:
         if leaf in pos:
-            leaf_x_positions.append(float(pos[leaf][0]))
+            lx, ly = pos[leaf]
+            leaf_x_positions.append(float(lx))
+            leaf_prop = G[leaf].get('proportion', None)
+            is_rest_leaf = leaf_prop is not None and leaf_prop < 0
+            if is_rest_leaf:
+                leaf_halo_groups.append([])
+            else:
+                group = _add_halo_traces(fig, lx, ly, halo_r_x, halo_r_y, False)
+                leaf_halo_groups.append(group)
         else:
             leaf_x_positions.append(0.0)
+            leaf_halo_groups.append([])
 
     fig._node_to_traces = node_to_traces
     fig._leaf_x_positions = leaf_x_positions
+    fig._leaf_halo_groups = leaf_halo_groups
     fig._trace_bright_colors = {}
     fig._trace_base_colors = {}
     return fig
@@ -780,7 +858,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     else:
         plt.show()
 
-def _plot_ratios(rt, figsize=(20, 1), output_file=None):
+def _plot_ratios(rt, figsize=(20, 1), output_file=None, audio_source=None):
     ratios = rt.durations
     leaf_nodes = rt.leaf_nodes
     onsets = rt.onsets
@@ -806,21 +884,11 @@ def _plot_ratios(rt, figsize=(20, 1), output_file=None):
         is_rest = ratio < 0
         color = 'rgba(128,128,128,0.4)' if is_rest else '#e6e6e6'
         node_id = leaf_nodes[i]
-        node_data = rt[node_id]
 
         x0, x1 = pos, pos + width
         y0, y1 = y_offset_bar, y_offset_bar + bar_height
 
-        proportion = node_data.get('proportion', None)
-        depth = rt.depth_of(node_id)
-        hover_text = (
-            f"Node: {node_id}<br>"
-            f"Proportion: {proportion}<br>"
-            f"Duration: {node_data.get('metric_duration', '')}<br>"
-            f"Onset: {node_data.get('metric_onset', '')}<br>"
-            f"Depth: {depth}<br>"
-            f"Rest: {'Yes' if is_rest else 'No'}"
-        )
+        hover_text = _rt_node_hover(rt, node_id, audio_source=audio_source)
 
         trace_idx = len(fig.data)
         fig.add_trace(go.Scatter(
@@ -875,15 +943,30 @@ def _plot_ratios(rt, figsize=(20, 1), output_file=None):
 
     leaf_x_positions = [pos + sw / 2 for pos, sw in zip(positions, segment_widths)]
 
+    leaf_halo_groups = []
+    for i, (pos, sw, ratio) in enumerate(zip(positions, segment_widths, ratios)):
+        cx = pos + sw / 2
+        cy = y_offset_bar + bar_height / 2
+        hw = sw / 2 * 1.1
+        hh = bar_height / 2 * 2.0
+        is_rest = ratio < 0
+        if is_rest:
+            leaf_halo_groups.append([])
+        else:
+            group = _add_halo_traces(fig, cx, cy, hw, hh, False)
+            leaf_halo_groups.append(group)
+
     fig._node_to_traces = node_to_traces
     fig._leaf_x_positions = leaf_x_positions
+    fig._leaf_halo_groups = leaf_halo_groups
     fig._trace_bright_colors = trace_bright_colors
     fig._trace_base_colors = trace_base_colors
     return fig
 
 def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                         vertical_lines=True, barlines=True,
-                        barline_color='#666666', subdivision_line_color='#aaaaaa'):
+                        barline_color='#666666', subdivision_line_color='#aaaaaa',
+                        audio_source=None):
     def get_node_scaling(node, rt, min_scale=0.5):
         if rt.out_degree(node) == 0:
             return min_scale
@@ -905,6 +988,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
     node_to_traces = {}
     trace_bright_colors = {}
     trace_base_colors = {}
+    leaf_block_geom = {}
     max_depth = rt.depth
 
     margin = 0.01
@@ -922,8 +1006,8 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
         level_positions.append(y_pos)
 
     vertical_line_positions = set()
-    onset_text_y = margin * 0.3
-    line_cutoff = onset_text_y + (margin * 2.0)
+    onset_text_y = -0.015
+    line_cutoff = onset_text_y + (margin * 3.0)
 
     if rt.span > 1 and barlines:
         top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
@@ -976,15 +1060,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                         bx0, bx1 = x_start, x_start + w
                         by0, by1 = y_pos - bar_height / 2, y_pos + bar_height / 2
 
-                        depth = rt.depth_of(node)
-                        hover_text = (
-                            f"Node: {node}<br>"
-                            f"Proportion: {proportion}<br>"
-                            f"Duration: {ratio}<br>"
-                            f"Onset: {node_data.get('metric_onset', '')}<br>"
-                            f"Depth: {depth}<br>"
-                            f"Rest: {'Yes' if is_rest else 'No'}"
-                        )
+                        hover_text = _rt_node_hover(rt, node, audio_source=audio_source)
 
                         trace_idx = len(fig.data)
                         fig.add_trace(go.Scatter(
@@ -1047,15 +1123,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
             bx0, bx1 = x_start, x_start + w
             by0, by1 = y_pos - bar_height / 2, y_pos + bar_height / 2
 
-            depth = rt.depth_of(node)
-            hover_text = (
-                f"Node: {node}<br>"
-                f"Proportion: {proportion}<br>"
-                f"Duration: {ratio}<br>"
-                f"Onset: {node_data.get('metric_onset', '')}<br>"
-                f"Depth: {depth}<br>"
-                f"Rest: {'Yes' if is_rest else 'No'}"
-            )
+            hover_text = _rt_node_hover(rt, node, audio_source=audio_source)
 
             trace_idx = len(fig.data)
             fig.add_trace(go.Scatter(
@@ -1074,6 +1142,9 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
                 bright = '#ffffff' if not is_rest else '#707070'
                 trace_bright_colors[trace_idx] = bright
                 trace_base_colors[trace_idx] = color
+                cx = (bx0 + bx1) / 2
+                cy = (by0 + by1) / 2
+                leaf_block_geom[node] = (cx, cy, (bx1 - bx0) / 2, (by1 - by0) / 2, is_rest)
 
             label_text = f"{ratio}" if ratio is not None else ""
             text_color = 'white' if is_rest else 'black'
@@ -1142,16 +1213,8 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
         rx0, rx1 = pos, pos + sw
 
         leaf_id = leaf_nodes[i]
-        leaf_data = rt[leaf_id]
         is_rest = ratio < 0
-        hover_text = (
-            f"Node: {leaf_id}<br>"
-            f"Proportion: {leaf_data.get('proportion', '')}<br>"
-            f"Duration: {ratio}<br>"
-            f"Onset: {leaf_data.get('metric_onset', '')}<br>"
-            f"Depth: {rt.depth_of(leaf_id)}<br>"
-            f"Rest: {'Yes' if is_rest else 'No'}"
-        )
+        hover_text = _rt_node_hover(rt, leaf_id, audio_source=audio_source)
 
         trace_idx = len(fig.data)
         fig.add_trace(go.Scatter(
@@ -1177,7 +1240,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
     for i, onset in enumerate(rt.onsets):
         if i < len(positions):
             fig.add_annotation(
-                x=positions[i], y=margin * 0.3, text=str(onset),
+                x=positions[i], y=onset_text_y, text=str(onset),
                 showarrow=False, font=dict(color='white', size=10, family='Arial'),
                 xanchor='center', yanchor='middle',
             )
@@ -1194,7 +1257,7 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
         ),
         yaxis=dict(
             showgrid=False, zeroline=False, showticklabels=False,
-            range=[-0.01, 1.01],
+            range=[onset_text_y - 0.02, 1.005],
         ),
         margin=dict(l=0, r=0, t=0, b=0),
         hovermode='closest',
@@ -1208,8 +1271,22 @@ def _plot_rt_containers(rt, figsize=(20, 5), invert=True, output_file=None,
 
     leaf_x_positions = [pos_x + sw / 2 for pos_x, sw in zip(positions, segment_widths)]
 
+    leaf_halo_groups = []
+    for leaf in rt.leaf_nodes:
+        geom = leaf_block_geom.get(leaf)
+        if geom:
+            cx, cy, hw, hh, is_rest_l = geom
+            if is_rest_l:
+                leaf_halo_groups.append([])
+            else:
+                group = _add_halo_traces(fig, cx, cy, hw * 1.2, hh * 1.4, False)
+                leaf_halo_groups.append(group)
+        else:
+            leaf_halo_groups.append([])
+
     fig._node_to_traces = node_to_traces
     fig._leaf_x_positions = leaf_x_positions
+    fig._leaf_halo_groups = leaf_halo_groups
     fig._trace_bright_colors = trace_bright_colors
     fig._trace_base_colors = trace_base_colors
     return fig
@@ -1628,7 +1705,7 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                         )
                     )
         
-        width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+        width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
         
         fig.update_layout(
             width=width_px,
@@ -1802,21 +1879,24 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             subdivision_line_color: str = '#aaaaaa',
             animate: bool = False, dur: float = 0.5,
             audio_source=None,
-            beat=None, bpm=None) -> None:
+            beat=None, bpm=None,
+            glow: bool = False) -> None:
     if layout == 'tree':
         if figsize is None:
-            figsize = (20, 5)
-        fig = _plot_rt_tree(rt, attributes=attributes, figsize=figsize, invert=invert, output_file=output_file)
+            figsize = (11, 2)
+        fig = _plot_rt_tree(rt, attributes=attributes, figsize=figsize, invert=invert,
+                            output_file=output_file, audio_source=audio_source)
     elif layout == 'ratios':
         if figsize is None:
-            figsize = (20, 1)
-        fig = _plot_ratios(rt, figsize=figsize, output_file=output_file)
+            figsize = (11, 0.5)
+        fig = _plot_ratios(rt, figsize=figsize, output_file=output_file, audio_source=audio_source)
     elif layout == 'containers':
         if figsize is None:
-            figsize = (20, 5)
+            figsize = (11, 2)
         fig = _plot_rt_containers(rt, figsize=figsize, invert=invert, output_file=output_file,
                                   vertical_lines=vertical_lines, barlines=barlines,
-                                  barline_color=barline_color, subdivision_line_color=subdivision_line_color)
+                                  barline_color=barline_color, subdivision_line_color=subdivision_line_color,
+                                  audio_source=audio_source)
     else:
         raise ValueError(f"Unknown layout: {layout}. Choose 'tree', 'containers', or 'ratios'.")
 
@@ -1853,6 +1933,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
 
     leaf_x_positions = getattr(fig, '_leaf_x_positions', [])
+    leaf_halo_groups = getattr(fig, '_leaf_halo_groups', [])
     trace_bright_colors = getattr(fig, '_trace_bright_colors', {})
     trace_base_colors = getattr(fig, '_trace_base_colors', {})
 
@@ -1862,10 +1943,12 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         leaf_ancestors=leaf_ancestors,
         all_animated_traces=all_animated_traces,
         leaf_x_positions=leaf_x_positions,
+        leaf_halo_groups=leaf_halo_groups,
         trace_bright_colors=trace_bright_colors,
         trace_base_colors=trace_base_colors,
         audio_payload=audio_payload,
         dur=dur,
+        glow=glow,
     )
 
 def _plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
@@ -2218,7 +2301,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         factor_string = ' '.join(str(cps.factor_to_alias[f]) for f in cps.factors)
         title = f"{cps_type} [{factor_string}]"
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     fig.update_layout(
         title=dict(text=title, font=dict(color='white')),
@@ -2550,7 +2633,7 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
             else:
                 title = f"{obj_type} (ratios)"
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     fig.update_layout(
         title=dict(text=title, font=dict(color='white')),
@@ -4014,7 +4097,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             )
         )
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     bounds_coords = bounds_coords_override if (bounds_coords_override is not None and len(bounds_coords_override) > 0) else coords
     x_coords = [coord[0] for coord in bounds_coords]
@@ -5057,7 +5140,7 @@ def _plot_field(field: ParameterField, figsize: tuple[float, float] = (12, 12),
             )
         )
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     x_coords = [coord[0] for coord in coords]
     x_min, x_max = min(x_coords), max(x_coords)
@@ -5447,7 +5530,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
     if title is None:
         title = repr(obj)
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     fig.update_layout(
         title=dict(text=title, font=dict(color='white')),
@@ -5714,7 +5797,7 @@ def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, fig
     if title is None:
         title = repr(obj)
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     fig.update_layout(
         title=dict(text=title, font=dict(color='white')),
@@ -5974,7 +6057,7 @@ def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, fig
     if title is None:
         title = repr(obj)
     
-    width_px, height_px = int(figsize[0] * 72), int(figsize[1] * 72)
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
     fig.update_layout(
         title=dict(text=title, font=dict(color='white')),

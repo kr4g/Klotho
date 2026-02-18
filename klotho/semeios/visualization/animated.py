@@ -265,17 +265,20 @@ class AnimatedFigure:
 
 class AnimatedRTFigure:
     def __init__(self, fig, node_to_traces, leaf_ancestors, all_animated_traces,
-                 leaf_x_positions=None, trace_bright_colors=None, trace_base_colors=None,
-                 audio_payload=None, dur=0.5):
+                 leaf_x_positions=None, leaf_halo_groups=None,
+                 trace_bright_colors=None, trace_base_colors=None,
+                 audio_payload=None, dur=0.5, glow=False):
         self.fig = fig
         self.node_to_traces = node_to_traces
         self.leaf_ancestors = leaf_ancestors
         self.all_animated_traces = all_animated_traces
         self.leaf_x_positions = leaf_x_positions or []
+        self.leaf_halo_groups = leaf_halo_groups or []
         self.trace_bright_colors = trace_bright_colors or {}
         self.trace_base_colors = trace_base_colors or {}
         self.audio_payload = audio_payload
         self.dur = dur
+        self.glow = glow
         self.widget_id = f"klotho_rt_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
@@ -306,6 +309,7 @@ class AnimatedRTFigure:
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in self.leaf_ancestors])
         all_anim_json = json.dumps(self.all_animated_traces)
         leaf_x_json = json.dumps(self.leaf_x_positions)
+        halo_groups_json = json.dumps(self.leaf_halo_groups)
         bright_colors_json = json.dumps({str(k): v for k, v in self.trace_bright_colors.items()})
         base_colors_json = json.dumps({str(k): v for k, v in self.trace_base_colors.items()})
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
@@ -386,6 +390,8 @@ class AnimatedRTFigure:
     const leafAncestors = {leaf_ancestors_json};
     const allAnimatedTraces = {all_anim_json};
     const leafXPositions = {leaf_x_json};
+    const leafHaloGroups = {halo_groups_json};
+    const glowEnabled = {'true' if self.glow else 'false'};
     const traceBrightColors = {bright_colors_json};
     const traceBaseColors = {base_colors_json};
     const audioPayload = {payload_json};
@@ -394,6 +400,7 @@ class AnimatedRTFigure:
     let looping = false;
     let playing = false;
     var brightenedTraces = [];
+    var activeHaloGroup = [];
 
     function restoreBrightened() {{
         for (var i = 0; i < brightenedTraces.length; i++) {{
@@ -406,8 +413,27 @@ class AnimatedRTFigure:
         brightenedTraces = [];
     }}
 
+    function hideHalo() {{
+        if (activeHaloGroup.length > 0) {{
+            Plotly.restyle(plotDiv, {{ visible: false }}, activeHaloGroup);
+            activeHaloGroup = [];
+        }}
+    }}
+
+    function showHalo(leafIdx) {{
+        if (leafIdx < leafHaloGroups.length) {{
+            var group = leafHaloGroups[leafIdx];
+            if (group && group.length > 0) {{
+                var toShow = glowEnabled ? group : [group[group.length - 1]];
+                Plotly.restyle(plotDiv, {{ visible: true }}, toShow);
+                activeHaloGroup = toShow.slice();
+            }}
+        }}
+    }}
+
     function dimAll() {{
         restoreBrightened();
+        hideHalo();
         if (allAnimatedTraces.length > 0) {{
             Plotly.restyle(plotDiv, {{ opacity: 0.15 }}, allAnimatedTraces);
         }}
@@ -415,6 +441,7 @@ class AnimatedRTFigure:
 
     function resetAll() {{
         restoreBrightened();
+        hideHalo();
         if (allAnimatedTraces.length > 0) {{
             Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, allAnimatedTraces);
         }}
@@ -448,6 +475,7 @@ class AnimatedRTFigure:
                 brightenedTraces.push(ti);
             }}
         }}
+        showHalo(leafIdx);
         if (leafIdx < leafXPositions.length) {{
             try {{
                 var xax = plotDiv._fullLayout.xaxis;
