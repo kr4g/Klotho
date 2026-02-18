@@ -45,7 +45,12 @@ class AnimatedLattice3dFigure:
 
         html = f'''
 {cdn_html}
-<div id="{wid}_wrap" style="position:relative;width:{w}px;height:{h}px;background:black;">
+<div id="{wid}_wrap" style="position:relative;width:{w}px;background:black;">
+    <div id="{wid}_title" style="
+        color:white;font-family:Arial,sans-serif;font-size:14px;
+        text-align:center;padding:8px 0 4px 0;pointer-events:none;
+        display:{'block' if title_escaped else 'none'};
+    ">{title_escaped}</div>
     <canvas id="{wid}_canvas" style="display:block;width:{w}px;height:{h}px;"></canvas>
     <div id="{wid}_tooltip" style="
         display:none;position:absolute;pointer-events:none;top:0;left:0;
@@ -143,9 +148,13 @@ class AnimatedLattice3dFigure:
     camera.position.set(cx + span * 1.2, cy + span * 1.2, cz + span * 1.2);
     camera.lookAt(cx, cy, cz);
 
+    if (canvas._klothoRenderer) {{
+        try {{ canvas._klothoRenderer.dispose(); }} catch(_) {{}}
+    }}
     var renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    canvas._klothoRenderer = renderer;
 
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.set(cx, cy, cz);
@@ -184,6 +193,10 @@ class AnimatedLattice3dFigure:
     var sphereGeo = new THREE.SphereGeometry(sphereR, 16, 12);
     var nodeMeshes = [];
     var nodeGroup = new THREE.Group();
+    var dimColor = new THREE.Color(sceneData.dimmedNodeColor);
+    var brightColor = new THREE.Color("#ffffff");
+    var pathNodeIndices = sceneData.pathNodeIndices || [];
+
     for (var i = 0; i < nodeCount; i++) {{
         var n = sceneData.nodes[i];
         var mat = new THREE.MeshBasicMaterial({{ color: sceneData.nodeColors[i] }});
@@ -194,6 +207,22 @@ class AnimatedLattice3dFigure:
         nodeMeshes.push(mesh);
     }}
     scene.add(nodeGroup);
+
+    function dimAllNodes() {{
+        for (var i = 0; i < nodeMeshes.length; i++) nodeMeshes[i].material.color.copy(dimColor);
+    }}
+    function highlightAllPathNodes() {{
+        for (var i = 0; i < pathNodeIndices.length; i++) {{
+            var idx = pathNodeIndices[i];
+            if (idx >= 0 && idx < nodeMeshes.length) nodeMeshes[idx].material.color.copy(brightColor);
+        }}
+    }}
+    function highlightNodeAt(stepIdx) {{
+        if (stepIdx >= 0 && stepIdx < pathNodeIndices.length) {{
+            var idx = pathNodeIndices[stepIdx];
+            if (idx >= 0 && idx < nodeMeshes.length) nodeMeshes[idx].material.color.copy(brightColor);
+        }}
+    }}
 
     function makeTextSprite(text, color) {{
         var c2 = document.createElement("canvas");
@@ -247,11 +276,15 @@ class AnimatedLattice3dFigure:
         scene.add(zl);
     }}
 
-    if (titleText) {{
-        var ts = makeTextSprite(titleText, "#ffffff");
-        ts.scale.set(1.5, 0.4, 1);
-        ts.position.set(cx, axCfg.yRange[1] + 0.8, cz);
-        scene.add(ts);
+    function makeTube(pts, radius, color, opacity) {{
+        var vecs = pts.map(function(p) {{ return new THREE.Vector3(p[0], p[1], p[2]); }});
+        var curve = (vecs.length === 2)
+            ? new THREE.LineCurve3(vecs[0], vecs[1])
+            : new THREE.CatmullRomCurve3(vecs, false, "catmullrom", 0);
+        var segs = Math.max(vecs.length * 4, 8);
+        var geo = new THREE.TubeGeometry(curve, segs, radius, 6, false);
+        var mat = new THREE.MeshBasicMaterial({{ color: color, transparent: opacity < 1, opacity: opacity }});
+        return new THREE.Mesh(geo, mat);
     }}
 
     var stepGroups = [];
@@ -261,26 +294,15 @@ class AnimatedLattice3dFigure:
         var pts = step.polyline;
         var group = [];
 
-        var verts = new Float32Array(pts.length * 3);
-        for (var k = 0; k < pts.length; k++) {{
-            verts[k*3] = pts[k][0]; verts[k*3+1] = pts[k][1]; verts[k*3+2] = pts[k][2];
-        }}
-        var lineGeom = new THREE.BufferGeometry();
-        lineGeom.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+        var glowTube = makeTube(pts, 0.018, 0xffffff, 0.25);
+        glowTube.visible = true;
+        scene.add(glowTube);
+        group.push(glowTube);
 
-        var glowLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({{
-            color: 0xffffff, transparent: true, opacity: 0.3
-        }}));
-        glowLine.visible = false;
-        scene.add(glowLine);
-        group.push(glowLine);
-
-        var colLine = new THREE.Line(lineGeom.clone(), new THREE.LineBasicMaterial({{
-            color: step.color, transparent: true, opacity: 0.9
-        }}));
-        colLine.visible = false;
-        scene.add(colLine);
-        group.push(colLine);
+        var colTube = makeTube(pts, 0.012, step.color, 1.0);
+        colTube.visible = true;
+        scene.add(colTube);
+        group.push(colTube);
 
         var coneH = 0.12, coneR = 0.04;
         var coneGeo = new THREE.ConeGeometry(coneR, coneH, 8);
@@ -291,7 +313,7 @@ class AnimatedLattice3dFigure:
         var dir = new THREE.Vector3(step.arrow_dir[0], step.arrow_dir[1], step.arrow_dir[2]).normalize();
         var quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
         cone.setRotationFromQuaternion(quat);
-        cone.visible = false;
+        cone.visible = true;
         scene.add(cone);
         group.push(cone);
 
@@ -304,15 +326,17 @@ class AnimatedLattice3dFigure:
         startHalo = new THREE.Mesh(haloGeo,
             new THREE.MeshBasicMaterial({{ color: haloData.start.color, transparent: true, opacity: 0.4 }}));
         startHalo.position.set(haloData.start.pos[0], haloData.start.pos[1], haloData.start.pos[2]);
-        startHalo.visible = false;
+        startHalo.visible = true;
         scene.add(startHalo);
 
         endHalo = new THREE.Mesh(haloGeo.clone(),
             new THREE.MeshBasicMaterial({{ color: haloData.end.color, transparent: true, opacity: 0.4 }}));
         endHalo.position.set(haloData.end.pos[0], haloData.end.pos[1], haloData.end.pos[2]);
-        endHalo.visible = false;
+        endHalo.visible = true;
         scene.add(endHalo);
     }}
+
+    if (pathNodeIndices.length > 0) highlightAllPathNodes();
 
     var raycaster = new THREE.Raycaster();
     var mouse = new THREE.Vector2();
@@ -360,6 +384,7 @@ class AnimatedLattice3dFigure:
         }}
         if (startHalo) startHalo.visible = false;
         if (endHalo) endHalo.visible = false;
+        dimAllNodes();
     }}
 
     function showAllPath() {{
@@ -369,12 +394,14 @@ class AnimatedLattice3dFigure:
         }}
         if (startHalo) startHalo.visible = true;
         if (endHalo) endHalo.visible = true;
+        highlightAllPathNodes();
     }}
 
     function revealStep(stepIdx) {{
         if (stepIdx === 0) {{
             hideAllPath();
             if (startHalo) startHalo.visible = true;
+            highlightNodeAt(0);
             return;
         }}
         var edgeIdx = stepIdx - 1;
@@ -382,6 +409,7 @@ class AnimatedLattice3dFigure:
             var g = stepGroups[edgeIdx];
             if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = true; }}
         }}
+        highlightNodeAt(stepIdx);
         if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && endHalo) {{
             endHalo.visible = true;
         }}
@@ -1231,6 +1259,9 @@ class AnimatedLatticeSvgFigure:
         steps_json = json.dumps(sd.step_group_ids)
         halos_json = json.dumps(sd.halo_ids)
         all_path_json = json.dumps(sd.all_path_ids)
+        node_ids_json = json.dumps(getattr(sd, 'all_node_ids', []))
+        path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
+        dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
 
         html = f'''
@@ -1271,6 +1302,9 @@ class AnimatedLatticeSvgFigure:
     var haloIds = {halos_json};
     var allPathIds = {all_path_json};
     var audioPayload = {payload_json};
+    var allNodeIds = {node_ids_json};
+    var pathNodeIndices = {path_node_indices_json};
+    var dimmedColor = "{dimmed_color}";
     var totalSteps = steps.length;
 
     var toggleBtn = document.getElementById("{wid}_toggle");
@@ -1280,11 +1314,37 @@ class AnimatedLatticeSvgFigure:
 
     var looping = false, playing = false;
 
+    function dimAllNodes() {{
+        for (var i = 0; i < allNodeIds.length; i++) {{
+            var el = document.getElementById(allNodeIds[i]);
+            if (el) el.setAttribute("fill", dimmedColor);
+        }}
+    }}
+    function highlightAllPathNodes() {{
+        for (var i = 0; i < pathNodeIndices.length; i++) {{
+            var idx = pathNodeIndices[i];
+            if (idx >= 0 && idx < allNodeIds.length) {{
+                var el = document.getElementById(allNodeIds[idx]);
+                if (el) el.setAttribute("fill", "white");
+            }}
+        }}
+    }}
+    function highlightNodeAt(stepIdx) {{
+        if (stepIdx >= 0 && stepIdx < pathNodeIndices.length) {{
+            var idx = pathNodeIndices[stepIdx];
+            if (idx >= 0 && idx < allNodeIds.length) {{
+                var el = document.getElementById(allNodeIds[idx]);
+                if (el) el.setAttribute("fill", "white");
+            }}
+        }}
+    }}
+
     function hideAllPath() {{
         for (var i = 0; i < allPathIds.length; i++) {{
             var el = document.getElementById(allPathIds[i]);
             if (el) el.style.display = "none";
         }}
+        dimAllNodes();
     }}
 
     function showAllPath() {{
@@ -1292,6 +1352,7 @@ class AnimatedLatticeSvgFigure:
             var el = document.getElementById(allPathIds[i]);
             if (el) el.style.display = "";
         }}
+        highlightAllPathNodes();
     }}
 
     function revealStep(stepIdx) {{
@@ -1301,6 +1362,7 @@ class AnimatedLatticeSvgFigure:
                 var el = document.getElementById(haloIds[0]);
                 if (el) el.style.display = "";
             }}
+            highlightNodeAt(0);
             return;
         }}
         var edgeIdx = stepIdx - 1;
@@ -1313,6 +1375,7 @@ class AnimatedLatticeSvgFigure:
                 }}
             }}
         }}
+        highlightNodeAt(stepIdx);
         if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && haloIds.length > 1) {{
             var el = document.getElementById(haloIds[1]);
             if (el) el.style.display = "";

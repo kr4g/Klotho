@@ -215,6 +215,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     node_positions = []
     node_colors = []
     hover_texts = []
+    has_path = path and len(path) >= 2
 
     coords_iter = coords
     if (nodes or path) and mute_background and len(drawn_nodes) > 0:
@@ -253,6 +254,29 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         else:
             node_colors.append('#ffffff')
 
+    pos_to_node_idx = {}
+    for i, p in enumerate(node_positions):
+        key = (round(p[0], 6), round(p[1], 6), round(p[2], 6))
+        pos_to_node_idx[key] = i
+
+    path_node_indices = []
+    path_node_set = set()
+    if has_path:
+        for coord in path:
+            if lattice.dimensionality > 3:
+                plot_coord = coord_mapping.get(coord, coord)
+            else:
+                plot_coord = coord
+            px, py, pz = _unpack3(plot_coord)
+            key = (round(px, 6), round(py, 6), round(pz, 6))
+            idx = pos_to_node_idx.get(key, -1)
+            path_node_indices.append(idx)
+            if idx >= 0:
+                path_node_set.add(idx)
+
+        for i in range(len(node_colors)):
+            node_colors[i] = '#ffffff' if i in path_node_set else dimmed_node_color
+
     x_all = [p[0] for p in node_positions] if node_positions else [c[0] for c in coords]
     y_all = [p[1] for p in node_positions] if node_positions else [c[1] if len(c) > 1 else 0 for c in coords]
     z_all = [p[2] for p in node_positions] if node_positions else [c[2] if len(c) > 2 else 0 for c in coords]
@@ -286,6 +310,8 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         'nodeColors': node_colors,
         'nodeSize': node_size,
         'hoverData': hover_texts,
+        'dimmedNodeColor': dimmed_node_color,
+        'pathNodeIndices': path_node_indices,
         'axisConfig': {
             'xRange': [x_min - pad, x_max + pad],
             'yRange': [y_min - pad, y_max + pad],

@@ -16,7 +16,8 @@ def _rgba_to_hex(rgba):
 
 class SvgLatticeData:
     __slots__ = ('svg_str', 'width_px', 'height_px',
-                 'step_group_ids', 'halo_ids', 'all_path_ids')
+                 'step_group_ids', 'halo_ids', 'all_path_ids',
+                 'all_node_ids', 'path_node_indices', 'dimmed_node_color')
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -387,11 +388,22 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         halo_ids = [start_halo_id, end_halo_id]
         all_path_el_ids.extend(halo_ids)
 
+    has_path = path and len(path) >= 2
     coords_iter = coords
     if (nodes or path) and mute_background and len(drawn_nodes_set) > 0:
         coords_iter = list(drawn_nodes_set)
 
+    path_coord_set = set()
+    if has_path:
+        for coord in path:
+            if lattice.dimensionality > 3:
+                path_coord_set.add(coord_mapping.get(coord, coord))
+            else:
+                path_coord_set.add(coord)
+
     node_els = []
+    all_node_ids = []
+    coord_to_node_id = {}
     ns = node_size * 2
     for i, coord in enumerate(coords_iter):
         if effective_dimensionality == 1:
@@ -425,25 +437,39 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             except (KeyError, AttributeError):
                 pass
 
-        is_highlighted = False
-        if coords_iter is coords and i < len(original_coords):
-            is_highlighted = original_coords[i] in highlighted_coords
-        elif coords_iter is not coords:
-            is_highlighted = coord in highlighted_coords or (orig_coord is not None and orig_coord in highlighted_coords)
-
-        if is_highlighted:
+        if has_path:
+            nc = 'white' if coord in path_coord_set else dimmed_node_color
+        elif highlighted_coords and (
+            (coords_iter is coords and i < len(original_coords) and original_coords[i] in highlighted_coords) or
+            (coords_iter is not coords and (coord in highlighted_coords or (orig_coord is not None and orig_coord in highlighted_coords)))
+        ):
             nc = 'white'
         elif use_dimmed:
             nc = dimmed_node_color
         else:
             nc = 'white'
 
+        nid = next_eid("nd")
+        all_node_ids.append(nid)
+        coord_to_node_id[coord] = nid
+
         tooltip = html_escape(hover_text)
         node_els.append(
-            f'<circle cx="{cx_px:.2f}" cy="{cy_px:.2f}" r="{ns / 2:.1f}" '
+            f'<circle id="{nid}" cx="{cx_px:.2f}" cy="{cy_px:.2f}" r="{ns / 2:.1f}" '
             f'fill="{nc}" stroke="white" stroke-width="2">'
             f'<title>{tooltip}</title></circle>'
         )
+
+    path_node_indices = []
+    if has_path:
+        for coord in path:
+            if lattice.dimensionality > 3:
+                plot_coord = coord_mapping.get(coord, coord)
+            else:
+                plot_coord = coord
+            nid = coord_to_node_id.get(plot_coord, '')
+            idx = all_node_ids.index(nid) if nid in all_node_ids else -1
+            path_node_indices.append(idx)
 
     all_svg = '\n'.join(els + path_els + node_els)
     svg_str = (
@@ -461,4 +487,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         step_group_ids=step_group_ids,
         halo_ids=halo_ids,
         all_path_ids=all_path_el_ids,
+        all_node_ids=all_node_ids,
+        path_node_indices=path_node_indices,
+        dimmed_node_color=dimmed_node_color,
     )
