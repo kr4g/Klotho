@@ -135,7 +135,8 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
     bdy0 = border_y0 * height_px
     bdy1 = border_y1 * height_px
 
-    uid = f"svgrt_{id(rt) % 0xFFFFFF:06x}"
+    import uuid as _uuid
+    uid = f"svgrt_{_uuid.uuid4().hex[:8]}"
     els = []
     node_to_ids = {}
     leaf_bright = {}
@@ -259,7 +260,8 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
     def fy(frac):
         return frac * height_px
 
-    uid = f"svgrc_{id(rt) % 0xFFFFFF:06x}"
+    import uuid as _uuid
+    uid = f"svgrc_{_uuid.uuid4().hex[:8]}"
     els = []
     node_to_ids = {}
     leaf_bright = {}
@@ -631,7 +633,8 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
     node_size = max(8, 25 / density_factor)
     text_size = max(6, 15 / density_factor)
 
-    uid = f"svgtt_{id(rt) % 0xFFFFFF:06x}"
+    import uuid as _uuid
+    uid = f"svgtt_{_uuid.uuid4().hex[:8]}"
     els = []
     node_to_ids = {}
     all_anim_ids = []

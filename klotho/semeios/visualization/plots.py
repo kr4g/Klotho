@@ -4257,11 +4257,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             fig.write_image(output_file)
     
     if animate and path and len(path) > 1:
-        from .animated import AnimatedFigure
         from klotho.utils.playback.tonejs.converters import freq_to_velocity
-
-        step_trace_groups, halo_indices, _arrow_info = _anim_info
-        all_path_indices = list(range(_path_trace_start, _path_trace_end))
 
         ref_freq = 261.63
         audio_events = []
@@ -4280,11 +4276,33 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             })
         audio_payload = {"events": audio_events, "instruments": {}}
 
-        return AnimatedFigure(
-            fig, step_trace_groups, halo_indices, all_path_indices,
-            audio_payload=audio_payload,
-            dur=dur, is_3d=(effective_dimensionality == 3)
-        )
+        if effective_dimensionality <= 2:
+            from .svg_lattice import _svg_lattice_2d
+            from .animated import AnimatedLatticeSvgFigure
+
+            svg_data = _svg_lattice_2d(
+                lattice=lattice, coords=coords, G=G, path=path, nodes=nodes,
+                highlighted_coords=highlighted_coords, coord_mapping=coord_mapping,
+                original_coords=original_coords,
+                effective_dimensionality=effective_dimensionality,
+                use_dimmed=use_dimmed, mute_background=mute_background,
+                path_mode=path_mode, figsize=figsize, node_size=node_size,
+                title=title, is_tone_lattice=is_tone_lattice,
+                coord_label=coord_label, gen_labels=gen_labels,
+                path_cmap=path_cmap,
+            )
+            return AnimatedLatticeSvgFigure(
+                svg_data=svg_data, audio_payload=audio_payload, dur=dur
+            )
+        else:
+            from .animated import AnimatedFigure
+            step_trace_groups, halo_indices, _arrow_info = _anim_info
+            all_path_indices = list(range(_path_trace_start, _path_trace_end))
+            return AnimatedFigure(
+                fig, step_trace_groups, halo_indices, all_path_indices,
+                audio_payload=audio_payload,
+                dur=dur, is_3d=True
+            )
 
     return fig
 

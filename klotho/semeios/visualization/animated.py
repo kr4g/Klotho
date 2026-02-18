@@ -768,3 +768,155 @@ class AnimatedRTSvgFigure:
 </script>
 '''
         return html
+
+
+class AnimatedLatticeSvgFigure:
+    def __init__(self, svg_data, audio_payload=None, dur=0.5):
+        self.svg_data = svg_data
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.widget_id = f"klotho_slat_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        sd = self.svg_data
+        wid = self.widget_id
+
+        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
+
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+
+        steps_json = json.dumps(sd.step_group_ids)
+        halos_json = json.dumps(sd.halo_ids)
+        all_path_json = json.dumps(sd.all_path_ids)
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+
+        html = f'''
+{cdn_html}
+{sd.svg_str}
+<div id="{wid}_controls" style="
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
+    user-select: none; margin-top: 4px;">
+    <button id="{wid}_toggle" style="
+        width: 32px; height: 32px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0;">
+        <span id="{wid}_icon" style="
+            width: 0; height: 0;
+            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
+    </button>
+    <button id="{wid}_loop" style="
+        width: 28px; height: 28px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
+        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="#a0a0a0" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </button>
+</div>
+{session_script}
+<script>{instruments_js}</script>
+<script>{player_js}</script>
+<script>
+(function() {{
+    var steps = {steps_json};
+    var haloIds = {halos_json};
+    var allPathIds = {all_path_json};
+    var audioPayload = {payload_json};
+    var totalSteps = steps.length;
+
+    var toggleBtn = document.getElementById("{wid}_toggle");
+    var iconEl = document.getElementById("{wid}_icon");
+    var loopBtn = document.getElementById("{wid}_loop");
+    var loopSvg = document.getElementById("{wid}_loop_svg");
+
+    var looping = false, playing = false;
+
+    function hideAllPath() {{
+        for (var i = 0; i < allPathIds.length; i++) {{
+            var el = document.getElementById(allPathIds[i]);
+            if (el) el.style.display = "none";
+        }}
+    }}
+
+    function showAllPath() {{
+        for (var i = 0; i < allPathIds.length; i++) {{
+            var el = document.getElementById(allPathIds[i]);
+            if (el) el.style.display = "";
+        }}
+    }}
+
+    function revealStep(stepIdx) {{
+        if (stepIdx === 0) {{
+            hideAllPath();
+            if (haloIds.length > 0) {{
+                var el = document.getElementById(haloIds[0]);
+                if (el) el.style.display = "";
+            }}
+            return;
+        }}
+        var edgeIdx = stepIdx - 1;
+        if (edgeIdx >= 0 && edgeIdx < steps.length) {{
+            var group = steps[edgeIdx];
+            if (group) {{
+                for (var i = 0; i < group.length; i++) {{
+                    var el = document.getElementById(group[i]);
+                    if (el) el.style.display = "";
+                }}
+            }}
+        }}
+        if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && haloIds.length > 1) {{
+            var el = document.getElementById(haloIds[1]);
+            if (el) el.style.display = "";
+        }}
+    }}
+
+    function finishPlayback() {{ playing = false; showAllPath(); setPlayIcon(); }}
+    function setPlayIcon() {{ iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
+    function setStopIcon() {{ iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
+
+    loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
+
+    if (audioPayload && typeof Tone !== "undefined") {{
+        var events = audioPayload.events || [];
+        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        var player = KlothoPlayer.create();
+        toggleBtn.onclick = async function() {{
+            if (player.isPlaying()) {{ player.stop(); }}
+            else {{
+                playing = true; setStopIcon(); hideAllPath();
+                await player.play(events, instruments, {{
+                    loop: looping,
+                    onEvent: function(stepIdx) {{ revealStep(stepIdx); }},
+                    onStop: function() {{ finishPlayback(); }},
+                    onFinish: function() {{ finishPlayback(); }}
+                }});
+            }}
+        }};
+    }} else {{
+        var durMs = {self.dur * 1000};
+        var timerId = null;
+        function runAnimation(stepIdx) {{
+            if (!playing) return;
+            if (stepIdx > totalSteps) {{ if (looping) {{ hideAllPath(); timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
+            revealStep(stepIdx);
+            timerId = setTimeout(function() {{ runAnimation(stepIdx + 1); }}, durMs);
+        }}
+        toggleBtn.onclick = function() {{
+            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
+            else {{ playing = true; setStopIcon(); hideAllPath(); runAnimation(0); }}
+        }};
+    }}
+}})();
+</script>
+'''
+        return html
