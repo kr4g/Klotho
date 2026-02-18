@@ -21,11 +21,9 @@ class AnimatedFigure:
 
     def to_html(self, **kwargs):
         plot_div_id = f"{self.widget_id}_plot"
-        fig_html = self.fig.to_html(
-            full_html=False,
-            include_plotlyjs=False,
-            div_id=plot_div_id,
-        )
+        fig_json = self.fig.to_json()
+        fig_w = self.fig.layout.width or 700
+        fig_h = self.fig.layout.height or 450
 
         cdn_html = cdn_scripts(include_plotly=True, include_tone=bool(self.audio_payload))
 
@@ -43,7 +41,7 @@ class AnimatedFigure:
 
         html = f'''
 {cdn_html}
-{fig_html}
+<div id="{plot_div_id}" class="plotly-graph-div" style="height:{fig_h}px; width:{fig_w}px;"></div>
 <div id="{wid}_controls" style="
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     display: inline-flex;
@@ -105,8 +103,13 @@ class AnimatedFigure:
 {player_js}
 </script>
 <script>
-(() => {{
-    const plotDiv = document.getElementById("{plot_div_id}");
+(function _klothoInit() {{
+    if (typeof Plotly === "undefined") {{ setTimeout(_klothoInit, 50); return; }}
+
+    var _fig = {fig_json};
+    var plotDiv = document.getElementById("{plot_div_id}");
+    Plotly.newPlot(plotDiv, _fig.data, _fig.layout, {{responsive: true}});
+
     const toggleBtn = document.getElementById("{wid}_toggle");
     const iconEl = document.getElementById("{wid}_icon");
     const loopBtn = document.getElementById("{wid}_loop");
@@ -253,12 +256,14 @@ class AnimatedFigure:
 
 class AnimatedRTFigure:
     def __init__(self, fig, node_to_traces, leaf_ancestors, all_animated_traces,
+                 leaf_path_traces=None,
                  leaf_x_positions=None, leaf_halo_groups=None,
                  trace_bright_colors=None, trace_base_colors=None,
                  audio_payload=None, dur=0.5, glow=False):
         self.fig = fig
         self.node_to_traces = node_to_traces
         self.leaf_ancestors = leaf_ancestors
+        self.leaf_path_traces = leaf_path_traces or []
         self.all_animated_traces = all_animated_traces
         self.leaf_x_positions = leaf_x_positions or []
         self.leaf_halo_groups = leaf_halo_groups or []
@@ -271,11 +276,9 @@ class AnimatedRTFigure:
 
     def to_html(self, **kwargs):
         plot_div_id = f"{self.widget_id}_plot"
-        fig_html = self.fig.to_html(
-            full_html=False,
-            include_plotlyjs=False,
-            div_id=plot_div_id,
-        )
+        fig_json = self.fig.to_json()
+        fig_w = self.fig.layout.width or 700
+        fig_h = self.fig.layout.height or 450
 
         cdn_html = cdn_scripts(include_plotly=True, include_tone=bool(self.audio_payload))
 
@@ -292,12 +295,13 @@ class AnimatedRTFigure:
         halo_groups_json = json.dumps(self.leaf_halo_groups)
         bright_colors_json = json.dumps({str(k): v for k, v in self.trace_bright_colors.items()})
         base_colors_json = json.dumps({str(k): v for k, v in self.trace_base_colors.items()})
+        leaf_path_traces_json = json.dumps(self.leaf_path_traces)
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
         wid = self.widget_id
 
         html = f'''
 {cdn_html}
-{fig_html}
+<div id="{plot_div_id}" class="plotly-graph-div" style="height:{fig_h}px; width:{fig_w}px;"></div>
 <div id="{wid}_controls" style="
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     display: inline-flex;
@@ -359,8 +363,13 @@ class AnimatedRTFigure:
 {player_js}
 </script>
 <script>
-(() => {{
-    const plotDiv = document.getElementById("{plot_div_id}");
+(function _klothoInit() {{
+    if (typeof Plotly === "undefined") {{ setTimeout(_klothoInit, 50); return; }}
+
+    var _fig = {fig_json};
+    var plotDiv = document.getElementById("{plot_div_id}");
+    Plotly.newPlot(plotDiv, _fig.data, _fig.layout, {{responsive: true}});
+
     const toggleBtn = document.getElementById("{wid}_toggle");
     const iconEl = document.getElementById("{wid}_icon");
     const loopBtn = document.getElementById("{wid}_loop");
@@ -375,87 +384,104 @@ class AnimatedRTFigure:
     const traceBrightColors = {bright_colors_json};
     const traceBaseColors = {base_colors_json};
     const audioPayload = {payload_json};
+    const leafPathTraces = {leaf_path_traces_json};
     const totalSteps = leafAncestors.length;
 
     let looping = false;
     let playing = false;
-    var brightenedTraces = [];
-    var activeHaloGroup = [];
+    var prevPathSet = null;
+    var prevBrightened = [];
+    var prevHaloGroup = [];
 
-    function restoreBrightened() {{
-        for (var i = 0; i < brightenedTraces.length; i++) {{
-            var ti = brightenedTraces[i];
-            var base = traceBaseColors[String(ti)];
-            if (base) {{
-                Plotly.restyle(plotDiv, {{ 'fillcolor': base }}, [ti]);
+    function resetAll() {{
+        if (prevBrightened.length > 0) {{
+            var ci = [], cv = [];
+            for (var i = 0; i < prevBrightened.length; i++) {{
+                ci.push(prevBrightened[i].idx);
+                cv.push(prevBrightened[i].base);
+            }}
+            Plotly.restyle(plotDiv, {{fillcolor: cv}}, ci);
+            prevBrightened = [];
+        }}
+        if (prevHaloGroup.length > 0) {{
+            Plotly.restyle(plotDiv, {{visible: false}}, prevHaloGroup);
+            prevHaloGroup = [];
+        }}
+        if (allAnimatedTraces.length > 0) {{
+            Plotly.restyle(plotDiv, {{opacity: 1.0}}, allAnimatedTraces);
+        }}
+        prevPathSet = null;
+    }}
+
+    function highlightLeaf(leafIdx) {{
+        if (leafIdx < 0 || leafIdx >= totalSteps) return;
+
+        var currPathTraces = leafPathTraces[leafIdx];
+        var currPathSet = new Set(currPathTraces);
+        var leafNodeId = leafAncestors[leafIdx][leafAncestors[leafIdx].length - 1];
+        var leafTraceIds = nodeToTraces[leafNodeId] || [];
+
+        var opIdx = [], opVal = [];
+        if (prevPathSet === null) {{
+            for (var i = 0; i < allAnimatedTraces.length; i++) {{
+                var ti = allAnimatedTraces[i];
+                opIdx.push(ti);
+                opVal.push(currPathSet.has(ti) ? 1.0 : 0.15);
+            }}
+        }} else {{
+            prevPathSet.forEach(function(ti) {{
+                if (!currPathSet.has(ti)) {{ opIdx.push(ti); opVal.push(0.15); }}
+            }});
+            currPathSet.forEach(function(ti) {{
+                if (!prevPathSet.has(ti)) {{ opIdx.push(ti); opVal.push(1.0); }}
+            }});
+        }}
+        if (opIdx.length > 0) {{
+            Plotly.restyle(plotDiv, {{opacity: opVal}}, opIdx);
+        }}
+
+        var cIdx = [], cVal = [];
+        for (var i = 0; i < prevBrightened.length; i++) {{
+            cIdx.push(prevBrightened[i].idx);
+            cVal.push(prevBrightened[i].base);
+        }}
+        var newBrightened = [];
+        for (var i = 0; i < leafTraceIds.length; i++) {{
+            var ti = leafTraceIds[i];
+            var bright = traceBrightColors[String(ti)];
+            if (bright) {{
+                cIdx.push(ti);
+                cVal.push(bright);
+                newBrightened.push({{idx: ti, base: traceBaseColors[String(ti)]}});
             }}
         }}
-        brightenedTraces = [];
-    }}
-
-    function hideHalo() {{
-        if (activeHaloGroup.length > 0) {{
-            Plotly.restyle(plotDiv, {{ visible: false }}, activeHaloGroup);
-            activeHaloGroup = [];
+        if (cIdx.length > 0) {{
+            Plotly.restyle(plotDiv, {{fillcolor: cVal}}, cIdx);
         }}
-    }}
 
-    function showHalo(leafIdx) {{
+        var vIdx = [], vVal = [];
+        for (var i = 0; i < prevHaloGroup.length; i++) {{
+            vIdx.push(prevHaloGroup[i]); vVal.push(false);
+        }}
+        var newHaloGroup = [];
         if (leafIdx < leafHaloGroups.length) {{
             var group = leafHaloGroups[leafIdx];
             if (group && group.length > 0) {{
                 var toShow = glowEnabled ? group : [group[group.length - 1]];
-                Plotly.restyle(plotDiv, {{ visible: true }}, toShow);
-                activeHaloGroup = toShow.slice();
-            }}
-        }}
-    }}
-
-    function dimAll() {{
-        restoreBrightened();
-        hideHalo();
-        if (allAnimatedTraces.length > 0) {{
-            Plotly.restyle(plotDiv, {{ opacity: 0.15 }}, allAnimatedTraces);
-        }}
-    }}
-
-    function resetAll() {{
-        restoreBrightened();
-        hideHalo();
-        if (allAnimatedTraces.length > 0) {{
-            Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, allAnimatedTraces);
-        }}
-    }}
-
-    function highlightLeaf(leafIdx) {{
-        if (leafIdx < 0 || leafIdx >= leafAncestors.length) return;
-        dimAll();
-        var ancestorPath = leafAncestors[leafIdx];
-        var pathTraces = [];
-        var leafNodeId = ancestorPath[ancestorPath.length - 1];
-        var leafTraces = nodeToTraces[leafNodeId] || [];
-        for (var i = 0; i < ancestorPath.length; i++) {{
-            var traces = nodeToTraces[ancestorPath[i]];
-            if (traces) {{
-                for (var j = 0; j < traces.length; j++) {{
-                    if (pathTraces.indexOf(traces[j]) === -1) {{
-                        pathTraces.push(traces[j]);
-                    }}
+                for (var i = 0; i < toShow.length; i++) {{
+                    vIdx.push(toShow[i]); vVal.push(true);
                 }}
+                newHaloGroup = toShow.slice();
             }}
         }}
-        if (pathTraces.length > 0) {{
-            Plotly.restyle(plotDiv, {{ opacity: 1.0 }}, pathTraces);
+        if (vIdx.length > 0) {{
+            Plotly.restyle(plotDiv, {{visible: vVal}}, vIdx);
         }}
-        for (var k = 0; k < leafTraces.length; k++) {{
-            var ti = leafTraces[k];
-            var bright = traceBrightColors[String(ti)];
-            if (bright) {{
-                Plotly.restyle(plotDiv, {{ 'fillcolor': bright }}, [ti]);
-                brightenedTraces.push(ti);
-            }}
-        }}
-        showHalo(leafIdx);
+
+        prevPathSet = currPathSet;
+        prevBrightened = newBrightened;
+        prevHaloGroup = newHaloGroup;
+
         if (leafIdx < leafXPositions.length) {{
             try {{
                 var xax = plotDiv._fullLayout.xaxis;

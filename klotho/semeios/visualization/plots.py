@@ -1922,6 +1922,13 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
 
     all_animated_traces = sorted({idx for idxs in node_to_traces.values() for idx in idxs})
 
+    leaf_path_traces = []
+    for path in leaf_ancestors:
+        traces = set()
+        for node in path:
+            traces.update(node_to_traces.get(node, []))
+        leaf_path_traces.append(sorted(traces))
+
     if audio_source is not None:
         if isinstance(audio_source, _CompositionalUnit):
             audio_payload = compositional_unit_to_animation_events(audio_source)
@@ -1941,6 +1948,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         fig=fig,
         node_to_traces=node_to_traces,
         leaf_ancestors=leaf_ancestors,
+        leaf_path_traces=leaf_path_traces,
         all_animated_traces=all_animated_traces,
         leaf_x_positions=leaf_x_positions,
         leaf_halo_groups=leaf_halo_groups,
