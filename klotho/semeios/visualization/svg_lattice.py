@@ -17,7 +17,8 @@ def _rgba_to_hex(rgba):
 class SvgLatticeData:
     __slots__ = ('svg_str', 'width_px', 'height_px',
                  'step_group_ids', 'halo_ids', 'all_path_ids',
-                 'all_node_ids', 'path_node_indices', 'dimmed_node_color')
+                 'all_node_ids', 'path_node_indices', 'path_node_colors',
+                 'dimmed_node_color')
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -376,14 +377,30 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
 
         start_halo_id = next_eid("hs")
         end_halo_id = next_eid("he")
+        sg_id = next_eid("rg")
+        eg_id = next_eid("rg")
 
         path_els.append(
-            f'<circle id="{start_halo_id}" cx="{sx:.2f}" cy="{sy:.2f}" r="17" '
-            f'fill="{start_hex}" opacity="0.4" pointer-events="none"/>'
+            f'<defs>'
+            f'<radialGradient id="{sg_id}">'
+            f'<stop offset="0%" stop-color="{start_hex}" stop-opacity="0.6"/>'
+            f'<stop offset="70%" stop-color="{start_hex}" stop-opacity="0.2"/>'
+            f'<stop offset="100%" stop-color="{start_hex}" stop-opacity="0"/>'
+            f'</radialGradient>'
+            f'<radialGradient id="{eg_id}">'
+            f'<stop offset="0%" stop-color="{end_hex}" stop-opacity="0.6"/>'
+            f'<stop offset="70%" stop-color="{end_hex}" stop-opacity="0.2"/>'
+            f'<stop offset="100%" stop-color="{end_hex}" stop-opacity="0"/>'
+            f'</radialGradient>'
+            f'</defs>'
         )
         path_els.append(
-            f'<circle id="{end_halo_id}" cx="{ex:.2f}" cy="{ey:.2f}" r="17" '
-            f'fill="{end_hex}" opacity="0.4" pointer-events="none"/>'
+            f'<circle id="{start_halo_id}" cx="{sx:.2f}" cy="{sy:.2f}" r="20" '
+            f'fill="url(#{sg_id})" pointer-events="none"/>'
+        )
+        path_els.append(
+            f'<circle id="{end_halo_id}" cx="{ex:.2f}" cy="{ey:.2f}" r="20" '
+            f'fill="url(#{eg_id})" pointer-events="none"/>'
         )
         halo_ids = [start_halo_id, end_halo_id]
         all_path_el_ids.extend(halo_ids)
@@ -393,13 +410,16 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     if (nodes or path) and mute_background and len(drawn_nodes_set) > 0:
         coords_iter = list(drawn_nodes_set)
 
-    path_coord_set = set()
+    path_coord_colors = {}
     if has_path:
-        for coord in path:
+        for k in range(len(path)):
+            coord = path[k]
             if lattice.dimensionality > 3:
-                path_coord_set.add(coord_mapping.get(coord, coord))
+                coord = coord_mapping.get(coord, coord)
+            if k == 0:
+                path_coord_colors[coord] = _rgba_to_hex(colors[0])
             else:
-                path_coord_set.add(coord)
+                path_coord_colors[coord] = _rgba_to_hex(colors[k - 1])
 
     node_els = []
     all_node_ids = []
@@ -438,7 +458,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                 pass
 
         if has_path:
-            nc = 'white' if coord in path_coord_set else dimmed_node_color
+            nc = path_coord_colors.get(coord, dimmed_node_color)
         elif highlighted_coords and (
             (coords_iter is coords and i < len(original_coords) and original_coords[i] in highlighted_coords) or
             (coords_iter is not coords and (coord in highlighted_coords or (orig_coord is not None and orig_coord in highlighted_coords)))
@@ -461,8 +481,9 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         )
 
     path_node_indices = []
+    path_node_colors = []
     if has_path:
-        for coord in path:
+        for k, coord in enumerate(path):
             if lattice.dimensionality > 3:
                 plot_coord = coord_mapping.get(coord, coord)
             else:
@@ -470,6 +491,10 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             nid = coord_to_node_id.get(plot_coord, '')
             idx = all_node_ids.index(nid) if nid in all_node_ids else -1
             path_node_indices.append(idx)
+            if k == 0:
+                path_node_colors.append(_rgba_to_hex(colors[0]))
+            else:
+                path_node_colors.append(_rgba_to_hex(colors[k - 1]))
 
     all_svg = '\n'.join(els + path_els + node_els)
     svg_str = (
@@ -489,5 +514,6 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         all_path_ids=all_path_el_ids,
         all_node_ids=all_node_ids,
         path_node_indices=path_node_indices,
+        path_node_colors=path_node_colors,
         dimmed_node_color=dimmed_node_color,
     )

@@ -989,7 +989,7 @@ class CombinationSet:
         """
         n_nodes = len(self._combos)
         G = Graph.complete_graph(n_nodes)
-        for i, combo in enumerate(self._combos):
+        for i, combo in enumerate(sorted(self._combos)):
             G[i]['combo'] = combo
         return G
     

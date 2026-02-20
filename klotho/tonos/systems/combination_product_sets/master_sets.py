@@ -12,7 +12,7 @@ MASTER_SETS = {
   'tetrad': {
     # Generating
     ALPHA_SYMBOLS['D'] / ALPHA_SYMBOLS['A']: {'angle': math.pi * 7/6, 'distance': math.sqrt(3.0), 'elevation': None},
-    ALPHA_SYMBOLS['D'] / ALPHA_SYMBOLS['B']: {'angle': math.pi * 0/1, 'distance': math.sqrt(3.0), 'elevation': None},
+    ALPHA_SYMBOLS['D'] / ALPHA_SYMBOLS['B']: {'angle': math.pi * 11/6, 'distance': math.sqrt(3.0), 'elevation': None},
     ALPHA_SYMBOLS['D'] / ALPHA_SYMBOLS['C']: {'angle': math.pi * 1/2, 'distance': math.sqrt(3.0), 'elevation': None},
     ALPHA_SYMBOLS['C'] / ALPHA_SYMBOLS['A']: {'angle': math.pi * 4/3, 'distance': 3.0, 'elevation': None},
     ALPHA_SYMBOLS['C'] / ALPHA_SYMBOLS['B']: {'angle': math.pi * 5/3, 'distance': 3.0, 'elevation': None},
@@ -20,7 +20,7 @@ MASTER_SETS = {
 
     # Reciprocal
     ALPHA_SYMBOLS['A'] / ALPHA_SYMBOLS['D']: {'angle': math.pi * 1/6, 'distance': math.sqrt(3.0), 'elevation': None},
-    ALPHA_SYMBOLS['B'] / ALPHA_SYMBOLS['D']: {'angle': math.pi * 1/1, 'distance': math.sqrt(3.0), 'elevation': None},
+    ALPHA_SYMBOLS['B'] / ALPHA_SYMBOLS['D']: {'angle': math.pi * 5/6, 'distance': math.sqrt(3.0), 'elevation': None},
     ALPHA_SYMBOLS['C'] / ALPHA_SYMBOLS['D']: {'angle': math.pi * 3/2, 'distance': math.sqrt(3.0), 'elevation': None},
     ALPHA_SYMBOLS['A'] / ALPHA_SYMBOLS['C']: {'angle': math.pi * 1/3, 'distance': 3.0, 'elevation': None},
     ALPHA_SYMBOLS['B'] / ALPHA_SYMBOLS['C']: {'angle': math.pi * 2/3, 'distance': 3.0, 'elevation': None},

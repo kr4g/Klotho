@@ -8,7 +8,7 @@ from tabulate import tabulate
 from klotho.topos.collections import CombinationSet as CS
 from klotho.topos.graphs import Graph
 from klotho.tonos.utils.interval_normalization import equave_reduce
-from .master_sets import ALPHA_SYMBOLS, MASTER_SETS
+from .master_set import MasterSet, MASTER_SETS
 
 __all__ = [
     'CombinationProductSet',
@@ -37,19 +37,47 @@ class CombinationProductSet(CS):
   
   see: https://en.xen.wiki/w/Combination_product_set
   '''
-  def __init__(self, factors: Tuple[int], r: int, normalized: bool = False, master_set: str = None):
+  def __init__(self, factors: Tuple[int], r: int, normalized: bool = False, master_set = None):
     super().__init__(factors, r)
     self._normalized = normalized
-    self._master_set = master_set.lower() if master_set else None
+
+    if isinstance(master_set, MasterSet):
+      self._master_set = master_set.name
+      ms = master_set
+      if ms.factors is None and ms.n_factors == len(self._factors):
+        self._master_set_instance = ms.with_factors(self._factors)
+      else:
+        self._master_set_instance = ms
+    elif isinstance(master_set, str):
+      self._master_set = master_set.lower()
+      ms_key = self._master_set
+      if ms_key in MASTER_SETS:
+        ms = MASTER_SETS[ms_key]()
+        if ms.n_factors == len(self._factors):
+          self._master_set_instance = ms.with_factors(self._factors)
+        else:
+          self._master_set_instance = ms
+      else:
+        self._master_set_instance = None
+    else:
+      self._master_set = None
+      self._master_set_instance = None
+
     self._populate_graph()
-    if self._master_set and self._master_set in MASTER_SETS:
-      self._build_master_set_structure(MASTER_SETS[self._master_set])
+    if self._master_set_instance is not None:
+      self._build_master_set_structure(self._master_set_instance.relationship_dict)
     
+  @classmethod
+  def from_master_set(cls, master_set: MasterSet, factors: Tuple[int], r: int, normalized: bool = False):
+    if len(factors) != master_set.n_factors:
+      raise ValueError(
+        f"MasterSet '{master_set.name}' requires {master_set.n_factors} factors, "
+        f"got {len(factors)}"
+      )
+    return cls(factors, r, normalized=normalized, master_set=master_set)
+
   def _populate_graph(self):
-    """Populate graph nodes with combo, product, ratio, and alias information."""
     directed_graph = self._graph.to_directed()
-    # for node, attrs in self._graph.nodes(data=True):
-        # directed_graph[node].update(attrs)
     directed_graph._graph.clear_edges()
     self._graph = directed_graph
     
@@ -71,12 +99,6 @@ class CombinationProductSet(CS):
         self._graph.nodes[node]['alias']   = symbolic_expr
   
   def _build_master_set_structure(self, relationship_dict):
-    """
-    Enhance the graph with edges based on relationships defined in the provided dictionary.
-    
-    Args:
-        relationship_dict: Dictionary mapping symbolic relationships to values
-    """
     if not relationship_dict:
       return
       
@@ -106,6 +128,10 @@ class CombinationProductSet(CS):
   def master_set(self):
     return self._master_set
   
+  @property
+  def master_set_instance(self):
+    return self._master_set_instance
+
   @property
   def aliases(self):
     return self.factor_to_alias

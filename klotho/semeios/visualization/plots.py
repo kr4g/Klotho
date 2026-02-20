@@ -6,8 +6,8 @@ from klotho.thetos.parameters.parameter_fields import ParameterField
 from klotho.chronos.rhythm_trees import RhythmTree
 from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
-from klotho.tonos.systems.combination_product_sets import CombinationProductSet
-from klotho.tonos.systems.combination_product_sets.master_sets import MASTER_SETS
+from klotho.tonos.systems.combination_product_sets import CombinationProductSet, MasterSet
+from klotho.tonos.systems.combination_product_sets.master_set import MASTER_SETS
 from klotho.tonos.scales import Scale
 from klotho.tonos.chords import Chord, Voicing
 
@@ -80,6 +80,8 @@ def plot(obj, **kwargs):
                     return _show(_plot_lattice(obj, **kwargs))
                 case _:
                     return _show(_plot_graph(obj._graph, **kwargs))
+        case MasterSet():
+            return _show(_plot_master_set(obj, **kwargs))
         case CombinationSet():
             match obj:
                 case CombinationProductSet():
@@ -2101,20 +2103,121 @@ def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12),
     else:
         plt.show()
 
+def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
+                     show_labels=True, title=None, output_file=None):
+    positions = ms.positions
+    edge_pairs = ms.edges
+
+    fig = go.Figure()
+
+    for fr, to in edge_pairs:
+        x1, y1 = positions[fr]
+        x2, y2 = positions[to]
+        fig.add_trace(go.Scatter(
+            x=[x1, x2], y=[y1, y2],
+            mode='lines', line=dict(color='#808080', width=1.5),
+            showlegend=False, hoverinfo='none'))
+
+    node_x, node_y, node_text, hover_data = [], [], [], []
+    nd = ms.node_data()
+    for i, label in enumerate(sorted(positions)):
+        x, y = positions[label]
+        node_x.append(x)
+        node_y.append(y)
+        node_text.append(label)
+        info = nd.get(label, {})
+        if 'factor' in info:
+            hover_data.append(
+                f"Node: {i}<br>Alias: {label}<br>Factor: {info['factor']}<br>Ratio: {info['ratio']}")
+        else:
+            hover_data.append(f"Node: {i}<br>Alias: {label}")
+
+    fig.add_trace(go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers+text' if show_labels else 'markers',
+        marker=dict(size=node_size, color='white', line=dict(color='white', width=2)),
+        text=node_text,
+        textposition='middle center',
+        textfont=dict(color='black', size=text_size, family='Arial Black', weight='bold'),
+        hovertemplate='%{customdata}<extra></extra>',
+        hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
+        customdata=hover_data,
+        showlegend=False))
+
+    if title is None:
+        title = f"MasterSet: {ms.name or 'unnamed'}"
+
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
+    x_pad, y_pad = 1.0, 1.0
+
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px, height=height_px,
+        paper_bgcolor='black', plot_bgcolor='black',
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                   range=[min(node_x) - x_pad, max(node_x) + x_pad]),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                   scaleanchor="x", scaleratio=1,
+                   range=[min(node_y) - y_pad, max(node_y) + y_pad]),
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0))
+
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+
+    return fig
+
+
+def _cps_node_positions(G):
+    node_neighbors = {}
+    for u, v, data in G.edges(data=True):
+        if 'angle' in data and 'distance' in data:
+            node_neighbors.setdefault(u, []).append((v, data['angle'], data['distance']))
+
+    node_positions = {}
+
+    nx_graph = G.to_networkx()
+    components = list(nx.strongly_connected_components(nx_graph))
+
+    for component in components:
+        start_node = next(iter(component))
+        pos = {start_node: (0.0, 0.0)}
+        placed = {start_node}
+        queue = [start_node]
+
+        while queue:
+            current = queue.pop(0)
+            for nb, angle, dist in node_neighbors.get(current, []):
+                if nb not in placed and nb in component:
+                    cx, cy = pos[current]
+                    pos[nb] = (cx + dist * math.cos(angle),
+                               cy + dist * math.sin(angle))
+                    placed.add(nb)
+                    queue.append(nb)
+
+        if pos:
+            center_x = sum(x for x, y in pos.values()) / len(pos)
+            center_y = sum(y for x, y in pos.values()) / len(pos)
+            for n in pos:
+                x, y = pos[n]
+                pos[n] = (x - center_x, y - center_y)
+
+        node_positions.update(pos)
+
+    return node_positions
+
+
 def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
              node_size: int = 30, text_size: int = 12, show_labels: bool = True,
-             title: str = None, output_file: str = None, nodes: list = None) -> go.Figure:
+             title: str = None, output_file: str = None, nodes: list = None,
+             path: list = None, path_cmap: str = 'viridis',
+             mute_background: bool = False,
+             animate: bool = False, dur: float = 0.5) -> go.Figure:
     """
     Plot a Combination Product Set as an interactive network diagram based on its master set.
-    
-    Note: This function requires a CPS instance with a defined master set. 
-    
-    Supported types:
-    - Hexany (tetrad master set)
-    - Eikosany (asterisk master set) 
-    - Hebdomekontany (ogdoad master set)
-    - Dekany/Pentadekany (with master_set parameter)
-    - CombinationProductSet (with master_set parameter)
     
     Args:
         cps: CPS instance to visualize (must have a master_set defined)
@@ -2124,9 +2227,14 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         title: Title for the plot (default is derived from CPS if None)
         output_file: Path to save the figure (if None, display instead)
         nodes: List of node IDs to highlight in pale green
+        path: List of node IDs representing a traversal path through the CPS graph
+        path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis')
+        mute_background: If True and path is provided, dim non-path nodes
+        animate: If True and path is provided, return an animated SVG figure
+        dur: Duration in seconds between animation steps (default 0.5)
         
     Returns:
-        Plotly figure object that can be displayed or further customized
+        Plotly figure object (or AnimatedCPSSvgFigure when animate=True)
     """
     master_set_name = cps.master_set
     if not master_set_name:
@@ -2139,72 +2247,23 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     if master_set_name not in MASTER_SETS:
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
-    relationship_angles = MASTER_SETS[master_set_name]
-    
-    G = cps.graph  # Use the Graph wrapper, not the internal _graph
-    
-    combo_to_node = {}
-    node_to_combo = {}
-    for node, attrs in G.nodes(data=True):
-        if 'combo' in attrs:
-            combo = attrs['combo']
-            combo_to_node[combo] = node
-            node_to_combo[node] = combo
-    
-    node_relationships = {}
-    for u, v, data in G.edges(data=True):
-        if 'relation' in data:
-            if u not in node_relationships:
-                node_relationships[u] = []
-            relation_str = str(data['relation'])
-            node_relationships[u].append((v, relation_str))
-    
-        node_positions = {}
-    
-    # Convert our Graph wrapper to NetworkX for compatibility with NetworkX algorithms
-    nx_graph = G.to_networkx()
-    components = list(nx.strongly_connected_components(nx_graph))
-    
-    for component in components:
-        start_node = next(iter(component))
-        component_positions = {start_node: (0, 0)}
-        
-        placed_nodes = set([start_node])
-        to_visit = [start_node]
-        
-        while to_visit:
-            current_node = to_visit.pop(0)
-            
-            if current_node in node_relationships:
-                for neighbor_node, relation in node_relationships[current_node]:
-                    if neighbor_node not in placed_nodes and neighbor_node in component:
-                        for sym_rel, rel_data in relationship_angles.items():
-                            if str(sym_rel) == relation:
-                                current_pos = component_positions[current_node]
-                                distance = rel_data['distance']
-                                angle = rel_data['angle']
-                                
-                                x = current_pos[0] + distance * math.cos(angle)
-                                y = current_pos[1] + distance * math.sin(angle)
-                                
-                                component_positions[neighbor_node] = (x, y)
-                                placed_nodes.add(neighbor_node)
-                                to_visit.append(neighbor_node)
-                                break
-        
-        if component_positions:
-            center_x = sum(x for x, y in component_positions.values()) / len(component_positions)
-            center_y = sum(y for x, y in component_positions.values()) / len(component_positions)
-            
-            for node in component_positions:
-                x, y = component_positions[node]
-                component_positions[node] = (x - center_x, y - center_y)
-        
-        node_positions.update(component_positions)
-    
+    G = cps.graph
+    node_positions = _cps_node_positions(G)
+
+    if animate and path:
+        from .svg_cps import _svg_cps
+        from .animated import AnimatedCPSSvgFigure
+        svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
+                            mute_background=mute_background, figsize=figsize,
+                            node_size=node_size, text_size=text_size,
+                            show_labels=show_labels, title=title)
+        return AnimatedCPSSvgFigure(svg_data, dur=dur)
+
     fig = go.Figure()
     
     highlight_nodes = set(nodes) if nodes else set()
+    path_nodes = set(path) if path else set()
+    dim_bg = mute_background and bool(path)
     
     regular_edges = []
     highlighted_edges = []
@@ -2216,6 +2275,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             else:
                 regular_edges.append((u, v))
     
+    edge_color = '#808080' if not dim_bg else '#333333'
     for u, v in regular_edges:
         x1, y1 = node_positions[u]
         x2, y2 = node_positions[v]
@@ -2224,7 +2284,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 x=[x1, x2], y=[y1, y2],
                 mode='lines+markers',
                 marker=dict(size=0.1, opacity=0),
-                line=dict(color='#808080', width=1),
+                line=dict(color=edge_color, width=1),
                 showlegend=False,
                 hoverinfo='none'
             )
@@ -2243,7 +2303,80 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 hoverinfo='none'
             )
         )
-    
+
+    if path and len(path) >= 2:
+        colors = _path_color_array(path_cmap, len(path) - 1)
+        from collections import defaultdict
+        edge_counts = defaultdict(int)
+
+        for i in range(len(path) - 1):
+            n1, n2 = path[i], path[i + 1]
+            if n1 not in node_positions or n2 not in node_positions:
+                continue
+            x1, y1 = node_positions[n1]
+            x2, y2 = node_positions[n2]
+            path_color_hex = _rgba_to_hex(colors[i])
+
+            edge_key = tuple(sorted([n1, n2]))
+            traversal_idx = edge_counts[edge_key]
+            edge_counts[edge_key] += 1
+
+            if traversal_idx == 0:
+                trace_x = [x1, x2]
+                trace_y = [y1, y2]
+                mid_x = (x1 + x2) / 2
+                mid_y = (y1 + y2) / 2
+                arrow_angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+            else:
+                dx, dy = x2 - x1, y2 - y1
+                length = math.sqrt(dx*dx + dy*dy)
+                if length < 1e-9:
+                    continue
+                perp_x, perp_y = -dy / length, dx / length
+                is_forward = n1 < n2
+                side = 1 if is_forward else -1
+                offset_mag = 0.15 * ((traversal_idx + 1) // 2)
+                if traversal_idx % 2 == 0:
+                    side = -side
+                ctrl_x = (x1 + x2) / 2 + side * perp_x * offset_mag
+                ctrl_y = (y1 + y2) / 2 + side * perp_y * offset_mag
+                bx, by = _bezier_2d((x1, y1), (x2, y2), (ctrl_x, ctrl_y), 20)
+                trace_x = bx.tolist()
+                trace_y = by.tolist()
+                mid_idx = 10
+                mid_x = trace_x[mid_idx]
+                mid_y = trace_y[mid_idx]
+                tan_x = trace_x[mid_idx + 1] - trace_x[mid_idx - 1]
+                tan_y = trace_y[mid_idx + 1] - trace_y[mid_idx - 1]
+                arrow_angle = math.degrees(math.atan2(tan_y, tan_x))
+
+            fig.add_trace(go.Scatter(
+                x=trace_x, y=trace_y, mode='lines',
+                line=dict(color='white', width=6), opacity=0.3,
+                showlegend=False, hoverinfo='none'))
+            fig.add_trace(go.Scatter(
+                x=trace_x, y=trace_y, mode='lines',
+                line=dict(color=path_color_hex, width=4), opacity=0.9,
+                showlegend=False, hoverinfo='none'))
+            fig.add_trace(go.Scatter(
+                x=[mid_x], y=[mid_y], mode='markers',
+                marker=dict(symbol='triangle-up', size=12, color=path_color_hex,
+                            angle=-(arrow_angle - 90), line=dict(color='white', width=1)),
+                showlegend=False, hoverinfo='none'))
+
+        start_hex = _rgba_to_hex(colors[0])
+        end_hex = _rgba_to_hex(colors[-1])
+        sx, sy = node_positions[path[0]]
+        ex, ey = node_positions[path[-1]]
+        fig.add_trace(go.Scatter(
+            x=[sx], y=[sy], mode='markers',
+            marker=dict(size=35, color=start_hex, opacity=0.4, line=dict(width=0)),
+            showlegend=False, hoverinfo='none'))
+        fig.add_trace(go.Scatter(
+            x=[ex], y=[ey], mode='markers',
+            marker=dict(size=35, color=end_hex, opacity=0.4, line=dict(width=0)),
+            showlegend=False, hoverinfo='none'))
+
     node_x, node_y = [], []
     node_text, hover_data, node_colors = [], [], []
     
@@ -2257,15 +2390,17 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             label = ''.join(str(cps.factor_to_alias[f]).strip('()') for f in combo)
             node_text.append(label)
             
-            combo_str = str(combo).replace(',)', ')')
+            combo_str = '(' + ' '.join(str(f) for f in combo) + ')'
             product = attrs['product']
             ratio = attrs['ratio']
             
-            hover_info = f"Node: {node}<br>Combo: {combo_str}<br>Product: {product}<br>Ratio: {ratio}"
+            hover_info = f"Node: {node}<br>Alias: {label}<br>Combo: {combo_str}<br>Product: {product}<br>Ratio: {ratio}"
             hover_data.append(hover_info)
             
             if node in highlight_nodes:
                 node_colors.append('#90EE90')
+            elif dim_bg and node not in path_nodes:
+                node_colors.append('#555555')
             else:
                 node_colors.append('white')
     
@@ -2290,7 +2425,6 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
     if title is None:
         cps_type = type(cps).__name__
-        # factor_string = ', '.join(str(f) for f in cps.factors)
         factor_string = ' '.join(str(cps.factor_to_alias[f]) for f in cps.factors)
         title = f"{cps_type} [{factor_string}]"
     

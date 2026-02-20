@@ -43,7 +43,7 @@ from .scales.scale import InstancedScale
 from .chords import Chord, Voicing, Sonority, ChordSequence, FreeSonority
 from .chords.chord import InstancedChord, InstancedVoicing
 from .pitch import Contour
-from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany
+from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany, MasterSet
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
 from .systems.tone_lattices import ToneLattice
@@ -99,6 +99,7 @@ __all__ = [
     'Dekany',
     'Pentadekany',
     'Eikosany',
+    'Hebdomekontany',
     'HarmonicTree',
     'Spectrum',
     'ToneLattice',

@@ -194,8 +194,8 @@ class AnimatedLattice3dFigure:
     var nodeMeshes = [];
     var nodeGroup = new THREE.Group();
     var dimColor = new THREE.Color(sceneData.dimmedNodeColor);
-    var brightColor = new THREE.Color("#ffffff");
     var pathNodeIndices = sceneData.pathNodeIndices || [];
+    var pathNodeColors = sceneData.pathNodeColors || [];
 
     for (var i = 0; i < nodeCount; i++) {{
         var n = sceneData.nodes[i];
@@ -214,13 +214,15 @@ class AnimatedLattice3dFigure:
     function highlightAllPathNodes() {{
         for (var i = 0; i < pathNodeIndices.length; i++) {{
             var idx = pathNodeIndices[i];
-            if (idx >= 0 && idx < nodeMeshes.length) nodeMeshes[idx].material.color.copy(brightColor);
+            var col = pathNodeColors[i] || "#ffffff";
+            if (idx >= 0 && idx < nodeMeshes.length) nodeMeshes[idx].material.color.set(col);
         }}
     }}
     function highlightNodeAt(stepIdx) {{
         if (stepIdx >= 0 && stepIdx < pathNodeIndices.length) {{
             var idx = pathNodeIndices[stepIdx];
-            if (idx >= 0 && idx < nodeMeshes.length) nodeMeshes[idx].material.color.copy(brightColor);
+            var col = pathNodeColors[stepIdx] || "#ffffff";
+            if (idx >= 0 && idx < nodeMeshes.length) nodeMeshes[idx].material.color.set(col);
         }}
     }}
 
@@ -320,17 +322,32 @@ class AnimatedLattice3dFigure:
         stepGroups.push(group);
     }}
 
+    function makeHaloSprite(hex, size) {{
+        var c2 = document.createElement("canvas");
+        c2.width = 64; c2.height = 64;
+        var ctx = c2.getContext("2d");
+        var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+        var grad = ctx.createRadialGradient(32,32,0, 32,32,32);
+        grad.addColorStop(0, "rgba("+r+","+g+","+b+",0.6)");
+        grad.addColorStop(0.7, "rgba("+r+","+g+","+b+",0.15)");
+        grad.addColorStop(1, "rgba("+r+","+g+","+b+",0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0,0,64,64);
+        var tex = new THREE.CanvasTexture(c2);
+        var mat = new THREE.SpriteMaterial({{ map: tex, transparent: true }});
+        var sprite = new THREE.Sprite(mat);
+        sprite.scale.set(size, size, 1);
+        return sprite;
+    }}
+
     var startHalo = null, endHalo = null;
     if (haloData) {{
-        var haloGeo = new THREE.SphereGeometry(0.18, 16, 12);
-        startHalo = new THREE.Mesh(haloGeo,
-            new THREE.MeshBasicMaterial({{ color: haloData.start.color, transparent: true, opacity: 0.4 }}));
+        startHalo = makeHaloSprite(haloData.start.color, 0.55);
         startHalo.position.set(haloData.start.pos[0], haloData.start.pos[1], haloData.start.pos[2]);
         startHalo.visible = true;
         scene.add(startHalo);
 
-        endHalo = new THREE.Mesh(haloGeo.clone(),
-            new THREE.MeshBasicMaterial({{ color: haloData.end.color, transparent: true, opacity: 0.4 }}));
+        endHalo = makeHaloSprite(haloData.end.color, 0.55);
         endHalo.position.set(haloData.end.pos[0], haloData.end.pos[1], haloData.end.pos[2]);
         endHalo.visible = true;
         scene.add(endHalo);
@@ -1261,6 +1278,7 @@ class AnimatedLatticeSvgFigure:
         all_path_json = json.dumps(sd.all_path_ids)
         node_ids_json = json.dumps(getattr(sd, 'all_node_ids', []))
         path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
+        path_node_colors_json = json.dumps(getattr(sd, 'path_node_colors', []))
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
 
@@ -1304,6 +1322,7 @@ class AnimatedLatticeSvgFigure:
     var audioPayload = {payload_json};
     var allNodeIds = {node_ids_json};
     var pathNodeIndices = {path_node_indices_json};
+    var pathNodeColors = {path_node_colors_json};
     var dimmedColor = "{dimmed_color}";
     var totalSteps = steps.length;
 
@@ -1323,18 +1342,20 @@ class AnimatedLatticeSvgFigure:
     function highlightAllPathNodes() {{
         for (var i = 0; i < pathNodeIndices.length; i++) {{
             var idx = pathNodeIndices[i];
+            var col = pathNodeColors[i] || "white";
             if (idx >= 0 && idx < allNodeIds.length) {{
                 var el = document.getElementById(allNodeIds[idx]);
-                if (el) el.setAttribute("fill", "white");
+                if (el) el.setAttribute("fill", col);
             }}
         }}
     }}
     function highlightNodeAt(stepIdx) {{
         if (stepIdx >= 0 && stepIdx < pathNodeIndices.length) {{
             var idx = pathNodeIndices[stepIdx];
+            var col = pathNodeColors[stepIdx] || "white";
             if (idx >= 0 && idx < allNodeIds.length) {{
                 var el = document.getElementById(allNodeIds[idx]);
-                if (el) el.setAttribute("fill", "white");
+                if (el) el.setAttribute("fill", col);
             }}
         }}
     }}
@@ -1417,6 +1438,115 @@ class AnimatedLatticeSvgFigure:
             if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
             else {{ playing = true; setStopIcon(); hideAllPath(); runAnimation(0); }}
         }};
+    }}
+}})();
+</script>
+'''
+        return html  # end AnimatedLatticeSvgFigure.to_html
+
+
+class AnimatedCPSSvgFigure:
+    def __init__(self, svg_data, audio_payload=None, dur=0.5):
+        self.svg_data = svg_data
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.widget_id = f"klotho_scps_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        sd = self.svg_data
+        wid = self.widget_id
+
+        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+
+        steps_json = json.dumps(sd.step_group_ids)
+        halos_json = json.dumps(sd.halo_ids)
+        all_path_json = json.dumps(sd.all_path_ids)
+        node_ids_json = json.dumps(sd.all_node_ids)
+        path_node_indices_json = json.dumps(sd.path_node_indices)
+        path_node_colors_json = json.dumps(sd.path_node_colors)
+        dimmed_color = sd.dimmed_node_color
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+
+        html = f'''
+{cdn_html}
+{sd.svg_str}
+<div id="{wid}_controls" style="
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
+    user-select: none; margin-top: 4px;">
+    <button id="{wid}_toggle" style="
+        width: 32px; height: 32px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0;">
+        <span id="{wid}_icon" style="
+            width: 0; height: 0;
+            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
+    </button>
+    <button id="{wid}_loop" style="
+        width: 28px; height: 28px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
+        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="#a0a0a0" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </button>
+</div>
+{session_script}
+<script>{instruments_js}</script>
+<script>{player_js}</script>
+<script>
+(function() {{
+    var steps = {steps_json};
+    var haloIds = {halos_json};
+    var allPathIds = {all_path_json};
+    var audioPayload = {payload_json};
+    var allNodeIds = {node_ids_json};
+    var pathNodeIndices = {path_node_indices_json};
+    var pathNodeColors = {path_node_colors_json};
+    var dimmedColor = "{dimmed_color}";
+    var totalSteps = steps.length;
+    var toggleBtn = document.getElementById("{wid}_toggle");
+    var iconEl = document.getElementById("{wid}_icon");
+    var loopBtn = document.getElementById("{wid}_loop");
+    var loopSvg = document.getElementById("{wid}_loop_svg");
+    var looping = false, playing = false;
+    function dimAllNodes() {{ for (var i=0;i<allNodeIds.length;i++) {{ var el=document.getElementById(allNodeIds[i]); if(el) el.setAttribute("fill",dimmedColor); }} }}
+    function highlightAllPathNodes() {{ for (var i=0;i<pathNodeIndices.length;i++) {{ var idx=pathNodeIndices[i], col=pathNodeColors[i]||"white"; if(idx>=0&&idx<allNodeIds.length) {{ var el=document.getElementById(allNodeIds[idx]); if(el) el.setAttribute("fill",col); }} }} }}
+    function highlightNodeAt(s) {{ if(s>=0&&s<pathNodeIndices.length) {{ var idx=pathNodeIndices[s], col=pathNodeColors[s]||"white"; if(idx>=0&&idx<allNodeIds.length) {{ var el=document.getElementById(allNodeIds[idx]); if(el) el.setAttribute("fill",col); }} }} }}
+    function hideAllPath() {{ for(var i=0;i<allPathIds.length;i++) {{ var el=document.getElementById(allPathIds[i]); if(el) el.style.display="none"; }} dimAllNodes(); }}
+    function showAllPath() {{ for(var i=0;i<allPathIds.length;i++) {{ var el=document.getElementById(allPathIds[i]); if(el) el.style.display=""; }} highlightAllPathNodes(); }}
+    function revealStep(s) {{
+        if(s===0) {{ hideAllPath(); if(haloIds.length>0) {{ var el=document.getElementById(haloIds[0]); if(el) el.style.display=""; }} highlightNodeAt(0); return; }}
+        var e=s-1; if(e>=0&&e<steps.length) {{ var g=steps[e]; if(g) for(var i=0;i<g.length;i++) {{ var el=document.getElementById(g[i]); if(el) el.style.display=""; }} }}
+        highlightNodeAt(s);
+        if(s===(audioPayload?audioPayload.events.length-1:totalSteps)&&haloIds.length>1) {{ var el=document.getElementById(haloIds[1]); if(el) el.style.display=""; }}
+    }}
+    function finishPlayback() {{ playing=false; showAllPath(); setPlayIcon(); }}
+    function setPlayIcon() {{ iconEl.style.cssText="width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
+    function setStopIcon() {{ iconEl.style.cssText="width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
+    loopBtn.onclick=function(){{ looping=!looping; loopBtn.style.opacity=looping?"1":"0.5"; loopSvg.setAttribute("stroke",looping?"#4ade80":"#a0a0a0"); }};
+    if(audioPayload&&typeof Tone!=="undefined") {{
+        var events=audioPayload.events||[];
+        var instruments=globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments||{{}});
+        var player=KlothoPlayer.create();
+        toggleBtn.onclick=async function(){{
+            if(player.isPlaying()){{ player.stop(); }}
+            else {{ playing=true; setStopIcon(); hideAllPath(); await player.play(events,instruments,{{ loop:looping, onEvent:function(s){{ revealStep(s); }}, onStop:function(){{ finishPlayback(); }}, onFinish:function(){{ finishPlayback(); }} }}); }}
+        }};
+    }} else {{
+        var durMs={self.dur * 1000};
+        var timerId=null;
+        function runAnimation(s){{ if(!playing) return; if(s>totalSteps){{ if(looping){{ hideAllPath(); timerId=setTimeout(function(){{ runAnimation(0); }},durMs); }} else {{ finishPlayback(); }} return; }} revealStep(s); timerId=setTimeout(function(){{ runAnimation(s+1); }},durMs); }}
+        toggleBtn.onclick=function(){{ if(playing){{ playing=false; if(timerId){{ clearTimeout(timerId); timerId=null; }} finishPlayback(); }} else {{ playing=true; setStopIcon(); hideAllPath(); runAnimation(0); }} }};
     }}
 }})();
 </script>

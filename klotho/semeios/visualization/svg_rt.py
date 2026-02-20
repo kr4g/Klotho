@@ -4,11 +4,6 @@ from html import escape as html_escape
 
 
 _HALO_NOTE_COLOR = (100, 160, 255)
-_HALO_RINGS = [
-    (1.0,  0.22),
-    (1.35, 0.13),
-    (1.8,  0.06),
-]
 
 
 def _rt_node_tooltip(rt, node_id, audio_source=None):
@@ -51,19 +46,21 @@ def _rt_node_tooltip(rt, node_id, audio_source=None):
 
 
 def _svg_halo_ellipses(prefix, cx, cy, rx, ry):
-    ids = []
-    elements = []
     base = _HALO_NOTE_COLOR
-    for i, (scale, alpha) in enumerate(reversed(_HALO_RINGS)):
-        eid = f"{prefix}_h{i}"
-        ids.append(eid)
-        elements.append(
-            f'<ellipse id="{eid}" cx="{cx:.4f}" cy="{cy:.4f}" '
-            f'rx="{rx * scale:.4f}" ry="{ry * scale:.4f}" '
-            f'fill="rgba({base[0]},{base[1]},{base[2]},{alpha})" '
-            f'style="display:none" pointer-events="none"/>'
-        )
-    return ids, elements
+    grad_id = f"{prefix}_rg"
+    eid = f"{prefix}_h"
+    elements = [
+        f'<defs><radialGradient id="{grad_id}">'
+        f'<stop offset="0%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0.5"/>'
+        f'<stop offset="60%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0.15"/>'
+        f'<stop offset="100%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0"/>'
+        f'</radialGradient></defs>',
+        f'<ellipse id="{eid}" cx="{cx:.4f}" cy="{cy:.4f}" '
+        f'rx="{rx * 1.5:.4f}" ry="{ry * 1.5:.4f}" '
+        f'fill="url(#{grad_id})" '
+        f'style="display:none" pointer-events="none"/>',
+    ]
+    return [eid], elements
 
 
 def _wrap_svg(inner_svg, width_px, height_px, y_min, y_max):
