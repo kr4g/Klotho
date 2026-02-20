@@ -12,7 +12,12 @@ _ALPHA = {chr(65 + i): sp.Symbol(chr(65 + i)) for i in range(26)}
 
 class MasterSet:
     def __init__(self, positions, edges, name=None, factors=None):
-        self._positions = {k: (float(v[0]), float(v[1])) for k, v in positions.items()}
+        self._positions = {}
+        for k, v in positions.items():
+            if len(v) >= 3:
+                self._positions[k] = (float(v[0]), float(v[1]), float(v[2]))
+            else:
+                self._positions[k] = (float(v[0]), float(v[1]), 0.0)
         self._edge_pairs = list(edges)
         self._name = name
         self._n_factors = len(positions)
@@ -31,16 +36,22 @@ class MasterSet:
     def _build_relationship_dict(self):
         rd = {}
         for fr, to in self._edge_pairs:
-            x1, y1 = self._positions[fr]
-            x2, y2 = self._positions[to]
-            dx, dy = x2 - x1, y2 - y1
+            x1, y1, z1 = self._positions[fr]
+            x2, y2, z2 = self._positions[to]
+            dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
             angle = math.atan2(dy, dx)
-            dist = math.sqrt(dx * dx + dy * dy)
+            horiz = math.sqrt(dx * dx + dy * dy)
+            dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+            elev = math.atan2(dz, horiz) if dist > 1e-12 else 0.0
             sym_fwd = _ALPHA[fr] / _ALPHA[to]
             sym_rev = _ALPHA[to] / _ALPHA[fr]
-            rd[sym_fwd] = {'angle': angle, 'distance': dist, 'elevation': None}
-            rd[sym_rev] = {'angle': angle + math.pi, 'distance': dist, 'elevation': None}
+            rd[sym_fwd] = {'angle': angle, 'distance': dist, 'elevation': elev}
+            rd[sym_rev] = {'angle': angle + math.pi, 'distance': dist, 'elevation': -elev}
         return rd
+
+    @property
+    def dimensionality(self):
+        return 3 if any(abs(p[2]) > 1e-12 for p in self._positions.values()) else 2
 
     @property
     def relationship_dict(self):
@@ -251,6 +262,56 @@ class MasterSet:
         edges = [('A', lbl) for lbl in outer]
         return cls(positions, edges, name='ogdoad')
 
+    # ------------------------------------------------------------------
+    # 3D Named constructors
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def tetrad_3d(cls):
+        base = cls.tetrad()
+        apex_height = math.sqrt(6)
+        positions = {
+            'A': base._positions['A'][:2] + (0.0,),
+            'B': base._positions['B'][:2] + (0.0,),
+            'C': base._positions['C'][:2] + (0.0,),
+            'D': (0.0, 0.0, apex_height),
+        }
+        edges = [
+            ('D', 'A'), ('D', 'B'), ('D', 'C'),
+            ('C', 'A'), ('C', 'B'), ('B', 'A'),
+        ]
+        return cls(positions, edges, name='tetrad_3d')
+
+    @classmethod
+    def asterisk_3d(cls, height=None):
+        r = 3.0
+        if height is None:
+            height = r
+        base = cls.asterisk()
+        positions = {}
+        for label, pos in base._positions.items():
+            if label == 'A':
+                positions[label] = (0.0, 0.0, height)
+            else:
+                positions[label] = pos[:2] + (0.0,)
+        edges = [('A', lbl) for lbl in positions if lbl != 'A']
+        return cls(positions, edges, name='asterisk_3d')
+
+    @classmethod
+    def ogdoad_3d(cls, height=None):
+        r = 3.0
+        if height is None:
+            height = r
+        base = cls.ogdoad()
+        positions = {}
+        for label, pos in base._positions.items():
+            if label == 'A':
+                positions[label] = (0.0, 0.0, height)
+            else:
+                positions[label] = pos[:2] + (0.0,)
+        edges = [('A', lbl) for lbl in positions if lbl != 'A']
+        return cls(positions, edges, name='ogdoad_3d')
+
 
 MASTER_SETS = {
     'tetrad': MasterSet.tetrad,
@@ -259,4 +320,7 @@ MASTER_SETS = {
     'hexagon': MasterSet.hexagon,
     'irregular_hexagon': MasterSet.irregular_hexagon,
     'ogdoad': MasterSet.ogdoad,
+    'tetrad_3d': MasterSet.tetrad_3d,
+    'asterisk_3d': MasterSet.asterisk_3d,
+    'ogdoad_3d': MasterSet.ogdoad_3d,
 }

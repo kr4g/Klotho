@@ -2107,60 +2107,116 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      show_labels=True, title=None, output_file=None):
     positions = ms.positions
     edge_pairs = ms.edges
+    is_3d = ms.dimensionality == 3
 
     fig = go.Figure()
 
-    for fr, to in edge_pairs:
-        x1, y1 = positions[fr]
-        x2, y2 = positions[to]
+    if is_3d:
+        for fr, to in edge_pairs:
+            x1, y1, z1 = positions[fr]
+            x2, y2, z2 = positions[to]
+            fig.add_trace(go.Scatter3d(
+                x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                mode='lines', line=dict(color='#808080', width=3),
+                showlegend=False, hoverinfo='none'))
+
+        node_x, node_y, node_z, node_text, hover_data = [], [], [], [], []
+        nd = ms.node_data()
+        for i, label in enumerate(sorted(positions)):
+            x, y, z = positions[label]
+            node_x.append(x); node_y.append(y); node_z.append(z)
+            node_text.append(label)
+            info = nd.get(label, {})
+            if 'factor' in info:
+                hover_data.append(
+                    f"Node: {i}<br>Alias: {label}<br>Factor: {info['factor']}<br>Ratio: {info['ratio']}")
+            else:
+                hover_data.append(f"Node: {i}<br>Alias: {label}")
+
+        fig.add_trace(go.Scatter3d(
+            x=node_x, y=node_y, z=node_z,
+            mode='markers+text' if show_labels else 'markers',
+            marker=dict(size=node_size * 0.3, color='white', line=dict(color='white', width=1)),
+            text=node_text,
+            textposition='middle center',
+            textfont=dict(color='white', size=text_size),
+            hovertemplate='%{customdata}<extra></extra>',
+            hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
+            customdata=hover_data,
+            showlegend=False))
+
+        if title is None:
+            title = f"MasterSet: {ms.name or 'unnamed'}"
+
+        width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
+        pad = 0.5
+        fig.update_layout(
+            title=dict(text=title, font=dict(color='white')),
+            width=width_px, height=height_px,
+            paper_bgcolor='black',
+            scene=dict(
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                           showbackground=False, range=[min(node_x)-pad, max(node_x)+pad], title=''),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                           showbackground=False, range=[min(node_y)-pad, max(node_y)+pad], title=''),
+                zaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                           showbackground=False, range=[min(node_z)-pad, max(node_z)+pad], title=''),
+                bgcolor='black',
+            ),
+            hovermode='closest',
+            margin=dict(l=0, r=0, t=50, b=0))
+    else:
+        for fr, to in edge_pairs:
+            x1, y1 = positions[fr][0], positions[fr][1]
+            x2, y2 = positions[to][0], positions[to][1]
+            fig.add_trace(go.Scatter(
+                x=[x1, x2], y=[y1, y2],
+                mode='lines', line=dict(color='#808080', width=1.5),
+                showlegend=False, hoverinfo='none'))
+
+        node_x, node_y, node_text, hover_data = [], [], [], []
+        nd = ms.node_data()
+        for i, label in enumerate(sorted(positions)):
+            x, y = positions[label][0], positions[label][1]
+            node_x.append(x)
+            node_y.append(y)
+            node_text.append(label)
+            info = nd.get(label, {})
+            if 'factor' in info:
+                hover_data.append(
+                    f"Node: {i}<br>Alias: {label}<br>Factor: {info['factor']}<br>Ratio: {info['ratio']}")
+            else:
+                hover_data.append(f"Node: {i}<br>Alias: {label}")
+
         fig.add_trace(go.Scatter(
-            x=[x1, x2], y=[y1, y2],
-            mode='lines', line=dict(color='#808080', width=1.5),
-            showlegend=False, hoverinfo='none'))
+            x=node_x, y=node_y,
+            mode='markers+text' if show_labels else 'markers',
+            marker=dict(size=node_size, color='white', line=dict(color='white', width=2)),
+            text=node_text,
+            textposition='middle center',
+            textfont=dict(color='black', size=text_size, family='Arial Black', weight='bold'),
+            hovertemplate='%{customdata}<extra></extra>',
+            hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
+            customdata=hover_data,
+            showlegend=False))
 
-    node_x, node_y, node_text, hover_data = [], [], [], []
-    nd = ms.node_data()
-    for i, label in enumerate(sorted(positions)):
-        x, y = positions[label]
-        node_x.append(x)
-        node_y.append(y)
-        node_text.append(label)
-        info = nd.get(label, {})
-        if 'factor' in info:
-            hover_data.append(
-                f"Node: {i}<br>Alias: {label}<br>Factor: {info['factor']}<br>Ratio: {info['ratio']}")
-        else:
-            hover_data.append(f"Node: {i}<br>Alias: {label}")
+        if title is None:
+            title = f"MasterSet: {ms.name or 'unnamed'}"
 
-    fig.add_trace(go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers+text' if show_labels else 'markers',
-        marker=dict(size=node_size, color='white', line=dict(color='white', width=2)),
-        text=node_text,
-        textposition='middle center',
-        textfont=dict(color='black', size=text_size, family='Arial Black', weight='bold'),
-        hovertemplate='%{customdata}<extra></extra>',
-        hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
-        customdata=hover_data,
-        showlegend=False))
+        width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
+        x_pad, y_pad = 1.0, 1.0
 
-    if title is None:
-        title = f"MasterSet: {ms.name or 'unnamed'}"
-
-    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
-    x_pad, y_pad = 1.0, 1.0
-
-    fig.update_layout(
-        title=dict(text=title, font=dict(color='white')),
-        width=width_px, height=height_px,
-        paper_bgcolor='black', plot_bgcolor='black',
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
-                   range=[min(node_x) - x_pad, max(node_x) + x_pad]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
-                   scaleanchor="x", scaleratio=1,
-                   range=[min(node_y) - y_pad, max(node_y) + y_pad]),
-        hovermode='closest',
-        margin=dict(l=0, r=0, t=50, b=0))
+        fig.update_layout(
+            title=dict(text=title, font=dict(color='white')),
+            width=width_px, height=height_px,
+            paper_bgcolor='black', plot_bgcolor='black',
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                       range=[min(node_x) - x_pad, max(node_x) + x_pad]),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                       scaleanchor="x", scaleratio=1,
+                       range=[min(node_y) - y_pad, max(node_y) + y_pad]),
+            hovermode='closest',
+            margin=dict(l=0, r=0, t=50, b=0))
 
     if output_file:
         if output_file.endswith('.html'):
@@ -2173,9 +2229,13 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
 
 def _cps_node_positions(G):
     node_neighbors = {}
+    is_3d = False
     for u, v, data in G.edges(data=True):
         if 'angle' in data and 'distance' in data:
-            node_neighbors.setdefault(u, []).append((v, data['angle'], data['distance']))
+            elev = data.get('elevation', 0.0) or 0.0
+            if abs(elev) > 1e-12:
+                is_3d = True
+            node_neighbors.setdefault(u, []).append((v, data['angle'], data['distance'], elev))
 
     node_positions = {}
 
@@ -2184,30 +2244,136 @@ def _cps_node_positions(G):
 
     for component in components:
         start_node = next(iter(component))
-        pos = {start_node: (0.0, 0.0)}
+        if is_3d:
+            pos = {start_node: (0.0, 0.0, 0.0)}
+        else:
+            pos = {start_node: (0.0, 0.0)}
         placed = {start_node}
         queue = [start_node]
 
         while queue:
             current = queue.pop(0)
-            for nb, angle, dist in node_neighbors.get(current, []):
+            for nb, angle, dist, elev in node_neighbors.get(current, []):
                 if nb not in placed and nb in component:
-                    cx, cy = pos[current]
-                    pos[nb] = (cx + dist * math.cos(angle),
-                               cy + dist * math.sin(angle))
+                    if is_3d:
+                        cx, cy, cz = pos[current]
+                        horiz_dist = dist * math.cos(elev)
+                        pos[nb] = (cx + horiz_dist * math.cos(angle),
+                                   cy + horiz_dist * math.sin(angle),
+                                   cz + dist * math.sin(elev))
+                    else:
+                        cx, cy = pos[current]
+                        pos[nb] = (cx + dist * math.cos(angle),
+                                   cy + dist * math.sin(angle))
                     placed.add(nb)
                     queue.append(nb)
 
         if pos:
-            center_x = sum(x for x, y in pos.values()) / len(pos)
-            center_y = sum(y for x, y in pos.values()) / len(pos)
-            for n in pos:
-                x, y = pos[n]
-                pos[n] = (x - center_x, y - center_y)
+            if is_3d:
+                n_pos = len(pos)
+                center_x = sum(p[0] for p in pos.values()) / n_pos
+                center_y = sum(p[1] for p in pos.values()) / n_pos
+                center_z = sum(p[2] for p in pos.values()) / n_pos
+                for n in pos:
+                    x, y, z = pos[n]
+                    pos[n] = (x - center_x, y - center_y, z - center_z)
+            else:
+                n_pos = len(pos)
+                center_x = sum(p[0] for p in pos.values()) / n_pos
+                center_y = sum(p[1] for p in pos.values()) / n_pos
+                for n in pos:
+                    x, y = pos[n]
+                    pos[n] = (x - center_x, y - center_y)
 
         node_positions.update(pos)
 
     return node_positions
+
+
+def _plot_cps_3d(cps, node_positions, G, figsize, node_size, text_size,
+                 show_labels, title, output_file, nodes):
+    fig = go.Figure()
+    highlight_nodes = set(nodes) if nodes else set()
+    edge_color = '#808080'
+
+    for u, v, data in G.edges(data=True):
+        if u in node_positions and v in node_positions:
+            x1, y1, z1 = node_positions[u]
+            x2, y2, z2 = node_positions[v]
+            ec = '#90EE90' if (u in highlight_nodes and v in highlight_nodes) else edge_color
+            fig.add_trace(go.Scatter3d(
+                x=[x1, x2], y=[y1, y2], z=[z1, z2],
+                mode='lines',
+                line=dict(color=ec, width=2),
+                showlegend=False, hoverinfo='none',
+            ))
+
+    node_x, node_y, node_z = [], [], []
+    node_text, hover_data, node_colors = [], [], []
+    for node, attrs in G.nodes(data=True):
+        if node in node_positions and 'combo' in attrs:
+            x, y, z = node_positions[node]
+            node_x.append(x); node_y.append(y); node_z.append(z)
+            combo = attrs['combo']
+            label = ''.join(str(cps.factor_to_alias[f]).strip('()') for f in combo)
+            node_text.append(label)
+            combo_str = '(' + ' '.join(str(f) for f in combo) + ')'
+            hover_info = f"Node: {node}<br>Alias: {label}<br>Combo: {combo_str}<br>Product: {attrs['product']}<br>Ratio: {attrs['ratio']}"
+            hover_data.append(hover_info)
+            if node in highlight_nodes:
+                node_colors.append('#90EE90')
+            else:
+                node_colors.append('white')
+
+    fig.add_trace(go.Scatter3d(
+        x=node_x, y=node_y, z=node_z,
+        mode='markers+text' if show_labels else 'markers',
+        marker=dict(size=node_size * 0.3, color=node_colors,
+                    line=dict(color='white', width=1)),
+        text=node_text,
+        textposition='middle center',
+        textfont=dict(color='white', size=text_size),
+        hovertemplate='%{customdata}<extra></extra>',
+        hoverlabel=dict(bgcolor='lightgrey', font_color='black'),
+        customdata=hover_data,
+        showlegend=False,
+    ))
+
+    if title is None:
+        cps_type = type(cps).__name__
+        factor_string = ' '.join(str(cps.factor_to_alias[f]) for f in cps.factors)
+        title = f"{cps_type} [{factor_string}] (3D)"
+
+    width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
+    pad = 0.5
+    x_range = [min(node_x) - pad, max(node_x) + pad]
+    y_range = [min(node_y) - pad, max(node_y) + pad]
+    z_range = [min(node_z) - pad, max(node_z) + pad]
+
+    fig.update_layout(
+        title=dict(text=title, font=dict(color='white')),
+        width=width_px, height=height_px,
+        paper_bgcolor='black',
+        scene=dict(
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                       showbackground=False, range=x_range, title=''),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                       showbackground=False, range=y_range, title=''),
+            zaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                       showbackground=False, range=z_range, title=''),
+            bgcolor='black',
+        ),
+        hovermode='closest',
+        margin=dict(l=0, r=0, t=50, b=0),
+    )
+
+    if output_file:
+        if output_file.endswith('.html'):
+            fig.write_html(output_file)
+        else:
+            fig.write_image(output_file)
+
+    return fig
 
 
 def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
@@ -2249,6 +2415,11 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     
     G = cps.graph
     node_positions = _cps_node_positions(G)
+
+    is_3d = any(len(p) >= 3 and abs(p[2]) > 1e-12 for p in node_positions.values())
+    if is_3d:
+        return _plot_cps_3d(cps, node_positions, G, figsize, node_size, text_size,
+                            show_labels, title, output_file, nodes)
 
     if animate and path:
         from .svg_cps import _svg_cps

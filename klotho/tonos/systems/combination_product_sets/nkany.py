@@ -19,10 +19,13 @@ class Hexany(CombinationProductSet):
         https://en.xen.wiki/w/Hexany
   
   '''  
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7), normalized:bool = False):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7), normalized:bool = False, master_set:str = "tetrad"):
     if len(factors) != 4:
       raise ValueError('Hexany must have exactly 4 factors.')
-    super().__init__(factors, r=2, normalized=normalized, master_set="tetrad")
+    valid_master_sets = ("tetrad", "tetrad_3d")
+    if master_set and master_set.lower() not in valid_master_sets:
+      raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
+    super().__init__(factors, r=2, normalized=normalized, master_set=master_set)
 
 class Dekany(CombinationProductSet):
   '''
@@ -70,7 +73,7 @@ class Eikosany(CombinationProductSet):
   def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11), normalized:bool = False, master_set:str = "asterisk"):
     if len(factors) != 6:
       raise ValueError('Eikosany must have exactly 6 factors.')
-    valid_master_sets = ("asterisk", "hexagon", "irregular_hexagon", "centered_pentagon")
+    valid_master_sets = ("asterisk", "hexagon", "irregular_hexagon", "centered_pentagon", "asterisk_3d")
     if master_set and master_set.lower() not in valid_master_sets:
       raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
     super().__init__(factors, r=3, normalized=normalized, master_set=master_set)
@@ -83,7 +86,10 @@ class Hebdomekontany(CombinationProductSet):
   
   see: https://en.xen.wiki/w/Hebdomekontany
   '''
-  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11, 13, 17), normalized:bool = False):
+  def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11, 13, 17), normalized:bool = False, master_set:str = 'ogdoad'):
     if len(factors) != 8:
       raise ValueError('Hebdomekontany must have exactly 8 factors.')
-    super().__init__(factors, r=4, normalized=normalized, master_set='ogdoad') 
+    valid_master_sets = ("ogdoad", "ogdoad_3d")
+    if master_set and master_set.lower() not in valid_master_sets:
+      raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
+    super().__init__(factors, r=4, normalized=normalized, master_set=master_set)

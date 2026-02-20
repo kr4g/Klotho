@@ -122,7 +122,8 @@ class CombinationProductSet(CS):
             self._graph.add_edge(node1, node2, 
                                relation=sym_ratio,
                                angle=rel_data['angle'],
-                               distance=rel_data['distance'])
+                               distance=rel_data['distance'],
+                               elevation=rel_data['elevation'])
 
   @property
   def master_set(self):

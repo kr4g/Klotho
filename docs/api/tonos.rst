@@ -88,7 +88,7 @@ CPS Core
 Master Sets
 ^^^^^^^^^^^
 
-.. automodule:: klotho.tonos.systems.combination_product_sets.master_sets
+.. automodule:: klotho.tonos.systems.combination_product_sets.master_set
    :members:
    :undoc-members:
    :show-inheritance:
