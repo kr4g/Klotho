@@ -2427,10 +2427,12 @@ def _plot_cps_3d(cps, node_positions, G, figsize, node_size, text_size,
         title = f"{cps_type} [{factor_string}] (3D)"
 
     width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
-    pad = 0.5
-    x_range = [min(node_x) - pad, max(node_x) + pad]
-    y_range = [min(node_y) - pad, max(node_y) + pad]
-    z_range = [min(node_z) - pad, max(node_z) + pad]
+    x_span = max(node_x) - min(node_x) if len(node_x) > 1 else 1.0
+    y_span = max(node_y) - min(node_y) if len(node_y) > 1 else 1.0
+    z_span = max(node_z) - min(node_z) if len(node_z) > 1 else 1.0
+    x_range = [min(node_x) - x_span * 0.15, max(node_x) + x_span * 0.15]
+    y_range = [min(node_y) - y_span * 0.15, max(node_y) + y_span * 0.15]
+    z_range = [min(node_z) - z_span * 0.15, max(node_z) + z_span * 0.15]
 
     fig.update_layout(
         title=dict(text=title, font=dict(color='white')),
@@ -2464,7 +2466,9 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              title: str = None, output_file: str = None, nodes: list = None,
              path: list = None, path_cmap: str = 'viridis',
              mute_background: bool = False,
-             animate: bool = False, dur: float = 0.5) -> go.Figure:
+             animate: bool = False, dur: float = 0.5,
+             shape: list = None,
+             arp: bool = False, strum: float = 0, direction: str = 'u') -> go.Figure:
     """
     Plot a Combination Product Set as an interactive network diagram based on its master set.
     
@@ -2478,12 +2482,18 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         nodes: List of node IDs to highlight in pale green
         path: List of node IDs representing a traversal path through the CPS graph
         path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis')
-        mute_background: If True and path is provided, dim non-path nodes
-        animate: If True and path is provided, return an animated SVG figure
+        mute_background: If True and path/shape is provided, dim non-selected nodes
+        animate: If True and path/shape is provided, return an animated figure
         dur: Duration in seconds between animation steps (default 0.5)
+        shape: List of node IDs (a chord) or list of lists of node IDs (a chord sequence).
+               Highlights nodes and draws edges between adjacent ones.
+               When animate=True, plays as chord or chord sequence.
+        arp: If True, arpeggiate chord notes sequentially instead of block chord
+        strum: Strum offset (0-1) for slight timing offset per note in a chord
+        direction: 'u' for ascending or 'd' for descending pitch order
         
     Returns:
-        Plotly figure object (or AnimatedCPSSvgFigure when animate=True)
+        Plotly figure object (or animated figure when animate=True)
     """
     master_set_name = cps.master_set
     if not master_set_name:
@@ -2497,7 +2507,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
     G = cps.graph
-    node_positions = _cps_node_positions(G)
+    node_positions = cps.positions if hasattr(cps, 'positions') else _cps_node_positions(G)
 
     pos_dim = max((len(p) for p in node_positions.values()), default=2)
     if pos_dim > 3:
@@ -2511,26 +2521,142 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     if animate and path:
         from .svg_cps import _svg_cps
         from .animated import AnimatedCPSSvgFigure
+        from klotho.utils.playback.tonejs.converters import freq_to_velocity
         svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                             mute_background=mute_background, figsize=figsize,
                             node_size=node_size, text_size=text_size,
                             show_labels=show_labels, title=title)
-        return AnimatedCPSSvgFigure(svg_data, dur=dur)
+        ref_freq = 261.63
+        audio_events = []
+        for i, node_id in enumerate(path):
+            try:
+                ratio = float(G.nodes[node_id]['ratio'])
+                freq = ref_freq * ratio
+            except Exception:
+                freq = ref_freq
+            audio_events.append({
+                "start": round(i * dur, 6),
+                "duration": round(dur * 0.9, 6),
+                "instrument": "synth",
+                "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
+                "_stepIndex": i,
+            })
+        audio_payload = {"events": audio_events, "instruments": {}}
+        return AnimatedCPSSvgFigure(svg_data, audio_payload=audio_payload, dur=dur)
+
+    if shape is not None and len(shape) > 0:
+        if isinstance(shape[0], (list, tuple)):
+            shape_groups = [list(g) for g in shape]
+        else:
+            shape_groups = [list(shape)]
+
+        if animate:
+            from .svg_cps import _svg_cps
+            from .animated import AnimatedCPSShapeFigure
+            from klotho.utils.playback.tonejs.converters import freq_to_velocity
+            svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
+                                mute_background=mute_background, figsize=figsize,
+                                node_size=node_size, text_size=text_size,
+                                show_labels=show_labels, title=title,
+                                shape=shape)
+            ref_freq = 261.63
+            audio_events = []
+            current_time = 0.0
+
+            for gi, group in enumerate(shape_groups):
+                freqs = []
+                for node_id in group:
+                    try:
+                        ratio = float(G.nodes[node_id]['ratio'])
+                        freqs.append(ref_freq * ratio)
+                    except Exception:
+                        freqs.append(ref_freq)
+                if direction.lower() == 'd':
+                    freqs = list(reversed(freqs))
+
+                if arp:
+                    note_dur = dur
+                    for i, freq in enumerate(freqs):
+                        audio_events.append({
+                            "start": round(current_time + i * note_dur, 6),
+                            "duration": round(note_dur * 0.9, 6),
+                            "instrument": "synth",
+                            "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
+                            "_stepIndex": gi,
+                        })
+                    current_time += len(freqs) * note_dur
+                else:
+                    chord_dur = dur
+                    num_notes = len(freqs)
+                    strum_val = max(0, min(1, strum))
+                    for i, freq in enumerate(freqs):
+                        start_offset = (strum_val * chord_dur * i) / num_notes if num_notes > 1 else 0
+                        audio_events.append({
+                            "start": round(current_time + start_offset, 6),
+                            "duration": round((chord_dur * 0.95) - start_offset, 6),
+                            "instrument": "synth",
+                            "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
+                            "_stepIndex": gi,
+                        })
+                    current_time += chord_dur
+
+            audio_payload = {"events": audio_events, "instruments": {}}
+            return AnimatedCPSShapeFigure(svg_data, audio_payload=audio_payload, dur=dur)
 
     fig = go.Figure()
 
     highlight_nodes = set(nodes) if nodes else set()
+    all_shape_nodes = set()
+    if shape is not None and len(shape) > 0:
+        if isinstance(shape[0], (list, tuple)):
+            for g in shape:
+                all_shape_nodes.update(g)
+        else:
+            all_shape_nodes.update(shape)
+    highlight_nodes.update(all_shape_nodes)
+
     path_nodes = set(path) if path else set()
-    dim_bg = mute_background and bool(path)
+    dim_bg = mute_background and (bool(path) or bool(all_shape_nodes))
     
+    from .svg_cps import SHAPE_COLORS as _SHAPE_COLORS
+
+    shape_node_color_map = {}
+    if shape is not None and len(shape) > 0:
+        if isinstance(shape[0], (list, tuple)):
+            shape_groups_static = [list(g) for g in shape]
+        else:
+            shape_groups_static = [list(shape)]
+        for gi, group in enumerate(shape_groups_static):
+            color = _SHAPE_COLORS[gi % len(_SHAPE_COLORS)]
+            group_set = set(group)
+            for n in group:
+                shape_node_color_map[n] = color
+            for u, v, _ in G.edges(data=True):
+                if u in group_set and v in group_set and u in node_positions and v in node_positions:
+                    x1, y1 = node_positions[u]
+                    x2, y2 = node_positions[v]
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x1, x2], y=[y1, y2],
+                            mode='lines+markers',
+                            marker=dict(size=0.1, opacity=0),
+                            line=dict(color=color, width=3),
+                            showlegend=False,
+                            hoverinfo='none',
+                            opacity=0.8,
+                        )
+                    )
+    else:
+        shape_groups_static = []
+
     regular_edges = []
     highlighted_edges = []
     
     for u, v, data in G.edges(data=True):
         if u in node_positions and v in node_positions:
-            if u in highlight_nodes and v in highlight_nodes:
+            if u in highlight_nodes and v in highlight_nodes and not shape_node_color_map:
                 highlighted_edges.append((u, v))
-            else:
+            elif not (shape_node_color_map and u in all_shape_nodes and v in all_shape_nodes):
                 regular_edges.append((u, v))
     
     edge_color = '#808080' if not dim_bg else '#333333'
@@ -2655,7 +2781,9 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             hover_info = f"Node: {node}<br>Alias: {label}<br>Combo: {combo_str}<br>Product: {product}<br>Ratio: {ratio}"
             hover_data.append(hover_info)
             
-            if node in highlight_nodes:
+            if node in shape_node_color_map:
+                node_colors.append(shape_node_color_map[node])
+            elif node in highlight_nodes:
                 node_colors.append('#90EE90')
             elif dim_bg and node not in path_nodes:
                 node_colors.append('#555555')
@@ -2696,12 +2824,14 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         plot_bgcolor='black',
         xaxis=dict(
             showgrid=False, zeroline=False, showticklabels=False,
-            range=[min(node_x)-1, max(node_x)+1]
+            range=[min(node_x) - (max(node_x)-min(node_x))*0.15,
+                   max(node_x) + (max(node_x)-min(node_x))*0.15] if len(node_x) > 1 else [-1.15, 1.15]
         ),
         yaxis=dict(
             showgrid=False, zeroline=False, showticklabels=False,
             scaleanchor="x", scaleratio=1,
-            range=[min(node_y)-1, max(node_y)+1]
+            range=[min(node_y) - (max(node_y)-min(node_y))*0.15,
+                   max(node_y) + (max(node_y)-min(node_y))*0.15] if len(node_y) > 1 else [-1.15, 1.15]
         ),
         hovermode='closest',
         margin=dict(l=0, r=0, t=50, b=0),
@@ -3620,7 +3750,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                  mute_background: bool = False, fit=False, pad: int = 1,
                  path_cmap: str = 'viridis',
-                 animate: bool = False, dur: float = 0.5) -> go.Figure:
+                 animate: bool = False, dur: float = 0.5,
+                 shape: list = None,
+                 arp: bool = False, strum: float = 0, direction: str = 'u') -> go.Figure:
     import networkx as nx
     """
     Plot a Lattice as a 2D or 3D grid visualization.
@@ -3654,10 +3786,16 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
              when ``fit`` is active. Clamped to lattice bounds. Ignored when fit is False.
         path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis').
                    Only applies when ``path`` is provided.
-        animate: If True and ``path`` is provided, returns an AnimatedFigure with
-                 playback controls instead of a static go.Figure.
+        animate: If True and ``path``/``shape`` is provided, returns an animated figure
+                 with playback controls instead of a static go.Figure.
         dur: Duration in seconds between animation steps (default 0.5).
              Only applies when ``animate`` is True.
+        shape: List of coordinate tuples (a chord) or list of lists of coordinate tuples
+               (a chord sequence). Highlights nodes and draws edges between adjacent ones.
+               When animate=True, plays as chord or chord sequence.
+        arp: If True, arpeggiate chord notes sequentially instead of block chord
+        strum: Strum offset (0-1) for slight timing offset per note in a chord
+        direction: 'u' for ascending or 'd' for descending pitch order
         
     Returns:
         go.Figure: Plotly figure object
@@ -3939,9 +4077,31 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     
     if path:
         highlighted_coords.update(coord for coord in path if coord in valid_coords)
+
+    if shape is not None and len(shape) > 0:
+        if isinstance(shape[0], list):
+            lattice_shape_groups = [list(g) for g in shape]
+        else:
+            lattice_shape_groups = [list(shape)]
+        for g in lattice_shape_groups:
+            for coord in g:
+                c = tuple(coord) if not isinstance(coord, tuple) else coord
+                if c in valid_coords:
+                    highlighted_coords.add(c)
+    else:
+        lattice_shape_groups = []
+
+    has_shape = len(lattice_shape_groups) > 0
+    lattice_shape_color_map = {}
+    if has_shape:
+        from .svg_cps import SHAPE_COLORS as _SC
+        for gi, group in enumerate(lattice_shape_groups):
+            color = _SC[gi % len(_SC)]
+            for coord in group:
+                c = tuple(coord) if not isinstance(coord, tuple) else coord
+                lattice_shape_color_map[c] = color
     
-    # Determine if we should use dimmed appearance (whenever nodes or path are provided)
-    use_dimmed = ((nodes is not None and len(nodes) > 0) or (path is not None and len(path) > 0)) and not mute_background
+    use_dimmed = ((nodes is not None and len(nodes) > 0) or (path is not None and len(path) > 0) or has_shape) and not mute_background
     
     if effective_dimensionality > 2:
         dimmed_edge_color = '#333333'
@@ -4091,12 +4251,15 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             hover_data.append(hover_text)
             
             is_highlighted = False
+            orig_c = original_coords[i] if coords_iter is coords and i < len(original_coords) else coord
             if coords_iter is coords and i < len(original_coords):
                 is_highlighted = original_coords[i] in highlighted_coords
             elif coords_iter is not coords:
                 is_highlighted = (x,) in coords_iter
             
-            if is_highlighted:
+            if orig_c in lattice_shape_color_map:
+                node_colors.append(lattice_shape_color_map[orig_c])
+            elif is_highlighted:
                 node_colors.append('white')
             elif use_dimmed:
                 node_colors.append(dimmed_node_color)
@@ -4268,7 +4431,12 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             
             hover_data.append(hover_text)
             
-            if highlighted_coords and orig_coord in highlighted_coords:
+            coord_for_shape = orig_coord if orig_coord is not None else coord
+            if coord_for_shape in lattice_shape_color_map:
+                node_colors.append(lattice_shape_color_map[coord_for_shape])
+                hover_bg.append('white')
+                hover_font.append('black')
+            elif highlighted_coords and orig_coord in highlighted_coords:
                 node_colors.append('white')
                 hover_bg.append('white')
                 hover_font.append('black')
@@ -4453,7 +4621,12 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             
             hover_data.append(hover_text)
             
-            if highlighted_coords and orig_coord in highlighted_coords:
+            coord_for_shape_3d = orig_coord if orig_coord is not None else coord
+            if coord_for_shape_3d in lattice_shape_color_map:
+                node_colors.append(lattice_shape_color_map[coord_for_shape_3d])
+                hover_bg.append('white')
+                hover_font.append('black')
+            elif highlighted_coords and orig_coord in highlighted_coords:
                 node_colors.append('white')
                 hover_bg.append('white')
                 hover_font.append('black')
@@ -4512,6 +4685,36 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         if effective_dimensionality == 3:
             z_ticks = list(range(int(z_min), int(z_max) + 1))
     
+    if has_shape:
+        from .svg_cps import SHAPE_COLORS as _SHAPE_COLORS_LS
+        for gi, group in enumerate(lattice_shape_groups):
+            color = _SHAPE_COLORS_LS[gi % len(_SHAPE_COLORS_LS)]
+            group_coords = [tuple(c) if not isinstance(c, tuple) else c for c in group]
+            group_set = set(group_coords)
+            for i, c1 in enumerate(group_coords):
+                pc1 = coord_mapping.get(c1, c1) if lattice.dimensionality > 3 else c1
+                for c2 in group_coords[i + 1:]:
+                    pc2 = coord_mapping.get(c2, c2) if lattice.dimensionality > 3 else c2
+                    if G.has_edge(pc1, pc2) or G.has_edge(pc2, pc1):
+                        if effective_dimensionality == 1:
+                            fig.add_trace(go.Scatter(
+                                x=[pc1[0], pc2[0]], y=[0, 0], mode='lines',
+                                line=dict(color=color, width=3), opacity=0.8,
+                                showlegend=False, hoverinfo='none'))
+                        elif effective_dimensionality == 2:
+                            fig.add_trace(go.Scatter(
+                                x=[pc1[0], pc2[0]], y=[pc1[1], pc2[1]], mode='lines',
+                                line=dict(color=color, width=3), opacity=0.8,
+                                showlegend=False, hoverinfo='none'))
+                        else:
+                            z1 = pc1[2] if len(pc1) > 2 else 0
+                            z2 = pc2[2] if len(pc2) > 2 else 0
+                            fig.add_trace(go.Scatter3d(
+                                x=[pc1[0], pc2[0]], y=[pc1[1], pc2[1]], z=[z1, z2],
+                                mode='lines',
+                                line=dict(color=color, width=4),
+                                showlegend=False, hoverinfo='none'))
+
     layout_dict = dict(
         title=dict(text=title, font=dict(color='white')),
         width=width_px,
@@ -4703,6 +4906,74 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             )
             return AnimatedLattice3dFigure(
                 scene_data=threejs_data, audio_payload=audio_payload, dur=dur
+            )
+
+    if animate and has_shape:
+        from klotho.utils.playback.tonejs.converters import freq_to_velocity
+        from .svg_cps import SHAPE_COLORS as _SHAPE_COLORS_L
+
+        ref_freq = 261.63
+        audio_events = []
+        current_time = 0.0
+
+        for gi, group in enumerate(lattice_shape_groups):
+            freqs = []
+            for coord in group:
+                try:
+                    ratio = lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
+                    freq = ref_freq * float(ratio) if ratio is not None else ref_freq
+                except Exception:
+                    freq = ref_freq
+                freqs.append(freq)
+            if direction.lower() == 'd':
+                freqs = list(reversed(freqs))
+
+            if arp:
+                note_dur = dur
+                for i, freq in enumerate(freqs):
+                    audio_events.append({
+                        "start": round(current_time + i * note_dur, 6),
+                        "duration": round(note_dur * 0.9, 6),
+                        "instrument": "synth",
+                        "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
+                        "_stepIndex": gi,
+                    })
+                current_time += len(freqs) * note_dur
+            else:
+                chord_dur = dur
+                num_notes = len(freqs)
+                strum_val = max(0, min(1, strum))
+                for i, freq in enumerate(freqs):
+                    start_offset = (strum_val * chord_dur * i) / num_notes if num_notes > 1 else 0
+                    audio_events.append({
+                        "start": round(current_time + start_offset, 6),
+                        "duration": round((chord_dur * 0.95) - start_offset, 6),
+                        "instrument": "synth",
+                        "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
+                        "_stepIndex": gi,
+                    })
+                current_time += chord_dur
+
+        audio_payload = {"events": audio_events, "instruments": {}}
+
+        if effective_dimensionality <= 2:
+            from .svg_lattice import _svg_lattice_2d
+            from .animated import AnimatedLatticeShapeFigure
+
+            svg_data = _svg_lattice_2d(
+                lattice=lattice, coords=coords, G=G, path=path, nodes=nodes,
+                highlighted_coords=highlighted_coords, coord_mapping=coord_mapping,
+                original_coords=original_coords,
+                effective_dimensionality=effective_dimensionality,
+                use_dimmed=use_dimmed, mute_background=mute_background,
+                path_mode=path_mode, figsize=figsize, node_size=node_size,
+                title=title, is_tone_lattice=is_tone_lattice,
+                coord_label=coord_label, gen_labels=gen_labels,
+                path_cmap=path_cmap,
+                shape=lattice_shape_groups,
+            )
+            return AnimatedLatticeShapeFigure(
+                svg_data=svg_data, audio_payload=audio_payload, dur=dur
             )
 
     return fig

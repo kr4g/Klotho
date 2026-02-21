@@ -14,11 +14,16 @@ def _rgba_to_hex(rgba):
     return '#%02x%02x%02x' % (int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
 
 
+SHAPE_COLORS = ['#90EE90', '#FFD700', '#FF6B6B', '#87CEEB', '#DDA0DD', '#FFA07A']
+
+
 class SvgCPSData:
     __slots__ = ('svg_str', 'width_px', 'height_px',
                  'step_group_ids', 'halo_ids', 'all_path_ids',
                  'all_node_ids', 'path_node_indices', 'path_node_colors',
-                 'dimmed_node_color')
+                 'dimmed_node_color',
+                 'shape_group_node_indices', 'shape_group_edge_ids',
+                 'shape_colors', 'all_shape_edge_ids')
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -30,7 +35,8 @@ class SvgCPSData:
 
 def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
              mute_background=False, figsize=(12, 12),
-             node_size=30, text_size=12, show_labels=True, title=None):
+             node_size=30, text_size=12, show_labels=True, title=None,
+             shape=None):
     import uuid as _uuid
 
     G = cps.graph
@@ -46,8 +52,10 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
     x_min, x_max = min(xs), max(xs)
     y_min, y_max = min(ys), max(ys)
 
-    x_pad = 1.0
-    y_pad = 1.0
+    x_range = x_max - x_min if x_max > x_min else 1.0
+    y_range = y_max - y_min if y_max > y_min else 1.0
+    x_pad = x_range * 0.15
+    y_pad = y_range * 0.15
     data_x_min = x_min - x_pad
     data_x_max = x_max + x_pad
     data_y_min = y_min - y_pad
@@ -103,7 +111,23 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
         )
 
     has_path = path and len(path) >= 2
-    dim_bg = mute_background and has_path
+
+    if shape is not None and len(shape) > 0 and isinstance(shape[0], (list, tuple)):
+        shape_groups = [list(g) for g in shape]
+        is_multi_shape = True
+    elif shape is not None and len(shape) > 0:
+        shape_groups = [list(shape)]
+        is_multi_shape = False
+    else:
+        shape_groups = []
+        is_multi_shape = False
+
+    has_shape = len(shape_groups) > 0
+    all_shape_nodes = set()
+    for g in shape_groups:
+        all_shape_nodes.update(g)
+
+    dim_bg = mute_background and (has_path or has_shape)
     path_nodes = set(path) if path else set()
 
     edge_color = dimmed_edge_color if dim_bg else '#808080'
@@ -255,6 +279,42 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
             else:
                 path_node_colors_map[n] = _rgba_to_hex(colors[k - 1])
 
+    shape_els = []
+    svg_shape_group_edge_ids = []
+    all_shape_el_ids = []
+    shape_node_colors_map = {}
+    used_shape_colors = []
+
+    if has_shape:
+        graph_edges = set()
+        for u, v, _ in G.edges(data=True):
+            graph_edges.add((u, v))
+            graph_edges.add((v, u))
+
+        for gi, group in enumerate(shape_groups):
+            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
+            used_shape_colors.append(color)
+            group_edge_ids = []
+            group_set = set(group)
+            for n in group:
+                shape_node_colors_map[n] = color
+
+            for i, n1 in enumerate(group):
+                for n2 in group[i + 1:]:
+                    if (n1, n2) in graph_edges and n1 in node_positions and n2 in node_positions:
+                        px1, py1 = tx(node_positions[n1][0]), ty(node_positions[n1][1])
+                        px2, py2 = tx(node_positions[n2][0]), ty(node_positions[n2][1])
+                        eid = next_eid("se")
+                        shape_els.append(
+                            f'<line id="{eid}" x1="{px1:.2f}" y1="{py1:.2f}" '
+                            f'x2="{px2:.2f}" y2="{py2:.2f}" '
+                            f'stroke="{color}" stroke-width="3" opacity="0.8" '
+                            f'pointer-events="none"/>'
+                        )
+                        group_edge_ids.append(eid)
+                        all_shape_el_ids.append(eid)
+            svg_shape_group_edge_ids.append(group_edge_ids)
+
     node_els = []
     all_node_ids = []
     node_id_map = {}
@@ -276,6 +336,8 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
 
         if has_path:
             nc = path_node_colors_map.get(node, dimmed_node_color)
+        elif has_shape:
+            nc = shape_node_colors_map.get(node, dimmed_node_color if dim_bg else 'white')
         else:
             nc = 'white'
 
@@ -311,7 +373,17 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
             else:
                 path_node_colors.append(_rgba_to_hex(colors[k - 1]))
 
-    all_svg = '\n'.join(els + path_els + node_els)
+    svg_shape_group_node_indices = []
+    if has_shape:
+        for group in shape_groups:
+            indices = []
+            for n in group:
+                nid = node_id_map.get(n, '')
+                idx = all_node_ids.index(nid) if nid in all_node_ids else -1
+                indices.append(idx)
+            svg_shape_group_node_indices.append(indices)
+
+    all_svg = '\n'.join(els + path_els + shape_els + node_els)
     svg_str = (
         f'<div style="overflow-x:auto;overflow-y:hidden;background:black">'
         f'<svg xmlns="http://www.w3.org/2000/svg" '
@@ -331,4 +403,8 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
         path_node_indices=path_node_indices,
         path_node_colors=path_node_colors,
         dimmed_node_color=dimmed_node_color,
+        shape_group_node_indices=svg_shape_group_node_indices,
+        shape_group_edge_ids=svg_shape_group_edge_ids,
+        shape_colors=used_shape_colors,
+        all_shape_edge_ids=all_shape_el_ids,
     )

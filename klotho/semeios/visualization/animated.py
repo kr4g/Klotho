@@ -1552,3 +1552,306 @@ class AnimatedCPSSvgFigure:
 </script>
 '''
         return html
+
+
+class _AnimatedShapeFigureBase:
+    def __init__(self, svg_data, audio_payload=None, dur=0.5):
+        self.svg_data = svg_data
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        sd = self.svg_data
+        wid = self.widget_id
+
+        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
+        kernel_session = uuid.uuid4().hex
+        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
+        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
+        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+
+        group_node_indices_json = json.dumps(sd.shape_group_node_indices)
+        group_edge_ids_json = json.dumps(sd.shape_group_edge_ids)
+        shape_colors_json = json.dumps(sd.shape_colors)
+        all_shape_edge_ids_json = json.dumps(sd.all_shape_edge_ids)
+        node_ids_json = json.dumps(sd.all_node_ids)
+        dimmed_color = sd.dimmed_node_color
+        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+        total_groups = len(sd.shape_group_node_indices)
+        is_multi = total_groups > 1
+
+        nav_display = "inline-flex" if is_multi else "none"
+
+        html = f'''
+{cdn_html}
+{sd.svg_str}
+<div id="{wid}_controls" style="
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
+    user-select: none; margin-top: 4px;">
+    <button id="{wid}_toggle" style="
+        width: 32px; height: 32px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0;">
+        <span id="{wid}_icon" style="
+            width: 0; height: 0;
+            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
+    </button>
+    <button id="{wid}_loop" style="
+        width: 28px; height: 28px; border: none; border-radius: 4px;
+        background: #16213e; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
+        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="#a0a0a0" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </button>
+    <div id="{wid}_nav" style="display:{nav_display};align-items:center;gap:4px;margin-left:4px;">
+        <button id="{wid}_prev" style="
+            width:24px;height:24px;border:none;border-radius:4px;
+            background:#16213e;cursor:pointer;display:flex;
+            align-items:center;justify-content:center;padding:0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="#a0a0a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        <span id="{wid}_counter" style="color:#a0a0a0;font-size:11px;min-width:36px;text-align:center;">1 / {total_groups}</span>
+        <button id="{wid}_next" style="
+            width:24px;height:24px;border:none;border-radius:4px;
+            background:#16213e;cursor:pointer;display:flex;
+            align-items:center;justify-content:center;padding:0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="#a0a0a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </button>
+        <label style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;cursor:pointer;">
+            <input id="{wid}_solo" type="checkbox" style="
+                width:13px;height:13px;accent-color:#4ade80;cursor:pointer;margin:0;">
+            <span style="color:#a0a0a0;font-size:11px;">solo</span>
+        </label>
+    </div>
+</div>
+{session_script}
+<script>{instruments_js}</script>
+<script>{player_js}</script>
+<script>
+(function() {{
+    var groupNodeIndices = {group_node_indices_json};
+    var groupEdgeIds = {group_edge_ids_json};
+    var shapeColors = {shape_colors_json};
+    var allShapeEdgeIds = {all_shape_edge_ids_json};
+    var allNodeIds = {node_ids_json};
+    var dimmedColor = "{dimmed_color}";
+    var audioPayload = {payload_json};
+    var totalGroups = {total_groups};
+
+    var toggleBtn = document.getElementById("{wid}_toggle");
+    var iconEl = document.getElementById("{wid}_icon");
+    var loopBtn = document.getElementById("{wid}_loop");
+    var loopSvg = document.getElementById("{wid}_loop_svg");
+    var prevBtn = document.getElementById("{wid}_prev");
+    var nextBtn = document.getElementById("{wid}_next");
+    var counterEl = document.getElementById("{wid}_counter");
+    var soloBox = document.getElementById("{wid}_solo");
+    var looping = false, playing = false;
+    var currentView = 0;
+    var playbackOrigin = 0;
+
+    function updateCounter() {{
+        if (counterEl) counterEl.textContent = (currentView + 1) + " / " + totalGroups;
+    }}
+
+    function dimAllNodes() {{
+        for (var i = 0; i < allNodeIds.length; i++) {{
+            var el = document.getElementById(allNodeIds[i]);
+            if (el) el.setAttribute("fill", dimmedColor);
+        }}
+    }}
+    function hideAllShapeEdges() {{
+        for (var i = 0; i < allShapeEdgeIds.length; i++) {{
+            var el = document.getElementById(allShapeEdgeIds[i]);
+            if (el) el.style.display = "none";
+        }}
+    }}
+    function revealGroup(gi) {{
+        dimAllNodes();
+        hideAllShapeEdges();
+        if (gi < 0 || gi >= totalGroups) return;
+        var col = shapeColors[gi] || "white";
+        var nodeIdxs = groupNodeIndices[gi] || [];
+        for (var i = 0; i < nodeIdxs.length; i++) {{
+            var idx = nodeIdxs[i];
+            if (idx >= 0 && idx < allNodeIds.length) {{
+                var el = document.getElementById(allNodeIds[idx]);
+                if (el) el.setAttribute("fill", col);
+            }}
+        }}
+        var edgeIds = groupEdgeIds[gi] || [];
+        for (var i = 0; i < edgeIds.length; i++) {{
+            var el = document.getElementById(edgeIds[i]);
+            if (el) el.style.display = "";
+        }}
+    }}
+    function revealAndTrack(gi) {{
+        currentView = gi;
+        revealGroup(gi);
+        updateCounter();
+    }}
+    function restoreView() {{ revealGroup(currentView); updateCounter(); }}
+    function finishPlayback() {{ playing = false; currentView = playbackOrigin; restoreView(); setPlayIcon(); }}
+    function setPlayIcon() {{ iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
+    function setStopIcon() {{ iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
+
+    function filterEventsForGroup(allEvents, gi) {{
+        var filtered = [];
+        var minStart = Infinity;
+        for (var i = 0; i < allEvents.length; i++) {{
+            if (allEvents[i]._stepIndex === gi) {{
+                if (allEvents[i].start < minStart) minStart = allEvents[i].start;
+                filtered.push(allEvents[i]);
+            }}
+        }}
+        if (minStart === Infinity) minStart = 0;
+        var result = [];
+        for (var i = 0; i < filtered.length; i++) {{
+            var e = {{}};
+            for (var k in filtered[i]) e[k] = filtered[i][k];
+            e.start = filtered[i].start - minStart;
+            e._stepIndex = 0;
+            result.push(e);
+        }}
+        return result;
+    }}
+
+    function reorderEventsFrom(allEvents, startGi, total) {{
+        var buckets = [];
+        for (var g = 0; g < total; g++) buckets.push([]);
+        for (var i = 0; i < allEvents.length; i++) {{
+            var si = allEvents[i]._stepIndex;
+            if (si >= 0 && si < total) buckets[si].push(allEvents[i]);
+        }}
+        var groupStarts = [];
+        for (var g = 0; g < total; g++) {{
+            var mn = Infinity;
+            for (var i = 0; i < buckets[g].length; i++) {{
+                if (buckets[g][i].start < mn) mn = buckets[g][i].start;
+            }}
+            groupStarts.push(mn === Infinity ? 0 : mn);
+        }}
+        var groupDurs = [];
+        for (var g = 0; g < total; g++) {{
+            var mx = 0;
+            for (var i = 0; i < buckets[g].length; i++) {{
+                var end = buckets[g][i].start + buckets[g][i].duration;
+                if (end > mx) mx = end;
+            }}
+            groupDurs.push(mx - groupStarts[g]);
+        }}
+        var result = [];
+        var cursor = 0;
+        var seqMap = [];
+        for (var step = 0; step < total; step++) {{
+            var gi = (startGi + step) % total;
+            seqMap.push(gi);
+            var base = groupStarts[gi];
+            for (var i = 0; i < buckets[gi].length; i++) {{
+                var e = {{}};
+                for (var k in buckets[gi][i]) e[k] = buckets[gi][i][k];
+                e.start = cursor + (buckets[gi][i].start - base);
+                e._stepIndex = step;
+                result.push(e);
+            }}
+            cursor += groupDurs[gi];
+        }}
+        return {{ events: result, seqMap: seqMap }};
+    }}
+
+    if (totalGroups > 0) {{
+        revealGroup(0);
+        updateCounter();
+    }}
+
+    if (prevBtn) {{
+        prevBtn.onclick = function() {{
+            if (playing) return;
+            currentView = (currentView - 1 + totalGroups) % totalGroups;
+            revealGroup(currentView);
+            updateCounter();
+        }};
+    }}
+    if (nextBtn) {{
+        nextBtn.onclick = function() {{
+            if (playing) return;
+            currentView = (currentView + 1) % totalGroups;
+            revealGroup(currentView);
+            updateCounter();
+        }};
+    }}
+
+    loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
+
+    if (audioPayload && typeof Tone !== "undefined") {{
+        var allEvents = audioPayload.events || [];
+        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        var player = KlothoPlayer.create();
+        toggleBtn.onclick = async function() {{
+            if (player.isPlaying()) {{ player.stop(); }}
+            else {{
+                var solo = soloBox && soloBox.checked;
+                playbackOrigin = currentView;
+                playing = true; setStopIcon();
+                if (solo) {{
+                    var soloEvents = filterEventsForGroup(allEvents, currentView);
+                    revealAndTrack(currentView);
+                    await player.play(soloEvents, instruments, {{
+                        loop: looping,
+                        onEvent: function() {{}},
+                        onStop: function() {{ finishPlayback(); }},
+                        onFinish: function() {{ finishPlayback(); }}
+                    }});
+                }} else {{
+                    var reordered = reorderEventsFrom(allEvents, currentView, totalGroups);
+                    dimAllNodes(); hideAllShapeEdges();
+                    await player.play(reordered.events, instruments, {{
+                        loop: looping,
+                        onEvent: function(stepIdx) {{ revealAndTrack(reordered.seqMap[stepIdx]); }},
+                        onStop: function() {{ finishPlayback(); }},
+                        onFinish: function() {{ finishPlayback(); }}
+                    }});
+                }}
+            }}
+        }};
+    }} else {{
+        var durMs = {self.dur * 1000};
+        var timerId = null;
+        function runAnimation(step) {{
+            if (!playing) return;
+            if (step >= totalGroups) {{ if (looping) {{ dimAllNodes(); hideAllShapeEdges(); timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
+            var gi = (currentView + step) % totalGroups;
+            revealAndTrack(gi);
+            timerId = setTimeout(function() {{ runAnimation(step + 1); }}, durMs);
+        }}
+        toggleBtn.onclick = function() {{
+            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
+            else {{
+                playbackOrigin = currentView;
+                playing = true; setStopIcon(); dimAllNodes(); hideAllShapeEdges();
+                runAnimation(0);
+            }}
+        }};
+    }}
+}})();
+</script>
+'''
+        return html
+
+
+AnimatedCPSShapeFigure = _AnimatedShapeFigureBase
+AnimatedLatticeShapeFigure = _AnimatedShapeFigureBase

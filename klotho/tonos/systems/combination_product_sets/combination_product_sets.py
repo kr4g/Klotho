@@ -1,3 +1,4 @@
+import math
 from typing import Tuple
 from math import prod
 from fractions import Fraction
@@ -70,6 +71,7 @@ class CombinationProductSet(CS):
       master_set, self._factors)
     self._populate_graph()
     self._build_master_set_structure(self._master_set_instance.relationship_dict)
+    self._compute_positions()
 
   def _populate_graph(self):
     directed_graph = self._graph.to_directed()
@@ -120,6 +122,92 @@ class CombinationProductSet(CS):
                                distance=rel_data['distance'],
                                elevation=rel_data['elevation'],
                                displacement=rel_data.get('displacement'))
+
+  def _compute_positions(self):
+    G = self._graph
+    n_dims = 2
+    for u, v, data in G.edges(data=True):
+      disp = data.get('displacement')
+      if disp is not None and len(disp) > n_dims:
+        n_dims = len(disp)
+      elev = data.get('elevation', 0.0) or 0.0
+      if abs(elev) > 1e-12 and n_dims < 3:
+        n_dims = 3
+
+    all_nodes = set(n for n, _ in G.nodes(data=True))
+    node_positions = {}
+    visited_global = set()
+
+    while visited_global != all_nodes:
+      start = min(all_nodes - visited_global)
+      pos = {start: tuple(0.0 for _ in range(n_dims))}
+      visited = {start}
+      queue = [start]
+
+      while queue:
+        current = queue.pop(0)
+        for nb in list(G.successors(current)) + list(G.predecessors(current)):
+          if nb in visited:
+            continue
+          if G.has_edge(current, nb):
+            edata = G.edges[current, nb]
+          elif G.has_edge(nb, current):
+            edata = G.edges[nb, current]
+          else:
+            continue
+
+          disp = edata.get('displacement')
+          cur_pos = pos[current]
+
+          if G.has_edge(current, nb) and disp is not None and len(disp) >= n_dims:
+            pos[nb] = tuple(cur_pos[i] + disp[i] for i in range(n_dims))
+          elif G.has_edge(nb, current) and edata.get('displacement') is not None and len(edata['displacement']) >= n_dims:
+            pos[nb] = tuple(cur_pos[i] - edata['displacement'][i] for i in range(n_dims))
+          elif n_dims == 3:
+            angle = edata.get('angle', 0.0)
+            dist = edata.get('distance', 0.0)
+            elev = edata.get('elevation', 0.0) or 0.0
+            sign = 1.0 if G.has_edge(current, nb) else -1.0
+            horiz_dist = dist * math.cos(elev)
+            pos[nb] = (cur_pos[0] + sign * horiz_dist * math.cos(angle),
+                       cur_pos[1] + sign * horiz_dist * math.sin(angle),
+                       cur_pos[2] + sign * dist * math.sin(elev))
+          else:
+            angle = edata.get('angle', 0.0)
+            dist = edata.get('distance', 0.0)
+            sign = 1.0 if G.has_edge(current, nb) else -1.0
+            pos[nb] = (cur_pos[0] + sign * dist * math.cos(angle),
+                       cur_pos[1] + sign * dist * math.sin(angle))
+
+          visited.add(nb)
+          queue.append(nb)
+
+      if pos:
+        n_pos = len(pos)
+        center = tuple(sum(p[i] for p in pos.values()) / n_pos for i in range(n_dims))
+        for n in pos:
+          pos[n] = tuple(pos[n][i] - center[i] for i in range(n_dims))
+
+      node_positions.update(pos)
+      visited_global |= visited
+
+    if node_positions:
+      max_abs = 0.0
+      for p in node_positions.values():
+        for c in p:
+          if abs(c) > max_abs:
+            max_abs = abs(c)
+      if max_abs > 1e-12:
+        node_positions = {
+          n: tuple(c / max_abs for c in p)
+          for n, p in node_positions.items()
+        }
+
+    self._positions = node_positions
+
+  @property
+  def positions(self):
+    return dict(self._positions)
 
   @property
   def master_set(self):
@@ -311,4 +399,5 @@ class CombinationProductSet(CS):
     if instance._master_set_instance is not None:
       instance._build_master_set_structure(instance._master_set_instance.relationship_dict)
 
+    instance._compute_positions()
     return instance

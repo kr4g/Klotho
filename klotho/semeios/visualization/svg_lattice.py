@@ -14,11 +14,16 @@ def _rgba_to_hex(rgba):
     return '#%02x%02x%02x' % (int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
 
 
+from .svg_cps import SHAPE_COLORS
+
+
 class SvgLatticeData:
     __slots__ = ('svg_str', 'width_px', 'height_px',
                  'step_group_ids', 'halo_ids', 'all_path_ids',
                  'all_node_ids', 'path_node_indices', 'path_node_colors',
-                 'dimmed_node_color')
+                 'dimmed_node_color',
+                 'shape_group_node_indices', 'shape_group_edge_ids',
+                 'shape_colors', 'all_shape_edge_ids')
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -33,7 +38,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                     effective_dimensionality, use_dimmed, mute_background,
                     path_mode, figsize, node_size, title,
                     is_tone_lattice, coord_label, gen_labels,
-                    path_cmap='viridis'):
+                    path_cmap='viridis', shape=None):
     import networkx as nx
 
     width_px = int(figsize[0] * 100)
@@ -406,8 +411,19 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         all_path_el_ids.extend(halo_ids)
 
     has_path = path and len(path) >= 2
+
+    if shape is not None and len(shape) > 0:
+        shape_groups = shape
+    else:
+        shape_groups = []
+    has_shape = len(shape_groups) > 0
+    all_shape_node_set = set()
+    for g in shape_groups:
+        for c in g:
+            all_shape_node_set.add(tuple(c) if not isinstance(c, tuple) else c)
+
     coords_iter = coords
-    if (nodes or path) and mute_background and len(drawn_nodes_set) > 0:
+    if (nodes or path or has_shape) and mute_background and len(drawn_nodes_set) > 0:
         coords_iter = list(drawn_nodes_set)
 
     path_coord_colors = {}
@@ -420,6 +436,49 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                 path_coord_colors[coord] = _rgba_to_hex(colors[0])
             else:
                 path_coord_colors[coord] = _rgba_to_hex(colors[k - 1])
+
+    shape_els = []
+    svg_shape_group_edge_ids = []
+    all_shape_el_ids = []
+    shape_coord_colors = {}
+    used_shape_colors = []
+
+    if has_shape:
+        edge_set = set()
+        for u, v in G.edges():
+            edge_set.add((u, v))
+            edge_set.add((v, u))
+
+        for gi, group in enumerate(shape_groups):
+            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
+            used_shape_colors.append(color)
+            group_edge_ids = []
+            group_tuples = [tuple(c) if not isinstance(c, tuple) else c for c in group]
+            group_set = set(group_tuples)
+            for c in group_tuples:
+                shape_coord_colors[c] = color
+
+            for i, c1 in enumerate(group_tuples):
+                for c2 in group_tuples[i + 1:]:
+                    pc1 = coord_mapping.get(c1, c1) if lattice.dimensionality > 3 else c1
+                    pc2 = coord_mapping.get(c2, c2) if lattice.dimensionality > 3 else c2
+                    if (pc1, pc2) in edge_set or (pc2, pc1) in edge_set:
+                        if effective_dimensionality == 1:
+                            px1, py1 = tx(pc1[0]), ty(0)
+                            px2, py2 = tx(pc2[0]), ty(0)
+                        else:
+                            px1, py1 = tx(pc1[0]), ty(pc1[1])
+                            px2, py2 = tx(pc2[0]), ty(pc2[1])
+                        eid = next_eid("se")
+                        shape_els.append(
+                            f'<line id="{eid}" x1="{px1:.2f}" y1="{py1:.2f}" '
+                            f'x2="{px2:.2f}" y2="{py2:.2f}" '
+                            f'stroke="{color}" stroke-width="3" opacity="0.8" '
+                            f'pointer-events="none"/>'
+                        )
+                        group_edge_ids.append(eid)
+                        all_shape_el_ids.append(eid)
+            svg_shape_group_edge_ids.append(group_edge_ids)
 
     node_els = []
     all_node_ids = []
@@ -457,8 +516,13 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             except (KeyError, AttributeError):
                 pass
 
+        orig_or_coord = orig_coord if orig_coord is not None else coord
         if has_path:
             nc = path_coord_colors.get(coord, dimmed_node_color)
+        elif has_shape and orig_or_coord in shape_coord_colors:
+            nc = shape_coord_colors[orig_or_coord]
+        elif has_shape and coord in shape_coord_colors:
+            nc = shape_coord_colors[coord]
         elif highlighted_coords and (
             (coords_iter is coords and i < len(original_coords) and original_coords[i] in highlighted_coords) or
             (coords_iter is not coords and (coord in highlighted_coords or (orig_coord is not None and orig_coord in highlighted_coords)))
@@ -496,7 +560,19 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             else:
                 path_node_colors.append(_rgba_to_hex(colors[k - 1]))
 
-    all_svg = '\n'.join(els + path_els + node_els)
+    svg_shape_group_node_indices = []
+    if has_shape:
+        for group in shape_groups:
+            indices = []
+            for c in group:
+                ct = tuple(c) if not isinstance(c, tuple) else c
+                plot_c = coord_mapping.get(ct, ct) if lattice.dimensionality > 3 else ct
+                nid = coord_to_node_id.get(plot_c, '')
+                idx = all_node_ids.index(nid) if nid in all_node_ids else -1
+                indices.append(idx)
+            svg_shape_group_node_indices.append(indices)
+
+    all_svg = '\n'.join(els + path_els + shape_els + node_els)
     svg_str = (
         f'<div style="overflow-x:auto;overflow-y:hidden;background:black">'
         f'<svg xmlns="http://www.w3.org/2000/svg" '
@@ -516,4 +592,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         path_node_indices=path_node_indices,
         path_node_colors=path_node_colors,
         dimmed_node_color=dimmed_node_color,
+        shape_group_node_indices=svg_shape_group_node_indices,
+        shape_group_edge_ids=svg_shape_group_edge_ids,
+        shape_colors=used_shape_colors,
+        all_shape_edge_ids=all_shape_el_ids,
     )
