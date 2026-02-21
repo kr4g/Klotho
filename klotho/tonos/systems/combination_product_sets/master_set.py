@@ -183,9 +183,39 @@ class MasterSet:
         cx = np.mean([v[0] for v in positions.values()])
         cy = np.mean([v[1] for v in positions.values()])
         positions = {k: (v[0] - cx, v[1] - cy) for k, v in positions.items()}
+        positions['A'] = (0.0, 0.0)
 
         edges = [('B', 'F'), ('B', 'C'), ('F', 'E'), ('C', 'D'), ('E', 'D')]
         return cls(positions, edges, name='centered_pentagon')
+
+    @classmethod
+    def connected_centered_pentagon(cls):
+        r = 3.0
+        gen_angles = {
+            ('B', 'F'): math.pi * 6 / 5,
+            ('B', 'C'): math.pi * 9 / 5,
+            ('F', 'E'): math.pi * 8 / 5,
+            ('C', 'D'): math.pi * 7 / 5,
+        }
+        positions = {'B': (0.0, 0.0)}
+        positions['F'] = (r * math.cos(gen_angles[('B', 'F')]),
+                          r * math.sin(gen_angles[('B', 'F')]))
+        positions['C'] = (r * math.cos(gen_angles[('B', 'C')]),
+                          r * math.sin(gen_angles[('B', 'C')]))
+        positions['E'] = (positions['F'][0] + r * math.cos(gen_angles[('F', 'E')]),
+                          positions['F'][1] + r * math.sin(gen_angles[('F', 'E')]))
+        positions['D'] = (positions['C'][0] + r * math.cos(gen_angles[('C', 'D')]),
+                          positions['C'][1] + r * math.sin(gen_angles[('C', 'D')]))
+
+        cx = np.mean([v[0] for v in positions.values()])
+        cy = np.mean([v[1] for v in positions.values()])
+        positions = {k: (v[0] - cx, v[1] - cy) for k, v in positions.items()}
+        positions['A'] = (0.0, 0.0)
+
+        outer = ['B', 'C', 'D', 'E', 'F']
+        edges = [('B', 'F'), ('B', 'C'), ('F', 'E'), ('C', 'D'), ('E', 'D')]
+        edges += [('A', lbl) for lbl in outer]
+        return cls(positions, edges, name='connected_centered_pentagon')
 
     @classmethod
     def hexagon(cls):
@@ -383,12 +413,12 @@ class MasterSet:
     def h_shape(cls):
         r = 3.0
         positions = {
-            'A': (-r * 1.1,   r * 0.9),
-            'B': (-r * 0.9,  -r * 0.45),
-            'C': (-r * 0.15,  r * 0.4),
-            'D': ( r * 0.2,  -r * 0.5),
-            'E': ( r * 0.85,  r * 0.35),
-            'F': ( r * 1.1,  -r * 0.85),
+            'A': (-r,  r * 0.9),
+            'B': (-r, -r * 0.5),
+            'C': ( 0,  r * 0.35),
+            'D': ( 0, -r * 0.45),
+            'E': ( r,  r * 0.55),
+            'F': ( r, -r * 0.65),
         }
         edges = [('A', 'B'), ('A', 'C'), ('B', 'D'),
                  ('C', 'D'), ('C', 'E'), ('D', 'F'), ('E', 'F')]
@@ -561,6 +591,7 @@ MASTER_SETS = {
     'tetrad': MasterSet.tetrad,
     'asterisk': MasterSet.asterisk,
     'centered_pentagon': MasterSet.centered_pentagon,
+    'connected_centered_pentagon': MasterSet.connected_centered_pentagon,
     'hexagon': MasterSet.hexagon,
     'irregular_hexagon': MasterSet.irregular_hexagon,
     'ogdoad': MasterSet.ogdoad,

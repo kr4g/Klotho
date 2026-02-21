@@ -2490,8 +2490,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         raise ValueError(
             f"CPS instance has no master set defined. plot() requires a master set for node positioning.\n"
             f"Available master sets: {list(MASTER_SETS.keys())}\n"
-            f"Try using specific CPS classes like Hexany, Eikosany, or Hebdomekontany, "
-            f"or create a CPS with master_set parameter: CombinationProductSet(factors, r, master_set='tetrad')"
+            f"Try using CPS presets like CombinationProductSet.hexany() or CombinationProductSet.eikosany(), "
+            f"or pass a master_set parameter: CombinationProductSet(factors, r, master_set='tetrad')"
         )
     if master_set_name not in MASTER_SETS:
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
