@@ -12,12 +12,12 @@ _ALPHA = {chr(65 + i): sp.Symbol(chr(65 + i)) for i in range(26)}
 
 class MasterSet:
     def __init__(self, positions, edges, name=None, factors=None):
+        max_dim = max(len(v) for v in positions.values()) if positions else 2
+        max_dim = max(max_dim, 2)
         self._positions = {}
         for k, v in positions.items():
-            if len(v) >= 3:
-                self._positions[k] = (float(v[0]), float(v[1]), float(v[2]))
-            else:
-                self._positions[k] = (float(v[0]), float(v[1]), 0.0)
+            padded = tuple(float(c) for c in v) + (0.0,) * (max_dim - len(v))
+            self._positions[k] = padded
         self._edge_pairs = list(edges)
         self._name = name
         self._n_factors = len(positions)
@@ -36,22 +36,33 @@ class MasterSet:
     def _build_relationship_dict(self):
         rd = {}
         for fr, to in self._edge_pairs:
-            x1, y1, z1 = self._positions[fr]
-            x2, y2, z2 = self._positions[to]
-            dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
+            p1 = self._positions[fr]
+            p2 = self._positions[to]
+            disp = tuple(p2[i] - p1[i] for i in range(len(p1)))
+            dx = disp[0] if len(disp) > 0 else 0.0
+            dy = disp[1] if len(disp) > 1 else 0.0
+            dz = disp[2] if len(disp) > 2 else 0.0
             angle = math.atan2(dy, dx)
             horiz = math.sqrt(dx * dx + dy * dy)
-            dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+            dist = math.sqrt(sum(d * d for d in disp))
             elev = math.atan2(dz, horiz) if dist > 1e-12 else 0.0
             sym_fwd = _ALPHA[fr] / _ALPHA[to]
             sym_rev = _ALPHA[to] / _ALPHA[fr]
-            rd[sym_fwd] = {'angle': angle, 'distance': dist, 'elevation': elev}
-            rd[sym_rev] = {'angle': angle + math.pi, 'distance': dist, 'elevation': -elev}
+            rd[sym_fwd] = {'angle': angle, 'distance': dist, 'elevation': elev,
+                           'displacement': disp}
+            rd[sym_rev] = {'angle': angle + math.pi, 'distance': dist, 'elevation': -elev,
+                           'displacement': tuple(-d for d in disp)}
         return rd
 
     @property
     def dimensionality(self):
-        return 3 if any(abs(p[2]) > 1e-12 for p in self._positions.values()) else 2
+        if not self._positions:
+            return 2
+        dim = len(next(iter(self._positions.values())))
+        for d in range(dim, 2, -1):
+            if any(abs(p[d - 1]) > 1e-12 for p in self._positions.values()):
+                return d
+        return 2
 
     @property
     def relationship_dict(self):
@@ -124,13 +135,13 @@ class MasterSet:
     def tetrad(cls):
         positions = {
             'A': (-1.5, -math.sqrt(3) / 2),
-            'B': (1.5, -math.sqrt(3) / 2),
-            'C': (0.0, math.sqrt(3)),
+            'B': (0.0, math.sqrt(3)),
+            'C': (1.5, -math.sqrt(3) / 2),
             'D': (0.0, 0.0),
         }
         edges = [
             ('D', 'A'), ('D', 'B'), ('D', 'C'),
-            ('C', 'A'), ('C', 'B'), ('B', 'A'),
+            ('A', 'B'), ('B', 'C'), ('C', 'A'),
         ]
         return cls(positions, edges, name='tetrad')
 
@@ -207,7 +218,7 @@ class MasterSet:
     @classmethod
     def irregular_hexagon(cls):
         r = 3.0
-        target_short = 2.75
+        target_short = 2.333
 
         int_angles = [90, 150, 90, 150, 90, 150]
         order = ['C', 'F', 'A', 'E', 'B', 'D']
@@ -263,6 +274,146 @@ class MasterSet:
         return cls(positions, edges, name='ogdoad')
 
     # ------------------------------------------------------------------
+    # Additional 2D Named constructors
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def heptagon(cls):
+        r = 3.0
+        angles = [2 * math.pi * i / 7 + math.pi / 2 for i in range(7)]
+        labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+        positions = {labels[i]: (r * math.cos(a), r * math.sin(a)) for i, a in enumerate(angles)}
+        edges = [(labels[i], labels[(i + 1) % 7]) for i in range(7)]
+        return cls(positions, edges, name='heptagon')
+
+    @classmethod
+    def kite(cls):
+        r = 3.0
+        positions = {
+            'A': ( 0,       r * 0.85),
+            'B': ( r * 0.6, 0),
+            'C': ( 0,      -r * 0.5),
+            'D': (-r * 0.6, 0),
+        }
+        edges = [('A', 'B'), ('B', 'C'), ('C', 'D'), ('D', 'A'), ('A', 'C')]
+        return cls(positions, edges, name='kite')
+
+    @classmethod
+    def arrow(cls):
+        r = 3.0
+        positions = {
+            'A': ( 0,        r),
+            'B': ( r * 0.8,  0),
+            'C': ( r * 0.3,  r * 0.3),
+            'D': (-r * 0.3,  r * 0.3),
+            'E': (-r * 0.8,  0),
+        }
+        edges = [('A', 'B'), ('B', 'C'), ('C', 'D'), ('D', 'E'), ('E', 'A')]
+        return cls(positions, edges, name='arrow')
+
+    @classmethod
+    def k23_bipartite(cls):
+        r = 3.0
+        positions = {
+            'A': (-r * 0.5,  r * 0.6),
+            'B': ( r * 0.5,  r * 0.6),
+            'C': (-r,       -r * 0.5),
+            'D': ( 0,       -r * 0.7),
+            'E': ( r,       -r * 0.5),
+        }
+        edges = [('A', 'C'), ('A', 'D'), ('A', 'E'),
+                 ('B', 'C'), ('B', 'D'), ('B', 'E')]
+        return cls(positions, edges, name='k23_bipartite')
+
+    @classmethod
+    def wheel5(cls):
+        r = 3.0
+        angles = [2 * math.pi * i / 5 + math.pi / 2 for i in range(5)]
+        outer = ['B', 'C', 'D', 'E', 'F']
+        positions = {'A': (0.0, 0.0)}
+        for i, label in enumerate(outer):
+            positions[label] = (r * math.cos(angles[i]), r * math.sin(angles[i]))
+        edges = [(outer[i], outer[(i + 1) % 5]) for i in range(5)]
+        edges += [('A', lbl) for lbl in outer]
+        return cls(positions, edges, name='wheel5')
+
+    @classmethod
+    def bowtie(cls):
+        r = 3.0
+        positions = {
+            'A': ( 0,          0),
+            'B': ( r * 1.15,   r * 0.7),
+            'C': ( r * 1.15,  -r * 0.7),
+            'D': (-r * 0.85,   r * 0.5),
+            'E': (-r * 0.85,  -r * 0.5),
+        }
+        edges = [('A', 'B'), ('A', 'C'), ('B', 'C'),
+                 ('A', 'D'), ('A', 'E'), ('D', 'E')]
+        return cls(positions, edges, name='bowtie')
+
+    @classmethod
+    def house(cls):
+        sq = 2.0
+        positions = {
+            'A': ( 0,         sq * 1.2),
+            'B': (-sq * 0.8,  0),
+            'C': ( sq * 0.8,  0),
+            'D': ( sq * 1.1, -2 * sq),
+            'E': (-sq * 1.1, -2 * sq),
+        }
+        edges = [('A', 'B'), ('A', 'C'), ('B', 'C'),
+                 ('C', 'D'), ('D', 'E'), ('E', 'B')]
+        return cls(positions, edges, name='house')
+
+    @classmethod
+    def wheel4(cls):
+        sq = 2.0
+        positions = {
+            'A': ( 0,        0.15),
+            'B': ( 0,        sq * 1.3),
+            'C': (-sq * 0.9, 0),
+            'D': ( 0,       -sq * 0.8),
+            'E': ( sq * 0.9, 0),
+        }
+        edges = [('B', 'C'), ('C', 'D'), ('D', 'E'), ('E', 'B'),
+                 ('A', 'B'), ('A', 'C'), ('A', 'D'), ('A', 'E')]
+        return cls(positions, edges, name='wheel4')
+
+    @classmethod
+    def h_shape(cls):
+        r = 3.0
+        positions = {
+            'A': (-r * 1.1,   r * 0.9),
+            'B': (-r * 0.9,  -r * 0.45),
+            'C': (-r * 0.15,  r * 0.4),
+            'D': ( r * 0.2,  -r * 0.5),
+            'E': ( r * 0.85,  r * 0.35),
+            'F': ( r * 1.1,  -r * 0.85),
+        }
+        edges = [('A', 'B'), ('A', 'C'), ('B', 'D'),
+                 ('C', 'D'), ('C', 'E'), ('D', 'F'), ('E', 'F')]
+        return cls(positions, edges, name='h_shape')
+
+    @classmethod
+    def nested_triangles(cls):
+        r_out = 3.0
+        r_in = 1.0
+        sy = 0.1
+        ang_out = [2 * math.pi * i / 3 + math.pi / 2 for i in range(3)]
+        ang_in = [2 * math.pi * i / 3 + math.pi / 2 + math.pi / 3 for i in range(3)]
+        positions = {}
+        for i, a in enumerate(ang_out):
+            positions[chr(65 + i)] = (r_out * math.cos(a), r_out * math.sin(a))
+        for i, a in enumerate(ang_in):
+            positions[chr(68 + i)] = (r_in * math.cos(a), r_in * math.sin(a) + sy)
+        edges = [
+            ('A', 'B'), ('B', 'C'), ('C', 'A'),
+            ('D', 'E'), ('E', 'F'), ('F', 'D'),
+            ('A', 'D'), ('A', 'F'), ('B', 'D'), ('B', 'E'), ('C', 'E'), ('C', 'F'),
+        ]
+        return cls(positions, edges, name='nested_triangles')
+
+    # ------------------------------------------------------------------
     # 3D Named constructors
     # ------------------------------------------------------------------
 
@@ -278,39 +429,132 @@ class MasterSet:
         }
         edges = [
             ('D', 'A'), ('D', 'B'), ('D', 'C'),
-            ('C', 'A'), ('C', 'B'), ('B', 'A'),
+            ('A', 'B'), ('B', 'C'), ('C', 'A'),
         ]
         return cls(positions, edges, name='tetrad_3d')
 
     @classmethod
-    def asterisk_3d(cls, height=None):
-        r = 3.0
-        if height is None:
-            height = r
-        base = cls.asterisk()
-        positions = {}
-        for label, pos in base._positions.items():
-            if label == 'A':
-                positions[label] = (0.0, 0.0, height)
-            else:
-                positions[label] = pos[:2] + (0.0,)
-        edges = [('A', lbl) for lbl in positions if lbl != 'A']
-        return cls(positions, edges, name='asterisk_3d')
+    def octahedron(cls):
+        s = 3.0
+        d = 0.5
+        positions = {
+            'A': ( s + d,  0,      0),     'B': (-s,     0,      0),
+            'C': ( 0,      s + d,  0),     'D': ( 0,    -s,      0),
+            'E': ( 0,      0,      s + d), 'F': ( 0,     0,     -s),
+        }
+        edges = [
+            ('A', 'C'), ('A', 'D'), ('A', 'E'), ('A', 'F'),
+            ('B', 'C'), ('B', 'D'), ('B', 'E'), ('B', 'F'),
+            ('C', 'E'), ('C', 'F'), ('D', 'E'), ('D', 'F'),
+        ]
+        return cls(positions, edges, name='octahedron')
 
     @classmethod
-    def ogdoad_3d(cls, height=None):
+    def trigonal_bipyramid(cls):
         r = 3.0
-        if height is None:
-            height = r
-        base = cls.ogdoad()
-        positions = {}
-        for label, pos in base._positions.items():
-            if label == 'A':
-                positions[label] = (0.0, 0.0, height)
-            else:
-                positions[label] = pos[:2] + (0.0,)
-        edges = [('A', lbl) for lbl in positions if lbl != 'A']
-        return cls(positions, edges, name='ogdoad_3d')
+        h = r * math.sqrt(2.0 / 3.0)
+        s32 = r * math.sqrt(3) / 2
+        positions = {
+            'A': ( r,      0,    0),
+            'B': (-r / 2,  s32,  0),
+            'C': (-r / 2, -s32,  0),
+            'D': ( 0,      0,    h),
+            'E': ( 0,      0,   -h),
+        }
+        edges = [
+            ('A', 'B'), ('A', 'C'), ('B', 'C'),
+            ('A', 'D'), ('B', 'D'), ('C', 'D'),
+            ('A', 'E'), ('B', 'E'), ('C', 'E'),
+        ]
+        return cls(positions, edges, name='trigonal_bipyramid')
+
+    @classmethod
+    def triangular_prism(cls):
+        r = 3.0
+        h = 3.0
+        t = 2/3
+        s32 = r * math.sqrt(3) / 2
+        positions = {
+            'A': ( r,          0,        0),
+            'B': (-r / 2,      s32,      0),
+            'C': (-r / 2,     -s32,      0),
+            'D': ( r * t,      0,        h),
+            'E': (-r / 2 * t,  s32 * t,  h),
+            'F': (-r / 2 * t, -s32 * t,  h),
+        }
+        edges = [
+            ('A', 'B'), ('B', 'C'), ('C', 'A'),
+            ('D', 'E'), ('E', 'F'), ('F', 'D'),
+            ('A', 'D'), ('B', 'E'), ('C', 'F'),
+        ]
+        return cls(positions, edges, name='triangular_prism')
+
+    @classmethod
+    def pentagonal_bipyramid(cls):
+        r = 3.0
+        h = r * math.sqrt(2.0 / 3.0)
+        angles = [2 * math.pi * i / 5 for i in range(5)]
+        positions = {
+            'A': (r * math.cos(angles[0]), r * math.sin(angles[0]), 0),
+            'B': (r * math.cos(angles[1]), r * math.sin(angles[1]), 0),
+            'C': (r * math.cos(angles[2]), r * math.sin(angles[2]), 0),
+            'D': (r * math.cos(angles[3]), r * math.sin(angles[3]), 0),
+            'E': (r * math.cos(angles[4]), r * math.sin(angles[4]), 0),
+            'F': (0, 0,  h),
+            'G': (0, 0, -h),
+        }
+        edges = [
+            ('A', 'B'), ('B', 'C'), ('C', 'D'), ('D', 'E'), ('E', 'A'),
+            ('A', 'F'), ('B', 'F'), ('C', 'F'), ('D', 'F'), ('E', 'F'),
+            ('A', 'G'), ('B', 'G'), ('C', 'G'), ('D', 'G'), ('E', 'G'),
+        ]
+        return cls(positions, edges, name='pentagonal_bipyramid')
+
+    @classmethod
+    def kite_pyramid(cls):
+        r = 3.0
+        positions = {
+            'A': ( 0,        r * 0.85, 0),
+            'B': ( r * 0.7,  0,        0),
+            'C': ( 0,       -r * 0.5,  0),
+            'D': (-r * 0.7,  0,        0),
+            'E': ( 0,        0,        r),
+        }
+        edges = [
+            ('A', 'B'), ('B', 'C'), ('C', 'D'), ('D', 'A'),
+            ('A', 'E'), ('B', 'E'), ('C', 'E'), ('D', 'E'),
+        ]
+        return cls(positions, edges, name='kite_pyramid')
+
+    # ------------------------------------------------------------------
+    # N-D Named constructors
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def asterisk_nd(cls):
+        r = 3.0
+        outer_labels = ['B', 'C', 'D', 'E', 'F']
+        n_dims = len(outer_labels)
+        positions = {'A': tuple(0.0 for _ in range(n_dims))}
+        for i, label in enumerate(outer_labels):
+            pos = [0.0] * n_dims
+            pos[i] = r
+            positions[label] = tuple(pos)
+        edges = [('A', lbl) for lbl in outer_labels]
+        return cls(positions, edges, name='asterisk_nd')
+
+    @classmethod
+    def ogdoad_nd(cls):
+        r = 3.0
+        outer_labels = ['B', 'C', 'D', 'E', 'F', 'G', 'H']
+        n_dims = len(outer_labels)
+        positions = {'A': tuple(0.0 for _ in range(n_dims))}
+        for i, label in enumerate(outer_labels):
+            pos = [0.0] * n_dims
+            pos[i] = r
+            positions[label] = tuple(pos)
+        edges = [('A', lbl) for lbl in outer_labels]
+        return cls(positions, edges, name='ogdoad_nd')
 
 
 MASTER_SETS = {
@@ -320,7 +564,22 @@ MASTER_SETS = {
     'hexagon': MasterSet.hexagon,
     'irregular_hexagon': MasterSet.irregular_hexagon,
     'ogdoad': MasterSet.ogdoad,
+    'heptagon': MasterSet.heptagon,
+    'kite': MasterSet.kite,
+    'arrow': MasterSet.arrow,
+    'k23_bipartite': MasterSet.k23_bipartite,
+    'wheel5': MasterSet.wheel5,
+    'bowtie': MasterSet.bowtie,
+    'house': MasterSet.house,
+    'wheel4': MasterSet.wheel4,
+    'h_shape': MasterSet.h_shape,
+    'nested_triangles': MasterSet.nested_triangles,
     'tetrad_3d': MasterSet.tetrad_3d,
-    'asterisk_3d': MasterSet.asterisk_3d,
-    'ogdoad_3d': MasterSet.ogdoad_3d,
+    'octahedron': MasterSet.octahedron,
+    'trigonal_bipyramid': MasterSet.trigonal_bipyramid,
+    'triangular_prism': MasterSet.triangular_prism,
+    'pentagonal_bipyramid': MasterSet.pentagonal_bipyramid,
+    'kite_pyramid': MasterSet.kite_pyramid,
+    'asterisk_nd': MasterSet.asterisk_nd,
+    'ogdoad_nd': MasterSet.ogdoad_nd,
 }

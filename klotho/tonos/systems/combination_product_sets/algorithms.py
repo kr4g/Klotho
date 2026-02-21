@@ -5,6 +5,9 @@ from itertools import combinations, permutations
 
 __all__ = [
     'match_pattern',
+    'sub_cps',
+    'classify',
+    'faces',
 ]
 
 def match_pattern(cps, node_ids: List[int]) -> List[Tuple[int, ...]]:
@@ -678,3 +681,115 @@ def _get_discrete_rotation_angles(cps) -> List[float]:
             rotation_set.add(rotated)
     
     return list(rotation_set) 
+
+
+def sub_cps(cps, k: int, s: int) -> List[dict]:
+    factors = list(cps.factors)
+    n = len(factors)
+    r = cps.rank
+
+    if r is None:
+        raise ValueError("sub_cps requires a standard CPS with a rank (r). Use on CPS created via __init__, not from_rules.")
+
+    anchor_size = r - s
+    if anchor_size < 0 or k + anchor_size > n:
+        return []
+
+    combo_to_node = {}
+    for node, attrs in cps.graph.nodes(data=True):
+        if 'combo' in attrs:
+            combo_to_node[attrs['combo']] = node
+
+    results = []
+    for anchor in combinations(factors, anchor_size):
+        remaining = [f for f in factors if f not in anchor]
+        for varying in combinations(remaining, k):
+            nodes = []
+            combos = []
+            for sub_combo in combinations(varying, s):
+                full_combo = tuple(sorted(list(anchor) + list(sub_combo)))
+                if full_combo in combo_to_node:
+                    nodes.append(combo_to_node[full_combo])
+                    combos.append(full_combo)
+
+            if len(nodes) == math.comb(k, s):
+                results.append({
+                    'nodes': tuple(sorted(nodes)),
+                    'anchor': anchor,
+                    'varying': varying,
+                    'combos': combos,
+                })
+
+    seen = set()
+    unique = []
+    for entry in results:
+        key = entry['nodes']
+        if key not in seen:
+            seen.add(key)
+            unique.append(entry)
+
+    return unique
+
+
+def classify(cps, node_ids: List[int]) -> dict:
+    factors = set(cps.factors)
+    G = cps.graph
+
+    combos = []
+    for n in node_ids:
+        attrs = G.nodes[n]
+        if 'combo' in attrs:
+            combo = attrs['combo']
+            if isinstance(combo, tuple) and isinstance(combo[0], tuple):
+                return {'type': 'unknown', 'reason': 'ratio-based nodes'}
+            combos.append(set(combo))
+
+    if not combos:
+        return {'type': 'unknown', 'reason': 'no combo data'}
+
+    shared = combos[0].copy()
+    for c in combos[1:]:
+        shared &= c
+
+    all_present = set()
+    for c in combos:
+        all_present |= c
+
+    excluded = factors - all_present
+
+    result = {
+        'nodes': list(node_ids),
+        'shared': sorted(shared),
+        'excluded': sorted(excluded),
+        'factors_present': sorted(all_present),
+    }
+
+    if shared:
+        diff = sorted(all_present - shared)
+        result['type'] = 'harmonic'
+        result['anchor'] = sorted(shared)
+        result['varying'] = diff
+    elif excluded:
+        result['type'] = 'subharmonic'
+    else:
+        result['type'] = 'mixed'
+
+    return result
+
+
+def faces(cps, size: int) -> List[Tuple[int, ...]]:
+    G = cps.graph
+    all_nodes = list(G.nodes())
+    result = []
+
+    for subset in combinations(all_nodes, size):
+        edge_count = 0
+        for u, v, data in G.edges(data=True):
+            if u in subset and v in subset and 'distance' in data:
+                edge_count += 1
+        undirected_edges = edge_count // 2
+        max_possible = size * (size - 1) // 2
+        if undirected_edges == max_possible:
+            result.append(subset)
+
+    return result

@@ -123,7 +123,8 @@ class CombinationProductSet(CS):
                                relation=sym_ratio,
                                angle=rel_data['angle'],
                                distance=rel_data['distance'],
-                               elevation=rel_data['elevation'])
+                               elevation=rel_data['elevation'],
+                               displacement=rel_data.get('displacement'))
 
   @property
   def master_set(self):
@@ -167,3 +168,101 @@ class CombinationProductSet(CS):
   
   def __repr__(self):
     return self.__str__()
+
+  @classmethod
+  def from_rules(cls, factors, rules, master_set=None, normalized=False):
+    aliases = {f: sp.Symbol(chr(65 + i)) for i, f in enumerate(sorted(factors))}
+    factors_sorted = tuple(sorted(factors))
+    expressions = []
+    seen = set()
+
+    for rule in rules:
+      op = rule[0]
+      if op == 'product':
+        r = rule[1]
+        from itertools import combinations as _combs
+        for combo in _combs(factors_sorted, r):
+          expr = sp.Integer(1)
+          for f in combo:
+            expr *= aliases[f]
+          product = prod(combo)
+          key = sp.simplify(expr)
+          if key not in seen:
+            seen.add(key)
+            expressions.append({'combo': combo, 'alias': expr, 'product': product})
+
+      elif op == 'power':
+        k = rule[1]
+        for f in factors_sorted:
+          expr = aliases[f] ** k
+          product = f ** k
+          key = sp.simplify(expr)
+          if key not in seen:
+            seen.add(key)
+            expressions.append({'combo': (f,) * k, 'alias': expr, 'product': product})
+
+      elif op == 'ratio':
+        r_num = rule[1]
+        r_den = rule[2]
+        from itertools import combinations as _combs
+        for num_combo in _combs(factors_sorted, r_num):
+          remaining = [f for f in factors_sorted if f not in num_combo]
+          for den_combo in _combs(remaining, r_den):
+            num_expr = sp.Integer(1)
+            for f in num_combo:
+              num_expr *= aliases[f]
+            den_expr = sp.Integer(1)
+            for f in den_combo:
+              den_expr *= aliases[f]
+            expr = num_expr / den_expr
+            product = Fraction(prod(num_combo), prod(den_combo))
+            key = sp.simplify(expr)
+            if key not in seen:
+              seen.add(key)
+              expressions.append({'combo': (num_combo, den_combo), 'alias': expr, 'product': product})
+
+    n_nodes = len(expressions)
+    G = Graph.complete_graph(n_nodes)
+    directed_graph = G.to_directed()
+    directed_graph._graph.clear_edges()
+
+    for i, entry in enumerate(expressions):
+      ratio = equave_reduce(entry['product']) if not isinstance(entry['product'], Fraction) else equave_reduce(entry['product'])
+      if normalized:
+        ratio = equave_reduce(ratio / max(factors_sorted))
+      directed_graph.nodes[i]['combo'] = entry['combo']
+      directed_graph.nodes[i]['alias'] = entry['alias']
+      directed_graph.nodes[i]['product'] = entry['product']
+      directed_graph.nodes[i]['ratio'] = ratio
+
+    instance = object.__new__(cls)
+    instance._factors = factors_sorted
+    instance._r = None
+    instance._combos = set(e['combo'] for e in expressions)
+    instance._factor_aliases = aliases
+    instance._graph = directed_graph
+    instance._normalized = normalized
+    instance._master_set = None
+    instance._master_set_instance = None
+
+    if isinstance(master_set, MasterSet):
+      instance._master_set = master_set.name
+      ms = master_set
+      if ms.factors is None and ms.n_factors == len(factors_sorted):
+        instance._master_set_instance = ms.with_factors(factors_sorted)
+      else:
+        instance._master_set_instance = ms
+    elif isinstance(master_set, str):
+      instance._master_set = master_set.lower()
+      ms_key = instance._master_set
+      if ms_key in MASTER_SETS:
+        ms = MASTER_SETS[ms_key]()
+        if ms.n_factors == len(factors_sorted):
+          instance._master_set_instance = ms.with_factors(factors_sorted)
+        else:
+          instance._master_set_instance = ms
+
+    if instance._master_set_instance is not None:
+      instance._build_master_set_structure(instance._master_set_instance.relationship_dict)
+
+    return instance

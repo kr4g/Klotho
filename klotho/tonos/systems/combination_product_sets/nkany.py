@@ -22,7 +22,7 @@ class Hexany(CombinationProductSet):
   def __init__(self, factors:tuple[int] = (1, 3, 5, 7), normalized:bool = False, master_set:str = "tetrad"):
     if len(factors) != 4:
       raise ValueError('Hexany must have exactly 4 factors.')
-    valid_master_sets = ("tetrad", "tetrad_3d")
+    valid_master_sets = ("tetrad", "tetrad_3d", "kite")
     if master_set and master_set.lower() not in valid_master_sets:
       raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
     super().__init__(factors, r=2, normalized=normalized, master_set=master_set)
@@ -41,6 +41,10 @@ class Dekany(CombinationProductSet):
       raise ValueError('Dekany must have exactly 5 factors.')
     if not r in (2, 3):
       raise ValueError('Dekany rank must be 2 or 3.')
+    valid_master_sets = ("arrow", "k23_bipartite", "bowtie", "house", "wheel4",
+                         "trigonal_bipyramid", "kite_pyramid")
+    if master_set and master_set.lower() not in valid_master_sets:
+      raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
     super().__init__(factors, r, normalized=normalized, master_set=master_set)
     
 class Pentadekany(CombinationProductSet):
@@ -59,6 +63,11 @@ class Pentadekany(CombinationProductSet):
       raise ValueError('Pentadekany must have exactly 6 factors.')
     if not r in (2, 4):
       raise ValueError('Pentadekany rank must be 2 or 4.')
+    valid_master_sets = ("asterisk", "hexagon", "irregular_hexagon", "centered_pentagon", "asterisk_nd",
+                         "wheel5", "h_shape", "nested_triangles",
+                         "octahedron", "triangular_prism")
+    if master_set and master_set.lower() not in valid_master_sets:
+      raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
     super().__init__(factors, r, normalized=normalized, master_set=master_set)
 
 class Eikosany(CombinationProductSet):
@@ -73,7 +82,9 @@ class Eikosany(CombinationProductSet):
   def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11), normalized:bool = False, master_set:str = "asterisk"):
     if len(factors) != 6:
       raise ValueError('Eikosany must have exactly 6 factors.')
-    valid_master_sets = ("asterisk", "hexagon", "irregular_hexagon", "centered_pentagon", "asterisk_3d")
+    valid_master_sets = ("asterisk", "hexagon", "irregular_hexagon", "centered_pentagon", "asterisk_nd",
+                         "wheel5", "h_shape", "nested_triangles",
+                         "octahedron", "triangular_prism")
     if master_set and master_set.lower() not in valid_master_sets:
       raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
     super().__init__(factors, r=3, normalized=normalized, master_set=master_set)
@@ -89,7 +100,7 @@ class Hebdomekontany(CombinationProductSet):
   def __init__(self, factors:tuple[int] = (1, 3, 5, 7, 9, 11, 13, 17), normalized:bool = False, master_set:str = 'ogdoad'):
     if len(factors) != 8:
       raise ValueError('Hebdomekontany must have exactly 8 factors.')
-    valid_master_sets = ("ogdoad", "ogdoad_3d")
+    valid_master_sets = ("ogdoad", "ogdoad_nd")
     if master_set and master_set.lower() not in valid_master_sets:
       raise ValueError(f'Master set must be one of: {", ".join(valid_master_sets)}.')
     super().__init__(factors, r=4, normalized=normalized, master_set=master_set)

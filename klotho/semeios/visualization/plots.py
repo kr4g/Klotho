@@ -2107,7 +2107,11 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      show_labels=True, title=None, output_file=None):
     positions = ms.positions
     edge_pairs = ms.edges
-    is_3d = ms.dimensionality == 3
+    dim = ms.dimensionality
+    if dim > 3:
+        positions = _reduce_positions(positions, target_dims=3)
+        dim = 3
+    is_3d = dim == 3
 
     fig = go.Figure()
 
@@ -2155,6 +2159,7 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
             width=width_px, height=height_px,
             paper_bgcolor='black',
             scene=dict(
+                camera=dict(eye=dict(x=0, y=0, z=2.5)),
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
                            showbackground=False, range=[min(node_x)-pad, max(node_x)+pad], title=''),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
@@ -2227,15 +2232,30 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
     return fig
 
 
+def _reduce_positions(node_positions, target_dims=3):
+    from sklearn.manifold import MDS
+    nodes = list(node_positions.keys())
+    coords = np.array([list(node_positions[n]) for n in nodes])
+    reducer = MDS(n_components=target_dims, random_state=42, normalized_stress='auto')
+    reduced = reducer.fit_transform(coords)
+    return {nodes[i]: tuple(reduced[i]) for i in range(len(nodes))}
+
+
 def _cps_node_positions(G):
     node_neighbors = {}
-    is_3d = False
+    n_dims = 2
     for u, v, data in G.edges(data=True):
         if 'angle' in data and 'distance' in data:
+            disp = data.get('displacement')
+            if disp is not None and len(disp) > n_dims:
+                n_dims = len(disp)
             elev = data.get('elevation', 0.0) or 0.0
-            if abs(elev) > 1e-12:
-                is_3d = True
-            node_neighbors.setdefault(u, []).append((v, data['angle'], data['distance'], elev))
+            if abs(elev) > 1e-12 and n_dims < 3:
+                n_dims = 3
+            node_neighbors.setdefault(u, []).append({
+                'nb': v, 'angle': data['angle'], 'distance': data['distance'],
+                'elevation': elev, 'displacement': disp,
+            })
 
     node_positions = {}
 
@@ -2244,46 +2264,40 @@ def _cps_node_positions(G):
 
     for component in components:
         start_node = next(iter(component))
-        if is_3d:
-            pos = {start_node: (0.0, 0.0, 0.0)}
-        else:
-            pos = {start_node: (0.0, 0.0)}
+        pos = {start_node: tuple(0.0 for _ in range(n_dims))}
         placed = {start_node}
         queue = [start_node]
 
         while queue:
             current = queue.pop(0)
-            for nb, angle, dist, elev in node_neighbors.get(current, []):
+            for edge_data in node_neighbors.get(current, []):
+                nb = edge_data['nb']
                 if nb not in placed and nb in component:
-                    if is_3d:
-                        cx, cy, cz = pos[current]
+                    cur_pos = pos[current]
+                    disp = edge_data['displacement']
+                    if disp is not None and len(disp) >= n_dims:
+                        pos[nb] = tuple(cur_pos[i] + disp[i] for i in range(n_dims))
+                    elif n_dims == 3:
+                        angle = edge_data['angle']
+                        dist = edge_data['distance']
+                        elev = edge_data['elevation']
                         horiz_dist = dist * math.cos(elev)
-                        pos[nb] = (cx + horiz_dist * math.cos(angle),
-                                   cy + horiz_dist * math.sin(angle),
-                                   cz + dist * math.sin(elev))
+                        pos[nb] = (cur_pos[0] + horiz_dist * math.cos(angle),
+                                   cur_pos[1] + horiz_dist * math.sin(angle),
+                                   cur_pos[2] + dist * math.sin(elev))
                     else:
-                        cx, cy = pos[current]
-                        pos[nb] = (cx + dist * math.cos(angle),
-                                   cy + dist * math.sin(angle))
+                        angle = edge_data['angle']
+                        dist = edge_data['distance']
+                        pos[nb] = (cur_pos[0] + dist * math.cos(angle),
+                                   cur_pos[1] + dist * math.sin(angle))
                     placed.add(nb)
                     queue.append(nb)
 
         if pos:
-            if is_3d:
-                n_pos = len(pos)
-                center_x = sum(p[0] for p in pos.values()) / n_pos
-                center_y = sum(p[1] for p in pos.values()) / n_pos
-                center_z = sum(p[2] for p in pos.values()) / n_pos
-                for n in pos:
-                    x, y, z = pos[n]
-                    pos[n] = (x - center_x, y - center_y, z - center_z)
-            else:
-                n_pos = len(pos)
-                center_x = sum(p[0] for p in pos.values()) / n_pos
-                center_y = sum(p[1] for p in pos.values()) / n_pos
-                for n in pos:
-                    x, y = pos[n]
-                    pos[n] = (x - center_x, y - center_y)
+            n_pos = len(pos)
+            center = tuple(sum(p[i] for p in pos.values()) / n_pos for i in range(n_dims))
+            for n in pos:
+                pos[n] = tuple(pos[n][i] - center[i] for i in range(n_dims))
 
         node_positions.update(pos)
 
@@ -2355,6 +2369,7 @@ def _plot_cps_3d(cps, node_positions, G, figsize, node_size, text_size,
         width=width_px, height=height_px,
         paper_bgcolor='black',
         scene=dict(
+            camera=dict(eye=dict(x=0, y=0, z=2.5)),
             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
                        showbackground=False, range=x_range, title=''),
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
@@ -2416,7 +2431,11 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     G = cps.graph
     node_positions = _cps_node_positions(G)
 
-    is_3d = any(len(p) >= 3 and abs(p[2]) > 1e-12 for p in node_positions.values())
+    pos_dim = max((len(p) for p in node_positions.values()), default=2)
+    if pos_dim > 3:
+        node_positions = _reduce_positions(node_positions, target_dims=3)
+        pos_dim = 3
+    is_3d = pos_dim >= 3 and any(abs(p[2]) > 1e-12 for p in node_positions.values())
     if is_3d:
         return _plot_cps_3d(cps, node_positions, G, figsize, node_size, text_size,
                             show_labels, title, output_file, nodes)
