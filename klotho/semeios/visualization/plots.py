@@ -13,6 +13,7 @@ from klotho.tonos.chords import Chord, Voicing
 
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
+from itertools import combinations as _combinations
 
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.parameters.parameter_tree import ParameterTree
@@ -2232,6 +2233,73 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
     return fig
 
 
+def _detect_faces(G, node_positions, max_size=8):
+    adj = {}
+    for u, v, data in G.edges(data=True):
+        if u in node_positions and v in node_positions and 'distance' in data:
+            adj.setdefault(u, set()).add(v)
+            adj.setdefault(v, set()).add(u)
+
+    all_nodes = sorted(n for n in G.nodes() if n in node_positions)
+    found = []
+    seen_sets = set()
+
+    for a, b, c in _combinations(all_nodes, 3):
+        if b in adj.get(a, set()) and c in adj.get(b, set()) and a in adj.get(c, set()):
+            found.append((a, b, c))
+            seen_sets.add(frozenset((a, b, c)))
+
+    if max_size >= 4:
+        for cycle_len in range(4, max_size + 1):
+            for subset in _combinations(all_nodes, cycle_len):
+                fs = frozenset(subset)
+                if fs in seen_sets:
+                    continue
+                subset_set = set(subset)
+                sub_adj = {n: adj.get(n, set()) & subset_set for n in subset}
+                if any(len(nb) != 2 for nb in sub_adj.values()):
+                    continue
+                start = subset[0]
+                visited = {start}
+                cycle = [start]
+                current = start
+                valid = True
+                for _ in range(cycle_len - 1):
+                    nxt = [n for n in sub_adj[current] if n not in visited]
+                    if not nxt:
+                        valid = False
+                        break
+                    current = nxt[0]
+                    visited.add(current)
+                    cycle.append(current)
+                if not valid or len(cycle) != cycle_len or start not in sub_adj[cycle[-1]]:
+                    continue
+                cycle_set = set(cycle)
+                has_chord = False
+                for i, node in enumerate(cycle):
+                    non_neighbors_in_cycle = adj.get(node, set()) & cycle_set - {cycle[(i-1) % cycle_len], cycle[(i+1) % cycle_len]}
+                    if non_neighbors_in_cycle:
+                        has_chord = True
+                        break
+                if not has_chord:
+                    seen_sets.add(fs)
+                    found.append(tuple(cycle))
+
+    return found
+
+
+_FACE_COLORS = [
+    'rgba(65,105,225,0.18)',
+    'rgba(220,60,60,0.18)',
+    'rgba(50,205,50,0.18)',
+    'rgba(255,165,0,0.18)',
+    'rgba(148,103,189,0.18)',
+    'rgba(0,206,209,0.18)',
+    'rgba(255,105,180,0.18)',
+    'rgba(255,215,0,0.18)',
+]
+
+
 def _reduce_positions(node_positions, target_dims=3):
     from sklearn.manifold import MDS
     nodes = list(node_positions.keys())
@@ -2450,7 +2518,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         return AnimatedCPSSvgFigure(svg_data, dur=dur)
 
     fig = go.Figure()
-    
+
     highlight_nodes = set(nodes) if nodes else set()
     path_nodes = set(path) if path else set()
     dim_bg = mute_background and bool(path)
