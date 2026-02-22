@@ -2,6 +2,8 @@ import math
 from fractions import Fraction
 from html import escape as html_escape
 
+from ._svg_utils import SvgFigureData, svg_wrap_viewbox, svg_text
+
 
 _HALO_NOTE_COLOR = (100, 160, 255)
 
@@ -64,46 +66,21 @@ def _svg_halo_ellipses(prefix, cx, cy, rx, ry):
 
 
 def _wrap_svg(inner_svg, width_px, height_px, y_min, y_max):
-    vb_y = -y_max
-    vb_h = y_max - y_min
-    svg = (
-        f'<div style="overflow-x:auto;overflow-y:hidden;background:black">'
-        f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'width="{width_px}" height="{height_px}" '
-        f'viewBox="0 {vb_y:.4f} {width_px} {vb_h:.4f}" '
-        f'style="display:block;background:black" '
-        f'preserveAspectRatio="none">'
-        f'<g transform="scale(1,-1)">'
-        f'{inner_svg}'
-        f'</g>'
-        f'</svg></div>'
-    )
-    return svg
+    return svg_wrap_viewbox(inner_svg, width_px, height_px, y_min, y_max)
 
 
 def _svg_text(x, y, text, font_size=12, fill='white', font_family='Arial',
               anchor='middle', weight='normal'):
-    return (
-        f'<g transform="translate({x:.2f},{y:.2f}) scale(1,-1)">'
-        f'<text x="0" y="0" text-anchor="{anchor}" dominant-baseline="central" '
-        f'font-family="{font_family}" font-size="{font_size:.1f}" '
-        f'font-weight="{weight}" fill="{fill}" pointer-events="none">'
-        f'{html_escape(str(text))}</text></g>'
-    )
+    return svg_text(x, y, text, font_size=font_size, fill=fill,
+                    font_family=font_family, anchor=anchor, weight=weight,
+                    invert_y=True)
 
 
-class SvgRTData:
+class SvgRTData(SvgFigureData):
     __slots__ = ('svg_str', 'width_px', 'height_px', 'node_to_ids',
                  'leaf_path_ids', 'leaf_bright_colors', 'leaf_base_colors',
                  'leaf_halo_ids', 'leaf_x_positions', 'all_animated_ids',
                  'leaf_ancestors')
-
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-    def to_html(self, **kwargs):
-        return self.svg_str
 
 
 def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):

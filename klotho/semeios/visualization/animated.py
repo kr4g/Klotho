@@ -7,6 +7,11 @@ from klotho.utils.playback.tonejs.cdn import (
     THREEJS_CDN, THREEJS_ORBIT_CDN,
 )
 
+from ._animation_base import (
+    build_session_preamble, build_control_bar_html,
+    build_nav_controls_html, build_scripts_html, build_playback_js,
+)
+
 
 class AnimatedLattice3dFigure:
     def __init__(self, scene_data, audio_payload=None, dur=0.5):
@@ -19,17 +24,10 @@ class AnimatedLattice3dFigure:
         sd = self.scene_data
         wid = self.widget_id
 
-        cdn_html = cdn_scripts(
-            include_plotly=False,
-            include_tone=bool(self.audio_payload),
-            include_threejs=True,
-        )
-
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+            include_tone=bool(self.audio_payload), include_threejs=True)
+        controls_html = build_control_bar_html(wid)
+        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
 
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
@@ -42,6 +40,8 @@ class AnimatedLattice3dFigure:
 
         threejs_cdn = THREEJS_CDN
         orbit_cdn = THREEJS_ORBIT_CDN
+
+        playback_js = build_playback_js(wid, self.dur * 1000)
 
         html = f'''
 {cdn_html}
@@ -59,35 +59,8 @@ class AnimatedLattice3dFigure:
         white-space:pre;max-width:300px;z-index:10;
     "></div>
 </div>
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
-    user-select: none; margin-top: 4px;">
-    <button id="{wid}_toggle" style="
-        width: 32px; height: 32px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0;">
-        <span id="{wid}_icon" style="
-            width: 0; height: 0;
-            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px; height: 28px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="#a0a0a0" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>
-{session_script}
-<script>{instruments_js}</script>
-<script>{player_js}</script>
+{controls_html}
+{scripts_html}
 <script>
 (function _klotho3dInit() {{
     if (typeof THREE === "undefined") {{
@@ -117,10 +90,6 @@ class AnimatedLattice3dFigure:
 
     var container = document.getElementById("{wid}_wrap");
     var tooltip   = document.getElementById("{wid}_tooltip");
-    var toggleBtn = document.getElementById("{wid}_toggle");
-    var iconEl    = document.getElementById("{wid}_icon");
-    var loopBtn   = document.getElementById("{wid}_loop");
-    var loopSvg   = document.getElementById("{wid}_loop_svg");
 
     var sceneData = {scene_json};
     var pathSteps = {steps_json};
@@ -391,7 +360,6 @@ class AnimatedLattice3dFigure:
     }}
     renderLoop();
 
-    var looping = false, playing = false;
     var totalSteps = pathSteps.length;
 
     function hideAllPath() {{
@@ -432,59 +400,11 @@ class AnimatedLattice3dFigure:
         }}
     }}
 
-    function finishPlayback() {{
-        playing = false;
-        showAllPath();
-        setPlayIcon();
-    }}
+    function onReset() {{ showAllPath(); }}
+    function onBeforePlay() {{ hideAllPath(); }}
+    function onStep(stepIdx) {{ revealStep(stepIdx); }}
 
-    function setPlayIcon() {{
-        iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none";
-    }}
-    function setStopIcon() {{
-        iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444";
-    }}
-
-    loopBtn.onclick = function() {{
-        looping = !looping;
-        loopBtn.style.opacity = looping ? "1" : "0.5";
-        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
-    }};
-
-    if (audioPayload && typeof Tone !== "undefined") {{
-        var events = audioPayload.events || [];
-        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
-        var player = KlothoPlayer.create();
-        toggleBtn.onclick = async function() {{
-            if (player.isPlaying()) {{ player.stop(); }}
-            else {{
-                playing = true; setStopIcon(); hideAllPath();
-                await player.play(events, instruments, {{
-                    loop: looping,
-                    onEvent: function(stepIdx) {{ revealStep(stepIdx); }},
-                    onStop: function() {{ finishPlayback(); }},
-                    onFinish: function() {{ finishPlayback(); }}
-                }});
-            }}
-        }};
-    }} else {{
-        var durMs = {self.dur * 1000};
-        var timerId = null;
-        function runAnimation(stepIdx) {{
-            if (!playing) return;
-            if (stepIdx > totalSteps) {{
-                if (looping) {{ hideAllPath(); timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }}
-                else {{ finishPlayback(); }}
-                return;
-            }}
-            revealStep(stepIdx);
-            timerId = setTimeout(function() {{ runAnimation(stepIdx + 1); }}, durMs);
-        }}
-        toggleBtn.onclick = function() {{
-            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
-            else {{ playing = true; setStopIcon(); hideAllPath(); runAnimation(0); }}
-        }};
-    }}
+    {playback_js}
 }})();
 </script>
 '''
@@ -509,13 +429,10 @@ class AnimatedFigure:
         fig_w = self.fig.layout.width or 700
         fig_h = self.fig.layout.height or 450
 
-        cdn_html = cdn_scripts(include_plotly=True, include_tone=bool(self.audio_payload))
-
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+            include_plotly=True, include_tone=bool(self.audio_payload))
+        controls_html = build_control_bar_html(self.widget_id)
+        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
 
         steps_json = json.dumps(self.step_trace_groups)
         halos_json = json.dumps(self.halo_indices)
@@ -523,69 +440,13 @@ class AnimatedFigure:
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
         wid = self.widget_id
 
+        playback_js = build_playback_js(wid, self.dur * 1000)
+
         html = f'''
 {cdn_html}
 <div id="{plot_div_id}" class="plotly-graph-div" style="height:{fig_h}px; width:{fig_w}px;"></div>
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background: #1a1a2e;
-    border-radius: 6px;
-    user-select: none;
-    margin-top: 4px;
-">
-    <button id="{wid}_toggle" style="
-        width: 32px;
-        height: 32px;
-        border: none;
-        border-radius: 4px;
-        background: #16213e;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-    ">
-        <span id="{wid}_icon" style="
-            width: 0;
-            height: 0;
-            border-top: 7px solid transparent;
-            border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80;
-            margin-left: 3px;
-        "></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px;
-        height: 28px;
-        border: none;
-        border-radius: 4px;
-        background: #16213e;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        opacity: 0.5;
-    ">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path>
-            <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path>
-            <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>
-{session_script}
-<script>
-{instruments_js}
-</script>
-<script>
-{player_js}
-</script>
+{controls_html}
+{scripts_html}
 <script>
 (function _klothoInit() {{
     if (typeof Plotly === "undefined") {{ setTimeout(_klothoInit, 50); return; }}
@@ -594,19 +455,11 @@ class AnimatedFigure:
     var plotDiv = document.getElementById("{plot_div_id}");
     Plotly.newPlot(plotDiv, _fig.data, _fig.layout, {{responsive: true}});
 
-    const toggleBtn = document.getElementById("{wid}_toggle");
-    const iconEl = document.getElementById("{wid}_icon");
-    const loopBtn = document.getElementById("{wid}_loop");
-    const loopSvg = document.getElementById("{wid}_loop_svg");
-
-    const steps = {steps_json};
-    const haloIndices = {halos_json};
-    const allPathIndices = {all_path_json};
-    const audioPayload = {payload_json};
-    const totalSteps = steps.length;
-
-    let looping = false;
-    let playing = false;
+    var steps = {steps_json};
+    var haloIndices = {halos_json};
+    var allPathIndices = {all_path_json};
+    var audioPayload = {payload_json};
+    var totalSteps = steps.length;
 
     function hideAllPath() {{
         if (allPathIndices.length > 0) {{
@@ -640,98 +493,11 @@ class AnimatedFigure:
         }}
     }}
 
-    function finishPlayback() {{
-        playing = false;
-        showAllPath();
-        setPlayIcon();
-    }}
+    function onReset() {{ showAllPath(); }}
+    function onBeforePlay() {{ hideAllPath(); }}
+    function onStep(stepIdx) {{ revealStep(stepIdx); }}
 
-    function setPlayIcon() {{
-        iconEl.style.width = "0";
-        iconEl.style.height = "0";
-        iconEl.style.borderTop = "7px solid transparent";
-        iconEl.style.borderBottom = "7px solid transparent";
-        iconEl.style.borderLeft = "12px solid #4ade80";
-        iconEl.style.borderRight = "none";
-        iconEl.style.marginLeft = "3px";
-        iconEl.style.background = "none";
-    }}
-
-    function setStopIcon() {{
-        iconEl.style.width = "12px";
-        iconEl.style.height = "12px";
-        iconEl.style.border = "none";
-        iconEl.style.borderRadius = "2px";
-        iconEl.style.marginLeft = "0";
-        iconEl.style.background = "#ef4444";
-    }}
-
-    loopBtn.onclick = () => {{
-        looping = !looping;
-        loopBtn.style.opacity = looping ? "1" : "0.5";
-        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
-    }};
-
-    if (audioPayload && typeof Tone !== "undefined") {{
-        var events = audioPayload.events || [];
-        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
-        var player = KlothoPlayer.create();
-
-        toggleBtn.onclick = async () => {{
-            if (player.isPlaying()) {{
-                player.stop();
-            }} else {{
-                playing = true;
-                setStopIcon();
-                hideAllPath();
-                await player.play(events, instruments, {{
-                    loop: looping,
-                    onEvent: function(stepIdx) {{
-                        revealStep(stepIdx);
-                    }},
-                    onStop: function() {{
-                        finishPlayback();
-                    }},
-                    onFinish: function() {{
-                        finishPlayback();
-                    }}
-                }});
-            }}
-        }};
-    }} else {{
-        var durMs = {self.dur * 1000};
-        var timerId = null;
-
-        function runAnimation(stepIdx) {{
-            if (!playing) return;
-            if (stepIdx > totalSteps) {{
-                if (looping) {{
-                    hideAllPath();
-                    timerId = setTimeout(function() {{ runAnimation(0); }}, durMs);
-                }} else {{
-                    finishPlayback();
-                }}
-                return;
-            }}
-            revealStep(stepIdx);
-            timerId = setTimeout(function() {{
-                runAnimation(stepIdx + 1);
-            }}, durMs);
-        }}
-
-        toggleBtn.onclick = () => {{
-            if (playing) {{
-                playing = false;
-                if (timerId) {{ clearTimeout(timerId); timerId = null; }}
-                finishPlayback();
-            }} else {{
-                playing = true;
-                setStopIcon();
-                hideAllPath();
-                runAnimation(0);
-            }}
-        }};
-    }}
+    {playback_js}
 }})();
 </script>
 '''
@@ -764,13 +530,10 @@ class AnimatedRTFigure:
         fig_w = self.fig.layout.width or 700
         fig_h = self.fig.layout.height or 450
 
-        cdn_html = cdn_scripts(include_plotly=True, include_tone=bool(self.audio_payload))
-
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+            include_plotly=True, include_tone=bool(self.audio_payload))
+        controls_html = build_control_bar_html(self.widget_id)
+        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
 
         node_to_traces_json = json.dumps({str(k): v for k, v in self.node_to_traces.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in self.leaf_ancestors])
@@ -783,69 +546,13 @@ class AnimatedRTFigure:
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
         wid = self.widget_id
 
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False)
+
         html = f'''
 {cdn_html}
 <div id="{plot_div_id}" class="plotly-graph-div" style="height:{fig_h}px; width:{fig_w}px;"></div>
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background: #1a1a2e;
-    border-radius: 6px;
-    user-select: none;
-    margin-top: 4px;
-">
-    <button id="{wid}_toggle" style="
-        width: 32px;
-        height: 32px;
-        border: none;
-        border-radius: 4px;
-        background: #16213e;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-    ">
-        <span id="{wid}_icon" style="
-            width: 0;
-            height: 0;
-            border-top: 7px solid transparent;
-            border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80;
-            margin-left: 3px;
-        "></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px;
-        height: 28px;
-        border: none;
-        border-radius: 4px;
-        background: #16213e;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        opacity: 0.5;
-    ">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path>
-            <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path>
-            <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>
-{session_script}
-<script>
-{instruments_js}
-</script>
-<script>
-{player_js}
-</script>
+{controls_html}
+{scripts_html}
 <script>
 (function _klothoInit() {{
     if (typeof Plotly === "undefined") {{ setTimeout(_klothoInit, 50); return; }}
@@ -854,25 +561,18 @@ class AnimatedRTFigure:
     var plotDiv = document.getElementById("{plot_div_id}");
     Plotly.newPlot(plotDiv, _fig.data, _fig.layout, {{responsive: true}});
 
-    const toggleBtn = document.getElementById("{wid}_toggle");
-    const iconEl = document.getElementById("{wid}_icon");
-    const loopBtn = document.getElementById("{wid}_loop");
-    const loopSvg = document.getElementById("{wid}_loop_svg");
+    var nodeToTraces = {node_to_traces_json};
+    var leafAncestors = {leaf_ancestors_json};
+    var allAnimatedTraces = {all_anim_json};
+    var leafXPositions = {leaf_x_json};
+    var leafHaloGroups = {halo_groups_json};
+    var glowEnabled = {'true' if self.glow else 'false'};
+    var traceBrightColors = {bright_colors_json};
+    var traceBaseColors = {base_colors_json};
+    var audioPayload = {payload_json};
+    var leafPathTraces = {leaf_path_traces_json};
+    var totalSteps = leafAncestors.length;
 
-    const nodeToTraces = {node_to_traces_json};
-    const leafAncestors = {leaf_ancestors_json};
-    const allAnimatedTraces = {all_anim_json};
-    const leafXPositions = {leaf_x_json};
-    const leafHaloGroups = {halo_groups_json};
-    const glowEnabled = {'true' if self.glow else 'false'};
-    const traceBrightColors = {bright_colors_json};
-    const traceBaseColors = {base_colors_json};
-    const audioPayload = {payload_json};
-    const leafPathTraces = {leaf_path_traces_json};
-    const totalSteps = leafAncestors.length;
-
-    let looping = false;
-    let playing = false;
     var prevPathSet = null;
     var prevBrightened = [];
     var prevHaloGroup = [];
@@ -983,95 +683,11 @@ class AnimatedRTFigure:
         }}
     }}
 
-    function finishPlayback() {{
-        playing = false;
-        resetAll();
-        setPlayIcon();
-    }}
+    function onReset() {{ resetAll(); }}
+    function onBeforePlay() {{}}
+    function onStep(stepIdx) {{ highlightLeaf(stepIdx); }}
 
-    function setPlayIcon() {{
-        iconEl.style.width = "0";
-        iconEl.style.height = "0";
-        iconEl.style.borderTop = "7px solid transparent";
-        iconEl.style.borderBottom = "7px solid transparent";
-        iconEl.style.borderLeft = "12px solid #4ade80";
-        iconEl.style.borderRight = "none";
-        iconEl.style.marginLeft = "3px";
-        iconEl.style.background = "none";
-    }}
-
-    function setStopIcon() {{
-        iconEl.style.width = "12px";
-        iconEl.style.height = "12px";
-        iconEl.style.border = "none";
-        iconEl.style.borderRadius = "2px";
-        iconEl.style.marginLeft = "0";
-        iconEl.style.background = "#ef4444";
-    }}
-
-    loopBtn.onclick = () => {{
-        looping = !looping;
-        loopBtn.style.opacity = looping ? "1" : "0.5";
-        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
-    }};
-
-    if (audioPayload && typeof Tone !== "undefined") {{
-        var events = audioPayload.events || [];
-        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
-        var player = KlothoPlayer.create();
-
-        toggleBtn.onclick = async () => {{
-            if (player.isPlaying()) {{
-                player.stop();
-            }} else {{
-                playing = true;
-                setStopIcon();
-                await player.play(events, instruments, {{
-                    loop: looping,
-                    onEvent: function(stepIdx) {{
-                        highlightLeaf(stepIdx);
-                    }},
-                    onStop: function() {{
-                        finishPlayback();
-                    }},
-                    onFinish: function() {{
-                        finishPlayback();
-                    }}
-                }});
-            }}
-        }};
-    }} else {{
-        var durMs = {self.dur * 1000};
-        var timerId = null;
-
-        function runAnimation(stepIdx) {{
-            if (!playing) return;
-            if (stepIdx >= totalSteps) {{
-                if (looping) {{
-                    timerId = setTimeout(function() {{ runAnimation(0); }}, durMs);
-                }} else {{
-                    finishPlayback();
-                }}
-                return;
-            }}
-            highlightLeaf(stepIdx);
-            timerId = setTimeout(function() {{
-                runAnimation(stepIdx + 1);
-            }}, durMs);
-        }}
-
-        toggleBtn.onclick = () => {{
-            if (playing) {{
-                playing = false;
-                if (timerId) {{ clearTimeout(timerId); timerId = null; }}
-                finishPlayback();
-            }} else {{
-                playing = true;
-                setStopIcon();
-                runAnimation(0);
-            }}
-        }};
-    }}
+    {playback_js}
 }})();
 </script>
 '''
@@ -1090,13 +706,10 @@ class AnimatedRTSvgFigure:
         sd = self.svg_data
         wid = self.widget_id
 
-        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
-
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+            include_tone=bool(self.audio_payload))
+        controls_html = build_control_bar_html(wid)
+        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
 
         leaf_path_ids_json = json.dumps(sd.leaf_path_ids)
         all_anim_ids_json = json.dumps(sd.all_animated_ids)
@@ -1110,38 +723,13 @@ class AnimatedRTSvgFigure:
 
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
 
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False)
+
         html = f'''
 {cdn_html}
 {sd.svg_str}
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
-    user-select: none; margin-top: 4px;">
-    <button id="{wid}_toggle" style="
-        width: 32px; height: 32px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0;">
-        <span id="{wid}_icon" style="
-            width: 0; height: 0;
-            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px; height: 28px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="#a0a0a0" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>
-{session_script}
-<script>{instruments_js}</script>
-<script>{player_js}</script>
+{controls_html}
+{scripts_html}
 <script>
 (function() {{
     var elCache = {{}};
@@ -1159,12 +747,6 @@ class AnimatedRTSvgFigure:
     var glowEnabled = {'true' if self.glow else 'false'};
     var totalSteps = leafAncestors.length;
 
-    var toggleBtn = document.getElementById("{wid}_toggle");
-    var iconEl = document.getElementById("{wid}_icon");
-    var loopBtn = document.getElementById("{wid}_loop");
-    var loopSvg = document.getElementById("{wid}_loop_svg");
-
-    var looping = false, playing = false;
     var prevPathSet = null, prevBrightened = [], prevHaloIds = [];
 
     function resetAll() {{
@@ -1212,42 +794,11 @@ class AnimatedRTSvgFigure:
         prevPathSet = currSet; prevBrightened = newBrightened; prevHaloIds = newHaloIds;
     }}
 
-    function finishPlayback() {{ playing = false; resetAll(); setPlayIcon(); }}
-    function setPlayIcon() {{ iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
-    function setStopIcon() {{ iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
+    function onReset() {{ resetAll(); }}
+    function onBeforePlay() {{}}
+    function onStep(stepIdx) {{ highlightLeaf(stepIdx); }}
 
-    loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
-
-    if (audioPayload && typeof Tone !== "undefined") {{
-        var events = audioPayload.events || [];
-        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
-        var player = KlothoPlayer.create();
-        toggleBtn.onclick = async function() {{
-            if (player.isPlaying()) {{ player.stop(); }}
-            else {{
-                playing = true; setStopIcon();
-                await player.play(events, instruments, {{
-                    loop: looping,
-                    onEvent: function(stepIdx) {{ highlightLeaf(stepIdx); }},
-                    onStop: function() {{ finishPlayback(); }},
-                    onFinish: function() {{ finishPlayback(); }}
-                }});
-            }}
-        }};
-    }} else {{
-        var durMs = {self.dur * 1000};
-        var timerId = null;
-        function runAnimation(stepIdx) {{
-            if (!playing) return;
-            if (stepIdx >= totalSteps) {{ if (looping) {{ timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
-            highlightLeaf(stepIdx);
-            timerId = setTimeout(function() {{ runAnimation(stepIdx + 1); }}, durMs);
-        }}
-        toggleBtn.onclick = function() {{
-            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
-            else {{ playing = true; setStopIcon(); runAnimation(0); }}
-        }};
-    }}
+    {playback_js}
 }})();
 </script>
 '''
@@ -1265,13 +816,10 @@ class AnimatedLatticeSvgFigure:
         sd = self.svg_data
         wid = self.widget_id
 
-        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
-
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+            include_tone=bool(self.audio_payload))
+        controls_html = build_control_bar_html(wid)
+        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
 
         steps_json = json.dumps(sd.step_group_ids)
         halos_json = json.dumps(sd.halo_ids)
@@ -1282,38 +830,13 @@ class AnimatedLatticeSvgFigure:
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
         payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
 
+        playback_js = build_playback_js(wid, self.dur * 1000)
+
         html = f'''
 {cdn_html}
 {sd.svg_str}
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
-    user-select: none; margin-top: 4px;">
-    <button id="{wid}_toggle" style="
-        width: 32px; height: 32px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0;">
-        <span id="{wid}_icon" style="
-            width: 0; height: 0;
-            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px; height: 28px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="#a0a0a0" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>
-{session_script}
-<script>{instruments_js}</script>
-<script>{player_js}</script>
+{controls_html}
+{scripts_html}
 <script>
 (function() {{
     var steps = {steps_json};
@@ -1325,13 +848,6 @@ class AnimatedLatticeSvgFigure:
     var pathNodeColors = {path_node_colors_json};
     var dimmedColor = "{dimmed_color}";
     var totalSteps = steps.length;
-
-    var toggleBtn = document.getElementById("{wid}_toggle");
-    var iconEl = document.getElementById("{wid}_icon");
-    var loopBtn = document.getElementById("{wid}_loop");
-    var loopSvg = document.getElementById("{wid}_loop_svg");
-
-    var looping = false, playing = false;
 
     function dimAllNodes() {{
         for (var i = 0; i < allNodeIds.length; i++) {{
@@ -1403,155 +919,18 @@ class AnimatedLatticeSvgFigure:
         }}
     }}
 
-    function finishPlayback() {{ playing = false; showAllPath(); setPlayIcon(); }}
-    function setPlayIcon() {{ iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
-    function setStopIcon() {{ iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
+    function onReset() {{ showAllPath(); }}
+    function onBeforePlay() {{ hideAllPath(); }}
+    function onStep(stepIdx) {{ revealStep(stepIdx); }}
 
-    loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
-
-    if (audioPayload && typeof Tone !== "undefined") {{
-        var events = audioPayload.events || [];
-        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
-        var player = KlothoPlayer.create();
-        toggleBtn.onclick = async function() {{
-            if (player.isPlaying()) {{ player.stop(); }}
-            else {{
-                playing = true; setStopIcon(); hideAllPath();
-                await player.play(events, instruments, {{
-                    loop: looping,
-                    onEvent: function(stepIdx) {{ revealStep(stepIdx); }},
-                    onStop: function() {{ finishPlayback(); }},
-                    onFinish: function() {{ finishPlayback(); }}
-                }});
-            }}
-        }};
-    }} else {{
-        var durMs = {self.dur * 1000};
-        var timerId = null;
-        function runAnimation(stepIdx) {{
-            if (!playing) return;
-            if (stepIdx > totalSteps) {{ if (looping) {{ hideAllPath(); timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
-            revealStep(stepIdx);
-            timerId = setTimeout(function() {{ runAnimation(stepIdx + 1); }}, durMs);
-        }}
-        toggleBtn.onclick = function() {{
-            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
-            else {{ playing = true; setStopIcon(); hideAllPath(); runAnimation(0); }}
-        }};
-    }}
-}})();
-</script>
-'''
-        return html  # end AnimatedLatticeSvgFigure.to_html
-
-
-class AnimatedCPSSvgFigure:
-    def __init__(self, svg_data, audio_payload=None, dur=0.5):
-        self.svg_data = svg_data
-        self.audio_payload = audio_payload
-        self.dur = dur
-        self.widget_id = f"klotho_scps_{uuid.uuid4().hex[:8]}"
-
-    def to_html(self, **kwargs):
-        sd = self.svg_data
-        wid = self.widget_id
-
-        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
-
-        steps_json = json.dumps(sd.step_group_ids)
-        halos_json = json.dumps(sd.halo_ids)
-        all_path_json = json.dumps(sd.all_path_ids)
-        node_ids_json = json.dumps(sd.all_node_ids)
-        path_node_indices_json = json.dumps(sd.path_node_indices)
-        path_node_colors_json = json.dumps(sd.path_node_colors)
-        dimmed_color = sd.dimmed_node_color
-        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
-
-        html = f'''
-{cdn_html}
-{sd.svg_str}
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
-    user-select: none; margin-top: 4px;">
-    <button id="{wid}_toggle" style="
-        width: 32px; height: 32px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0;">
-        <span id="{wid}_icon" style="
-            width: 0; height: 0;
-            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px; height: 28px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="#a0a0a0" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>
-{session_script}
-<script>{instruments_js}</script>
-<script>{player_js}</script>
-<script>
-(function() {{
-    var steps = {steps_json};
-    var haloIds = {halos_json};
-    var allPathIds = {all_path_json};
-    var audioPayload = {payload_json};
-    var allNodeIds = {node_ids_json};
-    var pathNodeIndices = {path_node_indices_json};
-    var pathNodeColors = {path_node_colors_json};
-    var dimmedColor = "{dimmed_color}";
-    var totalSteps = steps.length;
-    var toggleBtn = document.getElementById("{wid}_toggle");
-    var iconEl = document.getElementById("{wid}_icon");
-    var loopBtn = document.getElementById("{wid}_loop");
-    var loopSvg = document.getElementById("{wid}_loop_svg");
-    var looping = false, playing = false;
-    function dimAllNodes() {{ for (var i=0;i<allNodeIds.length;i++) {{ var el=document.getElementById(allNodeIds[i]); if(el) el.setAttribute("fill",dimmedColor); }} }}
-    function highlightAllPathNodes() {{ for (var i=0;i<pathNodeIndices.length;i++) {{ var idx=pathNodeIndices[i], col=pathNodeColors[i]||"white"; if(idx>=0&&idx<allNodeIds.length) {{ var el=document.getElementById(allNodeIds[idx]); if(el) el.setAttribute("fill",col); }} }} }}
-    function highlightNodeAt(s) {{ if(s>=0&&s<pathNodeIndices.length) {{ var idx=pathNodeIndices[s], col=pathNodeColors[s]||"white"; if(idx>=0&&idx<allNodeIds.length) {{ var el=document.getElementById(allNodeIds[idx]); if(el) el.setAttribute("fill",col); }} }} }}
-    function hideAllPath() {{ for(var i=0;i<allPathIds.length;i++) {{ var el=document.getElementById(allPathIds[i]); if(el) el.style.display="none"; }} dimAllNodes(); }}
-    function showAllPath() {{ for(var i=0;i<allPathIds.length;i++) {{ var el=document.getElementById(allPathIds[i]); if(el) el.style.display=""; }} highlightAllPathNodes(); }}
-    function revealStep(s) {{
-        if(s===0) {{ hideAllPath(); if(haloIds.length>0) {{ var el=document.getElementById(haloIds[0]); if(el) el.style.display=""; }} highlightNodeAt(0); return; }}
-        var e=s-1; if(e>=0&&e<steps.length) {{ var g=steps[e]; if(g) for(var i=0;i<g.length;i++) {{ var el=document.getElementById(g[i]); if(el) el.style.display=""; }} }}
-        highlightNodeAt(s);
-        if(s===(audioPayload?audioPayload.events.length-1:totalSteps)&&haloIds.length>1) {{ var el=document.getElementById(haloIds[1]); if(el) el.style.display=""; }}
-    }}
-    function finishPlayback() {{ playing=false; showAllPath(); setPlayIcon(); }}
-    function setPlayIcon() {{ iconEl.style.cssText="width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
-    function setStopIcon() {{ iconEl.style.cssText="width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
-    loopBtn.onclick=function(){{ looping=!looping; loopBtn.style.opacity=looping?"1":"0.5"; loopSvg.setAttribute("stroke",looping?"#4ade80":"#a0a0a0"); }};
-    if(audioPayload&&typeof Tone!=="undefined") {{
-        var events=audioPayload.events||[];
-        var instruments=globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments||{{}});
-        var player=KlothoPlayer.create();
-        toggleBtn.onclick=async function(){{
-            if(player.isPlaying()){{ player.stop(); }}
-            else {{ playing=true; setStopIcon(); hideAllPath(); await player.play(events,instruments,{{ loop:looping, onEvent:function(s){{ revealStep(s); }}, onStop:function(){{ finishPlayback(); }}, onFinish:function(){{ finishPlayback(); }} }}); }}
-        }};
-    }} else {{
-        var durMs={self.dur * 1000};
-        var timerId=null;
-        function runAnimation(s){{ if(!playing) return; if(s>totalSteps){{ if(looping){{ hideAllPath(); timerId=setTimeout(function(){{ runAnimation(0); }},durMs); }} else {{ finishPlayback(); }} return; }} revealStep(s); timerId=setTimeout(function(){{ runAnimation(s+1); }},durMs); }}
-        toggleBtn.onclick=function(){{ if(playing){{ playing=false; if(timerId){{ clearTimeout(timerId); timerId=null; }} finishPlayback(); }} else {{ playing=true; setStopIcon(); hideAllPath(); runAnimation(0); }} }};
-    }}
+    {playback_js}
 }})();
 </script>
 '''
         return html
+
+
+AnimatedCPSSvgFigure = AnimatedLatticeSvgFigure
 
 
 class _AnimatedShapeFigureBase:
@@ -1565,11 +944,10 @@ class _AnimatedShapeFigureBase:
         sd = self.svg_data
         wid = self.widget_id
 
-        cdn_html = cdn_scripts(include_plotly=False, include_tone=bool(self.audio_payload))
-        kernel_session = uuid.uuid4().hex
-        session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-        instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-        player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
+        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+            include_tone=bool(self.audio_payload))
+        controls_html = build_control_bar_html(wid)
+        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
 
         group_node_indices_json = json.dumps(sd.shape_group_node_indices)
         group_edge_ids_json = json.dumps(sd.shape_group_edge_ids)
@@ -1586,31 +964,7 @@ class _AnimatedShapeFigureBase:
         html = f'''
 {cdn_html}
 {sd.svg_str}
-<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
-    user-select: none; margin-top: 4px;">
-    <button id="{wid}_toggle" style="
-        width: 32px; height: 32px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0;">
-        <span id="{wid}_icon" style="
-            width: 0; height: 0;
-            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px; height: 28px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="#a0a0a0" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
+{controls_html}
     <div id="{wid}_nav" style="display:{nav_display};align-items:center;gap:4px;margin-left:4px;">
         <button id="{wid}_prev" style="
             width:24px;height:24px;border:none;border-radius:4px;
@@ -1637,10 +991,7 @@ class _AnimatedShapeFigureBase:
             <span style="color:#a0a0a0;font-size:11px;">solo</span>
         </label>
     </div>
-</div>
-{session_script}
-<script>{instruments_js}</script>
-<script>{player_js}</script>
+{scripts_html}
 <script>
 (function() {{
     var groupNodeIndices = {group_node_indices_json};

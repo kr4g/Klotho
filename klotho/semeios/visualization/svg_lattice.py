@@ -1,36 +1,22 @@
 import math
 import numpy as np
-import matplotlib.pyplot as plt
 from collections import defaultdict
 from html import escape as html_escape
 
-
-def _path_color_array(cmap_name, n):
-    cmap = plt.cm.get_cmap(cmap_name)
-    return cmap(np.linspace(0.15, 1, n))
-
-
-def _rgba_to_hex(rgba):
-    return '#%02x%02x%02x' % (int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
+from ._colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
+from ._svg_utils import (
+    SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
+    svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
+)
 
 
-from .svg_cps import SHAPE_COLORS
-
-
-class SvgLatticeData:
+class SvgLatticeData(SvgFigureData):
     __slots__ = ('svg_str', 'width_px', 'height_px',
                  'step_group_ids', 'halo_ids', 'all_path_ids',
                  'all_node_ids', 'path_node_indices', 'path_node_colors',
                  'dimmed_node_color',
                  'shape_group_node_indices', 'shape_group_edge_ids',
                  'shape_colors', 'all_shape_edge_ids')
-
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-    def to_html(self, **kwargs):
-        return self.svg_str
 
 
 def _svg_lattice_2d(lattice, coords, G, path, nodes,
@@ -319,43 +305,16 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                 cpx, cpy = tx(ctrl_x), ty(ctrl_y)
                 svg_d = f"M{px1:.2f},{py1:.2f} Q{cpx:.2f},{cpy:.2f} {px2:.2f},{py2:.2f}"
 
-                ts = np.array([0.5])
-                mid_bx = (1 - ts)**2 * px1 + 2 * (1 - ts) * ts * cpx + ts**2 * px2
-                mid_by = (1 - ts)**2 * py1 + 2 * (1 - ts) * ts * cpy + ts**2 * py2
-                mid_px = float(mid_bx[0])
-                mid_py = float(mid_by[0])
-
-                dt = 0.01
-                t1 = 0.5 - dt
-                t2 = 0.5 + dt
-                tan_x = ((1-t2)**2*px1 + 2*(1-t2)*t2*cpx + t2**2*px2) - ((1-t1)**2*px1 + 2*(1-t1)*t1*cpx + t1**2*px2)
-                tan_y = ((1-t2)**2*py1 + 2*(1-t2)*t2*cpy + t2**2*py2) - ((1-t1)**2*py1 + 2*(1-t1)*t1*cpy + t1**2*py2)
-                arrow_angle = math.degrees(math.atan2(tan_y, tan_x))
+                mid_px, mid_py, arrow_angle = compute_quadratic_bezier_midpoint(
+                    px1, py1, cpx, cpy, px2, py2)
 
             glow_id = next_eid("pg")
             edge_id = next_eid("pe")
             arrow_id = next_eid("pa")
 
-            path_els.append(
-                f'<path id="{glow_id}" d="{svg_d}" fill="none" '
-                f'stroke="white" stroke-width="6" opacity="0.3" '
-                f'pointer-events="none"/>'
-            )
-            path_els.append(
-                f'<path id="{edge_id}" d="{svg_d}" fill="none" '
-                f'stroke="{path_color_hex}" stroke-width="4" opacity="0.9" '
-                f'pointer-events="none"/>'
-            )
-
-            arr_size = 6
-            svg_angle = arrow_angle + 90
-            path_els.append(
-                f'<polygon id="{arrow_id}" '
-                f'points="{-arr_size},{arr_size} {arr_size},{arr_size} 0,{-arr_size}" '
-                f'fill="{path_color_hex}" stroke="white" stroke-width="1" '
-                f'transform="translate({mid_px:.2f},{mid_py:.2f}) rotate({svg_angle:.2f})" '
-                f'pointer-events="none"/>'
-            )
+            path_els.append(svg_glow_edge(glow_id, svg_d))
+            path_els.append(svg_path_edge(edge_id, svg_d, path_color_hex))
+            path_els.append(svg_arrow_polygon(arrow_id, mid_px, mid_py, arrow_angle, path_color_hex))
 
             group = [glow_id, edge_id, arrow_id]
             step_group_ids.append(group)
@@ -385,28 +344,12 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         sg_id = next_eid("rg")
         eg_id = next_eid("rg")
 
-        path_els.append(
-            f'<defs>'
-            f'<radialGradient id="{sg_id}">'
-            f'<stop offset="0%" stop-color="{start_hex}" stop-opacity="0.6"/>'
-            f'<stop offset="70%" stop-color="{start_hex}" stop-opacity="0.2"/>'
-            f'<stop offset="100%" stop-color="{start_hex}" stop-opacity="0"/>'
-            f'</radialGradient>'
-            f'<radialGradient id="{eg_id}">'
-            f'<stop offset="0%" stop-color="{end_hex}" stop-opacity="0.6"/>'
-            f'<stop offset="70%" stop-color="{end_hex}" stop-opacity="0.2"/>'
-            f'<stop offset="100%" stop-color="{end_hex}" stop-opacity="0"/>'
-            f'</radialGradient>'
-            f'</defs>'
-        )
-        path_els.append(
-            f'<circle id="{start_halo_id}" cx="{sx:.2f}" cy="{sy:.2f}" r="20" '
-            f'fill="url(#{sg_id})" pointer-events="none"/>'
-        )
-        path_els.append(
-            f'<circle id="{end_halo_id}" cx="{ex:.2f}" cy="{ey:.2f}" r="20" '
-            f'fill="url(#{eg_id})" pointer-events="none"/>'
-        )
+        s_defs, s_circle = svg_radial_halo(sg_id, start_halo_id, sx, sy, 20, start_hex)
+        e_defs, e_circle = svg_radial_halo(eg_id, end_halo_id, ex, ey, 20, end_hex)
+        path_els.append(s_defs)
+        path_els.append(s_circle)
+        path_els.append(e_defs)
+        path_els.append(e_circle)
         halo_ids = [start_halo_id, end_halo_id]
         all_path_el_ids.extend(halo_ids)
 
@@ -573,13 +516,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             svg_shape_group_node_indices.append(indices)
 
     all_svg = '\n'.join(els + path_els + shape_els + node_els)
-    svg_str = (
-        f'<div style="overflow-x:auto;overflow-y:hidden;background:black">'
-        f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'width="{width_px}" height="{height_px}" '
-        f'style="display:block;background:black">'
-        f'{all_svg}</svg></div>'
-    )
+    svg_str = svg_wrap(all_svg, width_px, height_px)
 
     return SvgLatticeData(
         svg_str=svg_str,

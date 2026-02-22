@@ -2618,8 +2618,6 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     path_nodes = set(path) if path else set()
     dim_bg = mute_background and (bool(path) or bool(all_shape_nodes))
     
-    from .svg_cps import SHAPE_COLORS as _SHAPE_COLORS
-
     shape_node_color_map = {}
     if shape is not None and len(shape) > 0:
         if isinstance(shape[0], (list, tuple)):
@@ -2627,7 +2625,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         else:
             shape_groups_static = [list(shape)]
         for gi, group in enumerate(shape_groups_static):
-            color = _SHAPE_COLORS[gi % len(_SHAPE_COLORS)]
+            color = _SHAPE_COLORS_GLOBAL[gi % len(_SHAPE_COLORS_GLOBAL)]
             group_set = set(group)
             for n in group:
                 shape_node_color_map[n] = color
@@ -3337,28 +3335,12 @@ def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True
         plt.show()
 
 
-def _bezier_2d(p0, p1, control, n_points=20):
-    ts = np.linspace(0, 1, n_points)
-    xs = (1 - ts)**2 * p0[0] + 2 * (1 - ts) * ts * control[0] + ts**2 * p1[0]
-    ys = (1 - ts)**2 * p0[1] + 2 * (1 - ts) * ts * control[1] + ts**2 * p1[1]
-    return xs, ys
-
-
-def _bezier_3d(p0, p1, control, n_points=20):
-    ts = np.linspace(0, 1, n_points)
-    xs = (1 - ts)**2 * p0[0] + 2 * (1 - ts) * ts * control[0] + ts**2 * p1[0]
-    ys = (1 - ts)**2 * p0[1] + 2 * (1 - ts) * ts * control[1] + ts**2 * p1[1]
-    zs = (1 - ts)**2 * p0[2] + 2 * (1 - ts) * ts * control[2] + ts**2 * p1[2]
-    return xs, ys, zs
-
-
-def _path_color_array(cmap_name, n):
-    cmap = plt.cm.get_cmap(cmap_name)
-    return cmap(np.linspace(0.15, 1, n))
-
-
-def _rgba_to_hex(rgba):
-    return '#%02x%02x%02x' % (int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
+from ._colors import _path_color_array, _rgba_to_hex, SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
+from ._geometry import (
+    bezier_2d as _bezier_2d, bezier_3d as _bezier_3d,
+    rodrigues_rotate as _rodrigues_rotate, get_perp as _get_perp,
+    unpack3 as _unpack3,
+)
 
 
 def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_nodes,
@@ -3532,13 +3514,6 @@ def _draw_path_edges_2d(fig, path, coords, coord_mapping, dimensionality, drawn_
     return edge_trace_data, edge_color_data, (step_trace_groups, halo_indices, arrow_data)
 
 
-def _rodrigues_rotate(v, axis, theta):
-    axis = axis / np.linalg.norm(axis)
-    return (v * math.cos(theta)
-            + np.cross(axis, v) * math.sin(theta)
-            + axis * np.dot(axis, v) * (1 - math.cos(theta)))
-
-
 def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_nodes,
                         base_arc_offset=0.15, n_bezier_points=20, cmap='viridis'):
     from collections import defaultdict
@@ -3552,23 +3527,6 @@ def _draw_path_edges_3d(fig, path, coords, coord_mapping, dimensionality, drawn_
     edge_color_data = []
     arrow_data = []
     step_trace_groups = []
-
-    def _unpack3(c):
-        if len(c) >= 3:
-            return c[0], c[1], c[2]
-        elif len(c) == 2:
-            return c[0], c[1], 0
-        return c[0], 0, 0
-
-    def _get_perp(edge_dir):
-        up = np.array([0.0, 0.0, 1.0])
-        perp = np.cross(edge_dir, up)
-        perp_len = np.linalg.norm(perp)
-        if perp_len < 1e-9:
-            up = np.array([0.0, 1.0, 0.0])
-            perp = np.cross(edge_dir, up)
-            perp_len = np.linalg.norm(perp)
-        return perp / perp_len
 
     for i in range(len(path) - 1):
         coord1, coord2 = path[i], path[i + 1]
@@ -4094,9 +4052,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     has_shape = len(lattice_shape_groups) > 0
     lattice_shape_color_map = {}
     if has_shape:
-        from .svg_cps import SHAPE_COLORS as _SC
         for gi, group in enumerate(lattice_shape_groups):
-            color = _SC[gi % len(_SC)]
+            color = _SHAPE_COLORS_GLOBAL[gi % len(_SHAPE_COLORS_GLOBAL)]
             for coord in group:
                 c = tuple(coord) if not isinstance(coord, tuple) else coord
                 lattice_shape_color_map[c] = color
@@ -4686,9 +4643,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             z_ticks = list(range(int(z_min), int(z_max) + 1))
     
     if has_shape:
-        from .svg_cps import SHAPE_COLORS as _SHAPE_COLORS_LS
         for gi, group in enumerate(lattice_shape_groups):
-            color = _SHAPE_COLORS_LS[gi % len(_SHAPE_COLORS_LS)]
+            color = _SHAPE_COLORS_GLOBAL[gi % len(_SHAPE_COLORS_GLOBAL)]
             group_coords = [tuple(c) if not isinstance(c, tuple) else c for c in group]
             group_set = set(group_coords)
             for i, c1 in enumerate(group_coords):
@@ -4910,7 +4866,6 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
 
     if animate and has_shape:
         from klotho.utils.playback.tonejs.converters import freq_to_velocity
-        from .svg_cps import SHAPE_COLORS as _SHAPE_COLORS_L
 
         ref_freq = 261.63
         audio_events = []

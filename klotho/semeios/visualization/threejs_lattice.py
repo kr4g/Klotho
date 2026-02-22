@@ -1,59 +1,15 @@
 import math
 import numpy as np
-import matplotlib.pyplot as plt
 from collections import defaultdict
 
-
-def _path_color_array(cmap_name, n):
-    cmap = plt.cm.get_cmap(cmap_name)
-    return cmap(np.linspace(0.15, 1, n))
-
-
-def _rgba_to_hex(rgba):
-    return '#%02x%02x%02x' % (int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
+from ._colors import _path_color_array, _rgba_to_hex
+from ._geometry import bezier_3d as _bezier_3d, rodrigues_rotate as _rodrigues_rotate, get_perp as _get_perp, unpack3 as _unpack3
+from ._svg_utils import SvgFigureData
 
 
-def _bezier_3d(p0, p1, control, n_points=20):
-    ts = np.linspace(0, 1, n_points)
-    xs = (1 - ts)**2 * p0[0] + 2 * (1 - ts) * ts * control[0] + ts**2 * p1[0]
-    ys = (1 - ts)**2 * p0[1] + 2 * (1 - ts) * ts * control[1] + ts**2 * p1[1]
-    zs = (1 - ts)**2 * p0[2] + 2 * (1 - ts) * ts * control[2] + ts**2 * p1[2]
-    return xs, ys, zs
-
-
-def _rodrigues_rotate(v, axis, theta):
-    axis = axis / np.linalg.norm(axis)
-    return (v * math.cos(theta)
-            + np.cross(axis, v) * math.sin(theta)
-            + axis * np.dot(axis, v) * (1 - math.cos(theta)))
-
-
-def _get_perp(edge_dir):
-    up = np.array([0.0, 0.0, 1.0])
-    perp = np.cross(edge_dir, up)
-    perp_len = np.linalg.norm(perp)
-    if perp_len < 1e-9:
-        up = np.array([0.0, 1.0, 0.0])
-        perp = np.cross(edge_dir, up)
-        perp_len = np.linalg.norm(perp)
-    return perp / perp_len
-
-
-def _unpack3(c):
-    if len(c) >= 3:
-        return c[0], c[1], c[2]
-    elif len(c) == 2:
-        return c[0], c[1], 0
-    return c[0], 0, 0
-
-
-class ThreejsLatticeData:
+class ThreejsLatticeData(SvgFigureData):
     __slots__ = ('scene_data', 'path_steps', 'halo_data',
                  'title', 'width_px', 'height_px')
-
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
 
 def _threejs_lattice_3d(lattice, coords, G, path, nodes,
