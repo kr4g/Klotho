@@ -149,6 +149,7 @@ rebuild_tutorials.sh
 !tutorials/**/
 !tutorials/**/*.ipynb
 !tutorials/**/*.md
+tutorials/**/.ipynb_checkpoints/
 
 # Jupyter Book config
 !myst.yml

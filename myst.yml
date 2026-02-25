@@ -26,17 +26,18 @@ project:
 
     - title: Time
       children:
+        - file: tutorials/01_time/1-0-1_principles_of_proportion.ipynb
         - title: Rhythm Trees
           children:
             - file: tutorials/01_time/01_rhythm_trees/1-1-1_intro_to_rhythm_trees.ipynb
             - file: tutorials/01_time/01_rhythm_trees/1-1-2_rhythmic_vocabulary.ipynb
-            - file: tutorials/01_time/01_rhythm_trees/1-1-3_generating_rhythm_trees.ipynb
         - title: Temporal Units
           children:
             - file: tutorials/01_time/02_temporal_units/1-2-1_intro_to_temporal_units.ipynb
-        - title: Operations
+        - title: Operations and Algorithms
           children:
             - file: tutorials/01_time/03_operations/1-3-1_partitions.ipynb
+            - file: tutorials/01_time/03_operations/1-3-2_generating_rhythm_trees.ipynb
 
     - title: Tones
       children:
