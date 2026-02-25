@@ -972,56 +972,64 @@ class _AnimatedShapeFigureBase:
 
     loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
 
-    if (audioPayload && typeof Tone !== "undefined") {{
-        var allEvents = audioPayload.events || [];
-        var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
-        var player = KlothoPlayer.create();
-        toggleBtn.onclick = async function() {{
-            if (player.isPlaying()) {{ player.stop(); }}
-            else {{
-                var solo = soloBox && soloBox.checked;
-                playbackOrigin = currentView;
-                playing = true; setStopIcon();
-                if (solo) {{
-                    var soloEvents = filterEventsForGroup(allEvents, currentView);
-                    revealAndTrack(currentView);
-                    await player.play(soloEvents, instruments, {{
-                        loop: looping,
-                        onEvent: function() {{}},
-                        onStop: function() {{ finishPlayback(); }},
-                        onFinish: function() {{ finishPlayback(); }}
-                    }});
-                }} else {{
-                    var reordered = reorderEventsFrom(allEvents, currentView, totalGroups);
-                    dimAllNodes(); hideAllShapeEdges();
-                    await player.play(reordered.events, instruments, {{
-                        loop: looping,
-                        onEvent: function(stepIdx) {{ revealAndTrack(reordered.seqMap[stepIdx]); }},
-                        onStop: function() {{ finishPlayback(); }},
-                        onFinish: function() {{ finishPlayback(); }}
-                    }});
-                }}
+    var _aPlayer = null, _aInstruments = null;
+    function _canAudio() {{
+        if (_aPlayer) return true;
+        if (!audioPayload || typeof Tone === "undefined"
+            || typeof globalThis.KLOTHO_BUILD_INSTRUMENTS !== "function"
+            || typeof globalThis.KlothoPlayer === "undefined") return false;
+        _aInstruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
+        _aPlayer = KlothoPlayer.create();
+        return true;
+    }}
+
+    var _timerId = null;
+    var durMs = {self.dur * 1000};
+    function _runAnimation(step) {{
+        if (!playing) return;
+        if (step >= totalGroups) {{ if (looping) {{ dimAllNodes(); hideAllShapeEdges(); _timerId = setTimeout(function() {{ _runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
+        var gi = (currentView + step) % totalGroups;
+        revealAndTrack(gi);
+        _timerId = setTimeout(function() {{ _runAnimation(step + 1); }}, durMs);
+    }}
+
+    toggleBtn.onclick = async function() {{
+        if (_canAudio()) {{
+            if (_aPlayer.isPlaying()) {{ _aPlayer.stop(); return; }}
+            var solo = soloBox && soloBox.checked;
+            playbackOrigin = currentView;
+            playing = true; setStopIcon();
+            if (solo) {{
+                var soloEvents = filterEventsForGroup(audioPayload.events || [], currentView);
+                revealAndTrack(currentView);
+                await _aPlayer.play(soloEvents, _aInstruments, {{
+                    loop: looping,
+                    onEvent: function() {{}},
+                    onStop: function() {{ finishPlayback(); }},
+                    onFinish: function() {{ finishPlayback(); }}
+                }});
+            }} else {{
+                var reordered = reorderEventsFrom(audioPayload.events || [], currentView, totalGroups);
+                dimAllNodes(); hideAllShapeEdges();
+                await _aPlayer.play(reordered.events, _aInstruments, {{
+                    loop: looping,
+                    onEvent: function(stepIdx) {{ revealAndTrack(reordered.seqMap[stepIdx]); }},
+                    onStop: function() {{ finishPlayback(); }},
+                    onFinish: function() {{ finishPlayback(); }}
+                }});
             }}
-        }};
-    }} else {{
-        var durMs = {self.dur * 1000};
-        var timerId = null;
-        function runAnimation(step) {{
-            if (!playing) return;
-            if (step >= totalGroups) {{ if (looping) {{ dimAllNodes(); hideAllShapeEdges(); timerId = setTimeout(function() {{ runAnimation(0); }}, durMs); }} else {{ finishPlayback(); }} return; }}
-            var gi = (currentView + step) % totalGroups;
-            revealAndTrack(gi);
-            timerId = setTimeout(function() {{ runAnimation(step + 1); }}, durMs);
-        }}
-        toggleBtn.onclick = function() {{
-            if (playing) {{ playing = false; if (timerId) {{ clearTimeout(timerId); timerId = null; }} finishPlayback(); }}
-            else {{
+        }} else {{
+            if (playing) {{
+                playing = false;
+                if (_timerId) {{ clearTimeout(_timerId); _timerId = null; }}
+                finishPlayback();
+            }} else {{
                 playbackOrigin = currentView;
                 playing = true; setStopIcon(); dimAllNodes(); hideAllShapeEdges();
-                runAnimation(0);
+                _runAnimation(0);
             }}
-        }};
-    }}
+        }}
+    }};
 }})();
 </script>
 '''
