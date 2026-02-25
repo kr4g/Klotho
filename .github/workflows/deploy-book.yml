@@ -19,24 +19,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.13"
+          node-version: 18.x
 
-      - name: Install Jupyter Book
-        run: pip install --pre "jupyter-book>=2"
+      - name: Install MyST
+        run: npm install -g mystmd
 
-      - name: Build the book
-        run: jupyter book build .
-
-      - name: Debug build output
-        run: find _build -type d | head -20
+      - name: Build the site
+        run: myst build --html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _build/site/public
+          path: _build/html
 
   deploy:
     needs: build
