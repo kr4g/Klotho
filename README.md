@@ -1,3 +1,7 @@
+[![PyPI version](https://img.shields.io/pypi/v/klotho-cac.svg)](https://pypi.org/project/klotho-cac/)
+[![Python 3.10+](https://img.shields.io/pypi/pyversions/klotho-cac.svg)](https://pypi.org/project/klotho-cac/)
+[![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
+
 # Klotho
 `Klotho` is an open source computer-assisted composition toolkit implemented in Python. It is designed to work in tandem with external synthesis applications and as a resource for the methods, models, works, and frameworks associated with music composition and metacomposition.
 
@@ -9,64 +13,31 @@ Klotho adapts to multiple Python workflows, supporting traditional scripting, in
 
 ### Option 1: Install from PyPI (Recommended)
 
-**Basic Installation:**
 ```bash
 pip install klotho-cac
 ```
-<!-- 
-**With Documentation Tools:**
-```bash
-pip install klotho-cac[docs]
-```
 
-**For Development (includes documentation tools and testing):**
-```bash
-pip install klotho-cac[dev]
-``` -->
+That's it. You're ready to go.
 
 ### Option 2: Install from Source
 
-1. **Clone the Repository**:
+Clone the repository to get a local copy of the Klotho source code, then install in editable mode:
 
-   Clone the Klotho repository:
-   
-   ```
-   git clone https://github.com/kr4g/Klotho.git
-   ```
+```bash
+git clone https://github.com/kr4g/Klotho.git
+cd Klotho/
+pip install -e .
+```
 
-2. **Navigate to the `Klotho/` Directory**:
-   
-    ```
-    cd Klotho/
-    ```
+Editable mode (`-e`) means changes you make to the source are immediately reflected without reinstalling.
 
-3. **Install in Development Mode**:
-    
-    ```
-    pip install -e .
-    ```
-    
-    **For development with all dependencies:**
-    
-    ```
-    pip install -e .[dev]
-    ```
-    
-    Or install the required dependencies separately:
-    
-    ```
-    pip install -r requirements.txt
-    ```
+> **For contributors:** To also install testing and documentation tools, run `pip install -e .[dev]` instead.
 
 ---
 
 ## Integration with SuperCollider
 
-To use Klotho with SuperCollider, clone or download the `Klotho-SC` extension package (<a href="https://github.com/kr4g/Klotho-SC.git" target="_blank">https://github.com/kr4g/Klotho-SC.git</a>) and place it in your SuperCollider extensions directory. You can find the extensions directory by evaluating the following line in the SuperCollider code editor:
-
-```
-Platform.userExtensionDir
-```
+To use Klotho with SuperCollider, see the `Klotho-SC` extension package: (<a href="https://github.com/kr4g/Klotho-SC.git" target="_blank">https://github.com/kr4g/Klotho-SC.git</a>).
 
 ---
 
@@ -74,7 +45,7 @@ Platform.userExtensionDir
 
 **Interactive Tutorials:** <a href="https://kr4g.github.io/Klotho/" target="_blank">https://kr4g.github.io/Klotho/</a>
 
-Browse the Klotho tutorial series directly in your browser — no installation required. Tutorials with interactive widgets can be activated with the power button at the top of the page.
+Browse the Klotho tutorial series directly in your browser — no installation required.
 
 ---
 
@@ -105,7 +76,7 @@ Klotho extends from a lineage of computer-assisted composition (CAC) theories, p
 
 <!-- While drawing from the computational paradigms found in patching-based environments like [OpenMusic](https://openmusic-project.github.io/), [Bach](https://www.bachproject.net/), and [Cage](https://www.bachproject.net/cage/), Klotho diverges from the visual patching paradigm in favor of a high-level, text-based scripting syntax. As such, Klotho is closer in spirit to [OpusModus](https://opusmodus.com/), which also favors text-based scripting over visual patching, though its LISP-based proprietary language creates unnecessary barriers to entry and forecloses access to Python's diverse ecosystem—libraries like Librosa, Music21, and Pyo, as well as scientific tools that enable more analytical and data-oriented approaches to music generation—allowing Klotho to embody the underlying mathematical expressions governing musical materials from topological, algebraic, and computational perspectives. -->
 
-## Architecture
+<!-- ## Architecture
 
 Klotho is organized into six primary modules, each addressing fundamental aspects of musical composition and computation:
 
@@ -125,14 +96,16 @@ Dedicated to dynamics, articulations, and expressive envelopes. This module hand
 The compositional complement to Topos, Thetos handles the concrete assembly and combination of musical materials across all dimensions—temporal, tonal, dynamic, instrumental, and parametric. It manages the systematic composition and positioning of musical elements into coherent structures.
 
 ### **Semeios**
-Manages all forms of musical representation including visualization, notation, plotting, animation, and multimedia output. Semeios converts computational processes into human-readable and performable representations as well as automated formats.
+Manages all forms of musical representation including visualization, notation, plotting, animation, and multimedia output. Semeios converts computational processes into human-readable and performable representations as well as automated formats. -->
+
+## Contributing
+
+Contributions of all kinds are welcome — whether it's code, bug reports, documentation improvements, or ideas for new features. To contribute, fork the repository, create a branch, and open a pull request. For bugs or suggestions, open an issue on <a href="https://github.com/kr4g/Klotho/issues" target="_blank">GitHub Issues</a>. All contributions are accepted under the same CC BY-SA 4.0 license, and contributors are credited through Git history.
 
 ## License
 
-<a href="https://github.com/kr4g/Klotho" target="_blank">Klotho</a> by Ryan Millett is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1" target="_blank">CC BY-SA 4.0</a>.
+<a href="https://github.com/kr4g/Klotho" target="_blank">Klotho</a> © 2023–2026 by Ryan Millett is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a>.
 
 ![CC Icon](https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1)
 ![BY Icon](https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1)
 ![SA Icon](https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1)
-
-Klotho © 2023 by Ryan Millett is licensed under CC BY-SA 4.0. To view a copy of this license, visit <a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">http://creativecommons.org/licenses/by-sa/4.0/</a>

@@ -33,7 +33,9 @@ setup(
         'panel',
         'bokeh',
         'jupyter_bokeh',
-        'diversipy'
+        'diversipy',
+        'plotly',
+        'scikit-learn'
     ],
     extras_require={
         'docs': [
