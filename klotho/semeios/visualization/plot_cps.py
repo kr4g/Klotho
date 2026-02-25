@@ -7,6 +7,35 @@ from klotho.tonos.systems.combination_product_sets.master_set import MASTER_SETS
 
 def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      show_labels=True, title=None, output_file=None):
+    """
+    Render a MasterSet as a 2D SVG or 3D Three.js network diagram.
+
+    Automatically chooses a 3D renderer when the master set has three or
+    more effective dimensions, falling back to 2D SVG otherwise.
+    High-dimensional positions are reduced via MDS.
+
+    Parameters
+    ----------
+    ms : MasterSet
+        MasterSet instance to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : int, optional
+        Diameter of the rendered nodes.
+    text_size : int, optional
+        Font size for node labels.
+    show_labels : bool, optional
+        Whether to display labels on nodes.
+    title : str or None, optional
+        Plot title.  Auto-generated when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.
+
+    Returns
+    -------
+    SvgMasterSetData or ThreejsLatticeData
+        Renderable figure data.
+    """
     dim = ms.dimensionality
     override_positions = None
     if dim > 3:
@@ -29,6 +58,23 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
 
 
 def _detect_faces(G, node_positions, max_size=8):
+    """
+    Detect chordless cycles (faces) in a planar CPS graph.
+
+    Parameters
+    ----------
+    G : Graph
+        CPS graph with ``'distance'`` edge attributes.
+    node_positions : dict
+        Mapping of node IDs to coordinate tuples.
+    max_size : int, optional
+        Maximum cycle length to search for.
+
+    Returns
+    -------
+    list of tuple
+        Each tuple contains the node IDs forming a detected face.
+    """
     adj = {}
     for u, v, data in G.edges(data=True):
         if u in node_positions and v in node_positions and 'distance' in data:
@@ -96,6 +142,21 @@ _FACE_COLORS = [
 
 
 def _reduce_positions(node_positions, target_dims=3):
+    """
+    Reduce high-dimensional node positions via MDS.
+
+    Parameters
+    ----------
+    node_positions : dict
+        Mapping of node IDs to coordinate tuples.
+    target_dims : int, optional
+        Number of output dimensions (default 3).
+
+    Returns
+    -------
+    dict
+        Mapping of node IDs to reduced-dimension coordinate tuples.
+    """
     from sklearn.manifold import MDS
     nodes = list(node_positions.keys())
     coords = np.array([list(node_positions[n]) for n in nodes])
@@ -105,6 +166,23 @@ def _reduce_positions(node_positions, target_dims=3):
 
 
 def _cps_node_positions(G):
+    """
+    Compute spatial positions for CPS graph nodes from edge geometry.
+
+    Traverses connected components of *G* using BFS, accumulating
+    positions from angle, distance, and displacement edge attributes.
+
+    Parameters
+    ----------
+    G : Graph
+        CPS graph whose edges carry ``'angle'``, ``'distance'``, and
+        optionally ``'elevation'`` / ``'displacement'`` attributes.
+
+    Returns
+    -------
+    dict
+        Mapping of node IDs to position tuples.
+    """
     node_neighbors = {}
     n_dims = 2
     for u, v, data in G.edges(data=True):
@@ -177,30 +255,54 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              shape: list = None,
              arp: bool = False, strum: float = 0, direction: str = 'u'):
     """
-    Plot a Combination Product Set as an interactive network diagram based on its master set.
-    
-    Args:
-        cps: CPS instance to visualize (must have a master_set defined)
-        figsize: Size of the figure as (width, height) in inches
-        node_size: Size of the nodes in the plot
-        show_labels: Whether to show labels on the nodes
-        title: Title for the plot (default is derived from CPS if None)
-        output_file: Path to save the figure (if None, display instead)
-        nodes: List of node IDs to highlight in pale green
-        path: List of node IDs representing a traversal path through the CPS graph
-        path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis')
-        mute_background: If True and path/shape is provided, dim non-selected nodes
-        animate: If True and path/shape is provided, return an animated figure
-        dur: Duration in seconds between animation steps (default 0.5)
-        shape: List of node IDs (a chord) or list of lists of node IDs (a chord sequence).
-               Highlights nodes and draws edges between adjacent ones.
-               When animate=True, plays as chord or chord sequence.
-        arp: If True, arpeggiate chord notes sequentially instead of block chord
-        strum: Strum offset (0-1) for slight timing offset per note in a chord
-        direction: 'u' for ascending or 'd' for descending pitch order
-        
-    Returns:
-        Plotly figure object (or animated figure when animate=True)
+    Render a Combination Product Set as an interactive network diagram.
+
+    Positions are derived from the CPS master set geometry.  When the
+    effective dimensionality is 3 or higher a Three.js scene is returned;
+    otherwise an SVG figure is produced.
+
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        CPS instance to visualize (must have a ``master_set`` defined).
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : int, optional
+        Diameter of the rendered nodes.
+    text_size : int, optional
+        Font size for node labels.
+    show_labels : bool, optional
+        Whether to display labels on nodes.
+    title : str or None, optional
+        Plot title.  Derived from the CPS when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.
+    nodes : list or None, optional
+        Node IDs to highlight in pale green.
+    path : list or None, optional
+        Node IDs defining a traversal path through the CPS graph.
+    path_cmap : str, optional
+        Matplotlib colormap name for path edge colouring.
+    mute_background : bool, optional
+        Dim non-selected nodes when a path or shape is active.
+    animate : bool, optional
+        Return an animated figure with playback controls when ``True``.
+    dur : float, optional
+        Seconds between animation steps.
+    shape : list or None, optional
+        Node IDs (a chord) or list of lists (chord sequence).
+        Highlights nodes and draws edges between adjacent members.
+    arp : bool, optional
+        Arpeggiate chord notes sequentially instead of block chord.
+    strum : float, optional
+        Strum offset (0--1) for per-note timing in a chord.
+    direction : str, optional
+        ``'u'`` for ascending or ``'d'`` for descending pitch order.
+
+    Returns
+    -------
+    SvgCPSData, ThreejsLatticeData, or animated figure
+        Renderable figure data.
     """
     master_set_name = cps.master_set
     if not master_set_name:

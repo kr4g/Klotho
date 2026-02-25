@@ -1,3 +1,12 @@
+"""
+Compositional units combining temporal structure with parameterized events.
+
+This module provides ``CompositionalUnit``, which extends ``TemporalUnit``
+with a synchronized ``ParameterTree`` for hierarchical parameter management,
+envelope application, slur marking, and instrument assignment. The ``Event``
+class extends ``Chronon`` with parameter field access.
+"""
+
 from typing import Union, Optional, Any, Literal
 from fractions import Fraction
 from dataclasses import dataclass
@@ -15,6 +24,22 @@ from klotho.topos.collections.sequences import Pattern
 
 @dataclass
 class PFieldContext:
+    """
+    Context object passed to callable parameter-field values during distribution.
+    
+    Attributes
+    ----------
+    index : int
+        Zero-based position of the current node in the target sequence.
+    total : int
+        Total number of target nodes being distributed to.
+    node : int
+        The node ID in the rhythm/parameter tree.
+    is_rest : bool
+        Whether this node is a rest.
+    params : dict
+        Current active parameter values for this node.
+    """
     index: int
     total: int
     node: int
@@ -42,6 +67,21 @@ class Event(Chronon):
     __slots__ = ('_pt', '_instrument_resolver')
     
     def __init__(self, node_id: int, rt: RhythmTree, pt: ParameterTree, instrument_resolver=None):
+        """
+        Initialize an Event.
+        
+        Parameters
+        ----------
+        node_id : int
+            The leaf-node ID in the rhythm tree.
+        rt : RhythmTree
+            The rhythm tree providing temporal data.
+        pt : ParameterTree
+            The parameter tree providing field values.
+        instrument_resolver : callable, optional
+            Function ``(node_id) -> (Instrument, exclude_set)`` for
+            resolving the governing instrument of this event.
+        """
         super().__init__(node_id, rt)
         self._pt = pt
         self._instrument_resolver = instrument_resolver
@@ -191,6 +231,29 @@ class CompositionalUnit(TemporalUnit):
     
     @classmethod
     def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
+        """
+        Create a CompositionalUnit from an existing RhythmTree.
+        
+        Parameters
+        ----------
+        rt : RhythmTree
+            Source rhythm tree whose structure is adopted.
+        beat : Fraction, int, float, str, or None, optional
+            Beat unit for tempo calculation.
+        bpm : int, float, or None, optional
+            Beats per minute.
+        pfields : dict, list, or None, optional
+            Parameter fields to initialize.
+        mfields : dict, list, or None, optional
+            Meta fields to initialize.
+        inst : Instrument or None, optional
+            Instrument to assign to the root node.
+            
+        Returns
+        -------
+        CompositionalUnit
+            A new CompositionalUnit with the rhythm tree's structure.
+        """
         return cls(span     = rt.span,
                    tempus   = rt.meas,
                    prolatio = rt.subdivisions,
@@ -203,6 +266,25 @@ class CompositionalUnit(TemporalUnit):
         
     @classmethod
     def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
+        """
+        Create a CompositionalUnit from an existing TemporalUnit.
+        
+        Parameters
+        ----------
+        ut : TemporalUnit
+            Source temporal unit whose timing and structure are adopted.
+        pfields : dict, list, or None, optional
+            Parameter fields to initialize.
+        mfields : dict, list, or None, optional
+            Meta fields to initialize.
+        inst : Instrument or None, optional
+            Instrument to assign to the root node.
+            
+        Returns
+        -------
+        CompositionalUnit
+            A new CompositionalUnit with the temporal unit's structure.
+        """
         return cls(span     = ut.span,
                    tempus   = ut.tempus,
                    prolatio = ut.prolationis,
@@ -316,6 +398,22 @@ class CompositionalUnit(TemporalUnit):
         return result
 
     def get_active_instrument(self, node: int):
+        """
+        Get the governing instrument for a node.
+        
+        Resolves the instrument by walking up the tree hierarchy from the
+        given node to find the nearest ancestor with an instrument assignment.
+        
+        Parameters
+        ----------
+        node : int
+            The node ID to query.
+            
+        Returns
+        -------
+        Instrument or None
+            The active instrument, or None if no instrument is assigned.
+        """
         instrument, _ = self._resolve_instrument_with_exclusions(node)
         return instrument
 
@@ -804,10 +902,16 @@ class CompositionalUnit(TemporalUnit):
 
     def make_rest(self, node: int) -> None:
         """
-        Make a node/subtree rest and remove intersecting slurs.
+        Make a node (and its subtree) a rest, removing intersecting slurs.
 
-        Any existing slur touching newly-rested leaves is removed and a warning
-        is emitted, then rest mutation is applied to the rhythm tree.
+        Any existing slur touching newly-rested leaves is removed and a
+        ``RuntimeWarning`` is emitted before the rest mutation is applied
+        to the rhythm tree.
+        
+        Parameters
+        ----------
+        node : int
+            The node ID to convert to a rest.
         """
         affected = set([node] + list(self._rt.descendants(node)))
         affected_leaves = set([n for n in affected if n in self._rt.leaf_nodes])
@@ -863,6 +967,25 @@ class CompositionalUnit(TemporalUnit):
 
     def set(self, node, inst=None, mfields=None, pfields=None,
             exclude=None, include_rests=False):
+        """
+        Convenience method to set instrument, meta fields, and parameter fields in one call.
+        
+        Parameters
+        ----------
+        node : int or list/tuple of int
+            Target node(s).
+        inst : Instrument, Pattern, callable, or None, optional
+            Instrument to assign.
+        mfields : dict or None, optional
+            Meta field names and values to set.
+        pfields : dict or None, optional
+            Parameter field names and values to set.
+        exclude : str, list, set, or None, optional
+            Parameter fields to exclude from instrument application.
+        include_rests : bool, optional
+            When True, rest nodes are included during callable/Pattern
+            distribution (default is False).
+        """
         if inst is not None:
             self.set_instrument(node, inst, exclude=exclude)
         if mfields is not None:
@@ -871,6 +994,23 @@ class CompositionalUnit(TemporalUnit):
             self.set_pfields(node, include_rests=include_rests, **pfields)
 
     def sparsify(self, probability, node=None):
+        """
+        Randomly convert sounding leaves to rests.
+        
+        Extends the base ``TemporalUnit.sparsify`` to accept a callable
+        probability that receives a ``PFieldContext`` for each candidate
+        leaf, enabling parameter-aware rest decisions.
+        
+        Parameters
+        ----------
+        probability : float or callable
+            If float, the fixed probability (0--1) of each leaf becoming
+            a rest. If callable, receives a ``PFieldContext`` and returns
+            True to rest the leaf.
+        node : int or iterable of int, optional
+            Restrict sparsification to this node's subtree leaves.
+            If None, all leaves are candidates.
+        """
         if not callable(probability):
             super().sparsify(probability, node)
             return
@@ -1077,4 +1217,13 @@ class CompositionalUnit(TemporalUnit):
         return new_cu
     
     def copy(self):
+        """
+        Create a deep copy of this CompositionalUnit.
+        
+        Returns
+        -------
+        CompositionalUnit
+            A new CompositionalUnit with identical structure, parameters,
+            instruments, envelopes, and slurs.
+        """
         return self.from_subtree(self.rt.root)

@@ -13,25 +13,33 @@ __all__ = [
 ]
 
 def ampdb(amp: float) -> float:
-    '''
+    """
     Convert amplitude to decibels (dB).
 
-    Args:
-    amp (float): The amplitude to convert.
+    Parameters
+    ----------
+    amp : float
+        The linear amplitude value to convert.
 
-    Returns:
-    float: The amplitude in decibels.
-    '''
+    Returns
+    -------
+    float
+        The amplitude expressed in decibels.
+    """
     return 20 * np.log10(amp)
 
 def dbamp(db: float) -> float:
-    '''
+    """
     Convert decibels (dB) to amplitude.
 
-    Args:
-    db (float): The decibels to convert.
+    Parameters
+    ----------
+    db : float
+        The decibel value to convert.
 
-    Returns:
-    float: The amplitude.
-    '''
+    Returns
+    -------
+    float
+        The linear amplitude value.
+    """
     return 10 ** (db / 20) 

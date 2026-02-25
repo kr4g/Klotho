@@ -11,6 +11,8 @@ from ._svg_utils import (
 
 
 class SvgCPSData(SvgFigureData):
+    """Container for CPS SVG rendering data and animation metadata."""
+
     __slots__ = ('svg_str', 'width_px', 'height_px',
                  'step_group_ids', 'halo_ids', 'all_path_ids',
                  'all_node_ids', 'path_node_indices', 'path_node_colors',
@@ -23,6 +25,44 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
              mute_background=False, figsize=(12, 12),
              node_size=30, text_size=12, show_labels=True, title=None,
              shape=None):
+    """
+    Build a 2D SVG representation of a Combination Product Set.
+
+    Generates an inline SVG string with nodes, edges, optional path
+    overlays, and optional shape (chord) overlays, bundled into an
+    `SvgCPSData` container for display or animation.
+
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        The CPS to render.
+    node_positions : dict
+        Mapping of node IDs to 2D ``(x, y)`` positions.
+    path : list or None, optional
+        Node IDs defining a traversal path.
+    path_cmap : str, optional
+        Matplotlib colormap for path edge colouring.
+    mute_background : bool, optional
+        Dim non-selected nodes when a path or shape is active.
+    figsize : tuple of float, optional
+        Width and height in inches (converted to pixels at 100 dpi).
+    node_size : int, optional
+        Diameter of the rendered nodes.
+    text_size : int, optional
+        Font size for node labels.
+    show_labels : bool, optional
+        Whether to draw alias labels inside nodes.
+    title : str or None, optional
+        Title string rendered above the diagram.
+    shape : list or None, optional
+        Node IDs (chord) or list of lists (chord sequence) to
+        highlight with coloured edges.
+
+    Returns
+    -------
+    SvgCPSData
+        SVG string and associated animation metadata.
+    """
     import uuid as _uuid
 
     G = cps.graph

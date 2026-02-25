@@ -11,6 +11,8 @@ from ._svg_utils import (
 
 
 class SvgLatticeData(SvgFigureData):
+    """Container for 2D lattice SVG rendering data and animation metadata."""
+
     __slots__ = ('svg_str', 'width_px', 'height_px',
                  'step_group_ids', 'halo_ids', 'all_path_ids',
                  'all_node_ids', 'path_node_indices', 'path_node_colors',
@@ -25,6 +27,61 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                     path_mode, figsize, node_size, title,
                     is_tone_lattice, coord_label, gen_labels,
                     path_cmap='viridis', shape=None):
+    """
+    Build a 2D SVG representation of a lattice.
+
+    Generates an inline SVG with grid edges, nodes, optional path /
+    shape overlays, axis labels, and hover tooltips.  The result is
+    wrapped in an `SvgLatticeData` container for display or animation.
+
+    Parameters
+    ----------
+    lattice : Lattice
+        The lattice object providing coordinate and metadata access.
+    coords : list of tuple
+        Lattice coordinates to render.
+    G : networkx.Graph
+        Edge structure for the rendered region.
+    path : list of tuple or None
+        Coordinate path to overlay.
+    nodes : list of tuple or None
+        Coordinates to highlight.
+    highlighted_coords : set
+        Union of all highlighted coordinates.
+    coord_mapping : dict
+        Maps original high-dimensional coordinates to reduced ones.
+    original_coords : list of tuple
+        Pre-reduction coordinate list.
+    effective_dimensionality : int
+        Number of plotting dimensions (1 or 2).
+    use_dimmed : bool
+        Whether non-highlighted elements should be dimmed.
+    mute_background : bool
+        Hide non-selected nodes entirely when ``True``.
+    path_mode : str
+        ``'adjacent'`` or ``'origin'``.
+    figsize : tuple of float
+        Width and height in inches.
+    node_size : float
+        Base node diameter.
+    title : str
+        Title rendered above the diagram.
+    is_tone_lattice : bool
+        Whether the lattice carries ratio information.
+    coord_label : str
+        Label prefix for hover tooltips (e.g. ``"Monzo"``).
+    gen_labels : list of str
+        Axis labels derived from lattice generators.
+    path_cmap : str, optional
+        Matplotlib colormap for path edge colouring.
+    shape : list of list of tuple or None, optional
+        Chord groups to highlight.
+
+    Returns
+    -------
+    SvgLatticeData
+        SVG string and associated animation metadata.
+    """
     import networkx as nx
 
     width_px = int(figsize[0] * 100)

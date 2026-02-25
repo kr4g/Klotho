@@ -367,11 +367,15 @@ class Graph:
     def predecessors(self, node):
         """Returns all predecessors of a node.
         
-        Args:
-            node: The node whose predecessors to return
+        Parameters
+        ----------
+        node : int
+            The node whose predecessors to return.
             
-        Returns:
-            tuple: All predecessors of the node
+        Returns
+        -------
+        tuple
+            All predecessors of the node.
         """
         _ = self._structure_version
         if hasattr(self._graph, 'predecessor_indices'):
@@ -383,11 +387,15 @@ class Graph:
     def successors(self, node):
         """Returns all successors of a node.
         
-        Args:
-            node: The node whose successors to return
+        Parameters
+        ----------
+        node : int
+            The node whose successors to return.
             
-        Returns:
-            tuple: All successors of the node in sorted order (left-to-right)
+        Returns
+        -------
+        tuple
+            All successors of the node in sorted order (left-to-right).
         """
         _ = self._structure_version
         if hasattr(self._graph, 'successor_indices'):
@@ -400,11 +408,15 @@ class Graph:
     def descendants(self, node):
         """Returns all descendants of a node using native RustworkX algorithm.
         
-        Args:
-            node: The node whose descendants to return
+        Parameters
+        ----------
+        node : int
+            The node whose descendants to return.
             
-        Returns:
-            tuple: All descendants of the node
+        Returns
+        -------
+        tuple
+            All descendants of the node.
         """
         _ = self._structure_version
         try:
@@ -416,11 +428,15 @@ class Graph:
     def ancestors(self, node):
         """Returns all ancestors of a node using native RustworkX algorithm.
         
-        Args:
-            node: The node whose ancestors to return
+        Parameters
+        ----------
+        node : int
+            The node whose ancestors to return.
             
-        Returns:
-            tuple: All ancestors of the node
+        Returns
+        -------
+        tuple
+            All ancestors of the node.
         """
         _ = self._structure_version
         try:
@@ -431,8 +447,10 @@ class Graph:
     def topological_sort(self):
         """Returns nodes in topological order.
         
-        Returns:
-            generator: Nodes in topological order
+        Returns
+        -------
+        generator
+            Nodes in topological order.
         """
         if hasattr(self._graph, 'out_degree'):
             indices = rx.topological_sort(self._graph)
@@ -444,8 +462,10 @@ class Graph:
     def to_directed(self):
         """Return a directed version of this graph.
         
-        Returns:
-            Graph: A new Graph instance with directed edges
+        Returns
+        -------
+        Graph
+            A new Graph instance with directed edges.
         """
         directed_rx = rx.PyDiGraph()
         
@@ -466,27 +486,35 @@ class Graph:
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
         
-        Returns:
-            int: Number of nodes
+        Returns
+        -------
+        int
+            Number of nodes.
         """
         return self._graph.num_nodes()
         
     def number_of_edges(self):
         """Return the number of edges in the graph.
         
-        Returns:
-            int: Number of edges
+        Returns
+        -------
+        int
+            Number of edges.
         """
         return self._graph.num_edges()
         
     def nodes_with_data(self, data=True):
         """Return nodes with their data.
         
-        Args:
-            data: If True, return node data as well
+        Parameters
+        ----------
+        data : bool
+            If True, return node data as well.
             
-        Returns:
-            Iterator: Iterator of (node, data) pairs if data=True, else just nodes
+        Returns
+        -------
+        Iterator
+            Iterator of (node, data) pairs if data=True, else just nodes.
         """
         if data:
             for idx in self._graph.node_indices():
@@ -499,12 +527,17 @@ class Graph:
     def subgraph(self, node, renumber=True):
         """Extract a subgraph starting from a given node.
         
-        Args:
-            node: The node to use as the starting point of the subgraph
-            renumber: Whether to renumber the nodes in the new graph
+        Parameters
+        ----------
+        node : int
+            The node to use as the starting point of the subgraph.
+        renumber : bool
+            Whether to renumber the nodes in the new graph.
             
-        Returns:
-            Graph: A new Graph object representing the subgraph
+        Returns
+        -------
+        Graph
+            A new Graph object representing the subgraph.
         """
         if node not in self:
             raise ValueError(f"Node {node} not found in graph")
@@ -539,11 +572,15 @@ class Graph:
     def add_node(self, **attr):
         """Add a node to the graph.
         
-        Args:
-            **attr: Node attributes
+        Parameters
+        ----------
+        **attr : dict
+            Node attributes as keyword arguments.
             
-        Returns:
-            The node ID that was added
+        Returns
+        -------
+        int
+            The node ID that was added.
         """
         node_id = self._graph.add_node(attr if attr else {})
         self._invalidate_caches()
@@ -552,9 +589,12 @@ class Graph:
     def set_node_data(self, node, **attr):
         """Update data for an existing node.
         
-        Args:
-            node: The node to update
-            **attr: Node attributes to set
+        Parameters
+        ----------
+        node : int
+            The node to update.
+        **attr : dict
+            Node attributes to set.
         """
         if not self._graph.has_node(node):
             raise KeyError(f"Node {node} not found in graph")
@@ -635,8 +675,10 @@ class Graph:
     def clear_node_attributes(self, nodes=None):
         """Clear attributes of specified nodes or all nodes.
         
-        Args:
-            nodes: Specific nodes to clear attributes for, or None for all nodes
+        Parameters
+        ----------
+        nodes : list, optional
+            Specific nodes to clear attributes for, or None for all nodes.
         """
         nodes_to_clear = nodes if nodes is not None else self._graph.node_indices()
         for node in nodes_to_clear:
@@ -646,14 +688,18 @@ class Graph:
     def renumber_nodes(self, method='default'):
         """Renumber the nodes in the graph to consecutive integers.
         
-        Args:
-            method (str): The method to use for renumbering:
-                - 'default': Use sequential numbering
-                - 'dfs': Use depth-first search preorder
-                - 'bfs': Use breadth-first search
+        Parameters
+        ----------
+        method : str
+            The method to use for renumbering:
+            - 'default': Use sequential numbering
+            - 'dfs': Use depth-first search preorder
+            - 'bfs': Use breadth-first search
                 
-        Returns:
-            Graph: Self with renumbered nodes
+        Returns
+        -------
+        Graph
+            Self with renumbered nodes.
         """
         if method == 'default':
             pass
@@ -679,8 +725,10 @@ class Graph:
     def to_networkx(self):
         """Convert this Graph to a NetworkX graph for compatibility with NetworkX functions.
         
-        Returns:
-            networkx.Graph or networkx.DiGraph: NetworkX equivalent of this graph
+        Returns
+        -------
+        networkx.Graph or networkx.DiGraph
+            NetworkX equivalent of this graph.
         """
         import networkx as nx
         
@@ -701,12 +749,17 @@ class Graph:
     def _from_graph(cls, G, **kwargs):
         """Create a new instance from an existing graph.
         
-        Args:
-            G: The graph to create a new instance from
-            **kwargs: Additional arguments
+        Parameters
+        ----------
+        G : Graph or rustworkx graph
+            The graph to create a new instance from.
+        **kwargs : dict
+            Additional arguments.
             
-        Returns:
-            Graph: A new Graph instance
+        Returns
+        -------
+        Graph
+            A new Graph instance.
         """
         if isinstance(G, Graph):
             new_graph = cls.from_rustworkx(G._graph)
@@ -784,11 +837,15 @@ class Graph:
     def complete_graph(cls, n_nodes, labels: Optional[List[Any]] = None, directed: bool = False, node_key: str = 'label'):
         """Create a complete graph.
         
-        Args:
-            n_nodes: Number of nodes in the complete graph
+        Parameters
+        ----------
+        n_nodes : int
+            Number of nodes in the complete graph.
             
-        Returns:
-            Graph: A new Graph instance with complete structure
+        Returns
+        -------
+        Graph
+            A new Graph instance with complete structure.
         """
         if n_nodes < 0:
             raise ValueError("n_nodes must be >= 0")

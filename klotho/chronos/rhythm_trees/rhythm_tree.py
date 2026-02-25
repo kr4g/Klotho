@@ -1,20 +1,16 @@
 # ------------------------------------------------------------------------------------
 # Klotho/klotho/chronos/rhythm_trees/rt.py
 # ------------------------------------------------------------------------------------
-'''
---------------------------------------------------------------------------------------
-A rhythm tree (RT) is a list representing a rhythmic structure. This list is organized 
-hierarchically in sub lists , just as time is organized in measures, time signatures, 
-pulses and rhythmic elements in the traditional notation.
+"""
+Rhythm trees.
 
-Hence, the expression form of rhythm trees is crucially different from that of onsets 
-and offsets. It can be exacting and not very "ergonomic", from a musician's point of 
-view : rhythm trees can be long, with a great number of parenthesis and sub lists 
-nested within each others.
+A rhythm tree (RT) is a list representing a rhythmic structure. This list
+is organized hierarchically in sub-lists, just as time is organized in
+measures, time signatures, pulses and rhythmic elements in traditional
+notation.
 
-see: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
---------------------------------------------------------------------------------------
-'''
+See: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
+"""
 from fractions import Fraction
 from typing import Union, Tuple
 from tabulate import tabulate
@@ -63,7 +59,17 @@ class RhythmTree(Tree):
                  span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '1/1',
                  subdivisions:Tuple            = (1,1)):
-        
+        """
+        Parameters
+        ----------
+        span : int, optional
+            The number of measures the tree spans. Default is 1.
+        meas : Meas, Fraction, or str, optional
+            The time signature. Default is ``'1/1'``.
+        subdivisions : tuple, optional
+            The proportional subdivisions of the measure. Elements may
+            be integers or nested ``(D, S)`` tuples. Default is ``(1, 1)``.
+        """
         super().__init__(Meas(meas).numerator * span, subdivisions)
         
         self._meta['span'] = span
@@ -75,10 +81,41 @@ class RhythmTree(Tree):
 
     @classmethod
     def from_tree(cls, tree:Tree, span:int = 1):
+        """
+        Construct a ``RhythmTree`` from an existing :class:`Tree`.
+
+        Parameters
+        ----------
+        tree : Tree
+            A tree whose root node has a ``'metric_duration'`` attribute.
+        span : int, optional
+            The number of measures. Default is 1.
+
+        Returns
+        -------
+        RhythmTree
+        """
         return cls(span = span, meas = Meas(tree[tree.root]['metric_duration']), subdivisions = tree.group.S)
     
     @classmethod
     def from_ratios(cls, ratios:Tuple[Fraction, float, str], span:int = 1):
+        """
+        Construct a ``RhythmTree`` from a flat sequence of fractional ratios.
+
+        The ratios are converted to integer subdivisions and the time
+        signature is inferred from the sum of absolute ratios.
+
+        Parameters
+        ----------
+        ratios : tuple of Fraction, float, or str
+            The proportional ratios for each leaf.
+        span : int, optional
+            The number of measures. Default is 1.
+
+        Returns
+        -------
+        RhythmTree
+        """
         ratios = tuple(Fraction(r) for r in ratios)
         S = ratios_to_subdivs(ratios)
         meas = Meas(sum(abs(r) for r in ratios))
@@ -86,14 +123,35 @@ class RhythmTree(Tree):
 
     @property
     def span(self):
+        """
+        The number of measures this tree spans.
+
+        Returns
+        -------
+        int
+        """
         return self._meta['span']
 
     @property
     def meas(self):
+        """
+        The time signature of this tree.
+
+        Returns
+        -------
+        Meas
+        """
         return Meas(self._meta['meas'])
 
     @property
     def subdivisions(self):
+        """
+        The proportional subdivisions (S part) of this tree.
+
+        Returns
+        -------
+        tuple
+        """
         return self._list.S
 
     def _cast_subdivs(self, children):
@@ -107,17 +165,18 @@ class RhythmTree(Tree):
         return tuple(convert_to_tuple(child) for child in children)
 
     def _build_subdivisions(self, root_node=None):
-        """Build subdivisions structure from the current graph state.
-        
+        """
+        Build a subdivisions structure from the current graph state.
+
         Parameters
         ----------
         root_node : int, optional
-            The node to start building from (default: self.root)
-            
+            The node to start building from. Default is ``self.root``.
+
         Returns
         -------
         tuple
-            Nested tuple structure representing subdivisions
+            Nested tuple structure representing subdivisions.
         """
         if root_node is None:
             root_node = self.root
@@ -131,7 +190,7 @@ class RhythmTree(Tree):
         return self._build_nested_structure(root_node, get_node_value, get_children)
     
     def _update_group_structure(self):
-        """Update the Group structure, preserving D and updating S."""
+        """Update the Group structure, preserving D and rebuilding S."""
         if hasattr(self, '_list'):
             new_subdivisions = self._build_subdivisions()
             if isinstance(new_subdivisions, tuple) and len(new_subdivisions) > 1:
@@ -142,14 +201,36 @@ class RhythmTree(Tree):
     
     @property
     def durations(self):
+        """
+        The metric durations of all leaf nodes.
+
+        Returns
+        -------
+        tuple of Fraction
+        """
         return tuple(self.nodes[n]['metric_duration'] for n in self.leaf_nodes)
     
     @property
     def onsets(self):
+        """
+        The metric onsets of all leaf nodes.
+
+        Returns
+        -------
+        tuple of Fraction
+        """
         return tuple(self.nodes[n]['metric_onset'] for n in self.leaf_nodes)
     
     @property
     def info(self):
+        """
+        A formatted string summarizing the tree's metadata, subdivisions,
+        durations, and onsets.
+
+        Returns
+        -------
+        str
+        """
         ordered_meta = {k: self._meta[k] for k in ['span', 'meas', 'type']}
         ordered_meta['depth'] = self.depth
         ordered_meta['k'] = self.k
@@ -199,29 +280,16 @@ class RhythmTree(Tree):
     
     def _evaluate(self):
         """
-        Evaluate the rhythm tree to compute metric durations and onsets.
-        
-        This method processes the tree in two phases:
-        1. Computation of metric durations and proportions for all nodes
-        2. Computation of metric onsets based on durations
+        Evaluate the tree to compute metric durations and onsets.
+
+        Processing occurs in two phases:
+
+        1. Compute metric durations and proportions for all nodes.
+        2. Compute metric onsets based on durations.
         """
         self[self.root]['metric_duration'] = self.meas * self.span
         
         def _process_child_durations(child, div, parent_ratio, parent_is_negative=False):
-            """
-            Process duration and proportion for a single child node.
-            
-            Parameters
-            ----------
-            child : int
-                Child node ID to process.
-            div : int
-                Sum of all proportions at this level.
-            parent_ratio : Fraction
-                Parent node's metric duration ratio.
-            parent_is_negative : bool, optional
-                Whether the parent node has a negative proportion.
-            """
             child_data = self[child]
             
             s = child_data['label']
@@ -242,16 +310,6 @@ class RhythmTree(Tree):
             self[child].pop('label', None)
         
         def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
-            """
-            Process a subtree to compute metric durations and proportions.
-            
-            Parameters
-            ----------
-            node : int, optional
-                Root node of subtree to process (default is 0).
-            parent_ratio : Fraction, optional
-                Parent node's metric duration ratio.
-            """
             node_data = self[node]
             
             if 'meta' in node_data:
@@ -355,7 +413,24 @@ class RhythmTree(Tree):
         return new_rt
     
     def graft_subtree(self, target_node, subtree, mode='replace'):
-        """Graft a subtree and re-evaluate the rhythm tree."""
+        """
+        Graft a subtree onto the tree and re-evaluate metric values.
+
+        Parameters
+        ----------
+        target_node : int
+            The node at which to graft.
+        subtree : RhythmTree or Tree
+            The subtree to graft.
+        mode : str, optional
+            Grafting mode (``'replace'`` or ``'append'``). Default is
+            ``'replace'``.
+
+        Returns
+        -------
+        RhythmTree
+            The modified tree (self).
+        """
         result = super().graft_subtree(target_node, subtree, mode)
         
         for node in self.nodes:

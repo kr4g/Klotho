@@ -3,6 +3,31 @@ from .threejs_lattice import ThreejsLatticeData
 
 def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
                            show_labels=True, title=None, override_positions=None):
+    """
+    Build a Three.js 3D scene for a MasterSet.
+
+    Parameters
+    ----------
+    ms : MasterSet
+        The master set to render.
+    figsize : tuple of float, optional
+        Width and height in inches.
+    node_size : int, optional
+        Base node diameter.
+    text_size : int, optional
+        Font size for labels.
+    show_labels : bool, optional
+        Whether to display labels (title generation only).
+    title : str or None, optional
+        Scene title.  Auto-generated when ``None``.
+    override_positions : dict or None, optional
+        Pre-computed 3D positions to use instead of ``ms.positions``.
+
+    Returns
+    -------
+    ThreejsLatticeData
+        Three.js scene description and metadata.
+    """
     positions = override_positions if override_positions is not None else ms.positions
     edge_pairs = ms.edges
     nd = ms.node_data()

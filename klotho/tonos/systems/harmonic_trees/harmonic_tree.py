@@ -5,8 +5,30 @@ from typing import Tuple, Union
 from fractions import Fraction
 
 class HarmonicTree(Tree):
-    '''
-    '''
+    """
+    A tree structure that models multiplicative harmonic relationships.
+
+    Each leaf node's *harmonic* value is the product of node labels along
+    the path from the root. When an equave is specified, leaf ratios are
+    reduced into the equave window controlled by *span*.
+
+    This is useful for building spectra, combination tones, and other
+    structures derived from a chain of harmonic multiplications.
+
+    Parameters
+    ----------
+    root : int, optional
+        The label of the root node (typically the fundamental partial
+        number). Default is 1.
+    children : tuple of int, optional
+        Child labels that define the branching structure. Default is ``(1,)``.
+    equave : Fraction, int, float, str, or None, optional
+        Interval of equivalence for ratio reduction. ``None`` disables
+        reduction.
+    span : int, optional
+        Number of equaves for the reduction window. Default is 1.
+    """
+
     def __init__(self,
                  root:int                                  = 1,
                  children:Tuple[int, ...]                  = (1,),
@@ -57,18 +79,22 @@ class HarmonicTree(Tree):
 
     @property
     def harmonics(self):
+        """tuple : Raw harmonic values at each leaf node (product along path from root)."""
         return tuple(self[n]['harmonic'] for n in self.leaf_nodes)
 
     @property
     def ratios(self):
+        """tuple : Equave-reduced ratios at each leaf node (or raw harmonics if no equave)."""
         return tuple(self[n]['ratio'] for n in self.leaf_nodes)
     
     @property
     def equave(self):
+        """Fraction or None : The interval of equivalence, or None if reduction is disabled."""
         return self._meta['equave']
     
     @property
     def span(self):
+        """int : Number of equaves used for the reduction window."""
         return self._meta['span']
     
     # @property

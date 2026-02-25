@@ -9,7 +9,7 @@ from klotho.utils.algorithms.factors import to_factors
 
 
 class ToneLatticeLookupWarning(RuntimeWarning):
-    """Warning emitted when inverse ratio lookup is ambiguous or unresolved."""
+    """Warning emitted when inverse ratio lookup is ambiguous or unresolved in a ``ToneLattice``."""
     pass
 
 
@@ -34,10 +34,19 @@ class ToneLattice(Lattice):
       - ``bipolar=True``  -> ``(1/equave, equave)``
       - ``bipolar=False`` -> ``[1, equave)``
 
-    Input types
-    -----------
-    ``equave`` and custom generators accept ``int``, ``Fraction``, or ``str``.
-    Floats are rejected to preserve exact rational semantics.
+    Parameters
+    ----------
+    dimensionality : int, optional
+        Number of generator axes. Default is 2.
+    resolution : int or list of int, optional
+        Per-axis coordinate bounds. Default is 10.
+    bipolar : bool, optional
+        Whether coordinates span negative values and which equave
+        reduction window to use. Default is True.
+    equave_reduce : bool, optional
+        Whether to reduce output ratios by equave. Default is True.
+    equave : int, Fraction, or str, optional
+        Equivalence interval. Floats are rejected. Default is 2.
     """
     
     def __init__(

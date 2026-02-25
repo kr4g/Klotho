@@ -13,10 +13,14 @@ sys.path.insert(0, os.path.abspath('..'))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Klotho'
-copyright = '2025, Ryan Millett'
+copyright = '2023-2026, Ryan Millett'
 author = 'Ryan Millett'
-release = '3.0.5'
-version = '3.0.5'
+
+import re as _re
+with open(os.path.join(os.path.abspath('..'), 'klotho', '__init__.py')) as _f:
+    _match = _re.search(r"__version__\s*=\s*'(.*)'", _f.read())
+    release = _match.group(1) if _match else 'unknown'
+version = release
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -89,7 +93,7 @@ html_theme_options = {
     'analytics_id': '',
     'analytics_anonymize_ip': False,
     'logo_only': False,
-    'display_version': True,
+    # 'display_version': True,  # deprecated in sphinx_rtd_theme 3.0+
     'prev_next_buttons_location': 'bottom',
     'style_external_links': False,
     'vcs_pageview_mode': '',

@@ -1,18 +1,36 @@
+"""
+Navigation algorithms for traversing parameter fields.
+
+This module provides path-generation utilities that trace oscillating
+trajectories through a ``ParameterField``, producing sequences of
+coordinate–value pairs.
+"""
+
 import random
 import numpy as np
 from typing import List, Tuple
 
 def find_navigation_path(field, steps: int = 2000, frequency: float = 0.05) -> List[Tuple]:
     """
-    Generate a navigation path through the field.
+    Generate a navigation path through a parameter field.
     
-    Args:
-        field: The ParameterField object to navigate
-        steps: Number of steps to take in the navigation
-        frequency: Frequency of oscillation for path generation
+    Traces a Lissajous-like oscillating trajectory through lattice space,
+    snapping each point to its nearest lattice coordinate.
+    
+    Parameters
+    ----------
+    field : ParameterField
+        The parameter field to navigate.
+    steps : int, optional
+        Number of steps to take in the navigation (default is 2000).
+    frequency : float, optional
+        Angular frequency of oscillation for path generation (default is 0.05).
         
-    Returns:
-        List of (coordinate, value) tuples representing the path
+    Returns
+    -------
+    list of tuple
+        Each element is a ``(coordinate, value)`` pair representing one
+        step along the path.
     """
     dimensions = field.dimensionality
     resolution = field.resolution

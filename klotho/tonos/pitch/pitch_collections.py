@@ -14,6 +14,24 @@ PitchList = Union[List[Pitch], List[str]]
 
 
 def _parse_equave(equave: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
+    """
+    Parse an equave value into a float or Fraction.
+
+    Parameters
+    ----------
+    equave : float, Fraction, int, or str
+        The equave (interval of equivalence) to parse.
+
+    Returns
+    -------
+    float or Fraction
+        The parsed equave value.
+
+    Raises
+    ------
+    ValueError
+        If the value cannot be parsed.
+    """
     if isinstance(equave, float):
         return equave
     if isinstance(equave, Fraction):
@@ -29,6 +47,25 @@ def _parse_equave(equave: Union[float, Fraction, int, str]) -> Union[float, Frac
 
 
 def _convert_degree(value: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
+    """
+    Convert a scale degree value to a float or Fraction.
+
+    Parameters
+    ----------
+    value : float, Fraction, int, or str
+        The degree value to convert. Strings containing ``'/'`` are
+        interpreted as fractions.
+
+    Returns
+    -------
+    float or Fraction
+        The converted degree value.
+
+    Raises
+    ------
+    ValueError
+        If the value cannot be converted.
+    """
     if isinstance(value, float):
         return value
     if isinstance(value, Fraction):
@@ -44,6 +81,14 @@ def _convert_degree(value: Union[float, Fraction, int, str]) -> Union[float, Fra
 
 
 class PitchCollectionBase(ABC):
+    """
+    Abstract base class for all pitch collections.
+
+    Defines the common interface for both relative (interval-based) and
+    absolute (pitch-based) collections, including properties for degrees,
+    pitches, intervals, equave, and indexing operations.
+    """
+
     @property
     @abstractmethod
     def is_relative(self) -> bool:
@@ -109,6 +154,29 @@ class PitchCollectionBase(ABC):
         return result
 
     def index(self, value: Union[Pitch, float, Fraction, int, str], start: int = 0, stop: Optional[int] = None) -> int:
+        """
+        Return the index of the first occurrence of *value* in the collection.
+
+        Parameters
+        ----------
+        value : Pitch, float, Fraction, int, or str
+            The value to search for. Interpreted as a degree for relative
+            collections without a reference pitch, or as a Pitch otherwise.
+        start : int, optional
+            Index at which to begin the search. Default is 0.
+        stop : int or None, optional
+            Index at which to stop searching. Default is None (end).
+
+        Returns
+        -------
+        int
+            The index of the matching element.
+
+        Raises
+        ------
+        ValueError
+            If the value is not found in the collection.
+        """
         if self.is_relative and not self.is_instanced:
             target = _convert_degree(value)
             if isinstance(target, Fraction) and isinstance(self.degrees[0], float):
@@ -139,10 +207,38 @@ class PitchCollectionBase(ABC):
 
 
 class EquaveCyclicMixin:
+    """Mixin that enables equave-cyclic indexing by default."""
+
     _equave_cyclic_enabled = True
 
 
 class RelativePitchCollection(PitchCollectionBase):
+    """
+    A collection of pitches defined by interval degrees relative to a root.
+
+    Degrees are stored as ratios (``Fraction``) or cents (``float``) and can
+    optionally be anchored to a reference pitch to resolve concrete ``Pitch``
+    objects. Supports equave-cyclic indexing when enabled.
+
+    Parameters
+    ----------
+    degrees : list of float, Fraction, int, or str
+        Scale/chord degrees as ratios or cent values.
+    interval_type : str, optional
+        ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
+    equave : float, Fraction, int, str, or None, optional
+        Interval of equivalence. When provided, equave-cyclic indexing
+        is enabled.
+    reference_pitch : Pitch, str, or None, optional
+        If given, the collection is *instanced* at this pitch and indexing
+        returns ``Pitch`` objects.
+
+    Examples
+    --------
+    >>> coll = RelativePitchCollection(["1/1", "5/4", "3/2"])
+    >>> coll.degrees
+    [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
+    """
     _equave_cyclic_enabled: Optional[bool] = None
 
     def __init__(
@@ -195,6 +291,24 @@ class RelativePitchCollection(PitchCollectionBase):
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> "RelativePitchCollection":
+        """
+        Construct from an explicit list of cumulative degrees.
+
+        Parameters
+        ----------
+        degrees : list
+            Cumulative degree values (ratios or cents).
+        interval_type : str, optional
+            ``"ratios"`` or ``"cents"``.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         return cls(degrees, interval_type, equave, reference_pitch)
 
     @classmethod
@@ -205,6 +319,24 @@ class RelativePitchCollection(PitchCollectionBase):
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> "RelativePitchCollection":
+        """
+        Construct from successive intervals (step sizes) rather than cumulative degrees.
+
+        Parameters
+        ----------
+        intervals : list
+            Successive interval values (ratios or cents).
+        interval_type : str, optional
+            ``"ratios"`` or ``"cents"``.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         if not intervals:
             return cls.from_degrees([], interval_type, equave, reference_pitch)
 
@@ -233,6 +365,25 @@ class RelativePitchCollection(PitchCollectionBase):
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> "RelativePitchCollection":
+        """
+        Construct from pitch-class integers in an equal-tempered system.
+
+        Parameters
+        ----------
+        pcs : list of int
+            Pitch-class integers (e.g., ``[0, 4, 7]`` for a major triad
+            in 12-TET).
+        mod : int, optional
+            Number of divisions per equave. Default is 12.
+        equave : float, Fraction, int, str, or None, optional
+            Override equave in cents. Defaults to ``mod * 100``.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         equave_cents = float(mod * 100)
         step_size = equave_cents / mod
         degrees = [float(pc * step_size) for pc in pcs]
@@ -257,45 +408,73 @@ class RelativePitchCollection(PitchCollectionBase):
 
     @property
     def is_relative(self) -> bool:
+        """bool : Always True for relative collections."""
         return True
 
     @property
     def is_instanced(self) -> bool:
+        """bool : True if a reference pitch has been assigned."""
         return self._reference_pitch is not None
 
     @property
     def reference_pitch(self) -> Optional[Pitch]:
+        """Pitch or None : The reference pitch anchoring the collection."""
         return self._reference_pitch
 
     @property
     def equave(self) -> Union[float, Fraction]:
+        """float or Fraction : The interval of equivalence."""
         return self._equave
 
     @property
     def equave_cyclic(self) -> bool:
+        """bool : Whether indexing wraps around the equave."""
         return self._equave_cyclic
 
     @property
     def degrees(self) -> List[IntervalType]:
+        """list : The cumulative degree values (ratios or cents)."""
         return list(self._degrees)
 
     @property
     def pitches(self) -> List[Pitch]:
+        """
+        list of Pitch : Concrete pitches resolved from degrees and reference pitch.
+
+        Raises
+        ------
+        ValueError
+            If no reference pitch has been set.
+        """
         if not self.is_instanced:
             raise ValueError("Cannot resolve pitches without a reference pitch")
         return [self._calculate_pitch(i) for i in range(len(self._degrees))]
 
     @property
     def intervals(self) -> List[IntervalType]:
+        """list : Successive intervals between adjacent degrees."""
         return self._intervals
 
     @property
     def interval_type(self) -> Optional[type]:
+        """type or None : The Python type of the stored degrees (float or Fraction)."""
         if self._degrees:
             return type(self._degrees[0])
         return None
 
     def root(self, pitch: Union[Pitch, str]) -> "RootedPitchCollection":
+        """
+        Return a copy of this collection rooted at the given pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The pitch to use as the reference root.
+
+        Returns
+        -------
+        RootedPitchCollection
+        """
         return RootedPitchCollection(
             list(self._degrees),
             self._interval_type_mode,
@@ -304,6 +483,13 @@ class RelativePitchCollection(PitchCollectionBase):
         )
 
     def relative(self) -> "RelativePitchCollection":
+        """
+        Return a rootless copy retaining only the interval structure.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         if not self.is_instanced:
             return self
         relative = RelativePitchCollection(
@@ -425,7 +611,27 @@ class RelativePitchCollection(PitchCollectionBase):
 
 
 class RootedPitchCollection(RelativePitchCollection):
+    """
+    A ``RelativePitchCollection`` that always carries a reference pitch.
+
+    Slicing or sequence-indexing a ``RelativePitchCollection`` with a
+    reference pitch produces a ``RootedPitchCollection`` so that the
+    root information is preserved through subsetting.
+    """
+
     def root(self, pitch: Union[Pitch, str]) -> "RootedPitchCollection":
+        """
+        Return a copy rooted at a different pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The new reference pitch.
+
+        Returns
+        -------
+        RootedPitchCollection
+        """
         return RootedPitchCollection(
             list(self._degrees),
             self._interval_type_mode,
@@ -445,6 +651,23 @@ class RootedPitchCollection(RelativePitchCollection):
 
 
 class AbsolutePitchCollection(PitchCollectionBase):
+    """
+    A collection defined by concrete ``Pitch`` objects rather than intervals.
+
+    Intervals are derived from successive pitch frequencies rather than
+    stored directly. Supports equave-cyclic indexing when an equave is
+    provided.
+
+    Parameters
+    ----------
+    pitches : list of Pitch or str
+        The pitches in the collection.
+    equave : float, Fraction, int, str, or None, optional
+        Interval of equivalence for cyclic indexing.
+    reference_pitch : Pitch, str, or None, optional
+        Optional reference pitch for partial calculations.
+    """
+
     def __init__(
         self,
         pitches: PitchList,
@@ -476,37 +699,57 @@ class AbsolutePitchCollection(PitchCollectionBase):
 
     @property
     def is_relative(self) -> bool:
+        """bool : Always False for absolute collections."""
         return False
 
     @property
     def is_instanced(self) -> bool:
+        """bool : True if a reference pitch has been assigned."""
         return self._reference_pitch is not None
 
     @property
     def reference_pitch(self) -> Optional[Pitch]:
+        """Pitch or None : The reference pitch."""
         return self._reference_pitch
 
     @property
     def equave(self) -> Union[float, Fraction]:
+        """float or Fraction : The interval of equivalence."""
         return self._equave
 
     @property
     def equave_cyclic(self) -> bool:
+        """bool : Whether indexing wraps around the equave."""
         return self._equave_cyclic
 
     @property
     def degrees(self) -> List[Pitch]:
+        """list of Pitch : The pitches (same as ``pitches`` for absolute collections)."""
         return list(self._pitches)
 
     @property
     def pitches(self) -> List[Pitch]:
+        """list of Pitch : The stored pitch objects."""
         return list(self._pitches)
 
     @property
     def intervals(self) -> List[float]:
+        """list of float : Successive intervals in cents between adjacent pitches."""
         return self._intervals
 
     def root(self, pitch: Union[Pitch, str]) -> "AbsolutePitchCollection":
+        """
+        Return a copy with a different reference pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The new reference pitch.
+
+        Returns
+        -------
+        AbsolutePitchCollection
+        """
         rooted = AbsolutePitchCollection(list(self._pitches), self._equave, pitch)
         rooted._equave_cyclic = self._equave_cyclic
         return rooted
@@ -570,6 +813,16 @@ class AbsolutePitchCollection(PitchCollectionBase):
 
 
 class PitchCollection:
+    """
+    Factory class providing unified constructors for pitch collections.
+
+    All methods are classmethods that delegate to ``RelativePitchCollection``
+    or ``AbsolutePitchCollection`` depending on the input format. Use this
+    class when you want a single entry point for creating collections from
+    degrees, intervals, set classes, pitches, MIDI notes, MIDI cents, or
+    frequencies.
+    """
+
     @classmethod
     def from_degrees(
         cls,
@@ -579,6 +832,26 @@ class PitchCollection:
         reference_pitch: Union[Pitch, str, None] = None,
         mod: int = 12,
     ) -> RelativePitchCollection:
+        """
+        Create a relative collection from cumulative degree values.
+
+        Parameters
+        ----------
+        degrees : list
+            Degree values as ratios, cents, or pitch-class integers.
+        mode : str, optional
+            ``"ratios"``, ``"cents"``, or ``"setclass"``. Default is ``"ratios"``.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+        mod : int, optional
+            Divisions per equave when *mode* is ``"setclass"``. Default is 12.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         if mode == "setclass":
             return RelativePitchCollection.from_setclass(
                 [int(pc) for pc in degrees], mod, equave, reference_pitch
@@ -594,6 +867,26 @@ class PitchCollection:
         reference_pitch: Union[Pitch, str, None] = None,
         mod: int = 12,
     ) -> RelativePitchCollection:
+        """
+        Create a relative collection from successive interval sizes.
+
+        Parameters
+        ----------
+        intervals : list
+            Successive interval values.
+        mode : str, optional
+            ``"ratios"``, ``"cents"``, or ``"setclass"``. Default is ``"ratios"``.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+        mod : int, optional
+            Divisions per equave when *mode* is ``"setclass"``. Default is 12.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         if mode == "setclass":
             step_size = float(mod * 100) / mod
             interval_cents = [float(i) * step_size for i in intervals]
@@ -613,6 +906,24 @@ class PitchCollection:
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> RelativePitchCollection:
+        """
+        Create a relative collection from pitch-class integers.
+
+        Parameters
+        ----------
+        pcs : list of int
+            Pitch-class integers.
+        mod : int, optional
+            Divisions per equave. Default is 12.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+
+        Returns
+        -------
+        RelativePitchCollection
+        """
         return RelativePitchCollection.from_setclass(pcs, mod, equave, reference_pitch)
 
     @classmethod
@@ -622,6 +933,22 @@ class PitchCollection:
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> AbsolutePitchCollection:
+        """
+        Create an absolute collection from Pitch objects or pitch strings.
+
+        Parameters
+        ----------
+        pitches : list of Pitch or str
+            The pitches to include.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence for cyclic indexing.
+        reference_pitch : Pitch, str, or None, optional
+            Optional reference pitch.
+
+        Returns
+        -------
+        AbsolutePitchCollection
+        """
         return AbsolutePitchCollection(pitches, equave, reference_pitch)
 
     @classmethod
@@ -631,6 +958,22 @@ class PitchCollection:
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> AbsolutePitchCollection:
+        """
+        Create an absolute collection from MIDI note numbers.
+
+        Parameters
+        ----------
+        midi_notes : list of float
+            MIDI note numbers.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional reference pitch.
+
+        Returns
+        -------
+        AbsolutePitchCollection
+        """
         pitches = [Pitch.from_midi(midi) for midi in midi_notes]
         return AbsolutePitchCollection(pitches, equave, reference_pitch)
 
@@ -641,6 +984,22 @@ class PitchCollection:
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> AbsolutePitchCollection:
+        """
+        Create an absolute collection from MIDI cent values.
+
+        Parameters
+        ----------
+        midicents : list of float
+            MIDI cent values.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional reference pitch.
+
+        Returns
+        -------
+        AbsolutePitchCollection
+        """
         pitches = [Pitch.from_midicent(midicent) for midicent in midicents]
         return AbsolutePitchCollection(pitches, equave, reference_pitch)
 
@@ -651,5 +1010,21 @@ class PitchCollection:
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ) -> AbsolutePitchCollection:
+        """
+        Create an absolute collection from frequencies in Hertz.
+
+        Parameters
+        ----------
+        frequencies : list of float
+            Frequencies in Hertz.
+        equave : float, Fraction, int, str, or None, optional
+            Interval of equivalence.
+        reference_pitch : Pitch, str, or None, optional
+            Optional reference pitch.
+
+        Returns
+        -------
+        AbsolutePitchCollection
+        """
         pitches = [Pitch.from_freq(freq) for freq in frequencies]
         return AbsolutePitchCollection(pitches, equave, reference_pitch)

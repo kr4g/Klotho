@@ -9,6 +9,21 @@ from klotho.utils.playback.tonejs.cdn import (
 
 
 def _convert_numpy_types(obj):
+    """
+    Recursively convert NumPy scalar types to native Python types.
+
+    Parameters
+    ----------
+    obj : object
+        Value or nested structure (dict, list) potentially containing
+        NumPy numeric scalars.
+
+    Returns
+    -------
+    object
+        The same structure with NumPy scalars replaced by ``int``
+        or ``float``.
+    """
     try:
         import numpy as np
         if isinstance(obj, dict):
@@ -26,6 +41,22 @@ def _convert_numpy_types(obj):
 
 
 class ToneEngine:
+    """
+    Jupyter widget that renders Tone.js-based audio playback controls.
+
+    Generates an HTML/JS snippet with play/stop and loop buttons,
+    wiring the provided event list through Tone.js instruments.
+
+    Parameters
+    ----------
+    events : list of dict
+        Audio event payload (typically from :func:`convert_to_events`).
+    custom_js_path : str or Path, optional
+        Path to a custom JavaScript file loaded before the player.
+    custom_js : str, optional
+        Inline JavaScript source embedded before the player.
+    """
+
     def __init__(self, events, custom_js_path=None, custom_js=None):
         self.events = _convert_numpy_types(events)
         self.custom_js_path = Path(custom_js_path) if custom_js_path else None
@@ -33,12 +64,22 @@ class ToneEngine:
         self.widget_id = f"klotho_{uuid.uuid4().hex[:8]}"
 
     def _load_instruments_js(self):
+        """Return the bundled instruments JavaScript source."""
         return INSTRUMENTS_JS_PATH.read_text()
 
     def _load_player_js(self):
+        """Return the bundled player JavaScript source."""
         return PLAYER_JS_PATH.read_text()
 
     def _load_user_custom_js(self):
+        """
+        Return user-supplied custom JavaScript, if any.
+
+        Returns
+        -------
+        str
+            Custom JS source, or an empty string when none is provided.
+        """
         if self.custom_js_path and self.custom_js_path.exists():
             return self.custom_js_path.read_text()
         if self.custom_js:
@@ -46,6 +87,15 @@ class ToneEngine:
         return ""
 
     def _generate_html(self):
+        """
+        Build the full HTML string for the playback widget.
+
+        Returns
+        -------
+        str
+            HTML containing inline styles, CDN scripts, instrument
+            definitions, and the player logic.
+        """
         payload_json = json.dumps(self.events)
         user_custom_js = self._load_user_custom_js()
         instruments_js = self._load_instruments_js()
@@ -169,8 +219,17 @@ class ToneEngine:
         return html
 
     def display(self):
+        """
+        Render the playback widget in the active Jupyter notebook.
+
+        Returns
+        -------
+        IPython.display.DisplayHandle
+            The display handle for the rendered HTML widget.
+        """
         html = self._generate_html()
         return display(HTML(html))
 
     def _repr_html_(self):
+        """Return the widget HTML for automatic notebook rendering."""
         return self._generate_html()

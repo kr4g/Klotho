@@ -3,9 +3,9 @@ chronos
 
 Chronos provides specialized classes and functions for working with time and rhythm in music.
 
-The word "chronos" originates from Ancient Greek and is deeply rooted in both language 
-and mythology. In Greek, "χρόνος" (chronos) means "time". In Greek mythology, Chronos 
-is personified as the god of time, symbolizing the endless passage of time and the 
+The word "chronos" originates from Ancient Greek and is deeply rooted in both language
+and mythology. In Greek, "χρόνος" (chronos) means "time". In Greek mythology, Chronos
+is personified as the god of time, symbolizing the endless passage of time and the
 cycles of creation and destruction within the universe.
 
 Rhythm Pairs
@@ -51,7 +51,10 @@ Core Classes
    :members:
    :show-inheritance:
 
-.. autoclass:: klotho.chronos.temporal_units.temporal.Chronon
+Temporal Algorithms
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.chronos.temporal_units.algorithms
    :members:
    :show-inheritance:
 
@@ -61,11 +64,9 @@ Utilities
 Beat Utilities
 ~~~~~~~~~~~~~~
 
-.. autofunction:: klotho.chronos.utils.beat.cycles_to_frequency
-
-.. autofunction:: klotho.chronos.utils.beat.beat_duration
-
-.. autofunction:: klotho.chronos.utils.beat.calc_onsets
+.. automodule:: klotho.chronos.utils.beat
+   :members:
+   :show-inheritance:
 
 Tempo Utilities
 ~~~~~~~~~~~~~~~
@@ -79,4 +80,4 @@ Time Conversion
 
 .. automodule:: klotho.chronos.utils.time_conversion
    :members:
-   :show-inheritance: 
+   :show-inheritance:

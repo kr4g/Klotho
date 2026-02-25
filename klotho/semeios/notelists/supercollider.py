@@ -1,8 +1,8 @@
 """
-Scheduler: A module for scheduling musical events and nodes.
+Scheduler for SuperCollider event export.
 
-Provides the Scheduler class for managing timed musical events 
-with priority-based scheduling.
+Provides the ``Scheduler`` class for building priority-ordered event
+lists that can be serialized to JSON for playback in SuperCollider.
 """
 
 from uuid import uuid4
@@ -20,6 +20,26 @@ ENV_TYPES = {
 }
 
 class Scheduler:
+    """Priority-queue based scheduler for SuperCollider synth events.
+
+    Manages a heap of timed events (``new``, ``set``, ``release``) that are
+    sorted by start time and priority, then serialized to a JSON file
+    consumable by a SuperCollider playback engine.
+
+    Attributes
+    ----------
+    events : list
+        Min-heap of ``(start, priority, uid, counter, event_dict)`` tuples.
+    total_events : int
+        Cumulative number of events pushed onto the heap.
+    event_counter : int
+        Monotonic counter used as a tiebreaker when start time and
+        priority are equal.
+    meta : dict
+        Metadata dictionary (synth groups, insert effects, etc.) written
+        alongside events.
+    """
+
     def __init__(self):
         self.events = []
         self.total_events = 0
@@ -27,6 +47,31 @@ class Scheduler:
         self.meta = {}
         
     def new_node(self, synth_name: str, start: float = 0, dur: Union[float, None] = None, group: str = None, **pfields):
+        """Create a new synth node event.
+
+        Pushes a ``"new"`` event onto the scheduler heap.  If *dur* is
+        provided, a corresponding ``"set"`` event with ``gate=0`` is
+        automatically scheduled at ``start + dur``.
+
+        Parameters
+        ----------
+        synth_name : str
+            Name of the SuperCollider SynthDef to instantiate.
+        start : float, optional
+            Start time in seconds (default ``0``).
+        dur : float or None, optional
+            Duration in seconds.  When given, the node is automatically
+            released after this period.
+        group : str or None, optional
+            Synth group name.  Defaults to ``"default"``.
+        **pfields
+            Arbitrary parameter fields forwarded to the synth.
+
+        Returns
+        -------
+        str
+            Unique identifier for the created node.
+        """
         uid = str(uuid4()).replace('-', '')
         
         event = {
@@ -53,6 +98,17 @@ class Scheduler:
         return uid
 
     def set_node(self, uid: str, start: float, **pfields):
+        """Schedule a parameter-update event on an existing node.
+
+        Parameters
+        ----------
+        uid : str
+            Unique identifier of the target node.
+        start : float
+            Time in seconds at which the update takes effect.
+        **pfields
+            Parameter fields to set on the node.
+        """
         event = {
             "type": "set",
             "id": uid,
@@ -66,6 +122,15 @@ class Scheduler:
         self.total_events += 1
     
     def release_node(self, uid: str, start: float):
+        """Schedule a release event for a gated synth node.
+
+        Parameters
+        ----------
+        uid : str
+            Unique identifier of the node to release.
+        start : float
+            Time in seconds at which the release occurs.
+        """
         event = {
             "type": "release",
             "id": uid,
@@ -77,6 +142,18 @@ class Scheduler:
         self.total_events += 1
         
     def add(self, uc: Union[CompositionalUnit, TemporalUnit, TemporalUnitSequence, TemporalBlock]):
+        """Add events from a compositional or temporal structure.
+
+        Iterates over the chronons in *uc*, creating ``new_node``,
+        ``set_node``, and ``release_node`` events as appropriate based on
+        envelope type (gated vs. ungated) and slur markings.
+
+        Parameters
+        ----------
+        uc : CompositionalUnit, TemporalUnit, TemporalUnitSequence, or TemporalBlock
+            The musical structure whose events should be scheduled.
+            Sequences and blocks are recursively expanded.
+        """
         
         if isinstance(uc, TemporalUnitSequence):
             for unit in uc:
@@ -149,6 +226,19 @@ class Scheduler:
                     self.release_node(uid, start=event.end)
             
     def synth_groups(self, groups):
+        """Register one or more synth group names in the scheduler metadata.
+
+        Parameters
+        ----------
+        groups : str or list of str
+            Group name(s) to register.  ``"main"`` is reserved and will
+            raise a ``ValueError``.
+
+        Raises
+        ------
+        ValueError
+            If any group is named ``"main"``.
+        """
         if 'groups' not in self.meta:
             self.meta['groups'] = []
         
@@ -162,6 +252,18 @@ class Scheduler:
                 self.meta['groups'].append(group)
     
     def group_inserts(self, inserts):
+        """Assign insert-effect mappings to registered synth groups.
+
+        Parameters
+        ----------
+        inserts : dict
+            Mapping of group names to their insert-effect configurations.
+
+        Raises
+        ------
+        ValueError
+            If ``synth_groups`` has not been called first.
+        """
         if 'groups' not in self.meta:
             raise ValueError("Must add groups before adding inserts")
         # self.synth_groups(inserts.keys())
@@ -180,11 +282,28 @@ class Scheduler:
         #     self.meta['inserts'].append(insert)
     
     def clear_events(self):
+        """Remove all scheduled events and reset counters."""
         self.events = []
         self.total_events = 0
         self.event_counter = 0
         
     def write(self, filepath, start_time: Union[float, None] = None, time_scale: float = 1.0):
+        """Serialize all scheduled events to a JSON file.
+
+        Events are sorted by start time, optionally shifted and scaled,
+        then written alongside the scheduler metadata.
+
+        Parameters
+        ----------
+        filepath : str
+            Output file path for the JSON data.
+        start_time : float or None, optional
+            If given, the earliest event is shifted so that it begins at
+            this time.
+        time_scale : float, optional
+            Multiplicative factor applied to all event start times
+            (default ``1.0``).
+        """
         sorted_events = []
         events_copy = self.events.copy()
         

@@ -228,6 +228,7 @@ def ratio_to_coordinate(
     Convert a ratio to a coordinate vector.
 
     Behavior depends on ``generators``:
+
     - If ``generators`` is ``None``, return prime coordinates (monzo-style) in
       the canonical prime basis.
     - If ``generators`` is provided, solve for integer generator coordinates

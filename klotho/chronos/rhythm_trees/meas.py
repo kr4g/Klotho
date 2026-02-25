@@ -3,10 +3,39 @@ from math import gcd
 from numbers import Rational
 
 class Meas:
-    '''
-    Time signature class that preserves unreduced fractions.
-    Similar to Python's Fraction class, but for musical time signatures.
-    '''
+    """
+    A time signature that preserves unreduced fractions.
+
+    Unlike Python's :class:`~fractions.Fraction`, which always reduces to
+    lowest terms, ``Meas`` keeps the numerator and denominator as given so
+    that musically distinct time signatures such as 4/4 and 2/2 remain
+    distinguishable.
+
+    Parameters
+    ----------
+    numerator : int, float, str, Fraction, or Meas
+        The numerator of the time signature, or a value that can be
+        interpreted as a complete time signature (e.g., ``'3/4'``,
+        ``Fraction(3, 4)``).
+    denominator : int or None, optional
+        The denominator of the time signature. When provided, *numerator*
+        must also be an ``int``. Default is None.
+
+    Raises
+    ------
+    ValueError
+        If the arguments cannot be parsed into a valid time signature, or
+        if the denominator is zero.
+
+    Examples
+    --------
+    >>> Meas(3, 4)
+    3/4
+    >>> Meas('6/8')
+    6/8
+    >>> Meas(Fraction(1, 4))
+    1/4
+    """
     def __init__(self, numerator, denominator=None):
         match (numerator, denominator):
             case (Meas() as m, None):
@@ -34,10 +63,24 @@ class Meas:
 
     @property
     def numerator(self):
+        """
+        The numerator of the time signature.
+
+        Returns
+        -------
+        int
+        """
         return self._numerator
 
     @property
     def denominator(self):
+        """
+        The denominator of the time signature.
+
+        Returns
+        -------
+        int
+        """
         return self._denominator
     
     def __add__(self, other):
@@ -169,7 +212,21 @@ class Meas:
                 return NotImplemented
 
     def __eq__(self, other):
-        """Strict equality - exact same time signature representation"""
+        """
+        Check strict equality of time signature representations.
+
+        Two ``Meas`` values are equal only if both their numerator and
+        denominator match exactly (e.g., ``Meas(4, 4) != Meas(2, 2)``).
+
+        Parameters
+        ----------
+        other : Meas, Fraction, int, float, or str
+            The value to compare against.
+
+        Returns
+        -------
+        bool
+        """
         match other:
             case Meas() | Fraction():
                 return (self._numerator == other.numerator and 
@@ -196,7 +253,21 @@ class Meas:
         return Meas(-self._numerator, self._denominator)
 
     def is_equivalent(self, other) -> bool:
-        """Check if two time signatures represent the same metric proportion"""
+        """
+        Check if two time signatures represent the same metric proportion.
+
+        Unlike ``__eq__``, this compares the rational value so that
+        ``Meas(4, 4)`` is equivalent to ``Meas(2, 2)``.
+
+        Parameters
+        ----------
+        other : Meas, Fraction, or str
+            The value to compare against.
+
+        Returns
+        -------
+        bool
+        """
         match other:
             case Meas() | Fraction():
                 return (self._numerator * other.denominator == 
@@ -210,14 +281,26 @@ class Meas:
                 return False
 
     def to_fraction(self):
+        """
+        Convert to a standard :class:`~fractions.Fraction`.
+
+        Returns
+        -------
+        Fraction
+        """
         return Fraction(self._numerator, self._denominator)
 
     def _as_fraction(self):
-        """Special method that Fraction constructor looks for"""
         return Fraction(self._numerator, self._denominator)
 
     def reduced(self):
-        """Return a new Meas with reduced form"""
+        """
+        Return a new ``Meas`` reduced to lowest terms.
+
+        Returns
+        -------
+        Meas
+        """
         return Meas(self.to_fraction().limit_denominator())
     
     def __str__(self):

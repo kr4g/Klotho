@@ -2,15 +2,42 @@
 # Klotho/klotho/chronos/rhythm_pairs/rp.py
 # -----------------------------------------------------------------------------
 '''
---------------------------------------------------------------------------------------
 Rhythm pairs.
---------------------------------------------------------------------------------------
+
+A rhythm pair is a combinatorial structure derived from a tuple of integers.
+It generates rhythmic sequences by computing the inter-onset intervals from
+the superposition of evenly spaced pulse grids, each determined by an element
+of the input tuple.
 '''
 from typing import Tuple
 from math import prod
 from ..rhythm_trees.algorithms import rhythm_pair
 
 class RhythmPair:
+    """
+    A rhythm pair derived from a tuple of integers.
+
+    A rhythm pair computes rhythmic sequences from the superimposition of
+    evenly spaced pulse grids. Given a tuple of integers, two complementary
+    sequences are produced: an MM (metric modulation) sequence and a non-MM
+    sequence, along with partitions and measure groupings.
+
+    Parameters
+    ----------
+    lst : tuple of int
+        The tuple of integers from which to derive the rhythm pair.
+    subdivs : bool, optional
+        If True, partition and measure accessors return full ``(label, parts)``
+        tuples; if False, only the labels are returned. Default is False.
+
+    Examples
+    --------
+    >>> rp = RhythmPair((3, 4))
+    >>> rp.product
+    12
+    >>> rp.beats
+    (3, 1, 2, 2, 1, 3)
+    """
     def __init__(self, lst: Tuple[int, ...], subdivs: bool = False):
         self.lst = lst
         self._subdivs = subdivs
@@ -23,50 +50,89 @@ class RhythmPair:
 
     @property
     def product(self) -> int:
-        '''Return the total product of the list.'''
+        """
+        The total product of all elements in the input tuple.
+
+        Returns
+        -------
+        int
+        """
         return self._total_product
     
     @property
     def products(self) -> Tuple[int, int, int]:
-        '''Return the products of the total product divided by each element in the list.'''
+        """
+        The total product divided by each element in the input tuple.
+
+        Returns
+        -------
+        tuple of int
+        """
         return tuple(self._total_product // x for x in self.lst)
 
     @property
     def partitions(self) -> Tuple[Tuple[int, ...], ...]:
-        '''Return partitions or just the partition labels depending on subdivs.'''
+        """
+        The partitions of the non-MM sequence grouped by each product value.
+
+        When ``subdivs`` is True, each partition element is a ``(label, parts)``
+        tuple. When False, only the labels are returned.
+
+        Returns
+        -------
+        tuple of tuple
+        """
         if self._subdivs:
             return self._partitions
         return tuple(tuple(part[0] for part in group) for group in self._partitions)
 
     @property
     def measures(self) -> Tuple[int, ...]:
-        '''Return measures or just the measure labels depending on subdivs.'''
+        """
+        The measure groupings derived from the MM sequence.
+
+        When ``subdivs`` is True, each measure element is a ``(label, parts)``
+        tuple. When False, only the labels are returned.
+
+        Returns
+        -------
+        tuple
+        """
         if self._subdivs:
             return self._measures
         return tuple(measure[0] for measure in self._measures)
 
     @property
     def beats(self) -> Tuple[int, ...]:
-        '''Return the non-MM sequence (beats).'''
+        """
+        The non-MM (beat-level) rhythmic sequence.
+
+        Returns
+        -------
+        tuple of int
+        """
         return self._beats
     
     @property
     def subdivs(self) -> bool:
-        '''Get the current state of subdivs.'''
+        """
+        Whether partition and measure accessors return full subdivision detail.
+
+        Returns
+        -------
+        bool
+        """
         return self._subdivs
     
     @subdivs.setter
     def subdivs(self, value: bool):
-        '''Set the subdivs flag.'''
         self._subdivs = value
 
     def _calculate_partitions(self) -> Tuple[Tuple[int, Tuple[int, ...]], ...]:
-        '''Calculate partitions based on the non-MM sequence.'''
         mm_partitions = self.products
         return tuple(self._partition_sequence(self._non_mm_sequence, partition) for partition in mm_partitions)
 
     def _partition_sequence(self, sequence: Tuple[int, ...], partition_value: int) -> Tuple[int, Tuple[int, ...]]:
-        '''Partition the sequence based on a given partition value.'''
         partitions = []
         current_partition = []
         current_sum = 0
@@ -83,7 +149,6 @@ class RhythmPair:
         return tuple(partitions)
 
     def _calculate_measures(self) -> Tuple[Tuple[int, Tuple[int, ...]], ...]:
-        '''Calculate measures based on the MM sequence.'''
         partitions = []
         current_partition = []
         mm_index = 0

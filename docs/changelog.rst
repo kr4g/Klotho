@@ -1,27 +1,37 @@
 Changelog
 =========
 
-Version 3.0.5 (Current)
+Version 4.0.5 (Current)
 ------------------------
+
+* Comprehensive documentation overhaul with NumPy-style docstrings across all modules
+* Sphinx docs restructured to match current source tree
+* ``conf.py`` version now reads dynamically from ``klotho/__init__.py``
+* Added ``plotly`` and ``scikit-learn`` to ``install_requires``
+* README cleanup: simplified installation instructions, added badges, updated copyright
+
+Version 4.x
+------------
+
+* Major API restructuring across all modules
+* Removed ``maquettes``, ``animation``, ``notation``, ``midi``, and ``allolib`` submodules from semeios
+* Removed ``fields`` subtree from ``topos.graphs.lattices``
+* Added ``tone_lattices`` system to tonos
+* Renamed CPS modules (``cps.py`` → ``combination_product_sets.py``, ``nkany.py`` → ``algorithms.py``)
+* Added ``Contour`` class to tonos.pitch
+* Added ``basis.py`` to utils.algorithms
+* Graph backend migrated to RustworkX for performance
+
+Version 3.0.5
+--------------
 
 * Documentation infrastructure setup
 * Added comprehensive Sphinx documentation
 * NumPy-style docstring standards established
-* **NEW:** Added ``klotho.semeios.maquettes`` module for interactive timeline visualization
-* **NEW:** Timeline class with web-based GUI for musical maquettes (sketches)
-* **NEW:** Clip class for representing time-bounded events
-* **NEW:** OSC communication support for real-time clip highlighting
-* **NEW:** Multi-track timeline system with DAW-like behavior
-* **NEW:** Dependencies added: panel, bokeh, jupyter_bokeh for interactive visualization
-* **REFACTORED:** ``klotho.utils.algorithms`` module architecture improvements:
-  
-  * **NEW:** Added ``graphs.py`` module with flexible ``minimum_cost_path`` function
-  * **IMPROVED:** ``cost_matrix`` now returns numpy arrays instead of pandas DataFrames for better performance
-  * **RENAMED:** ``cost_matrix_graph`` → ``cost_matrix_to_graph`` for clarity
-  * **ENHANCED:** ``minimum_cost_path`` supports arbitrary traversal functions with ``**kwargs``
-  * **FIXED:** Import issues with non-existent ``Notelist`` class
+* Dependencies added: panel, bokeh, jupyter_bokeh for interactive visualization
+* ``klotho.utils.algorithms`` module architecture improvements
 
 Previous Versions
 -----------------
 
-Coming soon... 
+See the `GitHub repository <https://github.com/kr4g/Klotho>`_ for full commit history.

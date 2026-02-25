@@ -1,9 +1,35 @@
+"""
+Field function abstractions for parameter field evaluation.
+
+This module provides ``FieldFunction``, an abstract base class for functions
+that are evaluated over parameter field lattice coordinates, along with
+concrete implementations (Identity, Sigmoid, Gaussian, Polynomial) and
+a composition utility.
+"""
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Union, Tuple
 import numpy as np
 
 class FieldFunction(ABC):
-    '''Base class for field functions with variable input dimensionality and output range.'''
+    """
+    Abstract base class for field functions with variable input/output dimensionality.
+    
+    Subclasses implement ``_raw_function``; the ``__call__`` wrapper handles
+    dimensionality validation, reshaping, and output-range clipping.
+    
+    Parameters
+    ----------
+    input_dim : int, optional
+        Expected number of input dimensions (default is 1).
+    output_dim : int, optional
+        Number of output dimensions (default is 1).
+    output_range : tuple of float, optional
+        ``(min, max)`` clipping range for output values
+        (default is ``(-inf, inf)``).
+    parameters : dict, optional
+        Arbitrary named parameters accessible as ``self.parameters``.
+    """
 
     def __init__(self, input_dim: int = 1, output_dim: int = 1, 
                  output_range: Tuple[float, float] = (float('-inf'), float('inf')),
@@ -15,11 +41,43 @@ class FieldFunction(ABC):
 
     @abstractmethod
     def _raw_function(self, x: np.ndarray) -> np.ndarray:
-        '''Raw function to be implemented by subclasses.'''
+        """
+        Core function logic to be implemented by subclasses.
+        
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Input array with last dimension matching ``input_dim``.
+            
+        Returns
+        -------
+        numpy.ndarray
+            Raw (unclipped) output values.
+        """
         pass
 
     def __call__(self, x: Union[float, list, np.ndarray]) -> Union[float, np.ndarray]:
-        '''Apply the function to input x, ensuring correct dimensionality and range.'''
+        """
+        Evaluate the function on input *x*.
+        
+        Validates input dimensionality, applies the raw function, reshapes
+        multi-dimensional output, and clips to ``output_range``.
+        
+        Parameters
+        ----------
+        x : float, list, or numpy.ndarray
+            Input value(s).
+            
+        Returns
+        -------
+        float or numpy.ndarray
+            Clipped function output.
+            
+        Raises
+        ------
+        ValueError
+            If the last dimension of *x* does not match ``input_dim``.
+        """
         x = np.atleast_1d(x)
         if x.shape[-1] != self.input_dim:
             raise ValueError(f"Input dimensionality {x.shape[-1]} does not match expected {self.input_dim}")
@@ -33,7 +91,28 @@ class FieldFunction(ABC):
 
     @staticmethod
     def compose(*functions: 'FieldFunction') -> 'FieldFunction':
-        '''Compose multiple FieldFunctions.'''
+        """
+        Compose multiple FieldFunctions into a single callable.
+        
+        Functions are applied right-to-left: ``compose(f, g)(x)`` computes
+        ``f(g(x))``. Adjacent output/input dimensions must match.
+        
+        Parameters
+        ----------
+        *functions : FieldFunction
+            Two or more FieldFunction instances to compose.
+            
+        Returns
+        -------
+        FieldFunction
+            A composed function with the input dimension of the last function
+            and the output dimension/range of the first.
+            
+        Raises
+        ------
+        ValueError
+            If fewer than two functions are given or dimensions are incompatible.
+        """
         if len(functions) < 2:
             raise ValueError("At least two functions are required for composition.")
         
@@ -54,17 +133,31 @@ class FieldFunction(ABC):
         return ComposedFunction(*functions)
 
     def set_parameters(self, **kwargs):
-        '''Set parameters of the function.'''
+        """
+        Update the function's named parameters.
+        
+        Parameters
+        ----------
+        **kwargs
+            Parameter names and values to set or update.
+        """
         self.parameters.update(kwargs)
 
 
 class Identity(FieldFunction):
-    '''Identity function.'''
+    """Identity function that returns its input unchanged."""
     def _raw_function(self, x: np.ndarray) -> np.ndarray:
         return x
 
 class Sigmoid(FieldFunction):
-    '''Sigmoid function.'''
+    """
+    Sigmoid (logistic) function mapping inputs to the (0, 1) range.
+    
+    Parameters
+    ----------
+    input_dim : int, optional
+        Number of input dimensions (default is 1).
+    """
     def __init__(self, input_dim: int = 1):
         super().__init__(input_dim, 1, (0, 1))
     
@@ -72,7 +165,18 @@ class Sigmoid(FieldFunction):
         return 1 / (1 + np.exp(-x))
 
 class Gaussian(FieldFunction):
-    '''Gaussian function.'''
+    """
+    Gaussian (bell curve) function.
+    
+    Parameters
+    ----------
+    input_dim : int, optional
+        Number of input dimensions (default is 1).
+    mu : float, optional
+        Mean of the Gaussian (default is 0).
+    sigma : float, optional
+        Standard deviation (default is 1).
+    """
     def __init__(self, input_dim: int = 1, mu: float = 0, sigma: float = 1):
         super().__init__(input_dim, 1, (0, 1), {'mu': mu, 'sigma': sigma})
     
@@ -80,7 +184,18 @@ class Gaussian(FieldFunction):
         return np.exp(-((x - self.parameters['mu']) ** 2) / (2 * self.parameters['sigma'] ** 2))
 
 class Polynomial(FieldFunction):
-    '''Polynomial function.'''
+    """
+    Polynomial function defined by a list of coefficients.
+    
+    Evaluates ``c[0] + c[1]*x + c[2]*x^2 + ...``
+    
+    Parameters
+    ----------
+    coefficients : list of float
+        Polynomial coefficients in ascending order of degree.
+    input_dim : int, optional
+        Number of input dimensions (default is 1).
+    """
     def __init__(self, coefficients: list, input_dim: int = 1):
         super().__init__(input_dim, 1, parameters={'coefficients': coefficients})
     

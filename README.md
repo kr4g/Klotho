@@ -37,7 +37,7 @@ Editable mode (`-e`) means changes you make to the source are immediately reflec
 
 ## Integration with SuperCollider
 
-To use Klotho with SuperCollider, see the `Klotho-SC` extension package: (<a href="https://github.com/kr4g/Klotho-SC.git" target="_blank">https://github.com/kr4g/Klotho-SC.git</a>).
+To use Klotho with SuperCollider, see the `Klotho-SC` extension package: <a href="https://github.com/kr4g/Klotho-SC.git" target="_blank">https://github.com/kr4g/Klotho-SC.git</a>.
 
 ---
 

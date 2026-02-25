@@ -14,6 +14,22 @@ from ._animation_base import (
 
 
 class AnimatedLattice3dFigure:
+    """Animated Three.js 3D lattice figure with step-by-step path reveal.
+
+    Wraps a ``ThreejsLatticeData`` scene with playback controls that
+    progressively show path edges and update node colours.  Optional
+    audio events are dispatched through the Tone.js player.
+
+    Parameters
+    ----------
+    scene_data : ThreejsLatticeData
+        Pre-built Three.js scene descriptor.
+    audio_payload : dict or None, optional
+        Tone.js-compatible event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps.
+    """
+
     def __init__(self, scene_data, audio_payload=None, dur=0.5):
         self.scene_data = scene_data
         self.audio_payload = audio_payload
@@ -21,6 +37,7 @@ class AnimatedLattice3dFigure:
         self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
+        """Return a self-contained HTML string for Jupyter display."""
         sd = self.scene_data
         wid = self.widget_id
 
@@ -519,6 +536,23 @@ class AnimatedLattice3dFigure:
 
 
 class AnimatedRTSvgFigure:
+    """Animated SVG figure for rhythm-tree leaf-by-leaf playback.
+
+    Highlights successive leaf nodes and their ancestor paths inside an
+    SVG rhythm-tree diagram, optionally synchronised with audio events.
+
+    Parameters
+    ----------
+    svg_data : SvgRTData
+        Pre-built SVG data for the rhythm tree.
+    audio_payload : dict or None, optional
+        Tone.js-compatible event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps.
+    glow : bool, optional
+        Enable halo glow on the active leaf node.
+    """
+
     def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
@@ -527,6 +561,7 @@ class AnimatedRTSvgFigure:
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
+        """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
 
@@ -630,6 +665,21 @@ class AnimatedRTSvgFigure:
 
 
 class AnimatedLatticeSvgFigure:
+    """Animated SVG figure for step-by-step lattice path traversal.
+
+    Progressively reveals path edges and updates node colours inside a
+    2D SVG lattice diagram, optionally synchronised with audio events.
+
+    Parameters
+    ----------
+    svg_data : SvgLatticeData or SvgCPSData
+        Pre-built SVG data for the lattice or CPS.
+    audio_payload : dict or None, optional
+        Tone.js-compatible event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps.
+    """
+
     def __init__(self, svg_data, audio_payload=None, dur=0.5):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
@@ -637,6 +687,7 @@ class AnimatedLatticeSvgFigure:
         self.widget_id = f"klotho_slat_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
+        """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
 
@@ -755,9 +806,26 @@ class AnimatedLatticeSvgFigure:
 
 
 AnimatedCPSSvgFigure = AnimatedLatticeSvgFigure
+"""Alias for ``AnimatedLatticeSvgFigure`` used for CPS path animations."""
 
 
 class _AnimatedShapeFigureBase:
+    """Animated SVG figure for chord / chord-sequence shape playback.
+
+    Cycles through shape groups (chords), highlighting their nodes and
+    edges with per-group colouring.  Includes prev/next navigation,
+    solo mode, and optional audio synchronisation.
+
+    Parameters
+    ----------
+    svg_data : SvgLatticeData or SvgCPSData
+        Pre-built SVG data containing shape group metadata.
+    audio_payload : dict or None, optional
+        Tone.js-compatible event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps.
+    """
+
     def __init__(self, svg_data, audio_payload=None, dur=0.5):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
@@ -765,6 +833,7 @@ class _AnimatedShapeFigureBase:
         self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
+        """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
 
@@ -1037,4 +1106,7 @@ class _AnimatedShapeFigureBase:
 
 
 AnimatedCPSShapeFigure = _AnimatedShapeFigureBase
+"""Alias for ``_AnimatedShapeFigureBase`` used for CPS shape animations."""
+
 AnimatedLatticeShapeFigure = _AnimatedShapeFigureBase
+"""Alias for ``_AnimatedShapeFigureBase`` used for lattice shape animations."""

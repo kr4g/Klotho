@@ -8,6 +8,8 @@ from ._svg_utils import SvgFigureData
 
 
 class ThreejsLatticeData(SvgFigureData):
+    """Container for Three.js 3D lattice scene data and path metadata."""
+
     __slots__ = ('scene_data', 'path_steps', 'halo_data',
                  'title', 'width_px', 'height_px')
 
@@ -16,6 +18,19 @@ class ThreejsLatticeData(SvgFigureData):
 
 
 def _static_threejs_html(sd):
+    """
+    Generate a self-contained HTML snippet for a static Three.js lattice.
+
+    Parameters
+    ----------
+    sd : ThreejsLatticeData
+        Scene descriptor containing node positions, edges, and metadata.
+
+    Returns
+    -------
+    str
+        HTML string with embedded JavaScript for Three.js rendering.
+    """
     import json
     import uuid
 
@@ -408,6 +423,59 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
                         path_mode, figsize, node_size, title,
                         is_tone_lattice, coord_label, gen_labels,
                         path_cmap='viridis'):
+    """
+    Build a Three.js 3D scene for a lattice.
+
+    Generates grid edges, highlighted edges, node spheres with hover
+    data, optional path tubes with arrow-head cones, and start/end
+    halo sprites.
+
+    Parameters
+    ----------
+    lattice : Lattice
+        The lattice object.
+    coords : list of tuple
+        Coordinates to render.
+    G : networkx.Graph
+        Edge structure for the rendered region.
+    path : list of tuple or None
+        Coordinate path to overlay.
+    nodes : list of tuple or None
+        Coordinates to highlight.
+    highlighted_coords : set
+        Union of all highlighted coordinates.
+    coord_mapping : dict
+        Maps original coordinates to reduced ones.
+    original_coords : list of tuple
+        Pre-reduction coordinate list.
+    effective_dimensionality : int
+        Always 3 for this renderer.
+    use_dimmed : bool
+        Dim non-highlighted elements.
+    mute_background : bool
+        Hide non-selected nodes.
+    path_mode : str
+        ``'adjacent'`` or ``'origin'``.
+    figsize : tuple of float
+        Width and height in inches.
+    node_size : float
+        Base node diameter.
+    title : str
+        Scene title.
+    is_tone_lattice : bool
+        Whether the lattice carries ratio information.
+    coord_label : str
+        Label prefix for hover text.
+    gen_labels : list of str
+        Axis labels from lattice generators.
+    path_cmap : str, optional
+        Matplotlib colormap for path colouring.
+
+    Returns
+    -------
+    ThreejsLatticeData
+        Three.js scene description and metadata.
+    """
     import networkx as nx
 
     width_px = int(figsize[0] * 100)

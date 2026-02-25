@@ -26,7 +26,8 @@ def cost_matrix(items: List[T], cost_function: Callable[[T, T], float], **kwargs
     -------
     Tuple[numpy.ndarray, List[T]]
         A tuple containing:
-        - Symmetric cost matrix as numpy array where entry (i, j) 
+
+        - Symmetric cost matrix as numpy array where entry (i, j)
           contains cost_function(items[i], items[j])
         - List of items in the same order as matrix indices
 

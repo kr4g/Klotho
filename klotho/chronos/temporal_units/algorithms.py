@@ -25,7 +25,29 @@ if TYPE_CHECKING:
 #     return TemporalUnit(span=ut.span, tempus=ut.tempus, prolatio=segment(ratio), beat=ut.beat, bpm=ut.bpm)
 
 def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tuple, str, None] = None, depth: Union[int, None] = None) -> TemporalUnitSequence:
-    """Decomposes a temporal structure into its constituent parts based on the provided prolatio."""
+    """
+    Decompose a temporal structure into its constituent parts.
+
+    When *depth* is given, subtrees at that depth become the new units.
+    Otherwise, each leaf duration becomes an independent unit with the
+    specified *prolatio*.
+
+    Parameters
+    ----------
+    ut : TemporalUnit or CompositionalUnit
+        The temporal structure to decompose.
+    prolatio : tuple, str, or None, optional
+        The subdivision specification for the resulting units. When None,
+        defaults to ``'d'`` (duration). Default is None.
+    depth : int or None, optional
+        If given, decompose at the specified tree depth rather than at
+        the leaf level. Default is None.
+
+    Returns
+    -------
+    TemporalUnitSequence
+        A sequence of the resulting temporal units.
+    """
     
     # Import here to avoid circular imports
     from klotho.thetos.composition.compositional import CompositionalUnit
@@ -117,16 +139,24 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
 
 def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fraction, str, float], bpm: Union[int, float]) -> Union[TemporalUnit, 'CompositionalUnit']:
     """
-    Creates a new TemporalUnit or CompositionalUnit with the specified beat and bpm, 
-    adjusting the tempus to maintain the same duration as the original unit.
-    
-    Args:
-        ut (Union[TemporalUnit, CompositionalUnit]): The original temporal unit
-        beat (Union[Fraction, str, float]): The new beat value
-        bpm (Union[int, float]): The new beats per minute
-        
-    Returns:
-        Union[TemporalUnit, CompositionalUnit]: A new temporal unit with adjusted tempus and the specified beat/bpm
+    Create a new unit with specified beat/bpm, preserving the original duration.
+
+    The tempus is adjusted so that the resulting unit has the same duration
+    as *ut* under the new tempo parameters.
+
+    Parameters
+    ----------
+    ut : TemporalUnit or CompositionalUnit
+        The original temporal unit.
+    beat : Fraction, str, or float
+        The new beat value.
+    bpm : int or float
+        The new beats per minute.
+
+    Returns
+    -------
+    TemporalUnit or CompositionalUnit
+        A new unit with adjusted tempus and the specified beat/bpm.
     """
     from klotho.thetos.composition.compositional import CompositionalUnit
     
@@ -164,16 +194,24 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
 
 def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tempus: Union[Meas, Fraction, float, str]) -> Union[TemporalUnit, 'CompositionalUnit']:
     """
-    Creates a new TemporalUnit or CompositionalUnit with the specified tempus, 
-    adjusting the beat/bpm to maintain the same duration as the original unit.
-    
-    Args:
-        ut (Union[TemporalUnit, CompositionalUnit]): The original temporal unit
-        span (int): The new span value
-        tempus (Union[Meas, Fraction, float, str]): The new tempus value
-        
-    Returns:
-        Union[TemporalUnit, CompositionalUnit]: A new temporal unit with the specified tempus and adjusted beat/bpm
+    Create a new unit with specified tempus, preserving the original duration.
+
+    The bpm is adjusted so that the resulting unit has the same duration
+    as *ut* under the new tempus and span.
+
+    Parameters
+    ----------
+    ut : TemporalUnit or CompositionalUnit
+        The original temporal unit.
+    span : int
+        The new span value.
+    tempus : Meas, Fraction, float, or str
+        The new time signature.
+
+    Returns
+    -------
+    TemporalUnit or CompositionalUnit
+        A new unit with the specified tempus and adjusted bpm.
     """
     from klotho.thetos.composition.compositional import CompositionalUnit
     
@@ -212,6 +250,29 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
         )
 
 def convolve(x: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], h: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], beat: Union[Fraction, str, float] = '1/4', bpm: Union[int, float] = 60) -> TemporalUnitSequence:
+    """
+    Convolve two temporal structures to produce a new sequence.
+
+    Both inputs are first decomposed (if not already sequences), then
+    their tempus values are convolved in the signal-processing sense to
+    produce a sequence of ``y_len = len(x) + len(h) - 1`` units.
+
+    Parameters
+    ----------
+    x : TemporalUnit, CompositionalUnit, or TemporalUnitSequence
+        The first temporal structure (signal).
+    h : TemporalUnit, CompositionalUnit, or TemporalUnitSequence
+        The second temporal structure (kernel).
+    beat : Fraction, str, or float, optional
+        Beat reference for the output units. Default is ``'1/4'``.
+    bpm : int or float, optional
+        Beats per minute for the output units. Default is 60.
+
+    Returns
+    -------
+    TemporalUnitSequence
+        The convolved sequence.
+    """
     beat = Fraction(beat)
     bpm = float(bpm)
     

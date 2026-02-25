@@ -10,6 +10,51 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             audio_source=None,
             beat=None, bpm=None,
             glow: bool = False) -> None:
+    """
+    Render a RhythmTree using one of several SVG layout modes.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        RhythmTree instance to visualize.
+    layout : str, optional
+        Layout mode: ``'containers'`` (nested bars, default),
+        ``'ratios'`` (leaf-duration bar), or ``'tree'`` (node-link
+        diagram).
+    figsize : tuple of float or None, optional
+        Width and height in inches.  Defaults vary by layout.
+    invert : bool, optional
+        When ``True``, places the root at the top.
+    output_file : str or None, optional
+        Path to save the visualization.
+    attributes : list of str or None, optional
+        Node attributes to display (tree layout only).
+    vertical_lines : bool, optional
+        Show subdivision guide lines (containers layout).
+    barlines : bool, optional
+        Show barlines for multi-span trees (containers layout).
+    barline_color : str, optional
+        CSS colour for barlines.
+    subdivision_line_color : str, optional
+        CSS colour for subdivision guide lines.
+    animate : bool, optional
+        Return an animated figure with audio playback controls.
+    dur : float, optional
+        Seconds between animation steps.
+    audio_source : TemporalUnit or CompositionalUnit or None, optional
+        Source of real-time audio data for the animation.
+    beat : optional
+        Beat value forwarded to the animation event converter.
+    bpm : optional
+        Tempo value forwarded to the animation event converter.
+    glow : bool, optional
+        Enable halo glow effect on the active leaf during animation.
+
+    Returns
+    -------
+    SvgRTData or AnimatedRTSvgFigure
+        Renderable SVG data or animated figure.
+    """
     from klotho.semeios.visualization.svg_rt import (
         _svg_rt_ratios, _svg_rt_containers, _svg_rt_tree,
     )

@@ -8,17 +8,36 @@ __all__ = [
 ]
 
 def partial_to_fundamental(pitchclass: str, octave: int = 4, partial: int = 1, cent_offset: float = 0.0) -> Tuple[str, float]:
-    '''
-    Calculate the fundamental frequency given a pitch class and its partial number.
-    
-    Args:
-        pitchclass: The pitch class with octave (e.g., "A4", "C#3", "Bb2")
-        partial: The partial number (integer, non-zero). Negative values indicate undertones.
-        cent_offset: The cents offset from the pitch class, default is 0.0
-        
-    Returns:
-        A tuple containing the fundamental's pitch class with octave and cents offset
-    '''
+    """
+    Calculate the fundamental from a pitch and its partial number.
+
+    Given a pitch that represents a specific partial of an unknown
+    fundamental, this function back-calculates the fundamental frequency
+    and returns its pitch-class information.
+
+    Parameters
+    ----------
+    pitchclass : str
+        Pitch class name (e.g., ``"A"``, ``"C#"``).
+    octave : int, optional
+        Octave number. Default is 4.
+    partial : int, optional
+        Partial number (non-zero). Negative values indicate undertones.
+        Default is 1.
+    cent_offset : float, optional
+        Microtonal offset in cents. Default is 0.0.
+
+    Returns
+    -------
+    namedtuple
+        A named tuple with fields ``pitchclass``, ``octave``, and
+        ``cents_offset`` for the fundamental.
+
+    Raises
+    ------
+    ValueError
+        If *partial* is zero.
+    """
     if partial == 0:
         raise ValueError("Partial number cannot be zero")
 
@@ -28,16 +47,27 @@ def partial_to_fundamental(pitchclass: str, octave: int = 4, partial: int = 1, c
     return freq_to_pitchclass(fundamental_freq)
 
 def first_equave(harmonic: Union[int, float, Fraction], equave: Union[int, float, Fraction, str] = 2, max_equave: Union[int, float, Fraction, str] = None):
-  '''
-  Returns the first equave in which a harmonic first appears.
-  
-  Args:
-    harmonic: A harmonic.
-    max_equave: The maximum equave to search, default is None.
-    
-  Returns:
-    The first equave in which the harmonic first appears as an integer.
-  '''
+  """
+  Return the first equave register in which a harmonic number appears.
+
+  For example, harmonics 2 and 3 first appear in equave 1 (range 2--4),
+  harmonic 5 first appears in equave 2 (range 4--8), etc.
+
+  Parameters
+  ----------
+  harmonic : int, float, or Fraction
+      The harmonic number.
+  equave : int, float, Fraction, or str, optional
+      Interval of equivalence. Default is 2 (octave).
+  max_equave : int, float, Fraction, str, or None, optional
+      Maximum equave register to search. None means unbounded.
+
+  Returns
+  -------
+  int or None
+      The equave register number, or None if not found within
+      *max_equave*.
+  """
   equave = Fraction(equave)
   max_equave = Fraction(max_equave) if max_equave is not None else None
   n_equave = 0

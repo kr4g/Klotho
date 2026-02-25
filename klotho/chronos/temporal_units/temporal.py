@@ -1,11 +1,14 @@
 # ------------------------------------------------------------------------
 # Klotho/klotho/chronos/temporal_units/ut.py
 # ------------------------------------------------------------------------
-'''
---------------------------------------------------------------------------------------
-Temporal Units
---------------------------------------------------------------------------------------
-'''
+"""
+Temporal units.
+
+A temporal unit binds a rhythm tree to a tempo and beat reference, producing
+concrete onset times and durations in seconds. Temporal units can be
+collected into sequences and blocks for polyphonic or multi-layered timing
+structures.
+"""
 from fractions import Fraction
 from typing import Union
 from ..rhythm_trees import Meas, RhythmTree
@@ -17,6 +20,18 @@ import pandas as pd
 import copy
 
 class ProlatioTypes(Enum):
+    """
+    Enum of prolatio (subdivision) types for a temporal unit.
+
+    The four types describe how a time signature is subdivided:
+
+    - **DURATION** -- a single sustained note spanning the entire measure.
+    - **REST** -- a single rest spanning the entire measure.
+    - **PULSE** -- evenly spaced pulses matching the numerator.
+    - **SUBDIVISION** -- a custom subdivision tuple.
+
+    Each type also carries a set of string aliases for convenient parsing.
+    """
     DURATION    = 'Duration'
     REST        = 'Rest'
     PULSE       = 'Pulse'
@@ -33,6 +48,19 @@ class TemporalMeta(type):
 
 
 class Chronon(metaclass=TemporalMeta):
+    """
+    A single temporal event (leaf node) within a :class:`RhythmTree`.
+
+    A chronon exposes the real-time onset, duration, and end for one leaf,
+    along with its metric proportion and rest status.
+
+    Parameters
+    ----------
+    node_id : int
+        The node identifier within the rhythm tree.
+    rt : RhythmTree
+        The parent rhythm tree that owns this node.
+    """
     __slots__ = ('_node_id', '_rt')
     
     def __init__(self, node_id:int, rt:RhythmTree):
@@ -40,21 +68,44 @@ class Chronon(metaclass=TemporalMeta):
         self._rt = rt
     
     @property
-    def start(self): return abs(self._rt[self._node_id]['real_onset'])
+    def start(self):
+        """The absolute start time in seconds."""
+        return abs(self._rt[self._node_id]['real_onset'])
+
     @property
-    def duration(self): return abs(self._rt[self._node_id]['real_duration'])
+    def duration(self):
+        """The absolute duration in seconds."""
+        return abs(self._rt[self._node_id]['real_duration'])
+
     @property
-    def end(self): return self.start + abs(self.duration)
+    def end(self):
+        """The absolute end time in seconds."""
+        return self.start + abs(self.duration)
+
     @property
-    def proportion(self): return self._rt[self._node_id]['proportion']
+    def proportion(self):
+        """The integer proportion value from the rhythm tree."""
+        return self._rt[self._node_id]['proportion']
+
     @property
-    def metric_duration(self): return self._rt[self._node_id]['metric_duration']
+    def metric_duration(self):
+        """The fractional metric duration relative to the measure."""
+        return self._rt[self._node_id]['metric_duration']
+
     @property
-    def metric_onset(self): return self._rt[self._node_id]['metric_onset']
+    def metric_onset(self):
+        """The fractional metric onset relative to the measure."""
+        return self._rt[self._node_id]['metric_onset']
+
     @property
-    def node_id(self): return self._node_id
+    def node_id(self):
+        """The node identifier within the parent rhythm tree."""
+        return self._node_id
+
     @property
-    def is_rest(self): return self._rt[self._node_id]['proportion'] < 0
+    def is_rest(self):
+        """Whether this event is a rest (negative proportion)."""
+        return self._rt[self._node_id]['proportion'] < 0
     
     def __str__(self):
         return pd.DataFrame({
@@ -73,6 +124,38 @@ class Chronon(metaclass=TemporalMeta):
 
 
 class TemporalUnit(metaclass=TemporalMeta):
+    """
+    A rhythmic structure bound to a tempo, producing real-time events.
+
+    A ``TemporalUnit`` combines a :class:`RhythmTree` (defined by
+    *tempus* and *prolatio*) with a tempo specification (*beat*, *bpm*)
+    and an optional time *offset* to produce concrete onset times and
+    durations in seconds.
+
+    Parameters
+    ----------
+    span : int, float, or Fraction, optional
+        Number of measures. Default is 1.
+    tempus : Meas, Fraction, int, float, or str, optional
+        The time signature. Default is ``'4/4'``.
+    prolatio : tuple or str, optional
+        The subdivision specification. A tuple gives explicit proportions;
+        a string selects a preset (``'d'`` = duration, ``'r'`` = rest,
+        ``'p'`` = pulse). Default is ``'d'``.
+    beat : Fraction, int, float, str, or None, optional
+        The beat reference for tempo calculation. When None, the
+        denominator of the time signature is used. Default is None.
+    bpm : int, float, or None, optional
+        Beats per minute. Default is None (falls back to 60).
+    offset : float, optional
+        Absolute start time in seconds. Default is 0.
+
+    Examples
+    --------
+    >>> ut = TemporalUnit(tempus='4/4', prolatio='p', bpm=120)
+    >>> len(ut)
+    4
+    """
     def __init__(self,
                  span     : Union[int,float,Fraction]          = 1,
                  tempus   : Union[Meas,Fraction,int,float,str] = '4/4',
@@ -94,6 +177,22 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
+        """
+        Construct a ``TemporalUnit`` from an existing :class:`RhythmTree`.
+
+        Parameters
+        ----------
+        rt : RhythmTree
+            The rhythm tree to wrap.
+        beat : Fraction, int, float, str, or None, optional
+            Beat reference. Default is None.
+        bpm : int, float, or None, optional
+            Beats per minute. Default is None.
+
+        Returns
+        -------
+        TemporalUnit
+        """
         return cls(span     = rt.span,
                    tempus   = rt.meas,
                    prolatio = rt.subdivisions,
@@ -181,10 +280,12 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def onsets(self):
+        """The real-time onset of each leaf event in seconds."""
         return tuple(self._rt[n]['real_onset'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
+        """The real-time duration of each leaf event in seconds."""
         return tuple(self._rt[n]['real_duration'] for n in self._rt.leaf_nodes)
 
     @property
@@ -202,6 +303,13 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     @property
     def events(self):
+        """
+        A :class:`~pandas.DataFrame` of all leaf events with timing and metric data.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
         if self._events is None:
             self._events = self._evaluate()
         return pd.DataFrame([{
@@ -223,16 +331,20 @@ class TemporalUnit(metaclass=TemporalMeta):
         
     def set_duration(self, target_duration: float) -> None:
         """
-        Sets the tempo (bpm) to achieve a specific duration in seconds.
-        
-        This method calculates and sets the appropriate bpm value so that
-        the TemporalUnit's total duration matches the target duration.
-        
-        Args:
-            target_duration: The desired duration in seconds
-            
-        Raises:
-            ValueError: If target_duration is not positive
+        Set the tempo (bpm) to achieve a specific total duration.
+
+        Calculates and sets the appropriate bpm so that this unit's
+        total duration matches *target_duration*.
+
+        Parameters
+        ----------
+        target_duration : float
+            The desired duration in seconds.
+
+        Raises
+        ------
+        ValueError
+            If *target_duration* is not positive.
         """
         if target_duration <= 0:
             raise ValueError("Target duration must be positive")
@@ -245,21 +357,35 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     def make_rest(self, node: int) -> None:
         """
-        Make a node and all its descendants into rests by setting their proportions to negative.
-        
-        This method calls the RhythmTree's make_rest method and then re-evaluates the
-        TemporalUnit to update the timing information.
-        
-        Args:
-            node: The node ID to make into a rest along with all its descendants
-            
-        Raises:
-            ValueError: If the node is not found in the rhythm tree
+        Turn a node and all its descendants into rests.
+
+        Delegates to :meth:`RhythmTree.make_rest` and re-evaluates timing.
+
+        Parameters
+        ----------
+        node : int
+            The node ID to convert to a rest.
+
+        Raises
+        ------
+        ValueError
+            If the node is not found in the rhythm tree.
         """
         self._rt.make_rest(node)
         self._events = None
 
     def sparsify(self, probability, node=None):
+        """
+        Randomly convert leaf events to rests with a given probability.
+
+        Parameters
+        ----------
+        probability : float
+            Probability (0--1) that each eligible leaf becomes a rest.
+        node : int, list of int, or None, optional
+            Restrict to leaves under this node (or nodes). When None,
+            all leaves are candidates. Default is None.
+        """
         import numpy as _np
         if node is None:
             targets = list(self._rt.leaf_nodes)
@@ -364,6 +490,18 @@ class TemporalUnit(metaclass=TemporalMeta):
         return self.__str__()
 
     def repeat(self, n):
+        """
+        Create a :class:`TemporalUnitSequence` of *n* copies of this unit.
+
+        Parameters
+        ----------
+        n : int
+            Number of repetitions.
+
+        Returns
+        -------
+        TemporalUnitSequence
+        """
         uts = TemporalUnitSequence()
         uts.extend([self] * n)
         return uts
@@ -375,7 +513,20 @@ class TemporalUnit(metaclass=TemporalMeta):
 
 
 class TemporalUnitSequence(metaclass=TemporalMeta):
-    """A sequence of TemporalUnit objects that represent consecutive temporal events."""
+    """
+    An ordered sequence of :class:`TemporalUnit` objects representing
+    consecutive temporal events.
+
+    Units are automatically offset so that each begins where the previous
+    one ends.
+
+    Parameters
+    ----------
+    ut_seq : list of TemporalUnit, optional
+        Initial sequence of temporal units. Default is an empty list.
+    offset : float, optional
+        Absolute start time in seconds. Default is 0.
+    """
     
     def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0):
         self._seq    = [ut.copy() for ut in ut_seq] # XXX - this needs to be ut.copy()
@@ -430,18 +581,20 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     
     def set_duration(self, target_duration: float) -> None:
         """
-        Sets the tempo (bpm) of all TemporalUnits to achieve a specific total duration in seconds.
-        
-        This method calculates and sets the appropriate bpm values for all TemporalUnits
-        in the sequence so that the total duration matches the target duration.
-        The relative durations between units are preserved by scaling all bpm values
-        by the same factor.
-        
-        Args:
-            target_duration: The desired total duration in seconds
-            
-        Raises:
-            ValueError: If target_duration is not positive or if sequence is empty
+        Scale the tempo of all units to achieve a specific total duration.
+
+        Relative durations between units are preserved by applying the same
+        scaling factor to every bpm value.
+
+        Parameters
+        ----------
+        target_duration : float
+            The desired total duration in seconds.
+
+        Raises
+        ------
+        ValueError
+            If *target_duration* is not positive or the sequence is empty.
         """
         if target_duration <= 0:
             raise ValueError("Target duration must be positive")
@@ -460,11 +613,14 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
     def append(self, ut: TemporalUnit, repeat: int = 1) -> None:
         """
-        Append a TemporalUnit to the end of the sequence.
-        
-        Args:
-            ut: The TemporalUnit to append
-            repeat: Number of independent copies to append (default 1)
+        Append a temporal unit to the end of the sequence.
+
+        Parameters
+        ----------
+        ut : TemporalUnit
+            The unit to append.
+        repeat : int, optional
+            Number of independent copies to append. Default is 1.
         """
         for _ in range(repeat):
             self._seq.append(ut.copy())
@@ -472,24 +628,31 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
     def prepend(self, ut: TemporalUnit) -> None:
         """
-        Prepend a TemporalUnit to the beginning of the sequence.
-        
-        Args:
-            ut: The TemporalUnit to prepend
+        Prepend a temporal unit to the beginning of the sequence.
+
+        Parameters
+        ----------
+        ut : TemporalUnit
+            The unit to prepend.
         """
         self._seq.insert(0, ut.copy())
         self._set_offsets()
         
     def insert(self, index: int, ut: TemporalUnit) -> None:
         """
-        Insert a TemporalUnit at the specified index in the sequence.
-        
-        Args:
-            index: The index at which to insert the TemporalUnit
-            ut: The TemporalUnit to insert
-            
-        Raises:
-            IndexError: If the index is out of range
+        Insert a temporal unit at the specified index.
+
+        Parameters
+        ----------
+        index : int
+            The position at which to insert.
+        ut : TemporalUnit
+            The unit to insert.
+
+        Raises
+        ------
+        IndexError
+            If the index is out of range.
         """
         if not -len(self._seq) <= index <= len(self._seq):
             raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
@@ -499,13 +662,17 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
     def remove(self, index: int) -> None:
         """
-        Remove the TemporalUnit at the specified index.
-        
-        Args:
-            index: The index of the TemporalUnit to remove
-            
-        Raises:
-            IndexError: If the index is out of range
+        Remove the temporal unit at the specified index.
+
+        Parameters
+        ----------
+        index : int
+            The index of the unit to remove.
+
+        Raises
+        ------
+        IndexError
+            If the index is out of range.
         """
         if not -len(self._seq) <= index < len(self._seq):
             raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
@@ -515,14 +682,19 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
     def replace(self, index: int, ut: TemporalUnit) -> None:
         """
-        Replace the TemporalUnit at the specified index with a new one.
-        
-        Args:
-            index: The index of the TemporalUnit to replace
-            ut: The new TemporalUnit
-            
-        Raises:
-            IndexError: If the index is out of range
+        Replace the temporal unit at the specified index.
+
+        Parameters
+        ----------
+        index : int
+            The index of the unit to replace.
+        ut : TemporalUnit
+            The replacement unit.
+
+        Raises
+        ------
+        IndexError
+            If the index is out of range.
         """
         if not -len(self._seq) <= index < len(self._seq):
             raise IndexError(f"Index {index} out of range for sequence of length {len(self._seq)}")
@@ -532,11 +704,14 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
     def extend(self, other_seq, repeat: int = 1) -> None:
         """
-        Extend the sequence by appending all TemporalUnits from another sequence.
-        
-        Args:
-            other_seq: The TemporalUnitSequence or iterable of TemporalUnits to extend from
-            repeat: Number of times to repeat the extension (default 1)
+        Extend the sequence by appending all units from another iterable.
+
+        Parameters
+        ----------
+        other_seq : TemporalUnitSequence or iterable of TemporalUnit
+            The source of units to append.
+        repeat : int, optional
+            Number of times to repeat the extension. Default is 1.
         """
         for _ in range(repeat):
             for ut in other_seq:
@@ -576,19 +751,27 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
 
 class TemporalBlock(metaclass=TemporalMeta):
     """
-    A collection of parallel temporal structures that represent simultaneous temporal events.
-    Each row can be a TemporalUnit, TemporalUnitSequence, or another TemporalBlock.
+    A collection of parallel temporal structures representing simultaneous events.
+
+    Each row can be a :class:`TemporalUnit`, :class:`TemporalUnitSequence`,
+    or another ``TemporalBlock``. Rows are aligned according to the *axis*
+    parameter and optionally sorted by duration.
+
+    Parameters
+    ----------
+    rows : list, optional
+        Temporal structures (``TemporalUnit``, ``TemporalUnitSequence``,
+        or ``TemporalBlock``). Default is an empty list.
+    axis : float, optional
+        Alignment axis from -1 (left) through 0 (center) to 1 (right).
+        Default is -1.
+    offset : float, optional
+        Initial time offset in seconds. Default is 0.
+    sort_rows : bool, optional
+        Whether to sort rows by duration (longest first). Default is True.
     """
     
     def __init__(self, rows:list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']]=[], axis:float = -1, offset:float=0, sort_rows:bool=True):
-        """
-        Initialize a TemporalBlock with rows of temporal structures.
-        
-        Args:
-            rows: List of temporal structures (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
-            offset: Initial time offset in seconds
-            sort_rows: Whether to sort rows by duration (longest at index 0)
-        """
         self._rows = [row.copy() for row in rows] if rows else [] # XXX - this needs to be row.copy()
         self._axis = axis
         self._offset = offset
@@ -602,15 +785,26 @@ class TemporalBlock(metaclass=TemporalMeta):
     def from_tree_mat(cls, matrix, meas_denom:int=1, subdiv:bool=False,
                       rotation_offset:int=1, beat=None, bpm=None):
         """
-        Creates a TemporalBlock from a matrix of tree specifications.
-        
-        Args:
-            matrix: Input matrix containing duration and subdivision specifications
-            meas_denom: Denominator for measure fractions
-            subdiv: Whether to automatically generate subdivisions
-            rotation_offset: Offset for rotation calculations
-            bpm: bpm in beats per minute
-            beat: Beat ratio specification
+        Create a ``TemporalBlock`` from a matrix of tree specifications.
+
+        Parameters
+        ----------
+        matrix : tuple of tuple
+            Matrix where each element is a ``(D, S)`` pair.
+        meas_denom : int, optional
+            Denominator for measure fractions. Default is 1.
+        subdiv : bool, optional
+            Whether to apply automatic subdivision. Default is False.
+        rotation_offset : int, optional
+            Offset for rotation calculations. Default is 1.
+        beat : Fraction, str, float, or None, optional
+            Beat ratio specification. Default is None.
+        bpm : int, float, or None, optional
+            Beats per minute. Default is None.
+
+        Returns
+        -------
+        TemporalBlock
         """
         tb = []
         for i, row in enumerate(matrix):
@@ -695,14 +889,18 @@ class TemporalBlock(metaclass=TemporalMeta):
     @axis.setter
     def axis(self, axis: float):
         """
-        Sets the temporal axis position of the block and realigns rows.
-        
-        Args:
-            axis: Float between -1 and 1, where:
-                -1: rows start at block offset (left-aligned)
-                 0: rows are centered within the block
-                 1: rows end at block offset + duration (right-aligned)
-                Any value in between creates a proportional alignment
+        Set the temporal axis and realign rows.
+
+        Parameters
+        ----------
+        axis : float
+            Value between -1 and 1 controlling alignment:
+            -1 = left-aligned, 0 = centered, 1 = right-aligned.
+
+        Raises
+        ------
+        ValueError
+            If *axis* is outside [-1, 1].
         """
         if not -1 <= axis <= 1:
             raise ValueError("Axis must be between -1 and 1")
@@ -711,18 +909,20 @@ class TemporalBlock(metaclass=TemporalMeta):
         
     def set_duration(self, target_duration: float) -> None:
         """
-        Sets the tempo (bpm) of all rows to achieve a specific total duration in seconds.
-        
-        This method calculates and sets the appropriate bpm values for all rows
-        in the block so that the total duration matches the target duration.
-        The relative durations between rows are preserved by scaling all bpm values
-        by the same factor.
-        
-        Args:
-            target_duration: The desired total duration in seconds
-            
-        Raises:
-            ValueError: If target_duration is not positive or if block is empty
+        Scale the tempo of all rows to achieve a specific total duration.
+
+        Relative durations between rows are preserved by applying the same
+        scaling factor.
+
+        Parameters
+        ----------
+        target_duration : float
+            The desired total duration in seconds.
+
+        Raises
+        ------
+        ValueError
+            If *target_duration* is not positive or the block is empty.
         """
         if target_duration <= 0:
             raise ValueError("Target duration must be positive")
@@ -742,40 +942,43 @@ class TemporalBlock(metaclass=TemporalMeta):
 
     def prepend(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
-        Add a temporal structure at the beginning of the block (index 0).
-        
-        Note: In this implementation, index 0 is considered the "bottom" row.
-        
-        Args:
-            row: The temporal structure to add (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
+        Add a temporal structure at the beginning (index 0) of the block.
+
+        Parameters
+        ----------
+        row : TemporalUnit, TemporalUnitSequence, or TemporalBlock
+            The temporal structure to prepend.
         """
         self._rows.insert(0, row.copy())
         self._align_rows()
         
     def append(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
-        Add a temporal structure at the end of the block (highest index).
-        
-        Note: In this implementation, the highest index is considered the "top" row.
-        
-        Args:
-            row: The temporal structure to add (TemporalUnit, TemporalUnitSequence, or TemporalBlock)
+        Add a temporal structure at the end (highest index) of the block.
+
+        Parameters
+        ----------
+        row : TemporalUnit, TemporalUnitSequence, or TemporalBlock
+            The temporal structure to append.
         """
         self._rows.append(row.copy())
         self._align_rows()
         
     def insert(self, index: int, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
-        Insert a temporal structure at the specified index in the block.
-        
-        Note: Index 0 is the first row (bottom), with higher indices moving upward.
-        
-        Args:
-            index: The index at which to insert the row
-            row: The temporal structure to insert
-            
-        Raises:
-            IndexError: If the index is out of range
+        Insert a temporal structure at the specified index.
+
+        Parameters
+        ----------
+        index : int
+            The position at which to insert.
+        row : TemporalUnit, TemporalUnitSequence, or TemporalBlock
+            The temporal structure to insert.
+
+        Raises
+        ------
+        IndexError
+            If the index is out of range.
         """
         if not -len(self._rows) <= index <= len(self._rows):
             raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
@@ -786,12 +989,16 @@ class TemporalBlock(metaclass=TemporalMeta):
     def remove(self, index: int) -> None:
         """
         Remove the row at the specified index.
-        
-        Args:
-            index: The index of the row to remove
-            
-        Raises:
-            IndexError: If the index is out of range
+
+        Parameters
+        ----------
+        index : int
+            The index of the row to remove.
+
+        Raises
+        ------
+        IndexError
+            If the index is out of range.
         """
         if not -len(self._rows) <= index < len(self._rows):
             raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
@@ -801,14 +1008,19 @@ class TemporalBlock(metaclass=TemporalMeta):
         
     def replace(self, index: int, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
-        Replace the row at the specified index with a new one.
-        
-        Args:
-            index: The index of the row to replace
-            row: The new temporal structure
-            
-        Raises:
-            IndexError: If the index is out of range
+        Replace the row at the specified index.
+
+        Parameters
+        ----------
+        index : int
+            The index of the row to replace.
+        row : TemporalUnit, TemporalUnitSequence, or TemporalBlock
+            The replacement temporal structure.
+
+        Raises
+        ------
+        IndexError
+            If the index is out of range.
         """
         if not -len(self._rows) <= index < len(self._rows):
             raise IndexError(f"Index {index} out of range for block of height {len(self._rows)}")
@@ -819,9 +1031,11 @@ class TemporalBlock(metaclass=TemporalMeta):
     def extend(self, other_block: 'TemporalBlock') -> None:
         """
         Extend the block by appending all rows from another block.
-        
-        Args:
-            other_block: The TemporalBlock to extend from
+
+        Parameters
+        ----------
+        other_block : TemporalBlock
+            The block whose rows will be appended.
         """
         for row in other_block:
             self._rows.append(row.copy())

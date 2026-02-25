@@ -19,6 +19,7 @@ class NodeIdentityMapper:
     RustworkX's integer indices, ensuring consistent mapping across all graph operations.
     
     Features:
+
     - O(1) lookup performance in both directions
     - Handles non-hashable objects using object identity
     - Automatic cleanup of removed nodes
@@ -27,18 +28,14 @@ class NodeIdentityMapper:
     """
     
     def __init__(self):
-        # Primary mappings for hashable objects
         self._obj_to_index: Dict[Any, int] = {}
         self._index_to_obj: List[Optional[Any]] = []
         
-        # Secondary mapping for non-hashable objects using object id
         self._nonhashable_to_index: Dict[int, int] = {}
         self._nonhashable_refs: Dict[int, Any] = {}
         
-        # Set of freed indices for reuse
         self._freed_indices: Set[int] = set()
         
-        # Next available index
         self._next_index = 0
     
     def add_node(self, node_obj: Any) -> int:
@@ -48,40 +45,41 @@ class NodeIdentityMapper:
         If the node already exists, returns its existing index.
         Otherwise, creates a new mapping and returns the new index.
         
-        Args:
-            node_obj: The node object to add (can be any Python object)
+        Parameters
+        ----------
+        node_obj : object
+            The node object to add (can be any Python object).
             
-        Returns:
-            int: The integer index assigned to this node
+        Returns
+        -------
+        int
+            The integer index assigned to this node.
             
-        Raises:
-            ValueError: If node_obj is None (reserved value)
+        Raises
+        ------
+        ValueError
+            If *node_obj* is ``None`` (reserved value).
         """
         if node_obj is None:
             raise ValueError("None is not allowed as a node object")
         
-        # Check if already mapped (hashable objects)
         if self._is_hashable(node_obj):
             if node_obj in self._obj_to_index:
                 return self._obj_to_index[node_obj]
         else:
-            # Check non-hashable objects by id
             obj_id = id(node_obj)
             if obj_id in self._nonhashable_to_index:
                 return self._nonhashable_to_index[obj_id]
         
-        # Get next available index
         if self._freed_indices:
             index = self._freed_indices.pop()
         else:
             index = self._next_index
             self._next_index += 1
         
-        # Extend index list if necessary
         while len(self._index_to_obj) <= index:
             self._index_to_obj.append(None)
         
-        # Store the mapping
         self._index_to_obj[index] = node_obj
         
         if self._is_hashable(node_obj):
@@ -97,11 +95,15 @@ class NodeIdentityMapper:
         """
         Get the index for an existing node object.
         
-        Args:
-            node_obj: The node object to look up
+        Parameters
+        ----------
+        node_obj : object
+            The node object to look up.
             
-        Returns:
-            int: The index if found, None otherwise
+        Returns
+        -------
+        int or None
+            The index if found, ``None`` otherwise.
         """
         if node_obj is None:
             return None
@@ -116,11 +118,15 @@ class NodeIdentityMapper:
         """
         Get the original object from its index.
         
-        Args:
-            index: The integer index to look up
+        Parameters
+        ----------
+        index : int
+            The integer index to look up.
             
-        Returns:
-            Any: The original object if found, None otherwise
+        Returns
+        -------
+        object or None
+            The original object if found, ``None`` otherwise.
         """
         if 0 <= index < len(self._index_to_obj):
             return self._index_to_obj[index]
@@ -130,11 +136,15 @@ class NodeIdentityMapper:
         """
         Remove a node object and its mapping.
         
-        Args:
-            node_obj: The node object to remove
+        Parameters
+        ----------
+        node_obj : object
+            The node object to remove.
             
-        Returns:
-            bool: True if the node was found and removed, False otherwise
+        Returns
+        -------
+        bool
+            ``True`` if the node was found and removed, ``False`` otherwise.
         """
         index = self.get_index(node_obj)
         if index is None:
@@ -146,18 +156,21 @@ class NodeIdentityMapper:
         """
         Remove a node by its index.
         
-        Args:
-            index: The integer index to remove
+        Parameters
+        ----------
+        index : int
+            The integer index to remove.
             
-        Returns:
-            bool: True if the index was found and removed, False otherwise
+        Returns
+        -------
+        bool
+            ``True`` if the index was found and removed, ``False`` otherwise.
         """
         if not (0 <= index < len(self._index_to_obj)) or self._index_to_obj[index] is None:
             return False
         
         node_obj = self._index_to_obj[index]
         
-        # Remove from primary mappings
         if self._is_hashable(node_obj):
             self._obj_to_index.pop(node_obj, None)
         else:
@@ -165,7 +178,6 @@ class NodeIdentityMapper:
             self._nonhashable_to_index.pop(obj_id, None)
             self._nonhashable_refs.pop(obj_id, None)
         
-        # Clear the index slot and mark as freed
         self._index_to_obj[index] = None
         self._freed_indices.add(index)
         
@@ -175,11 +187,15 @@ class NodeIdentityMapper:
         """
         Check if a node object is mapped.
         
-        Args:
-            node_obj: The node object to check
+        Parameters
+        ----------
+        node_obj : object
+            The node object to check.
             
-        Returns:
-            bool: True if the node exists in the mapping
+        Returns
+        -------
+        bool
+            ``True`` if the node exists in the mapping.
         """
         return self.get_index(node_obj) is not None
     
@@ -187,17 +203,21 @@ class NodeIdentityMapper:
         """
         Check if an index is mapped to a node.
         
-        Args:
-            index: The index to check
+        Parameters
+        ----------
+        index : int
+            The index to check.
             
-        Returns:
-            bool: True if the index exists and is mapped
+        Returns
+        -------
+        bool
+            ``True`` if the index exists and is mapped.
         """
         return (0 <= index < len(self._index_to_obj) and 
                 self._index_to_obj[index] is not None)
     
     def clear(self):
-        """Clear all mappings."""
+        """Clear all mappings and reset the index counter."""
         self._obj_to_index.clear()
         self._index_to_obj.clear()
         self._nonhashable_to_index.clear()
@@ -209,8 +229,10 @@ class NodeIdentityMapper:
         """
         Get all mapped node objects.
         
-        Returns:
-            List[Any]: List of all node objects currently mapped
+        Returns
+        -------
+        list
+            All node objects currently mapped.
         """
         return [obj for obj in self._index_to_obj if obj is not None]
     
@@ -218,8 +240,10 @@ class NodeIdentityMapper:
         """
         Get all mapped indices.
         
-        Returns:
-            List[int]: List of all indices currently mapped
+        Returns
+        -------
+        list of int
+            All indices currently mapped.
         """
         return [i for i, obj in enumerate(self._index_to_obj) if obj is not None]
     
@@ -227,8 +251,10 @@ class NodeIdentityMapper:
         """
         Get the number of mapped nodes.
         
-        Returns:
-            int: Number of nodes currently mapped
+        Returns
+        -------
+        int
+            Number of nodes currently mapped.
         """
         return len(self._index_to_obj) - len(self._freed_indices)
     
@@ -236,11 +262,15 @@ class NodeIdentityMapper:
         """
         Check if an object is hashable.
         
-        Args:
-            obj: The object to check
+        Parameters
+        ----------
+        obj : object
+            The object to check.
             
-        Returns:
-            bool: True if the object is hashable
+        Returns
+        -------
+        bool
+            ``True`` if the object is hashable.
         """
         try:
             hash(obj)
@@ -253,9 +283,9 @@ class NodeIdentityMapper:
         return self.num_nodes()
     
     def __contains__(self, node_obj: Any) -> bool:
-        """Check if a node object is mapped (supports 'in' operator)."""
+        """Check if a node object is mapped (supports ``in`` operator)."""
         return self.has_node(node_obj)
     
     def __repr__(self) -> str:
-        """String representation of the mapper."""
-        return f"NodeIdentityMapper(nodes={self.num_nodes()}, next_index={self._next_index})" 
+        """Return a string representation of the mapper."""
+        return f"NodeIdentityMapper(nodes={self.num_nodes()}, next_index={self._next_index})"

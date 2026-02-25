@@ -15,18 +15,26 @@ __all__ = [
 ]
 
 def line(start=0.0, end=1.0, steps=100, curve=0.0):
-    '''
+    """
     Generate a curved line from start to end value over n steps.
     
-    Args:
-        start: Starting value
-        end: Ending value
-        steps: Number of steps
-        curve: Shape of the curve. Negative for exponential, positive for logarithmic, 0 for linear
+    Parameters
+    ----------
+    start : float, optional
+        Starting value (default is 0.0).
+    end : float, optional
+        Ending value (default is 1.0).
+    steps : int, optional
+        Number of steps (default is 100).
+    curve : float, optional
+        Shape of the curve. Negative for exponential, positive for logarithmic,
+        0 for linear (default is 0.0).
         
-    Returns:
-        numpy.ndarray: Array of values following the specified curve
-    '''
+    Returns
+    -------
+    numpy.ndarray
+        Array of values following the specified curve.
+    """
     if curve == 0:
         return np.linspace(start, end, steps)
     
@@ -37,21 +45,33 @@ def line(start=0.0, end=1.0, steps=100, curve=0.0):
     return start + (end - start) * curved_t
 
 def arch(base=0.0, peak=1.0, steps=100, curve=0.0, axis=0):
-    '''
-    Generate a swelling curve that rises and falls, starting and ending at base value, peaking at peak value.
+    """
+    Generate a swelling curve that rises and falls.
     
-    Args:
-        base: Starting and ending value
-        peak: Peak value
-        steps: Number of steps
-        curve: Shape of the curve. Can be:
-               - A single number: Same curve applied to both sides (negative for exponential, positive for logarithmic)
-               - A tuple/list of two values: First value for ascending curve, second for descending
-        axis: Position of the peak (-1 to 1). 0 centers the peak, negative shifts earlier, positive shifts later
+    Starts and ends at the base value, peaking at the peak value.
+    
+    Parameters
+    ----------
+    base : float, optional
+        Starting and ending value (default is 0.0).
+    peak : float, optional
+        Peak value (default is 1.0).
+    steps : int, optional
+        Number of steps (default is 100).
+    curve : float or list of float, optional
+        Shape of the curve. A single number applies the same curve to both
+        sides (negative for exponential, positive for logarithmic). A list
+        of two values sets ascending and descending curves independently
+        (default is 0.0).
+    axis : float, optional
+        Position of the peak (-1 to 1). 0 centers the peak, negative shifts
+        earlier, positive shifts later (default is 0).
         
-    Returns:
-        numpy.ndarray: Array of values following a swell curve
-    '''
+    Returns
+    -------
+    numpy.ndarray
+        Array of values following a swell curve.
+    """
     axis = np.clip(axis, -1, 1)
     split_point = int((0.5 + axis * 0.4) * steps)
     
@@ -66,18 +86,26 @@ def arch(base=0.0, peak=1.0, steps=100, curve=0.0, axis=0):
     return np.concatenate([up[:-1], down])
 
 def map_curve(value, in_range, out_range, curve=0.0):
-    '''
+    """
     Map a value from an input range to an output range with optional curve shaping.
     
-    Args:
-        value: Input value to map
-        in_range: Tuple of (min, max) for input range
-        out_range: Tuple of (min, max) for output range
-        curve: Shape of the curve. Negative for exponential, positive for logarithmic, 0 for linear
+    Parameters
+    ----------
+    value : float
+        Input value to map.
+    in_range : tuple of float
+        (min, max) for the input range.
+    out_range : tuple of float
+        (min, max) for the output range.
+    curve : float, optional
+        Shape of the curve. Negative for exponential, positive for logarithmic,
+        0 for linear (default is 0.0).
         
-    Returns:
-        float: Mapped value with curve applied
-    '''
+    Returns
+    -------
+    float
+        Mapped value with curve applied.
+    """
     normalized = np.interp(value, in_range, (0, 1))
     
     if curve != 0:

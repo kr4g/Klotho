@@ -21,17 +21,26 @@ __all__ = [
 ]
 
 def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fraction, int, str, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:
-  '''
-  Reduce an interval to within the span of a specified octave.
-  
-  Args:
-    interval: The musical interval to be octave-reduced.
-    equave: The span of the octave for reduction, default is 2.
-    n_equaves: The number of equaves, default is 1.
-    
-  Returns:
-    The equave-reduced interval as a float.
-  '''
+  """
+  Reduce an interval into the range ``[1, equave^n_equaves)``.
+
+  Repeatedly multiplies or divides by *equave* until the interval
+  falls within the target range.
+
+  Parameters
+  ----------
+  interval : int, float, Fraction, or str
+      The interval to reduce.
+  equave : Fraction, int, str, or float, optional
+      Interval of equivalence. Default is 2 (octave).
+  n_equaves : int, optional
+      Number of equaves for the reduction window. Default is 1.
+
+  Returns
+  -------
+  Fraction
+      The equave-reduced interval.
+  """
   interval = Fraction(interval)
   equave = Fraction(equave)
   while interval < 1:
@@ -41,17 +50,26 @@ def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fracti
   return interval
 
 def reduce_interval(interval:Union[Fraction, int, float, str], equave:Union[Fraction, int, float, str] = 2, n_equaves:int = 1) -> Fraction: 
-  '''
-  Fold an interval to within a specified range.
+  """
+  Fold an interval into the bipolar range ``[1/equave^n, equave^n)``.
 
-  Args:
-    interval: The interval to be wrapped.
-    equave: The equave value, default is 2.
-    n_equaves: The number of equaves, default is 1.
+  Unlike ``equave_reduce``, the lower bound extends below unison,
+  allowing sub-fundamental intervals to be represented.
 
-  Returns:
-    The folded interval as a float.
-  '''
+  Parameters
+  ----------
+  interval : Fraction, int, float, or str
+      The interval to fold.
+  equave : Fraction, int, float, or str, optional
+      Interval of equivalence. Default is 2.
+  n_equaves : int, optional
+      Number of equaves for the range. Default is 1.
+
+  Returns
+  -------
+  Fraction
+      The folded interval.
+  """
   interval = Fraction(interval)
   equave = Fraction(equave)  
   while interval < 1/(equave**n_equaves):
@@ -61,17 +79,26 @@ def reduce_interval(interval:Union[Fraction, int, float, str], equave:Union[Frac
   return interval
 
 def reduce_interval_relative(target: Union[Fraction, int, float, str], source: Union[Fraction, int, float, str], equave: Union[Fraction, int, float, str] = 2) -> Fraction:
-    '''
-    Fold a target interval to minimize its distance from a source interval through octave reduction.
+    """
+    Fold *target* to the equave transposition closest to *source*.
 
-    Args:
-        target: The interval to be folded
-        source: The reference interval to fold relative to
-        equave: The equave value, default is 2 (octave)
+    Searches upward and downward by equave until the minimum absolute
+    distance from *source* is found.
 
-    Returns:
-        The folded interval as a Fraction that minimizes distance from source
-    '''
+    Parameters
+    ----------
+    target : Fraction, int, float, or str
+        The interval to fold.
+    source : Fraction, int, float, or str
+        The reference interval.
+    equave : Fraction, int, float, or str, optional
+        Interval of equivalence. Default is 2.
+
+    Returns
+    -------
+    Fraction
+        The transposition of *target* that minimizes ``|source - target|``.
+    """
     target = Fraction(target)
     source = Fraction(source)
     equave = Fraction(equave)
@@ -105,18 +132,24 @@ def reduce_interval_relative(target: Union[Fraction, int, float, str], source: U
     return best_target
 
 def reduce_sequence_relative(sequence: List[Union[Fraction, int, float, str]], equave: Union[Fraction, int, float, str] = 2) -> List[Fraction]:
-    '''
-    Fold a sequence of intervals where each interval is folded relative to its neighbors.
-    The first and last intervals remain unchanged, serving as anchors.
-    Intermediate intervals are folded to minimize octave displacement between adjacent pairs.
+    """
+    Fold a sequence of intervals to minimise octave jumps between neighbours.
 
-    Args:
-        sequence: List of intervals to be folded
-        equave: The equave value, default is 2 (octave)
+    The first and last intervals are kept as anchors. Interior intervals are
+    folded forward then backward to minimise adjacent displacement.
 
-    Returns:
-        List of folded intervals as Fractions, preserving original start and end values
-    '''
+    Parameters
+    ----------
+    sequence : list of Fraction, int, float, or str
+        Intervals to fold.
+    equave : Fraction, int, float, or str, optional
+        Interval of equivalence. Default is 2.
+
+    Returns
+    -------
+    list of Fraction
+        Folded intervals preserving the original start and end values.
+    """
     if len(sequence) <= 2:
         return [Fraction(x) for x in sequence]
     
@@ -131,21 +164,27 @@ def reduce_sequence_relative(sequence: List[Union[Fraction, int, float, str]], e
     return result
   
 def fold_interval(interval: Union[Fraction, int, float, str], lower_thresh: Union[Fraction, int, float, str], upper_thresh: Union[Fraction, int, float, str]) -> Fraction:
-    '''
-    Fold an interval by reflecting it relative to explicit threshold boundaries.
-    If interval exceeds upper threshold, measure how far above it is and move that 
-    same distance down FROM the upper threshold.
-    If interval is below lower threshold, measure how far below it is and move that
-    same distance up FROM the lower threshold.
+    """
+    Reflect an interval back inside explicit threshold boundaries.
 
-    Args:
-        interval: The interval to be folded
-        lower_thresh: The lower threshold interval
-        upper_thresh: The upper threshold interval
+    If the interval exceeds the upper threshold, it is reflected
+    downward by the overshoot distance; if below the lower threshold,
+    it is reflected upward.
 
-    Returns:
-        The folded interval as a Fraction
-    '''
+    Parameters
+    ----------
+    interval : Fraction, int, float, or str
+        The interval to fold.
+    lower_thresh : Fraction, int, float, or str
+        Lower boundary.
+    upper_thresh : Fraction, int, float, or str
+        Upper boundary.
+
+    Returns
+    -------
+    Fraction
+        The folded interval.
+    """
     interval = Fraction(interval)
     lower_thresh = Fraction(lower_thresh)
     upper_thresh = Fraction(upper_thresh)
@@ -160,17 +199,25 @@ def fold_interval(interval: Union[Fraction, int, float, str], lower_thresh: Unio
     return interval
 
 def reduce_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: Union[int, float, Fraction, str] = 2) -> float:
-  '''
-  Fold a frequency value to within a specified range.
-  
-  Args:
-    freq: The frequency to be wrapped.
-    lower: The lower bound of the range.
-    upper: The upper bound of the range.
-    
-  Returns:
-    The folded frequency as a float.
-  '''
+  """
+  Fold a frequency into a bounded range by equave transposition.
+
+  Parameters
+  ----------
+  freq : float
+      The frequency to fold.
+  lower : float, optional
+      Lower bound in Hertz. Default is 27.5 (A0).
+  upper : float, optional
+      Upper bound in Hertz. Default is 4186 (C8).
+  equave : int, float, Fraction, or str, optional
+      Interval of equivalence. Default is 2.
+
+  Returns
+  -------
+  float
+      The frequency folded into ``[lower, upper]``.
+  """
   equave = Fraction(equave)
   while freq < lower:
       freq *= equave

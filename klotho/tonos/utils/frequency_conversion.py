@@ -18,6 +18,7 @@ __all__ = [
 ]
 
 class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
+  """Enumeration of pitch classes for 12-TET with both sharp and flat naming."""
   @member
   class N_TET_12(Enum, metaclass=DirectValueEnumMeta):
     C  = 0
@@ -48,67 +49,66 @@ class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
 
 
 def freq_to_midicents(frequency: float) -> float:
-  '''
+  """
   Convert a frequency in Hertz to MIDI cents notation.
-  
-  MIDI cents are a logarithmic unit of measure used for musical intervals.
-  The cent is equal to 1/100th of a semitone. There are 1200 cents in an octave.
-  
-  MIDI cents combines MIDI note numbers (denoting pitch with) with cents (denoting
-  intervals).  The MIDI note number is the integer part of the value, and the cents
-  are the fractional part.
-  
-  The MIDI note for A above middle C is 69, and the frequency is 440 Hz.  The MIDI
-  cent value for A above middle C is 6900.  Adding or subtracting 100 to the MIDI
-  cent value corresponds to a change of one semitone (one note number in the Western
-  dodecaphonic equal-tempered "chromatic" scale).
-  
-  Values other than multiple of 100 indicate microtonal intervals.
 
-  Args:
-  frequency: The frequency in Hertz to convert.
+  MIDI cents combine MIDI note numbers with cent offsets. A value of
+  6900 corresponds to A4 (440 Hz). Each increment of 100 is one
+  12-TET semitone; non-multiples of 100 indicate microtonal pitches.
 
-  Returns:
-  The MIDI cent value as a float.
-  '''
+  Parameters
+  ----------
+  frequency : float
+      The frequency in Hertz.
+
+  Returns
+  -------
+  float
+      The MIDI cent value.
+
+  Examples
+  --------
+  >>> freq_to_midicents(440.0)
+  6900.0
+  """
   return 100 * (12 * np.log2(frequency / A4_Hz) + A4_MIDI)
 
 def midicents_to_freq(midicents: float) -> float:
-  '''
+  """
   Convert MIDI cents back to a frequency in Hertz.
-  
-  MIDI cents are a logarithmic unit of measure used for musical intervals.
-  The cent is equal to 1/100th of a semitone. There are 1200 cents in an octave.
-  
-  MIDI cents combines MIDI note numbers (denoting pitch with) with cents (denoting
-  intervals).  The MIDI note number is the integer part of the value, and the cents
-  are the fractional part.
-  
-  The MIDI note for A above middle C is 69, and the frequency is 440 Hz.  The MIDI
-  cent value for A above middle C is 6900.  Adding or subtracting 100 to the MIDI
-  cent value corresponds to a change of one semitone (one note number in the Western
-  dodecaphonic equal-tempered "chromatic" scale).
-  
-  Values other than multiple of 100 indicate microtonal intervals.
-  
-  Args:
-    midicents: The MIDI cent value to convert.
-    
-  Returns:
-    The corresponding frequency in Hertz as a float.
-  '''
+
+  Parameters
+  ----------
+  midicents : float
+      The MIDI cent value (e.g., 6900 for A4).
+
+  Returns
+  -------
+  float
+      The corresponding frequency in Hertz.
+
+  Examples
+  --------
+  >>> midicents_to_freq(6900)
+  440.0
+  """
   return A4_Hz * (2 ** ((midicents - A4_MIDI * 100) / 1200.0))
 
 def midicents_to_pitchclass(midicents: float) -> namedtuple:
-  '''
-  Convert MIDI cents to a pitch class with offset in cents.
-  
-  Args:
-    midicents: The MIDI cent value to convert.
-    
-  Returns:
-    A tuple containing the pitch class and the cents offset.
-  '''
+  """
+  Convert MIDI cents to a pitch class with octave and cents offset.
+
+  Parameters
+  ----------
+  midicents : float
+      The MIDI cent value.
+
+  Returns
+  -------
+  namedtuple
+      A named tuple with fields ``pitchclass``, ``octave``, and
+      ``cents_offset``.
+  """
   result = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
   PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
   midi = midicents / 100
@@ -121,16 +121,22 @@ def midicents_to_pitchclass(midicents: float) -> namedtuple:
   # return Pitch(pitch_label, octave, round(cents_diff, 4))
   
 def freq_to_pitchclass(freq: float, cent_round: int = 4) -> namedtuple:
-    '''
-    Converts a frequency to a pitch class with offset in cents.
-    
-    Args:
-        freq: The frequency in Hertz to convert.
-        cent_round: Number of decimal places to round cents to
-    
-    Returns:
-        A tuple containing the pitch class and the cents offset.
-    '''
+    """
+    Convert a frequency in Hertz to a pitch class with octave and cents offset.
+
+    Parameters
+    ----------
+    freq : float
+        The frequency in Hertz.
+    cent_round : int, optional
+        Decimal places for rounding the cents offset. Default is 4.
+
+    Returns
+    -------
+    namedtuple
+        A named tuple with fields ``pitchclass``, ``octave``, and
+        ``cents_offset``.
+    """
     result = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
     PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
     n_PITCH_LABELS = len(PITCH_LABELS)
@@ -144,18 +150,29 @@ def freq_to_pitchclass(freq: float, cent_round: int = 4) -> namedtuple:
     return result(pitch_label, octave, round(cents_diff, cent_round))
 
 def pitchclass_to_freq(pitchclass: str, octave: int = 4, cent_offset: float = 0.0, hz_round: int = 4, A4_Hz=A4_Hz, A4_MIDI=A4_MIDI):
-    '''
-    Converts a pitch class with offset in cents to a frequency.
-    
-    Args:
-        pitchclass: The pitch class (like "C4" or "F#-2") to convert.
-        cent_offset: The cents offset, default is 0.0.
-        A4_Hz: The frequency of A4, default is 440 Hz.
-        A4_MIDI: The MIDI note number of A4, default is 69.
-    
-    Returns:
+    """
+    Convert a pitch class name to a frequency in Hertz.
+
+    Parameters
+    ----------
+    pitchclass : str
+        Pitch class name (e.g., ``"C"``, ``"F#"``, ``"Bb"``).
+    octave : int, optional
+        Octave number. Default is 4.
+    cent_offset : float, optional
+        Microtonal offset in cents. Default is 0.0.
+    hz_round : int, optional
+        Decimal places for rounding the result. Default is 4.
+    A4_Hz : float, optional
+        Reference frequency for A4. Default is 440.0.
+    A4_MIDI : int, optional
+        MIDI note number for A4. Default is 69.
+
+    Returns
+    -------
+    float
         The frequency in Hertz.
-    '''
+    """
     # Try both sharp and flat notations
     SHARP_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
     FLAT_LABELS = PITCH_CLASSES.N_TET_12.names.as_flats

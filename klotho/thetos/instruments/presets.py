@@ -1,3 +1,11 @@
+"""
+Built-in Tone.js synthesizer preset definitions.
+
+This module contains a dictionary of preset configurations for various Tone.js
+synthesizer types (AMSynth, FMSynth, MonoSynth, NoiseSynth, Synth). Each preset
+specifies a ``tonejs_class`` and a ``pfields`` dictionary of synthesis parameters.
+"""
+
 TONEJS_PRESETS = {
     'Harmonics': {
         'tonejs_class': 'AMSynth',

@@ -6,6 +6,21 @@ import copy
 
 
 class Tree(Graph):
+    """A directed acyclic graph tree structure.
+
+    Represents a rooted tree where each node has at most one parent.
+    Built from nested tuple structures and backed by a RustworkX directed graph
+    inherited from Graph.
+
+    Parameters
+    ----------
+    root : hashable
+        The value for the root node of the tree.
+    children : tuple
+        Nested tuple structure defining the tree's children.
+        Each element is either a leaf value or a ``(value, children)`` pair.
+    """
+
     def __init__(self, root, children:tuple):
         super().__init__(directed=True)
         self._building_tree = True
@@ -157,12 +172,16 @@ class Tree(Graph):
     @lru_cache(maxsize=None)
     def parent(self, node):
         """Returns the parent of a node.
-        
-        Args:
-            node: The node to get the parent of
-            
-        Returns:
-            int: The parent node, or None if the node is the root
+
+        Parameters
+        ----------
+        node : hashable
+            The node to get the parent of.
+
+        Returns
+        -------
+        int or None
+            The parent node, or None if the node is the root.
         """
         parents = list(self.predecessors(node))
         return parents[0] if parents else None
@@ -451,14 +470,20 @@ class Tree(Graph):
 
     def add_child(self, parent, index=None, **attr):
         """Add a child node to a parent.
-        
-        Args:
-            parent: The parent node ID
-            index: Position to insert child (None for append)
-            **attr: Node attributes
-            
-        Returns:
-            int: The new child node ID
+
+        Parameters
+        ----------
+        parent : int
+            The parent node ID.
+        index : int or None, optional
+            Position to insert child (default is None, which appends).
+        **attr : dict
+            Node attributes.
+
+        Returns
+        -------
+        int
+            The new child node ID.
         """
         self._building_tree = True
         try:
@@ -470,14 +495,20 @@ class Tree(Graph):
 
     def add_subtree(self, parent, subtree, index=None):
         """Add a subtree as a child of a parent node.
-        
-        Args:
-            parent: The parent node to attach to
-            subtree: Tree instance to attach
-            index: Position to insert subtree (None for append)
-            
-        Returns:
-            int: The root ID of the attached subtree
+
+        Parameters
+        ----------
+        parent : int
+            The parent node to attach to.
+        subtree : Tree
+            Tree instance to attach.
+        index : int or None, optional
+            Position to insert subtree (default is None, which appends).
+
+        Returns
+        -------
+        int
+            The root ID of the attached subtree.
         """
         if not isinstance(subtree, Tree):
             raise TypeError("subtree must be a Tree instance")
@@ -499,9 +530,11 @@ class Tree(Graph):
 
     def prune(self, node):
         """Remove a node and promote its children to its parent.
-        
-        Args:
-            node: The node to remove
+
+        Parameters
+        ----------
+        node : int
+            The node to remove.
         """
         if node == self.root:
             raise ValueError("Cannot prune the root node")
@@ -516,9 +549,11 @@ class Tree(Graph):
 
     def remove_subtree(self, node):
         """Remove a node and its entire subtree.
-        
-        Args:
-            node: The root of the subtree to remove
+
+        Parameters
+        ----------
+        node : int
+            The root of the subtree to remove.
         """
         if node == self.root:
             raise ValueError("Cannot remove the root node")
@@ -530,13 +565,18 @@ class Tree(Graph):
 
     def replace_node(self, old_node, **attr):
         """Replace a node with new attributes while preserving structure.
-        
-        Args:
-            old_node: The node to replace
-            **attr: New attributes for the node
-            
-        Returns:
-            int: The new node ID
+
+        Parameters
+        ----------
+        old_node : int
+            The node to replace.
+        **attr : dict
+            New attributes for the node.
+
+        Returns
+        -------
+        int
+            The new node ID.
         """
         parent = self.parent(old_node)
         children = list(self.successors(old_node))
@@ -673,11 +713,15 @@ class Tree(Graph):
 
     def move_subtree(self, node, new_parent, index=None):
         """Move a subtree to a new parent.
-        
-        Args:
-            node: Root of subtree to move
-            new_parent: New parent node
-            index: Position under new parent (None for append)
+
+        Parameters
+        ----------
+        node : int
+            Root of subtree to move.
+        new_parent : int
+            New parent node.
+        index : int or None, optional
+            Position under new parent (default is None, which appends).
         """
         if node == self.root:
             raise ValueError("Cannot move the root node")
@@ -778,15 +822,22 @@ class Tree(Graph):
     @classmethod
     def _from_graph(cls, G, clear_attributes=False, renumber=True, node_attr='label'):
         """Create a Tree from a RustworkX graph.
-        
-        Args:
-            G: RustworkX PyDiGraph or Graph instance
-            clear_attributes: Whether to clear node attributes
-            renumber: Whether to renumber nodes
-            node_attr: Attribute name to use for node labels
-            
-        Returns:
-            Tree: New Tree instance
+
+        Parameters
+        ----------
+        G : rx.PyDiGraph or Graph
+            RustworkX PyDiGraph or Graph instance.
+        clear_attributes : bool, optional
+            Whether to clear node attributes (default is False).
+        renumber : bool, optional
+            Whether to renumber nodes (default is True).
+        node_attr : str, optional
+            Attribute name to use for node labels (default is 'label').
+
+        Returns
+        -------
+        Tree
+            New Tree instance.
         """
         if isinstance(G, Graph):
             graph = G
@@ -833,14 +884,20 @@ class Tree(Graph):
     @classmethod
     def _build_nested_structure(cls, root_node, get_node_value, get_children):
         """Build nested tuple structure from a tree starting at root_node.
-        
-        Args:
-            root_node: The node to start building from
-            get_node_value: Function that takes a node and returns its value
-            get_children: Function that takes a node and returns its children
-            
-        Returns:
-            Nested tuple structure representing the tree
+
+        Parameters
+        ----------
+        root_node : hashable
+            The node to start building from.
+        get_node_value : callable
+            Function that takes a node and returns its value.
+        get_children : callable
+            Function that takes a node and returns its children.
+
+        Returns
+        -------
+        tuple or hashable
+            Nested tuple structure representing the tree.
         """
         children = get_children(root_node)
         if not children:
@@ -857,13 +914,18 @@ class Tree(Graph):
     @classmethod
     def _from_base_tree(cls, base_tree):
         """Create a Tree subclass instance from a base Tree.
-        
-        Subclasses should override this method to handle their specific construction.
-        
-        Args:
-            base_tree: Base Tree instance
-            
-        Returns:
-            Tree: New Tree subclass instance
+
+        Subclasses should override this method to handle their specific
+        construction.
+
+        Parameters
+        ----------
+        base_tree : Tree
+            Base Tree instance.
+
+        Returns
+        -------
+        Tree
+            New Tree subclass instance.
         """
         return base_tree

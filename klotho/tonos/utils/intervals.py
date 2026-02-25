@@ -28,15 +28,28 @@ __all__ = [
 ]
 
 def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -> float:
-  '''
-  Convert a musical interval ratio to cents, a logarithmic unit of measure.
-  
-  Args:
-    ratio: The musical interval ratio as a string (e.g., '3/2') or float.
-    
-  Returns:
-    The interval in cents as a float.
-  '''
+  """
+  Convert a musical interval ratio to cents.
+
+  Cents are a logarithmic unit where 1200 cents equals one octave (2/1).
+
+  Parameters
+  ----------
+  ratio : int, float, Fraction, or str
+      The interval ratio (e.g., ``'3/2'``, ``1.5``).
+  round_to : int, optional
+      Decimal places to round the result. Default is 4.
+
+  Returns
+  -------
+  float
+      The interval size in cents.
+
+  Examples
+  --------
+  >>> ratio_to_cents('3/2')
+  701.955
+  """
   # bad...
   # if isinstance(ratio, str):
   #   numerator, denominator = map(float, ratio.split('/'))
@@ -51,18 +64,44 @@ def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -
   return round(1200 * np.log2(numerator / denominator), round_to)
 
 def cents_to_ratio(cents: float) -> str:
-  '''
-  Convert a musical interval in cents to a ratio.
-  
-  Args:
-    cents: The interval in cents to convert.
-    
-  Returns:
-    The interval ratio as a float.
-  '''
+  """
+  Convert cents to a frequency ratio.
+
+  Parameters
+  ----------
+  cents : float
+      The interval in cents.
+
+  Returns
+  -------
+  float
+      The corresponding frequency ratio.
+
+  Examples
+  --------
+  >>> cents_to_ratio(1200)
+  2.0
+  """
   return 2 ** (cents / 1200)
 
 def cents_to_setclass(cent_value: float = 0.0, n_tet: int = 12, round_to: int = 2) -> float:
+   """
+   Convert a cent value to a pitch-class number in an equal-tempered system.
+
+   Parameters
+   ----------
+   cent_value : float, optional
+       Interval in cents. Default is 0.0.
+   n_tet : int, optional
+       Number of equal divisions per octave. Default is 12.
+   round_to : int, optional
+       Decimal places to round to. Default is 2.
+
+   Returns
+   -------
+   float
+       The pitch-class number.
+   """
    return round((cent_value / 100)  % n_tet, round_to)
 
 def fold_cents_symmetric(cents: float) -> float:
@@ -106,49 +145,53 @@ def fold_cents_symmetric(cents: float) -> float:
     return c if c <= 600.0 else 1200.0 - c
 
 def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int = 2) -> float:
-  '''
-  Convert a musical interval ratio to a set class.
-  
-  Args:
-    ratio: The musical interval ratio as a string (e.g., '3/2') or float.
-    n_tet: The number of divisions in the octave, default is 12.
-    round_to: The number of decimal places to round to, default is 2.
-    
-  Returns:
-    The set class as a float.
-  '''
+  """
+  Convert a musical interval ratio to a pitch-class number.
+
+  Parameters
+  ----------
+  ratio : str or float
+      The interval ratio (e.g., ``'3/2'``).
+  n_tet : int, optional
+      Number of equal divisions per octave. Default is 12.
+  round_to : int, optional
+      Decimal places to round to. Default is 2.
+
+  Returns
+  -------
+  float
+      The pitch-class number.
+  """
   return cents_to_setclass(ratio_to_cents(ratio), n_tet, round_to)
 
 def split_partial(interval:Union[int, float, Fraction, str], n:int = 2):
-    '''
-    Find the smallest sequence of n+1 integers that form n equal subdivisions of a given interval ratio.
-    
-    For a given interval ratio r and number of divisions n, finds a sequence of integers [a₀, a₁, ..., aₙ]
-    where each adjacent pair forms the same ratio, and aₙ/a₀ equals the target ratio r.
-    
-    Algorithm:
-    1. Initialize k = 1
-    2. Loop:
-        a. Calculate step size d = (r-1)k/n where r is target ratio
-        b. If d is an integer:
-            - Generate sequence [k, k+d, k+2d, ..., k+nd]
-            - If sequence[n]/sequence[0] equals target ratio:
-                return harmonics and k
-        c. Increment k
-    
-    Args:
-        interval: The target interval ratio to be subdivided
-        n: Number of equal subdivisions (default: 2)
-        
-    Returns:
-        A named tuple containing:
-            - harmonics: List of n+1 integers forming the subdivisions
-            - k: The smallest starting value that produces valid subdivisions
-            
-    Example:
-        split_partial('3/2', 2) returns harmonics [4, 5, 6] and k=4
-        because 5/4 = 6/5 = √(3/2)
-    '''
+    """
+    Find the smallest harmonic subdivision of an interval into *n* equal steps.
+
+    Returns a sequence of *n + 1* integers ``[a₀, a₁, …, aₙ]`` where each
+    adjacent pair forms the same ratio and ``aₙ / a₀`` equals the target
+    interval.
+
+    Parameters
+    ----------
+    interval : int, float, Fraction, or str
+        The target interval ratio to subdivide.
+    n : int, optional
+        Number of equal subdivisions. Default is 2.
+
+    Returns
+    -------
+    namedtuple
+        A named tuple with fields:
+
+        - ``harmonics`` -- list of *n + 1* integers forming the subdivision.
+        - ``k`` -- the smallest starting integer that yields a valid result.
+
+    Examples
+    --------
+    >>> split_partial('3/2', 2)
+    result(harmonics=[4, 5, 6], k=4)
+    """
     result = namedtuple('result', ['harmonics', 'k'])
 
     multiplier = Fraction(interval)
@@ -162,34 +205,48 @@ def split_partial(interval:Union[int, float, Fraction, str], n:int = 2):
         k += 1
 
 def harmonic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str]) -> Fraction:
-    '''
-    Calculate the harmonic mean between two values.
-    
-    The harmonic mean is defined as: 2 / (1/a + 1/b)
-    
-    Args:
-        a: First value
-        b: Second value
-        
-    Returns:
-        The harmonic mean as a Fraction
-    '''
+    """
+    Calculate the harmonic mean of two values: ``2 / (1/a + 1/b)``.
+
+    In music, the harmonic mean of two intervals produces the
+    interval that divides the span *harmonically* (unequal division
+    weighted toward the smaller value).
+
+    Parameters
+    ----------
+    a : int, float, Fraction, or str
+        First value.
+    b : int, float, Fraction, or str
+        Second value.
+
+    Returns
+    -------
+    Fraction
+        The harmonic mean.
+    """
     a, b = Fraction(a), Fraction(b)
     return 2 / (1/a + 1/b)
 
 def arithmetic_mean(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str]) -> Fraction:
-    '''
-    Calculate the arithmetic mean between two values.
-    
-    The arithmetic mean is defined as: (a + b) / 2
-    
-    Args:
-        a: First value
-        b: Second value
-        
-    Returns:
-        The arithmetic mean as a Fraction
-    '''
+    """
+    Calculate the arithmetic mean of two values: ``(a + b) / 2``.
+
+    In music, the arithmetic mean of two intervals produces the
+    interval that divides the span *arithmetically* (equal division
+    by frequency difference).
+
+    Parameters
+    ----------
+    a : int, float, Fraction, or str
+        First value.
+    b : int, float, Fraction, or str
+        Second value.
+
+    Returns
+    -------
+    Fraction
+        The arithmetic mean.
+    """
     a, b = Fraction(a), Fraction(b)
     return (a + b) / 2
 
@@ -231,14 +288,20 @@ def logarithmic_distance(a: Union[int, float, Fraction, str], b: Union[int, floa
                          equave: Union[int, float, Fraction, str] = 2) -> float:
     """
     Calculate the logarithmic distance between two musical intervals.
-    
-    Args:
-        a: First interval
-        b: Second interval
-        equave: The equave to use for logarithmic scaling (default: 2 for octave)
-        
-    Returns:
-        Logarithmic distance between the intervals
+
+    Parameters
+    ----------
+    a : int, float, Fraction, or str
+        First interval.
+    b : int, float, Fraction, or str
+        Second interval.
+    equave : int, float, Fraction, or str, optional
+        Base for logarithmic scaling. Default is 2 (octave).
+
+    Returns
+    -------
+    float
+        The absolute logarithmic distance.
     """
     match a:
         case int() as i:
@@ -265,6 +328,29 @@ def logarithmic_distance(a: Union[int, float, Fraction, str], b: Union[int, floa
 
 def interval_cost(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str], diff_coeff: float = 1.0, prime_coeff: float = 1.0,
                   equave: Union[int, float, Fraction, str] = 2) -> float:
+    """
+    Compute a weighted cost of moving between two intervals.
+
+    Combines logarithmic distance with prime-factorization distance.
+
+    Parameters
+    ----------
+    a : int, float, Fraction, or str
+        First interval.
+    b : int, float, Fraction, or str
+        Second interval.
+    diff_coeff : float, optional
+        Weight for logarithmic distance. Default is 1.0.
+    prime_coeff : float, optional
+        Weight for prime-exponent difference. Default is 1.0.
+    equave : int, float, Fraction, or str, optional
+        Base for logarithmic scaling. Default is 2.
+
+    Returns
+    -------
+    float
+        The weighted cost.
+    """
     match a:
         case int() as i:
             r1 = Fraction(i, 1)
@@ -295,33 +381,49 @@ def interval_cost(a: Union[int, float, Fraction, str], b: Union[int, float, Frac
     return diff_coeff * log_dist + prime_coeff * prime_diff
 
 def n_tet(divisions: int = 12, equave: Union[int, float, Fraction, str] = 2, nth_division: int = 1, symbolic: bool = False) -> Union[float, Rational]:
-    '''
-    Calculate the size of the nth division of an interval in equal temperament.
-    
-    Args:
-        divisions: The number of equal divisions (default: 12)
-        equave: The interval to divide (default: 2 for octave)
-        nth_division: The nth division to calculate (default: 1)
-        symbolic: If True, return symbolic expression instead of float (default: False)
-    
-    Returns:
-        The frequency ratio either as a float or as a sympy expression
-    '''
+    """
+    Calculate the frequency ratio of the *nth* step in an equal temperament.
+
+    Parameters
+    ----------
+    divisions : int, optional
+        Number of equal divisions of the equave. Default is 12.
+    equave : int, float, Fraction, or str, optional
+        The interval to divide. Default is 2 (octave).
+    nth_division : int, optional
+        Which step to compute. Default is 1.
+    symbolic : bool, optional
+        If True, return a sympy expression instead of a float.
+        Default is False.
+
+    Returns
+    -------
+    float or sympy.Rational
+        The frequency ratio.
+    """
     ratio = root(Fraction(equave), Rational(divisions)) ** nth_division
     return ratio if symbolic else float(ratio)
 
 def ratios_n_tet(divisions: int = 12, equave: Union[int, float, Fraction, str] = 2, symbolic: bool = False) -> List[Union[float, Rational]]:
-  '''
-  Calculate the ratios of the divisions of an interval in equal temperament.
+  """
+  Return all step ratios for an equal temperament.
 
-  see:  https://en.wikipedia.org/wiki/Equal_temperament
+  Parameters
+  ----------
+  divisions : int, optional
+      Number of equal divisions. Default is 12.
+  equave : int, float, Fraction, or str, optional
+      The interval to divide. Default is 2 (octave).
+  symbolic : bool, optional
+      If True, return sympy expressions. Default is False.
 
-  Args:
-    divisions: The number of equal divisions
-    equave: The interval to divide (default is 2 for an octave)
-    symbolic: If True, return symbolic expression instead of float (default: False)
-    
-  Returns:
-    A list of the frequency ratios of the divisions
-  '''
+  Returns
+  -------
+  list of float or sympy.Rational
+      Frequency ratios for steps 0 through ``divisions - 1``.
+
+  References
+  ----------
+  .. [1] https://en.wikipedia.org/wiki/Equal_temperament
+  """
   return [n_tet(divisions, equave, nth_division, symbolic) for nth_division in range(divisions)]

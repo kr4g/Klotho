@@ -40,18 +40,27 @@ __all__ = ['plot']
 
 def plot(obj, **kwargs):
     """
-    Universal plot function that dispatches to appropriate plotting function based on object type.
-    
+    Universal plot dispatcher for Klotho objects.
+
     Renders the figure via ``IPython.display.display`` so that plots
     appear even when the call is not the last expression in a notebook
     cell.  Returns ``None`` (like ``play``) to avoid double-rendering.
-    
-    Args:
-        obj: Object to plot (Tree, RhythmTree, CombinationSet, CombinationProductSet, DynamicRange, Envelope, networkx.Graph, etc.)
-        **kwargs: Keyword arguments passed to the specific plotting function
-        
-    Raises:
-        TypeError: If the object type is not supported
+
+    Parameters
+    ----------
+    obj : object
+        Object to plot.  Supported types include ``Tree``,
+        ``RhythmTree``, ``CombinationSet``, ``CombinationProductSet``,
+        ``DynamicRange``, ``Envelope``, ``Lattice``, ``Scale``,
+        ``Chord``, ``Voicing``, and graph-like objects.
+    **kwargs
+        Keyword arguments forwarded to the type-specific plotting
+        function.
+
+    Raises
+    ------
+    TypeError
+        If the object type is not supported for plotting.
     """
     def _show(fig):
         if fig is not None:
@@ -121,17 +130,26 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
                         invert: bool = True, output_file: str | None = None) -> go.Figure:
     """
     Visualize a ParameterTree structure with muting logic applied.
-    
-    Similar to _plot_tree but respects the ParameterTree's muting mechanism,
-    only displaying active (non-muted) attributes for each node.
-    
-    Args:
-        tree: ParameterTree instance to visualize
-        attributes: List of node attributes to display instead of labels. If None, shows only labels.
-                   Special values "node_id", "node", or "id" will display the node identifier.
-        figsize: Width and height of the output figure in inches
-        invert: When True, places root at the top; when False, root is at the bottom
-        output_file: Path to save the visualization (displays plot if None)
+
+    Similar to ``_plot_tree`` but respects the ParameterTree's muting
+    mechanism, only displaying active (non-muted) attributes for each
+    node.
+
+    Parameters
+    ----------
+    tree : ParameterTree
+        ParameterTree instance to visualize.
+    attributes : list of str or None, optional
+        Node attributes to display instead of labels.  Special values
+        ``"node_id"``, ``"node"``, or ``"id"`` display the node
+        identifier.
+    figsize : tuple of float, optional
+        Width and height of the output figure in inches.
+    invert : bool, optional
+        When ``True``, places the root at the top of the diagram.
+    output_file : str or None, optional
+        Path to save the visualization.  Displays the plot when
+        ``None``.
     """
     def _hierarchy_pos(G, root, width=1.5, height=1.0, xcenter=0.5, pos=None, parent=None, depth=0, inverted=True, vert_gap=None):
         if pos is None:
@@ -338,27 +356,39 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
              invert: bool = True, output_file: str | None = None) -> None:
     """
     Visualize a tree structure with customizable node appearance and layout.
-    
-    Renders a tree graph with nodes positioned hierarchically, where each node is displayed
-    with either its label or specified attributes. Nodes are drawn as squares (internal nodes)
-    or circles (leaf nodes) with white borders on a black background.
-    
-    Args:
-        tree: Tree instance to visualize
-        attributes: List of node attributes to display instead of labels. If None, shows only labels.
-                   Special values "node_id", "node", or "id" will display the node identifier.
-        figsize: Width and height of the output figure in inches
-        invert: When True, places root at the top; when False, root is at the bottom
-        output_file: Path to save the visualization (displays plot if None)
+
+    Renders a tree graph with nodes positioned hierarchically.  Internal
+    nodes are drawn as squares and leaf nodes as circles, with white
+    borders on a black background.
+
+    Parameters
+    ----------
+    tree : Tree
+        Tree instance to visualize.
+    attributes : list of str or None, optional
+        Node attributes to display instead of labels.  Special values
+        ``"node_id"``, ``"node"``, or ``"id"`` display the node
+        identifier.
+    figsize : tuple of float, optional
+        Width and height of the output figure in inches.
+    invert : bool, optional
+        When ``True``, places the root at the top of the diagram.
+    output_file : str or None, optional
+        Path to save the visualization.  Displays the plot when
+        ``None``.
     """
     def _hierarchy_pos(G, root, width=1.5, vert_gap=0.2, xcenter=0.5, pos=None, parent=None, depth=0, inverted=True):
         """
-        Position nodes in a hierarchical layout optimized for both wide and deep trees.
-        
-        Allocates horizontal space based on the structure of the tree, giving more
-        room to branches with deeper chains and ensuring proper vertical spacing.
-        
-        Returns a dictionary mapping each node to its (x, y) position.
+        Position nodes in a hierarchical layout for wide and deep trees.
+
+        Allocates horizontal space based on the structure of the tree,
+        giving more room to branches with deeper chains and ensuring
+        proper vertical spacing.
+
+        Returns
+        -------
+        dict
+            Mapping of each node to its ``(x, y)`` position.
         """
         if pos is None:
             max_depth = _get_max_depth(G, root)
@@ -515,7 +545,23 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
 
 
 def _get_children(G, node, parent=None):
-    """Helper function to get children of a node in tree-like graphs."""
+    """Return the child nodes of *node* in a tree-like graph.
+
+    Parameters
+    ----------
+    G : graph
+        A RustworkX, NetworkX, or Klotho graph object.
+    node : hashable
+        The parent node whose children are requested.
+    parent : hashable or None, optional
+        In undirected graphs, *parent* is excluded from the neighbour
+        list to avoid back-traversal.
+
+    Returns
+    -------
+    list
+        Child node identifiers.
+    """
     if hasattr(G, 'successors') and not str(type(G)).find('rustworkx') != -1:
         # For our wrapped Graph/Tree classes
         return list(G.successors(node))
@@ -532,12 +578,28 @@ def _get_children(G, node, parent=None):
         return []
 
 def _is_leaf(G, node):
-    """Helper function to check if a node is a leaf."""
+    """Return ``True`` if *node* has no children in *G*."""
     return len(_get_children(G, node)) == 0
 
 def _get_graph_layout(G, layout='spring', k=1, dim=2):
     """
-    Get node positions using RustworkX layouts when possible, fallback to NetworkX.
+    Compute node positions using RustworkX or NetworkX layout algorithms.
+
+    Parameters
+    ----------
+    G : graph
+        A RustworkX or NetworkX graph.
+    layout : str, optional
+        Layout algorithm name (e.g. ``'spring'``, ``'circular'``).
+    k : float, optional
+        Optimal distance between nodes for force-directed layouts.
+    dim : int, optional
+        Number of spatial dimensions (2 or 3).
+
+    Returns
+    -------
+    dict
+        Mapping of node identifiers to position tuples.
     """
     import rustworkx as rx
     
@@ -680,7 +742,44 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
                attributes: list[str] | None = None,
                dim: int = 2,
                output_file: str | None = None):
-    
+    """
+    Render a general graph using matplotlib with customizable layout and styling.
+
+    Parameters
+    ----------
+    G : graph
+        RustworkX or NetworkX graph to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : float, optional
+        Size of the drawn nodes.
+    font_size : float, optional
+        Font size for node labels.
+    layout : str, optional
+        Layout algorithm (``'spring'``, ``'circular'``, etc.).
+    k : float, optional
+        Optimal node distance for spring layout.
+    show_edge_labels : bool, optional
+        Whether to display edge weight labels.
+    edge_width : bool, optional
+        Scale edge widths by weight when ``True``.
+    edge_color : bool, optional
+        Color edges by weight when ``True``.
+    width_range : tuple of float, optional
+        Min and max edge widths when *edge_width* is enabled.
+    cmap : str, optional
+        Matplotlib colormap for edge coloring.
+    invert_weights : bool, optional
+        Invert the weight scale for width/color mapping.
+    path : list or None, optional
+        Sequence of node identifiers to highlight as a path.
+    attributes : list of str or None, optional
+        Node attributes to display as labels.
+    dim : int, optional
+        Dimensionality of the layout (2 or 3).
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
+    """
     # Convert RustworkX graphs to NetworkX for plotting compatibility
     original_G = G
     is_rustworkx = hasattr(G, 'node_indices') or str(type(G)).find('rustworkx') != -1
@@ -1097,21 +1196,28 @@ def _plot_graph(G, figsize: tuple[float, float] = (10, 10),
 def _plot_curve(*args, figsize=(16, 8), x_range=(0, 1), colors=None, labels=None, 
                title=None, grid=True, legend=True, output_file=None):
     """
-    Plot one or more curves with a consistent dark background style.
-    
-    Args:
-        *args: One or more sequences of y-values to plot
-        figsize: Tuple of (width, height) for the figure
-        x_range: Tuple of (min, max) for the x-axis range
-        colors: List of colors for multiple curves (defaults to viridis colormap)
-        labels: List of labels for the legend
-        title: Title for the plot
-        grid: Whether to show grid lines
-        legend: Whether to display the legend
-        output_file: Path to save the plot (if None, displays plot)
-    
-    Returns:
-        None
+    Plot one or more curves with a dark-background style.
+
+    Parameters
+    ----------
+    *args : array-like
+        One or more sequences of y-values to plot.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    x_range : tuple of float, optional
+        ``(min, max)`` range for the x-axis.
+    colors : list or None, optional
+        Colors for each curve.  Defaults to the viridis colormap.
+    labels : list of str or None, optional
+        Labels for the legend entries.
+    title : str or None, optional
+        Title displayed above the plot.
+    grid : bool, optional
+        Whether to render grid lines.
+    legend : bool, optional
+        Whether to display the legend.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
     """
     plt.figure(figsize=figsize)
     ax = plt.gca()
@@ -1173,17 +1279,26 @@ def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12),
              show_edge_labels: bool = False, edge_alpha: float = 0.3,
              title: str = None, output_file: str = None) -> None:
     """
-    Plot a CombinationSet as a circular graph with all combinations connected.
-    
-    Args:
-        cs: CombinationSet instance to visualize
-        figsize: Width and height of the output figure in inches
-        node_size: Size of the nodes in the plot
-        font_size: Size of the node labels
-        show_edge_labels: Whether to show labels on edges
-        edge_alpha: Transparency of the edges (0-1)
-        title: Title for the plot (auto-generated if None)
-        output_file: Path to save the visualization (displays plot if None)
+    Render a CombinationSet as a circular graph with connected combinations.
+
+    Parameters
+    ----------
+    cs : CombinationSet
+        CombinationSet instance to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : float, optional
+        Size of the drawn nodes.
+    font_size : float, optional
+        Font size for node labels.
+    show_edge_labels : bool, optional
+        Whether to display labels on edges.
+    edge_alpha : float, optional
+        Edge transparency in the range ``[0, 1]``.
+    title : str or None, optional
+        Plot title.  Auto-generated when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
     """
     plt.figure(figsize=figsize)
     ax = plt.gca()
@@ -1256,24 +1371,36 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
                      title: str = None, output_file: str = None, nodes: list = None, 
                      layout: str = 'circle') -> go.Figure:
     """
-    Plot a Scale or Chord with different visualizations based on interval type.
-    
-    For cents-based scales/chords: Circular clock-like diagram with nodes
-    For ratio-based scales/chords: Proportional segments showing interval sizes
-    
-    Args:
-        obj: Scale or Chord instance to visualize
-        figsize: Size of the figure as (width, height) in inches
-        node_size: Size of the nodes in the plot (cents mode only)
-        text_size: Size of the text labels
-        show_labels: Whether to show labels on the segments/nodes
-        title: Title for the plot (default is derived from object type if None)
-        output_file: Path to save the figure (if None, display instead)
-        nodes: List of node IDs to highlight (cents mode only)
-        layout: 'circle' (default) or 'line' for ratio-based visualization
-        
-    Returns:
-        Plotly figure object that can be displayed or further customized
+    Render a Scale or Chord using interval-type-appropriate visualization.
+
+    Cents-based objects are drawn as circular clock-like node diagrams;
+    ratio-based objects use proportional segments showing interval sizes.
+
+    Parameters
+    ----------
+    obj : Scale, Chord, or Voicing
+        The pitch structure to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : int, optional
+        Node size (cents mode only).
+    text_size : int, optional
+        Font size for text labels.
+    show_labels : bool, optional
+        Whether to display labels on segments / nodes.
+    title : str or None, optional
+        Plot title.  Derived from the object when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
+    nodes : list or None, optional
+        Node IDs to highlight (cents mode only).
+    layout : str, optional
+        ``'circle'`` (default) or ``'line'`` for ratio-based objects.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Interactive Plotly figure.
     """
     if obj.is_relative:
         calc_degrees = list(obj._degrees)
@@ -1300,7 +1427,7 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
 
 def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize, 
                            node_size, text_size, show_labels, title, output_file, nodes):
-    """Plot cents-based scales/chords as circular node diagrams."""
+    """Render cents-based scales/chords as circular node diagrams."""
     n_degrees = len(degrees)
     node_x, node_y = [], []
     node_text, hover_data, node_colors = [], [], []
@@ -1587,20 +1714,26 @@ def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(
                        resolution: int = 1000, show_labels: bool = True, 
                        show_grid: bool = True, title: str = None, output_file: str = None):
     """
-    Plot a DynamicRange as a colored curve with dynamic markings.
-    
-    Args:
-        dynamic_range: DynamicRange instance to visualize
-        mode: 'db' or 'amp' to plot decibel or amplitude values
-        figsize: Tuple of (width, height) for the figure
-        resolution: Number of points in the curve for smooth plotting
-        show_labels: Whether to show dynamic marking labels
-        show_grid: Whether to show grid lines
-        title: Title for the plot (auto-generated if None)
-        output_file: Path to save the plot (if None, displays plot)
-        
-    Returns:
-        None
+    Render a DynamicRange as a colored curve with dynamic-marking labels.
+
+    Parameters
+    ----------
+    dynamic_range : DynamicRange
+        DynamicRange instance to visualize.
+    mode : str, optional
+        ``'db'`` for decibels or ``'amp'`` for linear amplitude.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    resolution : int, optional
+        Number of sample points used for smooth curve rendering.
+    show_labels : bool, optional
+        Whether to display dynamic-marking labels along the curve.
+    show_grid : bool, optional
+        Whether to draw grid lines.
+    title : str or None, optional
+        Plot title.  Auto-generated when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
     """
     plt.figure(figsize=figsize)
     ax = plt.gca()
@@ -1695,6 +1828,26 @@ def _plot_dynamic_range(dynamic_range: DynamicRange, mode: str = 'db', figsize=(
 def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True,
                   show_grid: bool = True, title: str = None, output_file: str = None,
                   resolution: int = 1000):
+    """
+    Render an Envelope as a time-vs-value curve with breakpoint markers.
+
+    Parameters
+    ----------
+    envelope : Envelope
+        Envelope instance to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    show_points : bool, optional
+        Whether to draw markers at each breakpoint.
+    show_grid : bool, optional
+        Whether to display grid lines.
+    title : str or None, optional
+        Plot title.  Defaults to ``"Envelope"``.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
+    resolution : int, optional
+        Number of sample points for smooth curve rendering.
+    """
     plt.figure(figsize=figsize)
     ax = plt.gca()
     
@@ -1752,37 +1905,58 @@ def _plot_field(field: ParameterField, figsize: tuple[float, float] = (12, 12),
                nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                mute_background: bool = False, colormap: str = 'coolwarm', show_colorbar: bool = False) -> go.Figure:
     """
-    Plot a ParameterField as a 2D or 3D grid visualization with node colors representing field values.
-    
-    Args:
-        field: ParameterField instance to visualize
-        figsize: Width and height of the output figure in inches
-        node_size: Size of the nodes in the plot
-        title: Title for the plot (auto-generated if None)
-        output_file: Path to save the visualization (displays plot if None)
-        dim_reduction: Dimensionality reduction method for high-dimensional fields.
-                      Options: 'mds', 'spectral', or None (raises error for dim > 3)
-        target_dims: Target dimensionality for reduction (2 or 3, default 3)
-        mds_metric: Whether to use metric MDS (True) or non-metric MDS (False)
-        mds_max_iter: Maximum iterations for MDS algorithm
-        spectral_affinity: Kernel for spectral embedding ('rbf', 'nearest_neighbors', etc.)
-        spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
-        nodes: List of coordinate tuples to highlight, e.g. [(0,0,0), (-3,2,0), (2,-1,1)]
-               Highlights selected coordinates and draws edges based on path_mode
-        path: List of coordinate tuples representing a path, e.g. [(0,0,0), (1,0,0), (1,1,0)]
-              Draws edges between successive coordinates with viridis coloring for time progression
-        path_mode: Edge drawing mode when nodes are selected. Options:
-                  'adjacent' - Only show edges between selected nodes that are adjacent (default)
-                  'origin' - Show shortest paths from origin (0,0,0...) to each selected node
-        mute_background: If True, only show highlighted nodes/path coordinates (default: False)
-        colormap: Matplotlib colormap name for field values (default: 'hot')
-        show_colorbar: Whether to show the colorbar (default: False)
-        
-    Returns:
-        go.Figure: Plotly figure object
-        
-    Raises:
-        ValueError: If field dimensionality > 3 and dim_reduction is None
+    Render a ParameterField as a 2D or 3D grid with value-mapped node colors.
+
+    Parameters
+    ----------
+    field : ParameterField
+        ParameterField instance to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : float, optional
+        Size of the drawn nodes.
+    title : str or None, optional
+        Plot title.  Auto-generated when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
+    dim_reduction : str or None, optional
+        Dimensionality reduction method for fields with more than 3
+        dimensions.  ``'mds'``, ``'spectral'``, or ``None`` (raises
+        for dim > 3).
+    target_dims : int, optional
+        Target dimensions after reduction (2 or 3).
+    mds_metric : bool, optional
+        Use metric MDS when ``True``, non-metric when ``False``.
+    mds_max_iter : int, optional
+        Maximum iterations for the MDS algorithm.
+    spectral_affinity : str, optional
+        Kernel for spectral embedding.
+    spectral_gamma : float or None, optional
+        Kernel coefficient for rbf.  Auto-determined when ``None``.
+    nodes : list of tuple or None, optional
+        Coordinate tuples to highlight.
+    path : list of tuple or None, optional
+        Coordinate tuples defining a traversal path.
+    path_mode : str, optional
+        ``'adjacent'`` to show edges between neighbouring selected
+        nodes (default).
+    mute_background : bool, optional
+        Only show highlighted nodes / path coordinates when ``True``.
+    colormap : str, optional
+        Matplotlib colormap name for field value colouring.
+    show_colorbar : bool, optional
+        Whether to display a colourbar for field values.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Interactive Plotly figure.
+
+    Raises
+    ------
+    ValueError
+        If the field dimensionality exceeds 3 and *dim_reduction* is
+        ``None``.
     """
     import networkx as nx
     import matplotlib.pyplot as plt
@@ -2761,7 +2935,7 @@ def _plot_field(field: ParameterField, figsize: tuple[float, float] = (12, 12),
     return fig
 def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                                text_size, show_labels, title, output_file, layout):
-    """Plot ratio-based scales/chords as proportional segments."""
+    """Render ratio-based scales/chords as proportional segments."""
     n_degrees = len(degrees)
     
     if n_degrees < 2:
@@ -2998,7 +3172,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
     return fig
 def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                                  text_size, show_labels, title, output_file, layout):
-    """Plot ratio-based scales/chords as proportional segments."""
+    """Render ratio-based scales/chords as proportional segments (fixed intervals)."""
     n_degrees = len(degrees)
     
     if n_degrees < 2:
@@ -3265,7 +3439,7 @@ def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, fig
     return fig
 def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                                  text_size, show_labels, title, output_file, layout):
-    """Plot ratio-based scales/chords as proportional segments."""
+    """Render ratio-based scales/chords as proportional segments (clean style)."""
     n_degrees = len(degrees)
     
     if n_degrees < 2:

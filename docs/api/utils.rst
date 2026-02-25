@@ -34,6 +34,27 @@ Lists
    :members:
    :show-inheritance:
 
+Random
+~~~~~~
+
+.. automodule:: klotho.utils.algorithms.random
+   :members:
+   :show-inheritance:
+
+Ratios
+~~~~~~
+
+.. automodule:: klotho.utils.algorithms.ratios
+   :members:
+   :show-inheritance:
+
+Basis
+~~~~~
+
+.. automodule:: klotho.utils.algorithms.basis
+   :members:
+   :show-inheritance:
+
 Data Structures
 ---------------
 
@@ -51,17 +72,10 @@ Enums
    :members:
    :show-inheritance:
 
-Graphs
-~~~~~~
+Node Mapping
+~~~~~~~~~~~~
 
-.. automodule:: klotho.utils.data_structures.graphs
-   :members:
-   :show-inheritance:
-
-Groups
-~~~~~~
-
-.. automodule:: klotho.utils.data_structures.group
+.. automodule:: klotho.utils.data_structures.node_mapping
    :members:
    :show-inheritance:
 
@@ -75,9 +89,23 @@ Player
    :members:
    :show-inheritance:
 
-Streamer
-~~~~~~~~
+MIDI Player
+~~~~~~~~~~~
 
-.. automodule:: klotho.utils.playback.streamer
+.. automodule:: klotho.utils.playback.midi_player
    :members:
-   :show-inheritance: 
+   :show-inheritance:
+
+Tone.js Engine
+~~~~~~~~~~~~~~
+
+.. automodule:: klotho.utils.playback.tonejs.engine
+   :members:
+   :show-inheritance:
+
+Tone.js Converters
+~~~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.utils.playback.tonejs.converters
+   :members:
+   :show-inheritance:

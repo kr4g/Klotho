@@ -149,14 +149,17 @@ class Lattice(Graph):
         return list(self._coord_to_node.keys())
     
     def _get_plot_coords(self, max_resolution: int) -> List[Tuple[int, ...]]:
-        """
-        Get coordinates for plotting, limited by max resolution from origin.
-        
-        Args:
-            max_resolution: Maximum distance from origin in any dimension
-            
-        Returns:
-            List of coordinate tuples within the resolution limit
+        """Get coordinates for plotting, limited by max resolution from origin.
+
+        Parameters
+        ----------
+        max_resolution : int
+            Maximum distance from origin in any dimension.
+
+        Returns
+        -------
+        list of tuple of int
+            Coordinate tuples within the resolution limit.
         """
         import itertools
         

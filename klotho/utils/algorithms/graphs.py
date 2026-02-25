@@ -145,7 +145,7 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to walk on
     source : node
         Starting node
@@ -205,7 +205,7 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to walk on
     source : node
         Starting node
@@ -270,7 +270,7 @@ def deterministic_greedy_walk(G, source, steps: int = 10, weight: str = 'weight'
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to walk on
     source : node
         Starting node
@@ -338,7 +338,7 @@ def prim_order_traversal(G, source, weight: str = 'weight', **kwargs) -> List[in
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to traverse
     source : node
         Starting node for traversal
@@ -396,7 +396,7 @@ def greedy_nearest_unvisited(G, source, weight: str = 'weight', **kwargs) -> Lis
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to traverse
     source : node
         Starting node for traversal
@@ -481,7 +481,7 @@ def dijkstra_order_traversal(G, source, weight: str = 'weight', **kwargs) -> Lis
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to traverse
     source : node
         Starting node for traversal
@@ -542,7 +542,7 @@ def weighted_dfs_traversal(G, source, weight: str = 'weight', **kwargs) -> List[
     
     Parameters
     ----------
-    G : networkx.Graph
+    G : Graph
         The graph to traverse
     source : node
         Starting node for traversal

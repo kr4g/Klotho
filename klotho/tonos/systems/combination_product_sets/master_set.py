@@ -11,6 +11,27 @@ _ALPHA = {chr(65 + i): sp.Symbol(chr(65 + i)) for i in range(26)}
 
 
 class MasterSet:
+    """
+    A geometric layout template for Combination Product Sets.
+
+    Defines node positions and edges that determine the spatial
+    arrangement and relational structure of CPS nodes. Named
+    constructors (``tetrad``, ``asterisk``, etc.) provide common
+    geometric templates in 2-D, 3-D, or N-D.
+
+    Parameters
+    ----------
+    positions : dict
+        Mapping of single-letter node labels to coordinate tuples.
+    edges : list of tuple
+        Pairs of node labels defining the edge connections.
+    name : str or None, optional
+        Human-readable name for this layout.
+    factors : tuple of int or None, optional
+        If provided, assigns integer factors to node labels in
+        sorted order.
+    """
+
     def __init__(self, positions, edges, name=None, factors=None):
         max_dim = max(len(v) for v in positions.values()) if positions else 2
         max_dim = max(max_dim, 2)
@@ -56,6 +77,7 @@ class MasterSet:
 
     @property
     def dimensionality(self):
+        """int : The effective spatial dimensionality (2 or more)."""
         if not self._positions:
             return 2
         dim = len(next(iter(self._positions.values())))
@@ -66,48 +88,67 @@ class MasterSet:
 
     @property
     def relationship_dict(self):
+        """dict : Symbolic ratio keys mapping to angle, distance, and displacement data."""
         return self._relationship_dict
 
     @property
     def positions(self):
+        """dict : Mapping of node labels to coordinate tuples."""
         return dict(self._positions)
 
     @property
     def n_factors(self):
+        """int : The number of factor nodes in this layout."""
         return self._n_factors
 
     @property
     def name(self):
+        """str or None : The layout template name."""
         return self._name
 
     @property
     def edges(self):
+        """list of tuple : Edge pairs as ``(from_label, to_label)``."""
         return list(self._edge_pairs)
 
     @property
     def factors(self):
+        """tuple of int or None : The integer factors assigned to node labels."""
         return self._factors
 
     @property
     def factor_to_alias(self):
+        """dict or None : Mapping from integer factors to single-letter aliases."""
         return dict(self._factor_to_alias) if self._factor_to_alias else None
 
     @property
     def alias_to_factor(self):
+        """dict or None : Mapping from single-letter aliases to integer factors."""
         return dict(self._alias_to_factor) if self._alias_to_factor else None
 
     @property
     def aliases(self):
+        """list of str : Sorted single-letter node aliases."""
         return list(self._aliases)
 
     @property
     def ratios(self):
+        """tuple of Fraction or None : Equave-reduced ratios of the assigned factors."""
         if self._factors is None:
             return None
         from klotho.tonos.utils.interval_normalization import equave_reduce
         return tuple(sorted(equave_reduce(f) for f in self._factors))
 
     def node_data(self):
+        """
+        Return a dict of per-node data including alias, factor, and ratio.
+
+        Returns
+        -------
+        dict
+            Keyed by alias letter, values are dicts with ``'alias'``,
+            ``'factor'``, and ``'ratio'`` entries.
+        """
         if self._factors is None:
             return {a: {'alias': a} for a in self._aliases}
         from klotho.tonos.utils.interval_normalization import equave_reduce
@@ -121,6 +162,18 @@ class MasterSet:
         return result
 
     def with_factors(self, factors):
+        """
+        Return a new MasterSet with specific factors assigned.
+
+        Parameters
+        ----------
+        factors : tuple of int
+            Integer factors to assign to the node positions.
+
+        Returns
+        -------
+        MasterSet
+        """
         return MasterSet(self._positions, self._edge_pairs,
                          name=self._name, factors=factors)
 

@@ -23,56 +23,78 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  animate: bool = False, dur: float = 0.5,
                  shape: list = None,
                  arp: bool = False, strum: float = 0, direction: str = 'u'):
+    """
+    Render a Lattice as a 2D SVG or 3D Three.js grid visualization.
+
+    Supports dimensionality reduction for lattices with more than 3
+    dimensions.  Coordinate highlighting, path traversal, and animated
+    chord / chord-sequence playback are available as overlays.
+
+    Parameters
+    ----------
+    lattice : Lattice
+        Lattice instance to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    node_size : float, optional
+        Size of the drawn nodes.
+    title : str or None, optional
+        Plot title.  Auto-generated when ``None``.
+    output_file : str or None, optional
+        Path to save the figure.
+    dim_reduction : str or None, optional
+        ``'mds'``, ``'spectral'``, or ``None`` (raises for dim > 3).
+    target_dims : int, optional
+        Target dimensions after reduction (2 or 3).
+    mds_metric : bool, optional
+        Use metric MDS when ``True``.
+    mds_max_iter : int, optional
+        Maximum MDS iterations.
+    spectral_affinity : str, optional
+        Kernel for spectral embedding.
+    spectral_gamma : float or None, optional
+        Kernel coefficient for rbf.
+    nodes : list of tuple or None, optional
+        Coordinate tuples to highlight.
+    path : list of tuple or None, optional
+        Coordinate tuples defining a traversal path.
+    path_mode : str, optional
+        ``'adjacent'`` (default) or ``'origin'``.
+    mute_background : bool, optional
+        Hide non-selected nodes when ``True``.
+    fit : bool or str, optional
+        Cropping mode when nodes/path are provided.  ``'rect'`` /
+        ``True``, ``'square'``, or ``'tight'``.
+    pad : int, optional
+        Padding around the selection in each dimension when *fit* is
+        active.
+    path_cmap : str, optional
+        Matplotlib colormap for path edge colouring.
+    animate : bool, optional
+        Return an animated figure when ``True``.
+    dur : float, optional
+        Seconds between animation steps.
+    shape : list or None, optional
+        Coordinate tuples (chord) or list of lists (chord sequence).
+    arp : bool, optional
+        Arpeggiate chord notes sequentially.
+    strum : float, optional
+        Per-note timing offset (0--1) in a chord.
+    direction : str, optional
+        ``'u'`` for ascending or ``'d'`` for descending pitch order.
+
+    Returns
+    -------
+    SvgLatticeData, ThreejsLatticeData, or animated figure
+        Renderable figure data.
+
+    Raises
+    ------
+    ValueError
+        If lattice dimensionality exceeds 3 and *dim_reduction* is
+        ``None``.
+    """
     import networkx as nx
-    """
-    Plot a Lattice as a 2D or 3D grid visualization.
-    
-    Args:
-        lattice: Lattice instance to visualize
-        figsize: Width and height of the output figure in inches
-        node_size: Size of the nodes in the plot
-        title: Title for the plot (auto-generated if None)
-        output_file: Path to save the visualization (displays plot if None)
-        dim_reduction: Dimensionality reduction method for high-dimensional lattices.
-                      Options: 'mds', 'spectral', or None (raises error for dim > 3)
-        target_dims: Target dimensionality for reduction (2 or 3, default 3)
-        mds_metric: Whether to use metric MDS (True) or non-metric MDS (False)
-        mds_max_iter: Maximum iterations for MDS algorithm
-        spectral_affinity: Kernel for spectral embedding ('rbf', 'nearest_neighbors', etc.)
-        spectral_gamma: Kernel coefficient for rbf kernel (auto-determined if None)
-        nodes: List of coordinate tuples to highlight, e.g. [(0,0,0), (-3,2,0), (2,-1,1)]
-               Highlights selected coordinates and draws edges based on path_mode
-        path: List of coordinate tuples representing a path, e.g. [(0,0,0), (1,0,0), (1,1,0)]
-              Draws edges between successive coordinates with viridis coloring for time progression
-        path_mode: Edge drawing mode when nodes are selected. Options:
-                  'adjacent' - Only show edges between selected nodes that are adjacent (default)
-                  'origin' - Show shortest paths from origin (0,0,0...) to each selected node
-        fit: Controls how the lattice display is cropped when nodes/path are provided.
-             False (default) shows the full lattice. Accepts a string mode or True:
-             - 'rect' or True: minimal bounding rectangle per dimension
-             - 'square': uniform bounding box (largest dimension span used for all axes)
-             - 'tight': only the selected nodes/path plus their immediate lattice neighbors
-        pad: Integer padding (default 1) added around the selection in each direction
-             when ``fit`` is active. Clamped to lattice bounds. Ignored when fit is False.
-        path_cmap: Matplotlib colormap name for path edge coloring (default 'viridis').
-                   Only applies when ``path`` is provided.
-        animate: If True and ``path``/``shape`` is provided, returns an animated figure
-                 with playback controls instead of a static go.Figure.
-        dur: Duration in seconds between animation steps (default 0.5).
-             Only applies when ``animate`` is True.
-        shape: List of coordinate tuples (a chord) or list of lists of coordinate tuples
-               (a chord sequence). Highlights nodes and draws edges between adjacent ones.
-               When animate=True, plays as chord or chord sequence.
-        arp: If True, arpeggiate chord notes sequentially instead of block chord
-        strum: Strum offset (0-1) for slight timing offset per note in a chord
-        direction: 'u' for ascending or 'd' for descending pitch order
-        
-    Returns:
-        go.Figure: Plotly figure object
-        
-    Raises:
-        ValueError: If lattice dimensionality > 3 and dim_reduction is None
-    """
     
     # Check if this is a ToneLattice for enhanced hover information
     is_tone_lattice = hasattr(lattice, '_coord_to_ratio')

@@ -5,11 +5,36 @@ from ._svg_utils import SvgFigureData, svg_wrap
 
 
 class SvgMasterSetData(SvgFigureData):
+    """Container for 2D MasterSet SVG rendering data."""
+
     __slots__ = ('svg_str', 'width_px', 'height_px')
 
 
 def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
                        show_labels=True, title=None):
+    """
+    Build a 2D SVG representation of a MasterSet.
+
+    Parameters
+    ----------
+    ms : MasterSet
+        The master set to render.
+    figsize : tuple of float, optional
+        Width and height in inches.
+    node_size : int, optional
+        Diameter of each node circle.
+    text_size : int, optional
+        Font size for node labels.
+    show_labels : bool, optional
+        Whether to display alias labels inside nodes.
+    title : str or None, optional
+        Title rendered above the diagram.
+
+    Returns
+    -------
+    SvgMasterSetData
+        SVG string and dimension metadata.
+    """
     positions = ms.positions
     edge_pairs = ms.edges
     nd = ms.node_data()

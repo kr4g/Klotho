@@ -18,13 +18,19 @@ def freq_amp_scale(freq: float, db_level: float, min_db: float = -60) -> float:
     """
     Scale amplitude based on frequency and loudness according to psychoacoustic principles.
     
-    Args:
-        freq (float): The frequency in Hz
-        db_level (float): The input level in dB
-        min_db (float): The minimum dB level in the dynamic range (default -60)
+    Parameters
+    ----------
+    freq : float
+        The frequency in Hz.
+    db_level : float
+        The input level in dB.
+    min_db : float, optional
+        The minimum dB level in the dynamic range (default is -60).
         
-    Returns:
-        float: The perceptually scaled amplitude (linear scale)
+    Returns
+    -------
+    float
+        The perceptually scaled amplitude (linear scale).
     """
     range_db = abs(min_db)
     phon_level = 40 + ((db_level - min_db) / range_db) * 60

@@ -24,18 +24,22 @@ class Dynamic:
     and its corresponding decibel value, providing seamless conversion between symbolic
     and numeric representations of dynamics.
     
-    Args:
-        marking (str): The symbolic dynamic marking (e.g., 'f', 'pp', 'mf')
-        db_value (float): The decibel value corresponding to this dynamic level
+    Parameters
+    ----------
+    marking : str
+        The symbolic dynamic marking (e.g., 'f', 'pp', 'mf').
+    db_value : float
+        The decibel value corresponding to this dynamic level.
         
-    Example:
-        >>> dyn = Dynamic('f', -12)
-        >>> dyn.marking
-        'f'
-        >>> dyn.db
-        -12
-        >>> dyn.amp
-        0.25118864315095825
+    Examples
+    --------
+    >>> dyn = Dynamic('f', -12)
+    >>> dyn.marking
+    'f'
+    >>> dyn.db
+    -12
+    >>> dyn.amp
+    0.25118864315095825
     """
     def __init__(self, marking, db_value):
         self._marking = marking
@@ -43,14 +47,17 @@ class Dynamic:
     
     @property
     def marking(self):
+        """str : The symbolic dynamic marking."""
         return self._marking
     
     @property
     def db(self):
+        """float : The decibel value."""
         return self._db_value
         
     @property
     def amp(self):
+        """float : The linear amplitude value converted from decibels."""
         return dbamp(self._db_value)
     
     def __float__(self):
@@ -88,21 +95,29 @@ class DynamicRange:
     | pianississimo    | ppp     | very very quiet  |
     +------------------+---------+------------------+
     
-    Args:
-        min_dynamic (float): Minimum decibel value for the quietest dynamic (default: -60)
-        max_dynamic (float): Maximum decibel value for the loudest dynamic (default: -3)
-        curve (float): Curve shaping factor. 0 = linear, positive = logarithmic, negative = exponential (default: 0)
-        dynamics (tuple): Tuple of dynamic markings to use (default: standard 8-level dynamics)
+    Parameters
+    ----------
+    min_dynamic : float, optional
+        Minimum decibel value for the quietest dynamic (default is -60).
+    max_dynamic : float, optional
+        Maximum decibel value for the loudest dynamic (default is -3).
+    curve : float, optional
+        Curve shaping factor. 0 = linear, positive = logarithmic,
+        negative = exponential (default is 0).
+    dynamics : tuple of str, optional
+        Tuple of dynamic markings to use (default is standard 8-level dynamics).
         
-    Example:
-        >>> dr = DynamicRange()
-        >>> dr['f'].db
-        -12.857142857142858
-        >>> dr.at(0.5).marking
-        'mp'
+    Examples
+    --------
+    >>> dr = DynamicRange()
+    >>> dr['f'].db
+    -12.857142857142858
+    >>> dr.at(0.5).marking
+    'mp'
         
-    See Also:
-        https://en.wikipedia.org/wiki/Dynamics_(music)
+    See Also
+    --------
+    https://en.wikipedia.org/wiki/Dynamics_(music)
     """
     def __init__(self, min_dynamic=-60, max_dynamic=-3, curve=0, dynamics=DYNAMIC_MARKINGS):
         self._min_db = min_dynamic
@@ -113,18 +128,22 @@ class DynamicRange:
 
     @property
     def min_dynamic(self):
+        """Dynamic : The quietest dynamic in the range."""
         return self._range[self._dynamics[0]]
     
     @property
     def max_dynamic(self):
+        """Dynamic : The loudest dynamic in the range."""
         return self._range[self._dynamics[-1]]
     
     @property
     def curve(self):
+        """float : The curve shaping factor."""
         return self._curve
     
     @property
     def ranges(self):
+        """dict : Mapping of dynamic markings to Dynamic objects."""
         return self._range
 
     def _calculate_range(self):
@@ -151,6 +170,24 @@ class DynamicRange:
 
     @lru_cache(maxsize=128)
     def at(self, position):
+        """
+        Get the dynamic at a normalized position within the range.
+        
+        Parameters
+        ----------
+        position : float
+            Position between 0 and 1, where 0 is the quietest and 1 is the loudest.
+            
+        Returns
+        -------
+        Dynamic
+            The dynamic at the given position, with interpolated dB value.
+            
+        Raises
+        ------
+        ValueError
+            If position is not between 0 and 1.
+        """
         if position < 0 or position > 1:
             raise ValueError(f"Position {position} must be between 0 and 1")
         

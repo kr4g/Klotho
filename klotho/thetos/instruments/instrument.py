@@ -1,3 +1,11 @@
+"""
+Instrument definitions for compositional parameterization.
+
+This module provides instrument classes that encapsulate synthesis parameters,
+frequency ranges, dynamic ranges, and envelope types for use in compositional
+units. Supports SuperCollider SynthDef, MIDI, and Tone.js instrument models.
+"""
+
 from klotho.dynatos.dynamics import Dynamic, DynamicRange
 from klotho.tonos.pitch import Pitch
 from klotho.utils.data_structures.dictionaries import SafeDict
@@ -6,6 +14,16 @@ from typing import List, Dict, TypeVar, Union
 import copy
 
 class Instrument():
+    """
+    Base instrument encapsulating a name and parameter fields.
+    
+    Parameters
+    ----------
+    name : str, optional
+        The name of the instrument (default is ``'default'``).
+    pfields : dict or SafeDict, optional
+        Parameter fields with default values (default is ``{}``).
+    """
     
     def __init__(self,
                  name          = 'default',
@@ -14,9 +32,12 @@ class Instrument():
         """
         Initialize an Instrument.
         
-        Args:
-            name (str): The name of the instrument
-            pfields (dict or SafeDict): Parameter fields with default values
+        Parameters
+        ----------
+        name : str, optional
+            The name of the instrument (default is ``'default'``).
+        pfields : dict or SafeDict, optional
+            Parameter fields with default values.
         """
         self._name = name
         
@@ -26,13 +47,23 @@ class Instrument():
     
     @property
     def name(self):
+        """str : The instrument name."""
         return self._name
     
     @property
     def pfields(self):
+        """SafeDict : A copy of the parameter fields."""
         return self._pfields.copy()
     
     def keys(self):
+        """
+        Get all parameter field keys including ``'synth_name'``.
+        
+        Returns
+        -------
+        list of str
+            Parameter field key names.
+        """
         keys = ['synth_name']
         keys.extend(self._pfields.keys())
         return keys
@@ -49,6 +80,25 @@ class Instrument():
         return self.__str__()
 
 class SynthDefInstrument(Instrument):
+    """
+    Instrument modeled on a SuperCollider SynthDef with frequency range,
+    dynamic range, and envelope type.
+    
+    Parameters
+    ----------
+    name : str, optional
+        The name of the instrument (default is ``'default'``).
+    freq_range : tuple, optional
+        A (min, max) pair of frequency values or Pitch instances.
+        Defaults to the standard piano range (27.5 Hz -- 4186.01 Hz).
+    dynamic_range : DynamicRange or tuple, optional
+        A DynamicRange instance or a (min_db, max_db) tuple.
+        Defaults to ``DynamicRange(-60, -3, curve=1.25)``.
+    env_type : str, optional
+        The envelope type for the instrument (default is ``'Sustained'``).
+    pfields : dict or SafeDict, optional
+        Parameter fields with default values.
+    """
     
     def __init__(self,
                  name          = 'default',
@@ -60,12 +110,18 @@ class SynthDefInstrument(Instrument):
         """
         Initialize a SynthDefInstrument.
         
-        Args:
-            name (str): The name of the instrument
-            freq_range (tuple): A tuple of (min, max) frequency values or Pitch instances
-            dynamic_range: A DynamicRange instance or a tuple of (min, max) dB values
-            env_type (str): The envelope type for the instrument
-            pfields (dict or SafeDict): Parameter fields with default values
+        Parameters
+        ----------
+        name : str, optional
+            The name of the instrument.
+        freq_range : tuple, optional
+            A (min, max) pair of frequency values or Pitch instances.
+        dynamic_range : DynamicRange or tuple, optional
+            A DynamicRange instance or a (min_db, max_db) tuple.
+        env_type : str, optional
+            The envelope type for the instrument.
+        pfields : dict or SafeDict, optional
+            Parameter fields with default values.
         """
         if pfields is None:
             pfields = {'amp': 0.1, 'freq': 440.0, 'pan': 0.0, 'gate': 1, 'out': 0}
@@ -111,20 +167,38 @@ class SynthDefInstrument(Instrument):
     
     @property
     def freq_range(self):
+        """tuple of Pitch : The (min, max) frequency range as Pitch objects."""
         return self._freq_range
     
     @property
     def dynamic_range(self):
+        """DynamicRange : The dynamic range for this instrument."""
         return self._dynamic_range
     
     @property
     def env_type(self):
+        """str : The envelope type (e.g., ``'Sustained'``)."""
         return self._env_type
     
     def __str__(self):
         return f"SynthDefInstrument(name='{self._name}', pfields={dict(self._pfields)})"
 
 class MidiInstrument(Instrument):
+    """
+    Instrument targeting MIDI output with program number and drum channel support.
+    
+    Parameters
+    ----------
+    name : str, optional
+        The name of the instrument (default is ``'default'``).
+    prgm : int, optional
+        General MIDI program number, ignored if ``is_Drum`` is True (default is 0).
+    is_Drum : bool, optional
+        Whether this instrument uses the General MIDI percussion channel
+        (default is False).
+    pfields : dict or SafeDict, optional
+        Parameter fields with default values.
+    """
     
     def __init__(self,
                  name          = 'default',
@@ -135,11 +209,16 @@ class MidiInstrument(Instrument):
         """
         Initialize a MidiInstrument.
         
-        Args:
-            name (str): The name of the instrument
-            prgm (int): General MIDI program number (ignored if is_Drum is True)
-            is_Drum (bool): Whether this instrument uses the general MIDI percussion channel
-            pfields (dict or SafeDict): Parameter fields with default values
+        Parameters
+        ----------
+        name : str, optional
+            The name of the instrument.
+        prgm : int, optional
+            General MIDI program number (ignored if ``is_Drum`` is True).
+        is_Drum : bool, optional
+            Whether this instrument uses the General MIDI percussion channel.
+        pfields : dict or SafeDict, optional
+            Parameter fields with default values.
         """
         if pfields is None:
             pfields = {'note': 60 if not is_Drum else 35, 'velocity': 100}
@@ -151,16 +230,33 @@ class MidiInstrument(Instrument):
     
     @property
     def prgm(self):
+        """int : The General MIDI program number."""
         return self._prgm
     
     @property
     def is_Drum(self):
+        """bool : Whether this instrument uses the percussion channel."""
         return self._is_Drum
     
     def __str__(self):
         return f"MidiInstrument(name='{self._name}', prgm={self._prgm}, is_Drum={self._is_Drum}, pfields={dict(self._pfields)})"
 
 class JsInstrument(Instrument):
+    """
+    Instrument targeting Tone.js synthesis with preset support.
+    
+    Wraps a Tone.js synthesizer class name and its associated parameter fields.
+    Provides factory classmethods for built-in presets and percussion instruments.
+    
+    Parameters
+    ----------
+    name : str, optional
+        The name of the instrument (default is ``'default'``).
+    tonejs_class : str, optional
+        The Tone.js synthesizer class name (default is ``'Synth'``).
+    pfields : dict or SafeDict, optional
+        Parameter fields with default values.
+    """
     def __init__(self,
                  name          = 'default',
                  tonejs_class  = 'Synth',
@@ -186,6 +282,7 @@ class JsInstrument(Instrument):
     
     @property
     def tonejs_class(self):
+        """str : The Tone.js synthesizer class name."""
         return self._tonejs_class
     
     def __str__(self):
@@ -193,6 +290,21 @@ class JsInstrument(Instrument):
     
     @classmethod
     def _validate_kwargs(cls, valid_keys, kwargs):
+        """
+        Validate keyword arguments against allowed parameter keys.
+        
+        Parameters
+        ----------
+        valid_keys : iterable of str
+            Valid parameter field keys for the preset.
+        kwargs : dict
+            Keyword arguments to validate.
+            
+        Raises
+        ------
+        ValueError
+            If any keyword is not in the allowed set.
+        """
         allowed = set(valid_keys) | {'freq', 'vel', 'amp'}
         invalid = set(kwargs.keys()) - allowed
         if invalid:
@@ -203,6 +315,23 @@ class JsInstrument(Instrument):
 
     @classmethod
     def from_preset(cls, preset_name: str, name: str = None, **kwargs):
+        """
+        Create a JsInstrument from a named Tone.js preset.
+        
+        Parameters
+        ----------
+        preset_name : str
+            Name of the preset in ``TONEJS_PRESETS``.
+        name : str, optional
+            Override name for the instrument. Defaults to ``preset_name``.
+        **kwargs
+            Parameter field overrides applied on top of the preset defaults.
+            
+        Returns
+        -------
+        JsInstrument
+            A new instrument configured from the preset.
+        """
         preset = TONEJS_PRESETS[preset_name]
         pfields = copy.deepcopy(preset['pfields'])
         if kwargs:

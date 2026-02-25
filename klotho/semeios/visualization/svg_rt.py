@@ -9,6 +9,24 @@ _HALO_NOTE_COLOR = (100, 160, 255)
 
 
 def _rt_node_tooltip(rt, node_id, audio_source=None):
+    """
+    Build a multi-line tooltip string for a rhythm-tree node.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The rhythm tree containing *node_id*.
+    node_id : hashable
+        Identifier of the node.
+    audio_source : TemporalUnit or CompositionalUnit or None, optional
+        When provided, appends real-time onset/duration and parameter
+        information to the tooltip.
+
+    Returns
+    -------
+    str
+        Newline-separated tooltip text.
+    """
     node_data = rt[node_id]
     proportion = node_data.get('proportion', None)
     parts = [f"Node: {node_id}"]
@@ -48,6 +66,14 @@ def _rt_node_tooltip(rt, node_id, audio_source=None):
 
 
 def _svg_halo_ellipses(prefix, cx, cy, rx, ry):
+    """
+    Generate SVG elements for a radial halo ellipse around a leaf node.
+
+    Returns
+    -------
+    tuple of (list of str, list of str)
+        ``(halo_element_ids, svg_element_strings)``.
+    """
     base = _HALO_NOTE_COLOR
     grad_id = f"{prefix}_rg"
     eid = f"{prefix}_h"
@@ -66,17 +92,21 @@ def _svg_halo_ellipses(prefix, cx, cy, rx, ry):
 
 
 def _wrap_svg(inner_svg, width_px, height_px, y_min, y_max):
+    """Wrap raw SVG content in a full ``<svg>`` tag with a viewBox."""
     return svg_wrap_viewbox(inner_svg, width_px, height_px, y_min, y_max)
 
 
 def _svg_text(x, y, text, font_size=12, fill='white', font_family='Arial',
               anchor='middle', weight='normal'):
+    """Return an SVG ``<text>`` element string with y-axis inversion."""
     return svg_text(x, y, text, font_size=font_size, fill=fill,
                     font_family=font_family, anchor=anchor, weight=weight,
                     invert_y=True)
 
 
 class SvgRTData(SvgFigureData):
+    """Container for rhythm-tree SVG rendering data and animation metadata."""
+
     __slots__ = ('svg_str', 'width_px', 'height_px', 'node_to_ids',
                  'leaf_path_ids', 'leaf_bright_colors', 'leaf_base_colors',
                  'leaf_halo_ids', 'leaf_x_positions', 'all_animated_ids',
@@ -84,6 +114,25 @@ class SvgRTData(SvgFigureData):
 
 
 def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
+    """
+    Render a rhythm tree as a horizontal leaf-duration bar (ratios layout).
+
+    Each leaf is drawn as a proportionally sized coloured rectangle.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        Rhythm tree to render.
+    figsize : tuple of float, optional
+        Width and height in inches.
+    audio_source : optional
+        Audio source forwarded to tooltip generation.
+
+    Returns
+    -------
+    SvgRTData
+        SVG string and animation metadata.
+    """
     width_px = int(figsize[0] * 100)
     height_px = int(figsize[1] * 100)
 
@@ -193,6 +242,37 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                        vertical_lines=True, barlines=True,
                        barline_color='#666666', subdivision_line_color='#aaaaaa',
                        audio_source=None):
+    """
+    Render a rhythm tree as nested proportional containers.
+
+    Each level of the tree is drawn as a row of rectangles whose widths
+    reflect the metric proportions, with optional barlines and
+    subdivision guide lines.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        Rhythm tree to render.
+    figsize : tuple of float, optional
+        Width and height in inches.
+    invert : bool, optional
+        Place the root at the top when ``True``.
+    vertical_lines : bool, optional
+        Draw subdivision guide lines.
+    barlines : bool, optional
+        Draw barlines for multi-span trees.
+    barline_color : str, optional
+        CSS colour for barlines.
+    subdivision_line_color : str, optional
+        CSS colour for subdivision guide lines.
+    audio_source : optional
+        Audio source forwarded to tooltip generation.
+
+    Returns
+    -------
+    SvgRTData
+        SVG string and animation metadata.
+    """
     width_px = int(figsize[0] * 100)
     height_px = int(figsize[1] * 100)
 
@@ -534,6 +614,30 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
 
 
 def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source=None):
+    """
+    Render a rhythm tree as a node-link tree diagram.
+
+    Internal nodes are circles and leaf nodes are squares, connected by
+    edges whose colours reflect rest / non-rest status.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        Rhythm tree to render.
+    attributes : list of str or None, optional
+        Node attributes to display as labels.
+    figsize : tuple of float, optional
+        Width and height in inches.
+    invert : bool, optional
+        Place the root at the top when ``True``.
+    audio_source : optional
+        Audio source forwarded to tooltip generation.
+
+    Returns
+    -------
+    SvgRTData
+        SVG string and animation metadata.
+    """
     width_px = int(figsize[0] * 100)
     height_px = int(figsize[1] * 100)
 

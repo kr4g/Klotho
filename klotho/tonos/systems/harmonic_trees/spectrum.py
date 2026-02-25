@@ -9,20 +9,23 @@ import pandas as pd
 
 class Spectrum():
     """
-    A class representing a harmonic spectrum based on a fundamental frequency and its partials.
+    A harmonic spectrum built from a fundamental frequency and partial numbers.
 
-    The Spectrum class manages a collection of pitches derived from a fundamental frequency
-    and a list of partial numbers (harmonic or non-harmonic). It provides methods for
-    manipulating and transforming the spectrum through various operations.
+    Manages a collection of pitches derived from a fundamental and a list of
+    partial numbers (harmonic or non-harmonic). Provides operations for
+    reinterpreting, retargeting, and modulating the spectrum.
 
-    Attributes:
-        fundamental (Pitch): The fundamental frequency of the spectrum
-        partials (list): List of partial numbers (can be integers, floats, or Fractions)
-        data (dict): Dictionary containing the fundamental and all calculated partial pitches
+    Parameters
+    ----------
+    fundamental : int, float, or Pitch
+        The fundamental frequency (Hz) or a Pitch object.
+    partials : list of int, float, or Fraction
+        Partial numbers defining the spectrum.
 
-    Example:
-        >>> spectrum = Spectrum(Pitch('A', 4), [1, 2, 3, 4])  # Creates spectrum with A4 fundamental
-        >>> spectrum = Spectrum.from_target(Pitch('A', 4, partial=3), [1, 2, 3, 4])  # Creates spectrum where A4 is 3rd partial
+    Examples
+    --------
+    >>> spectrum = Spectrum(Pitch('A', 4), [1, 2, 3, 4])
+    >>> spectrum = Spectrum.from_target(Pitch('A', 4, partial=3), [1, 2, 3, 4])
     """
     def __init__(self, fundamental: Union[int, float, Pitch], partials: list[Union[int, float, Fraction]]):
         self._fundamental = (Pitch(*freq_to_pitchclass(fundamental)) 
@@ -33,32 +36,42 @@ class Spectrum():
 
     @property
     def fundamental(self):
+        """Pitch : The fundamental pitch of the spectrum."""
         return self._fundamental
 
     @property
     def partials(self):
+        """tuple : The partial numbers present in the spectrum."""
         return tuple(self._data['partial'])
     
     @property
     def data(self):
+        """pandas.DataFrame : Tabular data with partial, frequency, pitch, and offset columns."""
         return self._data
     
     @property
     def ht(self):
+        """HarmonicTree : The underlying harmonic tree structure."""
         return self._ht
     
     def __getitem__(self, key):
         """
         Get a Pitch by its partial number.
-        
-        Args:
-            key: The partial number to retrieve
-            
-        Returns:
-            The Pitch corresponding to the partial number
-            
-        Raises:
-            KeyError: If the partial number doesn't exist in the spectrum
+
+        Parameters
+        ----------
+        key : int or float
+            The partial number to retrieve.
+
+        Returns
+        -------
+        Pitch
+            The Pitch corresponding to the partial number.
+
+        Raises
+        ------
+        KeyError
+            If the partial number does not exist in the spectrum.
         """
         if key not in self.partials:
             raise KeyError(f"Partial {key} not found in spectrum")
@@ -85,17 +98,27 @@ class Spectrum():
     @classmethod
     def from_target(cls, target: Pitch, partials: list[Union[int, float, Fraction]]):
         """
-        Create a Spectrum from a target pitch and list of partials.
-        
-        Args:
-            target: A Pitch object representing a partial in the spectrum
-            partials: List of partial numbers to include
-            
-        Returns:
-            A new Spectrum instance with the calculated fundamental
-        
-        Raises:
-            ValueError: If target's partial number is not in the partials list
+        Create a Spectrum where *target* is a known partial rather than the fundamental.
+
+        The fundamental is back-calculated from the target pitch and its
+        partial number.
+
+        Parameters
+        ----------
+        target : Pitch
+            A Pitch whose ``partial`` attribute identifies which partial it
+            represents.
+        partials : list of int, float, or Fraction
+            Partial numbers to include.
+
+        Returns
+        -------
+        Spectrum
+
+        Raises
+        ------
+        ValueError
+            If the target's partial number is not in *partials*.
         """
         if target.partial not in partials:
             raise ValueError(f"Target partial {target.partial} must be in the list of partials")
@@ -112,17 +135,24 @@ class Spectrum():
 
     def pivot(self, source_partial: Union[int, float], target_partial: Union[int, float]) -> 'Spectrum':
         """
-        Reinterpret a partial as a different partial number, adjusting the spectrum accordingly.
-        
-        Args:
-            source_partial: The partial number to reinterpret
-            target_partial: The new partial number to use
-            
-        Returns:
-            A new Spectrum with the adjusted fundamental
-            
-        Raises:
-            ValueError: If either partial is not in the spectrum
+        Reinterpret a partial as a different partial number, adjusting the fundamental.
+
+        Parameters
+        ----------
+        source_partial : int or float
+            The partial number to reinterpret.
+        target_partial : int or float
+            The new partial number to assign.
+
+        Returns
+        -------
+        Spectrum
+            A new Spectrum with the adjusted fundamental.
+
+        Raises
+        ------
+        ValueError
+            If either partial is not in the spectrum.
         """
         if source_partial not in self.partials:
             raise ValueError(f"Source partial {source_partial} not found in spectrum")
@@ -143,17 +173,24 @@ class Spectrum():
 
     def retarget(self, partial: Union[int, float], target: Pitch) -> 'Spectrum':
         """
-        Adjust spectrum so the given partial matches the target pitch.
-        
-        Args:
-            partial: The partial number to adjust
-            target: The target pitch to match
-            
-        Returns:
-            A new Spectrum with the adjusted fundamental
-            
-        Raises:
-            ValueError: If the partial is not in the spectrum
+        Adjust the spectrum so that the given partial matches *target*.
+
+        Parameters
+        ----------
+        partial : int or float
+            The partial number to adjust.
+        target : Pitch
+            The target pitch to match.
+
+        Returns
+        -------
+        Spectrum
+            A new Spectrum with the adjusted fundamental.
+
+        Raises
+        ------
+        ValueError
+            If the partial is not in the spectrum.
         """
         if partial not in self.partials:
             raise ValueError(f"Partial {partial} not found in spectrum")
@@ -164,18 +201,26 @@ class Spectrum():
 
     def modulate(self, target: 'Spectrum', source_partial: Union[int, float], target_partial: Union[int, float]) -> 'Spectrum':
         """
-        Adjusts spectrum so that its source_partial matches target_partial in the target spectrum.
-        
-        Args:
-            target: The target spectrum to align with
-            source_partial: The partial number from this spectrum to adjust
-            target_partial: The partial number from the target spectrum to match
-            
-        Returns:
-            A new Spectrum with the adjusted fundamental
-            
-        Raises:
-            ValueError: If either partial is not in its respective spectrum
+        Adjust this spectrum so that *source_partial* aligns with *target_partial* in another spectrum.
+
+        Parameters
+        ----------
+        target : Spectrum
+            The target spectrum to align with.
+        source_partial : int or float
+            Partial number from this spectrum to adjust.
+        target_partial : int or float
+            Partial number from the target spectrum to match.
+
+        Returns
+        -------
+        Spectrum
+            A new Spectrum with the adjusted fundamental.
+
+        Raises
+        ------
+        ValueError
+            If either partial is not found in its respective spectrum.
         """
         if source_partial not in self.partials:
             raise ValueError(f"Source partial {source_partial} not found in source spectrum")

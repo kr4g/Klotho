@@ -9,6 +9,26 @@ __all__ = [
 ]
 
 def factor_children(subdivs:tuple) -> tuple:
+    """Flatten a nested subdivision tuple into a flat tuple of leaf values.
+
+    Recursively traverses *subdivs* and collects every non-tuple element
+    in depth-first order.
+
+    Parameters
+    ----------
+    subdivs : tuple
+        Arbitrarily nested tuple of numeric leaf values.
+
+    Returns
+    -------
+    tuple
+        Flat tuple containing all leaf values in traversal order.
+
+    Examples
+    --------
+    >>> factor_children((3, (2, 1), 4))
+    (3, 2, 1, 4)
+    """
     def _factor(subdivs, acc):
         for element in subdivs:
             if isinstance(element, tuple):
@@ -19,6 +39,30 @@ def factor_children(subdivs:tuple) -> tuple:
     return tuple(_factor(subdivs, []))
 
 def refactor_children(subdivs:tuple, factors:tuple) -> tuple:
+    """Re-nest flat *factors* into the nested structure of *subdivs*.
+
+    Walks *subdivs* depth-first and replaces each leaf position with the
+    next value from *factors*, preserving the original nesting topology.
+
+    Parameters
+    ----------
+    subdivs : tuple
+        Nested tuple whose structure (but not leaf values) is preserved.
+    factors : tuple
+        Flat sequence of replacement leaf values.  Must contain exactly as
+        many elements as there are leaves in *subdivs*.
+
+    Returns
+    -------
+    tuple
+        A new nested tuple with the same shape as *subdivs* but with leaf
+        values taken sequentially from *factors*.
+
+    Examples
+    --------
+    >>> refactor_children((3, (2, 1), 4), (10, 20, 30, 40))
+    (10, (20, 30), 40)
+    """
     def _refactor(subdivs, index):
         result = []
         for element in subdivs:
@@ -32,30 +76,88 @@ def refactor_children(subdivs:tuple, factors:tuple) -> tuple:
     return _refactor(subdivs, 0)[0]
 
 def get_signs(subdivs):
-        signs = []
-        for element in subdivs:
-            if isinstance(element, tuple):
-                signs.extend(get_signs(element))
-            else:
-                signs.append(1 if element >= 0 else -1)
-        return signs
+    """Extract the sign of each leaf value in a nested subdivision tuple.
+
+    Parameters
+    ----------
+    subdivs : tuple
+        Arbitrarily nested tuple of numeric values.
+
+    Returns
+    -------
+    list of int
+        Flat list of ``+1`` or ``-1`` for each leaf, in depth-first order.
+
+    Examples
+    --------
+    >>> get_signs((3, (-2, 1), -4))
+    [1, -1, 1, -1]
+    """
+    signs = []
+    for element in subdivs:
+        if isinstance(element, tuple):
+            signs.extend(get_signs(element))
+        else:
+            signs.append(1 if element >= 0 else -1)
+    return signs
     
 def get_abs(subdivs):
-        result = []
-        for element in subdivs:
-            if isinstance(element, tuple):
-                result.extend(get_abs(element))
-            else:
-                result.append(abs(element))
-        return result
+    """Get the absolute values of all leaves in a nested subdivision tuple.
+
+    Parameters
+    ----------
+    subdivs : tuple
+        Arbitrarily nested tuple of numeric values.
+
+    Returns
+    -------
+    list of int or float
+        Flat list of absolute leaf values in depth-first order.
+
+    Examples
+    --------
+    >>> get_abs((3, (-2, 1), -4))
+    [3, 2, 1, 4]
+    """
+    result = []
+    for element in subdivs:
+        if isinstance(element, tuple):
+            result.extend(get_abs(element))
+        else:
+            result.append(abs(element))
+    return result
 
 def rotate_children(subdivs: tuple, n: int = 1, preserve_signs: bool = False) -> tuple:
-    """Rotates the children of a nested tuple structure.
-    
-    Args:
-        subdivs: Nested tuple structure to rotate
-        n: Number of positions to rotate
-        preserve_signs: If True, preserves the signs of numbers while rotating their absolute values
+    """Rotate the leaf values of a nested subdivision tuple.
+
+    Flattens the leaves, performs a left-rotation by *n* positions, and
+    re-nests them into the original structure.  When *preserve_signs* is
+    ``True``, only the absolute values are rotated while the original sign
+    at each leaf position is retained.
+
+    Parameters
+    ----------
+    subdivs : tuple
+        Arbitrarily nested tuple of numeric values.
+    n : int, optional
+        Number of positions to rotate left (default is 1).
+    preserve_signs : bool, optional
+        If ``True``, rotate absolute values only and reapply the original
+        signs at each position (default is ``False``).
+
+    Returns
+    -------
+    tuple
+        A new nested tuple with the same shape as *subdivs* and rotated
+        leaf values.
+
+    Examples
+    --------
+    >>> rotate_children((1, (2, 3), 4))
+    (2, (3, 4), 1)
+
+    >>> rotate_children((1, (-2, 3), -4), preserve_signs=True)
+    (2, (-3, 4), -1)
     """
     if not preserve_signs:
         factors = factor_children(subdivs)
@@ -74,7 +176,26 @@ def rotate_children(subdivs: tuple, n: int = 1, preserve_signs: bool = False) ->
     return refactor_children(subdivs, tuple(signed_values))
 
 def format_subdivisions(subdivs):
-    """Format nested tuple structure removing commas."""
+    """Format a nested subdivision tuple as a human-readable string.
+
+    Produces a parenthesised, space-separated representation (no commas)
+    suitable for display.
+
+    Parameters
+    ----------
+    subdivs : tuple or list or scalar
+        Arbitrarily nested structure of numeric values.
+
+    Returns
+    -------
+    str
+        String representation, e.g. ``"(3 (2 1) 4)"``.
+
+    Examples
+    --------
+    >>> format_subdivisions((3, (2, 1), 4))
+    '(3 (2 1) 4)'
+    """
     if isinstance(subdivs, (tuple, list)):
         inner = ' '.join(str(format_subdivisions(x)) for x in subdivs)
         return f"({inner})"
@@ -82,6 +203,28 @@ def format_subdivisions(subdivs):
 
 
 class Group(tuple):
+    """Immutable ``(D, S)`` pair representing a rhythmic subdivision group.
+
+    *D* is the top-level duration/divisor and *S* is a (possibly nested)
+    tuple of subdivisions.  Nested tuples within *S* are recursively
+    converted to ``Group`` instances, so the entire tree is typed
+    throughout.
+
+    Parameters
+    ----------
+    G : tuple
+        A two-element tuple ``(D, S)`` where *D* is a numeric duration and
+        *S* is a subdivision value or nested tuple of subdivisions.
+
+    Examples
+    --------
+    >>> g = Group((4, (1, 2, 1)))
+    >>> g.D
+    4
+    >>> g.S
+    (1, 2, 1)
+    """
+
     def __new__(cls, G):
         if isinstance(G, tuple):
             D = G[0]

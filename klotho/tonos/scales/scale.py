@@ -18,34 +18,35 @@ import numpy as np
 class Scale(EquaveCyclicMixin, RelativePitchCollection):
     """
     A musical scale with automatic sorting, deduplication, and equave reduction.
-    
+
     Scale represents a collection of pitch intervals that form a musical scale.
     It automatically sorts degrees, removes duplicates, equave-reduces intervals,
-    and ensures the unison (1/1 or 0 cents) is present. Scales always use 
+    and ensures the unison (1/1 or 0 cents) is present. Scales always use
     equave-cyclic indexing for accessing pitches in different octaves.
-    
-    Args:
-        degrees: List of intervals as ratios, decimals, or numbers
-        interval_type: "ratios" or "cents"
-        equave: The interval of equivalence, defaults to "2/1" (octave)
-        reference_pitch: If provided, the scale is instanced at this pitch
-        
-    Examples:
-        >>> scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
-        >>> scale.degrees
-        [Fraction(1, 1), Fraction(9, 8), Fraction(5, 4), Fraction(4, 3), Fraction(3, 2), Fraction(5, 3), Fraction(15, 8)]
-        
-        >>> scale[7]  # Next octave
-        Fraction(2, 1)
-        
-        >>> scale.mode(1)  # Dorian mode
-        Scale([Fraction(1, 1), Fraction(10, 9), ...], equave=2)
-        
-        >>> c_major = scale.root("C4")
-        >>> c_major[0]
-        Pitch(C4, 261.63 Hz)
-        >>> type(c_major)
-        <class 'Scale'>
+
+    Parameters
+    ----------
+    degrees : list of str, float, int, or Fraction
+        Intervals as ratios (e.g., ``"5/4"``), decimals, or numbers.
+    interval_type : str, optional
+        ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
+    equave : float, Fraction, int, or str, optional
+        Interval of equivalence. Default is ``"2/1"`` (octave).
+    reference_pitch : Pitch, str, or None, optional
+        If provided, the scale is instanced at this pitch.
+
+    Examples
+    --------
+    >>> scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
+    >>> scale.degrees
+    [Fraction(1, 1), Fraction(9, 8), Fraction(5, 4), Fraction(4, 3), Fraction(3, 2), Fraction(5, 3), Fraction(15, 8)]
+
+    >>> scale[7]
+    Fraction(2, 1)
+
+    >>> c_major = scale.root("C4")
+    >>> c_major[0]
+    Pitch(C4, 261.63 Hz)
     """
     
     def __init__(self, degrees: DegreeList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"],
@@ -159,15 +160,24 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     
     @property
     def intervals(self) -> List[IntervalType]:
+        """list : Successive step intervals including the closing interval to the equave."""
         return self._intervals
 
     @property
     def degrees(self) -> List[Union[Pitch, IntervalType]]:
+        """list : Cumulative degrees. Returns Pitch objects when instanced."""
         if self.is_instanced:
             return [self._calculate_pitch(i) for i in range(len(self._degrees))]
         return list(self._degrees)
     
     def relative(self) -> 'Scale':
+        """
+        Return a rootless copy retaining only the interval structure.
+
+        Returns
+        -------
+        Scale
+        """
         if not self.is_instanced:
             return self
         return Scale(
@@ -178,6 +188,18 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         )
     
     def root(self, pitch: Union[Pitch, str]) -> 'Scale':
+        """
+        Return a copy of this scale rooted at the given pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The reference pitch.
+
+        Returns
+        -------
+        Scale
+        """
         return Scale(
             list(self._degrees),
             self._interval_type_mode,
@@ -186,6 +208,21 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         )
     
     def mode(self, mode_number: int) -> 'Scale':
+        """
+        Return a modal rotation of this scale.
+
+        Parameters
+        ----------
+        mode_number : int
+            Zero-based mode index. ``0`` returns the original scale,
+            ``1`` starts from the second degree, etc.
+
+        Returns
+        -------
+        Scale
+            A new Scale whose degrees are rotated to begin on the
+            specified degree of the original.
+        """
         if mode_number in self._mode_cache:
             cached = self._mode_cache[mode_number]
             if self._reference_pitch:
@@ -316,6 +353,22 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     
     @classmethod
     def n_edo(cls, n: int = 12, equave: float = 1200.0, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """
+        Construct an equal-division-of-the-octave (EDO) scale.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of equal divisions. Default is 12.
+        equave : float, optional
+            Size of the equave in cents. Default is 1200.0.
+        reference_pitch : Pitch, str, or None, optional
+            Optional root pitch.
+
+        Returns
+        -------
+        Scale
+        """
         step_size = equave / n
         degrees = [i * step_size for i in range(n)]
         return cls(degrees, 'cents', equave, reference_pitch)

@@ -5,6 +5,35 @@ from .threejs_lattice import ThreejsLatticeData
 def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
                     node_size=30, text_size=12, show_labels=True,
                     title=None, nodes=None):
+    """
+    Build a Three.js 3D scene for a Combination Product Set.
+
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        The CPS to render.
+    node_positions : dict
+        Mapping of node IDs to 3D ``(x, y, z)`` positions.
+    G : Graph
+        CPS graph providing edge and node attribute data.
+    figsize : tuple of float, optional
+        Width and height in inches (converted to pixels at 100 dpi).
+    node_size : int, optional
+        Base node diameter.
+    text_size : int, optional
+        Font size for labels.
+    show_labels : bool, optional
+        Whether to display labels (used for title generation).
+    title : str or None, optional
+        Scene title.  Auto-generated when ``None``.
+    nodes : list or None, optional
+        Node IDs to highlight in pale green.
+
+    Returns
+    -------
+    ThreejsLatticeData
+        Three.js scene description and metadata.
+    """
     width_px = int(figsize[0] * 100)
     height_px = int(figsize[1] * 100)
 

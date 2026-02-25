@@ -19,31 +19,35 @@ import numpy as np
 class Chord(EquaveCyclicMixin, RelativePitchCollection):
     """
     A musical chord with automatic sorting and deduplication.
-    
+
     Chord represents a collection of pitch intervals that form a musical chord.
     It automatically sorts degrees, removes duplicates, and equave-reduces intervals,
-    but unlike Scale, it does NOT enforce the presence of unison. Chords always use 
+    but unlike Scale, it does NOT enforce the presence of unison. Chords always use
     equave-cyclic indexing for accessing chord tones in different octaves.
-    
-    Args:
-        degrees: List of intervals as ratios, decimals, or numbers
-        interval_type: "ratios" or "cents"
-        equave: The interval of equivalence, defaults to "2/1" (octave)
-        reference_pitch: If provided, the chord is instanced at this pitch
-        
-    Examples:
-        >>> chord = Chord(["1/1", "5/4", "3/2"])  # Major triad
-        >>> chord.degrees
-        [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
-        
-        >>> chord[3]  # Next octave
-        Fraction(2, 1)
-        
-        >>> c_major = chord.root("C4")
-        >>> c_major[0]
-        Pitch(C4, 261.63 Hz)
-        >>> type(c_major)
-        <class 'Chord'>
+
+    Parameters
+    ----------
+    degrees : list of str, float, int, or Fraction
+        Intervals as ratios (e.g., ``"5/4"``), decimals, or numbers.
+    interval_type : str, optional
+        ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
+    equave : float, Fraction, int, or str, optional
+        Interval of equivalence. Default is ``"2/1"`` (octave).
+    reference_pitch : Pitch, str, or None, optional
+        If provided, the chord is instanced at this pitch.
+
+    Examples
+    --------
+    >>> chord = Chord(["1/1", "5/4", "3/2"])
+    >>> chord.degrees
+    [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
+
+    >>> chord[3]
+    Fraction(2, 1)
+
+    >>> c_major = chord.root("C4")
+    >>> c_major[0]
+    Pitch(C4, 261.63 Hz)
     """
     
     def __init__(self, degrees: DegreeList = ["1/1", "5/4", "3/2"],
@@ -145,15 +149,24 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
     
     @property
     def intervals(self) -> List[IntervalType]:
+        """list : Successive intervals between adjacent chord tones."""
         return self._intervals
 
     @property
     def degrees(self) -> List[Union[Pitch, IntervalType]]:
+        """list : Cumulative degrees. Returns Pitch objects when instanced."""
         if self.is_instanced:
             return [self._calculate_pitch(i) for i in range(len(self._degrees))]
         return list(self._degrees)
     
     def relative(self) -> 'Chord':
+        """
+        Return a rootless copy retaining only the interval structure.
+
+        Returns
+        -------
+        Chord
+        """
         if not self.is_instanced:
             return self
         return Chord(
@@ -164,6 +177,18 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         )
     
     def root(self, pitch: Union[Pitch, str]) -> 'Chord':
+        """
+        Return a copy of this chord rooted at the given pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The reference pitch.
+
+        Returns
+        -------
+        Chord
+        """
         return Chord(
             list(self._degrees),
             self._interval_type_mode,
@@ -172,6 +197,13 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         )
     
     def normalized(self) -> 'Chord':
+        """
+        Transpose the chord so the lowest degree is the unison (1/1 or 0 cents).
+
+        Returns
+        -------
+        Chord
+        """
         if not self._degrees:
             return Chord([], self._interval_type_mode, self._equave, self._reference_pitch)
         
@@ -185,6 +217,22 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         return Chord(normalized_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
     
     def voicing(self, index: Union[int, slice, Sequence[int], np.ndarray]) -> 'Voicing':
+        """
+        Extract a Voicing from this chord by selecting tones with cyclic indexing.
+
+        Unlike slicing (which returns a ``RelativePitchCollection``), this
+        preserves multi-octave spread by using cyclic degree lookup without
+        equave reduction.
+
+        Parameters
+        ----------
+        index : int, slice, or sequence of int
+            Indices into the chord (cyclic).
+
+        Returns
+        -------
+        Voicing
+        """
         if isinstance(index, slice):
             size = len(self._degrees)
             if size == 0:
@@ -293,6 +341,25 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
     
     @classmethod
     def from_collection(cls, collection: PitchCollectionBase, equave: Union[float, Fraction, int, str, None] = None) -> 'Chord':
+        """
+        Construct a Chord from an existing relative pitch collection.
+
+        Parameters
+        ----------
+        collection : PitchCollectionBase
+            A relative pitch collection to convert.
+        equave : float, Fraction, int, str, or None, optional
+            Override equave. Defaults to the collection's equave.
+
+        Returns
+        -------
+        Chord
+
+        Raises
+        ------
+        ValueError
+            If the collection is absolute (not relative).
+        """
         if not collection.is_relative:
             raise ValueError("Cannot create Chord from absolute collection")
         target_equave = equave if equave is not None else (collection.equave if collection.equave is not None else Fraction(2, 1))
@@ -306,27 +373,34 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
 
 class Voicing(RelativePitchCollection):
     """
-    A musical sonority with no equave reduction, removing only exact duplicates.
-    
-    Sonority represents a "frozen" set of intervals that preserves exact pitch relationships
-    without equave cycling. It does not reduce intervals to within an equave, allowing
-    for chords that span multiple octaves with exact interval preservation. Exact duplicates
-    are removed, but the same pitch-class in different octaves is allowed.
-    
-    Args:
-        degrees: List of intervals as ratios, decimals, or numbers
-        interval_type: "ratios" or "cents"
-        equave: The interval of equivalence, defaults to "2/1" (octave)
-        reference_pitch: If provided, the sonority is instanced at this pitch
-        
-    Examples:
-        >>> voicing = Voicing(["1/2", "1/1", "3/2", "5/2"])
-        >>> voicing.degrees
-        [Fraction(1, 2), Fraction(1, 1), Fraction(3, 2), Fraction(5, 2)]
-        
-        >>> voicing = Voicing(["1/1", "1/1", "3/2"])  # Exact duplicate removed
-        >>> voicing.degrees
-        [Fraction(1, 1), Fraction(3, 2)]
+    A musical voicing with no equave reduction, removing only exact duplicates.
+
+    Voicing represents a "frozen" set of intervals that preserves exact pitch
+    relationships without equave cycling. Unlike Chord, it does not reduce
+    intervals to within an equave, allowing voicings that span multiple octaves.
+    Exact duplicates are removed, but the same pitch-class in different octaves
+    is allowed.
+
+    Parameters
+    ----------
+    degrees : list of str, float, int, or Fraction
+        Intervals as ratios, decimals, or numbers.
+    interval_type : str, optional
+        ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
+    equave : float, Fraction, int, or str, optional
+        Interval of equivalence. Default is ``"2/1"``.
+    reference_pitch : Pitch, str, or None, optional
+        If provided, the voicing is instanced at this pitch.
+
+    Examples
+    --------
+    >>> voicing = Voicing(["1/2", "1/1", "3/2", "5/2"])
+    >>> voicing.degrees
+    [Fraction(1, 2), Fraction(1, 1), Fraction(3, 2), Fraction(5, 2)]
+
+    >>> voicing = Voicing(["1/1", "1/1", "3/2"])
+    >>> voicing.degrees
+    [Fraction(1, 1), Fraction(3, 2)]
     """
     
     def __init__(self, degrees: DegreeList = ["1/1", "5/4", "3/2"],
@@ -409,15 +483,24 @@ class Voicing(RelativePitchCollection):
     
     @property
     def intervals(self) -> List[IntervalType]:
+        """list : Successive intervals between adjacent voicing tones."""
         return self._intervals
 
     @property
     def degrees(self) -> List[Union[Pitch, IntervalType]]:
+        """list : The voicing degrees. Returns Pitch objects when instanced."""
         if self.is_instanced:
             return [self._getitem_single_sonority(i) for i in range(len(self._degrees))]
         return list(self._degrees)
     
     def relative(self) -> 'Voicing':
+        """
+        Return a rootless copy retaining only the interval structure.
+
+        Returns
+        -------
+        Voicing
+        """
         if not self.is_instanced:
             return self
         return Voicing(
@@ -428,6 +511,18 @@ class Voicing(RelativePitchCollection):
         )
     
     def root(self, pitch: Union[Pitch, str]) -> 'Voicing':
+        """
+        Return a copy rooted at the given pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The reference pitch.
+
+        Returns
+        -------
+        Voicing
+        """
         return Voicing(
             list(self._degrees),
             self._interval_type_mode,
@@ -485,6 +580,25 @@ class Voicing(RelativePitchCollection):
     
     @classmethod
     def from_collection(cls, collection: PitchCollectionBase, equave: Union[float, Fraction, int, str, None] = None) -> 'Voicing':
+        """
+        Construct a Voicing from an existing relative pitch collection.
+
+        Parameters
+        ----------
+        collection : PitchCollectionBase
+            A relative pitch collection to convert.
+        equave : float, Fraction, int, str, or None, optional
+            Override equave. Defaults to the collection's equave.
+
+        Returns
+        -------
+        Voicing
+
+        Raises
+        ------
+        ValueError
+            If the collection is absolute (not relative).
+        """
         if not collection.is_relative:
             raise ValueError("Cannot create Voicing from absolute collection")
         target_equave = equave if equave is not None else (collection.equave if collection.equave is not None else Fraction(2, 1))
@@ -499,18 +613,24 @@ class Voicing(RelativePitchCollection):
 class Sonority(AbsolutePitchCollection):
     """
     A sonority of absolute Pitch objects without interval structure.
-    
+
     Sonority stores Pitch objects directly without deriving them from
-    intervals and a reference pitch. Unlike PitchCollection which can be
-    used sequentially, Sonority represents simultaneous pitches (a chord).
-    
-    Args:
-        pitches: List of Pitch objects or pitch strings (e.g., "C4", "D#5")
-        
-    Examples:
-        >>> asnty = Sonority(["C4", "E4", "G4"])
-        >>> asnty[0]
-        Pitch(C4, 261.63 Hz)
+    intervals and a reference pitch. Represents simultaneous pitches.
+
+    Parameters
+    ----------
+    pitches : list of Pitch or str
+        Pitch objects or pitch strings (e.g., ``"C4"``, ``"D#5"``).
+    equave : float, Fraction, int, str, or None, optional
+        Interval of equivalence for cyclic indexing.
+    reference_pitch : Pitch, str, or None, optional
+        Optional reference pitch for partial calculations.
+
+    Examples
+    --------
+    >>> s = Sonority(["C4", "E4", "G4"])
+    >>> s[0]
+    Pitch(C4, 261.63 Hz)
     """
     
     def __init__(self, pitches: Union[List[Pitch], List[str]],
@@ -532,22 +652,23 @@ FreeSonority = Sonority
 
 class ChordSequence:
     """
-    A sequence of Chord, Voicing, or Sonority objects.
-    
-    ChordSequence provides a container for organizing multiple chord or sonority
-    objects in sequence, enabling operations on chord progressions or harmonic
-    sequences. Accepts both relative (Chord, Voicing) and absolute (Sonority)
-    chord types.
-    
-    Args:
-        chords: List of Chord, Voicing, and/or Sonority objects
-        
-    Examples:
-        >>> chord1 = Chord(["1/1", "5/4", "3/2"])
-        >>> chord2 = Chord(["1/1", "6/5", "3/2"])
-        >>> sequence = ChordSequence([chord1, chord2])
-        >>> len(sequence)
-        2
+    An ordered sequence of Chord, Voicing, or Sonority objects.
+
+    Provides a container for chord progressions or harmonic sequences.
+    Accepts both relative (Chord, Voicing) and absolute (Sonority) types.
+
+    Parameters
+    ----------
+    chords : list of Chord, Voicing, or Sonority, optional
+        The chord objects in the sequence.
+
+    Examples
+    --------
+    >>> chord1 = Chord(["1/1", "5/4", "3/2"])
+    >>> chord2 = Chord(["1/1", "6/5", "3/2"])
+    >>> sequence = ChordSequence([chord1, chord2])
+    >>> len(sequence)
+    2
     """
     
     def __init__(self, chords: List[Union[Chord, Voicing, Sonority]] = None):
@@ -555,6 +676,7 @@ class ChordSequence:
     
     @property
     def chords(self) -> List[Union[Chord, Voicing, Sonority]]:
+        """list : A copy of the chord objects in this sequence."""
         return self._chords.copy()
     
     def __len__(self) -> int:

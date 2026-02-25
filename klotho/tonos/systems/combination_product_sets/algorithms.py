@@ -14,29 +14,34 @@ __all__ = [
 def match_pattern(cps, node_ids: List[int], sort_by: str = 'position',
                   include_target: bool = False) -> List[Tuple[int, ...]]:
     """
-    Find all groups of nodes that form the same geometric shape as the input nodes.
-    
+    Find all groups of nodes forming the same geometric shape as the input nodes.
+
     The match is purely geometric: two node sets match if they occupy congruent
     positions (same shape, allowing rotation and reflection). Each returned match
-    is ordered so that match[i] occupies the same structural position as node_ids[i].
+    is ordered so that ``match[i]`` occupies the same structural position as
+    ``node_ids[i]``.
 
-    Args:
-        cps: CombinationProductSet instance
-        node_ids: List of node IDs that define the reference shape
-        sort_by: How to order the returned matches.
-            'position' (default) — clockwise spatial sweep based on centroid
-                angular position relative to the target. Invariant to the
-                ordering of node_ids.
-            'rotation' — clockwise Procrustes rotation angle needed to align
-                the centered target shape onto each centered match. Sensitive
-                to the ordering of node_ids; captures structural distinctions
-                such as reflection vs pure rotation.
-        include_target: If True, the target itself (as a tuple in the given
-            node order) is prepended as the first element of the result.
-        
-    Returns:
-        List of tuples containing node IDs for matching shapes, ordered to
-        correspond positionally with node_ids.
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        The CPS instance to search.
+    node_ids : list of int
+        Node IDs defining the reference shape.
+    sort_by : str, optional
+        How to order results:
+
+        - ``'position'`` (default) -- clockwise spatial sweep based on
+          centroid angular position relative to the target.
+        - ``'rotation'`` -- clockwise Procrustes rotation angle.
+    include_target : bool, optional
+        If True, prepend the target itself as the first result.
+        Default is False.
+
+    Returns
+    -------
+    list of tuple of int
+        Matching node-ID tuples, ordered to correspond positionally
+        with *node_ids*.
     """
     if len(node_ids) < 3:
         return [tuple(node_ids)] if include_target else []
@@ -193,6 +198,27 @@ def _find_correspondence(ref_sub, cand_sub, candidate_nodes):
 
 
 def sub_cps(cps, k: int, s: int) -> List[dict]:
+    """
+    Enumerate all sub-CPS structures within a CPS.
+
+    A sub-CPS is formed by fixing an *anchor* subset of factors and varying
+    the remaining *k* factors taken *s* at a time.
+
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        The parent CPS.
+    k : int
+        Number of varying factors in each sub-CPS.
+    s : int
+        Combination rank within the sub-CPS.
+
+    Returns
+    -------
+    list of dict
+        Each dict contains ``'nodes'``, ``'anchor'``, ``'varying'``,
+        and ``'combos'`` keys.
+    """
     factors = list(cps.factors)
     n = len(factors)
     r = cps.rank
@@ -241,6 +267,25 @@ def sub_cps(cps, k: int, s: int) -> List[dict]:
 
 
 def classify(cps, node_ids: List[int]) -> dict:
+    """
+    Classify a subset of CPS nodes as harmonic, subharmonic, or mixed.
+
+    Harmonic subsets share common anchor factors; subharmonic subsets
+    exclude factors entirely; mixed subsets do neither.
+
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        The CPS instance.
+    node_ids : list of int
+        Node IDs to classify.
+
+    Returns
+    -------
+    dict
+        Classification result with keys ``'type'``, ``'nodes'``,
+        ``'shared'``, ``'excluded'``, and ``'factors_present'``.
+    """
     factors = set(cps.factors)
     G = cps.graph
 
@@ -287,6 +332,24 @@ def classify(cps, node_ids: List[int]) -> dict:
 
 
 def faces(cps, size: int) -> List[Tuple[int, ...]]:
+    """
+    Find all fully-connected cliques of a given size in the CPS graph.
+
+    A *face* is a subset of nodes where every pair is connected by an
+    edge (a complete subgraph).
+
+    Parameters
+    ----------
+    cps : CombinationProductSet
+        The CPS instance.
+    size : int
+        Number of nodes per face.
+
+    Returns
+    -------
+    list of tuple of int
+        Each tuple contains the node IDs forming a complete subgraph.
+    """
     G = cps.graph
     all_nodes = list(G.nodes())
     result = []
