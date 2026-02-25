@@ -43,7 +43,7 @@ To use Klotho with SuperCollider, see the `Klotho-SC` extension package: <a href
 
 ## Tutorials
 
-**Interactive Tutorials:** <a href="https://kr4g.github.io/Klotho/" target="_blank">https://kr4g.github.io/Klotho/</a>
+**Interactive Tutorials:** <a href="https://kr4g.github.io/klotho-book/" target="_blank">https://kr4g.github.io/klotho-book/</a>
 
 Browse the Klotho tutorial series directly in your browser — no installation required.
 

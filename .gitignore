@@ -97,6 +97,7 @@ node_modules/
 # ==========================
 # Documentation
 # ==========================
+_build/
 docs/_build/
 docs/rebuild_docs.sh
 check_docs.py
@@ -144,17 +145,6 @@ rebuild_tutorials.sh
 !examples/
 !examples/.gitkeep
 
-# Jupyter Book tutorials
+# Tutorials directory (tracked, currently empty)
 !tutorials/
-!tutorials/**/
-!tutorials/**/*.ipynb
-!tutorials/**/*.md
-tutorials/**/.ipynb_checkpoints/
-
-# Jupyter Book config
-!myst.yml
-_build/
-
-# Binder environment
-!binder/
-!binder/**
+!tutorials/.gitkeep
