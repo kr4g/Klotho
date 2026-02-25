@@ -30,6 +30,9 @@ jobs:
       - name: Build the book
         run: jupyter book build .
 
+      - name: Debug build output
+        run: find _build -type d | head -20
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
