@@ -8,9 +8,10 @@ from klotho.tonos.systems.combination_product_sets.master_set import MASTER_SETS
 def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      show_labels=True, title=None, output_file=None):
     dim = ms.dimensionality
+    override_positions = None
     if dim > 3:
         from klotho.semeios.visualization.plots import _reduce_positions
-        ms_positions = _reduce_positions(ms.positions, target_dims=3)
+        override_positions = _reduce_positions(ms.positions, target_dims=3)
         dim = 3
     is_3d = dim == 3
 
@@ -18,7 +19,8 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
         from .threejs_master_set import _threejs_master_set_3d
         return _threejs_master_set_3d(ms, figsize=figsize, node_size=node_size,
                                       text_size=text_size, show_labels=show_labels,
-                                      title=title)
+                                      title=title,
+                                      override_positions=override_positions)
     else:
         from .svg_master_set import _svg_master_set_2d
         return _svg_master_set_2d(ms, figsize=figsize, node_size=node_size,

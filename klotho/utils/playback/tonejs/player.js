@@ -1,6 +1,5 @@
 (() => {
-  if (globalThis._KLOTHO_PLAYER_SESSION === globalThis._KLOTHO_SESSION) return;
-  globalThis._KLOTHO_PLAYER_SESSION = globalThis._KLOTHO_SESSION;
+  if (typeof globalThis.KlothoPlayer !== "undefined") return;
 
   let audioReady = false;
 

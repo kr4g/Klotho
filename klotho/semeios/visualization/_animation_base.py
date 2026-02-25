@@ -1,4 +1,3 @@
-import uuid
 from pathlib import Path
 
 from klotho.utils.playback.tonejs.cdn import (
@@ -17,13 +16,10 @@ def build_session_preamble(include_plotly=False, include_tone=False, include_thr
         include_threejs=include_threejs,
     )
 
-    kernel_session = uuid.uuid4().hex
-    session_script = f'<script>globalThis._KLOTHO_SESSION = "{kernel_session}";</script>'
-
     instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
     player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
 
-    return cdn_html, session_script, instruments_js, player_js
+    return cdn_html, instruments_js, player_js
 
 
 def build_control_bar_html(wid):
@@ -86,9 +82,8 @@ def build_nav_controls_html(wid, total_groups):
     </span>'''
 
 
-def build_scripts_html(session_script, instruments_js, player_js):
-    return f'''{session_script}
-<script>{instruments_js}</script>
+def build_scripts_html(instruments_js, player_js):
+    return f'''<script>{instruments_js}</script>
 <script>{player_js}</script>'''
 
 

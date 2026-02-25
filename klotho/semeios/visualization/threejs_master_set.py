@@ -2,8 +2,8 @@ from .threejs_lattice import ThreejsLatticeData
 
 
 def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
-                           show_labels=True, title=None):
-    positions = ms.positions
+                           show_labels=True, title=None, override_positions=None):
+    positions = override_positions if override_positions is not None else ms.positions
     edge_pairs = ms.edges
     nd = ms.node_data()
 

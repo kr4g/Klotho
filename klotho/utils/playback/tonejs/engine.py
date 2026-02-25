@@ -7,8 +7,6 @@ from klotho.utils.playback.tonejs.cdn import (
     cdn_scripts, INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
 )
 
-_KERNEL_SESSION = uuid.uuid4().hex
-
 
 def _convert_numpy_types(obj):
     try:
@@ -111,7 +109,6 @@ class ToneEngine:
 </div>
 
 {tone_script}
-<script>globalThis._KLOTHO_SESSION = "{_KERNEL_SESSION}";</script>
 <script>
 {scripts}
 </script>

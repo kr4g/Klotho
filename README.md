@@ -70,6 +70,14 @@ Platform.userExtensionDir
 
 ---
 
+## Tutorials
+
+**Interactive Tutorials:** <a href="https://kr4g.github.io/Klotho/" target="_blank">https://kr4g.github.io/Klotho/</a>
+
+Browse the Klotho tutorial series directly in your browser — no installation required. Tutorials with interactive widgets can be activated with the power button at the top of the page.
+
+---
+
 ## Documentation
 
 **📖 Online Documentation:** <a href="https://klotho.readthedocs.io/" target="_blank">https://klotho.readthedocs.io/</a>

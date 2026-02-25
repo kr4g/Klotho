@@ -8,27 +8,19 @@ THREEJS_TRACKBALL_CDN = "https://unpkg.com/three@0.147.0/examples/js/controls/Tr
 INSTRUMENTS_JS_PATH = Path(__file__).parent / "instruments.js"
 PLAYER_JS_PATH = Path(__file__).parent / "player.js"
 
-_plotly_included = False
-_tone_included = False
-_threejs_included = False
+
+def _idempotent_load(global_check, cdn_url):
+    return (
+        f'<script>if(typeof {global_check}==="undefined")'
+        f'{{var s=document.createElement("script");s.src="{cdn_url}";'
+        f'document.head.appendChild(s);}}</script>\n'
+    )
 
 
 def cdn_scripts(include_plotly=False, include_tone=False, include_threejs=False):
-    global _plotly_included, _tone_included, _threejs_included
     s = ''
-    if include_plotly and not _plotly_included:
-        s += f'<script src="{PLOTLY_CDN}"></script>\n'
-        _plotly_included = True
-    if include_tone and not _tone_included:
-        s += f'<script src="{TONEJS_CDN}"></script>\n'
-        _tone_included = True
-    if include_threejs:
-        _threejs_included = True
+    if include_plotly:
+        s += _idempotent_load('Plotly', PLOTLY_CDN)
+    if include_tone:
+        s += _idempotent_load('Tone', TONEJS_CDN)
     return s
-
-
-def reset_cdn_flags():
-    global _plotly_included, _tone_included, _threejs_included
-    _plotly_included = False
-    _tone_included = False
-    _threejs_included = False

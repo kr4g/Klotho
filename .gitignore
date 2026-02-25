@@ -126,3 +126,17 @@ node_modules/
 # Task files
 # tasks.json
 # tasks/ 
+
+# Jupyter Book tutorials (tracked on remote)
+!tutorials/
+!tutorials/**/
+!tutorials/**/*.ipynb
+!tutorials/**/*.md
+
+# Jupyter Book config (tracked)
+!myst.yml
+_build/
+
+# Binder config (tracked)
+!binder/
+!binder/**

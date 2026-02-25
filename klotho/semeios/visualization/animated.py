@@ -2,7 +2,7 @@ import json
 import uuid
 
 from klotho.utils.playback.tonejs.cdn import (
-    cdn_scripts, reset_cdn_flags,
+    cdn_scripts,
     INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
     THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
 )
@@ -24,10 +24,10 @@ class AnimatedLattice3dFigure:
         sd = self.scene_data
         wid = self.widget_id
 
-        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+        cdn_html, instruments_js, player_js = build_session_preamble(
             include_tone=bool(self.audio_payload), include_threejs=True)
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
+        scripts_html = build_scripts_html(instruments_js, player_js)
 
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
@@ -530,10 +530,10 @@ class AnimatedRTSvgFigure:
         sd = self.svg_data
         wid = self.widget_id
 
-        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+        cdn_html, instruments_js, player_js = build_session_preamble(
             include_tone=bool(self.audio_payload))
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
+        scripts_html = build_scripts_html(instruments_js, player_js)
 
         leaf_path_ids_json = json.dumps(sd.leaf_path_ids)
         all_anim_ids_json = json.dumps(sd.all_animated_ids)
@@ -640,10 +640,10 @@ class AnimatedLatticeSvgFigure:
         sd = self.svg_data
         wid = self.widget_id
 
-        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+        cdn_html, instruments_js, player_js = build_session_preamble(
             include_tone=bool(self.audio_payload))
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
+        scripts_html = build_scripts_html(instruments_js, player_js)
 
         steps_json = json.dumps(sd.step_group_ids)
         halos_json = json.dumps(sd.halo_ids)
@@ -768,10 +768,10 @@ class _AnimatedShapeFigureBase:
         sd = self.svg_data
         wid = self.widget_id
 
-        cdn_html, session_script, instruments_js, player_js = build_session_preamble(
+        cdn_html, instruments_js, player_js = build_session_preamble(
             include_tone=bool(self.audio_payload))
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(session_script, instruments_js, player_js)
+        scripts_html = build_scripts_html(instruments_js, player_js)
 
         group_node_indices_json = json.dumps(sd.shape_group_node_indices)
         group_edge_ids_json = json.dumps(sd.shape_group_edge_ids)

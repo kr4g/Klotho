@@ -1,6 +1,5 @@
 (() => {
-if (globalThis._KLOTHO_INSTRUMENTS_SESSION === globalThis._KLOTHO_SESSION) return;
-globalThis._KLOTHO_INSTRUMENTS_SESSION = globalThis._KLOTHO_SESSION;
+if (typeof globalThis.KLOTHO_BUILD_INSTRUMENTS === "function") return;
 
 function deepClone(obj) {
   return obj && typeof obj === "object" ? JSON.parse(JSON.stringify(obj)) : obj;
