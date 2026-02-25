@@ -131,6 +131,7 @@ ut_plotter/
 .taskmaster/
 benchmarks/
 CLAUDE.md
+TUTORIALS_WORKFLOW.md
 build_and_upload.sh
 build_and_upload_test.sh
 rebuild_tutorials.sh
