@@ -41,11 +41,13 @@ To use Klotho with SuperCollider, see the `Klotho-SC` extension package: <a href
 
 ---
 
-## Tutorials
+## Companion Book
 
-**Interactive Tutorials:** <a href="https://kr4g.github.io/klotho-book/" target="_blank">https://kr4g.github.io/klotho-book/</a>
+An interactive Jupyter Book exploring the theory, mathematics, and CAC practice behind Klotho — foundational graph structures, formal grammars, evolutionary algorithms, quantum fields, and beyond.
 
-Browse the Klotho tutorial series directly in your browser — no installation required.
+Readable directly in your browser with no installation required.
+
+**Read online:** <a href="https://kr4g.github.io/klotho-book/" target="_blank">https://kr4g.github.io/klotho-book/</a>
 
 ---
 
