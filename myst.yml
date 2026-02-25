@@ -3,6 +3,17 @@ version: 1
 project:
   title: Klotho Tutorials
   github: kr4g/Klotho
+  exclude:
+    - klotho/**
+    - tests/**
+    - examples/**
+    - projects/**
+    - binder/**
+    - tutorials/00_general/**
+    - "tutorials/Klotho Notebooks.md"
+    - "*.py"
+    - "*.txt"
+    - "*.cfg"
 
   jupyter:
     binder:

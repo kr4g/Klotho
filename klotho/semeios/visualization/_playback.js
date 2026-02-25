@@ -29,42 +29,50 @@ loopBtn.onclick = function() {
     loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
 };
 
-if (audioPayload && typeof Tone !== "undefined") {
-    var events = audioPayload.events || [];
-    var instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {});
-    var player = KlothoPlayer.create();
-    toggleBtn.onclick = async function() {
-        if (player.isPlaying()) { player.stop(); return; }
+var _aPlayer = null, _aInstruments = null;
+var _timerId = null;
+var durMs = __DUR_MS__;
+
+function _canAudio() {
+    if (_aPlayer) return true;
+    if (!audioPayload || typeof Tone === "undefined"
+        || typeof globalThis.KLOTHO_BUILD_INSTRUMENTS !== "function"
+        || typeof globalThis.KlothoPlayer === "undefined") return false;
+    _aInstruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {});
+    _aPlayer = KlothoPlayer.create();
+    return true;
+}
+
+function _runAnimation(stepIdx) {
+    if (!playing) return;
+    if (stepIdx __BOUNDARY_OP__ totalSteps) {
+        if (looping) {
+            onBeforePlay();
+            _timerId = setTimeout(function(){ _runAnimation(0); }, durMs);
+        } else { finishPlayback(); }
+        return;
+    }
+    onStep(stepIdx);
+    _timerId = setTimeout(function(){ _runAnimation(stepIdx + 1); }, durMs);
+}
+
+toggleBtn.onclick = async function() {
+    if (_canAudio()) {
+        if (_aPlayer.isPlaying()) { _aPlayer.stop(); return; }
         playing = true; setStopIcon(); onBeforePlay();
-        await player.play(events, instruments, {
+        await _aPlayer.play(audioPayload.events || [], _aInstruments, {
             loop: looping,
             onEvent:  function(stepIdx) { onStep(stepIdx); },
             onStop:   function() { finishPlayback(); },
             onFinish: function() { finishPlayback(); }
         });
-    };
-} else {
-    var durMs = __DUR_MS__;
-    var timerId = null;
-    function runAnimation(stepIdx) {
-        if (!playing) return;
-        if (stepIdx __BOUNDARY_OP__ totalSteps) {
-            if (looping) {
-                onBeforePlay();
-                timerId = setTimeout(function(){ runAnimation(0); }, durMs);
-            } else { finishPlayback(); }
-            return;
-        }
-        onStep(stepIdx);
-        timerId = setTimeout(function(){ runAnimation(stepIdx + 1); }, durMs);
-    }
-    toggleBtn.onclick = function() {
+    } else {
         if (playing) {
             playing = false;
-            if (timerId) { clearTimeout(timerId); timerId = null; }
+            if (_timerId) { clearTimeout(_timerId); _timerId = null; }
             finishPlayback();
         } else {
-            playing = true; setStopIcon(); onBeforePlay(); runAnimation(0);
+            playing = true; setStopIcon(); onBeforePlay(); _runAnimation(0);
         }
-    };
-}
+    }
+};
