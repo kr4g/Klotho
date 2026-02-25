@@ -1,22 +1,11 @@
-# macOS
+# ==========================
+# OS
+# ==========================
 .DS_Store
 
-# Archive (local backups, not for Git or PyPI)
-.archive/
-
-# Project specific
-projects/
-gui
-ut_plotter/
-.taskmaster/
-CLAUDE.md
-benchmarks/
-
-# Keep examples directory tracked but empty for now
-!examples/
-!examples/.gitkeep
-
+# ==========================
 # Python
+# ==========================
 **/__pycache__/
 *.py[cod]
 *.so
@@ -49,21 +38,9 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-.env.example
-
-# IDE
-.vscode/
-.idea/
-.claude/
-.cursor/
-*.swp
-*.swo
-
+# ==========================
 # Testing
+# ==========================
 tests/
 .pytest_cache/
 .coverage
@@ -75,68 +52,107 @@ coverage.xml
 *.py,cover
 .hypothesis/
 
-# Jupyter Notebook
+# ==========================
+# IDE / Editor
+# ==========================
+.vscode/
+.idea/
+.claude/
+.cursor/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ==========================
+# Environment variables
+# ==========================
+.env
+.env.local
+.env.*.local
+.env.example
+
+# ==========================
+# Logs
+# ==========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================
+# Dependencies
+# ==========================
+node_modules/
+
+# ==========================
+# Jupyter
+# ==========================
 *.ipynb
 .ipynb_checkpoints/
 
+# ==========================
 # Documentation
+# ==========================
 docs/_build/
 docs/rebuild_docs.sh
 check_docs.py
 
-# Media files
+# ==========================
+# Media / binary files
+# ==========================
 *.mp4
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.pdf
-
-# Other
-*.asd
 *.pkl
+*.zip
+
+# ==========================
+# Domain-specific
+# ==========================
+*.asd
 *.scd
 *.json
-*.zip
 *.ly
 
-# Build and deployment scripts
+# ==========================
+# Local project files (not published)
+# ==========================
+.archive/
+projects/
+gui/
+ut_plotter/
+.taskmaster/
+benchmarks/
+CLAUDE.md
 build_and_upload.sh
 build_and_upload_test.sh
+rebuild_tutorials.sh
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-dev-debug.log
-# Dependency directories
-node_modules/
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-# OS specific
+# ==========================
+# Tracked exceptions
+# ==========================
 
-# Task files
-# tasks.json
-# tasks/ 
+# Examples directory (tracked, currently empty)
+!examples/
+!examples/.gitkeep
 
-# Jupyter Book tutorials (tracked on remote)
+# Jupyter Book tutorials
 !tutorials/
 !tutorials/**/
 !tutorials/**/*.ipynb
 !tutorials/**/*.md
 
-# Jupyter Book config (tracked)
+# Jupyter Book config
 !myst.yml
 _build/
 
-# Binder config (tracked)
+# Binder environment
 !binder/
 !binder/**
