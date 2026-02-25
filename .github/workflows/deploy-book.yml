@@ -28,6 +28,8 @@ jobs:
         run: npm install -g mystmd
 
       - name: Build the site
+        env:
+          BASE_URL: /${{ github.event.repository.name }}
         run: myst build --html
 
       - name: Upload artifact
