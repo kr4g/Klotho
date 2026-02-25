@@ -60,3 +60,5 @@ project:
 site:
   template: book-theme
   title: Klotho
+  options:
+    base_url: /Klotho
