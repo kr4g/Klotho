@@ -12,6 +12,26 @@ Klotho adapts to multiple Python workflows, supporting traditional scripting, in
 
 ---
 
+## Companion Book
+
+An interactive Jupyter Book exploring the theory, mathematics, and CAC practice behind Klotho — foundational graph structures, formal grammars, evolutionary algorithms, quantum fields, and beyond.
+
+Readable directly in your browser with no installation required.
+
+**Read online:** <a href="https://kr4g.github.io/klotho-book/" target="_blank">https://kr4g.github.io/klotho-book/</a>
+
+---
+
+## About
+
+Klotho extends from a lineage of computer-assisted composition (CAC) theories, practices, and software environments. It draws particular influence from the computational paradigms explored in patching-based systems such as [OpenMusic](https://openmusic-project.github.io/) and the [Bach](https://www.bachproject.net/)/[Cage](https://www.bachproject.net/cage/) ecosystem, while diverging from visual patching in favor of a scripting-first workflow.
+
+In that sense, Klotho overlaps with the motivation behind [OpusModus](https://opusmodus.com/)—bringing “patch-like” compositional thinking into text—but takes a different path: Klotho is free and open source, and it uses Python as its authoring language. This makes it possible to work directly within Python’s broader ecosystem (e.g., [music21](https://web.mit.edu/music21/), [librosa](https://librosa.org/), [pyo](https://ajaxsoundstudio.com/software/pyo/)) and to combine computational composition with analytical and data-oriented workflows, without adopting a dedicated proprietary language for a single domain.
+
+While Klotho supports conventional musical materials, its strengths are best realized when working with complex, abstract, or otherwise unconventional structures that are awkward to express—or difficult to iterate on—within traditional notation software or digital audio workstations.
+
+---
+
 ## Installation
 
 ### Option 1: Install from PyPI (Recommended)
@@ -44,15 +64,6 @@ To use Klotho with SuperCollider, see the `Klotho-SC` extension package: <a href
 
 ---
 
-## Companion Book
-
-An interactive Jupyter Book exploring the theory, mathematics, and CAC practice behind Klotho — foundational graph structures, formal grammars, evolutionary algorithms, quantum fields, and beyond.
-
-Readable directly in your browser with no installation required.
-
-**Read online:** <a href="https://kr4g.github.io/klotho-book/" target="_blank">https://kr4g.github.io/klotho-book/</a>
-
----
 
 ## Documentation
 
@@ -74,14 +85,6 @@ make dev
 ```
 
 ---
-
-## About
-
-Klotho extends from a lineage of computer-assisted composition (CAC) theories, practices, and software environments. It draws particular influence from the computational paradigms explored in patching-based systems such as [OpenMusic](https://openmusic-project.github.io/) and the [Bach](https://www.bachproject.net/)/[Cage](https://www.bachproject.net/cage/) ecosystem, while diverging from visual patching in favor of a scripting-first workflow.
-
-In that sense, Klotho overlaps with the motivation behind [OpusModus](https://opusmodus.com/)—bringing “patch-like” compositional thinking into text—but takes a different path: Klotho is free and open source, and it uses Python as its authoring language. This makes it possible to work directly within Python’s broader ecosystem (e.g., [music21](https://web.mit.edu/music21/), [librosa](https://librosa.org/), [pyo](https://ajaxsoundstudio.com/software/pyo/)) and to combine computational composition with analytical and data-oriented workflows, without adopting a dedicated proprietary language for a single domain.
-
-While Klotho supports conventional musical materials, its strengths are best realized when working with complex, abstract, or otherwise unconventional structures that are awkward to express—or difficult to iterate on—within traditional notation software or digital audio workstations.
 
 <!-- ## Architecture
 
