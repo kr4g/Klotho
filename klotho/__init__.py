@@ -36,22 +36,11 @@ from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, r
 from .semeios.visualization.plots import plot
 from .semeios.notelists.supercollider import Scheduler
 
-try:
-    from .utils.playback.player import play
-except ImportError:
-    def play(*args, **kwargs):
-        raise ImportError("Playback requires 'IPython'. Install with: pip install IPython")
-
-try:
-    from .utils.playback.midi_player import play_midi, create_midi
-except ImportError:
-    def play_midi(*args, **kwargs):
-        raise ImportError("MIDI playback requires 'mido'. Install with: pip install klotho-cac[playback]")
-    def create_midi(*args, **kwargs):
-        raise ImportError("MIDI creation requires 'mido'. Install with: pip install klotho-cac[playback]")
+from .utils.playback.player import play
+from .utils.playback.midi_player import play_midi, create_midi
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
 ]
 
-__version__ = '4.0.11'
+__version__ = '4.0.13'
