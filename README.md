@@ -3,7 +3,10 @@
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
 
 # Klotho
-`Klotho` is an open source computer-assisted composition toolkit implemented in Python. It is designed to work in tandem with external synthesis applications and as a resource for the methods, models, works, and frameworks associated with music composition and metacomposition.
+
+*Klotho*, from the Ancient Greek *κλώθω* (klṓthō), meaning "to spin." The mythological figure Clotho, one of the three Fates, takes her name from this same word.
+
+**Klotho** is an open source computer-assisted composition toolkit implemented in Python. It is designed to work in tandem with external synthesis applications and as a resource for the methods, models, works, and frameworks associated with music composition and metacomposition.
 
 Klotho adapts to multiple Python workflows, supporting traditional scripting, interactive notebook environments, and immediate computational tasks through the interpreter.
 
@@ -74,9 +77,11 @@ make dev
 
 ## About
 
-Klotho extends from a lineage of computer-assisted composition (CAC) theories, practices, and software environments. While it provides support for conventional musical materials, its strengths are best utilized when working with complex, abstract, or otherwise unconventional musical structures not easily accessible with traditional notation software or digital audio workstations.
+Klotho extends from a lineage of computer-assisted composition (CAC) theories, practices, and software environments. It draws particular influence from the computational paradigms explored in patching-based systems such as [OpenMusic](https://openmusic-project.github.io/) and the [Bach](https://www.bachproject.net/)/[Cage](https://www.bachproject.net/cage/) ecosystem, while diverging from visual patching in favor of a scripting-first workflow.
 
-<!-- While drawing from the computational paradigms found in patching-based environments like [OpenMusic](https://openmusic-project.github.io/), [Bach](https://www.bachproject.net/), and [Cage](https://www.bachproject.net/cage/), Klotho diverges from the visual patching paradigm in favor of a high-level, text-based scripting syntax. As such, Klotho is closer in spirit to [OpusModus](https://opusmodus.com/), which also favors text-based scripting over visual patching, though its LISP-based proprietary language creates unnecessary barriers to entry and forecloses access to Python's diverse ecosystem—libraries like Librosa, Music21, and Pyo, as well as scientific tools that enable more analytical and data-oriented approaches to music generation—allowing Klotho to embody the underlying mathematical expressions governing musical materials from topological, algebraic, and computational perspectives. -->
+In that sense, Klotho overlaps with the motivation behind [OpusModus](https://opusmodus.com/)—bringing “patch-like” compositional thinking into text—but takes a different path: Klotho is free and open source, and it uses Python as its authoring language. This makes it possible to work directly within Python’s broader ecosystem (e.g., [music21](https://web.mit.edu/music21/), [librosa](https://librosa.org/), [pyo](https://ajaxsoundstudio.com/software/pyo/)) and to combine computational composition with analytical and data-oriented workflows, without adopting a dedicated proprietary language for a single domain.
+
+While Klotho supports conventional musical materials, its strengths are best realized when working with complex, abstract, or otherwise unconventional structures that are awkward to express—or difficult to iterate on—within traditional notation software or digital audio workstations.
 
 <!-- ## Architecture
 
@@ -99,10 +104,6 @@ The compositional complement to Topos, Thetos handles the concrete assembly and 
 
 ### **Semeios**
 Manages all forms of musical representation including visualization, notation, plotting, animation, and multimedia output. Semeios converts computational processes into human-readable and performable representations as well as automated formats. -->
-
-## Contributing
-
-Contributions of all kinds are welcome — whether it's code, bug reports, documentation improvements, or ideas for new features. To contribute, fork the repository, create a branch, and open a pull request. For bugs or suggestions, open an issue on <a href="https://github.com/kr4g/Klotho/issues" target="_blank">GitHub Issues</a>. All contributions are accepted under the same CC BY-SA 4.0 license, and contributors are credited through Git history.
 
 ## License
 
