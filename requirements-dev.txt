@@ -4,17 +4,18 @@
 # Core dependencies
 -r requirements.txt
 
+# Optional: MIDI audio playback
+midi2audio
+
+# Optional: Diversity-based sampling
+diversipy
+
 # Development and testing
 pytest>=7.0.0
-
-# GUI/Interactive dependencies (for maquettes module development)
-panel
-bokeh
-jupyter_bokeh
 
 # Documentation
 sphinx>=7.0.0
 sphinx-rtd-theme
 numpydoc
 sphinx-autodoc-typehints
-sphinx-copybutton 
+sphinx-copybutton
