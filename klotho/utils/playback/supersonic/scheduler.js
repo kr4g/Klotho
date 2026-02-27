@@ -10,16 +10,31 @@
       this._timers = [];
       this.nodeMap = new Map();
       this._synthNames = new Map();
+      this._groupId = null;
 
       this.drawScheduler = new DrawScheduler();
       this.onEvent = null;
       this.onFinish = null;
     }
 
+    _createGroup() {
+      var gid = this.sonic.nextNodeId();
+      this.sonic.send('/g_new', gid, 0, 0);
+      this._groupId = gid;
+    }
+
+    _freeGroup() {
+      if (this._groupId == null) return;
+      try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
+      try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
+      this._groupId = null;
+    }
+
     _sendNew(ev) {
       if (ev.synthName === "__rest__") return;
       var nodeId = this.sonic.nextNodeId();
-      var args = ['/s_new', ev.synthName, nodeId, 0, 0];
+      var target = this._groupId != null ? this._groupId : 0;
+      var args = ['/s_new', ev.synthName, nodeId, 0, target];
       var pf = ev.pfields || {};
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
@@ -77,6 +92,7 @@
       else {
         for (var i = 0; i < this._timers.length; i++) clearTimeout(this._timers[i]);
         this._timers = [];
+        this._freeGroup();
         this.nodeMap.clear();
         this._synthNames.clear();
       }
@@ -90,6 +106,7 @@
         return;
       }
 
+      this._createGroup();
       this.isPlaying = true;
       var token = this.stopToken;
       var self = this;
@@ -117,6 +134,7 @@
 
       var finishTid = setTimeout(function() {
         if (token !== self.stopToken) return;
+        self._freeGroup();
         self.isPlaying = false;
         if (self.onFinish) self.onFinish();
       }, pieceDur * 1000);
@@ -128,11 +146,10 @@
       this.isPlaying = false;
       for (var i = 0; i < this._timers.length; i++) clearTimeout(this._timers[i]);
       this._timers = [];
+      this._freeGroup();
       this.nodeMap.clear();
       this._synthNames.clear();
       this.drawScheduler.clear();
-      try { this.sonic.cancelAll(); } catch(e) {}
-      try { this.sonic.send('/g_freeAll', 0); } catch(e) {}
     }
   };
 })();

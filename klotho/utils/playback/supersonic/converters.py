@@ -19,6 +19,9 @@ DEFAULT_SYNTH = "sonic-pi-beep"
 DEFAULT_SINE_SYNTH = "sonic-pi-beep"
 DEFAULT_PERC_SYNTH = "sonic-pi-beep"
 
+PERC_ATTACK = 0.005
+PERC_BODY_RATIO = 1 / 3
+
 def _freq_to_note(freq):
     import math
     if not isinstance(freq, (int, float)) or freq <= 0:
@@ -81,7 +84,25 @@ def _perc_note(uid, synth, start, dur, pfields, step_index=None):
     }
     if step_index is not None:
         new_ev["_stepIndex"] = step_index
-    return [new_ev]
+    rel_ev = {
+        "type": "release",
+        "id": uid,
+        "start": start + dur,
+    }
+    if step_index is not None:
+        rel_ev["_stepIndex"] = step_index
+    return [new_ev, rel_ev]
+
+
+def _perc_env_pfields(dur):
+    body = dur * PERC_BODY_RATIO
+    attack = min(PERC_ATTACK, body * 0.5)
+    return {
+        "attack": attack,
+        "decay": 0,
+        "sustain": max(0, body - attack),
+        "release": max(0, dur - body),
+    }
 
 
 def pitch_to_sc_events(pitch, duration=None):
@@ -223,10 +244,12 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False):
             uid = _uid()
             start = chronon.start - time_offset
             dur = abs(chronon.duration)
-            events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, {
+            pf = {
                 "note": _freq_to_note(DEFAULT_DRUM_FREQ),
                 "amp": 0.85,
-            }))
+                **_perc_env_pfields(dur),
+            }
+            events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, pf))
 
     return events
 
@@ -263,10 +286,13 @@ def temporal_unit_to_sc_animation_events(obj, use_absolute_time=False):
             })
         else:
             uid = _uid()
-            events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, {
+            pf = {
                 "note": _freq_to_note(DEFAULT_DRUM_FREQ),
                 "amp": 0.85,
-            }, step_index=step_idx))
+                **_perc_env_pfields(dur),
+            }
+            events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, pf,
+                                     step_index=step_idx))
 
     events.sort(key=lambda ev: ev["start"])
     return events
@@ -533,16 +559,25 @@ def tonejs_events_to_sc(tone_events):
         synth = DEFAULT_PERC_SYNTH if instrument == "membrane" else DEFAULT_SYNTH
 
         if instrument == "membrane":
+            pfields = {"note": note, "amp": amp, "dur": dur, **_perc_env_pfields(dur)}
             new_ev = {
                 "type": "new",
                 "id": uid,
                 "synthName": synth,
                 "start": start,
-                "pfields": {"note": note, "amp": amp, "dur": dur},
+                "pfields": pfields,
             }
             if step is not None:
                 new_ev["_stepIndex"] = step
             sc_events.append(new_ev)
+            rel_ev = {
+                "type": "release",
+                "id": uid,
+                "start": start + dur,
+            }
+            if step is not None:
+                rel_ev["_stepIndex"] = step
+            sc_events.append(rel_ev)
         else:
             new_ev = {
                 "type": "new",

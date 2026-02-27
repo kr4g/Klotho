@@ -173,7 +173,6 @@ class SuperSonicEngine:
     var ssConfig = {config_json};
 
     var looping = false;
-    var sonic = null;
     var scheduler = null;
     var ready = false;
     var _loadPromise = null;
@@ -197,45 +196,68 @@ class SuperSonicEngine:
         loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
     }};
 
+    function ensureSharedSonic() {{
+        var state = globalThis.__klothoSonic;
+        if (state && state.instance) return Promise.resolve(state.instance);
+        if (state && state.promise) return state.promise;
+        state = {{ instance: null, promise: null, loadedDefs: new Set() }};
+        globalThis.__klothoSonic = state;
+        state.promise = (async function() {{
+            try {{
+                var mod = await import("{SUPERSONIC_CDN}");
+                globalThis.SuperSonic = mod.SuperSonic;
+                var s = new mod.SuperSonic(ssConfig);
+                await s.init();
+                state.instance = s;
+                return s;
+            }} catch(e) {{
+                return null;
+            }}
+        }})();
+        return state.promise;
+    }}
+
+    async function loadDefs(sonic) {{
+        var loaded = globalThis.__klothoSonic.loadedDefs;
+        for (var name in synthdefAssets) {{
+            if (!synthdefAssets.hasOwnProperty(name)) continue;
+            if (loaded.has(name)) continue;
+            var b64 = synthdefAssets[name];
+            var bytes = Uint8Array.from(atob(b64), function(c) {{ return c.charCodeAt(0); }});
+            await sonic.loadSynthDef(bytes);
+            loaded.add(name);
+        }}
+        for (var i = 0; i < neededSynthdefs.length; i++) {{
+            var sname = neededSynthdefs[i];
+            if (loaded.has(sname)) continue;
+            if (synthdefAssets[sname]) continue;
+            try {{
+                await sonic.loadSynthDef(sname);
+                loaded.add(sname);
+            }} catch(e) {{}}
+        }}
+    }}
+
     function ensureReady() {{
         if (ready) return Promise.resolve(true);
         if (_loadPromise) return _loadPromise;
         _loadPromise = (async function() {{
-            try {{
-                var mod = await import("{SUPERSONIC_CDN}");
-                var SuperSonic = mod.SuperSonic;
-                globalThis.SuperSonic = SuperSonic;
-
-                sonic = new SuperSonic(ssConfig);
-                await sonic.init();
-
-                for (var name in synthdefAssets) {{
-                    if (!synthdefAssets.hasOwnProperty(name)) continue;
-                    var b64 = synthdefAssets[name];
-                    var bytes = Uint8Array.from(atob(b64), function(c) {{ return c.charCodeAt(0); }});
-                    await sonic.loadSynthDef(bytes);
-                }}
-
-                for (var i = 0; i < neededSynthdefs.length; i++) {{
-                    var sname = neededSynthdefs[i];
-                    if (!synthdefAssets[sname]) {{
-                        try {{ await sonic.loadSynthDef(sname); }} catch(e) {{}}
-                    }}
-                }}
-
-                scheduler = new BrowserScheduler({{
-                    sonic: sonic,
-                    manifest: manifest,
-                }});
-                ready = true;
-                statusEl.textContent = "ready";
-                statusEl.style.color = "#4ade80";
-                return true;
-            }} catch(e) {{
+            var sonic = await ensureSharedSonic();
+            if (!sonic) {{
+                _loadPromise = null;
                 statusEl.textContent = "error";
                 statusEl.style.color = "#ef4444";
                 return false;
             }}
+            await loadDefs(sonic);
+            scheduler = new BrowserScheduler({{
+                sonic: sonic,
+                manifest: manifest,
+            }});
+            ready = true;
+            statusEl.textContent = "ready";
+            statusEl.style.color = "#4ade80";
+            return true;
         }})();
         return _loadPromise;
     }}
@@ -276,6 +298,7 @@ class SuperSonicEngine:
         }}
         var ok = await ensureReady();
         if (!ok) return;
+        var sonic = globalThis.__klothoSonic.instance;
         if (sonic.audioContext && sonic.audioContext.state === "suspended") {{
             await sonic.audioContext.resume();
         }}
