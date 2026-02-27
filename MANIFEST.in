@@ -4,6 +4,9 @@ include requirements-dev.txt
 include LICENSE
 recursive-include klotho *.py
 recursive-include klotho *.js
+recursive-include klotho *.json
+recursive-include klotho *.scsyndef
+recursive-include klotho *.scd
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .DS_Store

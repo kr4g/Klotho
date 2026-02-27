@@ -6,11 +6,24 @@ from klotho.utils.playback.tonejs.cdn import (
     INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
     THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
 )
+from klotho.utils.playback._config import get_audio_engine
 
 from ._animation_base import (
     build_session_preamble, build_control_bar_html,
     build_nav_controls_html, build_scripts_html, build_playback_js,
 )
+
+
+def _maybe_convert_payload(audio_payload, engine):
+    if engine != "supersonic" or audio_payload is None:
+        return audio_payload
+    events = audio_payload.get("events", []) if isinstance(audio_payload, dict) else audio_payload
+    if not events:
+        return audio_payload
+    if events[0].get("type") in ("new", "set", "release"):
+        return audio_payload
+    from klotho.utils.playback.supersonic.converters import tonejs_events_to_sc
+    return tonejs_events_to_sc(events)
 
 
 class AnimatedLattice3dFigure:
@@ -30,26 +43,31 @@ class AnimatedLattice3dFigure:
         Seconds between animation steps.
     """
 
-    def __init__(self, scene_data, audio_payload=None, dur=0.5):
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None):
         self.scene_data = scene_data
         self.audio_payload = audio_payload
         self.dur = dur
+        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.scene_data
         wid = self.widget_id
+        eng = self.engine
 
         cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=bool(self.audio_payload), include_threejs=True)
+            include_tone=(bool(self.audio_payload) and eng == "tone"),
+            include_threejs=True,
+            engine=eng)
         controls_html = build_control_bar_html(wid)
         scripts_html = build_scripts_html(instruments_js, player_js)
 
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
         halo_json = json.dumps(sd.halo_data)
-        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+        converted = _maybe_convert_payload(self.audio_payload, eng)
+        payload_json = json.dumps(converted) if converted else "null"
 
         w = sd.width_px
         h = sd.height_px
@@ -59,7 +77,7 @@ class AnimatedLattice3dFigure:
         orbit_cdn = THREEJS_ORBIT_CDN
         trackball_cdn = THREEJS_TRACKBALL_CDN
 
-        playback_js = build_playback_js(wid, self.dur * 1000)
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng)
 
         html = f'''
 {cdn_html}
@@ -553,20 +571,23 @@ class AnimatedRTSvgFigure:
         Enable halo glow on the active leaf node.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, engine=None):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.glow = glow
+        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
+        eng = self.engine
 
         cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=bool(self.audio_payload))
+            include_tone=(bool(self.audio_payload) and eng == "tone"),
+            engine=eng)
         controls_html = build_control_bar_html(wid)
         scripts_html = build_scripts_html(instruments_js, player_js)
 
@@ -580,9 +601,10 @@ class AnimatedRTSvgFigure:
         node_to_ids_json = json.dumps({str(k): v for k, v in sd.node_to_ids.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in sd.leaf_ancestors])
 
-        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+        converted = _maybe_convert_payload(self.audio_payload, eng)
+        payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False)
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, engine=eng)
 
         html = f'''
 {cdn_html}
@@ -680,19 +702,22 @@ class AnimatedLatticeSvgFigure:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
+        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_slat_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
+        eng = self.engine
 
         cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=bool(self.audio_payload))
+            include_tone=(bool(self.audio_payload) and eng == "tone"),
+            engine=eng)
         controls_html = build_control_bar_html(wid)
         scripts_html = build_scripts_html(instruments_js, player_js)
 
@@ -703,9 +728,10 @@ class AnimatedLatticeSvgFigure:
         path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
         path_node_colors_json = json.dumps(getattr(sd, 'path_node_colors', []))
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+        converted = _maybe_convert_payload(self.audio_payload, eng)
+        payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000)
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng)
 
         html = f'''
 {cdn_html}
@@ -826,19 +852,22 @@ class _AnimatedShapeFigureBase:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
+        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
+        eng = self.engine
 
         cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=bool(self.audio_payload))
+            include_tone=(bool(self.audio_payload) and eng == "tone"),
+            engine=eng)
         controls_html = build_control_bar_html(wid)
         scripts_html = build_scripts_html(instruments_js, player_js)
 
@@ -848,7 +877,8 @@ class _AnimatedShapeFigureBase:
         all_shape_edge_ids_json = json.dumps(sd.all_shape_edge_ids)
         node_ids_json = json.dumps(sd.all_node_ids)
         dimmed_color = sd.dimmed_node_color
-        payload_json = json.dumps(self.audio_payload) if self.audio_payload else "null"
+        converted = _maybe_convert_payload(self.audio_payload, eng)
+        payload_json = json.dumps(converted) if converted else "null"
         total_groups = len(sd.shape_group_node_indices)
         is_multi = total_groups > 1
 
@@ -895,6 +925,7 @@ class _AnimatedShapeFigureBase:
     var dimmedColor = "{dimmed_color}";
     var audioPayload = {payload_json};
     var totalGroups = {total_groups};
+    var engineType = "{eng}";
 
     var toggleBtn = document.getElementById("{wid}_toggle");
     var iconEl = document.getElementById("{wid}_icon");
@@ -953,6 +984,14 @@ class _AnimatedShapeFigureBase:
     function setPlayIcon() {{ iconEl.style.cssText = "width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid #4ade80;border-right:none;margin-left:3px;background:none"; }}
     function setStopIcon() {{ iconEl.style.cssText = "width:12px;height:12px;border:none;border-radius:2px;margin-left:0;background:#ef4444"; }}
 
+    function _eventEnd(ev) {{
+        var pf = ev.pfields || {{}};
+        if (ev.duration != null) return ev.start + ev.duration;
+        if (pf.dur != null) return ev.start + pf.dur;
+        if (ev.type === "release") return ev.start + 0.5;
+        return ev.start + 0.5;
+    }}
+
     function filterEventsForGroup(allEvents, gi) {{
         var filtered = [];
         var minStart = Infinity;
@@ -993,7 +1032,7 @@ class _AnimatedShapeFigureBase:
         for (var g = 0; g < total; g++) {{
             var mx = 0;
             for (var i = 0; i < buckets[g].length; i++) {{
-                var end = buckets[g][i].start + buckets[g][i].duration;
+                var end = _eventEnd(buckets[g][i]);
                 if (end > mx) mx = end;
             }}
             groupDurs.push(mx - groupStarts[g]);
@@ -1042,7 +1081,9 @@ class _AnimatedShapeFigureBase:
     loopBtn.onclick = function() {{ looping = !looping; loopBtn.style.opacity = looping ? "1" : "0.5"; loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0"); }};
 
     var _aPlayer = null, _aInstruments = null;
-    function _canAudio() {{
+    var _ssScheduler = null, _ssSonic = null, _ssReady = false;
+
+    function _canToneAudio() {{
         if (_aPlayer) return true;
         if (!audioPayload || typeof Tone === "undefined"
             || typeof globalThis.KLOTHO_BUILD_INSTRUMENTS !== "function"
@@ -1050,6 +1091,37 @@ class _AnimatedShapeFigureBase:
         _aInstruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {{}});
         _aPlayer = KlothoPlayer.create();
         return true;
+    }}
+
+    async function _ensureSSReady() {{
+        if (_ssReady) return true;
+        if (typeof __ensureSuperSonic !== "function") return false;
+        try {{
+            var sonic = await __ensureSuperSonic();
+            _ssSonic = sonic;
+            _ssScheduler = new BrowserScheduler({{
+                sonic: sonic,
+                manifest: {{ synths: {{ "sonic-pi-beep": {{ releaseMode: "gate", gateParam: "gate" }} }}, inserts: {{}} }},
+            }});
+            _ssReady = true;
+            return true;
+        }} catch(e) {{
+            return false;
+        }}
+    }}
+
+    function _getSSEvents() {{
+        if (!audioPayload) return [];
+        var raw = Array.isArray(audioPayload) ? audioPayload : (audioPayload.events || []);
+        return raw.filter(function(e) {{
+            return e.type === "new" || e.type === "set" || e.type === "release";
+        }});
+    }}
+
+    function _stopAll() {{
+        if (_timerId) {{ clearTimeout(_timerId); _timerId = null; }}
+        if (_ssScheduler && _ssScheduler.isPlaying) _ssScheduler.stop();
+        if (_aPlayer && _aPlayer.isPlaying()) _aPlayer.stop();
     }}
 
     var _timerId = null;
@@ -1063,39 +1135,105 @@ class _AnimatedShapeFigureBase:
     }}
 
     toggleBtn.onclick = async function() {{
-        if (_canAudio()) {{
-            if (_aPlayer.isPlaying()) {{ _aPlayer.stop(); return; }}
-            var solo = soloBox && soloBox.checked;
-            playbackOrigin = currentView;
-            playing = true; setStopIcon();
-            if (solo) {{
-                var soloEvents = filterEventsForGroup(audioPayload.events || [], currentView);
-                revealAndTrack(currentView);
-                await _aPlayer.play(soloEvents, _aInstruments, {{
-                    loop: looping,
-                    onEvent: function() {{}},
-                    onStop: function() {{ finishPlayback(); }},
-                    onFinish: function() {{ finishPlayback(); }}
-                }});
+        if (engineType === "supersonic") {{
+            if (playing) {{
+                _stopAll();
+                finishPlayback();
+                return;
+            }}
+
+            var ok = await _ensureSSReady();
+            var allEvts = ok ? _getSSEvents() : [];
+
+            if (ok && allEvts.length > 0) {{
+                if (_ssSonic && _ssSonic.audioContext && _ssSonic.audioContext.state === "suspended") {{
+                    await _ssSonic.audioContext.resume();
+                }}
+                var solo = soloBox && soloBox.checked;
+                playbackOrigin = currentView;
+                playing = true; setStopIcon();
+
+                if (solo) {{
+                    var soloEvts = filterEventsForGroup(allEvts, currentView);
+                    revealAndTrack(currentView);
+                    var _soloFirst = true;
+                    function ssLoopSolo() {{
+                        _ssScheduler.play(soloEvts, {{
+                            _skipStop: !_soloFirst,
+                            onEvent: function() {{}},
+                            onFinish: function() {{
+                                if (looping && playing) ssLoopSolo();
+                                else finishPlayback();
+                            }}
+                        }});
+                        _soloFirst = false;
+                    }}
+                    ssLoopSolo();
+                }} else {{
+                    var reordered = reorderEventsFrom(allEvts, currentView, totalGroups);
+                    dimAllNodes(); hideAllShapeEdges();
+                    var _seqFirst = true;
+                    function ssLoopSeq() {{
+                        _ssScheduler.play(reordered.events, {{
+                            _skipStop: !_seqFirst,
+                            onEvent: function(stepIdx) {{ if (playing) revealAndTrack(reordered.seqMap[stepIdx]); }},
+                            onFinish: function() {{
+                                if (looping && playing) {{
+                                    dimAllNodes(); hideAllShapeEdges();
+                                    ssLoopSeq();
+                                }} else {{
+                                    finishPlayback();
+                                }}
+                            }}
+                        }});
+                        _seqFirst = false;
+                    }}
+                    ssLoopSeq();
+                }}
             }} else {{
-                var reordered = reorderEventsFrom(audioPayload.events || [], currentView, totalGroups);
-                dimAllNodes(); hideAllShapeEdges();
-                await _aPlayer.play(reordered.events, _aInstruments, {{
-                    loop: looping,
-                    onEvent: function(stepIdx) {{ revealAndTrack(reordered.seqMap[stepIdx]); }},
-                    onStop: function() {{ finishPlayback(); }},
-                    onFinish: function() {{ finishPlayback(); }}
-                }});
+                if (playing) {{
+                    _stopAll();
+                    finishPlayback();
+                }} else {{
+                    playbackOrigin = currentView;
+                    playing = true; setStopIcon(); dimAllNodes(); hideAllShapeEdges();
+                    _runAnimation(0);
+                }}
             }}
         }} else {{
-            if (playing) {{
-                playing = false;
-                if (_timerId) {{ clearTimeout(_timerId); _timerId = null; }}
-                finishPlayback();
-            }} else {{
+            if (_canToneAudio()) {{
+                if (_aPlayer.isPlaying()) {{ _aPlayer.stop(); return; }}
+                var solo = soloBox && soloBox.checked;
                 playbackOrigin = currentView;
-                playing = true; setStopIcon(); dimAllNodes(); hideAllShapeEdges();
-                _runAnimation(0);
+                playing = true; setStopIcon();
+                if (solo) {{
+                    var soloEvents = filterEventsForGroup(audioPayload.events || [], currentView);
+                    revealAndTrack(currentView);
+                    await _aPlayer.play(soloEvents, _aInstruments, {{
+                        loop: looping,
+                        onEvent: function() {{}},
+                        onStop: function() {{ finishPlayback(); }},
+                        onFinish: function() {{ finishPlayback(); }}
+                    }});
+                }} else {{
+                    var reordered = reorderEventsFrom(audioPayload.events || [], currentView, totalGroups);
+                    dimAllNodes(); hideAllShapeEdges();
+                    await _aPlayer.play(reordered.events, _aInstruments, {{
+                        loop: looping,
+                        onEvent: function(stepIdx) {{ revealAndTrack(reordered.seqMap[stepIdx]); }},
+                        onStop: function() {{ finishPlayback(); }},
+                        onFinish: function() {{ finishPlayback(); }}
+                    }});
+                }}
+            }} else {{
+                if (playing) {{
+                    _stopAll();
+                    finishPlayback();
+                }} else {{
+                    playbackOrigin = currentView;
+                    playing = true; setStopIcon(); dimAllNodes(); hideAllShapeEdges();
+                    _runAnimation(0);
+                }}
             }}
         }}
     }};

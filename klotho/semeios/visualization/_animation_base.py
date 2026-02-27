@@ -6,10 +6,61 @@ from klotho.utils.playback.tonejs.cdn import (
 )
 
 _PLAYBACK_JS_PATH = Path(__file__).parent / '_playback.js'
-_PLAYBACK_JS_TEMPLATE = None
+_PLAYBACK_JS_TEMPLATE = None  # re-read on first use; restart kernel to pick up changes
 
 
-def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False):
+def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False,
+                           engine="tone"):
+    if engine == "supersonic":
+        from klotho.utils.playback.supersonic.cdn import (
+            SUPERSONIC_CDN,
+            SUPERSONIC_CORE_CDN,
+            SUPERSONIC_SYNTHDEFS_CDN,
+            SUPERSONIC_SAMPLES_CDN,
+            DRAW_JS_PATH,
+            SCHEDULER_JS_PATH,
+        )
+        import json
+
+        ss_config = json.dumps({
+            "baseURL": f"{SUPERSONIC_CDN}/dist/",
+            "coreBaseURL": SUPERSONIC_CORE_CDN,
+            "synthdefBaseURL": SUPERSONIC_SYNTHDEFS_CDN,
+            "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
+        })
+
+        draw_js = DRAW_JS_PATH.read_text() if DRAW_JS_PATH.exists() else ""
+        sched_js = SCHEDULER_JS_PATH.read_text() if SCHEDULER_JS_PATH.exists() else ""
+
+        cdn_html = cdn_scripts(
+            include_plotly=include_plotly,
+            include_tone=False,
+            include_threejs=include_threejs,
+        )
+
+        ss_boot_js = f'''
+var __ssConfig = {ss_config};
+var __ssBootPromise = null;
+function __ensureSuperSonic() {{
+    if (__ssBootPromise) return __ssBootPromise;
+    __ssBootPromise = (async function() {{
+        var mod = await import("{SUPERSONIC_CDN}");
+        var SuperSonic = mod.SuperSonic;
+        globalThis.SuperSonic = SuperSonic;
+        var sonic = new SuperSonic(__ssConfig);
+        await sonic.init();
+        try {{ await sonic.loadSynthDef("sonic-pi-beep"); }} catch(e) {{}}
+        return sonic;
+    }})();
+    return __ssBootPromise;
+}}
+__ensureSuperSonic();
+'''
+        instruments_js = ""
+        player_js = ""
+
+        return cdn_html, ss_boot_js + "\n" + draw_js + "\n" + sched_js, ""
+
     cdn_html = cdn_scripts(
         include_plotly=include_plotly,
         include_tone=include_tone,
@@ -87,12 +138,15 @@ def build_scripts_html(instruments_js, player_js):
 <script>{player_js}</script>'''
 
 
-def build_playback_js(wid, dur_ms, use_gt_for_boundary=True):
+def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone"):
     global _PLAYBACK_JS_TEMPLATE
     if _PLAYBACK_JS_TEMPLATE is None:
         _PLAYBACK_JS_TEMPLATE = _PLAYBACK_JS_PATH.read_text()
     boundary_op = ">" if use_gt_for_boundary else ">="
-    return (_PLAYBACK_JS_TEMPLATE
-            .replace('__WID__', wid)
-            .replace('__DUR_MS__', str(dur_ms))
-            .replace('__BOUNDARY_OP__', boundary_op))
+    result = (_PLAYBACK_JS_TEMPLATE
+              .replace('__WID__', wid)
+              .replace('__DUR_MS__', str(dur_ms))
+              .replace('__BOUNDARY_OP__', boundary_op)
+              .replace('__ENGINE_TYPE__', engine))
+
+    return result

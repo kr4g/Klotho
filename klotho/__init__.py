@@ -38,6 +38,7 @@ from .semeios.notelists.supercollider import Scheduler
 
 from .utils.playback.player import play
 from .utils.playback.midi_player import play_midi, create_midi
+from .utils.playback._config import set_audio_engine, get_audio_engine
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
