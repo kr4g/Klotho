@@ -153,4 +153,11 @@
         }
         doPlay(false);
     };
+
+    var _orphanCheckId = setInterval(function() {
+        if (toggleBtn && !toggleBtn.isConnected) {
+            if (scheduler) scheduler.stop();
+            clearInterval(_orphanCheckId);
+        }
+    }, 1000);
 })();

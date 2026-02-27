@@ -153,3 +153,11 @@ toggleBtn.onclick = async function() {
         }
     }
 };
+
+var _orphanCheckId = setInterval(function() {
+    if (toggleBtn && !toggleBtn.isConnected) {
+        _stopAll();
+        playing = false;
+        clearInterval(_orphanCheckId);
+    }
+}, 1000);
