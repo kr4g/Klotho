@@ -53,7 +53,7 @@ async function _ensureSSReady() {
         _ssSonic = sonic;
         _ssScheduler = new BrowserScheduler({
             sonic: sonic,
-            manifest: { synths: { "sonic-pi-beep": { releaseMode: "gate", gateParam: "gate" } }, inserts: {} },
+            manifest: (typeof __klothoManifest !== "undefined") ? __klothoManifest : { synths: {}, inserts: {} },
         });
         _ssReady = true;
         return true;

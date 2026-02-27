@@ -290,7 +290,7 @@ class SuperSonicEngine:
 
     toggleBtn.onclick = async function() {{
         if (scheduler && scheduler.isPlaying) {{
-            scheduler.stop();
+            await scheduler.stop();
             setPlayIcon();
             statusEl.textContent = "ready";
             statusEl.style.color = "#4ade80";

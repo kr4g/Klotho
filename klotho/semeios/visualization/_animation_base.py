@@ -6,7 +6,14 @@ from klotho.utils.playback.tonejs.cdn import (
 )
 
 _PLAYBACK_JS_PATH = Path(__file__).parent / '_playback.js'
-_PLAYBACK_JS_TEMPLATE = None  # re-read on first use; restart kernel to pick up changes
+_PLAYBACK_JS_TEMPLATE = None
+_SS_MANIFEST_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'manifest.json'
+
+
+def _load_manifest_json():
+    if _SS_MANIFEST_PATH.exists():
+        return _SS_MANIFEST_PATH.read_text()
+    return '{"synths": {}, "inserts": {}}'
 
 
 def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False,
@@ -38,8 +45,11 @@ def build_session_preamble(include_plotly=False, include_tone=False, include_thr
             include_threejs=include_threejs,
         )
 
+        manifest_json = _load_manifest_json()
+
         ss_boot_js = f'''
 var __ssConfig = {ss_config};
+var __klothoManifest = {manifest_json};
 var __ssBootPromise = null;
 function __ensureSuperSonic() {{
     if (__ssBootPromise) return __ssBootPromise;

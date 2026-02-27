@@ -25,7 +25,7 @@
         var now = performance.now();
         while (self._queue.length && self._queue[0].time <= now) {
           var item = self._queue.shift();
-          item.callback();
+          try { item.callback(); } catch(e) {}
         }
         if (self._queue.length || self._running) {
           requestAnimationFrame(tick);

@@ -536,7 +536,7 @@ class AnimatedLattice3dFigure:
             if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = true; }}
         }}
         highlightNodeAt(stepIdx);
-        if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && endHalo) {{
+        if (stepIdx >= totalSteps && endHalo) {{
             endHalo.visible = true;
         }}
     }}
@@ -814,7 +814,7 @@ class AnimatedLatticeSvgFigure:
             }}
         }}
         highlightNodeAt(stepIdx);
-        if (stepIdx === (audioPayload ? audioPayload.events.length - 1 : totalSteps) && haloIds.length > 1) {{
+        if (stepIdx >= totalSteps && haloIds.length > 1) {{
             var el = document.getElementById(haloIds[1]);
             if (el) el.style.display = "";
         }}
@@ -1101,7 +1101,7 @@ class _AnimatedShapeFigureBase:
             _ssSonic = sonic;
             _ssScheduler = new BrowserScheduler({{
                 sonic: sonic,
-                manifest: {{ synths: {{ "sonic-pi-beep": {{ releaseMode: "gate", gateParam: "gate" }} }}, inserts: {{}} }},
+                manifest: (typeof __klothoManifest !== "undefined") ? __klothoManifest : {{ synths: {{}}, inserts: {{}} }},
             }});
             _ssReady = true;
             return true;
