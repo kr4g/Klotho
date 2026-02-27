@@ -195,8 +195,6 @@
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
 
-      await this.sonic.purge();
-
       if (options._skipStop && this._groupId != null) {
         this._freeGroupDeferred(this._groupId);
         this._groupId = null;
@@ -244,7 +242,6 @@
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
       this._cancelAllDeferredRings();
-      await this.sonic.purge();
       this._freeGroup();
       this.nodeMap.clear();
       this._synthNames.clear();
