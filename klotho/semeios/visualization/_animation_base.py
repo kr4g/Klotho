@@ -52,20 +52,33 @@ def build_session_preamble(include_plotly=False, include_tone=False, include_thr
         ss_boot_js = f'''
 var __ssConfig = {ss_config};
 var __klothoManifest = {manifest_json};
-var __ssBootPromise = null;
-function __ensureSuperSonic() {{
-    if (__ssBootPromise) return __ssBootPromise;
-    __ssBootPromise = (async function() {{
-        var mod = await import("{SUPERSONIC_CDN}");
-        var SuperSonic = mod.SuperSonic;
-        globalThis.SuperSonic = SuperSonic;
-        var sonic = new SuperSonic(__ssConfig);
-        await sonic.init();
-        try {{ await sonic.loadSynthDef("sonic-pi-beep"); }} catch(e) {{}}
-        return sonic;
-    }})();
-    return __ssBootPromise;
+if (!globalThis.__ensureSuperSonic) {{
+    globalThis.__ensureSuperSonic = function() {{
+        var state = globalThis.__klothoSonic;
+        if (state && state.instance) return Promise.resolve(state.instance);
+        if (state && state.promise) return state.promise;
+        if (!state) {{
+            state = {{ instance: null, promise: null, loadedDefs: new Set() }};
+            globalThis.__klothoSonic = state;
+        }}
+        state.promise = (async function() {{
+            try {{
+                var mod = await import("{SUPERSONIC_CDN}");
+                globalThis.SuperSonic = mod.SuperSonic;
+                var sonic = new mod.SuperSonic(__ssConfig);
+                await sonic.init();
+                try {{ await sonic.loadSynthDef("sonic-pi-beep"); }} catch(e) {{}}
+                state.instance = sonic;
+                return sonic;
+            }} catch(e) {{
+                state.promise = null;
+                return null;
+            }}
+        }})();
+        return state.promise;
+    }};
 }}
+var __ensureSuperSonic = globalThis.__ensureSuperSonic;
 __ensureSuperSonic();
 '''
         instruments_js = ""

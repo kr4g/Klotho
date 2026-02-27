@@ -71,6 +71,8 @@ class KlothoPlot:
             (e.g. ``beat``, ``bpm``, ``amp``, ``glow``, ``arp``,
             ``strum``, ``direction``).
         """
+        from klotho.utils.playback._session_boot import boot_supersonic
+        boot_supersonic()
         from IPython.display import display, HTML
         merged_play = {**self._play_kwargs, **play_kwargs}
         kw = {**self._kwargs, 'animate': True, 'dur': dur, **merged_play}

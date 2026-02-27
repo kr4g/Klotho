@@ -1,5 +1,8 @@
 from .tonejs import ToneEngine, convert_to_events
 from ._config import get_audio_engine
+from ._session_boot import boot_supersonic
+
+boot_supersonic()
 
 
 def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
@@ -42,6 +45,8 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
     from klotho.semeios.visualization.klotho_plot import KlothoPlot
     if isinstance(obj, KlothoPlot):
         return obj.play(**kwargs)
+
+    boot_supersonic()
 
     if engine is None:
         engine = get_audio_engine()
