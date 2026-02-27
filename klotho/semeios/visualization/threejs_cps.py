@@ -55,6 +55,8 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
     scene_nodes = []
     node_colors = []
     hover_data = []
+    node_freqs = []
+    ref_freq = 261.63
     for node, attrs in G.nodes(data=True):
         if node not in node_positions or 'combo' not in attrs:
             continue
@@ -64,10 +66,16 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
         combo = attrs['combo']
         label = ''.join(str(cps.factor_to_alias[f]).strip('()') for f in combo)
         combo_str = '(' + ' '.join(str(f) for f in combo) + ')'
+        ratio = attrs['ratio']
         hover_data.append(
             f"Node: {node}\nAlias: {label}\nCombo: {combo_str}\n"
-            f"Product: {attrs['product']}\nRatio: {attrs['ratio']}"
+            f"Product: {attrs['product']}\nRatio: {ratio}"
         )
+
+        try:
+            node_freqs.append(ref_freq * float(ratio))
+        except (TypeError, ValueError):
+            node_freqs.append(ref_freq)
 
         if node in highlight_set:
             node_colors.append('#90EE90')
@@ -103,6 +111,7 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
         'pathNodeIndices': [],
         'pathNodeColors': [],
         'hoverData': hover_data,
+        'nodeFreqs': node_freqs,
         'axisConfig': {
             'xRange': [min(xs) - x_span * pad, max(xs) + x_span * pad],
             'yRange': [min(ys) - y_span * pad, max(ys) + y_span * pad],

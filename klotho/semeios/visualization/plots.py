@@ -15,12 +15,9 @@ from klotho.dynatos.envelopes import Envelope
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 
-import rustworkx as rx
-# Temporary compatibility imports for visualization
 try:
     import networkx as nx
 except ImportError:
-    # If NetworkX not available, create a minimal compatibility layer
     class _NetworkXCompat:
         def __getattr__(self, name):
             raise ImportError(f"NetworkX function '{name}' not available. Visualization may be limited.")
@@ -33,18 +30,25 @@ import math
 from sklearn.manifold import MDS, SpectralEmbedding
 
 from .plot_rt import _plot_rt
-from .plot_cps import _plot_master_set, _plot_cps, _reduce_positions, _detect_faces, _cps_node_positions
+from .plot_cps import _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions
 from .plot_lattice import _plot_lattice
+from .klotho_plot import KlothoPlot
 
-__all__ = ['plot']
+__all__ = ['plot', 'KlothoPlot']
 
 def plot(obj, **kwargs):
     """
     Universal plot dispatcher for Klotho objects.
 
-    Renders the figure via ``IPython.display.display`` so that plots
-    appear even when the call is not the last expression in a notebook
-    cell.  Returns ``None`` (like ``play``) to avoid double-rendering.
+    Returns a :class:`KlothoPlot` for types that support animation
+    (Lattice, CPS, RhythmTree, TemporalUnit, CompositionalUnit).
+    Jupyter renders the static figure automatically via
+    ``_repr_html_``.  Call ``.play()`` on the result to trigger
+    animated playback with audio.
+
+    For types without animation support, the figure is displayed
+    immediately via ``IPython.display.display`` and ``None`` is
+    returned.
 
     Parameters
     ----------
@@ -56,6 +60,12 @@ def plot(obj, **kwargs):
     **kwargs
         Keyword arguments forwarded to the type-specific plotting
         function.
+
+    Returns
+    -------
+    KlothoPlot or None
+        A ``KlothoPlot`` wrapper for animatable types, otherwise
+        ``None``.
 
     Raises
     ------
@@ -74,13 +84,19 @@ def plot(obj, **kwargs):
             except ImportError:
                 pass
 
+    def _wrap(plot_fn, target, kw):
+        animate = kw.pop('animate', False)
+        if animate:
+            return _show(plot_fn(target, animate=True, **kw))
+        return KlothoPlot(plot_fn, target, kw)
+
     match obj:
         case Graph():
             match obj:
                 case Tree():
                     match obj:
                         case RhythmTree():
-                            return _show(_plot_rt(obj, **kwargs))
+                            return _wrap(_plot_rt, obj, dict(kwargs))
                         case ParameterTree():
                             return _show(_plot_parameter_tree(obj, **kwargs))
                         case _:
@@ -88,7 +104,7 @@ def plot(obj, **kwargs):
                 case ParameterField():
                     return _show(_plot_field(obj, **kwargs))
                 case Lattice():
-                    return _show(_plot_lattice(obj, **kwargs))
+                    return _wrap(_plot_lattice, obj, dict(kwargs))
                 case _:
                     return _show(_plot_graph(obj._graph, **kwargs))
         case MasterSet():
@@ -96,7 +112,7 @@ def plot(obj, **kwargs):
         case CombinationSet():
             match obj:
                 case CombinationProductSet():
-                    return _show(_plot_cps(obj, **kwargs))
+                    return _wrap(_plot_cps, obj, dict(kwargs))
                 case _:
                     return _show(_plot_cs(obj, **kwargs))
         case Scale() | Chord() | Voicing():
@@ -112,9 +128,9 @@ def plot(obj, **kwargs):
                 case TemporalUnit():
                     match obj:
                         case CompositionalUnit():
-                            return _show(_plot_rt(obj._rt, audio_source=obj, **kwargs))
+                            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
                         case _:
-                            return _show(_plot_rt(obj._rt, audio_source=obj, **kwargs))
+                            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
                 case TemporalUnitSequence():
                     raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
                 case TemporalBlock():

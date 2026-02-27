@@ -34,6 +34,7 @@ from .thetos import ParameterTree, ParameterField, Instrument, SynthDefInstrumen
 from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 from .semeios.visualization.plots import plot
+from .semeios.visualization.klotho_plot import KlothoPlot
 from .semeios.notelists.supercollider import Scheduler
 
 from .utils.playback.player import play

@@ -8,6 +8,7 @@ from ._svg_utils import (
     SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
     svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
 )
+from ._svg_shared import compute_svg_layout, render_shape_groups, render_tooltip_system, BASE_ARC_OFFSET
 
 
 class SvgCPSData(SvgFigureData):
@@ -67,51 +68,15 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
 
     G = cps.graph
 
-    width_px = int(figsize[0] * 100)
-    height_px = int(figsize[1] * 100)
-
     dimmed_edge_color = '#333333'
     dimmed_node_color = '#555555'
 
-    xs = [pos[0] for pos in node_positions.values()]
-    ys = [pos[1] for pos in node_positions.values()]
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
-
-    x_range = x_max - x_min if x_max > x_min else 1.0
-    y_range = y_max - y_min if y_max > y_min else 1.0
-    x_pad = x_range * 0.15
-    y_pad = y_range * 0.15
-    data_x_min = x_min - x_pad
-    data_x_max = x_max + x_pad
-    data_y_min = y_min - y_pad
-    data_y_max = y_max + y_pad
-    data_w = data_x_max - data_x_min
-    data_h = data_y_max - data_y_min
-
-    margin_left = 20
-    margin_right = 20
-    margin_top = 50
-    margin_bottom = 20
-    plot_w = width_px - margin_left - margin_right
-    plot_h = height_px - margin_top - margin_bottom
-
-    aspect = data_w / data_h if data_h > 0 else 1
-    plot_aspect = plot_w / plot_h if plot_h > 0 else 1
-    if aspect > plot_aspect:
-        actual_w = plot_w
-        actual_h = plot_w / aspect
-    else:
-        actual_h = plot_h
-        actual_w = plot_h * aspect
-    ox = margin_left + (plot_w - actual_w) / 2
-    oy = margin_top
-
-    def tx(val):
-        return ox + (val - data_x_min) / data_w * actual_w
-
-    def ty(val):
-        return oy + actual_h - (val - data_y_min) / data_h * actual_h
+    layout = compute_svg_layout(node_positions, figsize)
+    width_px = layout['width_px']
+    height_px = layout['height_px']
+    tx = layout['tx']
+    ty = layout['ty']
+    margin_top = layout['oy']
 
     uid = f"svgcps_{_uuid.uuid4().hex[:8]}"
     els = []
@@ -273,34 +238,27 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
             graph_edges.add((u, v))
             graph_edges.add((v, u))
 
-        for gi, group in enumerate(shape_groups):
-            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
-            used_shape_colors.append(color)
-            group_edge_ids = []
-            group_set = set(group)
-            for n in group:
-                shape_node_colors_map[n] = color
+        def _cps_edge_exists(n1, n2):
+            return (n1, n2) in graph_edges
 
-            for i, n1 in enumerate(group):
-                for n2 in group[i + 1:]:
-                    if (n1, n2) in graph_edges and n1 in node_positions and n2 in node_positions:
-                        px1, py1 = tx(node_positions[n1][0]), ty(node_positions[n1][1])
-                        px2, py2 = tx(node_positions[n2][0]), ty(node_positions[n2][1])
-                        eid = next_eid("se")
-                        shape_els.append(
-                            f'<line id="{eid}" x1="{px1:.2f}" y1="{py1:.2f}" '
-                            f'x2="{px2:.2f}" y2="{py2:.2f}" '
-                            f'stroke="{color}" stroke-width="3" opacity="0.8" '
-                            f'pointer-events="none"/>'
-                        )
-                        group_edge_ids.append(eid)
-                        all_shape_el_ids.append(eid)
-            svg_shape_group_edge_ids.append(group_edge_ids)
+        def _cps_shape_pos(n):
+            if n not in node_positions:
+                return None
+            return tx(node_positions[n][0]), ty(node_positions[n][1])
+
+        shape_els, svg_shape_group_edge_ids, all_shape_el_ids, used_shape_colors, shape_node_colors_map = (
+            render_shape_groups(shape_groups, _cps_edge_exists, _cps_shape_pos, next_eid)
+        )
 
     node_els = []
     all_node_ids = []
     node_id_map = {}
+    hover_texts = []
+    is_active_list = []
+    node_freqs = []
+    ref_freq = 261.63
     ns = node_size
+    node_idx_counter = 0
 
     for node, attrs in G.nodes(data=True):
         if node not in node_positions or 'combo' not in attrs:
@@ -314,25 +272,35 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
         combo_str = '(' + ' '.join(str(f) for f in combo) + ')'
         product = attrs['product']
         ratio = attrs['ratio']
-        hover_text = f"Node: {node}  Alias: {label}  Combo: {combo_str}  Product: {product}  Ratio: {ratio}"
+        hover_text = f"Node: {node}  Alias: {label}\nCombo: {combo_str}  Product: {product}\nRatio: {ratio}"
 
         if has_path:
             nc = path_node_colors_map.get(node, dimmed_node_color)
+            active = node in path_nodes
         elif has_shape:
             nc = shape_node_colors_map.get(node, dimmed_node_color if dim_bg else 'white')
+            active = node in all_shape_nodes
         else:
             nc = 'white'
+            active = True
 
         nid = next_eid("nd")
         all_node_ids.append(nid)
         node_id_map[node] = nid
+        hover_texts.append(hover_text)
+        is_active_list.append(active)
+        try:
+            node_freqs.append(ref_freq * float(ratio))
+        except (TypeError, ValueError):
+            node_freqs.append(ref_freq)
 
-        tooltip = html_escape(hover_text)
         node_els.append(
             f'<circle id="{nid}" cx="{cx_px:.2f}" cy="{cy_px:.2f}" r="{ns / 2:.1f}" '
-            f'fill="{nc}" stroke="white" stroke-width="2">'
-            f'<title>{tooltip}</title></circle>'
+            f'fill="{nc}" stroke="white" stroke-width="2" '
+            f'data-idx="{node_idx_counter}" data-tip-uid="{uid}" '
+            f'style="cursor:pointer"/>'
         )
+        node_idx_counter += 1
 
         if show_labels:
             node_els.append(
@@ -366,7 +334,10 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
             svg_shape_group_node_indices.append(indices)
 
     all_svg = '\n'.join(els + path_els + shape_els + node_els)
-    svg_str = svg_wrap(all_svg, width_px, height_px)
+    tooltip_html = render_tooltip_system(uid, hover_texts,
+                                         is_active=is_active_list if (has_path or has_shape) else None,
+                                         node_freqs=node_freqs if node_freqs else None)
+    svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
     return SvgCPSData(
         svg_str=svg_str,

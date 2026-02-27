@@ -1,6 +1,6 @@
 _VALID_ENGINES = ("tone", "supersonic")
 
-_current_engine = "tone"
+_current_engine = "supersonic"
 
 
 def set_audio_engine(engine):

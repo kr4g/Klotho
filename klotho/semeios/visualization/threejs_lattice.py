@@ -412,6 +412,43 @@ def _static_threejs_html(sd):
     container.addEventListener("mouseleave", function() {{
         tooltip.style.display = "none";
     }});
+
+    var _clickCtx = null;
+    var _nodeFreqs = sceneData.nodeFreqs || null;
+    function _playFreq(freq) {{
+        if (!freq || freq <= 0) return;
+        try {{
+            if (!_clickCtx) _clickCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (_clickCtx.state === "suspended") _clickCtx.resume();
+            var osc = _clickCtx.createOscillator();
+            var gain = _clickCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, _clickCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, _clickCtx.currentTime + 0.6);
+            osc.connect(gain); gain.connect(_clickCtx.destination);
+            osc.start(); osc.stop(_clickCtx.currentTime + 0.65);
+        }} catch(e) {{}}
+    }}
+    if (_nodeFreqs) {{
+        var _downX = 0, _downY = 0;
+        canvas.addEventListener("pointerdown", function(ev) {{
+            _downX = ev.clientX; _downY = ev.clientY;
+        }});
+        canvas.addEventListener("pointerup", function(ev) {{
+            var dx = ev.clientX - _downX, dy = ev.clientY - _downY;
+            if (dx * dx + dy * dy > 9) return;
+            var rect = canvas.getBoundingClientRect();
+            mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            var hits = raycaster.intersectObjects(nodeMeshes, false);
+            if (hits.length > 0) {{
+                var idx = hits[0].object.userData.nodeIdx;
+                if (idx >= 0 && idx < _nodeFreqs.length) _playFreq(_nodeFreqs[idx]);
+            }}
+        }});
+    }}
 }})();
 </script>
 '''
@@ -629,6 +666,8 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     node_positions = []
     node_colors = []
     hover_texts = []
+    node_freqs = [] if is_tone_lattice else None
+    ref_freq = 261.63
     has_path = path and len(path) >= 2
 
     coords_iter = coords
@@ -656,8 +695,11 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
                 coord_to_use = orig_coord if orig_coord is not None else coord
                 ratio = lattice._coord_to_ratio(coord_to_use)
                 hover_text += f"\nRatio: {ratio}"
+                if node_freqs is not None:
+                    node_freqs.append(ref_freq * float(ratio))
             except (KeyError, AttributeError):
-                pass
+                if node_freqs is not None:
+                    node_freqs.append(ref_freq)
 
         hover_texts.append(hover_text)
 
@@ -728,6 +770,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         'nodeColors': node_colors,
         'nodeSize': 2,
         'hoverData': hover_texts,
+        'nodeFreqs': node_freqs,
         'dimmedNodeColor': dimmed_node_color,
         'pathNodeIndices': path_node_indices,
         'pathNodeColors': path_node_colors,

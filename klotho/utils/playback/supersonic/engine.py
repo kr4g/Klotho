@@ -16,6 +16,8 @@ from klotho.utils.playback.supersonic.cdn import (
 
 MANIFEST_PATH = Path(__file__).parent / "assets" / "manifest.json"
 SYNTHDEFS_DIR = Path(__file__).parent / "assets" / "synthdefs"
+_WIDGET_JS_PATH = Path(__file__).parent / "_engine_widget.js"
+_WIDGET_JS_TEMPLATE = None
 
 
 def _convert_numpy_types(obj):
@@ -50,6 +52,13 @@ def _load_synthdef_assets():
     return assets
 
 
+def _load_widget_template():
+    global _WIDGET_JS_TEMPLATE
+    if _WIDGET_JS_TEMPLATE is None:
+        _WIDGET_JS_TEMPLATE = _WIDGET_JS_PATH.read_text()
+    return _WIDGET_JS_TEMPLATE
+
+
 class SuperSonicEngine:
     def __init__(self, events, ring_time=5):
         self.events = _convert_numpy_types(events)
@@ -57,12 +66,6 @@ class SuperSonicEngine:
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         self.manifest = _load_manifest()
         self.synthdef_assets = _load_synthdef_assets()
-
-    def _load_draw_js(self):
-        return DRAW_JS_PATH.read_text()
-
-    def _load_scheduler_js(self):
-        return SCHEDULER_JS_PATH.read_text()
 
     def _needed_synthdefs(self):
         names = set()
@@ -86,11 +89,20 @@ class SuperSonicEngine:
             "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
         })
 
-        draw_js = self._load_draw_js()
-        scheduler_js = self._load_scheduler_js()
+        draw_js = DRAW_JS_PATH.read_text() if DRAW_JS_PATH.exists() else ""
+        scheduler_js = SCHEDULER_JS_PATH.read_text() if SCHEDULER_JS_PATH.exists() else ""
 
         needed_json = json.dumps(list(needed))
         wid = self.widget_id
+
+        widget_js = (_load_widget_template()
+                     .replace('__WID__', wid)
+                     .replace('__EVENTS_JSON__', events_json)
+                     .replace('__MANIFEST_JSON__', manifest_json)
+                     .replace('__SYNTHDEF_ASSETS_JSON__', synthdef_assets_json)
+                     .replace('__NEEDED_JSON__', needed_json)
+                     .replace('__SS_CONFIG_JSON__', config_json)
+                     .replace('__RING_TIME__', str(self.ring_time)))
 
         html = f'''
 <div id="{wid}" style="
@@ -156,157 +168,7 @@ class SuperSonicEngine:
 
 {scheduler_js}
 
-(function __klothoSSInit_{wid}() {{
-    var wid = "{wid}";
-    var toggleBtn = document.getElementById(wid + "_toggle");
-    if (!toggleBtn) {{
-        setTimeout(__klothoSSInit_{wid}, 50);
-        return;
-    }}
-    var iconEl = document.getElementById(wid + "_icon");
-    var loopBtn = document.getElementById(wid + "_loop");
-    var loopSvg = document.getElementById(wid + "_loop_svg");
-    var statusEl = document.getElementById(wid + "_status");
-    var allEvents = {events_json};
-    var manifest = {manifest_json};
-    var synthdefAssets = {synthdef_assets_json};
-    var neededSynthdefs = {needed_json};
-    var ssConfig = {config_json};
-
-    var looping = false;
-    var scheduler = null;
-    var ready = false;
-    var _loadPromise = null;
-
-    function setPlayIcon() {{
-        iconEl.style.cssText =
-            "width:0;height:0;border-top:7px solid transparent;"
-            + "border-bottom:7px solid transparent;border-left:12px solid #4ade80;"
-            + "border-right:none;margin-left:3px;background:none";
-    }}
-
-    function setStopIcon() {{
-        iconEl.style.cssText =
-            "width:12px;height:12px;border:none;border-radius:2px;"
-            + "margin-left:0;background:#ef4444";
-    }}
-
-    loopBtn.onclick = function() {{
-        looping = !looping;
-        loopBtn.style.opacity = looping ? "1" : "0.5";
-        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
-    }};
-
-    function ensureSharedSonic() {{
-        var state = globalThis.__klothoSonic;
-        if (state && state.instance) return Promise.resolve(state.instance);
-        if (state && state.promise) return state.promise;
-        state = {{ instance: null, promise: null, loadedDefs: new Set() }};
-        globalThis.__klothoSonic = state;
-        state.promise = (async function() {{
-            try {{
-                var mod = await import("{SUPERSONIC_CDN}");
-                globalThis.SuperSonic = mod.SuperSonic;
-                var s = new mod.SuperSonic(ssConfig);
-                await s.init();
-                state.instance = s;
-                return s;
-            }} catch(e) {{
-                return null;
-            }}
-        }})();
-        return state.promise;
-    }}
-
-    async function loadDefs(sonic) {{
-        var loaded = globalThis.__klothoSonic.loadedDefs;
-        for (var name in synthdefAssets) {{
-            if (!synthdefAssets.hasOwnProperty(name)) continue;
-            if (loaded.has(name)) continue;
-            var b64 = synthdefAssets[name];
-            var bytes = Uint8Array.from(atob(b64), function(c) {{ return c.charCodeAt(0); }});
-            await sonic.loadSynthDef(bytes);
-            loaded.add(name);
-        }}
-        for (var i = 0; i < neededSynthdefs.length; i++) {{
-            var sname = neededSynthdefs[i];
-            if (loaded.has(sname)) continue;
-            if (synthdefAssets[sname]) continue;
-            try {{
-                await sonic.loadSynthDef(sname);
-                loaded.add(sname);
-            }} catch(e) {{}}
-        }}
-    }}
-
-    function ensureReady() {{
-        if (ready) return Promise.resolve(true);
-        if (_loadPromise) return _loadPromise;
-        _loadPromise = (async function() {{
-            var sonic = await ensureSharedSonic();
-            if (!sonic) {{
-                _loadPromise = null;
-                statusEl.textContent = "error";
-                statusEl.style.color = "#ef4444";
-                return false;
-            }}
-            await loadDefs(sonic);
-            scheduler = new BrowserScheduler({{
-                sonic: sonic,
-                manifest: manifest,
-                ringTime: {self.ring_time},
-            }});
-            ready = true;
-            statusEl.textContent = "ready";
-            statusEl.style.color = "#4ade80";
-            return true;
-        }})();
-        return _loadPromise;
-    }}
-
-    statusEl.textContent = "loading...";
-    statusEl.style.color = "#f0ad4e";
-    ensureReady();
-
-    function doPlay(skipStop) {{
-        var evts = allEvents;
-        if (evts.length === 0) return;
-
-        setStopIcon();
-        statusEl.textContent = "playing";
-        statusEl.style.color = "#4ade80";
-
-        scheduler.play(evts, {{
-            _skipStop: !!skipStop,
-            onFinish: function() {{
-                if (looping) {{
-                    doPlay(true);
-                }} else {{
-                    setPlayIcon();
-                    statusEl.textContent = "ready";
-                    statusEl.style.color = "#4ade80";
-                }}
-            }}
-        }});
-    }}
-
-    toggleBtn.onclick = async function() {{
-        if (scheduler && scheduler.isPlaying) {{
-            await scheduler.stop();
-            setPlayIcon();
-            statusEl.textContent = "ready";
-            statusEl.style.color = "#4ade80";
-            return;
-        }}
-        var ok = await ensureReady();
-        if (!ok) return;
-        var sonic = globalThis.__klothoSonic.instance;
-        if (sonic.audioContext && sonic.audioContext.state === "suspended") {{
-            await sonic.audioContext.resume();
-        }}
-        doPlay(false);
-    }};
-}})();
+{widget_js}
 </script>
 '''
         return html

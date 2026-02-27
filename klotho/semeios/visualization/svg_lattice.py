@@ -8,6 +8,7 @@ from ._svg_utils import (
     SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
     svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
 )
+from ._svg_shared import render_tooltip_system
 
 
 class SvgLatticeData(SvgFigureData):
@@ -483,7 +484,12 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     node_els = []
     all_node_ids = []
     coord_to_node_id = {}
+    hover_texts = []
+    is_active_list = []
+    node_freqs = [] if is_tone_lattice else None
+    ref_freq = 261.63
     ns = node_size * 2
+    node_idx_counter = 0
     for i, coord in enumerate(coords_iter):
         if effective_dimensionality == 1:
             cx_px, cy_px = tx(coord[0]), ty(0)
@@ -513,36 +519,48 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                 coord_to_use = orig_coord if orig_coord is not None else coord
                 ratio = lattice._coord_to_ratio(coord_to_use)
                 hover_text += f"\nRatio: {ratio}"
+                if node_freqs is not None:
+                    node_freqs.append(ref_freq * float(ratio))
             except (KeyError, AttributeError):
-                pass
+                if node_freqs is not None:
+                    node_freqs.append(ref_freq)
 
         orig_or_coord = orig_coord if orig_coord is not None else coord
         if has_path:
             nc = path_coord_colors.get(coord, dimmed_node_color)
+            active = coord in path_coord_colors
         elif has_shape and orig_or_coord in shape_coord_colors:
             nc = shape_coord_colors[orig_or_coord]
+            active = True
         elif has_shape and coord in shape_coord_colors:
             nc = shape_coord_colors[coord]
+            active = True
         elif highlighted_coords and (
             (coords_iter is coords and i < len(original_coords) and original_coords[i] in highlighted_coords) or
             (coords_iter is not coords and (coord in highlighted_coords or (orig_coord is not None and orig_coord in highlighted_coords)))
         ):
             nc = 'white'
+            active = True
         elif use_dimmed:
             nc = dimmed_node_color
+            active = False
         else:
             nc = 'white'
+            active = True
 
         nid = next_eid("nd")
         all_node_ids.append(nid)
         coord_to_node_id[coord] = nid
+        hover_texts.append(hover_text)
+        is_active_list.append(active)
 
-        tooltip = html_escape(hover_text)
         node_els.append(
             f'<circle id="{nid}" cx="{cx_px:.2f}" cy="{cy_px:.2f}" r="{ns / 2:.1f}" '
-            f'fill="{nc}" stroke="white" stroke-width="2">'
-            f'<title>{tooltip}</title></circle>'
+            f'fill="{nc}" stroke="white" stroke-width="2" '
+            f'data-idx="{node_idx_counter}" data-tip-uid="{uid}" '
+            f'style="cursor:pointer"/>'
         )
+        node_idx_counter += 1
 
     path_node_indices = []
     path_node_colors = []
@@ -573,7 +591,10 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             svg_shape_group_node_indices.append(indices)
 
     all_svg = '\n'.join(els + path_els + shape_els + node_els)
-    svg_str = svg_wrap(all_svg, width_px, height_px)
+    tooltip_html = render_tooltip_system(uid, hover_texts,
+                                         is_active=is_active_list if use_dimmed else None,
+                                         node_freqs=node_freqs)
+    svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
     return SvgLatticeData(
         svg_str=svg_str,

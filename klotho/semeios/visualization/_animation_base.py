@@ -6,7 +6,9 @@ from klotho.utils.playback.tonejs.cdn import (
 )
 
 _PLAYBACK_JS_PATH = Path(__file__).parent / '_playback.js'
+_SHAPE_PLAYBACK_JS_PATH = Path(__file__).parent / '_shape_playback.js'
 _PLAYBACK_JS_TEMPLATE = None
+_SHAPE_PLAYBACK_JS_TEMPLATE = None
 _SS_MANIFEST_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'manifest.json'
 
 
@@ -161,3 +163,15 @@ def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring
               .replace('__RING_TIME__', str(ring_time)))
 
     return result
+
+
+def build_shape_playback_js(wid, dur_ms, total_groups, engine="tone", ring_time=5):
+    global _SHAPE_PLAYBACK_JS_TEMPLATE
+    if _SHAPE_PLAYBACK_JS_TEMPLATE is None:
+        _SHAPE_PLAYBACK_JS_TEMPLATE = _SHAPE_PLAYBACK_JS_PATH.read_text()
+    return (_SHAPE_PLAYBACK_JS_TEMPLATE
+            .replace('__WID__', wid)
+            .replace('__DUR_MS__', str(dur_ms))
+            .replace('__TOTAL_GROUPS__', str(total_groups))
+            .replace('__ENGINE_TYPE__', engine)
+            .replace('__RING_TIME__', str(ring_time)))

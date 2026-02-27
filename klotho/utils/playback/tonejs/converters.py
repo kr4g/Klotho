@@ -1,3 +1,5 @@
+import copy
+
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
 from klotho.tonos.chords.chord import Chord, Voicing, Sonority, ChordSequence
@@ -8,25 +10,17 @@ from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSeq
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import JsInstrument
 from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
-import copy
-
-DEFAULT_NOTE_DURATION = 0.5
-DEFAULT_CHORD_DURATION = 2.0
-DEFAULT_SPECTRUM_DURATION = 3.0
-DEFAULT_DRUM_FREQ = 110.0
-
-KNOWN_KWARGS = frozenset({
-    'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
-    'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time',
-})
+from klotho.utils.playback._converter_base import (
+    DEFAULT_NOTE_DURATION, DEFAULT_CHORD_DURATION,
+    DEFAULT_SPECTRUM_DURATION, DEFAULT_DRUM_FREQ,
+    KNOWN_KWARGS,
+    _get_addressed_collection, _merge_pfields,
+    scale_pitch_sequence, extract_convert_kwargs,
+)
 
 
 def _payload(events, instruments=None):
     return {"events": events, "instruments": instruments or {}}
-
-
-def freq_to_velocity(freq, base_vel=0.6):
-    return single_voice_amplitude(freq, base_vel)
 
 
 def _deep_merge(base, override):
@@ -47,24 +41,6 @@ def _normalize_event_pfields(pfields):
     if 'freq' not in pfields:
         pfields['freq'] = 440.0
     return pfields
-
-
-def _get_addressed_collection(obj):
-    if hasattr(obj, 'freq'):
-        return obj
-    if hasattr(obj, 'is_instanced') and obj.is_instanced:
-        return obj
-    if hasattr(obj, 'is_relative') and not obj.is_relative:
-        return obj
-    return obj.root("C4")
-
-
-def _merge_pfields(base, extra):
-    if not extra:
-        return base
-    merged = dict(extra)
-    merged.update(base)
-    return merged
 
 
 def _build_seq_events(pitches, start, instrument, amp=None, per_voice_dur=None,
@@ -123,16 +99,44 @@ def _build_chord_events(pitches, start, dur, strum, instrument, amp=None,
     return events
 
 
-def compositional_unit_to_events(obj, extra_pfields=None):
+def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
     events = []
     instruments = {}
     inst_id_map = {}
 
+    leaf_nodes = obj._rt.leaf_nodes if animation else None
+    node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)}
+                    if animation else None)
+
+    time_offset = 0
+    if animation:
+        time_offset = min(ev.start for ev in obj if not ev.is_rest) if any(not ev.is_rest for ev in obj) else 0
+
     for event in obj:
+        step_idx = node_to_step.get(event.node_id, None) if animation else None
+        start_time = event.start - time_offset if animation else event.start
+
         if event.is_rest:
+            if animation:
+                events.append({
+                    "start": start_time,
+                    "duration": abs(event.duration),
+                    "instrument": "__rest__",
+                    "pfields": {},
+                    "_stepIndex": step_idx,
+                })
             continue
+
         instrument = obj.get_active_instrument(event.node_id)
         if not isinstance(instrument, JsInstrument):
+            if animation:
+                events.append({
+                    "start": start_time,
+                    "duration": abs(event.duration),
+                    "instrument": "__rest__",
+                    "pfields": {},
+                    "_stepIndex": step_idx,
+                })
             continue
 
         inst_identity = id(instrument)
@@ -159,14 +163,23 @@ def compositional_unit_to_events(obj, extra_pfields=None):
         default_pfields = instruments[routing_key].get('preset', {})
         effective_pfields = _deep_merge(default_pfields, pfields)
         effective_pfields = _merge_pfields(effective_pfields, extra_pfields)
-        events.append({
-            "start": event.start,
+
+        ev_data = {
+            "start": start_time,
             "duration": abs(event.duration),
             "instrument": routing_key,
-            "pfields": effective_pfields
-        })
+            "pfields": effective_pfields,
+        }
+        if animation:
+            ev_data["_stepIndex"] = step_idx
+        events.append(ev_data)
+
     events.sort(key=lambda ev: ev["start"])
     return _payload(events, instruments)
+
+
+def compositional_unit_to_animation_events(obj, extra_pfields=None):
+    return compositional_unit_to_events(obj, extra_pfields=extra_pfields, animation=True)
 
 
 def pitch_to_events(pitch, duration=None, amp=None, extra_pfields=None):
@@ -210,28 +223,7 @@ def pitch_collection_to_events(obj, duration=None, mode="seq", arp=False, strum=
 
 def scale_to_events(obj, duration=None, equaves=1, amp=None, extra_pfields=None):
     dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-    addressed = _get_addressed_collection(obj)
-
-    if equaves == 0:
-        equaves = 1
-
-    scale_len = len(addressed)
-    abs_equaves = abs(equaves)
-    going_up = equaves > 0
-
-    all_pitches = []
-
-    if going_up:
-        for idx in range(abs_equaves * scale_len + 1):
-            all_pitches.append(addressed[idx])
-        pitches_down = list(reversed(all_pitches[:-1]))
-        all_pitches = all_pitches + pitches_down
-    else:
-        for i in range(abs_equaves * scale_len + 1):
-            all_pitches.append(addressed[-i])
-        pitches_up = list(reversed(all_pitches[:-1]))
-        all_pitches = all_pitches + pitches_up
-
+    all_pitches = scale_pitch_sequence(obj, equaves)
     return _payload(_build_seq_events(all_pitches, 0, "synth", amp=amp,
                                       per_voice_dur=dur, extra_pfields=extra_pfields))
 
@@ -317,9 +309,14 @@ def spectrum_to_events(obj, duration=None, arp=False, strum=0, direction='u',
                                             amp=target, extra_pfields=extra_pfields))
 
 
-def temporal_unit_to_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
+def temporal_unit_to_events(obj, use_absolute_time=False, amp=None, extra_pfields=None,
+                            animation=False):
     events = []
     target = amp if amp is not None else 0.85
+
+    leaf_nodes = obj._rt.leaf_nodes if animation else None
+    node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)}
+                    if animation else None)
 
     if use_absolute_time:
         time_offset = 0
@@ -327,23 +324,44 @@ def temporal_unit_to_events(obj, use_absolute_time=False, amp=None, extra_pfield
         time_offset = min(chronon.start for chronon in obj if not chronon.is_rest) if any(not chronon.is_rest for chronon in obj) else 0
 
     for chronon in obj:
-        if not chronon.is_rest:
-            start_time = chronon.start - time_offset
-            duration = abs(chronon.duration)
+        start_time = chronon.start - time_offset
+        duration = abs(chronon.duration)
+        step_idx = node_to_step.get(chronon.node_id, None) if animation else None
 
-            pf = {
-                "freq": DEFAULT_DRUM_FREQ,
-                "vel": target,
-            }
-            pf = _merge_pfields(pf, extra_pfields)
-            events.append({
-                "start": start_time,
-                "duration": duration,
-                "instrument": "membrane",
-                "pfields": pf,
-            })
+        if chronon.is_rest:
+            if animation:
+                events.append({
+                    "start": start_time,
+                    "duration": duration,
+                    "instrument": "__rest__",
+                    "pfields": {},
+                    "_stepIndex": step_idx,
+                })
+            continue
 
+        pf = {
+            "freq": DEFAULT_DRUM_FREQ,
+            "vel": target,
+        }
+        pf = _merge_pfields(pf, extra_pfields)
+        ev_data = {
+            "start": start_time,
+            "duration": duration,
+            "instrument": "membrane",
+            "pfields": pf,
+        }
+        if animation:
+            ev_data["_stepIndex"] = step_idx
+        events.append(ev_data)
+
+    if animation:
+        events.sort(key=lambda ev: ev["start"])
     return _payload(events)
+
+
+def temporal_unit_to_animation_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
+    return temporal_unit_to_events(obj, use_absolute_time=use_absolute_time, amp=amp,
+                                  extra_pfields=extra_pfields, animation=True)
 
 
 def rhythm_tree_to_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
@@ -352,123 +370,10 @@ def rhythm_tree_to_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None
                                   amp=amp, extra_pfields=extra_pfields)
 
 
-def temporal_unit_to_animation_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
-    events = []
-    leaf_nodes = obj._rt.leaf_nodes
-    target = amp if amp is not None else 0.85
-
-    if use_absolute_time:
-        time_offset = 0
-    else:
-        time_offset = min(c.start for c in obj if not c.is_rest) if any(not c.is_rest for c in obj) else 0
-
-    node_to_step = {nid: idx for idx, nid in enumerate(leaf_nodes)}
-
-    for chronon in obj:
-        start_time = chronon.start - time_offset
-        duration = abs(chronon.duration)
-        step_idx = node_to_step.get(chronon.node_id, None)
-
-        if chronon.is_rest:
-            events.append({
-                "start": start_time,
-                "duration": duration,
-                "instrument": "__rest__",
-                "pfields": {},
-                "_stepIndex": step_idx,
-            })
-        else:
-            pf = {
-                "freq": DEFAULT_DRUM_FREQ,
-                "vel": target,
-            }
-            pf = _merge_pfields(pf, extra_pfields)
-            events.append({
-                "start": start_time,
-                "duration": duration,
-                "instrument": "membrane",
-                "pfields": pf,
-                "_stepIndex": step_idx,
-            })
-
-    events.sort(key=lambda ev: ev["start"])
-    return _payload(events)
-
-
 def rhythm_tree_to_animation_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
     temporal_unit = TemporalUnit.from_rt(obj, beat=beat, bpm=bpm)
     return temporal_unit_to_animation_events(temporal_unit, use_absolute_time=False,
                                             amp=amp, extra_pfields=extra_pfields)
-
-
-def compositional_unit_to_animation_events(obj, extra_pfields=None):
-    events = []
-    instruments = {}
-    inst_id_map = {}
-    leaf_nodes = obj._rt.leaf_nodes
-    node_to_step = {nid: idx for idx, nid in enumerate(leaf_nodes)}
-
-    time_offset = min(ev.start for ev in obj if not ev.is_rest) if any(not ev.is_rest for ev in obj) else 0
-
-    for event in obj:
-        step_idx = node_to_step.get(event.node_id, None)
-        start_time = event.start - time_offset
-
-        if event.is_rest:
-            events.append({
-                "start": start_time,
-                "duration": abs(event.duration),
-                "instrument": "__rest__",
-                "pfields": {},
-                "_stepIndex": step_idx,
-            })
-            continue
-
-        instrument = obj.get_active_instrument(event.node_id)
-        if not isinstance(instrument, JsInstrument):
-            events.append({
-                "start": start_time,
-                "duration": abs(event.duration),
-                "instrument": "__rest__",
-                "pfields": {},
-                "_stepIndex": step_idx,
-            })
-            continue
-
-        inst_identity = id(instrument)
-        if inst_identity not in inst_id_map:
-            key = instrument.name
-            if key in instruments:
-                existing = instruments[key]
-                if existing['tonejs_class'] != instrument.tonejs_class or existing['preset'] != instrument.pfields:
-                    raise ValueError(
-                        f"Instrument name '{key}' is used by two different instruments. "
-                        f"Use distinct names."
-                    )
-            else:
-                instruments[key] = {
-                    'tonejs_class': instrument.tonejs_class,
-                    'preset': instrument.pfields
-                }
-            inst_id_map[inst_identity] = key
-
-        routing_key = inst_id_map[inst_identity]
-        pfields = {k: v for k, v in event.parameters.items()
-                   if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
-        pfields = _normalize_event_pfields(pfields)
-        default_pfields = instruments[routing_key].get('preset', {})
-        effective_pfields = _deep_merge(default_pfields, pfields)
-        effective_pfields = _merge_pfields(effective_pfields, extra_pfields)
-        events.append({
-            "start": start_time,
-            "duration": abs(event.duration),
-            "instrument": routing_key,
-            "pfields": effective_pfields,
-            "_stepIndex": step_idx,
-        })
-
-    events.sort(key=lambda ev: ev["start"])
-    return _payload(events, instruments)
 
 
 def _merge_sub_payload(target_events, target_instruments, sub_payload, time_offset):
@@ -526,19 +431,17 @@ def temporal_block_to_events(obj, extra_pfields=None):
 
 
 def convert_to_events(obj, **kwargs):
-    duration = kwargs.get('dur', kwargs.get('duration', None))
-    arp = kwargs.get('arp', False)
-    mode = kwargs.get('mode', None)
-    strum = kwargs.get('strum', 0)
-    direction = kwargs.get('dir', 'u')
-    equaves = kwargs.get('equaves', 1)
-    beat = kwargs.get('beat', None)
-    bpm = kwargs.get('bpm', None)
-    amp = kwargs.get('amp', None)
-
-    extra_pfields = {k: v for k, v in kwargs.items() if k not in KNOWN_KWARGS}
-    if not extra_pfields:
-        extra_pfields = None
+    kw = extract_convert_kwargs(kwargs)
+    duration = kw['duration']
+    arp = kw['arp']
+    mode = kw['mode']
+    strum = kw['strum']
+    direction = kw['direction']
+    equaves = kw['equaves']
+    beat = kw['beat']
+    bpm = kw['bpm']
+    amp = kw['amp']
+    extra_pfields = kw['extra_pfields']
 
     if isinstance(obj, Pitch):
         return pitch_to_events(obj, duration=duration, amp=amp, extra_pfields=extra_pfields)

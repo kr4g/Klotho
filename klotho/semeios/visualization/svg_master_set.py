@@ -1,7 +1,9 @@
 import math
+import json
 from html import escape as html_escape
 
 from ._svg_utils import SvgFigureData, svg_wrap
+from ._svg_shared import render_tooltip_system
 
 
 class SvgMasterSetData(SvgFigureData):
@@ -88,8 +90,14 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
                 f'stroke="#808080" stroke-width="1.5"/>'
             )
 
+    import uuid as _uuid
+    uid = f"svgms_{_uuid.uuid4().hex[:8]}"
+    hover_texts = []
+    node_freqs = []
+    ref_freq = 261.63
+
     r_px = node_size * 0.5
-    for label in sorted_labels:
+    for idx, label in enumerate(sorted_labels):
         x, y = positions[label][0], positions[label][1]
         cx, cy = tx(x), ty(y)
         info = nd.get(label, {})
@@ -97,12 +105,19 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
         if 'factor' in info:
             tooltip_parts.append(f"Factor: {info['factor']}")
             tooltip_parts.append(f"Ratio: {info['ratio']}")
-        tooltip = html_escape('\n'.join(tooltip_parts))
+            try:
+                node_freqs.append(ref_freq * float(info['ratio']))
+            except (TypeError, ValueError):
+                node_freqs.append(ref_freq)
+        else:
+            node_freqs.append(ref_freq)
+        hover_texts.append('\n'.join(tooltip_parts))
 
         elements.append(
             f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r_px}" '
-            f'fill="white" stroke="white" stroke-width="2">'
-            f'<title>{tooltip}</title></circle>'
+            f'fill="white" stroke="white" stroke-width="2" '
+            f'data-idx="{idx}" data-tip-uid="{uid}" '
+            f'style="cursor:pointer"/>'
         )
         if show_labels:
             elements.append(
@@ -120,5 +135,7 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
         f'{html_escape(title)}</text>'
     )
 
-    svg_str = svg_wrap('\n'.join(elements), width_px, height_px)
+    tooltip_html = render_tooltip_system(uid, hover_texts,
+                                         node_freqs=node_freqs if node_freqs else None)
+    svg_str = svg_wrap('\n'.join(elements), width_px, height_px) + tooltip_html
     return SvgMasterSetData(svg_str=svg_str, width_px=width_px, height_px=height_px)
