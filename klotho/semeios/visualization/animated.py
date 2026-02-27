@@ -477,6 +477,8 @@ class AnimatedLattice3dFigure:
     var raycaster = new THREE.Raycaster();
     var mouse = new THREE.Vector2();
     var hoveredIdx = -1;
+    var _nodeFreqs3d = sceneData.nodeFreqs || null;
+    var _isActive3d = sceneData.isActive || null;
 
     container.addEventListener("mousemove", function(ev) {{
         var rect = canvas.getBoundingClientRect();
@@ -489,19 +491,67 @@ class AnimatedLattice3dFigure:
             if (idx !== hoveredIdx) {{
                 hoveredIdx = idx;
                 tooltip.textContent = sceneData.hoverData[idx];
+                if (_isActive3d) {{
+                    if (_isActive3d[idx]) {{
+                        tooltip.style.background = "rgba(245,245,245,0.95)";
+                        tooltip.style.color = "#222";
+                    }} else {{
+                        tooltip.style.background = "rgba(30,30,30,0.92)";
+                        tooltip.style.color = "#eee";
+                    }}
+                }}
                 tooltip.style.display = "block";
             }}
             tooltip.style.left = (ev.clientX - rect.left + 12) + "px";
             tooltip.style.top  = (ev.clientY - rect.top  + 12) + "px";
+            canvas.style.cursor = _nodeFreqs3d ? "pointer" : "default";
         }} else {{
             hoveredIdx = -1;
             tooltip.style.display = "none";
+            canvas.style.cursor = "default";
         }}
     }});
     container.addEventListener("mouseleave", function() {{
         hoveredIdx = -1;
         tooltip.style.display = "none";
+        canvas.style.cursor = "default";
     }});
+
+    var _clickCtx3d = null;
+    function _playFreq3d(freq) {{
+        if (!freq || freq <= 0) return;
+        try {{
+            if (!_clickCtx3d) _clickCtx3d = new (window.AudioContext || window.webkitAudioContext)();
+            if (_clickCtx3d.state === "suspended") _clickCtx3d.resume();
+            var osc = _clickCtx3d.createOscillator();
+            var gain = _clickCtx3d.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, _clickCtx3d.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, _clickCtx3d.currentTime + 0.6);
+            osc.connect(gain); gain.connect(_clickCtx3d.destination);
+            osc.start(); osc.stop(_clickCtx3d.currentTime + 0.65);
+        }} catch(e) {{}}
+    }}
+    if (_nodeFreqs3d) {{
+        var _dX3d = 0, _dY3d = 0;
+        canvas.addEventListener("pointerdown", function(ev) {{
+            _dX3d = ev.clientX; _dY3d = ev.clientY;
+        }});
+        canvas.addEventListener("pointerup", function(ev) {{
+            var dx = ev.clientX - _dX3d, dy = ev.clientY - _dY3d;
+            if (dx * dx + dy * dy > 9) return;
+            var rect = canvas.getBoundingClientRect();
+            mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            var hits = raycaster.intersectObjects(nodeMeshes, false);
+            if (hits.length > 0) {{
+                var idx = hits[0].object.userData.nodeIdx;
+                if (idx >= 0 && idx < _nodeFreqs3d.length) _playFreq3d(_nodeFreqs3d[idx]);
+            }}
+        }});
+    }}
 
     var totalSteps = pathSteps.length;
 

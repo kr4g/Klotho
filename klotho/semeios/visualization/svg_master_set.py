@@ -116,8 +116,7 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
         elements.append(
             f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r_px}" '
             f'fill="white" stroke="white" stroke-width="2" '
-            f'data-idx="{idx}" data-tip-uid="{uid}" '
-            f'style="cursor:pointer"/>'
+            f'data-idx="{idx}" data-tip-uid="{uid}"/>'
         )
         if show_labels:
             elements.append(
@@ -135,7 +134,6 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
         f'{html_escape(title)}</text>'
     )
 
-    tooltip_html = render_tooltip_system(uid, hover_texts,
-                                         node_freqs=node_freqs if node_freqs else None)
+    tooltip_html = render_tooltip_system(uid, hover_texts)
     svg_str = svg_wrap('\n'.join(elements), width_px, height_px) + tooltip_html
     return SvgMasterSetData(svg_str=svg_str, width_px=width_px, height_px=height_px)

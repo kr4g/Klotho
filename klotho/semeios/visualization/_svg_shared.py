@@ -262,8 +262,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None)
 
     Each node ``<circle>`` should have ``data-idx="N"`` and
     ``data-tip-uid="<svg_uid>"`` set by the caller instead of a child
-    ``<title>`` element.  Optionally, nodes may also carry
-    ``data-freq="<hz>"`` for click-to-play behaviour.
+    ``<title>`` element.
 
     Parameters
     ----------
@@ -296,15 +295,16 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None)
     line-height:1.4;
 "></div>
 <script>
-(function(){{
+(function _klothoTip_{svg_uid}(){{
     var data={data_json};
     var active={active_json};
     var freqs={freqs_json};
     var tip=document.getElementById("{svg_uid}_tip");
-    if(!tip) return;
+    if(!tip){{ setTimeout(_klothoTip_{svg_uid},50); return; }}
     var wrap=tip.parentElement;
     if(wrap) wrap.style.position="relative";
     var circles=document.querySelectorAll("[data-tip-uid='{svg_uid}']");
+    if(!circles.length){{ setTimeout(_klothoTip_{svg_uid},50); return; }}
 
     var _clickCtx=null;
     function _playFreq(freq){{
@@ -348,6 +348,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None)
             tip.style.top=(ev.clientY-r.top+12)+"px";
         }});
         if(freqs){{
+            c.style.cursor="pointer";
             c.addEventListener("click",function(){{
                 var idx=parseInt(c.getAttribute("data-idx"),10);
                 if(isNaN(idx)||idx<0||idx>=freqs.length) return;

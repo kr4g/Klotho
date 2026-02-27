@@ -394,6 +394,9 @@ def _static_threejs_html(sd):
 
     var raycaster = new THREE.Raycaster();
     var mouse = new THREE.Vector2();
+    var _nodeFreqs = sceneData.nodeFreqs || null;
+    var _isActive = sceneData.isActive || null;
+
     container.addEventListener("mousemove", function(ev) {{
         var rect = canvas.getBoundingClientRect();
         mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
@@ -401,20 +404,32 @@ def _static_threejs_html(sd):
         raycaster.setFromCamera(mouse, camera);
         var hits = raycaster.intersectObjects(nodeMeshes, false);
         if (hits.length > 0) {{
-            tooltip.textContent = sceneData.hoverData[hits[0].object.userData.nodeIdx];
+            var idx = hits[0].object.userData.nodeIdx;
+            tooltip.textContent = sceneData.hoverData[idx];
+            if (_isActive) {{
+                if (_isActive[idx]) {{
+                    tooltip.style.background = "rgba(245,245,245,0.95)";
+                    tooltip.style.color = "#222";
+                }} else {{
+                    tooltip.style.background = "rgba(30,30,30,0.92)";
+                    tooltip.style.color = "#eee";
+                }}
+            }}
             tooltip.style.display = "block";
             tooltip.style.left = (ev.clientX - rect.left + 12) + "px";
             tooltip.style.top  = (ev.clientY - rect.top  + 12) + "px";
+            canvas.style.cursor = _nodeFreqs ? "pointer" : "default";
         }} else {{
             tooltip.style.display = "none";
+            canvas.style.cursor = "default";
         }}
     }});
     container.addEventListener("mouseleave", function() {{
         tooltip.style.display = "none";
+        canvas.style.cursor = "default";
     }});
 
     var _clickCtx = null;
-    var _nodeFreqs = sceneData.nodeFreqs || null;
     function _playFreq(freq) {{
         if (!freq || freq <= 0) return;
         try {{
@@ -667,8 +682,10 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     node_colors = []
     hover_texts = []
     node_freqs = [] if is_tone_lattice else None
+    is_active_list = []
     ref_freq = 261.63
     has_path = path and len(path) >= 2
+    has_selection = has_path or (nodes and len(nodes) > 0)
 
     coords_iter = coords
     if (nodes or path) and mute_background and len(drawn_nodes) > 0:
@@ -705,10 +722,13 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
 
         if highlighted_coords and orig_coord in highlighted_coords:
             node_colors.append('#ffffff')
+            is_active_list.append(True)
         elif use_dimmed:
             node_colors.append(dimmed_node_color)
+            is_active_list.append(False)
         else:
             node_colors.append('#ffffff')
+            is_active_list.append(True)
 
     pos_to_node_idx = {}
     for i, p in enumerate(node_positions):
@@ -770,7 +790,8 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         'nodeColors': node_colors,
         'nodeSize': 2,
         'hoverData': hover_texts,
-        'nodeFreqs': node_freqs,
+        'nodeFreqs': node_freqs if has_selection else None,
+        'isActive': is_active_list if use_dimmed else None,
         'dimmedNodeColor': dimmed_node_color,
         'pathNodeIndices': path_node_indices,
         'pathNodeColors': path_node_colors,

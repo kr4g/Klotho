@@ -3,6 +3,7 @@ from fractions import Fraction
 from html import escape as html_escape
 
 from ._svg_utils import SvgFigureData, svg_wrap_viewbox, svg_text
+from ._svg_shared import render_tooltip_system
 
 
 _HALO_NOTE_COLOR = (100, 160, 255)
@@ -165,6 +166,7 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
     leaf_bright = {}
     leaf_base = {}
     all_anim_ids = []
+    hover_texts = []
 
     els.append(f'<rect x="0" y="0" width="{width_px}" height="{height_px}" fill="black"/>')
 
@@ -183,12 +185,12 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
         leaf_bright[eid] = bright
         leaf_base[eid] = color
 
-        tooltip = html_escape(_rt_node_tooltip(rt, node_id, audio_source))
+        hover_texts.append(_rt_node_tooltip(rt, node_id, audio_source))
         els.append(
             f'<rect id="{eid}" x="{x0:.2f}" y="{by0:.2f}" '
             f'width="{w:.2f}" height="{by1 - by0:.2f}" '
-            f'fill="{color}" stroke="none">'
-            f'<title>{tooltip}</title></rect>'
+            f'fill="{color}" stroke="none" '
+            f'data-idx="{i}" data-tip-uid="{uid}"/>'
         )
 
     for pos in positions + [1.0]:
@@ -227,7 +229,8 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
         leaf_path_ids.append(sorted(ids))
 
     inner = '\n'.join(els + halo_els)
-    svg_str = _wrap_svg(inner, width_px, height_px, 0, height_px)
+    tooltip_html = render_tooltip_system(uid, hover_texts)
+    svg_str = _wrap_svg(inner, width_px, height_px, 0, height_px) + tooltip_html
 
     return SvgRTData(
         svg_str=svg_str, width_px=width_px, height_px=height_px,
@@ -322,6 +325,8 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
     leaf_base = {}
     all_anim_ids = []
     leaf_block_geom = {}
+    hover_texts = []
+    tip_idx = [0]
     eid_counter = [0]
 
     def next_eid(prefix="n"):
@@ -391,13 +396,14 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                         eid = next_eid()
                         node_to_ids.setdefault(node, []).append(eid)
                         all_anim_ids.append(eid)
-                        tooltip = html_escape(_rt_node_tooltip(rt, node, audio_source))
+                        hover_texts.append(_rt_node_tooltip(rt, node, audio_source))
                         els.append(
                             f'<rect id="{eid}" x="{bx0:.2f}" y="{by0_px:.2f}" '
                             f'width="{bw:.2f}" height="{bh_px:.2f}" '
-                            f'fill="{color}" stroke="black" stroke-width="1">'
-                            f'<title>{tooltip}</title></rect>'
+                            f'fill="{color}" stroke="black" stroke-width="1" '
+                            f'data-idx="{tip_idx[0]}" data-tip-uid="{uid}"/>'
                         )
+                        tip_idx[0] += 1
 
                         text_color = 'white' if is_rest else 'black'
                         font_size = 12 * get_node_scaling(node, rt, 9 / 12)
@@ -450,13 +456,14 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
             node_to_ids.setdefault(node, []).append(eid)
             all_anim_ids.append(eid)
 
-            tooltip = html_escape(_rt_node_tooltip(rt, node, audio_source))
+            hover_texts.append(_rt_node_tooltip(rt, node, audio_source))
             els.append(
                 f'<rect id="{eid}" x="{bx0:.2f}" y="{by0_px:.2f}" '
                 f'width="{bw:.2f}" height="{bh_px:.2f}" '
-                f'fill="{color}" stroke="black" stroke-width="1">'
-                f'<title>{tooltip}</title></rect>'
+                f'fill="{color}" stroke="black" stroke-width="1" '
+                f'data-idx="{tip_idx[0]}" data-tip-uid="{uid}"/>'
             )
+            tip_idx[0] += 1
 
             if is_leaf:
                 bright = '#ffffff' if not is_rest else '#707070'
@@ -545,13 +552,14 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
         leaf_bright[eid] = '#707070' if is_rest else '#ffffff'
         leaf_base[eid] = color
 
-        tooltip = html_escape(_rt_node_tooltip(rt, leaf_id, audio_source))
+        hover_texts.append(_rt_node_tooltip(rt, leaf_id, audio_source))
         els.append(
             f'<rect id="{eid}" x="{rx0:.2f}" y="{ry0:.2f}" '
             f'width="{rw:.2f}" height="{rh:.2f}" '
-            f'fill="{color}" stroke="none">'
-            f'<title>{tooltip}</title></rect>'
+            f'fill="{color}" stroke="none" '
+            f'data-idx="{tip_idx[0]}" data-tip-uid="{uid}"/>'
         )
+        tip_idx[0] += 1
 
     for pos in positions + [1.0]:
         px = pos * width_px
@@ -601,8 +609,9 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
         leaf_path_ids.append(sorted(ids))
 
     inner = '\n'.join(els + halo_els)
+    tooltip_html = render_tooltip_system(uid, hover_texts)
     svg_str = _wrap_svg(inner, width_px, height_px,
-                        fy(y_min_frac), fy(y_max_frac))
+                        fy(y_min_frac), fy(y_max_frac)) + tooltip_html
 
     return SvgRTData(
         svg_str=svg_str, width_px=width_px, height_px=height_px,
@@ -716,6 +725,8 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
     els = []
     node_to_ids = {}
     all_anim_ids = []
+    hover_texts = []
+    tip_idx = [0]
     eid_counter = [0]
 
     def next_eid(prefix="tn"):
@@ -785,22 +796,23 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
         node_to_ids.setdefault(node, []).append(eid)
         all_anim_ids.append(eid)
 
-        tooltip = html_escape(_rt_node_tooltip(rt, node, audio_source))
+        hover_texts.append(_rt_node_tooltip(rt, node, audio_source))
         r = node_size / 2
 
         if is_leaf:
             els.append(
                 f'<rect id="{eid}" x="{x - r:.2f}" y="{y - r:.2f}" '
                 f'width="{node_size:.2f}" height="{node_size:.2f}" '
-                f'fill="{node_color}" stroke="{border_color}" stroke-width="2">'
-                f'<title>{tooltip}</title></rect>'
+                f'fill="{node_color}" stroke="{border_color}" stroke-width="2" '
+                f'data-idx="{tip_idx[0]}" data-tip-uid="{uid}"/>'
             )
         else:
             els.append(
                 f'<circle id="{eid}" cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" '
-                f'fill="{node_color}" stroke="{border_color}" stroke-width="2">'
-                f'<title>{tooltip}</title></circle>'
+                f'fill="{node_color}" stroke="{border_color}" stroke-width="2" '
+                f'data-idx="{tip_idx[0]}" data-tip-uid="{uid}"/>'
             )
+        tip_idx[0] += 1
 
         els.append(_svg_text(x, y, display_text, font_size=text_size,
                              fill=text_color, weight='bold'))
@@ -841,7 +853,8 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
         leaf_path_ids.append(sorted(ids))
 
     inner = '\n'.join(els + halo_els)
-    svg_str = _wrap_svg(inner, width_px, height_px, y_min_px, y_max_px)
+    tooltip_html = render_tooltip_system(uid, hover_texts)
+    svg_str = _wrap_svg(inner, width_px, height_px, y_min_px, y_max_px) + tooltip_html
 
     return SvgRTData(
         svg_str=svg_str, width_px=width_px, height_px=height_px,

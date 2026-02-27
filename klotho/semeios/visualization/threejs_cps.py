@@ -52,10 +52,12 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
             else:
                 grid_edges.append(edge)
 
+    has_selection = bool(highlight_set)
     scene_nodes = []
     node_colors = []
     hover_data = []
     node_freqs = []
+    is_active_list = []
     ref_freq = 261.63
     for node, attrs in G.nodes(data=True):
         if node not in node_positions or 'combo' not in attrs:
@@ -79,8 +81,10 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
 
         if node in highlight_set:
             node_colors.append('#90EE90')
+            is_active_list.append(True)
         else:
             node_colors.append('#ffffff')
+            is_active_list.append(not has_selection)
 
     if not scene_nodes:
         scene_nodes = [[0, 0, 0]]
@@ -111,7 +115,8 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
         'pathNodeIndices': [],
         'pathNodeColors': [],
         'hoverData': hover_data,
-        'nodeFreqs': node_freqs,
+        'nodeFreqs': node_freqs if has_selection else None,
+        'isActive': is_active_list if has_selection else None,
         'axisConfig': {
             'xRange': [min(xs) - x_span * pad, max(xs) + x_span * pad],
             'yRange': [min(ys) - y_span * pad, max(ys) + y_span * pad],
