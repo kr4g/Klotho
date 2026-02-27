@@ -38,8 +38,9 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
 
     if engine == "supersonic":
         from .supersonic import SuperSonicEngine, convert_to_sc_events
+        ring_time = kwargs.pop('ring_time', 5)
         events = convert_to_sc_events(obj, **kwargs)
-        return SuperSonicEngine(events).display()
+        return SuperSonicEngine(events, ring_time=ring_time).display()
     else:
         events = convert_to_events(obj, **kwargs)
         return ToneEngine(events, custom_js_path=custom_js_path, custom_js=custom_js).display()

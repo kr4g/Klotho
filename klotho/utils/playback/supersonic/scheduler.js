@@ -5,6 +5,7 @@
   var BATCH_OVERLAP_RATIO = 0.8;
   var NTP_EPOCH_OFFSET = 2208988800;
   var STARTUP_DELAY = 0.1;
+  var DEFAULT_RING_TIME = 5;
 
   function getNTP() {
     return (performance.timeOrigin + performance.now()) / 1000 + NTP_EPOCH_OFFSET;
@@ -14,6 +15,7 @@
     constructor(config) {
       this.sonic = config.sonic;
       this.manifest = config.manifest || { synths: {}, inserts: {} };
+      this.ringTime = (config.ringTime != null) ? config.ringTime : DEFAULT_RING_TIME;
 
       this.isPlaying = false;
       this.stopToken = 0;
@@ -25,6 +27,7 @@
       this._playStartPerfMs = 0;
       this._batchTimeoutId = null;
       this._finishTimeoutId = null;
+      this._deferredRings = [];
 
       this.drawScheduler = new DrawScheduler();
       this.onEvent = null;
@@ -42,6 +45,26 @@
       try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
       try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
       this._groupId = null;
+    }
+
+    _freeGroupDeferred(groupId) {
+      var sonic = this.sonic;
+      var ringMs = this.ringTime * 1000;
+      var tid = setTimeout(function() {
+        try { sonic.send('/g_freeAll', groupId); } catch(e) {}
+        try { sonic.send('/n_free', groupId); } catch(e) {}
+      }, ringMs);
+      this._deferredRings.push({ tid: tid, gid: groupId });
+    }
+
+    _cancelAllDeferredRings() {
+      for (var i = 0; i < this._deferredRings.length; i++) {
+        clearTimeout(this._deferredRings[i].tid);
+        var gid = this._deferredRings[i].gid;
+        try { this.sonic.send('/g_freeAll', gid); } catch(e) {}
+        try { this.sonic.send('/n_free', gid); } catch(e) {}
+      }
+      this._deferredRings = [];
     }
 
     _bundleNew(ev, ntp) {
@@ -151,9 +174,12 @@
         var remaining = (endNTP - now) * 1000;
         this._finishTimeoutId = setTimeout(function() {
           if (token !== self.stopToken) return;
-          self._freeGroup();
           self.isPlaying = false;
           if (self.onFinish) self.onFinish();
+          if (self._groupId != null) {
+            self._freeGroupDeferred(self._groupId);
+            self._groupId = null;
+          }
         }, Math.max(1, remaining));
       }
     }
@@ -170,7 +196,14 @@
       this._finishTimeoutId = null;
 
       await this.sonic.purge();
-      this._freeGroup();
+
+      if (options._skipStop && this._groupId != null) {
+        this._freeGroupDeferred(this._groupId);
+        this._groupId = null;
+      } else {
+        this._freeGroup();
+      }
+
       this.nodeMap.clear();
       this._synthNames.clear();
       this.drawScheduler.clear();
@@ -210,6 +243,7 @@
       this._batchTimeoutId = null;
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
+      this._cancelAllDeferredRings();
       await this.sonic.purge();
       this._freeGroup();
       this.nodeMap.clear();

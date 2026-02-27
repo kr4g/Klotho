@@ -54,6 +54,7 @@ async function _ensureSSReady() {
         _ssScheduler = new BrowserScheduler({
             sonic: sonic,
             manifest: (typeof __klothoManifest !== "undefined") ? __klothoManifest : { synths: {}, inserts: {} },
+            ringTime: __RING_TIME__,
         });
         _ssReady = true;
         return true;

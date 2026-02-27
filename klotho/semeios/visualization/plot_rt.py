@@ -9,7 +9,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             animate: bool = False, dur: float = 0.5,
             audio_source=None,
             beat=None, bpm=None,
-            glow: bool = False) -> None:
+            glow: bool = False, amp: float = None, **kwargs) -> None:
     """
     Render a RhythmTree using one of several SVG layout modes.
 
@@ -99,11 +99,11 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             if isinstance(audio_source, _CompositionalUnit):
                 audio_payload = compositional_unit_to_sc_animation_events(audio_source)
             elif isinstance(audio_source, _TemporalUnit):
-                audio_payload = temporal_unit_to_sc_animation_events(audio_source)
+                audio_payload = temporal_unit_to_sc_animation_events(audio_source, amp=amp)
             else:
-                audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm)
+                audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
         else:
-            audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm)
+            audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
     else:
         from klotho.utils.playback.tonejs.converters import (
             rhythm_tree_to_animation_events,
@@ -114,11 +114,11 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
             if isinstance(audio_source, _CompositionalUnit):
                 audio_payload = compositional_unit_to_animation_events(audio_source)
             elif isinstance(audio_source, _TemporalUnit):
-                audio_payload = temporal_unit_to_animation_events(audio_source)
+                audio_payload = temporal_unit_to_animation_events(audio_source, amp=amp)
             else:
-                audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
+                audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
         else:
-            audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm)
+            audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
 
     return AnimatedRTSvgFigure(
         svg_data=svg_data,

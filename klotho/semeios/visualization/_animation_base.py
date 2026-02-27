@@ -148,7 +148,7 @@ def build_scripts_html(instruments_js, player_js):
 <script>{player_js}</script>'''
 
 
-def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone"):
+def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring_time=5):
     global _PLAYBACK_JS_TEMPLATE
     if _PLAYBACK_JS_TEMPLATE is None:
         _PLAYBACK_JS_TEMPLATE = _PLAYBACK_JS_PATH.read_text()
@@ -157,6 +157,7 @@ def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone"):
               .replace('__WID__', wid)
               .replace('__DUR_MS__', str(dur_ms))
               .replace('__BOUNDARY_OP__', boundary_op)
-              .replace('__ENGINE_TYPE__', engine))
+              .replace('__ENGINE_TYPE__', engine)
+              .replace('__RING_TIME__', str(ring_time)))
 
     return result

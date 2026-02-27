@@ -51,8 +51,9 @@ def _load_synthdef_assets():
 
 
 class SuperSonicEngine:
-    def __init__(self, events):
+    def __init__(self, events, ring_time=5):
         self.events = _convert_numpy_types(events)
+        self.ring_time = ring_time
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         self.manifest = _load_manifest()
         self.synthdef_assets = _load_synthdef_assets()
@@ -253,6 +254,7 @@ class SuperSonicEngine:
             scheduler = new BrowserScheduler({{
                 sonic: sonic,
                 manifest: manifest,
+                ringTime: {self.ring_time},
             }});
             ready = true;
             statusEl.textContent = "ready";

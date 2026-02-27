@@ -43,10 +43,11 @@ class AnimatedLattice3dFigure:
         Seconds between animation steps.
     """
 
-    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None):
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None, ring_time=5):
         self.scene_data = scene_data
         self.audio_payload = audio_payload
         self.dur = dur
+        self.ring_time = ring_time
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
 
@@ -77,7 +78,7 @@ class AnimatedLattice3dFigure:
         orbit_cdn = THREEJS_ORBIT_CDN
         trackball_cdn = THREEJS_TRACKBALL_CDN
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng)
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time)
 
         html = f'''
 {cdn_html}
@@ -571,11 +572,12 @@ class AnimatedRTSvgFigure:
         Enable halo glow on the active leaf node.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, engine=None):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, engine=None, ring_time=5):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.glow = glow
+        self.ring_time = ring_time
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
@@ -604,7 +606,7 @@ class AnimatedRTSvgFigure:
         converted = _maybe_convert_payload(self.audio_payload, eng)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, engine=eng)
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, engine=eng, ring_time=self.ring_time)
 
         html = f'''
 {cdn_html}
@@ -702,10 +704,11 @@ class AnimatedLatticeSvgFigure:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
+        self.ring_time = ring_time
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_slat_{uuid.uuid4().hex[:8]}"
 
@@ -731,7 +734,7 @@ class AnimatedLatticeSvgFigure:
         converted = _maybe_convert_payload(self.audio_payload, eng)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng)
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time)
 
         html = f'''
 {cdn_html}
@@ -852,10 +855,11 @@ class _AnimatedShapeFigureBase:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
+        self.ring_time = ring_time
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
 
@@ -1102,6 +1106,7 @@ class _AnimatedShapeFigureBase:
             _ssScheduler = new BrowserScheduler({{
                 sonic: sonic,
                 manifest: (typeof __klothoManifest !== "undefined") ? __klothoManifest : {{ synths: {{}}, inserts: {{}} }},
+                ringTime: {self.ring_time},
             }});
             _ssReady = true;
             return true;

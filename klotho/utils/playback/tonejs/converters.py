@@ -5,9 +5,9 @@ from klotho.tonos.scales.scale import Scale
 from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
-from klotho.dynatos.dynamics import freq_amp_scale, ampdb
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import JsInstrument
+from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
 import copy
 
 DEFAULT_NOTE_DURATION = 0.5
@@ -15,29 +15,18 @@ DEFAULT_CHORD_DURATION = 2.0
 DEFAULT_SPECTRUM_DURATION = 3.0
 DEFAULT_DRUM_FREQ = 110.0
 
+KNOWN_KWARGS = frozenset({
+    'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
+    'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time',
+})
+
 
 def _payload(events, instruments=None):
     return {"events": events, "instruments": instruments or {}}
 
 
 def freq_to_velocity(freq, base_vel=0.6):
-    """
-    Map a frequency to a MIDI-style velocity using perceptual amplitude scaling.
-
-    Parameters
-    ----------
-    freq : float
-        Frequency in Hz.
-    base_vel : float, optional
-        Base velocity level (default 0.6).
-
-    Returns
-    -------
-    float
-        Velocity value clamped to ``[0.1, 1.0]``.
-    """
-    scaled_amp = freq_amp_scale(freq, ampdb(0.2))
-    return min(1.0, max(0.1, base_vel * (scaled_amp / 0.2)))
+    return single_voice_amplitude(freq, base_vel)
 
 
 def _deep_merge(base, override):
@@ -70,63 +59,71 @@ def _get_addressed_collection(obj):
     return obj.root("C4")
 
 
-def _build_seq_events(pitches, start, dur, instrument, base_vel=0.5):
+def _merge_pfields(base, extra):
+    if not extra:
+        return base
+    merged = dict(extra)
+    merged.update(base)
+    return merged
+
+
+def _build_seq_events(pitches, start, instrument, amp=None, per_voice_dur=None,
+                      total_dur=None, extra_pfields=None):
     events = []
+    n = len(pitches)
+    if n == 0:
+        return events
+
+    if total_dur is not None:
+        voice_dur = total_dur / n
+    elif per_voice_dur is not None:
+        voice_dur = per_voice_dur
+    else:
+        voice_dur = DEFAULT_NOTE_DURATION
+
     for i, pitch in enumerate(pitches):
+        pf = {
+            "freq": pitch.freq,
+            "vel": single_voice_amplitude(pitch.freq, amp),
+        }
+        pf = _merge_pfields(pf, extra_pfields)
         events.append({
-            "start": start + i * dur,
-            "duration": dur * 0.9,
+            "start": start + i * voice_dur,
+            "duration": voice_dur * 0.9,
             "instrument": instrument,
-            "pfields": {
-                "freq": pitch.freq,
-                "vel": freq_to_velocity(pitch.freq, base_vel),
-            }
+            "pfields": pf,
         })
     return events
 
 
-def _build_chord_events(pitches, start, dur, strum, instrument, max_amp=0.5, dur_factor=1.0):
+def _build_chord_events(pitches, start, dur, strum, instrument, amp=None,
+                        dur_factor=1.0, extra_pfields=None):
     events = []
     num_notes = len(pitches)
-    base_amp = max_amp / (num_notes * 0.7) if num_notes > 0 else max_amp
+    if num_notes == 0:
+        return events
+
+    freqs = [p.freq for p in pitches]
+    voice_amps = compute_voice_amplitudes(freqs, amp)
     strum = max(0, min(1, strum))
 
     for i, pitch in enumerate(pitches):
-        taper_factor = 1.0 - (i / num_notes) * 0.6 if num_notes > 0 else 1.0
-        vel = base_amp * taper_factor
         start_offset = (strum * dur * i) / num_notes if num_notes > 1 else 0
-
+        pf = {
+            "freq": pitch.freq,
+            "vel": voice_amps[i],
+        }
+        pf = _merge_pfields(pf, extra_pfields)
         events.append({
             "start": start + start_offset,
             "duration": (dur * dur_factor) - start_offset,
             "instrument": instrument,
-            "pfields": {
-                "freq": pitch.freq,
-                "vel": min(1.0, max(0.1, vel)),
-            }
+            "pfields": pf,
         })
     return events
 
 
-def compositional_unit_to_events(obj):
-    """
-    Convert a :class:`CompositionalUnit` to a Tone.js event payload.
-
-    Parameters
-    ----------
-    obj : CompositionalUnit
-        The compositional unit to convert.
-
-    Returns
-    -------
-    dict
-        Payload with ``"events"`` and ``"instruments"`` keys.
-
-    Raises
-    ------
-    ValueError
-        If two different instruments share the same name.
-    """
+def compositional_unit_to_events(obj, extra_pfields=None):
     events = []
     instruments = {}
     inst_id_map = {}
@@ -161,6 +158,7 @@ def compositional_unit_to_events(obj):
         pfields = _normalize_event_pfields(pfields)
         default_pfields = instruments[routing_key].get('preset', {})
         effective_pfields = _deep_merge(default_pfields, pfields)
+        effective_pfields = _merge_pfields(effective_pfields, extra_pfields)
         events.append({
             "start": event.start,
             "duration": abs(event.duration),
@@ -171,61 +169,23 @@ def compositional_unit_to_events(obj):
     return _payload(events, instruments)
 
 
-def pitch_to_events(pitch, duration=None):
-    """
-    Convert a single :class:`Pitch` to a Tone.js event payload.
-
-    Parameters
-    ----------
-    pitch : Pitch
-        The pitch to play.
-    duration : float, optional
-        Duration in seconds (default 1.0).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def pitch_to_events(pitch, duration=None, amp=None, extra_pfields=None):
     dur = duration if duration is not None else 1.0
+    pf = {
+        "freq": pitch.freq,
+        "vel": single_voice_amplitude(pitch.freq, amp),
+    }
+    pf = _merge_pfields(pf, extra_pfields)
     return _payload([{
         "start": 0.0,
         "duration": dur,
         "instrument": "synth",
-        "pfields": {
-            "freq": pitch.freq,
-            "vel": freq_to_velocity(pitch.freq),
-        }
+        "pfields": pf,
     }])
 
 
-def pitch_collection_to_events(obj, duration=None, mode="seq", arp=False, strum=0, direction='u'):
-    """
-    Convert a :class:`PitchCollectionBase` to a Tone.js event payload.
-
-    Parameters
-    ----------
-    obj : PitchCollectionBase
-        Pitch collection to render.
-    duration : float, optional
-        Note or chord duration in seconds.
-    mode : {'seq', 'chord'}, optional
-        ``'seq'`` for sequential notes, ``'chord'`` for simultaneous
-        (default ``'seq'``).
-    arp : bool, optional
-        Arpeggiate the chord instead of playing simultaneously
-        (default ``False``).
-    strum : float, optional
-        Strum offset factor in ``[0, 1]`` for chord mode
-        (default 0).
-    direction : {'u', 'd'}, optional
-        ``'u'`` for ascending, ``'d'`` for descending (default ``'u'``).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def pitch_collection_to_events(obj, duration=None, mode="seq", arp=False, strum=0, direction='u',
+                               amp=None, extra_pfields=None):
     addressed = _get_addressed_collection(obj)
     pitches = [addressed[i] for i in range(len(addressed))]
 
@@ -235,35 +195,20 @@ def pitch_collection_to_events(obj, duration=None, mode="seq", arp=False, strum=
             pitches = list(reversed(pitches))
 
         if arp:
-            note_dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-            return _payload(_build_seq_events(pitches, 0, note_dur, "synth", 0.5))
+            dur = duration if duration is not None else DEFAULT_CHORD_DURATION
+            return _payload(_build_seq_events(pitches, 0, "synth", amp=amp,
+                                              total_dur=dur, extra_pfields=extra_pfields))
         else:
             dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-            return _payload(_build_chord_events(pitches, 0, dur, strum, "synth"))
+            return _payload(_build_chord_events(pitches, 0, dur, strum, "synth",
+                                                amp=amp, extra_pfields=extra_pfields))
     else:
         dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-        return _payload(_build_seq_events(pitches, 0, dur, "synth", 0.5))
+        return _payload(_build_seq_events(pitches, 0, "synth", amp=amp,
+                                          per_voice_dur=dur, extra_pfields=extra_pfields))
 
 
-def scale_to_events(obj, duration=None, equaves=1):
-    """
-    Convert a :class:`Scale` to ascending-then-descending Tone.js events.
-
-    Parameters
-    ----------
-    obj : Scale
-        The scale to render.
-    duration : float, optional
-        Duration per note in seconds (default 0.5).
-    equaves : int, optional
-        Number of equaves to traverse. Positive values ascend first,
-        negative values descend first (default 1).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def scale_to_events(obj, duration=None, equaves=1, amp=None, extra_pfields=None):
     dur = duration if duration is not None else DEFAULT_NOTE_DURATION
     addressed = _get_addressed_collection(obj)
 
@@ -287,31 +232,12 @@ def scale_to_events(obj, duration=None, equaves=1):
         pitches_up = list(reversed(all_pitches[:-1]))
         all_pitches = all_pitches + pitches_up
 
-    return _payload(_build_seq_events(all_pitches, 0, dur, "synth", 0.5))
+    return _payload(_build_seq_events(all_pitches, 0, "synth", amp=amp,
+                                      per_voice_dur=dur, extra_pfields=extra_pfields))
 
 
-def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u'):
-    """
-    Convert a :class:`Chord`, :class:`Voicing`, or :class:`Sonority` to events.
-
-    Parameters
-    ----------
-    obj : Chord, Voicing, or Sonority
-        The chord-like object to render.
-    duration : float, optional
-        Duration in seconds.
-    arp : bool, optional
-        Arpeggiate the chord (default ``False``).
-    strum : float, optional
-        Strum offset factor in ``[0, 1]`` (default 0).
-    direction : {'u', 'd'}, optional
-        ``'u'`` ascending, ``'d'`` descending (default ``'u'``).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u',
+                    amp=None, extra_pfields=None):
     addressed = _get_addressed_collection(obj)
     pitches = [addressed[i] for i in range(len(addressed))]
 
@@ -319,40 +245,22 @@ def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u'):
         pitches = list(reversed(pitches))
 
     if arp:
-        note_dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-        return _payload(_build_seq_events(pitches, 0, note_dur, "synth", 0.5))
+        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
+        return _payload(_build_seq_events(pitches, 0, "synth", amp=amp,
+                                          total_dur=dur, extra_pfields=extra_pfields))
     else:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-        return _payload(_build_chord_events(pitches, 0, dur, strum, "synth"))
+        return _payload(_build_chord_events(pitches, 0, dur, strum, "synth",
+                                            amp=amp, extra_pfields=extra_pfields))
 
 
-def chord_sequence_to_events(obj, duration=None, arp=False, strum=0, direction='u'):
-    """
-    Convert a :class:`ChordSequence` to sequential Tone.js events.
-
-    Parameters
-    ----------
-    obj : ChordSequence
-        Sequence of chords to render in order.
-    duration : float, optional
-        Duration per chord in seconds.
-    arp : bool, optional
-        Arpeggiate each chord (default ``False``).
-    strum : float, optional
-        Strum offset factor in ``[0, 1]`` (default 0).
-    direction : {'u', 'd'}, optional
-        ``'u'`` ascending, ``'d'`` descending (default ``'u'``).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def chord_sequence_to_events(obj, duration=None, arp=False, strum=0, direction='u',
+                             amp=None, extra_pfields=None):
     events = []
     current_time = 0.0
 
     if arp:
-        note_dur = duration if duration is not None else DEFAULT_NOTE_DURATION
+        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
 
         for chord in obj:
             addressed = _get_addressed_collection(chord)
@@ -360,8 +268,21 @@ def chord_sequence_to_events(obj, duration=None, arp=False, strum=0, direction='
             if direction.lower() == 'd':
                 pitches = list(reversed(pitches))
 
-            events.extend(_build_seq_events(pitches, current_time, note_dur, "synth", 0.5))
-            current_time += len(pitches) * note_dur
+            n = len(pitches)
+            voice_dur = dur / max(1, n)
+            for i, pitch in enumerate(pitches):
+                pf = {
+                    "freq": pitch.freq,
+                    "vel": single_voice_amplitude(pitch.freq, amp),
+                }
+                pf = _merge_pfields(pf, extra_pfields)
+                events.append({
+                    "start": current_time + i * voice_dur,
+                    "duration": voice_dur * 0.9,
+                    "instrument": "synth",
+                    "pfields": pf,
+                })
+            current_time += dur
     else:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
 
@@ -371,65 +292,34 @@ def chord_sequence_to_events(obj, duration=None, arp=False, strum=0, direction='
             if direction.lower() == 'd':
                 pitches = list(reversed(pitches))
 
-            events.extend(_build_chord_events(pitches, current_time, dur, strum, "synth", dur_factor=0.95))
+            events.extend(_build_chord_events(pitches, current_time, dur, strum, "synth",
+                                              amp=amp, dur_factor=0.95, extra_pfields=extra_pfields))
             current_time += dur
 
     return _payload(events)
 
 
-def spectrum_to_events(obj, duration=None, arp=False, strum=0, direction='u'):
-    """
-    Convert a :class:`Spectrum` to Tone.js events using sine synthesis.
-
-    Parameters
-    ----------
-    obj : Spectrum
-        Harmonic spectrum to render.
-    duration : float, optional
-        Duration in seconds.
-    arp : bool, optional
-        Arpeggiate the partials (default ``False``).
-    strum : float, optional
-        Strum offset factor in ``[0, 1]`` (default 0).
-    direction : {'u', 'd'}, optional
-        ``'u'`` ascending, ``'d'`` descending (default ``'u'``).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def spectrum_to_events(obj, duration=None, arp=False, strum=0, direction='u',
+                       amp=None, extra_pfields=None):
     pitches = [row['pitch'] for _, row in obj.data.iterrows()]
 
     if direction.lower() == 'd':
         pitches = list(reversed(pitches))
 
+    target = amp if amp is not None else 0.4
     if arp:
-        note_dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-        return _payload(_build_seq_events(pitches, 0, note_dur, "sine", 0.4))
+        dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
+        return _payload(_build_seq_events(pitches, 0, "sine", amp=target,
+                                          total_dur=dur, extra_pfields=extra_pfields))
     else:
         dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
-        return _payload(_build_chord_events(pitches, 0, dur, strum, "sine", max_amp=0.4))
+        return _payload(_build_chord_events(pitches, 0, dur, strum, "sine",
+                                            amp=target, extra_pfields=extra_pfields))
 
 
-def temporal_unit_to_events(obj, use_absolute_time=False):
-    """
-    Convert a :class:`TemporalUnit` to percussive Tone.js events.
-
-    Parameters
-    ----------
-    obj : TemporalUnit
-        The temporal unit whose chronons are rendered as drum hits.
-    use_absolute_time : bool, optional
-        If ``True``, preserve the original start offsets; otherwise
-        normalize to start at time 0 (default ``False``).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def temporal_unit_to_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
     events = []
+    target = amp if amp is not None else 0.85
 
     if use_absolute_time:
         time_offset = 0
@@ -441,63 +331,31 @@ def temporal_unit_to_events(obj, use_absolute_time=False):
             start_time = chronon.start - time_offset
             duration = abs(chronon.duration)
 
+            pf = {
+                "freq": DEFAULT_DRUM_FREQ,
+                "vel": target,
+            }
+            pf = _merge_pfields(pf, extra_pfields)
             events.append({
                 "start": start_time,
                 "duration": duration,
                 "instrument": "membrane",
-                "pfields": {
-                    "freq": DEFAULT_DRUM_FREQ,
-                    "vel": 0.85,
-                }
+                "pfields": pf,
             })
 
     return _payload(events)
 
 
-def rhythm_tree_to_events(obj, beat=None, bpm=None):
-    """
-    Convert a :class:`RhythmTree` to Tone.js events via a temporary :class:`TemporalUnit`.
-
-    Parameters
-    ----------
-    obj : RhythmTree
-        The rhythm tree to render.
-    beat : str or Fraction, optional
-        Beat duration for the conversion.
-    bpm : float, optional
-        Tempo in beats per minute.
-
-    Returns
-    -------
-    dict
-        Event payload dictionary.
-    """
+def rhythm_tree_to_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
     temporal_unit = TemporalUnit.from_rt(obj, beat=beat, bpm=bpm)
-    return temporal_unit_to_events(temporal_unit, use_absolute_time=False)
+    return temporal_unit_to_events(temporal_unit, use_absolute_time=False,
+                                  amp=amp, extra_pfields=extra_pfields)
 
 
-def temporal_unit_to_animation_events(obj, use_absolute_time=False):
-    """
-    Convert a :class:`TemporalUnit` to animation-ready events with step indices.
-
-    Each event includes a ``_stepIndex`` key for synchronizing visual
-    animations with audio playback.
-
-    Parameters
-    ----------
-    obj : TemporalUnit
-        The temporal unit to convert.
-    use_absolute_time : bool, optional
-        If ``True``, preserve the original start offsets; otherwise
-        normalize to start at time 0 (default ``False``).
-
-    Returns
-    -------
-    dict
-        Event payload dictionary with ``_stepIndex`` on each event.
-    """
+def temporal_unit_to_animation_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
     events = []
     leaf_nodes = obj._rt.leaf_nodes
+    target = amp if amp is not None else 0.85
 
     if use_absolute_time:
         time_offset = 0
@@ -520,14 +378,16 @@ def temporal_unit_to_animation_events(obj, use_absolute_time=False):
                 "_stepIndex": step_idx,
             })
         else:
+            pf = {
+                "freq": DEFAULT_DRUM_FREQ,
+                "vel": target,
+            }
+            pf = _merge_pfields(pf, extra_pfields)
             events.append({
                 "start": start_time,
                 "duration": duration,
                 "instrument": "membrane",
-                "pfields": {
-                    "freq": DEFAULT_DRUM_FREQ,
-                    "vel": 0.85,
-                },
+                "pfields": pf,
                 "_stepIndex": step_idx,
             })
 
@@ -535,48 +395,13 @@ def temporal_unit_to_animation_events(obj, use_absolute_time=False):
     return _payload(events)
 
 
-def rhythm_tree_to_animation_events(obj, beat=None, bpm=None):
-    """
-    Convert a :class:`RhythmTree` to animation-ready events.
-
-    Parameters
-    ----------
-    obj : RhythmTree
-        The rhythm tree to render.
-    beat : str or Fraction, optional
-        Beat duration for the conversion.
-    bpm : float, optional
-        Tempo in beats per minute.
-
-    Returns
-    -------
-    dict
-        Event payload dictionary with ``_stepIndex`` on each event.
-    """
+def rhythm_tree_to_animation_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
     temporal_unit = TemporalUnit.from_rt(obj, beat=beat, bpm=bpm)
-    return temporal_unit_to_animation_events(temporal_unit, use_absolute_time=False)
+    return temporal_unit_to_animation_events(temporal_unit, use_absolute_time=False,
+                                            amp=amp, extra_pfields=extra_pfields)
 
 
-def compositional_unit_to_animation_events(obj):
-    """
-    Convert a :class:`CompositionalUnit` to animation-ready events with step indices.
-
-    Parameters
-    ----------
-    obj : CompositionalUnit
-        The compositional unit to convert.
-
-    Returns
-    -------
-    dict
-        Payload with ``"events"`` (including ``_stepIndex``) and
-        ``"instruments"`` keys.
-
-    Raises
-    ------
-    ValueError
-        If two different instruments share the same name.
-    """
+def compositional_unit_to_animation_events(obj, extra_pfields=None):
     events = []
     instruments = {}
     inst_id_map = {}
@@ -633,6 +458,7 @@ def compositional_unit_to_animation_events(obj):
         pfields = _normalize_event_pfields(pfields)
         default_pfields = instruments[routing_key].get('preset', {})
         effective_pfields = _deep_merge(default_pfields, pfields)
+        effective_pfields = _merge_pfields(effective_pfields, extra_pfields)
         events.append({
             "start": start_time,
             "duration": abs(event.duration),
@@ -661,110 +487,45 @@ def _merge_sub_payload(target_events, target_instruments, sub_payload, time_offs
             target_instruments[key] = val
 
 
-def temporal_sequence_to_events(obj):
-    """
-    Convert a :class:`TemporalUnitSequence` to Tone.js events.
-
-    Recursively converts each unit in the sequence, merging their
-    events and instrument definitions into a single payload.
-
-    Parameters
-    ----------
-    obj : TemporalUnitSequence
-        The sequence of temporal units.
-
-    Returns
-    -------
-    dict
-        Merged event payload dictionary.
-    """
+def temporal_sequence_to_events(obj, extra_pfields=None):
     events = []
     instruments = {}
     seq_offset = obj.offset
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
-            _merge_sub_payload(events, instruments, compositional_unit_to_events(unit), seq_offset)
+            _merge_sub_payload(events, instruments, compositional_unit_to_events(unit, extra_pfields=extra_pfields), seq_offset)
         elif isinstance(unit, TemporalUnit):
-            _merge_sub_payload(events, instruments, temporal_unit_to_events(unit, use_absolute_time=True), seq_offset)
+            _merge_sub_payload(events, instruments, temporal_unit_to_events(unit, use_absolute_time=True, extra_pfields=extra_pfields), seq_offset)
         elif isinstance(unit, TemporalUnitSequence):
-            _merge_sub_payload(events, instruments, temporal_sequence_to_events(unit), seq_offset)
+            _merge_sub_payload(events, instruments, temporal_sequence_to_events(unit, extra_pfields=extra_pfields), seq_offset)
         elif isinstance(unit, TemporalBlock):
-            _merge_sub_payload(events, instruments, temporal_block_to_events(unit), seq_offset)
+            _merge_sub_payload(events, instruments, temporal_block_to_events(unit, extra_pfields=extra_pfields), seq_offset)
 
     events.sort(key=lambda ev: ev["start"])
     return _payload(events, instruments)
 
 
-def temporal_block_to_events(obj):
-    """
-    Convert a :class:`TemporalBlock` to Tone.js events.
-
-    Recursively converts each row in the block, merging their
-    events and instrument definitions into a single payload.
-
-    Parameters
-    ----------
-    obj : TemporalBlock
-        The block of temporal units.
-
-    Returns
-    -------
-    dict
-        Merged event payload dictionary.
-    """
+def temporal_block_to_events(obj, extra_pfields=None):
     events = []
     instruments = {}
     block_offset = obj.offset
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
-            _merge_sub_payload(events, instruments, compositional_unit_to_events(row), block_offset)
+            _merge_sub_payload(events, instruments, compositional_unit_to_events(row, extra_pfields=extra_pfields), block_offset)
         elif isinstance(row, TemporalUnit):
-            _merge_sub_payload(events, instruments, temporal_unit_to_events(row, use_absolute_time=True), block_offset)
+            _merge_sub_payload(events, instruments, temporal_unit_to_events(row, use_absolute_time=True, extra_pfields=extra_pfields), block_offset)
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_payload(events, instruments, temporal_sequence_to_events(row), block_offset + row.offset)
+            _merge_sub_payload(events, instruments, temporal_sequence_to_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
         elif isinstance(row, TemporalBlock):
-            _merge_sub_payload(events, instruments, temporal_block_to_events(row), block_offset + row.offset)
+            _merge_sub_payload(events, instruments, temporal_block_to_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
 
     events.sort(key=lambda ev: ev["start"])
     return _payload(events, instruments)
 
 
 def convert_to_events(obj, **kwargs):
-    """
-    Dispatch a Klotho musical object to the appropriate event converter.
-
-    Parameters
-    ----------
-    obj : object
-        Any supported Klotho musical object (``Pitch``, ``Chord``,
-        ``Scale``, ``Spectrum``, ``HarmonicTree``, ``RhythmTree``,
-        ``TemporalUnit``, ``TemporalUnitSequence``, ``TemporalBlock``,
-        ``CompositionalUnit``, ``ChordSequence``, or
-        ``PitchCollectionBase``).
-    **kwargs
-        Keyword options forwarded to the specific converter:
-
-        - **dur** / **duration** (*float*) -- note or chord duration.
-        - **arp** (*bool*) -- arpeggiate chords.
-        - **mode** (*str*) -- ``'chord'`` or ``'sequential'``.
-        - **strum** (*float*) -- strum offset factor.
-        - **dir** (*str*) -- ``'u'`` or ``'d'``.
-        - **equaves** (*int*) -- equaves for scale traversal.
-        - **beat** (*str or Fraction*) -- beat duration.
-        - **bpm** (*float*) -- tempo in BPM.
-
-    Returns
-    -------
-    dict
-        Event payload with ``"events"`` and ``"instruments"`` keys.
-
-    Raises
-    ------
-    TypeError
-        If *obj* is not a supported type.
-    """
     duration = kwargs.get('dur', kwargs.get('duration', None))
     arp = kwargs.get('arp', False)
     mode = kwargs.get('mode', None)
@@ -773,45 +534,56 @@ def convert_to_events(obj, **kwargs):
     equaves = kwargs.get('equaves', 1)
     beat = kwargs.get('beat', None)
     bpm = kwargs.get('bpm', None)
+    amp = kwargs.get('amp', None)
+
+    extra_pfields = {k: v for k, v in kwargs.items() if k not in KNOWN_KWARGS}
+    if not extra_pfields:
+        extra_pfields = None
 
     if isinstance(obj, Pitch):
-        return pitch_to_events(obj, duration=duration)
+        return pitch_to_events(obj, duration=duration, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, Spectrum):
-        return spectrum_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction)
+        return spectrum_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
+                                  amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, HarmonicTree):
         spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
-        return spectrum_to_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction)
+        return spectrum_to_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction,
+                                  amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, RhythmTree):
-        return rhythm_tree_to_events(obj, beat=beat, bpm=bpm)
+        return rhythm_tree_to_events(obj, beat=beat, bpm=bpm, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, TemporalUnitSequence):
-        return temporal_sequence_to_events(obj)
+        return temporal_sequence_to_events(obj, extra_pfields=extra_pfields)
 
     if isinstance(obj, TemporalBlock):
-        return temporal_block_to_events(obj)
+        return temporal_block_to_events(obj, extra_pfields=extra_pfields)
 
     if isinstance(obj, CompositionalUnit):
-        return compositional_unit_to_events(obj)
+        return compositional_unit_to_events(obj, extra_pfields=extra_pfields)
 
     if isinstance(obj, TemporalUnit):
-        return temporal_unit_to_events(obj)
+        return temporal_unit_to_events(obj, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, ChordSequence):
-        return chord_sequence_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction)
+        return chord_sequence_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
+                                        amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, Scale):
-        return scale_to_events(obj, duration=duration, equaves=equaves)
+        return scale_to_events(obj, duration=duration, equaves=equaves, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, (Chord, Voicing, Sonority)):
-        return chord_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction)
+        return chord_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
+                               amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, PitchCollectionBase):
         effective_mode = mode if mode else "sequential"
         if effective_mode == "chord":
-            return pitch_collection_to_events(obj, duration=duration, mode="chord", arp=arp, strum=strum, direction=direction)
-        return pitch_collection_to_events(obj, duration=duration, mode="sequential")
+            return pitch_collection_to_events(obj, duration=duration, mode="chord", arp=arp, strum=strum,
+                                              direction=direction, amp=amp, extra_pfields=extra_pfields)
+        return pitch_collection_to_events(obj, duration=duration, mode="sequential",
+                                          amp=amp, extra_pfields=extra_pfields)
 
     raise TypeError(f"Unsupported object type: {type(obj)}")

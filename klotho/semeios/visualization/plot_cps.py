@@ -253,7 +253,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              mute_background: bool = False,
              animate: bool = False, dur: float = 0.5,
              shape: list = None,
-             arp: bool = False, strum: float = 0, direction: str = 'u'):
+             arp: bool = False, strum: float = 0, direction: str = 'u',
+             amp: float = None, **kwargs):
     """
     Render a Combination Product Set as an interactive network diagram.
 
@@ -332,27 +333,20 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     if animate and path:
         from .svg_cps import _svg_cps
         from .animated import AnimatedCPSSvgFigure
-        from klotho.utils.playback.tonejs.converters import freq_to_velocity
+        from ._audio_events import build_path_audio_events
         svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                             mute_background=mute_background, figsize=figsize,
                             node_size=node_size, text_size=text_size,
                             show_labels=show_labels, title=title)
         ref_freq = 261.63
-        audio_events = []
-        for i, node_id in enumerate(path):
+        freqs = []
+        for node_id in path:
             try:
                 ratio = float(G.nodes[node_id]['ratio'])
-                freq = ref_freq * ratio
+                freqs.append(ref_freq * ratio)
             except Exception:
-                freq = ref_freq
-            audio_events.append({
-                "start": round(i * dur, 6),
-                "duration": round(dur * 0.9, 6),
-                "instrument": "synth",
-                "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
-                "_stepIndex": i,
-            })
-        audio_payload = {"events": audio_events, "instruments": {}}
+                freqs.append(ref_freq)
+        audio_payload = build_path_audio_events(freqs, dur, amp=amp)
         return AnimatedCPSSvgFigure(svg_data, audio_payload=audio_payload, dur=dur)
 
     if shape is not None and len(shape) > 0:
@@ -364,54 +358,25 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         if animate:
             from .svg_cps import _svg_cps
             from .animated import AnimatedCPSShapeFigure
-            from klotho.utils.playback.tonejs.converters import freq_to_velocity
+            from ._audio_events import build_shape_audio_events
             svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                                 mute_background=mute_background, figsize=figsize,
                                 node_size=node_size, text_size=text_size,
                                 show_labels=show_labels, title=title,
                                 shape=shape)
             ref_freq = 261.63
-            audio_events = []
-            current_time = 0.0
-
-            for gi, group in enumerate(shape_groups):
-                freqs = []
+            freq_groups = []
+            for group in shape_groups:
+                group_freqs = []
                 for node_id in group:
                     try:
                         ratio = float(G.nodes[node_id]['ratio'])
-                        freqs.append(ref_freq * ratio)
+                        group_freqs.append(ref_freq * ratio)
                     except Exception:
-                        freqs.append(ref_freq)
-                if direction.lower() == 'd':
-                    freqs = list(reversed(freqs))
+                        group_freqs.append(ref_freq)
+                freq_groups.append(group_freqs)
 
-                if arp:
-                    note_dur = dur
-                    for i, freq in enumerate(freqs):
-                        audio_events.append({
-                            "start": round(current_time + i * note_dur, 6),
-                            "duration": round(note_dur * 0.9, 6),
-                            "instrument": "synth",
-                            "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
-                            "_stepIndex": gi,
-                        })
-                    current_time += len(freqs) * note_dur
-                else:
-                    chord_dur = dur
-                    num_notes = len(freqs)
-                    strum_val = max(0, min(1, strum))
-                    for i, freq in enumerate(freqs):
-                        start_offset = (strum_val * chord_dur * i) / num_notes if num_notes > 1 else 0
-                        audio_events.append({
-                            "start": round(current_time + start_offset, 6),
-                            "duration": round((chord_dur * 0.95) - start_offset, 6),
-                            "instrument": "synth",
-                            "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
-                            "_stepIndex": gi,
-                        })
-                    current_time += chord_dur
-
-            audio_payload = {"events": audio_events, "instruments": {}}
+            audio_payload = build_shape_audio_events(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp)
             return AnimatedCPSShapeFigure(svg_data, audio_payload=audio_payload, dur=dur)
 
     from .svg_cps import _svg_cps

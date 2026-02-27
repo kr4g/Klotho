@@ -5,9 +5,9 @@ from klotho.tonos.scales.scale import Scale
 from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
-from klotho.dynatos.dynamics import freq_amp_scale, ampdb
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.instrument import SynthDefInstrument
+from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
 from uuid import uuid4
 
 DEFAULT_NOTE_DURATION = 0.5
@@ -22,6 +22,11 @@ DEFAULT_PERC_SYNTH = "sonic-pi-beep"
 PERC_ATTACK = 0.005
 PERC_BODY_RATIO = 1 / 3
 
+KNOWN_KWARGS = frozenset({
+    'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
+    'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time',
+})
+
 def _freq_to_note(freq):
     import math
     if not isinstance(freq, (int, float)) or freq <= 0:
@@ -31,11 +36,6 @@ def _freq_to_note(freq):
 
 def _uid():
     return uuid4().hex
-
-
-def freq_to_amp(freq, base_amp=0.5):
-    scaled = freq_amp_scale(freq, ampdb(0.2))
-    return min(1.0, max(0.1, base_amp * (scaled / 0.2)))
 
 
 def _get_addressed_collection(obj):
@@ -48,14 +48,23 @@ def _get_addressed_collection(obj):
     return obj.root("C4")
 
 
-def _gated_note(uid, synth, start, dur, pfields, step_index=None):
+def _merge_pfields(base, extra):
+    if not extra:
+        return base
+    merged = dict(extra)
+    merged.update(base)
+    return merged
+
+
+def _gated_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=None):
+    pf = _merge_pfields(pfields, extra_pfields)
     events = []
     new_ev = {
         "type": "new",
         "id": uid,
         "synthName": synth,
         "start": start,
-        "pfields": pfields,
+        "pfields": pf,
     }
     if step_index is not None:
         new_ev["_stepIndex"] = step_index
@@ -72,8 +81,8 @@ def _gated_note(uid, synth, start, dur, pfields, step_index=None):
     return events
 
 
-def _perc_note(uid, synth, start, dur, pfields, step_index=None):
-    pf = dict(pfields)
+def _perc_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=None):
+    pf = _merge_pfields(pfields, extra_pfields)
     pf["dur"] = dur
     new_ev = {
         "type": "new",
@@ -105,16 +114,17 @@ def _perc_env_pfields(dur):
     }
 
 
-def pitch_to_sc_events(pitch, duration=None):
+def pitch_to_sc_events(pitch, duration=None, amp=None, extra_pfields=None):
     dur = duration if duration is not None else 1.0
     uid = _uid()
     return _gated_note(uid, DEFAULT_SYNTH, 0.0, dur, {
         "note": pitch.midi,
-        "amp": freq_to_amp(pitch.freq),
-    }, step_index=0)
+        "amp": single_voice_amplitude(pitch.freq, amp),
+    }, step_index=0, extra_pfields=extra_pfields)
 
 
-def pitch_collection_to_sc_events(obj, duration=None, mode="seq", arp=False, strum=0, direction='u'):
+def pitch_collection_to_sc_events(obj, duration=None, mode="seq", arp=False, strum=0, direction='u',
+                                  amp=None, extra_pfields=None):
     addressed = _get_addressed_collection(obj)
     pitches = [addressed[i] for i in range(len(addressed))]
 
@@ -123,17 +133,20 @@ def pitch_collection_to_sc_events(obj, duration=None, mode="seq", arp=False, str
         if direction.lower() == 'd':
             pitches = list(reversed(pitches))
         if arp:
-            dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-            return _build_seq_sc_events(pitches, 0, dur, DEFAULT_SYNTH, 0.5)
+            dur = duration if duration is not None else DEFAULT_CHORD_DURATION
+            return _build_seq_sc_events(pitches, 0, synth=DEFAULT_SYNTH, amp=amp,
+                                        total_dur=dur, extra_pfields=extra_pfields)
         else:
             dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-            return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SYNTH)
+            return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SYNTH,
+                                          amp=amp, extra_pfields=extra_pfields)
     else:
         dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-        return _build_seq_sc_events(pitches, 0, dur, DEFAULT_SYNTH, 0.5)
+        return _build_seq_sc_events(pitches, 0, synth=DEFAULT_SYNTH, amp=amp,
+                                    per_voice_dur=dur, extra_pfields=extra_pfields)
 
 
-def scale_to_sc_events(obj, duration=None, equaves=1):
+def scale_to_sc_events(obj, duration=None, equaves=1, amp=None, extra_pfields=None):
     dur = duration if duration is not None else DEFAULT_NOTE_DURATION
     addressed = _get_addressed_collection(obj)
 
@@ -156,10 +169,12 @@ def scale_to_sc_events(obj, duration=None, equaves=1):
         pitches_up = list(reversed(all_pitches[:-1]))
         all_pitches = all_pitches + pitches_up
 
-    return _build_seq_sc_events(all_pitches, 0, dur, DEFAULT_SYNTH, 0.5)
+    return _build_seq_sc_events(all_pitches, 0, synth=DEFAULT_SYNTH, amp=amp,
+                                per_voice_dur=dur, extra_pfields=extra_pfields)
 
 
-def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u'):
+def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
+                       amp=None, extra_pfields=None):
     addressed = _get_addressed_collection(obj)
     pitches = [addressed[i] for i in range(len(addressed))]
 
@@ -167,33 +182,39 @@ def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u'):
         pitches = list(reversed(pitches))
 
     if arp:
-        dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-        return _build_seq_sc_events(pitches, 0, dur, DEFAULT_SYNTH, 0.5)
+        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
+        return _build_seq_sc_events(pitches, 0, synth=DEFAULT_SYNTH, amp=amp,
+                                    total_dur=dur, extra_pfields=extra_pfields)
     else:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-        return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SYNTH)
+        return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SYNTH,
+                                      amp=amp, extra_pfields=extra_pfields)
 
 
-def chord_sequence_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u'):
+def chord_sequence_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
+                                amp=None, extra_pfields=None):
     events = []
     current_time = 0.0
     step = 0
 
     if arp:
-        dur = duration if duration is not None else DEFAULT_NOTE_DURATION
+        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
         for chord in obj:
             addressed = _get_addressed_collection(chord)
             pitches = [addressed[i] for i in range(len(addressed))]
             if direction.lower() == 'd':
                 pitches = list(reversed(pitches))
-            for p in pitches:
+            n = len(pitches)
+            voice_dur = dur / max(1, n)
+            for i, p in enumerate(pitches):
                 uid = _uid()
-                events.extend(_gated_note(uid, DEFAULT_SYNTH, current_time, dur * 0.9, {
-                    "note": p.midi,
-                    "amp": freq_to_amp(p.freq, 0.5),
-                }, step_index=step))
-                current_time += dur
-                step += 1
+                events.extend(_gated_note(uid, DEFAULT_SYNTH, current_time + i * voice_dur,
+                    voice_dur * 0.9, {
+                        "note": p.midi,
+                        "amp": single_voice_amplitude(p.freq, amp),
+                    }, step_index=step, extra_pfields=extra_pfields))
+            current_time += dur
+            step += 1
     else:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
         for chord in obj:
@@ -201,38 +222,44 @@ def chord_sequence_to_sc_events(obj, duration=None, arp=False, strum=0, directio
             pitches = [addressed[i] for i in range(len(addressed))]
             if direction.lower() == 'd':
                 pitches = list(reversed(pitches))
+            freqs = [p.freq for p in pitches]
+            voice_amps = compute_voice_amplitudes(freqs, amp)
+            strum_val = max(0, min(1, strum))
             num = len(pitches)
-            base_amp = 0.5 / (num * 0.7) if num > 0 else 0.5
             for i, p in enumerate(pitches):
                 uid = _uid()
-                taper = 1.0 - (i / num) * 0.6 if num > 0 else 1.0
-                start_offset = (strum * dur * i) / num if num > 1 else 0
+                start_offset = (strum_val * dur * i) / num if num > 1 else 0
                 events.extend(_gated_note(uid, DEFAULT_SYNTH, current_time + start_offset,
                     (dur * 0.95) - start_offset, {
                         "note": p.midi,
-                        "amp": min(1.0, max(0.1, base_amp * taper)),
-                    }, step_index=step))
+                        "amp": voice_amps[i],
+                    }, step_index=step, extra_pfields=extra_pfields))
             current_time += dur
             step += 1
 
     return events
 
 
-def spectrum_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u'):
+def spectrum_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
+                          amp=None, extra_pfields=None):
     pitches = [row['pitch'] for _, row in obj.data.iterrows()]
     if direction.lower() == 'd':
         pitches = list(reversed(pitches))
 
+    target = amp if amp is not None else 0.4
     if arp:
-        dur = duration if duration is not None else DEFAULT_NOTE_DURATION
-        return _build_seq_sc_events(pitches, 0, dur, DEFAULT_SINE_SYNTH, 0.4)
+        dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
+        return _build_seq_sc_events(pitches, 0, synth=DEFAULT_SINE_SYNTH, amp=target,
+                                    total_dur=dur, extra_pfields=extra_pfields)
     else:
         dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
-        return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SINE_SYNTH, max_amp=0.4)
+        return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SINE_SYNTH,
+                                      amp=target, extra_pfields=extra_pfields)
 
 
-def temporal_unit_to_sc_events(obj, use_absolute_time=False):
+def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
     events = []
+    target = amp if amp is not None else 0.85
 
     if use_absolute_time:
         time_offset = 0
@@ -246,22 +273,25 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False):
             dur = abs(chronon.duration)
             pf = {
                 "note": _freq_to_note(DEFAULT_DRUM_FREQ),
-                "amp": 0.85,
+                "amp": target,
                 **_perc_env_pfields(dur),
             }
-            events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, pf))
+            events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, pf,
+                                     extra_pfields=extra_pfields))
 
     return events
 
 
-def rhythm_tree_to_sc_events(obj, beat=None, bpm=None):
+def rhythm_tree_to_sc_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
     tu = TemporalUnit.from_rt(obj, beat=beat, bpm=bpm)
-    return temporal_unit_to_sc_events(tu, use_absolute_time=False)
+    return temporal_unit_to_sc_events(tu, use_absolute_time=False, amp=amp,
+                                     extra_pfields=extra_pfields)
 
 
-def temporal_unit_to_sc_animation_events(obj, use_absolute_time=False):
+def temporal_unit_to_sc_animation_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
     events = []
     leaf_nodes = obj._rt.leaf_nodes
+    target = amp if amp is not None else 0.85
 
     if use_absolute_time:
         time_offset = 0
@@ -288,22 +318,23 @@ def temporal_unit_to_sc_animation_events(obj, use_absolute_time=False):
             uid = _uid()
             pf = {
                 "note": _freq_to_note(DEFAULT_DRUM_FREQ),
-                "amp": 0.85,
+                "amp": target,
                 **_perc_env_pfields(dur),
             }
             events.extend(_perc_note(uid, DEFAULT_PERC_SYNTH, start, dur, pf,
-                                     step_index=step_idx))
+                                     step_index=step_idx, extra_pfields=extra_pfields))
 
     events.sort(key=lambda ev: ev["start"])
     return events
 
 
-def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None):
+def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
     tu = TemporalUnit.from_rt(obj, beat=beat, bpm=bpm)
-    return temporal_unit_to_sc_animation_events(tu, use_absolute_time=False)
+    return temporal_unit_to_sc_animation_events(tu, use_absolute_time=False, amp=amp,
+                                                extra_pfields=extra_pfields)
 
 
-def compositional_unit_to_sc_events(obj):
+def compositional_unit_to_sc_events(obj, extra_pfields=None):
     events = []
 
     for event in obj:
@@ -329,7 +360,7 @@ def compositional_unit_to_sc_events(obj):
         if 'amp' not in pfields:
             freq = pfields.get('freq', 440.0)
             if isinstance(freq, (int, float)):
-                pfields['amp'] = freq_to_amp(freq)
+                pfields['amp'] = single_voice_amplitude(freq)
             else:
                 pfields['amp'] = 0.5
 
@@ -337,15 +368,17 @@ def compositional_unit_to_sc_events(obj):
         is_gated = env_type.lower() in ('sustained', 'sus', 'asr', 'adsr', '')
 
         if is_gated:
-            events.extend(_gated_note(uid, synth_name, event.start, abs(event.duration), pfields))
+            events.extend(_gated_note(uid, synth_name, event.start, abs(event.duration), pfields,
+                                      extra_pfields=extra_pfields))
         else:
-            events.extend(_perc_note(uid, synth_name, event.start, abs(event.duration), pfields))
+            events.extend(_perc_note(uid, synth_name, event.start, abs(event.duration), pfields,
+                                     extra_pfields=extra_pfields))
 
     events.sort(key=lambda ev: ev["start"])
     return events
 
 
-def compositional_unit_to_sc_animation_events(obj):
+def compositional_unit_to_sc_animation_events(obj, extra_pfields=None):
     events = []
     leaf_nodes = obj._rt.leaf_nodes
     node_to_step = {nid: idx for idx, nid in enumerate(leaf_nodes)}
@@ -386,7 +419,7 @@ def compositional_unit_to_sc_animation_events(obj):
         if 'amp' not in pfields:
             freq = pfields.get('freq', 440.0)
             if isinstance(freq, (int, float)):
-                pfields['amp'] = freq_to_amp(freq)
+                pfields['amp'] = single_voice_amplitude(freq)
             else:
                 pfields['amp'] = 0.5
 
@@ -395,42 +428,59 @@ def compositional_unit_to_sc_animation_events(obj):
         dur = abs(event.duration)
 
         if is_gated:
-            evts = _gated_note(uid, synth_name, start, dur, pfields, step_index=step_idx)
+            evts = _gated_note(uid, synth_name, start, dur, pfields,
+                               step_index=step_idx, extra_pfields=extra_pfields)
         else:
-            evts = _perc_note(uid, synth_name, start, dur, pfields, step_index=step_idx)
+            evts = _perc_note(uid, synth_name, start, dur, pfields,
+                              step_index=step_idx, extra_pfields=extra_pfields)
         events.extend(evts)
 
     events.sort(key=lambda ev: ev["start"])
     return events
 
 
-def _build_seq_sc_events(pitches, start, dur, synth, base_amp):
+def _build_seq_sc_events(pitches, start, synth, amp=None, per_voice_dur=None,
+                         total_dur=None, extra_pfields=None):
     events = []
+    n = len(pitches)
+    if n == 0:
+        return events
+
+    if total_dur is not None:
+        voice_dur = total_dur / n
+    elif per_voice_dur is not None:
+        voice_dur = per_voice_dur
+    else:
+        voice_dur = DEFAULT_NOTE_DURATION
+
     for i, pitch in enumerate(pitches):
         uid = _uid()
-        events.extend(_gated_note(uid, synth, start + i * dur, dur * 0.9, {
+        events.extend(_gated_note(uid, synth, start + i * voice_dur, voice_dur * 0.9, {
             "note": pitch.midi,
-            "amp": freq_to_amp(pitch.freq, base_amp),
-        }, step_index=i))
+            "amp": single_voice_amplitude(pitch.freq, amp),
+        }, step_index=i, extra_pfields=extra_pfields))
     return events
 
 
-def _build_chord_sc_events(pitches, start, dur, strum, synth, max_amp=0.5, dur_factor=1.0):
+def _build_chord_sc_events(pitches, start, dur, strum, synth, amp=None,
+                           dur_factor=1.0, extra_pfields=None):
     events = []
     num = len(pitches)
-    base_amp = max_amp / (num * 0.7) if num > 0 else max_amp
+    if num == 0:
+        return events
+
+    freqs = [p.freq for p in pitches]
+    voice_amps = compute_voice_amplitudes(freqs, amp)
     strum = max(0, min(1, strum))
 
     for i, pitch in enumerate(pitches):
         uid = _uid()
-        taper = 1.0 - (i / num) * 0.6 if num > 0 else 1.0
-        amp = min(1.0, max(0.1, base_amp * taper))
         start_offset = (strum * dur * i) / num if num > 1 else 0
         events.extend(_gated_note(uid, synth, start + start_offset,
             (dur * dur_factor) - start_offset, {
                 "note": pitch.midi,
-                "amp": amp,
-            }, step_index=i))
+                "amp": voice_amps[i],
+            }, step_index=i, extra_pfields=extra_pfields))
     return events
 
 
@@ -440,37 +490,37 @@ def _merge_sub_sc(target_events, sub_events, time_offset):
     target_events.extend(sub_events)
 
 
-def temporal_sequence_to_sc_events(obj):
+def temporal_sequence_to_sc_events(obj, extra_pfields=None):
     events = []
     seq_offset = obj.offset
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
-            _merge_sub_sc(events, compositional_unit_to_sc_events(unit), seq_offset)
+            _merge_sub_sc(events, compositional_unit_to_sc_events(unit, extra_pfields=extra_pfields), seq_offset)
         elif isinstance(unit, TemporalUnit):
-            _merge_sub_sc(events, temporal_unit_to_sc_events(unit, use_absolute_time=True), seq_offset)
+            _merge_sub_sc(events, temporal_unit_to_sc_events(unit, use_absolute_time=True, extra_pfields=extra_pfields), seq_offset)
         elif isinstance(unit, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(unit), seq_offset)
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(unit, extra_pfields=extra_pfields), seq_offset)
         elif isinstance(unit, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(unit), seq_offset)
+            _merge_sub_sc(events, temporal_block_to_sc_events(unit, extra_pfields=extra_pfields), seq_offset)
 
     events.sort(key=lambda ev: ev["start"])
     return events
 
 
-def temporal_block_to_sc_events(obj):
+def temporal_block_to_sc_events(obj, extra_pfields=None):
     events = []
     block_offset = obj.offset
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
-            _merge_sub_sc(events, compositional_unit_to_sc_events(row), block_offset)
+            _merge_sub_sc(events, compositional_unit_to_sc_events(row, extra_pfields=extra_pfields), block_offset)
         elif isinstance(row, TemporalUnit):
-            _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True), block_offset)
+            _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True, extra_pfields=extra_pfields), block_offset)
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(row), block_offset + row.offset)
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
         elif isinstance(row, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(row), block_offset + row.offset)
+            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
 
     events.sort(key=lambda ev: ev["start"])
     return events
@@ -485,46 +535,57 @@ def convert_to_sc_events(obj, **kwargs):
     equaves = kwargs.get('equaves', 1)
     beat = kwargs.get('beat', None)
     bpm = kwargs.get('bpm', None)
+    amp = kwargs.get('amp', None)
+
+    extra_pfields = {k: v for k, v in kwargs.items() if k not in KNOWN_KWARGS}
+    if not extra_pfields:
+        extra_pfields = None
 
     if isinstance(obj, Pitch):
-        return pitch_to_sc_events(obj, duration=duration)
+        return pitch_to_sc_events(obj, duration=duration, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, Spectrum):
-        return spectrum_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction)
+        return spectrum_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
+                                    amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, HarmonicTree):
         spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
-        return spectrum_to_sc_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction)
+        return spectrum_to_sc_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction,
+                                    amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, RhythmTree):
-        return rhythm_tree_to_sc_events(obj, beat=beat, bpm=bpm)
+        return rhythm_tree_to_sc_events(obj, beat=beat, bpm=bpm, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, TemporalUnitSequence):
-        return temporal_sequence_to_sc_events(obj)
+        return temporal_sequence_to_sc_events(obj, extra_pfields=extra_pfields)
 
     if isinstance(obj, TemporalBlock):
-        return temporal_block_to_sc_events(obj)
+        return temporal_block_to_sc_events(obj, extra_pfields=extra_pfields)
 
     if isinstance(obj, CompositionalUnit):
-        return compositional_unit_to_sc_events(obj)
+        return compositional_unit_to_sc_events(obj, extra_pfields=extra_pfields)
 
     if isinstance(obj, TemporalUnit):
-        return temporal_unit_to_sc_events(obj)
+        return temporal_unit_to_sc_events(obj, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, ChordSequence):
-        return chord_sequence_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction)
+        return chord_sequence_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
+                                           amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, Scale):
-        return scale_to_sc_events(obj, duration=duration, equaves=equaves)
+        return scale_to_sc_events(obj, duration=duration, equaves=equaves, amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, (Chord, Voicing, Sonority)):
-        return chord_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction)
+        return chord_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
+                                  amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, PitchCollectionBase):
         effective_mode = mode if mode else "sequential"
         if effective_mode == "chord":
-            return pitch_collection_to_sc_events(obj, duration=duration, mode="chord", arp=arp, strum=strum, direction=direction)
-        return pitch_collection_to_sc_events(obj, duration=duration, mode="sequential")
+            return pitch_collection_to_sc_events(obj, duration=duration, mode="chord", arp=arp, strum=strum,
+                                                 direction=direction, amp=amp, extra_pfields=extra_pfields)
+        return pitch_collection_to_sc_events(obj, duration=duration, mode="sequential",
+                                             amp=amp, extra_pfields=extra_pfields)
 
     raise TypeError(f"Unsupported object type: {type(obj)}")
 
@@ -553,13 +614,13 @@ def tonejs_events_to_sc(tone_events):
             continue
 
         freq = pf.get("freq", 440.0)
-        amp = pf.get("vel", pf.get("amp", 0.5))
+        amp_val = pf.get("vel", pf.get("amp", 0.5))
         note = _freq_to_note(freq)
 
         synth = DEFAULT_PERC_SYNTH if instrument == "membrane" else DEFAULT_SYNTH
 
         if instrument == "membrane":
-            pfields = {"note": note, "amp": amp, "dur": dur, **_perc_env_pfields(dur)}
+            pfields = {"note": note, "amp": amp_val, "dur": dur, **_perc_env_pfields(dur)}
             new_ev = {
                 "type": "new",
                 "id": uid,
@@ -584,7 +645,7 @@ def tonejs_events_to_sc(tone_events):
                 "id": uid,
                 "synthName": synth,
                 "start": start,
-                "pfields": {"note": note, "amp": amp},
+                "pfields": {"note": note, "amp": amp_val},
             }
             if step is not None:
                 new_ev["_stepIndex"] = step

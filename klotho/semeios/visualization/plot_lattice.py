@@ -22,7 +22,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  path_cmap: str = 'viridis',
                  animate: bool = False, dur: float = 0.5,
                  shape: list = None,
-                 arp: bool = False, strum: float = 0, direction: str = 'u'):
+                 arp: bool = False, strum: float = 0, direction: str = 'u',
+                 amp: float = None, **kwargs):
     """
     Render a Lattice as a 2D SVG or 3D Three.js grid visualization.
 
@@ -425,24 +426,17 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             return _threejs_lattice_3d(**svg_threejs_kwargs)
 
     if path and len(path) > 1:
-        from klotho.utils.playback.tonejs.converters import freq_to_velocity
+        from ._audio_events import build_path_audio_events
 
         ref_freq = 261.63
-        audio_events = []
-        for i, coord in enumerate(path):
+        freqs = []
+        for coord in path:
             try:
                 ratio = lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
-                freq = ref_freq * float(ratio) if ratio is not None else ref_freq
+                freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
             except Exception:
-                freq = ref_freq
-            audio_events.append({
-                "start": round(i * dur, 6),
-                "duration": round(dur * 0.9, 6),
-                "instrument": "synth",
-                "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
-                "_stepIndex": i,
-            })
-        audio_payload = {"events": audio_events, "instruments": {}}
+                freqs.append(ref_freq)
+        audio_payload = build_path_audio_events(freqs, dur, amp=amp)
 
         if effective_dimensionality <= 2:
             from .animated import AnimatedLatticeSvgFigure
@@ -458,51 +452,21 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             )
 
     if has_shape:
-        from klotho.utils.playback.tonejs.converters import freq_to_velocity
+        from ._audio_events import build_shape_audio_events
 
         ref_freq = 261.63
-        audio_events = []
-        current_time = 0.0
-
-        for gi, group in enumerate(lattice_shape_groups):
-            freqs = []
+        freq_groups = []
+        for group in lattice_shape_groups:
+            group_freqs = []
             for coord in group:
                 try:
                     ratio = lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
-                    freq = ref_freq * float(ratio) if ratio is not None else ref_freq
+                    group_freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
                 except Exception:
-                    freq = ref_freq
-                freqs.append(freq)
-            if direction.lower() == 'd':
-                freqs = list(reversed(freqs))
+                    group_freqs.append(ref_freq)
+            freq_groups.append(group_freqs)
 
-            if arp:
-                note_dur = dur
-                for i, freq in enumerate(freqs):
-                    audio_events.append({
-                        "start": round(current_time + i * note_dur, 6),
-                        "duration": round(note_dur * 0.9, 6),
-                        "instrument": "synth",
-                        "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
-                        "_stepIndex": gi,
-                    })
-                current_time += len(freqs) * note_dur
-            else:
-                chord_dur = dur
-                num_notes = len(freqs)
-                strum_val = max(0, min(1, strum))
-                for i, freq in enumerate(freqs):
-                    start_offset = (strum_val * chord_dur * i) / num_notes if num_notes > 1 else 0
-                    audio_events.append({
-                        "start": round(current_time + start_offset, 6),
-                        "duration": round((chord_dur * 0.95) - start_offset, 6),
-                        "instrument": "synth",
-                        "pfields": {"freq": round(freq, 4), "vel": round(freq_to_velocity(freq, 0.5), 4)},
-                        "_stepIndex": gi,
-                    })
-                current_time += chord_dur
-
-        audio_payload = {"events": audio_events, "instruments": {}}
+        audio_payload = build_shape_audio_events(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp)
 
         if effective_dimensionality <= 2:
             from .animated import AnimatedLatticeShapeFigure
