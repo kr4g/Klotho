@@ -22,6 +22,7 @@ from ..utils.beat import calc_onsets
 
 
 class RhythmTree(Tree):
+    _node_value_attr = 'proportion'
     '''
     A rhythm tree is a list representing a rhythmic structure. This list is organized 
     hierarchically in sub lists, just as time is organized in measures, time signatures, 
@@ -70,12 +71,13 @@ class RhythmTree(Tree):
             The proportional subdivisions of the measure. Elements may
             be integers or nested ``(D, S)`` tuples. Default is ``(1, 1)``.
         """
-        super().__init__(Meas(meas).numerator * span, subdivisions)
+        casted = self._cast_subdivs(subdivisions)
+        super().__init__(Meas(meas).numerator * span, casted)
         
         self._meta['span'] = span
         self._meta['meas'] = str(Meas(meas))
         self._meta['type'] = None
-        self._list = Group((Meas(meas).numerator * span, self._cast_subdivs(subdivisions)))
+        self._list = Group((Meas(meas).numerator * span, casted))
         
         self._evaluate()
 
@@ -154,15 +156,64 @@ class RhythmTree(Tree):
         """
         return self._list.S
 
+    def _post_structure_clone(self):
+        self._meta['span'] = 1
+        self._meta['meas'] = '1/1'
+        self._meta['type'] = None
+        for node in self._graph.node_indices():
+            self._graph[node] = {'proportion': 1}
+        self._evaluate()
+        subdivs = self._build_subdivisions()
+        s = subdivs[1] if isinstance(subdivs, tuple) and len(subdivs) > 1 else (1,)
+        self._list = Group((1, s))
+
     def _cast_subdivs(self, children):
         def convert_to_tuple(item):
             if isinstance(item, RhythmTree):
                 return (item.meas.numerator * item.span, item.subdivisions)
-            if isinstance(item, tuple):
+            if isinstance(item, (tuple, list)):
                 return tuple(convert_to_tuple(x) for x in item)
             return item
         
         return tuple(convert_to_tuple(child) for child in children)
+
+    def _validate_s_form(self, s):
+        """Validate S is in valid S-form. Each element is non-zero int or (D, S) tuple.
+        S must have at least 2 elements (e.g. (1,) is invalid)."""
+        if isinstance(s, int):
+            if s == 0:
+                raise ValueError(f"S element cannot be zero: {s}")
+            return
+        if isinstance(s, (tuple, list)):
+            if len(s) < 2:
+                raise ValueError(f"S must have at least 2 elements, got {s}")
+            for elem in s:
+                if isinstance(elem, int):
+                    if elem == 0:
+                        raise ValueError(f"S element cannot be zero: {elem}")
+                elif isinstance(elem, (tuple, list)):
+                    if len(elem) != 2:
+                        raise ValueError(f"(D S) must have exactly 2 elements, got {len(elem)}: {elem}")
+                    d, sub = elem
+                    if not isinstance(d, int) or d == 0:
+                        raise ValueError(f"(D S): D must be non-zero integer, got D={d}")
+                    self._validate_s_form(sub)
+                else:
+                    raise ValueError(f"S element must be non-zero int or (D S) tuple, got {type(elem).__name__}: {elem}")
+            return
+        raise ValueError(f"S must be tuple or int, got {type(s).__name__}: {s}")
+
+    def _normalize_s_for_subdivide(self, S):
+        """Normalize S for subdivide: int -> (1,)*S; tuple -> validate and return.
+        S must represent at least 2 subdivisions (e.g. S>1 for int, len(S)>=2 for tuple)."""
+        if isinstance(S, int):
+            if S <= 1:
+                raise ValueError(f"S must be > 1 when int, got {S}")
+            return (1,) * S
+        if isinstance(S, (tuple, list)):
+            self._validate_s_form(S)
+            return tuple(S)
+        raise ValueError(f"S must be tuple or int, got {type(S).__name__}: {S}")
 
     def _build_subdivisions(self, root_node=None):
         """
@@ -182,7 +233,7 @@ class RhythmTree(Tree):
             root_node = self.root
         
         def get_node_value(node):
-            return self[node].get('proportion', self[node].get('label', 1))
+            return self[node].get('proportion', 1)
         
         def get_children(node):
             return list(self.successors(node))
@@ -198,6 +249,15 @@ class RhythmTree(Tree):
             else:
                 new_s = (1,)
             self._list = Group((self._list.D, new_s))
+
+    def _post_mutation(self, scope_node=None, op=None):
+        for node in self.nodes:
+            node_data = self[node]
+            if 'proportion' not in node_data:
+                node_data['proportion'] = node_data.get('label', 1)
+                node_data.pop('label', None)
+        super()._post_mutation(scope_node=scope_node, op=op)
+        self._evaluate(scope_node)
     
     @property
     def durations(self):
@@ -278,28 +338,34 @@ class RhythmTree(Tree):
     #         self._meta['type'] = self._set_type()
     #     return self._meta['type']
     
-    def _evaluate(self):
+    def _evaluate(self, root_node=None):
         """
         Evaluate the tree to compute metric durations and onsets.
 
-        Processing occurs in two phases:
+        Single-pass DFS: computes durations and onsets together in one traversal.
+        When root_node is provided, evaluates from that subtree (ancestors must
+        already have metric_duration). When None, evaluates from root.
 
-        1. Compute metric durations and proportions for all nodes.
-        2. Compute metric onsets based on durations.
+        Parameters
+        ----------
+        root_node : int, optional
+            Subtree root to evaluate from. If None, evaluates from tree root.
         """
+        if root_node is None:
+            root_node = self.root
         self[self.root]['metric_duration'] = self.meas * self.span
-        
-        def _process_child_durations(child, div, parent_ratio, parent_is_negative=False):
+        parent_ratio = self.span * self.meas.to_fraction() if root_node == self.root else Fraction(self[root_node]['metric_duration'])
+
+        leaf_onset_acc = [Fraction(0)]
+
+        def _process_child(child, div, parent_ratio, parent_is_negative):
             child_data = self[child]
-            
-            s = child_data['label']
+            s = child_data.get('proportion', 1)
             if 'meta' in child_data:
                 s = s * child_data['meta']['span']
             s = int(s) if isinstance(s, float) else s
-            
             if parent_is_negative and s > 0:
                 s = -s
-            
             ratio = Fraction(s, div) * parent_ratio
             if s < 0:
                 ratio = -abs(ratio)
@@ -307,53 +373,59 @@ class RhythmTree(Tree):
             self[child]['proportion'] = s
             if self.out_degree(child) > 0:
                 _process_subtree(child, ratio)
-            self[child].pop('label', None)
-        
-        def _process_subtree(node=0, parent_ratio=self.span * self.meas.to_fraction()):
+            else:
+                self[child]['metric_onset'] = leaf_onset_acc[0]
+                leaf_onset_acc[0] += abs(ratio)
+
+        def _process_subtree(node, parent_ratio):
             node_data = self[node]
-            
             if 'meta' in node_data:
-                node_data['label'] = node_data['label'] * node_data['meta']['span']
-            
-            label = node_data['label']
+                node_data['proportion'] = node_data.get('proportion', 1) * node_data['meta']['span']
+            label = node_data.get('proportion', 1)
             is_tied = isinstance(label, float)
             self[node]['tied'] = is_tied
             label_value = int(label) if is_tied else label
-            
             self[node]['proportion'] = label_value
             children = list(self.successors(node))
-            
             if not children:
                 ratio = Fraction(label_value) * parent_ratio
                 self[node]['metric_duration'] = ratio
-                self[node].pop('label', None)
+                self[node]['metric_onset'] = leaf_onset_acc[0]
+                leaf_onset_acc[0] += abs(ratio)
                 return
-            
-            div = int(sum(abs(self[c]['label'] * 
-                             self[c]['meta']['span'] if 'meta' in self[c]
-                             else self[c]['label']) 
-                         for c in children))
-            
+            div = int(sum(
+                abs(self[c].get('proportion', 1)) *
+                (self[c]['meta']['span'] if 'meta' in self[c] else 1)
+                for c in children
+            ))
             node_is_negative = label_value < 0
-                        
             for child in children:
-                _process_child_durations(child, div, parent_ratio, node_is_negative)
-            
-            self[node].pop('label', None)
-        
-        _process_subtree()
-        
-        leaf_durations = [self[n]['metric_duration'] for n in self.leaf_nodes]
-        leaf_onsets = calc_onsets(leaf_durations)
-        
-        for n, o in zip(self.leaf_nodes, leaf_onsets):
-            self[n]['metric_onset'] = o
-        
-        for node in reversed(list(self.topological_sort())):
-            if self.out_degree(node) > 0:
-                children = list(self.successors(node))
-                leftmost_child = children[0]
-                self[node]['metric_onset'] = self[leftmost_child]['metric_onset']
+                _process_child(child, div, parent_ratio, node_is_negative)
+            self[node]['metric_onset'] = self[children[0]]['metric_onset']
+
+        if root_node != self.root:
+            for n in self.leaf_nodes:
+                if n in self.subtree_leaves(root_node):
+                    break
+                leaf_onset_acc[0] += abs(Fraction(self[n]['metric_duration']))
+
+        _process_subtree(root_node, parent_ratio)
+
+        if root_node != self.root:
+            leaves_after = [n for n in self.leaf_nodes if list(self.leaf_nodes).index(n) > max(list(self.leaf_nodes).index(l) for l in self.subtree_leaves(root_node))]
+            for n in leaves_after:
+                self[n]['metric_onset'] = leaf_onset_acc[0]
+                leaf_onset_acc[0] += abs(Fraction(self[n]['metric_duration']))
+            for node in reversed(list(self.topological_sort())):
+                if self.out_degree(node) > 0 and node != root_node:
+                    if node not in self.descendants(root_node):
+                        children = list(self.successors(node))
+                        self[node]['metric_onset'] = self[children[0]]['metric_onset']
+        else:
+            for node in reversed(list(self.topological_sort())):
+                if self.out_degree(node) > 0:
+                    children = list(self.successors(node))
+                    self[node]['metric_onset'] = self[children[0]]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)
@@ -431,15 +503,67 @@ class RhythmTree(Tree):
         RhythmTree
             The modified tree (self).
         """
-        result = super().graft_subtree(target_node, subtree, mode)
-        
-        for node in self.nodes:
-            node_data = self[node]
-            if 'label' not in node_data:
-                node_data['label'] = node_data.get('proportion', 1)
-        
-        self._evaluate()
-        return result
+        return super().graft_subtree(target_node, subtree, mode)
+
+    def subdivide(self, node, S):
+        """
+        Subdivide leaf node(s) with structure S.
+
+        Each leaf becomes a parent with children defined by S. The node's
+        proportion D is used as the duration; S specifies the subdivisions.
+
+        Parameters
+        ----------
+        node : int or list of int
+            The leaf node(s) to subdivide. Must have no children.
+            If a list, subdivide is applied to each.
+        S : tuple or int
+            Subdivisions. If int, interpreted as ``(1,)*S`` (e.g. ``S=3`` → ``(1, 1, 1)``).
+            If tuple, must be valid S-form: each element is a non-zero integer
+            or a ``(D, S)`` pair.
+
+        Returns
+        -------
+        RhythmTree
+            self (for chaining)
+
+        Raises
+        ------
+        ValueError
+            If node is not found, is not a leaf, or S is invalid.
+        """
+        nodes = [node] if isinstance(node, int) else list(node)
+        for n in nodes:
+            if n not in self:
+                raise ValueError(f"Node {n} not found in tree")
+            if self.out_degree(n) != 0:
+                raise ValueError(f"Node {n} must be a leaf")
+
+        S = self._normalize_s_for_subdivide(S)
+        S = self._cast_subdivs(S)
+
+        def add_children(parent, children):
+            for child in children:
+                if isinstance(child, tuple) and len(child) == 2:
+                    D, sub = child
+                    child_id = self.add_child(parent, proportion=D)
+                    add_children(child_id, sub)
+                else:
+                    self.add_child(parent, proportion=child)
+
+        for n in nodes:
+            add_children(n, S)
+        scope = self.parent(nodes[0]) if len(nodes) == 1 else None
+        self._post_mutation(scope_node=scope, op='subdivide')
+        return self
+
+    def prune(self, node):
+        super().prune(node)
+        return self
+
+    def remove_subtree(self, node):
+        super().remove_subtree(node)
+        return self
 
     def make_rest(self, node):
         """
@@ -465,5 +589,4 @@ class RhythmTree(Tree):
             if 'proportion' in node_data and node_data['proportion'] > 0:
                 node_data['proportion'] = -abs(node_data['proportion'])
                 node_data['metric_duration'] = -abs(node_data['metric_duration'])
-        
         self._update_group_structure()

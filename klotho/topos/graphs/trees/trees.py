@@ -12,6 +12,10 @@ class Tree(Graph):
     Built from nested tuple structures and backed by a RustworkX directed graph
     inherited from Graph.
 
+    Subclasses can override ``_node_value_attr`` to use a different attribute
+    name for the node value (e.g. RhythmTree uses ``'proportion'`` instead of
+    ``'label'``).
+
     Parameters
     ----------
     root : hashable
@@ -20,6 +24,7 @@ class Tree(Graph):
         Nested tuple structure defining the tree's children.
         Each element is either a leaf value or a ``(value, children)`` pair.
     """
+    _node_value_attr = 'label'
 
     def __init__(self, root, children:tuple):
         super().__init__(directed=True)
@@ -35,6 +40,33 @@ class Tree(Graph):
     @property
     def group(self):
         return self._list
+
+    @classmethod
+    def from_tree_structure(cls, source_tree):
+        """Create a new instance with the same topology as source_tree but no node data."""
+        inst = cls.__new__(cls)
+        inst._graph = source_tree._graph.copy()
+        for idx in inst._graph.node_indices():
+            inst._graph[idx] = {}
+        inst._root = source_tree._root
+        inst._list = copy.deepcopy(source_tree._list)
+        inst._meta = {}
+        inst._structure_version = 0
+        inst._building_tree = False
+        inst._post_structure_clone()
+        return inst
+
+    def _post_structure_clone(self):
+        """Subclass hook: initialize domain-specific state after topology-only cloning."""
+        pass
+
+    def _post_mutation(self, scope_node=None, op=None):
+        """Subclass hook: run after any structure-changing mutation.
+        Default: invalidate caches and update Group structure.
+        Subclasses override to add domain-specific cleanup (e.g. RT re-evaluates metrics).
+        """
+        self._invalidate_caches()
+        self._update_group_structure()
     
     def _invalidate_caches(self):
         """Invalidate all tree caches"""
@@ -359,18 +391,19 @@ class Tree(Graph):
         new_tree._root = node_mapping[node]
         
         if hasattr(self, 'group'):
+            attr = getattr(self, '_node_value_attr', 'label')
             def build_group_structure(root_node):
                 children = [child for child in descendants if self.parent(child) == root_node]
                 if not children:
-                    return self[root_node].get('label', root_node)
+                    return self[root_node].get(attr, root_node)
                 
                 child_structures = []
                 for child in sorted(children):
                     child_structure = build_group_structure(child)
                     child_structures.append(child_structure)
                 
-                root_label = self[root_node].get('label', root_node)
-                return (root_label, tuple(child_structures))
+                root_val = self[root_node].get(attr, root_node)
+                return (root_val, tuple(child_structures))
             
             structure = build_group_structure(node)
             if isinstance(structure, tuple) and len(structure) > 1:
@@ -378,6 +411,8 @@ class Tree(Graph):
             else:
                 new_tree._list = Group((structure, tuple()))
         
+        if hasattr(self, '_after_subtree_built'):
+            self._after_subtree_built(new_tree, node_mapping, renumber)
         if renumber:
             new_tree.renumber_nodes()
         
@@ -525,7 +560,7 @@ class Tree(Graph):
         subtree_root = node_mapping[subtree.root]
         Graph.add_edge(self, parent, subtree_root)
         
-        self._invalidate_caches()
+        self._post_mutation(scope_node=parent, op='add_subtree')
         return subtree_root
 
     def prune(self, node):
@@ -546,6 +581,7 @@ class Tree(Graph):
             Graph.add_edge(self, parent, child)
         
         Graph.remove_node(self, node)
+        self._post_mutation(scope_node=parent, op='prune')
 
     def remove_subtree(self, node):
         """Remove a node and its entire subtree.
@@ -559,9 +595,11 @@ class Tree(Graph):
             raise ValueError("Cannot remove the root node")
         
         subtree_nodes = [node] + list(self.descendants(node))
+        parent = self.parent(node)
         
         for n in subtree_nodes:
             Graph.remove_node(self, n)
+        self._post_mutation(scope_node=parent, op='remove_subtree')
 
     def replace_node(self, old_node, **attr):
         """Replace a node with new attributes while preserving structure.
@@ -602,8 +640,9 @@ class Tree(Graph):
         Subclasses can override this to preserve specific parts of the Group.
         """
         if hasattr(self, '_list'):
+            attr = getattr(self, '_node_value_attr', 'label')
             def get_node_value(node):
-                return self[node].get('label', node)
+                return self[node].get(attr, node)
             
             def get_children(node):
                 return list(self.successors(node))
@@ -683,8 +722,7 @@ class Tree(Graph):
         # Remove the target leaf node
         Graph.remove_node(self, target_node)
         
-        self._invalidate_caches()
-        self._update_group_structure()
+        self._post_mutation(scope_node=parent, op='graft_subtree')
         return new_root
     
     def _graft_adopt_leaf(self, target_node, subtree):
@@ -707,8 +745,7 @@ class Tree(Graph):
         for child in subtree_root_children:
             Graph.add_edge(self, target_node, node_mapping[child])
         
-        self._invalidate_caches()
-        self._update_group_structure()
+        self._post_mutation(scope_node=target_node, op='graft_subtree')
         return target_node
 
     def move_subtree(self, node, new_parent, index=None):
@@ -732,7 +769,7 @@ class Tree(Graph):
         
         Graph.add_edge(self, new_parent, node)
         
-        self._invalidate_caches()
+        self._post_mutation(scope_node=new_parent, op='move_subtree')
 
     def prune_to_depth(self, max_depth):
         """Prune the tree to a maximum depth, removing all nodes beyond that depth."""
@@ -762,7 +799,7 @@ class Tree(Graph):
             node_obj = self._get_node_object(idx)
             Graph.remove_node(self, node_obj)
         
-        self._invalidate_caches()
+        self._post_mutation(scope_node=None, op='prune_to_depth')
 
     def prune_leaves(self, n):
         """Prune n levels from each branch, starting from the leaves."""
@@ -779,7 +816,7 @@ class Tree(Graph):
             if self._graph.num_nodes() == 1:
                 break
         
-        self._invalidate_caches()
+        self._post_mutation(scope_node=None, op='prune_leaves')
 
     def __deepcopy__(self, memo):
         """Create a deep copy of the tree including Tree-specific attributes."""
@@ -799,24 +836,28 @@ class Tree(Graph):
     
     def _build_tree(self, root, children):
         """Build the tree structure from nested tuples."""
-        root_id = super().add_node(label=root)
+        attr = getattr(self, '_node_value_attr', 'label')
+        root_id = super().add_node(**{attr: root})
         self._add_children(root_id, children)
         return root_id
 
     def _add_children(self, parent_id, children_list):
+        attr = getattr(self, '_node_value_attr', 'label')
         for child in children_list:
             match child:
                 case tuple((D, S)):
-                    duration_id = super().add_node(label=D)
+                    duration_id = super().add_node(**{attr: D})
                     super().add_edge(parent_id, duration_id)
                     self._add_children(duration_id, S)
                 case Tree():
-                    duration_id = super().add_node(label=child._graph.nodes[child.root]['label'], 
-                                               meta=child._meta.to_dict('records')[0])
+                    child_attr = getattr(child, '_node_value_attr', 'label')
+                    val = child._graph.nodes[child.root].get(child_attr, child.root)
+                    meta_val = child._meta if isinstance(child._meta, dict) else child._meta.to_dict('records')[0]
+                    duration_id = super().add_node(**{attr: val}, meta=meta_val)
                     super().add_edge(parent_id, duration_id)
                     self._add_children(duration_id, child.group.S)
                 case _:
-                    child_id = super().add_node(label=child)
+                    child_id = super().add_node(**{attr: child})
                     super().add_edge(parent_id, child_id)
     
     @classmethod

@@ -3,7 +3,10 @@ Hierarchical parameter storage synchronized with rhythm tree structure.
 
 This module provides ``ParameterTree``, a tree data structure that mirrors the
 shape of a ``RhythmTree`` and stores per-node musical parameter values
-(frequencies, amplitudes, etc.) with automatic inheritance and cache management.
+(frequencies, amplitudes, etc.) with automatic inheritance.
+
+Storage model: overrides are stored only at the node where set. Effective
+values (inherited from ancestors) are computed on write and cached for O(1) read.
 """
 
 from ...topos.graphs.trees import Tree
@@ -13,12 +16,11 @@ import copy
 class ParameterTree(Tree):
     """
     A tree that stores per-node parameter and meta field values.
-    
+
     Extends ``Tree`` with parameter-field and meta-field semantics: setting a
-    value on a node propagates it to all descendants. Maintains separate
-    registries for ``pfields`` (parameter fields) and ``mfields`` (meta fields)
-    and implements version-based caching for fast active-item lookups.
-    
+    value on a node propagates it to all descendants. Overrides are stored
+    only at the set site; effective values are cached for O(1) read.
+
     Parameters
     ----------
     root : int
@@ -28,147 +30,110 @@ class ParameterTree(Tree):
         ``RhythmTree`` subdivisions).
     """
     def __init__(self, root, children:tuple):
-        self._parameter_version = 0
-        self._active_items_cache = {}
-        
         super().__init__(root, children)
         for node in self.nodes:
             super().__getitem__(node).pop('label', None)
         self._meta['pfields'] = set()
         self._meta['mfields'] = set()
-    
-    def _ensure_parameter_attributes(self):
-        """Ensure all parameter-specific attributes are initialized."""
-        if not hasattr(self, '_parameter_version'):
-            self._parameter_version = 0
-        if not hasattr(self, '_active_items_cache'):
-            self._active_items_cache = {}
-    
-    def subtree(self, node, renumber=True):
-        """
-        Extract a subtree rooted at the given node.
-        
-        Overrides ``Tree.subtree`` to ensure parameter-specific caching
-        attributes are initialized on the result.
-        
-        Parameters
-        ----------
-        node : int
-            Root node of the subtree to extract.
-        renumber : bool, optional
-            Whether to renumber nodes starting from 0 (default is True).
-            
-        Returns
-        -------
-        ParameterTree
-            A new ParameterTree containing the subtree.
-        """
-        result = super().subtree(node, renumber)
-        if isinstance(result, ParameterTree):
-            result._ensure_parameter_attributes()
-        return result
-    
+        self._node_instruments = {}
+        self._effective_cache = None
+
+    def _post_structure_clone(self):
+        self._meta['pfields'] = set()
+        self._meta['mfields'] = set()
+        self._node_instruments = {}
+        self._effective_cache = None
+
+    def _invalidate_caches(self):
+        super()._invalidate_caches()
+        self._effective_cache = None
+
+    def _build_effective(self):
+        if self._effective_cache is not None:
+            return
+        self._effective_cache = {}
+        stack = [self.root]
+        while stack:
+            node = stack.pop()
+            p = self.parent(node)
+            base = dict(self._effective_cache[p]) if p is not None else {}
+            base.update(self.nodes[node])
+            self._effective_cache[node] = base
+            for c in self.successors(node):
+                stack.append(c)
+
+    def _after_subtree_built(self, new_tree, node_mapping, renumber):
+        new_tree._node_instruments = {}
+        for old_node, inst in self._node_instruments.items():
+            if old_node in node_mapping:
+                new_tree._node_instruments[node_mapping[old_node]] = inst
+        new_tree._effective_cache = None
+
+    def _resolve_governing_instrument_node(self, node: int):
+        if node in self._node_instruments:
+            return node
+        for ancestor in reversed(self.branch(node)[:-1]):
+            if ancestor in self._node_instruments:
+                return ancestor
+        return None
+
+    def set_instrument(self, node, instrument):
+        self._meta['pfields'].update(instrument.keys())
+        self._node_instruments[node] = instrument
+
     def __deepcopy__(self, memo):
         new_pt = super().__deepcopy__(memo)
-        
-        # Initialize caches for the new copy
-        new_pt._active_items_cache = {}
-        new_pt._parameter_version = 0
+        new_pt._node_instruments = copy.deepcopy(self._node_instruments, memo)
+        new_pt._effective_cache = None
         return new_pt
-    
-    def _invalidate_parameter_caches(self):
-        """Invalidate parameter-specific caches when data changes"""
-        self._parameter_version += 1
-        self._active_items_cache.clear()
-    
-    def _invalidate_caches(self):
-        """Override to include parameter cache invalidation"""
-        super()._invalidate_caches()
-        self._invalidate_parameter_caches()
-    
+
+    def subtree(self, node, renumber=True):
+        return super().subtree(node, renumber)
+
     def __getitem__(self, node):
         return ParameterNode(self, node)
-    
+
     @property
     def pfields(self):
-        """list of str : Sorted names of all registered parameter fields."""
         return sorted(self._meta['pfields'])
-    
+
     @property
     def mfields(self):
-        """list of str : Sorted names of all registered meta fields."""
         return sorted(self._meta['mfields'])
-    
+
     def set_pfields(self, node, **kwargs):
-        """
-        Set parameter field values on a node and all its descendants.
-        
-        Parameters
-        ----------
-        node : int
-            Target node ID.
-        **kwargs
-            Parameter field names and their values.
-        """
         self._meta['pfields'].update(kwargs.keys())
-        
-        affected_nodes = [node] + list(self.descendants(node))
-        
-        for affected_node in affected_nodes:
-            node_data = self.nodes[affected_node]
-            node_data.update(kwargs)
-        
-        self._invalidate_parameter_caches()
-    
+        self.nodes[node].update(kwargs)
+        self._effective_cache = None
+
     def set_mfields(self, node, **kwargs):
-        """
-        Set meta field values on a node and all its descendants.
-        
-        Parameters
-        ----------
-        node : int
-            Target node ID.
-        **kwargs
-            Meta field names and their values.
-        """
         self._meta['mfields'].update(kwargs.keys())
-        
-        affected_nodes = [node] + list(self.descendants(node))
-        
-        for affected_node in affected_nodes:
-            node_data = self.nodes[affected_node]
-            node_data.update(kwargs)
-        
-        self._invalidate_parameter_caches()
-        
+        self.nodes[node].update(kwargs)
+        self._effective_cache = None
+
+    def get_instrument(self, node):
+        governing = self._resolve_governing_instrument_node(node)
+        return self._node_instruments.get(governing) if governing is not None else None
+
+    def get_pfield(self, node, key):
+        if key not in self._meta['pfields']:
+            return None
+        self._build_effective()
+        return self._effective_cache[node].get(key)
+
+    def get_mfield(self, node, key):
+        if key not in self._meta['mfields']:
+            return None
+        self._build_effective()
+        return self._effective_cache[node].get(key)
+
     def get(self, node, key):
-        """
-        Get a single field value from a node.
-        
-        Parameters
-        ----------
-        node : int
-            The node ID.
-        key : str
-            The field name to retrieve.
-            
-        Returns
-        -------
-        Any or None
-            The value, or None if the key is not set.
-        """
-        return self.nodes[node].get(key)
-    
+        if key == 'instrument':
+            return self.get_instrument(node)
+        self._build_effective()
+        return self._effective_cache[node].get(key)
+
     def clear(self, node=None):
-        """
-        Clear all field values from a node (and its descendants), or from the
-        entire tree if no node is specified.
-        
-        Parameters
-        ----------
-        node : int, optional
-            Node ID to clear. If None, clears all nodes.
-        """
         if node is None:
             for n in self.nodes:
                 super().__getitem__(n).clear()
@@ -176,24 +141,11 @@ class ParameterTree(Tree):
             super().__getitem__(node).clear()
             for descendant in self.descendants(node):
                 super().__getitem__(descendant).clear()
-        
-        self._invalidate_parameter_caches()
-            
+        self._effective_cache = None
+
     def items(self, node):
-        """
-        Get all field values for a node as a dictionary.
-        
-        Parameters
-        ----------
-        node : int
-            The node ID.
-            
-        Returns
-        -------
-        dict
-            Copy of the node's field data.
-        """
-        return dict(self.nodes[node])
+        self._build_effective()
+        return dict(self._effective_cache[node])
 
 
 class ParameterNode:
@@ -219,6 +171,15 @@ class ParameterNode:
         if isinstance(key, str):
             return self._tree.get(self._node, key)
         raise TypeError("Key must be a string")
+
+    def get_instrument(self):
+        return self._tree.get_instrument(self._node)
+
+    def get_pfield(self, key):
+        return self._tree.get_pfield(self._node, key)
+
+    def get_mfield(self, key):
+        return self._tree.get_mfield(self._node, key)
     
     def __setitem__(self, key, value):
         self._tree.set_pfields(self._node, **{key: value})
@@ -262,21 +223,14 @@ class ParameterNode:
     
     def active_items(self):
         """
-        Get all field values for this node, with version-based caching.
+        Get all field values for this node.
         
         Returns
         -------
         dict
-            The node's active field data (cached per parameter version).
+            The node's active field data.
         """
-        cache_key = (self._node, self._tree._parameter_version)
-        if cache_key in self._tree._active_items_cache:
-            return self._tree._active_items_cache[cache_key]
-        
-        result = self._tree.items(self._node)
-        
-        self._tree._active_items_cache[cache_key] = result
-        return result
+        return self._tree.items(self._node)
     
     def copy(self):
         """

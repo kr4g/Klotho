@@ -4,6 +4,18 @@ from klotho.tonos.utils.interval_normalization import reduce_interval
 from typing import Tuple, Union
 from fractions import Fraction
 
+
+def _odd_prime_generator():
+    yield 3
+    primes = [3]
+    n = 5
+    while True:
+        if all(n % p != 0 for p in primes if p * p <= n):
+            primes.append(n)
+            yield n
+        n += 2
+
+
 class HarmonicTree(Tree):
     """
     A tree structure that models multiplicative harmonic relationships.
@@ -40,6 +52,18 @@ class HarmonicTree(Tree):
         self._meta['equave'] = Fraction(equave) if equave is not None else None
         self._meta['span']   = span
         
+        self._evaluate()
+
+    def _post_structure_clone(self):
+        self._meta['equave'] = None
+        self._meta['span'] = 1
+        non_root = [n for n in self._graph.node_indices() if n != self._root]
+        nodes_by_depth = sorted(non_root, key=lambda n: self.depth_of(n), reverse=True)
+        odd_primes = _odd_prime_generator()
+        label_map = {n: next(odd_primes) for n in nodes_by_depth}
+        self._graph[self._root] = {'label': 1}
+        for node in non_root:
+            self._graph[node] = {'label': label_map[node]}
         self._evaluate()
 
     def _evaluate(self):

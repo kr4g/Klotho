@@ -47,35 +47,91 @@ class TemporalMeta(type):
     pass
 
 
+class UTNodeView:
+    """View of UT nodes; subscripting returns a Chronon for that node."""
+
+    def __init__(self, ut):
+        self._ut = ut
+
+    def __getitem__(self, node):
+        return Chronon(node, self._ut)
+
+    def __iter__(self):
+        return iter(self._ut._rt.nodes)
+
+    def __contains__(self, node):
+        return node in self._ut._rt
+
+    def __len__(self):
+        return len(self._ut._rt)
+
+    def __call__(self, data=False):
+        if data:
+            for node in self._ut._rt.nodes:
+                yield (node, Chronon(node, self._ut))
+        else:
+            for node in self._ut._rt.nodes:
+                yield node
+
+
 class Chronon(metaclass=TemporalMeta):
     """
-    A single temporal event (leaf node) within a :class:`RhythmTree`.
+    A node in its temporal context within a :class:`TemporalUnit`.
 
-    A chronon exposes the real-time onset, duration, and end for one leaf,
-    along with its metric proportion and rest status.
+    Exposes real-time onset/duration and metric data for any node (leaf or branch).
+    Supports dict-like access (e.g. chronon['real_onset']) for compatibility.
 
     Parameters
     ----------
     node_id : int
         The node identifier within the rhythm tree.
-    rt : RhythmTree
-        The parent rhythm tree that owns this node.
+    ut : TemporalUnit
+        The parent temporal unit that owns this node.
     """
-    __slots__ = ('_node_id', '_rt')
-    
-    def __init__(self, node_id:int, rt:RhythmTree):
+    __slots__ = ('_node_id', '_ut')
+
+    def __init__(self, node_id: int, ut: 'TemporalUnit'):
         self._node_id = node_id
-        self._rt = rt
-    
+        self._ut = ut
+
+    def _rt_node(self):
+        return self._ut._rt[self._node_id]
+
+    def _real_data(self):
+        return self._ut._real_times.get(self._node_id, {})
+
+    def __getattr__(self, key):
+        if key in ('real_onset', 'real_duration'):
+            return self._real_data()[key]
+        try:
+            return self._rt_node()[key]
+        except KeyError:
+            raise AttributeError(f"'{type(self).__name__}' has no attribute '{key}'")
+
+    def __getitem__(self, key):
+        if key in ('real_onset', 'real_duration'):
+            return self._real_data()[key]
+        return self._rt_node()[key]
+
+    def get(self, key, default=None):
+        if key in ('real_onset', 'real_duration'):
+            return self._real_data().get(key, default)
+        return self._rt_node().get(key, default)
+
+    def __contains__(self, key):
+        if key in ('real_onset', 'real_duration'):
+            return key in self._real_data()
+        return key in self._rt_node()
+
     @property
     def start(self):
         """The absolute start time in seconds."""
-        return abs(self._rt[self._node_id]['real_onset'])
+        return abs(self.real_onset)
 
     @property
     def duration(self):
         """The absolute duration in seconds."""
-        return abs(self._rt[self._node_id]['real_duration'])
+        return abs(self.real_duration)
 
     @property
     def end(self):
@@ -85,17 +141,17 @@ class Chronon(metaclass=TemporalMeta):
     @property
     def proportion(self):
         """The integer proportion value from the rhythm tree."""
-        return self._rt[self._node_id]['proportion']
+        return self._rt_node()['proportion']
 
     @property
     def metric_duration(self):
         """The fractional metric duration relative to the measure."""
-        return self._rt[self._node_id]['metric_duration']
+        return self._rt_node()['metric_duration']
 
     @property
     def metric_onset(self):
         """The fractional metric onset relative to the measure."""
-        return self._rt[self._node_id]['metric_onset']
+        return self._rt_node()['metric_onset']
 
     @property
     def node_id(self):
@@ -105,8 +161,8 @@ class Chronon(metaclass=TemporalMeta):
     @property
     def is_rest(self):
         """Whether this event is a rest (negative proportion)."""
-        return self._rt[self._node_id]['proportion'] < 0
-    
+        return self._rt_node()['proportion'] < 0
+
     def __str__(self):
         return pd.DataFrame({
             'node_id': [self.node_id],
@@ -168,6 +224,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._type   = None
         
         self._rt     = self._set_rt(span, abs(Meas(tempus)), prolatio)
+        self._real_times = {}
         
         self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
         self._bpm    = bpm if bpm else 60
@@ -207,7 +264,7 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     @property
     def nodes(self):
-        return self._rt.nodes
+        return UTNodeView(self)
 
     def __getattr__(self, name):
         if name in TemporalUnit._RT_QUERY_METHODS:
@@ -281,12 +338,12 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def onsets(self):
         """The real-time onset of each leaf event in seconds."""
-        return tuple(self._rt[n]['real_onset'] for n in self._rt.leaf_nodes)
+        return tuple(self._real_times[n]['real_onset'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
         """The real-time duration of each leaf event in seconds."""
-        return tuple(self._rt[n]['real_duration'] for n in self._rt.leaf_nodes)
+        return tuple(self._real_times[n]['real_duration'] for n in self._rt.leaf_nodes)
 
     @property
     def duration(self):
@@ -374,6 +431,27 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._rt.make_rest(node)
         self._events = None
 
+    def subdivide(self, node: int, S) -> None:
+        """
+        Subdivide a leaf node with structure (D, S).
+
+        Delegates to :meth:`RhythmTree.subdivide` and invalidates cached events.
+
+        Parameters
+        ----------
+        node : int
+            The leaf node to subdivide.
+        S : tuple
+            Valid subdivisions tuple (integers or nested (D, S) tuples).
+
+        Raises
+        ------
+        ValueError
+            If the node is not found or is not a leaf.
+        """
+        self._rt.subdivide(node, S)
+        self._events = None
+
     def sparsify(self, probability, node=None):
         """
         Randomly convert leaf events to rests with a given probability.
@@ -448,6 +526,7 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     def _evaluate(self):
         """Updates node timings and returns chronon events."""
+        self._real_times.clear()
         for node in self._rt.nodes:
             metric_duration = self._rt[node]['metric_duration']
             metric_onset = self._rt[node]['metric_onset']
@@ -455,10 +534,9 @@ class TemporalUnit(metaclass=TemporalMeta):
             real_duration = beat_duration(ratio=metric_duration, bpm=self.bpm, beat_ratio=self.beat)
             real_onset = beat_duration(ratio=metric_onset, bpm=self.bpm, beat_ratio=self.beat) + self._offset
             
-            self._rt[node]['real_duration'] = real_duration
-            self._rt[node]['real_onset'] = real_onset
+            self._real_times[node] = {'real_duration': real_duration, 'real_onset': real_onset}
 
-        return tuple(Chronon(node_id, self._rt) for node_id in self._rt.leaf_nodes)
+        return tuple(Chronon(node_id, self) for node_id in self._rt.leaf_nodes)
 
     def __getitem__(self, idx: int) -> Chronon:
         if self._events is None:

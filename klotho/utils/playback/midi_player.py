@@ -306,7 +306,7 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     
     for event in compositional_unit:
         if not event.is_rest:
-            instrument = compositional_unit.get_active_instrument(event._node_id)
+            instrument = compositional_unit.get_instrument(event._node_id)
             if isinstance(instrument, MidiInstrument):
                 has_explicit_instruments = True
                 if not instrument.is_Drum:
@@ -320,7 +320,7 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
         instrument_types = []
         for event in compositional_unit:
             if not event.is_rest:
-                instrument = compositional_unit.get_active_instrument(event._node_id)
+                instrument = compositional_unit.get_instrument(event._node_id)
                 if isinstance(instrument, MidiInstrument):
                     instrument_types.append("drum" if instrument.is_Drum else "melodic")
                 else:
@@ -340,7 +340,7 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     num_melodic = 0
     for event in compositional_unit:
         if not event.is_rest:
-            instrument = compositional_unit.get_active_instrument(event._node_id)
+            instrument = compositional_unit.get_instrument(event._node_id)
             if isinstance(instrument, MidiInstrument) and instrument.is_Drum:
                 num_drums += 1
             else:
@@ -375,7 +375,7 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     for event in compositional_unit:
         if not event.is_rest:
             # Get instrument information
-            instrument = compositional_unit.get_active_instrument(event._node_id)
+            instrument = compositional_unit.get_instrument(event._node_id)
             
             if isinstance(instrument, MidiInstrument):
                 is_drum = instrument.is_Drum
@@ -512,7 +512,7 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
             print(f"[DEBUG] Processing as CompositionalUnit: {type(unit)}")
         for event in unit:
             if not event.is_rest:
-                instrument = unit.get_active_instrument(event._node_id)
+                instrument = unit.get_instrument(event._node_id)
                 
                 if debug:
                     print(f"[DEBUG] Collection event node {event._node_id}: instrument={instrument.name if instrument else 'None'}, is_Drum={instrument.is_Drum if instrument else 'N/A'}")
@@ -626,7 +626,7 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
         for event in unit_copy:
             if not event.is_rest:
                 # Get instrument information from the parameter tree
-                instrument = unit_copy.get_active_instrument(event._node_id)
+                instrument = unit_copy.get_instrument(event._node_id)
                 
                 if isinstance(instrument, MidiInstrument):
                     is_drum = instrument.is_Drum

@@ -5,8 +5,11 @@ This module provides tools for creating and manipulating composite musical struc
 that span multiple domains (temporal, tonal, parametric, etc.).
 """
 
-from .compositional import CompositionalUnit
+from .compositional import CompositionalUnit, Parametron, DistributionContext, PFieldContext
 
 __all__ = [
     'CompositionalUnit',
+    'Parametron',
+    'DistributionContext',
+    'PFieldContext',
 ] 

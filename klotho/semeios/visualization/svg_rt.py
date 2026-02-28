@@ -52,14 +52,14 @@ def _rt_node_tooltip(rt, node_id, audio_source=None):
             parts.append(f"Real Duration: {abs(chronon.duration):.4f}s")
             if isinstance(audio_source, _UC):
                 try:
-                    inst = audio_source.get_active_instrument(node_id)
+                    inst = audio_source.get_instrument(node_id)
                     if inst is not None and hasattr(inst, 'name'):
                         parts.append(f"Instrument: {inst.name}")
                 except Exception:
                     pass
-                if hasattr(chronon, 'parameters'):
+                if hasattr(chronon, 'pfields'):
                     skip = {'synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id'}
-                    for k, v in chronon.parameters.items():
+                    for k, v in chronon.pfields.items():
                         if k not in skip:
                             parts.append(f"{k}: {v}")
 

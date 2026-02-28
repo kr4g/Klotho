@@ -105,9 +105,8 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
                     pfields  = ut.pfields
                 )
                 
-                governing_instrument_node = ut._resolve_governing_instrument_node(ut._rt.root)
-                if governing_instrument_node is not None and governing_instrument_node in ut._node_instruments:
-                    instrument = ut._node_instruments[governing_instrument_node]
+                instrument = ut.get_instrument(ut._rt.root)
+                if instrument is not None:
                     unit.set_instrument(unit._pt.root, instrument)
             else:
                 # Original behavior for TemporalUnit
@@ -175,11 +174,6 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
         )
         # Copy the parameter tree data
         new_cu._pt = ut._pt.copy()
-        new_cu._node_instruments = ut._node_instruments.copy()
-        new_cu._instrument_exclusions = {k: v.copy() for k, v in ut._instrument_exclusions.items()}
-        new_cu._invalidate_instrument_cache()
-        new_cu._env_specs = copy.deepcopy(ut._env_specs)
-        new_cu._next_env_id = ut._next_env_id
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
         return new_cu
@@ -232,11 +226,6 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
         )
         # Copy the parameter tree data
         new_cu._pt = ut._pt.copy()
-        new_cu._node_instruments = ut._node_instruments.copy()
-        new_cu._instrument_exclusions = {k: v.copy() for k, v in ut._instrument_exclusions.items()}
-        new_cu._invalidate_instrument_cache()
-        new_cu._env_specs = copy.deepcopy(ut._env_specs)
-        new_cu._next_env_id = ut._next_env_id
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
         return new_cu

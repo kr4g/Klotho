@@ -285,7 +285,7 @@ def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
                 })
             continue
 
-        instrument = obj.get_active_instrument(event.node_id)
+        instrument = obj.get_instrument(event.node_id)
         synth_name = DEFAULT_SYNTH
         env_type = ''
 
@@ -296,7 +296,7 @@ def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
             synth_name = getattr(instrument, 'synth_name', None) or getattr(instrument, 'name', None) or DEFAULT_SYNTH
             env_type = getattr(instrument, 'env_type', '') or ''
 
-        pfields = {k: v for k, v in event.parameters.items()
+        pfields = {k: v for k, v in event.pfields.items()
                    if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
 
         if 'freq' in pfields and 'note' not in pfields:

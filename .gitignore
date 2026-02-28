@@ -127,6 +127,8 @@ check_docs.py
 # ==========================
 .archive/
 projects/
+.worktree-remote/
+scripts/
 gui/
 ut_plotter/
 .taskmaster/
@@ -149,3 +151,4 @@ klotho-book/
 # Tutorials directory (tracked, currently empty)
 !tutorials/
 !tutorials/.gitkeep
+

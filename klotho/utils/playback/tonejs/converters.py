@@ -127,7 +127,7 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
                 })
             continue
 
-        instrument = obj.get_active_instrument(event.node_id)
+        instrument = obj.get_instrument(event.node_id)
         if not isinstance(instrument, JsInstrument):
             if animation:
                 events.append({
@@ -157,7 +157,7 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
             inst_id_map[inst_identity] = key
 
         routing_key = inst_id_map[inst_identity]
-        pfields = {k: v for k, v in event.parameters.items()
+        pfields = {k: v for k, v in event.pfields.items()
                    if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
         pfields = _normalize_event_pfields(pfields)
         default_pfields = instruments[routing_key].get('preset', {})

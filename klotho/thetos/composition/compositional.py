@@ -3,7 +3,7 @@ Compositional units combining temporal structure with parameterized events.
 
 This module provides ``CompositionalUnit``, which extends ``TemporalUnit``
 with a synchronized ``ParameterTree`` for hierarchical parameter management,
-envelope application, slur marking, and instrument assignment. The ``Event``
+envelope application, slur marking, and instrument assignment. The ``Parametron``
 class extends ``Chronon`` with parameter field access.
 """
 
@@ -23,7 +23,7 @@ from klotho.topos.collections.sequences import Pattern
 
 
 @dataclass
-class PFieldContext:
+class DistributionContext:
     """
     Context object passed to callable parameter-field values during distribution.
     
@@ -37,14 +37,42 @@ class PFieldContext:
         The node ID in the rhythm/parameter tree.
     is_rest : bool
         Whether this node is a rest.
-    params : dict
-        Current active parameter values for this node.
+    pfields : dict
+        Effective parameter field values (PT overrides instrument).
+    mfields : dict
+        Meta field values from the PT.
+    instrument : Instrument or None
+        Resolved instrument for this node.
     """
     index: int
     total: int
     node: int
     is_rest: bool
-    params: dict
+    pfields: dict
+    mfields: dict
+    instrument: Any
+
+
+PFieldContext = DistributionContext
+
+
+def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) -> DistributionContext:
+    pt = uc._pt
+    inst = pt.get_instrument(node)
+    pfields = {}
+    for k in pt._meta['pfields']:
+        v = pt.get_pfield(node, k)
+        if v is None and inst is not None:
+            if k == 'synthName' and 'synth_name' in inst.keys():
+                v = inst['synth_name']
+            elif k in inst.keys():
+                v = inst[k]
+        pfields[k] = v
+    mfields = {k: pt.get_mfield(node, k) for k in pt._meta['mfields']}
+    return DistributionContext(
+        index=index, total=total, node=node, is_rest=is_rest,
+        pfields=pfields, mfields=mfields, instrument=inst
+    )
 
 
 def _callable_arity(fn):
@@ -56,7 +84,7 @@ def _callable_arity(fn):
         return 0
 
 
-class Event(Chronon):
+class Parametron(Chronon):
     """
     An enhanced Chronon that includes parameter field access.
     
@@ -64,54 +92,78 @@ class Event(Chronon):
     access to musical parameters stored in a synchronized ParameterTree.
     """
     
-    __slots__ = ('_pt', '_instrument_resolver')
-    
-    def __init__(self, node_id: int, rt: RhythmTree, pt: ParameterTree, instrument_resolver=None):
+    __slots__ = ('_pt',)
+
+    def __init__(self, node_id: int, ut, pt: ParameterTree):
         """
-        Initialize an Event.
-        
+        Initialize a Parametron.
+
         Parameters
         ----------
         node_id : int
-            The leaf-node ID in the rhythm tree.
-        rt : RhythmTree
-            The rhythm tree providing temporal data.
+            The node ID in the rhythm tree.
+        ut : TemporalUnit or CompositionalUnit
+            The temporal unit providing temporal data.
         pt : ParameterTree
-            The parameter tree providing field values.
-        instrument_resolver : callable, optional
-            Function ``(node_id) -> (Instrument, exclude_set)`` for
-            resolving the governing instrument of this event.
+            The parameter tree providing field values (including instrument via
+            ``pt.get(node_id, 'instrument')``).
         """
-        super().__init__(node_id, rt)
+        super().__init__(node_id, ut)
         self._pt = pt
-        self._instrument_resolver = instrument_resolver
     
     @property
-    def parameters(self):
+    def pfields(self):
         """
-        Get all active parameter fields for this event.
+        Get parameter field values for this event (for playback, etc.).
+        
+        Returns pfield values with instrument fallback for synth_name etc.
+        Use ``get_mfield`` for meta fields to avoid key collisions.
         
         Returns
         -------
         dict
-            Dictionary of active parameter field names and values
+            Dictionary of parameter field names and values
         """
-        params = {}
-        instrument, exclude = self._resolve_instrument()
-        if instrument is not None:
-            params = {k: instrument[k] for k in instrument.keys()}
-        params.update(self._pt[self._node_id].active_items())
-        if instrument is not None and exclude:
-            for key in exclude:
-                if key in instrument.keys():
-                    params[key] = instrument[key]
-        return params
+        result = {}
+        inst = self._resolve_instrument()
+        if inst is not None:
+            for k in inst.keys():
+                result[k] = inst[k]
+                if k == 'synth_name':
+                    result['synthName'] = inst[k]
+        for k in self._pt._meta['pfields']:
+            v = self._pt.get_pfield(self._node_id, k)
+            if v is not None:
+                result[k] = v
+            elif inst is not None:
+                if k == 'synthName' and 'synth_name' in inst.keys():
+                    result[k] = inst['synth_name']
+                elif k in inst.keys():
+                    result[k] = inst[k]
+        return result
+
+    @property
+    def mfields(self):
+        """
+        Get meta field values for this event.
+        
+        Returns
+        -------
+        dict
+            Dictionary of meta field names and values
+        """
+        return {k: self._pt.get_mfield(self._node_id, k)
+                for k in self._pt._meta['mfields']}
 
     def _resolve_instrument(self):
-        if callable(self._instrument_resolver):
-            return self._instrument_resolver(self._node_id)
-        return None, set()
-    
+        return self._pt.get_instrument(self._node_id)
+
+    def get_pfield(self, key: str, default=None):
+        return self._pt.get_pfield(self._node_id, key) or default
+
+    def get_mfield(self, key: str, default=None):
+        return self._pt.get_mfield(self._node_id, key) or default
+
     def get_parameter(self, key: str, default=None):
         """
         Get a specific parameter value for this event.
@@ -128,10 +180,13 @@ class Event(Chronon):
         Any
             The parameter value or default
         """
-        value = self._pt.get(self._node_id, key)
+        value = self._pt.get_pfield(self._node_id, key)
         if value is not None:
             return value
-        instrument, _ = self._resolve_instrument()
+        value = self._pt.get_mfield(self._node_id, key)
+        if value is not None:
+            return value
+        instrument = self._resolve_instrument()
         if instrument is not None:
             if key == 'synthName':
                 return instrument['synth_name']
@@ -153,10 +208,39 @@ class Event(Chronon):
         Any
             The requested attribute value
         """
-        temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_duration', 'node_id', 'is_rest'}
+        temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_duration', 'metric_onset', 'node_id', 'is_rest', 'real_onset', 'real_duration'}
         if key in temporal_attrs:
             return getattr(self, key)
         return self.get_parameter(key)
+
+
+class UCNodeView:
+    """View of UC nodes; subscripting returns a Parametron for that node."""
+
+    def __init__(self, uc):
+        self._uc = uc
+
+    def __getitem__(self, node):
+        if self._uc._events is None:
+            self._uc._events = self._uc._evaluate()
+        return Parametron(node, self._uc, self._uc._pt)
+
+    def __iter__(self):
+        return iter(self._uc._rt.nodes)
+
+    def __contains__(self, node):
+        return node in self._uc._rt
+
+    def __len__(self):
+        return len(self._uc._rt)
+
+    def __call__(self, data=False):
+        if data:
+            for node in self._uc._rt.nodes:
+                yield (node, Parametron(node, self._uc, self._uc._pt))
+        else:
+            for node in self._uc._rt.nodes:
+                yield node
 
 
 class CompositionalUnit(TemporalUnit):
@@ -216,18 +300,15 @@ class CompositionalUnit(TemporalUnit):
         
         self._pt = self._create_synchronized_parameter_tree(pfields, mfields)
         
-        self._node_instruments = {}
-        self._instrument_exclusions = {}
-        self._active_instrument_cache = {}
-        self._instrument_version = 0
-        
         if inst is not None:
             self.set_instrument(self._pt.root, inst)
         
-        self._env_specs = {}
-        self._next_env_id = 0
         self._slur_specs = {}
         self._next_slur_id = 0
+
+    @property
+    def nodes(self):
+        return UCNodeView(self)
     
     @classmethod
     def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
@@ -313,11 +394,7 @@ class CompositionalUnit(TemporalUnit):
         ParameterTree
             A parameter tree matching the rhythm tree structure with clean nodes
         """
-        pt = ParameterTree(self._rt.meas.numerator, self._rt.subdivisions)
-        
-        for node in pt.nodes:
-            node_data = pt[node]
-            node_data.clear()
+        pt = ParameterTree.from_tree_structure(self._rt)
         
         if pfields is not None:
             self._initialize_parameter_fields(pt, pfields)
@@ -361,61 +438,8 @@ class CompositionalUnit(TemporalUnit):
             default_values = {field: '' for field in mfields}
             pt.set_mfields(pt.root, **default_values)
 
-    def _invalidate_instrument_cache(self):
-        self._instrument_version += 1
-        self._active_instrument_cache.clear()
-
-    def _normalize_exclude(self, exclude):
-        if exclude is None:
-            return set()
-        if isinstance(exclude, str):
-            return {exclude}
-        if isinstance(exclude, (list, tuple, set)):
-            return set(exclude)
-        return set(exclude)
-
     def _resolve_governing_instrument_node(self, node: int):
-        if node in self._node_instruments:
-            return node
-        for ancestor in reversed(self._rt.branch(node)[:-1]):
-            if ancestor in self._node_instruments:
-                return ancestor
-        return None
-
-    def _resolve_instrument_with_exclusions(self, node: int):
-        cache_key = (node, self._instrument_version)
-        if cache_key in self._active_instrument_cache:
-            return self._active_instrument_cache[cache_key]
-        governing = self._resolve_governing_instrument_node(node)
-        if governing is None:
-            result = (None, set())
-        else:
-            result = (
-                self._node_instruments.get(governing),
-                self._instrument_exclusions.get(governing, set())
-            )
-        self._active_instrument_cache[cache_key] = result
-        return result
-
-    def get_active_instrument(self, node: int):
-        """
-        Get the governing instrument for a node.
-        
-        Resolves the instrument by walking up the tree hierarchy from the
-        given node to find the nearest ancestor with an instrument assignment.
-        
-        Parameters
-        ----------
-        node : int
-            The node ID to query.
-            
-        Returns
-        -------
-        Instrument or None
-            The active instrument, or None if no instrument is assigned.
-        """
-        instrument, _ = self._resolve_instrument_with_exclusions(node)
-        return instrument
+        return self._pt._resolve_governing_instrument_node(node)
 
     def _normalize_node_input(self, node):
         if node is None:
@@ -494,32 +518,6 @@ class CompositionalUnit(TemporalUnit):
         pt_snapshot = self._pt.copy()
         if self._events is None:
             super()._evaluate()
-        for env_spec in self._env_specs.values():
-            selected_leaves = env_spec['leaf_nodes']
-            sounding = [n for n in selected_leaves if self._rt[n].get('proportion', 1) >= 0]
-            if not sounding:
-                continue
-            start_time = min(self._rt[n]['real_onset'] for n in sounding)
-            if env_spec['endpoint']:
-                end_time = max(self._rt[n]['real_onset'] + abs(self._rt[n]['real_duration']) for n in sounding)
-            else:
-                end_time = max(self._rt[n]['real_onset'] for n in sounding)
-            duration = end_time - start_time
-            envelope = env_spec['envelope']
-            scaled_envelope = Envelope(
-                values=envelope.values,
-                times=envelope.times,
-                curve=envelope._curve,
-                time_scale=duration / envelope.total_time if envelope.total_time > 0 else 1.0
-            )
-            for node in sounding:
-                event_time = self._rt[node]['real_onset']
-                relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
-                try:
-                    env_value = scaled_envelope.at_time(relative_time)
-                except ValueError:
-                    env_value = scaled_envelope.values[0] if relative_time <= 0 else scaled_envelope.values[-1]
-                pt_snapshot.set_pfields(node, **{pfield: env_value for pfield in env_spec['pfields']})
         for slur_id, slur_spec in self._slur_specs.items():
             leaves = list(slur_spec['leaf_nodes'])
             if not leaves:
@@ -536,17 +534,17 @@ class CompositionalUnit(TemporalUnit):
 
     def _evaluate(self):
         """
-        Updates node timings and returns Event objects instead of Chronon objects.
+        Updates node timings and returns Parametron objects instead of Chronon objects.
         
         Returns
         -------
-        tuple of Event
-            Events containing both temporal and parameter data
+        tuple of Parametron
+            Parametrons containing both temporal and parameter data
         """
         super()._evaluate()
         eval_pt = self._build_effective_parameter_tree()
         leaf_nodes = self._rt.leaf_nodes
-        return tuple(Event(node_id, self._rt, eval_pt, self._resolve_instrument_with_exclusions) for node_id in leaf_nodes)
+        return tuple(Parametron(node_id, self, eval_pt) for node_id in leaf_nodes)
 
     @property
     def pt(self) -> ParameterTree:
@@ -609,8 +607,9 @@ class CompositionalUnit(TemporalUnit):
                 'is_rest': event.is_rest,
                 's': event.proportion,
                 'metric_duration': event.metric_duration,
+                'pfields': event.pfields,
+                'mfields': event.mfields,
             }
-            event_dict.update(event.parameters)
             base_data.append(event_dict)
         
         return pd.DataFrame(base_data, index=range(len(self._events)))
@@ -622,13 +621,9 @@ class CompositionalUnit(TemporalUnit):
 
         total = len(targets)
         for i, n in enumerate(targets):
-            ctx = PFieldContext(
-                index=i,
-                total=total,
-                node=n,
-                is_rest=self._rt[n].get('proportion', 1) < 0,
-                params=(self._pt[n].active_items()
-                        if hasattr(self._pt[n], 'active_items') else {})
+            ctx = _build_pfield_context(
+                self, n, i, total,
+                is_rest=self._rt[n].get('proportion', 1) < 0
             )
             resolved = {}
             for k, v in fields.items():
@@ -659,7 +654,7 @@ class CompositionalUnit(TemporalUnit):
         **kwargs
             Parameter field names and values. Value types:
             - Scalar: set directly on target node(s) (includes tuples, lists, or any non-callable/non-Pattern value)
-            - Callable: evaluated once per target node (0-arg or 1-arg with PFieldContext)
+            - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
         """
         targets = [node] if isinstance(node, int) else list(node)
@@ -689,7 +684,7 @@ class CompositionalUnit(TemporalUnit):
         **kwargs
             Meta field names and values. Value types:
             - Scalar: set directly on target node(s)
-            - Callable: evaluated once per target node (0-arg or 1-arg with PFieldContext)
+            - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
         """
         targets = [node] if isinstance(node, int) else list(node)
@@ -706,31 +701,32 @@ class CompositionalUnit(TemporalUnit):
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
 
-    def _validate_envelope_selection(self, selected, pfields_list, reserved_ranges=None):
-        proposed_range = self._selection_index_range(selected)
-        for spec in self._env_specs.values():
-            if not set(spec['pfields']).intersection(pfields_list):
-                continue
-            if self._ranges_overlap(proposed_range, spec['index_range']):
-                raise ValueError("Envelope overlap detected for one or more target pfields")
-        if reserved_ranges:
-            for reserved_range in reserved_ranges:
-                if self._ranges_overlap(proposed_range, reserved_range):
-                    raise ValueError("Envelope overlap detected within requested per-node applications")
-        return proposed_range
-
-    def _register_envelope(self, selected, envelope, pfields_list, endpoint):
-        proposed_range = self._validate_envelope_selection(selected, pfields_list)
-        env_id = self._next_env_id
-        self._next_env_id += 1
-        self._env_specs[env_id] = {
-            'envelope': envelope,
-            'leaf_nodes': selected,
-            'pfields': pfields_list,
-            'endpoint': endpoint,
-            'index_range': proposed_range
-        }
-        return env_id
+    def _bake_envelope(self, selected, envelope, pfields_list, endpoint):
+        if self._events is None:
+            super()._evaluate()
+        sounding = [n for n in selected if self.nodes[n].get('proportion', 1) >= 0]
+        if not sounding:
+            return
+        start_time = min(self.nodes[n]['real_onset'] for n in sounding)
+        if endpoint:
+            end_time = max(self.nodes[n]['real_onset'] + abs(self.nodes[n]['real_duration']) for n in sounding)
+        else:
+            end_time = max(self.nodes[n]['real_onset'] for n in sounding)
+        duration = end_time - start_time
+        scaled_envelope = Envelope(
+            values=envelope.values,
+            times=envelope.times,
+            curve=envelope._curve,
+            time_scale=duration / envelope.total_time if envelope.total_time > 0 else 1.0
+        )
+        for node in sounding:
+            event_time = self.nodes[node]['real_onset']
+            relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
+            try:
+                env_value = scaled_envelope.at_time(relative_time)
+            except ValueError:
+                env_value = scaled_envelope.values[0] if relative_time <= 0 else scaled_envelope.values[-1]
+            self._pt.set_pfields(node, **{pfield: env_value for pfield in pfields_list})
 
     def apply_envelope(self,
                        envelope: Envelope,
@@ -781,34 +777,49 @@ class CompositionalUnit(TemporalUnit):
         if mode == "span":
             selected = self._resolve_leaf_selection(node=node)
             selected = self._apply_offset_take(selected, offset=offset, take=take)
-            env_id = self._register_envelope(selected, envelope, pfields_list, endpoint)
+            self._bake_envelope(selected, envelope, pfields_list, endpoint)
             self._events = None
-            return env_id
-        if mode == "per_node":
-            selections = []
+        elif mode == "per_node":
             groups = self._resolve_per_node_leaf_groups(node)
-            reserved_ranges = []
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
-                selection_range = self._validate_envelope_selection(
-                    selected,
-                    pfields_list,
-                    reserved_ranges=reserved_ranges
-                )
-                reserved_ranges.append(selection_range)
-                selections.append(selected)
-            env_ids = []
-            for selected in selections:
-                env_ids.append(self._register_envelope(selected, envelope, pfields_list, endpoint))
+                self._bake_envelope(selected, envelope, pfields_list, endpoint)
             self._events = None
-            return env_ids
-        raise ValueError(f"Unknown mode: {mode}")
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
+    def _partition_non_rest_segments(self, leaves, rest_set):
+        segments = []
+        current = []
+        for leaf in leaves:
+            if leaf in rest_set:
+                if len(current) >= 2:
+                    segments.append(tuple(current))
+                current = []
+            else:
+                current.append(leaf)
+        if len(current) >= 2:
+            segments.append(tuple(current))
+        return segments
+
+    def _validate_slur_segment(self, segment, reserved_sets=None):
+        proposed_set = set(segment)
+        for spec in self._slur_specs.values():
+            if proposed_set.intersection(spec['leaf_set']):
+                raise ValueError("Slurs cannot overlap")
+        if reserved_sets:
+            for reserved_set in reserved_sets:
+                if proposed_set.intersection(reserved_set):
+                    raise ValueError("Slurs cannot overlap within requested per-node applications")
+        return proposed_set
 
     def _validate_slur_selection(self, selected, reserved_sets=None):
         if len(selected) < 2:
             raise ValueError("Slur requires at least two leaves")
-        if any(self._rt[n].get('proportion', 1) < 0 for n in selected):
-            raise ValueError("Slur selections cannot include rests")
+        rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
+        segments = self._partition_non_rest_segments(selected, rest_set)
+        if not segments:
+            raise ValueError("Slur selection has no segment with at least two sounding leaves")
         proposed_set = set(selected)
         proposed_range = self._selection_index_range(selected)
         for spec in self._slur_specs.values():
@@ -869,36 +880,45 @@ class CompositionalUnit(TemporalUnit):
         if mode == "span":
             selected = self._resolve_leaf_selection(node=node)
             selected = self._apply_offset_take(selected, offset=offset, take=take)
-            slur_id = self._register_slur(selected)
+            if len(selected) < 2:
+                raise ValueError("Slur requires at least two leaves")
+            rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
+            segments = self._partition_non_rest_segments(selected, rest_set)
+            slur_ids = []
+            reserved_sets = []
+            for segment in segments:
+                self._validate_slur_segment(segment, reserved_sets)
+                slur_id = self._register_slur(segment)
+                reserved_sets.append(set(segment))
+                slur_ids.append(slur_id)
             self._events = None
-            return slur_id
+            return slur_ids[0] if len(slur_ids) == 1 else slur_ids
         if mode == "per_node":
-            selections = []
             groups = self._resolve_per_node_leaf_groups(node)
+            slur_ids = []
             reserved_sets = []
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
-                proposed_set, _ = self._validate_slur_selection(selected, reserved_sets=reserved_sets)
-                reserved_sets.append(proposed_set)
-                selections.append(selected)
-            slur_ids = []
-            for selected in selections:
-                slur_ids.append(self._register_slur(selected))
+                rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
+                segments = self._partition_non_rest_segments(selected, rest_set)
+                for segment in segments:
+                    self._validate_slur_segment(segment, reserved_sets)
+                    slur_id = self._register_slur(segment)
+                    reserved_sets.append(set(segment))
+                    slur_ids.append(slur_id)
             self._events = None
             return slur_ids
         raise ValueError(f"Unknown mode: {mode}")
 
-    def _remove_slurs_for_nodes(self, nodes_to_remove: set[int]):
-        removed = []
+    def _split_slurs_for_rests(self, nodes_to_rest: set[int]):
         for slur_id, spec in list(self._slur_specs.items()):
-            if spec['leaf_set'].intersection(nodes_to_remove):
-                removed.append(slur_id)
-                del self._slur_specs[slur_id]
-        if removed:
-            warnings.warn(
-                f"Removed slur(s) {removed} because rests were introduced into slurred span(s).",
-                RuntimeWarning
-            )
+            if not spec['leaf_set'].intersection(nodes_to_rest):
+                continue
+            leaves = list(spec['leaf_nodes'])
+            segments = self._partition_non_rest_segments(leaves, nodes_to_rest)
+            del self._slur_specs[slur_id]
+            for segment in segments:
+                self._register_slur(segment)
 
     def make_rest(self, node: int) -> None:
         """
@@ -915,11 +935,66 @@ class CompositionalUnit(TemporalUnit):
         """
         affected = set([node] + list(self._rt.descendants(node)))
         affected_leaves = set([n for n in affected if n in self._rt.leaf_nodes])
-        self._remove_slurs_for_nodes(affected_leaves)
+        self._split_slurs_for_rests(affected_leaves)
         super().make_rest(node)
         self._events = None
-    
-    def set_instrument(self, node, instrument, exclude=None) -> None:
+
+    def subdivide(self, node: int, S) -> None:
+        """
+        Subdivide a leaf node with structure (D, S), syncing PT and cascading values.
+
+        Delegates to :meth:`RhythmTree.subdivide`, then adds corresponding nodes
+        to the ParameterTree with matching IDs and cascades pfields/mfields from
+        the subdivided node to its new children.
+
+        Parameters
+        ----------
+        node : int
+            The leaf node to subdivide.
+        S : tuple
+            Valid subdivisions tuple (integers or nested (D, S) tuples).
+
+        Raises
+        ------
+        ValueError
+            If the node is not found or is not a leaf.
+        """
+        parent_data = self._pt[node].active_items()
+        pfields = {k: v for k, v in parent_data.items() if k in self._pt._meta['pfields']}
+        mfields = {k: v for k, v in parent_data.items() if k in self._pt._meta['mfields']}
+
+        self._rt.subdivide(node, S)
+        new_children = list(self._rt.successors(node))
+
+        for _ in new_children:
+            self._pt.add_child(node)
+        self._pt._invalidate_caches()
+
+        for child in new_children:
+            if pfields:
+                self._pt.set_pfields(child, **pfields)
+            if mfields:
+                self._pt.set_mfields(child, **mfields)
+
+        self._events = None
+
+    def add_child(self, parent, **attr):
+        new_rt_node = self._rt.add_child(parent, **attr)
+        self._pt.add_child(parent)
+        self._events = None
+        return new_rt_node
+
+    def prune(self, node):
+        self._rt.prune(node)
+        self._pt.prune(node)
+        self._events = None
+
+    def remove_subtree(self, node):
+        self._rt.remove_subtree(node)
+        self._pt.remove_subtree(node)
+        self._events = None
+
+    def set_instrument(self, node, instrument) -> None:
         """
         Set an instrument for target node(s).
         
@@ -931,42 +1006,32 @@ class CompositionalUnit(TemporalUnit):
         instrument : Instrument, Pattern, or callable
             - Instrument: set directly on node (current behavior)
             - Pattern: next() called once per target node
-            - Callable: evaluated once per target node (0-arg or 1-arg with PFieldContext)
-        exclude : str, list, set, or None, optional
-            Parameter fields to exclude from instrument application
+            - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
         """
         targets = [node] if isinstance(node, int) else list(node)
 
         if isinstance(instrument, Instrument):
             for n in targets:
-                self._node_instruments[n] = instrument
-                self._instrument_exclusions[n] = self._normalize_exclude(exclude)
-                self._pt._meta['pfields'].update(instrument.keys())
-                self._invalidate_instrument_cache()
+                self._pt.set_instrument(n, instrument)
+            self._events = None
         elif callable(instrument) or isinstance(instrument, Pattern):
             total = len(targets)
             for i, n in enumerate(targets):
                 if isinstance(instrument, Pattern):
                     inst = next(instrument)
                 else:
-                    ctx = PFieldContext(
-                        index=i,
-                        total=total,
-                        node=n,
-                        is_rest=self._rt[n].get('proportion', 1) < 0,
-                        params=(self._pt[n].active_items()
-                                if hasattr(self._pt[n], 'active_items') else {})
+                    ctx = _build_pfield_context(
+                        self, n, i, total,
+                        is_rest=self._rt[n].get('proportion', 1) < 0
                     )
                     arity = _callable_arity(instrument)
                     inst = instrument(ctx) if arity >= 1 else instrument()
                 if inst is not None:
-                    self._node_instruments[n] = inst
-                    self._instrument_exclusions[n] = self._normalize_exclude(exclude)
-                    self._pt._meta['pfields'].update(inst.keys())
-                    self._invalidate_instrument_cache()
+                    self._pt.set_instrument(n, inst)
+            self._events = None
 
     def set(self, node, inst=None, mfields=None, pfields=None,
-            exclude=None, include_rests=False):
+            include_rests=False):
         """
         Convenience method to set instrument, meta fields, and parameter fields in one call.
         
@@ -980,14 +1045,12 @@ class CompositionalUnit(TemporalUnit):
             Meta field names and values to set.
         pfields : dict or None, optional
             Parameter field names and values to set.
-        exclude : str, list, set, or None, optional
-            Parameter fields to exclude from instrument application.
         include_rests : bool, optional
             When True, rest nodes are included during callable/Pattern
             distribution (default is False).
         """
         if inst is not None:
-            self.set_instrument(node, inst, exclude=exclude)
+            self.set_instrument(node, inst)
         if mfields is not None:
             self.set_mfields(node, include_rests=include_rests, **mfields)
         if pfields is not None:
@@ -998,14 +1061,14 @@ class CompositionalUnit(TemporalUnit):
         Randomly convert sounding leaves to rests.
         
         Extends the base ``TemporalUnit.sparsify`` to accept a callable
-        probability that receives a ``PFieldContext`` for each candidate
+        probability that receives a ``DistributionContext`` for each candidate
         leaf, enabling parameter-aware rest decisions.
         
         Parameters
         ----------
         probability : float or callable
             If float, the fixed probability (0--1) of each leaf becoming
-            a rest. If callable, receives a ``PFieldContext`` and returns
+            a rest. If callable, receives a ``DistributionContext`` and returns
             True to rest the leaf.
         node : int or iterable of int, optional
             Restrict sparsification to this node's subtree leaves.
@@ -1034,39 +1097,30 @@ class CompositionalUnit(TemporalUnit):
 
         total = len(targets)
         for i, leaf in enumerate(targets):
-            ctx = PFieldContext(
-                index=i, total=total, node=leaf,
-                is_rest=False,
-                params=(self._pt[leaf].active_items()
-                        if hasattr(self._pt[leaf], 'active_items')
-                        else {})
-            )
+            ctx = _build_pfield_context(self, leaf, i, total, is_rest=False)
             if probability(ctx):
                 self.make_rest(leaf)
 
+    def get_instrument(self, node: int):
+        """Resolved instrument for node (nearest ancestor with instrument)."""
+        return self._pt.get_instrument(node)
+
+    def get_pfield(self, node: int, key: str, default=None):
+        """Parameter field value for node (PT only, no instrument fallback)."""
+        return self._pt.get_pfield(node, key) or default
+
+    def get_mfield(self, node: int, key: str, default=None):
+        """Meta field value for node."""
+        return self._pt.get_mfield(node, key) or default
+
     def get_parameter(self, node: int, key: str, default=None):
-        """
-        Get an effective value for a specific node key.
-        
-        Parameters
-        ----------
-        node : int
-            The node ID to query
-        key : str
-            Parameter or instrument field name.
-        default : Any, optional
-            Default value if parameter not found
-            
-        Returns
-        -------
-        Any
-            The resolved value from PT first, then from active instrument fields.
-            Returns default if unresolved.
-        """
-        value = self._pt.get(node, key)
+        value = self._pt.get_pfield(node, key)
         if value is not None:
             return value
-        instrument = self.get_active_instrument(node)
+        value = self._pt.get_mfield(node, key)
+        if value is not None:
+            return value
+        instrument = self._pt.get_instrument(node)
         if instrument is not None:
             if key == 'synthName':
                 return instrument['synth_name']
@@ -1084,15 +1138,11 @@ class CompositionalUnit(TemporalUnit):
             Node ID to clear. If None, clears all nodes and all UC overlays.
         """
         if node is None:
-            self._env_specs.clear()
             self._slur_specs.clear()
         else:
             affected_nodes = {node}.union(set(self._rt.descendants(node)))
             affected_leaves = {n for n in affected_nodes if n in self._rt.leaf_nodes}
-            for env_id, env_spec in list(self._env_specs.items()):
-                if set(env_spec['leaf_nodes']).intersection(affected_leaves):
-                    del self._env_specs[env_id]
-            self._remove_slurs_for_nodes(affected_leaves)
+            self._split_slurs_for_rests(affected_leaves)
         
         self._pt.clear(node)
         self._events = None
@@ -1104,7 +1154,7 @@ class CompositionalUnit(TemporalUnit):
         Parameters
         ----------
         idx : int
-            Event index
+            Parametron index
             
         Returns
         -------
@@ -1113,7 +1163,8 @@ class CompositionalUnit(TemporalUnit):
         """
         if self._events is None:
             self._events = self._evaluate()
-        return self._events[idx].parameters
+        e = self._events[idx]
+        return {'pfields': e.pfields, 'mfields': e.mfields}
     
     def from_subtree(self, node: int) -> 'CompositionalUnit':
         """
@@ -1169,41 +1220,24 @@ class CompositionalUnit(TemporalUnit):
             new_cu._pt.nodes[new_node].update(node_data)
         new_cu._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
         new_cu._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
-        new_cu._pt._invalidate_parameter_caches()
 
         subtree_node_set = set(original_subtree_nodes)
-        governing_instrument_node = self._resolve_governing_instrument_node(node)
+        governing_instrument_node = self._pt._resolve_governing_instrument_node(node)
         if (governing_instrument_node is not None
             and governing_instrument_node not in subtree_node_set
-            and governing_instrument_node in self._node_instruments):
-            new_cu.set_instrument(
+            and governing_instrument_node in self._pt._node_instruments):
+            new_cu._pt.set_instrument(
                 new_cu._pt.root,
-                self._node_instruments[governing_instrument_node],
-                exclude=self._instrument_exclusions.get(governing_instrument_node)
+                self._pt._node_instruments[governing_instrument_node]
             )
         for old_node in original_subtree_nodes:
-            if old_node in self._node_instruments:
-                new_cu.set_instrument(
+            if old_node in self._pt._node_instruments:
+                new_cu._pt.set_instrument(
                     old_to_new_mapping[old_node],
-                    self._node_instruments[old_node],
-                    exclude=self._instrument_exclusions.get(old_node)
+                    self._pt._node_instruments[old_node]
                 )
 
         old_leaf_set = set(self._rt.subtree_leaves(node))
-        for env_id, env_spec in self._env_specs.items():
-            env_leaf_set = set(env_spec['leaf_nodes'])
-            if env_leaf_set and env_leaf_set.issubset(old_leaf_set):
-                mapped = []
-                for old_leaf in env_spec['leaf_nodes']:
-                    if old_leaf in old_to_new_mapping:
-                        mapped.append(old_to_new_mapping[old_leaf])
-                if mapped:
-                    new_cu.apply_envelope(
-                        envelope=env_spec['envelope'],
-                        pfields=env_spec['pfields'],
-                        node=mapped,
-                        endpoint=env_spec['endpoint']
-                    )
         for slur_id, slur_spec in self._slur_specs.items():
             slur_leaf_set = set(slur_spec['leaf_nodes'])
             if slur_leaf_set and slur_leaf_set.issubset(old_leaf_set):
