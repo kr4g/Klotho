@@ -421,11 +421,6 @@ class RhythmTree(Tree):
                     if node not in self.descendants(root_node):
                         children = list(self.successors(node))
                         self[node]['metric_onset'] = self[children[0]]['metric_onset']
-        else:
-            for node in reversed(list(self.topological_sort())):
-                if self.out_degree(node) > 0:
-                    children = list(self.successors(node))
-                    self[node]['metric_onset'] = self[children[0]]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)

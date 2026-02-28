@@ -56,9 +56,8 @@ class ParameterTree(Tree):
         while stack:
             node = stack.pop()
             p = self.parent(node)
-            base = dict(self._effective_cache[p]) if p is not None else {}
-            base.update(self.nodes[node])
-            self._effective_cache[node] = base
+            parent_eff = self._effective_cache[p] if p is not None else {}
+            self._effective_cache[node] = {**parent_eff, **self.nodes[node]}
             for c in self.successors(node):
                 stack.append(c)
 
