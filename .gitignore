@@ -144,6 +144,10 @@ klotho-book/
 # Tracked exceptions
 # ==========================
 
+!tests/
+!tests/**
+tests/**/__pycache__/
+
 # Examples directory (tracked, currently empty)
 !examples/
 !examples/.gitkeep
