@@ -333,7 +333,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     if animate and path:
         from .svg_cps import _svg_cps
         from .animated import AnimatedCPSSvgFigure
-        from ._audio_events import build_path_audio_events
+        from klotho.utils.playback._config import get_audio_engine
+        from klotho.utils.playback.animation_events import build_path_engine_payload
         svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                             mute_background=mute_background, figsize=figsize,
                             node_size=node_size, text_size=text_size,
@@ -346,7 +347,15 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 freqs.append(ref_freq * ratio)
             except Exception:
                 freqs.append(ref_freq)
-        audio_payload = build_path_audio_events(freqs, dur, amp=amp)
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+        audio_payload = build_path_engine_payload(
+            freqs,
+            dur,
+            engine=get_audio_engine(),
+            amp=amp,
+            extra_pfields=extra_synth_kwargs,
+            pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
+        )
         return AnimatedCPSSvgFigure(svg_data, audio_payload=audio_payload, dur=dur)
 
     if shape is not None and len(shape) > 0:
@@ -358,7 +367,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         if animate:
             from .svg_cps import _svg_cps
             from .animated import AnimatedCPSShapeFigure
-            from ._audio_events import build_shape_audio_events
+            from klotho.utils.playback._config import get_audio_engine
+            from klotho.utils.playback.animation_events import build_shape_engine_payload
             svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                                 mute_background=mute_background, figsize=figsize,
                                 node_size=node_size, text_size=text_size,
@@ -376,7 +386,18 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                         group_freqs.append(ref_freq)
                 freq_groups.append(group_freqs)
 
-            audio_payload = build_shape_audio_events(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp)
+            extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+            audio_payload = build_shape_engine_payload(
+                freq_groups,
+                dur,
+                engine=get_audio_engine(),
+                arp=arp,
+                strum=strum,
+                direction=direction,
+                amp=amp,
+                extra_pfields=extra_synth_kwargs,
+                pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
+            )
             return AnimatedCPSShapeFigure(svg_data, audio_payload=audio_payload, dur=dur)
 
     from .svg_cps import _svg_cps

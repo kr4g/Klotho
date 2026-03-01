@@ -8,8 +8,8 @@ from klotho.utils.playback._converter_base import (
     freq_to_midi,
 )
 
-GATED_ENV_TYPES = ('sustained', 'sus', 'asr', 'adsr', '')
-UNGATED_ENV_TYPES = ('standard', 'std', 'perc', 'linen')
+GATED_RELEASE_MODES = ('gate',)
+FREE_RELEASE_MODES = ('free',)
 SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
 
 
@@ -37,20 +37,21 @@ def _normalize_sc_pfields(pfields):
 
 
 def _resolve_event_synth(event, instrument, default_synth):
-    explicit = event.get_parameter('synth_name') or event.get_parameter('synthName')
+    explicit = event.get_parameter('defName') or event.get_parameter('synthName')
     if explicit:
         return explicit
     if isinstance(instrument, SynthDefInstrument):
-        return getattr(instrument, 'synth_name', None) or getattr(instrument, 'name', None) or default_synth
+        return getattr(instrument, 'defName', None) or default_synth
     if instrument is not None:
-        return getattr(instrument, 'synth_name', None) or getattr(instrument, 'name', None) or default_synth
+        return getattr(instrument, 'defName', None) or default_synth
     return default_synth
 
 
-def _env_type(instrument):
+def _release_mode(instrument):
     if instrument is None:
-        return ''
-    return (getattr(instrument, 'env_type', '') or '').lower()
+        return 'gate'
+    raw = (getattr(instrument, 'release_mode', '') or '').lower()
+    return raw if raw in ('gate', 'free') else 'gate'
 
 
 def _attach_poly_meta(event_record, voice_event):
@@ -69,7 +70,7 @@ def lower_compositional_ir_to_sc_assembly(
     obj,
     extra_pfields=None,
     animation=False,
-    default_synth='sonic-pi-beep',
+    default_synth='kl_tri',
     include_ungated_release=True,
     normalize_sc_pfields=True,
     sort_output=True,
@@ -115,9 +116,9 @@ def lower_compositional_ir_to_sc_assembly(
 
         instrument = obj.get_instrument(event.node_id)
         synth_name = _resolve_event_synth(event, instrument, default_synth)
-        env_type = _env_type(instrument)
-        is_gated = env_type in GATED_ENV_TYPES
-        is_ungated = env_type in UNGATED_ENV_TYPES
+        release_mode = _release_mode(instrument)
+        is_gated = release_mode in GATED_RELEASE_MODES
+        is_ungated = release_mode in FREE_RELEASE_MODES
         group = event.get_parameter('group')
         is_slur_start = event.get_parameter('_slur_start', 0)
         is_slur_end = event.get_parameter('_slur_end', 0)
@@ -129,7 +130,7 @@ def lower_compositional_ir_to_sc_assembly(
             voice_end = voice_event["end"] - time_offset if animation else voice_event["end"]
             voice_pfields = {
                 k: v for k, v in voice_event["pfields"].items()
-                if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')
+                if k not in ('defName', 'synthName', 'group')
             }
 
             if is_ungated:
@@ -137,7 +138,7 @@ def lower_compositional_ir_to_sc_assembly(
                 sustain_param = sustain_param_cache.get(instrument_id)
                 if instrument_id is not None and instrument_id not in sustain_param_cache:
                     sustain_param = None
-                    lower_to_key = {k.lower(): k for k in instrument.keys()}
+                    lower_to_key = {k.lower(): k for k in instrument.pfields.keys()}
                     for param in ('sustaintime', 'releasetime'):
                         if param in lower_to_key:
                             sustain_param = lower_to_key[param]

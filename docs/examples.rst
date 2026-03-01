@@ -31,4 +31,4 @@ To use custom instruments, inject a JS file when invoking the Tone.js player:
 
 ``play(obj, custom_js_path="path/to/custom_instruments.js")``
 
-On the Python side, you can reference the custom instrument by name with ``JsInstrument`` and supply default pfields if desired.
+On the Python side, you can reference the custom instrument by name with ``ToneInstrument`` and supply default pfields if desired.

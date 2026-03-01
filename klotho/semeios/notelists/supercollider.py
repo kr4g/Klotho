@@ -15,11 +15,6 @@ from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
-ENV_TYPES = {
-    'gated': ('sustained', 'sus', 'asr', 'adsr'),
-    'ungated': ('standard', 'std', 'perc', 'linen'),
-}
-
 class Scheduler:
     """Priority-queue based scheduler for SuperCollider synth events.
 
@@ -170,7 +165,7 @@ class Scheduler:
                 uc,
                 extra_pfields=None,
                 animation=False,
-                default_synth='sonic-pi-beep',
+                default_synth='kl_tri',
                 include_ungated_release=False,
                 normalize_sc_pfields=False,
                 sort_output=True,
@@ -209,11 +204,11 @@ class Scheduler:
         for event in uc:
             if event.is_rest:
                 continue
-            event_synth_name = event.get_parameter('synth_name') or event.get_parameter('synthName')
+            event_synth_name = event.get_parameter('defName') or event.get_parameter('synthName')
             if not event_synth_name:
                 continue
             event_group = event.get_parameter('group')
-            pfields = {k: v for k, v in event.pfields.items() if k not in ('synth_name', 'synthName', 'group')}
+            pfields = {k: v for k, v in event.pfields.items() if k not in ('defName', 'synthName', 'group')}
             uid = self.new_node(
                 synth_name=event_synth_name,
                 start=event.start,
@@ -221,8 +216,10 @@ class Scheduler:
                 **pfields
             )
             instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
-            env_type = (getattr(instrument, 'env_type', '') or '').lower() if instrument is not None else ''
-            if env_type in ENV_TYPES['gated']:
+            release_mode = (getattr(instrument, 'release_mode', '') or '').lower() if instrument is not None else 'gate'
+            if release_mode not in ('gate', 'free'):
+                release_mode = 'gate'
+            if release_mode == 'gate':
                 self.release_node(uid, start=event.end)
             
     def synth_groups(self, groups):

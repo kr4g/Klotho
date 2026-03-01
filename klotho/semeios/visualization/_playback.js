@@ -8,6 +8,13 @@ var loopBtn   = document.getElementById("__WID___loop");
 var loopSvg   = document.getElementById("__WID___loop_svg");
 var looping = false, playing = false;
 var engineType = "__ENGINE_TYPE__";
+var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
+    ? globalThis.KlothoPlaybackBridge({
+        engine: engineType,
+        audioPayload: audioPayload,
+        ringTime: __RING_TIME__,
+    })
+    : null;
 
 function finishPlayback() { playing = false; onReset(); setPlayIcon(); }
 
@@ -30,47 +37,8 @@ loopBtn.onclick = function() {
     loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
 };
 
-var _aPlayer = null, _aInstruments = null;
-var _ssScheduler = null, _ssSonic = null, _ssReady = false;
 var _timerId = null;
 var durMs = __DUR_MS__;
-
-function _canToneAudio() {
-    if (_aPlayer) return true;
-    if (!audioPayload || typeof Tone === "undefined"
-        || typeof globalThis.KLOTHO_BUILD_INSTRUMENTS !== "function"
-        || typeof globalThis.KlothoPlayer === "undefined") return false;
-    _aInstruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(audioPayload.instruments || {});
-    _aPlayer = KlothoPlayer.create();
-    return true;
-}
-
-async function _ensureSSReady() {
-    if (_ssReady) return true;
-    if (typeof __ensureSuperSonic !== "function") return false;
-    try {
-        var sonic = await __ensureSuperSonic();
-        _ssSonic = sonic;
-        _ssScheduler = new BrowserScheduler({
-            sonic: sonic,
-            manifest: (typeof __klothoManifest !== "undefined") ? __klothoManifest : { synths: {}, inserts: {} },
-            ringTime: __RING_TIME__,
-        });
-        _ssReady = true;
-        return true;
-    } catch(e) {
-        return false;
-    }
-}
-
-function _getSSEvents() {
-    if (!audioPayload) return [];
-    var raw = audioPayload.events || audioPayload;
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(function(e) {
-        return e.type === "new" || e.type === "set" || e.type === "release";
-    });
-}
 
 function _runAnimation(stepIdx) {
     if (!playing) return;
@@ -87,70 +55,34 @@ function _runAnimation(stepIdx) {
 
 function _stopAll() {
     if (_timerId) { clearTimeout(_timerId); _timerId = null; }
-    if (_ssScheduler && _ssScheduler.isPlaying) _ssScheduler.stop();
-    if (_aPlayer && _aPlayer.isPlaying()) _aPlayer.stop();
+    if (bridge) bridge.stop();
 }
 
 toggleBtn.onclick = async function() {
-    if (engineType === "supersonic") {
-        if (playing) {
-            _stopAll();
-            finishPlayback();
-            return;
-        }
+    if (playing) {
+        _stopAll();
+        finishPlayback();
+        return;
+    }
 
-        var ok = await _ensureSSReady();
-        var evts = ok ? _getSSEvents() : [];
+    var ok = bridge ? await bridge.ensureReady() : false;
+    var hasEvents = ok && bridge && bridge.hasPlayableEvents();
 
-        if (ok && evts.length > 0) {
-            if (_ssSonic.audioContext && _ssSonic.audioContext.state === "suspended") {
-                await _ssSonic.audioContext.resume();
-            }
-            playing = true; setStopIcon(); onBeforePlay();
-            var _ssFirstPlay = true;
-            function ssLoopPlay() {
-                _ssScheduler.play(evts, {
-                    _skipStop: !_ssFirstPlay,
-                    onEvent: function(stepIdx) { if (playing) onStep(stepIdx); },
-                    onFinish: function() {
-                        if (looping && playing) {
-                            onBeforePlay();
-                            ssLoopPlay();
-                        } else {
-                            finishPlayback();
-                        }
-                    }
-                });
-                _ssFirstPlay = false;
-            }
-            ssLoopPlay();
-        } else {
-            if (playing) {
-                _stopAll();
-                finishPlayback();
-            } else {
-                playing = true; setStopIcon(); onBeforePlay(); _runAnimation(0);
-            }
-        }
+    if (hasEvents) {
+        await bridge.resumeAudio();
+        playing = true;
+        setStopIcon();
+        onBeforePlay();
+        await bridge.play(null, {
+            loop: looping,
+            onEvent: function(stepIdx) { if (playing) onStep(stepIdx); },
+            onFinish: function() { finishPlayback(); },
+        });
     } else {
-        if (_canToneAudio()) {
-            if (_aPlayer.isPlaying()) { _aPlayer.stop(); return; }
-            playing = true; setStopIcon(); onBeforePlay();
-            await _aPlayer.play(audioPayload.events || [], _aInstruments, {
-                loop: looping,
-                onEvent:  function(stepIdx) { onStep(stepIdx); },
-                onStop:   function() { finishPlayback(); },
-                onFinish: function() { finishPlayback(); }
-            });
-        } else {
-            if (playing) {
-                playing = false;
-                if (_timerId) { clearTimeout(_timerId); _timerId = null; }
-                finishPlayback();
-            } else {
-                playing = true; setStopIcon(); onBeforePlay(); _runAnimation(0);
-            }
-        }
+        playing = true;
+        setStopIcon();
+        onBeforePlay();
+        _runAnimation(0);
     }
 };
 

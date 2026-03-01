@@ -2,7 +2,7 @@ from mido import MidiFile
 
 from klotho import CompositionalUnit
 from klotho.semeios.notelists.supercollider import Scheduler
-from klotho.thetos.instruments.instrument import JsInstrument, MidiInstrument
+from klotho.thetos.instruments.instrument import ToneInstrument, MidiInstrument
 from klotho.utils.playback._converter_base import lower_event_ir_to_voice_events, lower_poly_pfields_to_voices
 from klotho.utils.playback.midi_player import _create_midi_from_compositional_unit
 from klotho.utils.playback._sc_assembly import sort_sc_assembly_events
@@ -52,13 +52,11 @@ class _FakeCU:
 
 
 class _SimpleSCInstrument:
-    def __init__(self, synth_name="test-synth", env_type="Sustained"):
-        self.synth_name = synth_name
-        self.env_type = env_type
-        self.name = synth_name
-
-    def keys(self):
-        return []
+    def __init__(self, defName="test-synth", release_mode="gate"):
+        self.defName = defName
+        self.release_mode = release_mode
+        self.name = defName
+        self.pfields = {}
 
 
 def _collect_note_on_events_with_ticks(midi_file):
@@ -144,7 +142,7 @@ def test_tonejs_compositional_unit_poly_strum_animation_metadata():
         pfields={"freq": (220.0, 330.0, 440.0), "vel": (0.4, 0.6)},
         mfields={"strum": 0.5},
     )
-    cu = _FakeCU([event], JsInstrument(name="poly", tonejs_class="Synth", pfields={"vel": 0.5}))
+    cu = _FakeCU([event], ToneInstrument(name="poly", tonejs_class="Synth", pfields={"vel": 0.5}))
     payload = compositional_unit_to_events(cu, animation=True)
     events = payload["events"]
 
@@ -187,8 +185,8 @@ def test_sort_sc_events_orders_type_priority_at_same_start():
 def test_scheduler_accepts_arbitrary_synth_name_from_uc():
     uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), pfields={"note": 60, "amp": 0.2}, mfields={"group": "default"})
     leaves = tuple(uc._rt.leaf_nodes)
-    uc.set_pfields(leaves[0], synth_name='custom_poly_synth', note=(60, 64), amp=0.25)
-    uc.set_pfields(leaves[1], synth_name='custom_poly_synth', note=67, amp=0.2)
+    uc.set_pfields(leaves[0], defName='custom_poly_synth', note=(60, 64), amp=0.25)
+    uc.set_pfields(leaves[1], defName='custom_poly_synth', note=67, amp=0.2)
 
     scheduler = Scheduler()
     scheduler.add(uc)
@@ -196,3 +194,24 @@ def test_scheduler_accepts_arbitrary_synth_name_from_uc():
     new_events = [event for event in scheduled_events if event["type"] == "new"]
 
     assert any(event.get("synthName") == 'custom_poly_synth' for event in new_events)
+
+
+def test_slur_markers_live_in_mfields_not_pfields():
+    uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), pfields={"note": 60, "amp": 0.2})
+    leaves = tuple(uc._rt.leaf_nodes)
+    uc.apply_slur(leaves)
+
+    events = list(uc)
+    first_event = events[0]
+    second_event = events[1]
+
+    assert first_event.get_mfield('_slur_start') == 1
+    assert first_event.get_mfield('_slur_end') == 0
+    assert second_event.get_mfield('_slur_start') == 0
+    assert second_event.get_mfield('_slur_end') == 1
+    assert first_event.get_mfield('_slur_id') is not None
+    assert second_event.get_mfield('_slur_id') == first_event.get_mfield('_slur_id')
+
+    assert '_slur_start' not in first_event.pfields
+    assert '_slur_end' not in first_event.pfields
+    assert '_slur_id' not in first_event.pfields

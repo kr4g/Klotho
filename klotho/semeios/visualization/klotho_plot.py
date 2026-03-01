@@ -1,5 +1,6 @@
 _PLAYBACK_KWARGS = frozenset({
     'beat', 'bpm', 'amp', 'glow', 'arp', 'strum', 'direction', 'dur',
+    'pause',
 })
 
 

@@ -7,6 +7,7 @@ from klotho.utils.playback.tonejs.cdn import (
     THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
 )
 from klotho.utils.playback._config import get_audio_engine
+from klotho.utils.playback.animation_events import normalize_animation_payload_for_engine
 
 from ._animation_base import (
     build_session_preamble, build_control_bar_html,
@@ -16,15 +17,7 @@ from ._animation_base import (
 
 
 def _maybe_convert_payload(audio_payload, engine):
-    if engine != "supersonic" or audio_payload is None:
-        return audio_payload
-    events = audio_payload.get("events", []) if isinstance(audio_payload, dict) else audio_payload
-    if not events:
-        return audio_payload
-    if events[0].get("type") in ("new", "set", "release"):
-        return audio_payload
-    from klotho.utils.playback.supersonic.converters import tonejs_events_to_sc
-    return tonejs_events_to_sc(events)
+    return normalize_animation_payload_for_engine(audio_payload, engine)
 
 
 class AnimatedLattice3dFigure:

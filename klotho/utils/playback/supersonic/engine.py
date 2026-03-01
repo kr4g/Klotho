@@ -49,6 +49,8 @@ def _load_synthdef_assets():
         for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
             name = path.stem
             assets[name] = base64.b64encode(path.read_bytes()).decode("ascii")
+    if "default" not in assets and "kl_tri" in assets:
+        assets["default"] = assets["kl_tri"]
     return assets
 
 

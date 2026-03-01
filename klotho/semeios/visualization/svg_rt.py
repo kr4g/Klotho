@@ -58,7 +58,7 @@ def _rt_node_tooltip(rt, node_id, audio_source=None):
                 except Exception:
                     pass
                 if hasattr(chronon, 'pfields'):
-                    skip = {'synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id'}
+                    skip = {'defName', 'synthName', 'group'}
                     for k, v in chronon.pfields.items():
                         if k not in skip:
                             parts.append(f"{k}: {v}")

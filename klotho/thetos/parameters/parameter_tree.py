@@ -79,7 +79,9 @@ class ParameterTree(Tree):
     def set_instrument(self, node, instrument):
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
-        self._meta['pfields'].update(instrument.keys())
+        self._meta['pfields'].update(instrument.pfields.keys())
+        if hasattr(instrument, 'defName'):
+            self._meta['pfields'].add('defName')
         self._node_instruments[node] = instrument
 
     def __deepcopy__(self, memo):

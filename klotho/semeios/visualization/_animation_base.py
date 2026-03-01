@@ -4,87 +4,22 @@ from klotho.utils.playback.tonejs.cdn import (
     cdn_scripts,
     INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
 )
+from klotho.utils.playback._session_boot import build_supersonic_session_preamble
 
 _PLAYBACK_JS_PATH = Path(__file__).parent / '_playback.js'
 _SHAPE_PLAYBACK_JS_PATH = Path(__file__).parent / '_shape_playback.js'
 _PLAYBACK_JS_TEMPLATE = None
 _SHAPE_PLAYBACK_JS_TEMPLATE = None
-_SS_MANIFEST_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'manifest.json'
-
-
-def _load_manifest_json():
-    if _SS_MANIFEST_PATH.exists():
-        return _SS_MANIFEST_PATH.read_text()
-    return '{"synths": {}, "inserts": {}}'
+_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / '_animation_bridge.js'
 
 
 def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False,
                            engine="tone"):
     if engine == "supersonic":
-        from klotho.utils.playback.supersonic.cdn import (
-            SUPERSONIC_CDN,
-            SUPERSONIC_CORE_CDN,
-            SUPERSONIC_SYNTHDEFS_CDN,
-            SUPERSONIC_SAMPLES_CDN,
-            DRAW_JS_PATH,
-            SCHEDULER_JS_PATH,
-        )
-        import json
-
-        ss_config = json.dumps({
-            "baseURL": f"{SUPERSONIC_CDN}/dist/",
-            "coreBaseURL": SUPERSONIC_CORE_CDN,
-            "synthdefBaseURL": SUPERSONIC_SYNTHDEFS_CDN,
-            "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
-        })
-
-        draw_js = DRAW_JS_PATH.read_text() if DRAW_JS_PATH.exists() else ""
-        sched_js = SCHEDULER_JS_PATH.read_text() if SCHEDULER_JS_PATH.exists() else ""
-
-        cdn_html = cdn_scripts(
+        return build_supersonic_session_preamble(
             include_plotly=include_plotly,
-            include_tone=False,
             include_threejs=include_threejs,
         )
-
-        manifest_json = _load_manifest_json()
-
-        ss_boot_js = f'''
-var __ssConfig = {ss_config};
-var __klothoManifest = {manifest_json};
-if (!globalThis.__ensureSuperSonic) {{
-    globalThis.__ensureSuperSonic = function() {{
-        var state = globalThis.__klothoSonic;
-        if (state && state.instance) return Promise.resolve(state.instance);
-        if (state && state.promise) return state.promise;
-        if (!state) {{
-            state = {{ instance: null, promise: null, loadedDefs: new Set() }};
-            globalThis.__klothoSonic = state;
-        }}
-        state.promise = (async function() {{
-            try {{
-                var mod = await import("{SUPERSONIC_CDN}");
-                globalThis.SuperSonic = mod.SuperSonic;
-                var sonic = new mod.SuperSonic(__ssConfig);
-                await sonic.init();
-                try {{ await sonic.loadSynthDef("sonic-pi-beep"); }} catch(e) {{}}
-                state.instance = sonic;
-                return sonic;
-            }} catch(e) {{
-                state.promise = null;
-                return null;
-            }}
-        }})();
-        return state.promise;
-    }};
-}}
-var __ensureSuperSonic = globalThis.__ensureSuperSonic;
-__ensureSuperSonic();
-'''
-        instruments_js = ""
-        player_js = ""
-
-        return cdn_html, ss_boot_js + "\n" + draw_js + "\n" + sched_js, ""
 
     cdn_html = cdn_scripts(
         include_plotly=include_plotly,
@@ -159,8 +94,10 @@ def build_nav_controls_html(wid, total_groups):
 
 
 def build_scripts_html(instruments_js, player_js):
+    bridge_js = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
     return f'''<script>{instruments_js}</script>
-<script>{player_js}</script>'''
+<script>{player_js}</script>
+<script>{bridge_js}</script>'''
 
 
 def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring_time=5):
@@ -168,14 +105,12 @@ def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring
     if _PLAYBACK_JS_TEMPLATE is None:
         _PLAYBACK_JS_TEMPLATE = _PLAYBACK_JS_PATH.read_text()
     boundary_op = ">" if use_gt_for_boundary else ">="
-    result = (_PLAYBACK_JS_TEMPLATE
-              .replace('__WID__', wid)
-              .replace('__DUR_MS__', str(dur_ms))
-              .replace('__BOUNDARY_OP__', boundary_op)
-              .replace('__ENGINE_TYPE__', engine)
-              .replace('__RING_TIME__', str(ring_time)))
-
-    return result
+    return (_PLAYBACK_JS_TEMPLATE
+            .replace('__WID__', wid)
+            .replace('__DUR_MS__', str(dur_ms))
+            .replace('__BOUNDARY_OP__', boundary_op)
+            .replace('__ENGINE_TYPE__', engine)
+            .replace('__RING_TIME__', str(ring_time)))
 
 
 def build_shape_playback_js(wid, dur_ms, total_groups, engine="tone", ring_time=5):

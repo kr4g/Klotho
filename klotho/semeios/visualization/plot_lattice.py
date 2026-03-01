@@ -265,7 +265,8 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
     )
 
     if path and len(path) > 1:
-        from ._audio_events import build_path_audio_events
+        from klotho.utils.playback._config import get_audio_engine
+        from klotho.utils.playback.animation_events import build_path_engine_payload
 
         ref_freq = 261.63
         freqs = []
@@ -275,7 +276,15 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                 freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
             except Exception:
                 freqs.append(ref_freq)
-        audio_payload = build_path_audio_events(freqs, dur, amp=amp)
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+        audio_payload = build_path_engine_payload(
+            freqs,
+            dur,
+            engine=get_audio_engine(),
+            amp=amp,
+            extra_pfields=extra_synth_kwargs,
+            pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
+        )
 
         if effective_dimensionality <= 2:
             from .animated import AnimatedLatticeSvgFigure
@@ -293,7 +302,8 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             )
 
     if has_shape:
-        from ._audio_events import build_shape_audio_events
+        from klotho.utils.playback._config import get_audio_engine
+        from klotho.utils.playback.animation_events import build_shape_engine_payload
 
         ref_freq = 261.63
         freq_groups = []
@@ -307,7 +317,18 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                     group_freqs.append(ref_freq)
             freq_groups.append(group_freqs)
 
-        audio_payload = build_shape_audio_events(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp)
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+        audio_payload = build_shape_engine_payload(
+            freq_groups,
+            dur,
+            engine=get_audio_engine(),
+            arp=arp,
+            strum=strum,
+            direction=direction,
+            amp=amp,
+            extra_pfields=extra_synth_kwargs,
+            pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
+        )
 
         if effective_dimensionality <= 2:
             from .animated import AnimatedLatticeShapeFigure

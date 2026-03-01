@@ -295,8 +295,10 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
             active_items = tree[node].active_items()
             
             display_text = ""
-            if "synth_name" in active_items:
-                display_text = str(active_items["synth_name"])
+            if "defName" in active_items:
+                display_text = str(active_items["defName"])
+            elif "synthName" in active_items:
+                display_text = str(active_items["synthName"])
             
             node_text.append(display_text)
             

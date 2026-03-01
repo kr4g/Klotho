@@ -18,7 +18,7 @@ DEFAULT_DRUM_FREQ = 110.0
 
 KNOWN_KWARGS = frozenset({
     'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
-    'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time',
+    'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time', 'pause',
 })
 
 
@@ -80,6 +80,7 @@ def extract_convert_kwargs(kwargs):
         'beat': kwargs.get('beat', None),
         'bpm': kwargs.get('bpm', None),
         'amp': kwargs.get('amp', None),
+        'pause': kwargs.get('pause', None),
         'extra_pfields': extra if extra else None,
     }
 

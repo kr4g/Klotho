@@ -69,10 +69,11 @@
 
     _bundleNew(ev, ntp) {
       if (ev.synthName === "__rest__") return;
+      var synthName = this._resolveSynthName(ev.synthName);
       var nodeId = this.sonic.nextNodeId();
       var target = this._groupId != null ? this._groupId : 0;
-      var args = [ev.synthName, nodeId, 0, target];
-      var pf = ev.pfields || {};
+      var args = [synthName, nodeId, 0, target];
+      var pf = this._resolveSynthPfields(synthName, ev.pfields || {});
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
         args.push(key, pf[key]);
@@ -80,20 +81,61 @@
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/s_new', args);
       this.sonic.sendOSC(bundle);
       this.nodeMap.set(ev.id, nodeId);
-      this._synthNames.set(ev.id, ev.synthName);
+      this._synthNames.set(ev.id, synthName);
     }
 
     _bundleSet(ev, ntp) {
       var intId = this.nodeMap.get(ev.id);
       if (intId == null) return;
       var args = [intId];
-      var pf = ev.pfields || {};
+      var synthName = this._synthNames.get(ev.id);
+      var pf = this._resolveSynthPfields(synthName, ev.pfields || {});
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
         args.push(key, pf[key]);
       }
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_set', args);
       this.sonic.sendOSC(bundle);
+    }
+
+    _getByPath(obj, path) {
+      if (!obj || !path) return undefined;
+      var parts = path.split('.');
+      var cur = obj;
+      for (var i = 0; i < parts.length; i++) {
+        var key = parts[i];
+        if (cur == null || typeof cur !== 'object' || !(key in cur)) return undefined;
+        cur = cur[key];
+      }
+      return cur;
+    }
+
+    _resolveSynthPfields(synthName, pfields) {
+      var out = {};
+      for (var key in pfields) {
+        if (!pfields.hasOwnProperty(key)) continue;
+        var val = pfields[key];
+        if (val === null || val === undefined) continue;
+        if (typeof val === 'object') continue;
+        out[key] = val;
+      }
+      var meta = (this.manifest.synths || {})[synthName] || {};
+      var paths = meta.paths || {};
+      for (var srcPath in paths) {
+        if (!paths.hasOwnProperty(srcPath)) continue;
+        var dstKey = paths[srcPath];
+        var mapped = this._getByPath(pfields, srcPath);
+        if (mapped === undefined || mapped === null) continue;
+        if (typeof mapped === 'object') continue;
+        out[dstKey] = mapped;
+      }
+      return out;
+    }
+
+    _resolveSynthName(name) {
+      if (name === "__rest__") return "__rest__";
+      if (!name || name === "sonic-pi-beep") return "kl_tri";
+      return name;
     }
 
     _bundleRelease(ev, ntp) {

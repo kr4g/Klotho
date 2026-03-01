@@ -60,13 +60,14 @@ def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) 
     pt = uc._pt
     inst = pt.get_instrument(node)
     pfields = {}
+    inst_pfields = inst.pfields if inst is not None else {}
     for k in pt._meta['pfields']:
         v = pt.get_pfield(node, k)
         if v is None and inst is not None:
-            if k == 'synthName' and 'synth_name' in inst.keys():
-                v = inst['synth_name']
-            elif k in inst.keys():
-                v = inst[k]
+            if k == 'defName' and hasattr(inst, 'defName'):
+                v = inst.defName
+            elif k in inst_pfields:
+                v = inst_pfields[k]
         pfields[k] = v
     mfields = {k: pt.get_mfield(node, k) for k in pt._meta['mfields']}
     return DistributionContext(
@@ -116,7 +117,7 @@ class Parametron(Chronon):
         """
         Get parameter field values for this event (for playback, etc.).
         
-        Returns pfield values with instrument fallback for synth_name etc.
+        Returns pfield values with instrument fallback, including defName.
         Use ``get_mfield`` for meta fields to avoid key collisions.
         
         Returns
@@ -127,19 +128,19 @@ class Parametron(Chronon):
         result = {}
         inst = self._resolve_instrument()
         if inst is not None:
-            for k in inst.keys():
-                result[k] = inst[k]
-                if k == 'synth_name':
-                    result['synthName'] = inst[k]
+            result.update(dict(inst.pfields))
+            if hasattr(inst, 'defName'):
+                result['defName'] = inst.defName
         for k in self._pt._meta['pfields']:
             v = self._pt.get_pfield(self._node_id, k)
             if v is not None:
                 result[k] = v
             elif inst is not None:
-                if k == 'synthName' and 'synth_name' in inst.keys():
-                    result[k] = inst['synth_name']
-                elif k in inst.keys():
-                    result[k] = inst[k]
+                inst_pfields = inst.pfields
+                if k == 'defName' and hasattr(inst, 'defName'):
+                    result[k] = inst.defName
+                elif k in inst_pfields:
+                    result[k] = inst_pfields[k]
         return result
 
     @property
@@ -190,10 +191,11 @@ class Parametron(Chronon):
             return value
         instrument = self._resolve_instrument()
         if instrument is not None:
-            if key == 'synthName':
-                return instrument['synth_name']
-            if key in instrument.keys():
-                return instrument[key]
+            if key == 'defName' and hasattr(instrument, 'defName'):
+                return instrument.defName
+            inst_pfields = instrument.pfields
+            if key in inst_pfields:
+                return inst_pfields[key]
         return default
     
     def __getitem__(self, key: str):
@@ -526,7 +528,7 @@ class CompositionalUnit(TemporalUnit):
                 continue
             first, last = leaves[0], leaves[-1]
             for leaf in leaves:
-                pt_snapshot.set_pfields(
+                pt_snapshot.set_mfields(
                     leaf,
                     _slur_start=1 if leaf == first else 0,
                     _slur_end=1 if leaf == last else 0,
@@ -1107,10 +1109,11 @@ class CompositionalUnit(TemporalUnit):
             return value
         instrument = self._pt.get_instrument(node)
         if instrument is not None:
-            if key == 'synthName':
-                return instrument['synth_name']
-            if key in instrument.keys():
-                return instrument[key]
+            if key == 'defName' and hasattr(instrument, 'defName'):
+                return instrument.defName
+            inst_pfields = instrument.pfields
+            if key in inst_pfields:
+                return inst_pfields[key]
         return default
     
     def clear_parameters(self, node: int = None) -> None:

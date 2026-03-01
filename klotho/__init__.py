@@ -30,7 +30,7 @@ from .tonos import Pitch, Scale, Chord, Voicing, Sonority, ChordSequence, Contou
 
 from .dynatos import Envelope, DynamicRange
 
-from .thetos import ParameterTree, ParameterField, Instrument, SynthDefInstrument, MidiInstrument, JsInstrument, CompositionalUnit, Parametron, types
+from .thetos import ParameterTree, ParameterField, Instrument, SynthDefInstrument, MidiInstrument, ToneInstrument, CompositionalUnit, Parametron, types
 from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 from .semeios.visualization.plots import plot
@@ -45,4 +45,4 @@ __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
 ]
 
-__version__ = '5.0.11'
+__version__ = '5.0.12'
