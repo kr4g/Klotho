@@ -301,7 +301,8 @@ class ParameterNode:
         Any
             The field value, or *default*.
         """
-        return self._tree.get(self._node, key) or default
+        value = self._tree.get(self._node, key)
+        return default if value is None else value
         
     def __dict__(self):
         return self._tree.items(self._node)

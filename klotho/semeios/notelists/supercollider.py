@@ -164,9 +164,23 @@ class Scheduler:
                 self.add(unit)
             return
         
+        slur_end_events = {}
+        sustain_param_cache = {}
+        events_iterable = uc
+        if isinstance(uc, CompositionalUnit):
+            events_iterable = tuple(uc)
+            for event in events_iterable:
+                if event.is_rest:
+                    continue
+                slur_id = event.get_parameter('_slur_id')
+                if slur_id is None:
+                    continue
+                if event.get_parameter('_slur_end', 0):
+                    slur_end_events[slur_id] = event
+
         slur_uids = {}
         
-        for event in uc:
+        for event in events_iterable:
             if event.is_rest:
                 continue
                 
@@ -187,16 +201,22 @@ class Scheduler:
                 if instrument:
                     env_type = getattr(instrument, 'env_type', None) or ''
                     if env_type and env_type.lower() in ENV_TYPES['ungated']:
-                        sustain_param = None
-                        for param in ['sustaintime', 'releasetime']:
-                            if param in [k.lower() for k in instrument.keys()]:
-                                sustain_param = next(k for k in instrument.keys() if k.lower() == param)
-                                break
+                        instrument_id = id(instrument)
+                        sustain_param = sustain_param_cache.get(instrument_id)
+                        if instrument_id not in sustain_param_cache:
+                            sustain_param = None
+                            lower_to_key = {k.lower(): k for k in instrument.keys()}
+                            for param in ['sustaintime', 'releasetime']:
+                                if param in lower_to_key:
+                                    sustain_param = lower_to_key[param]
+                                    break
+                            sustain_param_cache[instrument_id] = sustain_param
                         
                         if sustain_param:
-                            end_event = next(e for e in uc._events if e.get_parameter('_slur_id') == slur_id and e.get_parameter('_slur_end'))
-                            total_duration = end_event.end - event.start
-                            pfields[sustain_param] = total_duration
+                            end_event = slur_end_events.get(slur_id)
+                            if end_event is not None:
+                                total_duration = end_event.end - event.start
+                                pfields[sustain_param] = total_duration
                 
                 slur_uid = self.new_node(
                     synth_name=event_synth_name,

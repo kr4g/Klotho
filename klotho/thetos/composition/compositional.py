@@ -159,10 +159,12 @@ class Parametron(Chronon):
         return self._pt.get_instrument(self._node_id)
 
     def get_pfield(self, key: str, default=None):
-        return self._pt.get_pfield(self._node_id, key) or default
+        value = self._pt.get_pfield(self._node_id, key)
+        return default if value is None else value
 
     def get_mfield(self, key: str, default=None):
-        return self._pt.get_mfield(self._node_id, key) or default
+        value = self._pt.get_mfield(self._node_id, key)
+        return default if value is None else value
 
     def get_parameter(self, key: str, default=None):
         """
@@ -221,8 +223,7 @@ class UCNodeView:
         self._uc = uc
 
     def __getitem__(self, node):
-        if self._uc._events is None:
-            self._uc._events = self._uc._evaluate()
+        self._uc._ensure_timing_cache()
         return Parametron(node, self._uc, self._uc._pt)
 
     def __iter__(self):
@@ -235,6 +236,7 @@ class UCNodeView:
         return len(self._uc._rt)
 
     def __call__(self, data=False):
+        self._uc._ensure_timing_cache()
         if data:
             for node in self._uc._rt.nodes:
                 yield (node, Parametron(node, self._uc, self._uc._pt))
@@ -458,6 +460,7 @@ class CompositionalUnit(TemporalUnit):
     def _resolve_leaf_selection(self, node):
         source_nodes = self._normalize_node_input(node)
         leaf_order = list(self._rt.leaf_nodes)
+        leaf_index = {leaf: i for i, leaf in enumerate(leaf_order)}
         leaf_set = set(leaf_order)
         selected = set()
         for selected_node in source_nodes:
@@ -470,7 +473,7 @@ class CompositionalUnit(TemporalUnit):
         if not selected:
             raise ValueError("Selection resolves to no leaf nodes")
         ordered = [leaf for leaf in leaf_order if leaf in selected]
-        indices = [leaf_order.index(leaf) for leaf in ordered]
+        indices = [leaf_index[leaf] for leaf in ordered]
         if indices != list(range(indices[0], indices[-1] + 1)):
             raise ValueError("Selection must be contiguous in left-to-right tree order")
         return ordered
@@ -511,13 +514,12 @@ class CompositionalUnit(TemporalUnit):
 
     def _selection_index_range(self, leaves):
         leaf_order = list(self._rt.leaf_nodes)
-        idx = [leaf_order.index(leaf) for leaf in leaves]
+        leaf_index = {leaf: i for i, leaf in enumerate(leaf_order)}
+        idx = [leaf_index[leaf] for leaf in leaves]
         return min(idx), max(idx)
 
     def _build_effective_parameter_tree(self):
         pt_snapshot = self._pt.copy()
-        if self._events is None:
-            super()._evaluate()
         for slur_id, slur_spec in self._slur_specs.items():
             leaves = list(slur_spec['leaf_nodes'])
             if not leaves:
@@ -532,19 +534,13 @@ class CompositionalUnit(TemporalUnit):
                 )
         return pt_snapshot
 
-    def _evaluate(self):
-        """
-        Updates node timings and returns Parametron objects instead of Chronon objects.
-        
-        Returns
-        -------
-        tuple of Parametron
-            Parametrons containing both temporal and parameter data
-        """
-        super()._evaluate()
-        eval_pt = self._build_effective_parameter_tree()
-        leaf_nodes = self._rt.leaf_nodes
-        return tuple(Parametron(node_id, self, eval_pt) for node_id in leaf_nodes)
+    def _event_context(self):
+        self._ensure_timing_cache()
+        return self._build_effective_parameter_tree()
+
+    def _make_event(self, node_id: int, event_context=None):
+        eval_pt = event_context if event_context is not None else self._build_effective_parameter_tree()
+        return Parametron(node_id, self, eval_pt)
 
     @property
     def pt(self) -> ParameterTree:
@@ -557,8 +553,6 @@ class CompositionalUnit(TemporalUnit):
             A copy of the parameter tree with UC overlays materialized for plotting
             and inspection (e.g., envelope-applied values and slur markers).
         """
-        if self._events is None:
-            self._events = self._evaluate()
         return self._build_effective_parameter_tree()
     
     @property
@@ -595,10 +589,9 @@ class CompositionalUnit(TemporalUnit):
         pandas.DataFrame
             DataFrame with temporal properties and all parameter fields
         """
-        if self._events is None:
-            self._events = self._evaluate()
+        events = self._materialize_events()
         base_data = []
-        for event in self._events:
+        for event in events:
             event_dict = {
                 'node_id': event.node_id,
                 'start': event.start,
@@ -612,7 +605,7 @@ class CompositionalUnit(TemporalUnit):
             }
             base_data.append(event_dict)
         
-        return pd.DataFrame(base_data, index=range(len(self._events)))
+        return pd.DataFrame(base_data, index=range(len(events)))
     
     def _distribute_to_targets(self, targets, fields, include_rests, setter='pfields'):
         if not include_rests:
@@ -702,8 +695,7 @@ class CompositionalUnit(TemporalUnit):
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
 
     def _bake_envelope(self, selected, envelope, pfields_list, endpoint):
-        if self._events is None:
-            super()._evaluate()
+        self._ensure_timing_cache()
         sounding = [n for n in selected if self.nodes[n].get('proportion', 1) >= 0]
         if not sounding:
             return
@@ -778,13 +770,11 @@ class CompositionalUnit(TemporalUnit):
             selected = self._resolve_leaf_selection(node=node)
             selected = self._apply_offset_take(selected, offset=offset, take=take)
             self._bake_envelope(selected, envelope, pfields_list, endpoint)
-            self._events = None
         elif mode == "per_node":
             groups = self._resolve_per_node_leaf_groups(node)
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
                 self._bake_envelope(selected, envelope, pfields_list, endpoint)
-            self._events = None
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
@@ -891,7 +881,6 @@ class CompositionalUnit(TemporalUnit):
                 slur_id = self._register_slur(segment)
                 reserved_sets.append(set(segment))
                 slur_ids.append(slur_id)
-            self._events = None
             return slur_ids[0] if len(slur_ids) == 1 else slur_ids
         if mode == "per_node":
             groups = self._resolve_per_node_leaf_groups(node)
@@ -906,7 +895,6 @@ class CompositionalUnit(TemporalUnit):
                     slur_id = self._register_slur(segment)
                     reserved_sets.append(set(segment))
                     slur_ids.append(slur_id)
-            self._events = None
             return slur_ids
         raise ValueError(f"Unknown mode: {mode}")
 
@@ -937,7 +925,6 @@ class CompositionalUnit(TemporalUnit):
         affected_leaves = set([n for n in affected if n in self._rt.leaf_nodes])
         self._split_slurs_for_rests(affected_leaves)
         super().make_rest(node)
-        self._events = None
 
     def subdivide(self, node: int, S) -> None:
         """
@@ -976,26 +963,21 @@ class CompositionalUnit(TemporalUnit):
             if mfields:
                 self._pt.set_mfields(child, **mfields)
 
-        self._events = None
-
     def add_child(self, parent, **attr):
         if 'label' in attr and 'proportion' not in attr:
             attr = dict(attr)
             attr['proportion'] = attr.pop('label')
         new_rt_node = self._rt.add_child(parent, **attr)
         self._pt.add_child(parent)
-        self._events = None
         return new_rt_node
 
     def prune(self, node):
         self._rt.prune(node)
         self._pt.prune(node)
-        self._events = None
 
     def remove_subtree(self, node):
         self._rt.remove_subtree(node)
         self._pt.remove_subtree(node)
-        self._events = None
 
     def set_instrument(self, node, instrument) -> None:
         """
@@ -1016,7 +998,6 @@ class CompositionalUnit(TemporalUnit):
         if isinstance(instrument, Instrument):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
-            self._events = None
         elif callable(instrument) or isinstance(instrument, Pattern):
             total = len(targets)
             for i, n in enumerate(targets):
@@ -1031,7 +1012,6 @@ class CompositionalUnit(TemporalUnit):
                     inst = instrument(ctx) if arity >= 1 else instrument()
                 if inst is not None:
                     self._pt.set_instrument(n, inst)
-            self._events = None
 
     def set(self, node, inst=None, mfields=None, pfields=None,
             include_rests=False):
@@ -1110,11 +1090,13 @@ class CompositionalUnit(TemporalUnit):
 
     def get_pfield(self, node: int, key: str, default=None):
         """Parameter field value for node (PT only, no instrument fallback)."""
-        return self._pt.get_pfield(node, key) or default
+        value = self._pt.get_pfield(node, key)
+        return default if value is None else value
 
     def get_mfield(self, node: int, key: str, default=None):
         """Meta field value for node."""
-        return self._pt.get_mfield(node, key) or default
+        value = self._pt.get_mfield(node, key)
+        return default if value is None else value
 
     def get_parameter(self, node: int, key: str, default=None):
         value = self._pt.get_pfield(node, key)
@@ -1148,7 +1130,6 @@ class CompositionalUnit(TemporalUnit):
             self._split_slurs_for_rests(affected_leaves)
         
         self._pt.clear(node)
-        self._events = None
     
     def get_event_parameters(self, idx: int) -> dict:
         """
@@ -1164,9 +1145,7 @@ class CompositionalUnit(TemporalUnit):
         dict
             Dictionary of parameter field names and values
         """
-        if self._events is None:
-            self._events = self._evaluate()
-        e = self._events[idx]
+        e = self[idx]
         return {'pfields': e.pfields, 'mfields': e.mfields}
     
     def from_subtree(self, node: int) -> 'CompositionalUnit':

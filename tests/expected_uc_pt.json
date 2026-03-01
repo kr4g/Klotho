@@ -12544,7 +12544,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12582,7 +12585,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12620,7 +12626,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12658,7 +12667,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12696,7 +12708,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12734,7 +12749,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12772,7 +12790,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12810,7 +12831,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12848,7 +12872,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12886,7 +12913,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12924,7 +12954,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -12962,7 +12995,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13000,7 +13036,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13038,7 +13077,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13076,7 +13118,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13114,7 +13159,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13152,7 +13200,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13190,7 +13241,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13228,7 +13282,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13266,7 +13323,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 0,
+            "offset": 0,
+            "drct": 1
           }
         },
         {
@@ -13304,7 +13364,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 5,
+            "drct": -1
           }
         },
         {
@@ -13342,7 +13405,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 5,
+            "drct": -1
           }
         },
         {
@@ -13380,7 +13446,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 5,
+            "drct": -1
           }
         },
         {
@@ -13418,7 +13487,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 4,
+            "drct": -1
           }
         },
         {
@@ -13456,7 +13528,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 4,
+            "drct": -1
           }
         },
         {
@@ -13494,7 +13569,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 4,
+            "drct": -1
           }
         },
         {
@@ -13532,7 +13610,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 3,
+            "drct": -1
           }
         },
         {
@@ -13570,7 +13651,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 3,
+            "drct": -1
           }
         },
         {
@@ -13608,7 +13692,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 3,
+            "drct": -1
           }
         },
         {
@@ -13646,7 +13733,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 2,
+            "drct": -1
           }
         },
         {
@@ -13684,7 +13774,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 2,
+            "drct": -1
           }
         },
         {
@@ -13722,7 +13815,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 2,
+            "drct": -1
           }
         },
         {
@@ -13760,7 +13856,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 1,
+            "drct": -1
           }
         },
         {
@@ -13798,7 +13897,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 1,
+            "drct": -1
           }
         },
         {
@@ -13836,7 +13938,10 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "group": "default",
+            "idx": 7,
+            "offset": 1,
+            "drct": -1
           }
         }
       ]
@@ -59756,7 +59861,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "idx": 0,
+            "group": "default",
+            "drct": 1
           }
         },
         {
@@ -59794,7 +59901,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "idx": 0,
+            "group": "default",
+            "drct": 1
           }
         },
         {
@@ -59832,7 +59941,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "idx": 0,
+            "group": "default",
+            "drct": 1
           }
         },
         {
@@ -59870,7 +59981,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "idx": 5,
+            "group": "default",
+            "drct": -1
           }
         },
         {
@@ -59908,7 +60021,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default"
+            "idx": 5,
+            "group": "default",
+            "drct": -1
           }
         }
       ]

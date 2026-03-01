@@ -229,8 +229,8 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
         self._bpm    = bpm if bpm else 60
         self._offset = offset
-        
-        self._events = None
+
+        self._timing_dirty = True
     
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
@@ -296,13 +296,10 @@ class TemporalUnit(metaclass=TemporalMeta):
     # @prolationis.setter
     # def prolationis(self, prolatio: Union[tuple, str]):
     #     self._rt = self._set_rt(self.span, self.tempus, prolatio)
-    #     self._events = self._set_nodes()
     
     @property
     def rt(self):
         """The RhythmTree of the TemporalUnit (returns a copy)."""
-        if self._events is None:
-            self._events = self._evaluate()
         return self._rt.copy()
 
     @property
@@ -338,11 +335,13 @@ class TemporalUnit(metaclass=TemporalMeta):
     @property
     def onsets(self):
         """The real-time onset of each leaf event in seconds."""
+        self._ensure_timing_cache()
         return tuple(self._real_times[n]['real_onset'] for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
         """The real-time duration of each leaf event in seconds."""
+        self._ensure_timing_cache()
         return tuple(self._real_times[n]['real_duration'] for n in self._rt.leaf_nodes)
 
     @property
@@ -367,8 +366,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         -------
         pandas.DataFrame
         """
-        if self._events is None:
-            self._events = self._evaluate()
+        events = self._materialize_events()
         return pd.DataFrame([{
             'node_id': c.node_id,
             'start': c.start,
@@ -378,13 +376,13 @@ class TemporalUnit(metaclass=TemporalMeta):
             's': c.proportion,
             'metric_onset': c.metric_onset,
             'metric_duration': c.metric_duration,
-        } for c in self._events], index=range(len(self._events)))
+        } for c in events], index=range(len(events)))
         
     @offset.setter
     def offset(self, offset:float):
         """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
         self._offset = offset
-        self._events = None
+        self._invalidate_timing_cache()
         
     def set_duration(self, target_duration: float) -> None:
         """
@@ -410,7 +408,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         ratio = current_duration / target_duration
         new_bpm = self._bpm * ratio
         self._bpm = new_bpm
-        self._events = None
+        self._invalidate_timing_cache()
 
     def make_rest(self, node: int) -> None:
         """
@@ -429,7 +427,7 @@ class TemporalUnit(metaclass=TemporalMeta):
             If the node is not found in the rhythm tree.
         """
         self._rt.make_rest(node)
-        self._events = None
+        self._invalidate_timing_cache()
 
     def subdivide(self, node: int, S) -> None:
         """
@@ -450,7 +448,7 @@ class TemporalUnit(metaclass=TemporalMeta):
             If the node is not found or is not a leaf.
         """
         self._rt.subdivide(node, S)
-        self._events = None
+        self._invalidate_timing_cache()
 
     def sparsify(self, probability, node=None):
         """
@@ -524,8 +522,8 @@ class TemporalUnit(metaclass=TemporalMeta):
             case _:
                 raise ValueError(f'Invalid prolatio type: {type(prolatio)}')
 
-    def _evaluate(self):
-        """Updates node timings and returns chronon events."""
+    def _compute_timing_cache(self):
+        """Recompute real-time onset/duration cache for all nodes."""
         self._real_times.clear()
         for node in self._rt.nodes:
             metric_duration = self._rt[node]['metric_duration']
@@ -535,23 +533,43 @@ class TemporalUnit(metaclass=TemporalMeta):
             real_onset = beat_duration(ratio=metric_onset, bpm=self.bpm, beat_ratio=self.beat) + self._offset
             
             self._real_times[node] = {'real_duration': real_duration, 'real_onset': real_onset}
+        self._timing_dirty = False
 
-        return tuple(Chronon(node_id, self) for node_id in self._rt.leaf_nodes)
+    def _ensure_timing_cache(self):
+        if self._timing_dirty or len(self._real_times) != len(self._rt):
+            self._compute_timing_cache()
 
-    def __getitem__(self, idx: int) -> Chronon:
-        if self._events is None:
-            self._events = self._evaluate()
-        return self._events[idx]
+    def _event_context(self):
+        self._ensure_timing_cache()
+        return None
+
+    def _make_event(self, node_id: int, event_context=None):
+        return Chronon(node_id, self)
+
+    def _materialize_events(self):
+        """Materialize leaf Chronons lazily from current tree state."""
+        leaf_nodes = tuple(self._rt.leaf_nodes)
+        event_context = self._event_context()
+        return tuple(self._make_event(node_id, event_context) for node_id in leaf_nodes)
+
+    def _invalidate_timing_cache(self):
+        self._timing_dirty = True
+
+    def __getitem__(self, idx):
+        leaf_nodes = tuple(self._rt.leaf_nodes)
+        event_context = self._event_context()
+        if isinstance(idx, slice):
+            return tuple(self._make_event(node_id, event_context) for node_id in leaf_nodes[idx])
+        return self._make_event(leaf_nodes[idx], event_context)
     
     def __iter__(self):
-        if self._events is None:
-            self._events = self._evaluate()
-        return iter(self._events)
+        leaf_nodes = tuple(self._rt.leaf_nodes)
+        event_context = self._event_context()
+        for node_id in leaf_nodes:
+            yield self._make_event(node_id, event_context)
     
     def __len__(self):
-        if self._events is None:
-            self._events = self._evaluate()
-        return len(self._events)
+        return len(self._rt.leaf_nodes)
         
     def __str__(self):
         result = (
@@ -606,15 +624,19 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         Absolute start time in seconds. Default is 0.
     """
     
-    def __init__(self, ut_seq:list[TemporalUnit]=[], offset:float=0):
+    def __init__(self, ut_seq:Union[list[TemporalUnit], None]=None, offset:float=0):
+        if ut_seq is None:
+            ut_seq = []
         self._seq    = [ut.copy() for ut in ut_seq] # XXX - this needs to be ut.copy()
         self._offset = offset
         self._set_offsets()
     
     def _set_offsets(self):
         """Updates the offsets of all TemporalUnits based on their position in the sequence."""
-        for i, ut in enumerate(self._seq):
-            ut.offset = self._offset + sum(self.durations[j] for j in range(i))
+        running_offset = self._offset
+        for ut in self._seq:
+            ut.offset = running_offset
+            running_offset += ut.duration
 
     @property
     def seq(self):
@@ -685,7 +707,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         
         for ut in self._seq:
             ut._bpm = ut.bpm * ratio
-            ut._events = None
+            ut._invalidate_timing_cache()
         
         self._set_offsets()
         
@@ -849,7 +871,9 @@ class TemporalBlock(metaclass=TemporalMeta):
         Whether to sort rows by duration (longest first). Default is True.
     """
     
-    def __init__(self, rows:list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']]=[], axis:float = -1, offset:float=0, sort_rows:bool=True):
+    def __init__(self, rows:Union[list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']], None]=None, axis:float = -1, offset:float=0, sort_rows:bool=True):
+        if rows is None:
+            rows = []
         self._rows = [row.copy() for row in rows] if rows else [] # XXX - this needs to be row.copy()
         self._axis = axis
         self._offset = offset
@@ -908,18 +932,20 @@ class TemporalBlock(metaclass=TemporalMeta):
         """
         if not self._rows:
             return
-        
+
+        row_duration_pairs = [(row, row.duration) for row in self._rows]
         if self._sort_rows:
-            self._rows = sorted(self._rows, key=lambda row: -row.duration, reverse=False)
-        
-        max_duration = self.duration
-        
-        for row in self._rows:
-            if row.duration == max_duration:
+            row_duration_pairs = sorted(row_duration_pairs, key=lambda pair: -pair[1], reverse=False)
+            self._rows = [pair[0] for pair in row_duration_pairs]
+
+        max_duration = max(duration for _, duration in row_duration_pairs)
+
+        for row, row_duration in row_duration_pairs:
+            if row_duration == max_duration:
                 row.offset = self._offset
                 continue
-            
-            duration_diff = max_duration - row.duration    
+
+            duration_diff = max_duration - row_duration
             adjustment = duration_diff * (self._axis + 1) / 2
             row.offset = self._offset + adjustment
 
