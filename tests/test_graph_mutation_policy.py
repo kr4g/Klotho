@@ -17,6 +17,20 @@ def test_graph_node_view_is_read_only():
         graph[node]["label"] = "B"
 
 
+def test_graph_update_and_replace_node_data_are_sanctioned():
+    graph = Graph()
+    node = graph.add_node(label="A", value=1)
+
+    graph.update_node_data(node, {"value": 2, "extra": "ok"})
+    assert graph[node]["label"] == "A"
+    assert graph[node]["value"] == 2
+    assert graph[node]["extra"] == "ok"
+
+    graph.replace_node_data(node, {"label": "B"})
+    assert set(graph[node].keys()) == {"label"}
+    assert graph[node]["label"] == "B"
+
+
 def test_rhythm_tree_set_node_data_uses_proportion_and_tied():
     rt = RhythmTree(span=1, meas="4/4", subdivisions=(1, 1, 1))
     target = list(rt.successors(rt.root))[1]

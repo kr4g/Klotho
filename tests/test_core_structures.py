@@ -708,6 +708,19 @@ class TestCompositionalUnitRT_PTSync:
         assert new_id in uc._rt.successors(uc._rt.root)
         assert new_id in uc._pt.successors(uc._pt.root)
 
+    def test_add_child_accepts_label_or_proportion_and_normalizes_rt_data(self):
+        uc = UC(tempus='4/4', prolatio=(1, 1), beat='1/4', bpm=120)
+        by_label = uc.add_child(uc._rt.root, label=3)
+        by_proportion = uc.add_child(uc._rt.root, proportion=4)
+
+        _assert_rt_pt_same_structure_and_ids(uc)
+        assert uc._rt[by_label]['proportion'] == 3
+        assert uc._rt[by_proportion]['proportion'] == 4
+        assert 'label' not in uc._rt[by_label]
+        assert 'label' not in uc._rt[by_proportion]
+        assert by_label in uc._pt.nodes
+        assert by_proportion in uc._pt.nodes
+
     def test_prune_keeps_rt_pt_same_structure_and_ids(self):
         uc = UC(tempus='4/4', prolatio=((2, (1, 1)), (2, (1, 1))), beat='1/4', bpm=120)
         inner = uc._rt.at_depth(1)[0]
