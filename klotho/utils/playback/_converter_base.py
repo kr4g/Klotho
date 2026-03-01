@@ -1,4 +1,5 @@
 import math
+from uuid import uuid4
 
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
@@ -96,3 +97,74 @@ def perc_env_pfields(dur):
         "sustain": max(0, body - attack),
         "release": max(0, dur - body),
     }
+
+
+def _is_tuple_value(value):
+    return isinstance(value, tuple) and len(value) > 0
+
+
+def _normalized_strum_value(raw_strum):
+    if not isinstance(raw_strum, (int, float)):
+        return 0.0
+    return max(-1.0, min(1.0, float(raw_strum)))
+
+
+def lower_poly_pfields_to_voices(pfields):
+    tuple_fields = {k: v for k, v in pfields.items() if _is_tuple_value(v)}
+    if not tuple_fields:
+        return [dict(pfields)], False
+
+    voice_count = max(len(v) for v in tuple_fields.values())
+    expanded = []
+    for voice_index in range(voice_count):
+        voice_pfields = {}
+        for key, value in pfields.items():
+            if key in tuple_fields:
+                seq = tuple_fields[key]
+                voice_pfields[key] = seq[voice_index % len(seq)]
+            else:
+                voice_pfields[key] = value
+        expanded.append(voice_pfields)
+    return expanded, True
+
+
+def lower_event_ir_to_voice_events(event, step_index=None):
+    base_pfields = dict(event.pfields)
+    expanded_pfields, tuple_expanded = lower_poly_pfields_to_voices(base_pfields)
+    voice_count = len(expanded_pfields)
+    base_start = float(event.start)
+    duration = abs(float(event.duration))
+    mfields = event.mfields if hasattr(event, "mfields") else {}
+    strum_raw = mfields.get("strum", 0.0)
+    strum_value = _normalized_strum_value(strum_raw)
+    apply_strum = tuple_expanded and voice_count > 1 and strum_value != 0.0
+    logical_step_id = uuid4().hex
+    voices = []
+
+    for voice_index, voice_pfields in enumerate(expanded_pfields):
+        if apply_strum:
+            order_index = voice_index if strum_value >= 0 else (voice_count - 1 - voice_index)
+            start_offset = (abs(strum_value) * duration * order_index) / voice_count
+            is_leader = order_index == 0
+        else:
+            start_offset = 0.0
+            is_leader = voice_index == 0
+
+        voices.append({
+            "node_id": event.node_id,
+            "start": base_start + start_offset,
+            "duration": max(0.0, duration - start_offset),
+            "end": (base_start + start_offset) + max(0.0, duration - start_offset),
+            "pfields": voice_pfields,
+            "mfields": dict(mfields),
+            "step_index": step_index,
+            "poly_group_id": logical_step_id,
+            "logical_step_id": logical_step_id,
+            "poly_voice_index": voice_index,
+            "poly_voice_count": voice_count,
+            "poly_is_leader": is_leader,
+            "animate": bool(is_leader),
+            "tuple_expanded": tuple_expanded,
+        })
+
+    return voices

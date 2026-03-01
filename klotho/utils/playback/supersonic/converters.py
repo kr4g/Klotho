@@ -8,7 +8,6 @@ from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
-from klotho.thetos.instruments.instrument import SynthDefInstrument
 from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
 from klotho.utils.playback._converter_base import (
     DEFAULT_NOTE_DURATION, DEFAULT_CHORD_DURATION,
@@ -16,6 +15,10 @@ from klotho.utils.playback._converter_base import (
     KNOWN_KWARGS, freq_to_midi, perc_env_pfields,
     _get_addressed_collection, _merge_pfields,
     scale_pitch_sequence, extract_convert_kwargs,
+)
+from klotho.utils.playback._sc_assembly import (
+    lower_compositional_ir_to_sc_assembly,
+    sort_sc_assembly_events,
 )
 
 DEFAULT_SYNTH = "sonic-pi-beep"
@@ -260,68 +263,15 @@ def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None, amp=None, extra
 
 
 def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
-    events = []
-    leaf_nodes = obj._rt.leaf_nodes if animation else None
-    node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)}
-                    if animation else None)
-
-    time_offset = 0
-    if animation:
-        time_offset = min(ev.start for ev in obj if not ev.is_rest) if any(not ev.is_rest for ev in obj) else 0
-
-    for event in obj:
-        step_idx = node_to_step.get(event.node_id, None) if animation else None
-        start = event.start - time_offset if animation else event.start
-
-        if event.is_rest:
-            if animation:
-                events.append({
-                    "type": "new",
-                    "id": _uid(),
-                    "synthName": "__rest__",
-                    "start": start,
-                    "pfields": {},
-                    "_stepIndex": step_idx,
-                })
-            continue
-
-        instrument = obj.get_instrument(event.node_id)
-        synth_name = DEFAULT_SYNTH
-        env_type = ''
-
-        if isinstance(instrument, SynthDefInstrument):
-            synth_name = instrument.synth_name or DEFAULT_SYNTH
-            env_type = getattr(instrument, 'env_type', '') or ''
-        elif instrument is not None:
-            synth_name = getattr(instrument, 'synth_name', None) or getattr(instrument, 'name', None) or DEFAULT_SYNTH
-            env_type = getattr(instrument, 'env_type', '') or ''
-
-        pfields = {k: v for k, v in event.pfields.items()
-                   if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
-
-        if 'freq' in pfields and 'note' not in pfields:
-            pfields['note'] = freq_to_midi(pfields['freq']) if isinstance(pfields['freq'], (int, float)) else pfields['freq']
-        if 'amp' not in pfields:
-            freq = pfields.get('freq', 440.0)
-            if isinstance(freq, (int, float)):
-                pfields['amp'] = single_voice_amplitude(freq)
-            else:
-                pfields['amp'] = 0.5
-
-        uid = _uid()
-        is_gated = env_type.lower() in ('sustained', 'sus', 'asr', 'adsr', '')
-        dur = abs(event.duration)
-
-        if is_gated:
-            evts = _gated_note(uid, synth_name, start, dur, pfields,
-                               step_index=step_idx, extra_pfields=extra_pfields)
-        else:
-            evts = _perc_note(uid, synth_name, start, dur, pfields,
-                              step_index=step_idx, extra_pfields=extra_pfields)
-        events.extend(evts)
-
-    events.sort(key=lambda ev: ev["start"])
-    return events
+    return lower_compositional_ir_to_sc_assembly(
+        obj,
+        extra_pfields=extra_pfields,
+        animation=animation,
+        default_synth=DEFAULT_SYNTH,
+        include_ungated_release=True,
+        normalize_sc_pfields=True,
+        sort_output=True,
+    )
 
 
 def compositional_unit_to_sc_animation_events(obj, extra_pfields=None):
@@ -393,8 +343,7 @@ def temporal_sequence_to_sc_events(obj, extra_pfields=None):
         elif isinstance(unit, TemporalBlock):
             _merge_sub_sc(events, temporal_block_to_sc_events(unit, extra_pfields=extra_pfields), seq_offset)
 
-    events.sort(key=lambda ev: ev["start"])
-    return events
+    return sort_sc_assembly_events(events)
 
 
 def temporal_block_to_sc_events(obj, extra_pfields=None):
@@ -411,8 +360,7 @@ def temporal_block_to_sc_events(obj, extra_pfields=None):
         elif isinstance(row, TemporalBlock):
             _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
 
-    events.sort(key=lambda ev: ev["start"])
-    return events
+    return sort_sc_assembly_events(events)
 
 
 def convert_to_sc_events(obj, **kwargs):
@@ -491,6 +439,7 @@ def tonejs_events_to_sc(tone_events):
         dur = ev.get("duration", 0.5)
         pf = ev.get("pfields", {})
         step = ev.get("_stepIndex", None)
+        animate = ev.get("_animate", True)
         instrument = ev.get("instrument", "")
 
         if instrument == "__rest__":
@@ -503,6 +452,7 @@ def tonejs_events_to_sc(tone_events):
             }
             if step is not None:
                 rest_ev["_stepIndex"] = step
+            rest_ev["_animate"] = animate
             sc_events.append(rest_ev)
             continue
 
@@ -526,6 +476,17 @@ def tonejs_events_to_sc(tone_events):
         }
         if step is not None:
             new_ev["_stepIndex"] = step
+        new_ev["_animate"] = animate
+        if "_polyGroupId" in ev:
+            new_ev["_polyGroupId"] = ev["_polyGroupId"]
+        if "_logicalStepId" in ev:
+            new_ev["_logicalStepId"] = ev["_logicalStepId"]
+        if "_polyVoiceIndex" in ev:
+            new_ev["_polyVoiceIndex"] = ev["_polyVoiceIndex"]
+        if "_polyVoiceCount" in ev:
+            new_ev["_polyVoiceCount"] = ev["_polyVoiceCount"]
+        if "_polyLeader" in ev:
+            new_ev["_polyLeader"] = ev["_polyLeader"]
         sc_events.append(new_ev)
 
         rel_ev = {
@@ -535,6 +496,17 @@ def tonejs_events_to_sc(tone_events):
         }
         if step is not None:
             rel_ev["_stepIndex"] = step
+        rel_ev["_animate"] = animate
+        if "_polyGroupId" in ev:
+            rel_ev["_polyGroupId"] = ev["_polyGroupId"]
+        if "_logicalStepId" in ev:
+            rel_ev["_logicalStepId"] = ev["_logicalStepId"]
+        if "_polyVoiceIndex" in ev:
+            rel_ev["_polyVoiceIndex"] = ev["_polyVoiceIndex"]
+        if "_polyVoiceCount" in ev:
+            rel_ev["_polyVoiceCount"] = ev["_polyVoiceCount"]
+        if "_polyLeader" in ev:
+            rel_ev["_polyLeader"] = ev["_polyLeader"]
         sc_events.append(rel_ev)
 
     sc_events.sort(key=lambda e: e["start"])

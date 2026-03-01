@@ -13,6 +13,7 @@ from typing import Union
 
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
+from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
 ENV_TYPES = {
     'gated': ('sustained', 'sus', 'asr', 'adsr'),
@@ -159,91 +160,70 @@ class Scheduler:
             for unit in uc:
                 self.add(unit)
             return
-        elif isinstance(uc, TemporalBlock):
+        if isinstance(uc, TemporalBlock):
             for unit in uc:
                 self.add(unit)
             return
-        
-        slur_end_events = {}
-        sustain_param_cache = {}
-        events_iterable = uc
-        if isinstance(uc, CompositionalUnit):
-            events_iterable = tuple(uc)
-            for event in events_iterable:
-                if event.is_rest:
-                    continue
-                slur_id = event.get_parameter('_slur_id')
-                if slur_id is None:
-                    continue
-                if event.get_parameter('_slur_end', 0):
-                    slur_end_events[slur_id] = event
 
-        slur_uids = {}
-        
-        for event in events_iterable:
+        if isinstance(uc, CompositionalUnit):
+            assembly_events = lower_compositional_ir_to_sc_assembly(
+                uc,
+                extra_pfields=None,
+                animation=False,
+                default_synth='sonic-pi-beep',
+                include_ungated_release=False,
+                normalize_sc_pfields=False,
+                sort_output=True,
+            )
+            id_map = {}
+            for event in assembly_events:
+                if event.get("synthName") == "__rest__":
+                    continue
+                event_type = event.get("type")
+                if event_type == "new":
+                    pfields = dict(event.get("pfields", {}))
+                    group = event.get("group", pfields.pop("group", None))
+                    created_uid = self.new_node(
+                        synth_name=event.get("synthName"),
+                        start=event.get("start", 0.0),
+                        group=group,
+                        **pfields
+                    )
+                    id_map[event.get("id")] = created_uid
+                elif event_type == "set":
+                    target_uid = id_map.get(event.get("id"))
+                    if target_uid is None:
+                        continue
+                    self.set_node(
+                        target_uid,
+                        start=event.get("start", 0.0),
+                        **dict(event.get("pfields", {}))
+                    )
+                elif event_type == "release":
+                    target_uid = id_map.get(event.get("id"))
+                    if target_uid is None:
+                        continue
+                    self.release_node(target_uid, start=event.get("start", 0.0))
+            return
+
+        for event in uc:
             if event.is_rest:
                 continue
-                
             event_synth_name = event.get_parameter('synth_name') or event.get_parameter('synthName')
             if not event_synth_name:
                 continue
-            
-            is_slur_start = event.get_parameter('_slur_start', 0)
-            is_slur_end = event.get_parameter('_slur_end', 0)
-            slur_id = event.get_parameter('_slur_id')
-            
             event_group = event.get_parameter('group')
-            pfields = {k: v for k, v in event.pfields.items() 
-                      if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
-            
-            if is_slur_start:
-                instrument = uc.get_instrument(event.node_id)
-                if instrument:
-                    env_type = getattr(instrument, 'env_type', None) or ''
-                    if env_type and env_type.lower() in ENV_TYPES['ungated']:
-                        instrument_id = id(instrument)
-                        sustain_param = sustain_param_cache.get(instrument_id)
-                        if instrument_id not in sustain_param_cache:
-                            sustain_param = None
-                            lower_to_key = {k.lower(): k for k in instrument.keys()}
-                            for param in ['sustaintime', 'releasetime']:
-                                if param in lower_to_key:
-                                    sustain_param = lower_to_key[param]
-                                    break
-                            sustain_param_cache[instrument_id] = sustain_param
-                        
-                        if sustain_param:
-                            end_event = slur_end_events.get(slur_id)
-                            if end_event is not None:
-                                total_duration = end_event.end - event.start
-                                pfields[sustain_param] = total_duration
-                
-                slur_uid = self.new_node(
-                    synth_name=event_synth_name,
-                    start=event.start,
-                    group=event_group,
-                    **pfields
-                )
-                slur_uids[slur_id] = slur_uid
-            elif slur_id is not None:
-                self.set_node(slur_uids[slur_id], start=event.start, **pfields)
-                if is_slur_end:
-                    instrument = uc.get_instrument(event.node_id)
-                    if instrument and hasattr(instrument, 'env_type'):
-                        env_type = getattr(instrument, 'env_type', '') or ''
-                        if env_type.lower() in ENV_TYPES['gated']:
-                            self.set_node(slur_uids[slur_id], start=event.end, gate=0)
-            else:
-                uid = self.new_node(
-                    synth_name=event_synth_name,
-                    start=event.start,
-                    group=event_group,
-                    **pfields
-                )
-                instrument = uc.get_instrument(event.node_id)
-                env_type = getattr(instrument, 'env_type', '') if instrument is not None else ''
-                if env_type.lower() in ENV_TYPES['gated']:
-                    self.release_node(uid, start=event.end)
+            pfields = {k: v for k, v in event.pfields.items() if k not in ('synth_name', 'synthName', 'group')}
+            uid = self.new_node(
+                synth_name=event_synth_name,
+                start=event.start,
+                group=event_group,
+                **pfields
+            )
+            instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
+            env_type = (getattr(instrument, 'env_type', '') or '').lower() if instrument is not None else ''
+            if env_type in ENV_TYPES['gated']:
+                self.release_node(uid, start=event.end)
             
     def synth_groups(self, groups):
         """Register one or more synth group names in the scheduler metadata.

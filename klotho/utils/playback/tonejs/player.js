@@ -77,7 +77,7 @@
 
       var myPart = new Tone.Part(function(time, ev) {
         if (!playing) return;
-        if (options.onEvent && ev._stepIndex != null) {
+        if (options.onEvent && ev._stepIndex != null && ev._animate !== false) {
           Tone.Draw.schedule(function() {
             if (playing) options.onEvent(ev._stepIndex);
           }, time);

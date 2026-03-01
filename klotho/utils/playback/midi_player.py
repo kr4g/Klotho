@@ -24,6 +24,7 @@ from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
 from klotho.tonos.pitch.pitch import Pitch
 from klotho.tonos.scales.scale import Scale
 from klotho.tonos.chords.chord import Chord, Voicing, Sonority, ChordSequence
+from klotho.utils.playback._converter_base import lower_event_ir_to_voice_events
 
 DEFAULT_DRUM_NOTE = 77
 PERCUSSION_CHANNEL = 9
@@ -333,7 +334,10 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     
     # For CompositionalUnit: Use FULL implementation capabilities for voice independence
     # Each note gets its own channel for microtonal support and voice independence
-    num_notes = len([event for event in compositional_unit if not event.is_rest])
+    num_notes = 0
+    for event in compositional_unit:
+        if not event.is_rest:
+            num_notes += len(lower_event_ir_to_voice_events(event))
     
     # Calculate how many drum and melodic notes we have
     num_drums = 0
@@ -341,10 +345,11 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     for event in compositional_unit:
         if not event.is_rest:
             instrument = compositional_unit.get_instrument(event._node_id)
+            voice_count = len(lower_event_ir_to_voice_events(event))
             if isinstance(instrument, MidiInstrument) and instrument.is_Drum:
-                num_drums += 1
+                num_drums += voice_count
             else:
-                num_melodic += 1
+                num_melodic += voice_count
     
     # Calculate minimum ports needed:
     # - Drums: need ceil(num_drums / 1) ports (1 drum channel per port)  
@@ -374,69 +379,61 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
     
     for event in compositional_unit:
         if not event.is_rest:
-            # Get instrument information
             instrument = compositional_unit.get_instrument(event._node_id)
-            
-            if isinstance(instrument, MidiInstrument):
-                is_drum = instrument.is_Drum
-                # For drums: ignore instrument.prgm, always use Standard Drum Kit (1)
-                # For melodic: use instrument.prgm
-                program = 1 if is_drum else instrument.prgm
-                note_param = event.get_parameter('note', instrument['note'])
-                velocity = event.get_parameter('velocity', instrument['velocity'])
-            else:
-                # Fallback for CompositionalUnit without explicit instruments
-                is_drum = event.get_parameter('is_drum', False)
-                default_program = 1 if is_drum else 0  # Drums=Standard Kit(1), Melodic=Piano(0)
-                program = event.get_parameter('program', default_program)
-                note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
-                velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
-            
-            voice_id = f"voice_{voice_counter}"
-            voice_counter += 1
-            
-            # Use absolute timing from event, subtract offset for standalone playback (DO NOT MUTATE OBJECT)
-            start_time = event.start - min_start_time
-            duration = abs(event.duration)
-            
-            # Allocate individual channel for each note (PRD: full voice independence)
-            try:
-                if debug:
-                    print(f"[DEBUG] Allocating voice_id={voice_id}, is_drum={is_drum}, program={program}")
-                    if isinstance(instrument, MidiInstrument):
-                        print(f"[DEBUG]   -> Instrument: {instrument.name}, is_Drum={instrument.is_Drum}, prgm={instrument.prgm}")
-                port, channel = allocator.allocate_voice(voice_id, is_drum, program)
-                if debug:
-                    print(f"[DEBUG] Allocated port={port}, channel={channel}")
-            except RuntimeError:
-                # If we run out of channels, skip this note
-                continue
-            
-            # Handle microtonal notes and pitch bend
-            if is_drum:
-                midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
-                pitch_bend = None
-            elif isinstance(note_param, Pitch):
-                midi_note, pitch_bend = _calculate_base_note_and_bend(note_param, allocator.bend_sensitivity_semitones)
-            elif isinstance(note_param, float) and note_param != int(note_param):
-                pitch = Pitch.from_midi(note_param)
-                midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, allocator.bend_sensitivity_semitones)
-            else:
-                midi_note = int(note_param) if note_param else 60
-                pitch_bend = None
-            
-            note_events.append({
-                'voice_id': voice_id,
-                'port': port,
-                'channel': channel,
-                'start_time': start_time,
-                'duration': duration,
-                'midi_note': midi_note,
-                'velocity': velocity,
-                'program': program,
-                'is_drum': is_drum,
-                'pitch_bend': pitch_bend
-            })
+            expanded_voices = lower_event_ir_to_voice_events(event)
+            for expanded_voice in expanded_voices:
+                if isinstance(instrument, MidiInstrument):
+                    is_drum = instrument.is_Drum
+                    program = 1 if is_drum else instrument.prgm
+                    note_param = expanded_voice["pfields"].get('note', instrument['note'])
+                    velocity = expanded_voice["pfields"].get('velocity', instrument['velocity'])
+                else:
+                    is_drum = expanded_voice["pfields"].get('is_drum', event.get_parameter('is_drum', False))
+                    default_program = 1 if is_drum else 0
+                    program = expanded_voice["pfields"].get('program', event.get_parameter('program', default_program))
+                    note_param = expanded_voice["pfields"].get('note', DEFAULT_DRUM_NOTE if is_drum else 60)
+                    velocity = expanded_voice["pfields"].get('velocity', event.get_parameter('velocity', DEFAULT_VELOCITY))
+
+                voice_id = f"voice_{voice_counter}"
+                voice_counter += 1
+                start_time = expanded_voice["start"] - min_start_time
+                duration = expanded_voice["duration"]
+
+                try:
+                    if debug:
+                        print(f"[DEBUG] Allocating voice_id={voice_id}, is_drum={is_drum}, program={program}")
+                        if isinstance(instrument, MidiInstrument):
+                            print(f"[DEBUG]   -> Instrument: {instrument.name}, is_Drum={instrument.is_Drum}, prgm={instrument.prgm}")
+                    port, channel = allocator.allocate_voice(voice_id, is_drum, program)
+                    if debug:
+                        print(f"[DEBUG] Allocated port={port}, channel={channel}")
+                except RuntimeError:
+                    continue
+
+                if is_drum:
+                    midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
+                    pitch_bend = None
+                elif isinstance(note_param, Pitch):
+                    midi_note, pitch_bend = _calculate_base_note_and_bend(note_param, allocator.bend_sensitivity_semitones)
+                elif isinstance(note_param, float) and note_param != int(note_param):
+                    pitch = Pitch.from_midi(note_param)
+                    midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, allocator.bend_sensitivity_semitones)
+                else:
+                    midi_note = int(note_param) if note_param else 60
+                    pitch_bend = None
+
+                note_events.append({
+                    'voice_id': voice_id,
+                    'port': port,
+                    'channel': channel,
+                    'start_time': start_time,
+                    'duration': duration,
+                    'midi_note': midi_note,
+                    'velocity': velocity,
+                    'program': program,
+                    'is_drum': is_drum,
+                    'pitch_bend': pitch_bend
+                })
     
     # Generate MIDI events using new allocator system
     _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
@@ -513,62 +510,56 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
         for event in unit:
             if not event.is_rest:
                 instrument = unit.get_instrument(event._node_id)
-                
+                expanded_voices = lower_event_ir_to_voice_events(event)
                 if debug:
                     print(f"[DEBUG] Collection event node {event._node_id}: instrument={instrument.name if instrument else 'None'}, is_Drum={instrument.is_Drum if instrument else 'N/A'}")
-                
-                if isinstance(instrument, MidiInstrument):
-                    is_drum = instrument.is_Drum
-                    # For drums: ignore instrument.prgm, always use Standard Drum Kit (1)
-                    # For melodic: use instrument.prgm
-                    program = 1 if is_drum else instrument.prgm
-                    note_param = event.get_parameter('note', instrument['note'])
-                    velocity = event.get_parameter('velocity', instrument['velocity'])
-                else:
-                    # Fallback for non-MidiInstrument cases
-                    is_drum = event.get_parameter('is_drum', False)
-                    default_program = 1 if is_drum else 0  # Drums=Standard Kit(1), Melodic=Piano(0)
-                    program = event.get_parameter('program', default_program)
-                    note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
-                    velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
-                
-                voice_id = f"collection_voice_{voice_counter}"
-                voice_counter += 1
-                
-                start_time = event.start  # Events already have absolute timing
-                duration = abs(event.duration)
-                
-                # Allocate individual channel for each note (PRD: voice independence)
-                try:
-                    port, channel = allocator.allocate_voice(voice_id, is_drum, program)
-                except RuntimeError:
-                    continue
-                
-                # Handle microtonal notes
-                if is_drum:
-                    midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
-                    pitch_bend = None
-                elif isinstance(note_param, Pitch):
-                    midi_note, pitch_bend = _calculate_base_note_and_bend(note_param, allocator.bend_sensitivity_semitones)
-                elif isinstance(note_param, float) and note_param != int(note_param):
-                    pitch = Pitch.from_midi(note_param)
-                    midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, allocator.bend_sensitivity_semitones)
-                else:
-                    midi_note = int(note_param) if note_param else 60
-                    pitch_bend = None
-                
-                note_events.append({
-                    'voice_id': voice_id,
-                    'port': port,
-                    'channel': channel,
-                    'start_time': start_time,
-                    'duration': duration,
-                    'midi_note': midi_note,
-                    'velocity': velocity,
-                    'program': program,
-                    'is_drum': is_drum,
-                    'pitch_bend': pitch_bend
-                })
+                for expanded_voice in expanded_voices:
+                    if isinstance(instrument, MidiInstrument):
+                        is_drum = instrument.is_Drum
+                        program = 1 if is_drum else instrument.prgm
+                        note_param = expanded_voice["pfields"].get('note', instrument['note'])
+                        velocity = expanded_voice["pfields"].get('velocity', instrument['velocity'])
+                    else:
+                        is_drum = expanded_voice["pfields"].get('is_drum', event.get_parameter('is_drum', False))
+                        default_program = 1 if is_drum else 0
+                        program = expanded_voice["pfields"].get('program', event.get_parameter('program', default_program))
+                        note_param = expanded_voice["pfields"].get('note', DEFAULT_DRUM_NOTE if is_drum else 60)
+                        velocity = expanded_voice["pfields"].get('velocity', event.get_parameter('velocity', DEFAULT_VELOCITY))
+
+                    voice_id = f"collection_voice_{voice_counter}"
+                    voice_counter += 1
+                    start_time = expanded_voice["start"]
+                    duration = expanded_voice["duration"]
+
+                    try:
+                        port, channel = allocator.allocate_voice(voice_id, is_drum, program)
+                    except RuntimeError:
+                        continue
+
+                    if is_drum:
+                        midi_note = int(note_param) if note_param else DEFAULT_DRUM_NOTE
+                        pitch_bend = None
+                    elif isinstance(note_param, Pitch):
+                        midi_note, pitch_bend = _calculate_base_note_and_bend(note_param, allocator.bend_sensitivity_semitones)
+                    elif isinstance(note_param, float) and note_param != int(note_param):
+                        pitch = Pitch.from_midi(note_param)
+                        midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, allocator.bend_sensitivity_semitones)
+                    else:
+                        midi_note = int(note_param) if note_param else 60
+                        pitch_bend = None
+
+                    note_events.append({
+                        'voice_id': voice_id,
+                        'port': port,
+                        'channel': channel,
+                        'start_time': start_time,
+                        'duration': duration,
+                        'midi_note': midi_note,
+                        'velocity': velocity,
+                        'program': program,
+                        'is_drum': is_drum,
+                        'pitch_bend': pitch_bend
+                    })
     
     elif isinstance(unit, TemporalUnit):
         # TemporalUnit: use single drum channel (optimization)

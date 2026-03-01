@@ -15,7 +15,7 @@ from klotho.utils.playback._converter_base import (
     DEFAULT_SPECTRUM_DURATION, DEFAULT_DRUM_FREQ,
     KNOWN_KWARGS,
     _get_addressed_collection, _merge_pfields,
-    scale_pitch_sequence, extract_convert_kwargs,
+    scale_pitch_sequence, extract_convert_kwargs, lower_event_ir_to_voice_events,
 )
 
 
@@ -157,22 +157,31 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
             inst_id_map[inst_identity] = key
 
         routing_key = inst_id_map[inst_identity]
-        pfields = {k: v for k, v in event.pfields.items()
-                   if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
-        pfields = _normalize_event_pfields(pfields)
-        default_pfields = instruments[routing_key].get('preset', {})
-        effective_pfields = _deep_merge(default_pfields, pfields)
-        effective_pfields = _merge_pfields(effective_pfields, extra_pfields)
+        expanded_voices = lower_event_ir_to_voice_events(event, step_index=step_idx)
+        for expanded_voice in expanded_voices:
+            pfields = {k: v for k, v in expanded_voice["pfields"].items()
+                       if k not in ('synth_name', 'synthName', 'group', '_slur_start', '_slur_end', '_slur_id')}
+            pfields = _normalize_event_pfields(pfields)
+            default_pfields = instruments[routing_key].get('preset', {})
+            effective_pfields = _deep_merge(default_pfields, pfields)
+            effective_pfields = _merge_pfields(effective_pfields, extra_pfields)
 
-        ev_data = {
-            "start": start_time,
-            "duration": abs(event.duration),
-            "instrument": routing_key,
-            "pfields": effective_pfields,
-        }
-        if animation:
-            ev_data["_stepIndex"] = step_idx
-        events.append(ev_data)
+            voice_start = expanded_voice["start"] - time_offset if animation else expanded_voice["start"]
+            ev_data = {
+                "start": voice_start,
+                "duration": expanded_voice["duration"],
+                "instrument": routing_key,
+                "pfields": effective_pfields,
+                "_polyGroupId": expanded_voice["poly_group_id"],
+                "_logicalStepId": expanded_voice["logical_step_id"],
+                "_polyVoiceIndex": expanded_voice["poly_voice_index"],
+                "_polyVoiceCount": expanded_voice["poly_voice_count"],
+                "_polyLeader": expanded_voice["poly_is_leader"],
+                "_animate": expanded_voice["animate"],
+            }
+            if animation:
+                ev_data["_stepIndex"] = step_idx
+            events.append(ev_data)
 
     events.sort(key=lambda ev: ev["start"])
     return _payload(events, instruments)
