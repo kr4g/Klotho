@@ -60,13 +60,30 @@ class Tree(Graph):
         """Subclass hook: initialize domain-specific state after topology-only cloning."""
         pass
 
+    def _normalize_mutation_scope(self, scope_node=None, op=None):
+        if scope_node is None:
+            return None
+        return scope_node if scope_node in self else None
+
+    def _resolve_data_update_scope(self, node, changed_keys, op=None):
+        return self._normalize_mutation_scope(scope_node=node, op=op)
+
+    def _before_post_mutation(self, scope_node=None, op=None):
+        pass
+
+    def _after_post_mutation(self, scope_node=None, op=None):
+        pass
+
+    def _after_node_data_mutation(self, node, attrs, scope_node=None, op=None):
+        normalized_scope = self._normalize_mutation_scope(scope_node=scope_node, op=op)
+        self._post_mutation(scope_node=normalized_scope, op=op or 'set_node_data')
+
     def _post_mutation(self, scope_node=None, op=None):
-        """Subclass hook: run after any structure-changing mutation.
-        Default: invalidate caches and update Group structure.
-        Subclasses override to add domain-specific cleanup (e.g. RT re-evaluates metrics).
-        """
+        scope_node = self._normalize_mutation_scope(scope_node=scope_node, op=op)
+        self._before_post_mutation(scope_node=scope_node, op=op)
         self._invalidate_caches()
         self._update_group_structure()
+        self._after_post_mutation(scope_node=scope_node, op=op)
     
     def _invalidate_caches(self):
         """Invalidate all tree caches"""
@@ -343,6 +360,18 @@ class Tree(Graph):
         parent = self.parent(node)
         return tuple(n for n in self.successors(parent) if n != node) if parent else tuple()
 
+    def lowest_common_ancestor(self, node_a, node_b):
+        if node_a not in self or node_b not in self:
+            raise ValueError("Both nodes must exist in the tree")
+        branch_a = self.branch(node_a)
+        branch_b = self.branch(node_b)
+        lca = self.root
+        for a, b in zip(branch_a, branch_b):
+            if a != b:
+                break
+            lca = a
+        return lca
+
     def subtree(self, node, renumber=True):
         """Extract a tree subtree rooted at the given node.
         
@@ -522,8 +551,11 @@ class Tree(Graph):
         """
         self._building_tree = True
         try:
-            child_id = super().add_node(**attr)
+            normalized = self._normalize_node_attrs(node=parent, attrs=attr, op='add_child')
+            self._validate_node_attrs(node=parent, attrs=normalized, op='add_child')
+            child_id = super().add_node(**normalized)
             super().add_edge(parent, child_id)
+            self._post_mutation(scope_node=parent, op='add_child')
             return child_id
         finally:
             self._building_tree = False
@@ -551,7 +583,7 @@ class Tree(Graph):
         node_mapping = {}
         
         for node in subtree.nodes:
-            new_id = Graph.add_node(self, **subtree[node])
+            new_id = Graph.add_node(self, **dict(subtree.nodes[node]))
             node_mapping[node] = new_id
         
         for u, v in subtree.edges:
@@ -614,24 +646,15 @@ class Tree(Graph):
         Returns
         -------
         int
-            The new node ID.
+            The replaced node ID.
         """
         parent = self.parent(old_node)
-        children = list(self.successors(old_node))
-        
-        new_node = Graph.add_node(self, **attr)
-        
-        if parent is not None:
-            Graph.add_edge(self, parent, new_node)
-        else:
-            self._root = new_node
-        
-        for child in children:
-            Graph.add_edge(self, new_node, child)
-        
-        Graph.remove_node(self, old_node)
-        
-        return new_node
+        normalized = self._normalize_node_attrs(node=old_node, attrs=attr, op='replace_node')
+        self._validate_node_attrs(node=old_node, attrs=normalized, op='replace_node')
+        self._graph[old_node] = copy.deepcopy(normalized if normalized else {})
+        scope_node = parent if parent is not None else old_node
+        self._post_mutation(scope_node=scope_node, op='replace_node')
+        return old_node
 
     def _update_group_structure(self):
         """Update the Group structure based on current graph state.
@@ -700,30 +723,24 @@ class Tree(Graph):
     def _graft_replace_leaf(self, target_node, subtree):
         """Replace the leaf node with the subtree root."""
         parent = self.parent(target_node)
-        
-        # Add all subtree nodes
-        node_mapping = {}
+
+        node_mapping = {subtree.root: target_node}
         for node in subtree.nodes:
-            new_id = Graph.add_node(self, **subtree[node])
+            if node == subtree.root:
+                continue
+            new_id = Graph.add_node(self, **dict(subtree.nodes[node]))
             node_mapping[node] = new_id
-        
-        # Add all subtree edges
+
+        self._graph[target_node] = copy.deepcopy(dict(subtree.nodes[subtree.root]))
+
         for u, v in subtree.edges:
-            Graph.add_edge(self, node_mapping[u], node_mapping[v])
-        
-        new_root = node_mapping[subtree.root]
-        
-        # Connect new root to parent (or make it the tree root)
-        if parent is not None:
-            Graph.add_edge(self, parent, new_root)
-        else:
-            self._root = new_root
-        
-        # Remove the target leaf node
-        Graph.remove_node(self, target_node)
-        
+            if u == subtree.root:
+                Graph.add_edge(self, target_node, node_mapping[v])
+            else:
+                Graph.add_edge(self, node_mapping[u], node_mapping[v])
+
         self._post_mutation(scope_node=parent, op='graft_subtree')
-        return new_root
+        return target_node
     
     def _graft_adopt_leaf(self, target_node, subtree):
         """Keep the leaf node and give it the children from subtree root."""
@@ -732,7 +749,7 @@ class Tree(Graph):
         
         node_mapping = {}
         for node in subtree_nodes_except_root:
-            new_id = Graph.add_node(self, **subtree[node])
+            new_id = Graph.add_node(self, **dict(subtree.nodes[node]))
             node_mapping[node] = new_id
         
         # Add edges between the mapped nodes (excluding edges from subtree root)
@@ -764,12 +781,15 @@ class Tree(Graph):
             raise ValueError("Cannot move the root node")
         
         old_parent = self.parent(node)
+        scope_node = new_parent
+        if old_parent is not None and new_parent is not None:
+            scope_node = self.lowest_common_ancestor(old_parent, new_parent)
         
         Graph.remove_edge(self, old_parent, node)
         
         Graph.add_edge(self, new_parent, node)
         
-        self._post_mutation(scope_node=new_parent, op='move_subtree')
+        self._post_mutation(scope_node=scope_node, op='move_subtree')
 
     def prune_to_depth(self, max_depth):
         """Prune the tree to a maximum depth, removing all nodes beyond that depth."""

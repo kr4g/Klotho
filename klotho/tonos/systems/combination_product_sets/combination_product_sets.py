@@ -82,6 +82,7 @@ class CombinationProductSet(CS):
     self._populate_graph()
     self._build_master_set_structure(self._master_set_instance.relationship_dict)
     self._compute_positions()
+    self._graph._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
 
   def _populate_graph(self):
     directed_graph = self._graph.to_directed()
@@ -101,9 +102,7 @@ class CombinationProductSet(CS):
         for factor in combo:
           symbolic_expr *= self.factor_to_alias[factor]
         
-        self._graph.nodes[node]['product'] = product
-        self._graph.nodes[node]['ratio']   = ratio
-        self._graph.nodes[node]['alias']   = symbolic_expr
+        self._graph.set_node_data(node, product=product, ratio=ratio, alias=symbolic_expr)
   
   def _build_master_set_structure(self, relationship_dict):
     if not relationship_dict:
@@ -529,10 +528,13 @@ class CombinationProductSet(CS):
       ratio = equave_reduce(entry['product']) if not isinstance(entry['product'], Fraction) else equave_reduce(entry['product'])
       if normalized:
         ratio = equave_reduce(ratio / max(factors_sorted))
-      directed_graph.nodes[i]['combo'] = entry['combo']
-      directed_graph.nodes[i]['alias'] = entry['alias']
-      directed_graph.nodes[i]['product'] = entry['product']
-      directed_graph.nodes[i]['ratio'] = ratio
+      directed_graph.set_node_data(
+        i,
+        combo=entry['combo'],
+        alias=entry['alias'],
+        product=entry['product'],
+        ratio=ratio,
+      )
 
     instance = object.__new__(cls)
     instance._factors = factors_sorted
@@ -548,4 +550,5 @@ class CombinationProductSet(CS):
       instance._build_master_set_structure(instance._master_set_instance.relationship_dict)
 
     instance._compute_positions()
+    instance._graph._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
     return instance

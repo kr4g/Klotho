@@ -979,6 +979,9 @@ class CompositionalUnit(TemporalUnit):
         self._events = None
 
     def add_child(self, parent, **attr):
+        if 'label' in attr and 'proportion' not in attr:
+            attr = dict(attr)
+            attr['proportion'] = attr.pop('label')
         new_rt_node = self._rt.add_child(parent, **attr)
         self._pt.add_child(parent)
         self._events = None
@@ -1216,8 +1219,7 @@ class CompositionalUnit(TemporalUnit):
 
         for old_node, new_node in old_to_new_mapping.items():
             node_data = self._pt.items(old_node)
-            new_cu._pt.nodes[new_node].clear()
-            new_cu._pt.nodes[new_node].update(node_data)
+            new_cu._pt._graph[new_node] = dict(node_data)
         new_cu._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
         new_cu._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
 

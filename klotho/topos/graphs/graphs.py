@@ -2,6 +2,7 @@ import rustworkx as rx
 import copy
 from functools import lru_cache
 from typing import List, TypeVar, Optional, Any, Union, Dict, Iterator, Tuple
+from types import MappingProxyType
 import numpy as np
 
 T = TypeVar('T')
@@ -13,6 +14,8 @@ class Graph:
         self._meta = {}
         self._structure_version = 0
         self._graph = rx.PyDiGraph() if directed else rx.PyGraph()
+        self._topology_mutable = True
+        self._node_attr_mutable = True
         
     @property
     def nodes(self):
@@ -31,10 +34,66 @@ class Graph:
         node_data = self._graph.get_node_data(node)
         
         if not isinstance(node_data, dict):
-            empty_dict = {}
-            return empty_dict
+            return MappingProxyType({})
         
-        return node_data
+        return MappingProxyType(node_data)
+
+    def _is_topology_mutable(self):
+        return getattr(self, '_topology_mutable', True)
+
+    def _is_node_attr_mutable(self):
+        return getattr(self, '_node_attr_mutable', True)
+
+    def _set_mutability_policy(self, topology_mutable=True, node_attr_mutable=True):
+        self._topology_mutable = bool(topology_mutable)
+        self._node_attr_mutable = bool(node_attr_mutable)
+
+    def _ensure_topology_mutable(self, op=None):
+        if not self._is_topology_mutable():
+            op_name = op or "topology mutation"
+            raise PermissionError(f"{self.__class__.__name__} does not allow {op_name}")
+
+    def _ensure_node_attr_mutable(self, op=None):
+        if not self._is_node_attr_mutable():
+            op_name = op or "node-attribute mutation"
+            raise PermissionError(f"{self.__class__.__name__} does not allow {op_name}")
+
+    def _normalize_node_attrs(self, node, attrs, op=None):
+        return dict(attrs) if isinstance(attrs, dict) else {}
+
+    def _validate_node_attrs(self, node, attrs, op=None):
+        pass
+
+    def _resolve_data_update_scope(self, node, changed_keys, op=None):
+        return node
+
+    def _before_node_data_mutation(self, node, attrs, scope_node=None, op=None):
+        pass
+
+    def _after_node_data_mutation(self, node, attrs, scope_node=None, op=None):
+        pass
+
+    def _apply_node_data_mutation(self, node, attrs, op=None, replace=False):
+        if not self._graph.has_node(node):
+            raise KeyError(f"Node {node} not found in graph")
+
+        self._ensure_node_attr_mutable(op=op)
+        normalized = self._normalize_node_attrs(node=node, attrs=attrs, op=op)
+        self._validate_node_attrs(node=node, attrs=normalized, op=op)
+        changed_keys = tuple(sorted(normalized.keys()))
+        scope_node = self._resolve_data_update_scope(node=node, changed_keys=changed_keys, op=op)
+        self._before_node_data_mutation(node=node, attrs=normalized, scope_node=scope_node, op=op)
+
+        existing_data = self._graph.get_node_data(node)
+        existing_data = existing_data if isinstance(existing_data, dict) else {}
+        if replace:
+            new_data = dict(normalized)
+        else:
+            new_data = dict(existing_data)
+            new_data.update(normalized)
+        self._graph[node] = new_data
+        self._invalidate_caches()
+        self._after_node_data_mutation(node=node, attrs=normalized, scope_node=scope_node, op=op)
     
     def __len__(self):
         """Return the number of nodes."""
@@ -118,6 +177,8 @@ class Graph:
         new_graph._graph = graph.copy() if copy_graph else graph
         new_graph._meta = {}
         new_graph._structure_version = 0
+        new_graph._topology_mutable = True
+        new_graph._node_attr_mutable = True
         return new_graph
 
     @classmethod
@@ -582,6 +643,7 @@ class Graph:
         int
             The node ID that was added.
         """
+        self._ensure_topology_mutable(op='add_node')
         node_id = self._graph.add_node(attr if attr else {})
         self._invalidate_caches()
         return node_id
@@ -596,32 +658,25 @@ class Graph:
         **attr : dict
             Node attributes to set.
         """
-        if not self._graph.has_node(node):
-            raise KeyError(f"Node {node} not found in graph")
-        
-        existing_data = self._graph.get_node_data(node)
-        if existing_data is None:
-            new_data = attr.copy()
-            node_data = {}
-            node_data.update(attr)
-            self._graph.remove_node(node)
-            new_node_id = self._graph.add_node(attr)
-            if new_node_id != node:
-                raise RuntimeError(f"Expected node ID {node}, got {new_node_id}")
-        elif not isinstance(existing_data, dict):
-            raise ValueError(f"Cannot update non-dict node data for node {node}. Node data type: {type(existing_data)}")
-        else:
-            existing_data.update(attr)
-        
-        self._invalidate_caches()
+        self._apply_node_data_mutation(node=node, attrs=attr, op='set_node_data', replace=False)
+
+    def update_node_data(self, node, attrs: Dict[str, Any]):
+        """Update data for an existing node from a dictionary."""
+        self._apply_node_data_mutation(node=node, attrs=attrs, op='update_node_data', replace=False)
+
+    def replace_node_data(self, node, attrs: Dict[str, Any]):
+        """Replace all data for an existing node."""
+        self._apply_node_data_mutation(node=node, attrs=attrs, op='replace_node_data', replace=True)
     
     def remove_node(self, node):
         """Remove a node from the graph."""
+        self._ensure_topology_mutable(op='remove_node')
         self._graph.remove_node(node)
         self._invalidate_caches()
         
     def add_edge(self, u, v, **attr):
         """Add an edge to the graph with optional attributes."""
+        self._ensure_topology_mutable(op='add_edge')
         if not self._graph.has_node(u):
             raise KeyError(f"Node {u} not found in graph")
         if not self._graph.has_node(v):
@@ -636,18 +691,22 @@ class Graph:
         
     def remove_edge(self, u, v):
         """Remove an edge from the graph."""
+        self._ensure_topology_mutable(op='remove_edge')
         self._graph.remove_edge(u, v)
         self._invalidate_caches()
         
     def update(self, edges=None, nodes=None):
         """Update the graph with nodes and edges."""
+        self._ensure_topology_mutable(op='update')
         if nodes:
             for node_data in nodes:
                 if isinstance(node_data, tuple) and len(node_data) == 2:
                     node, attrs = node_data
-                    self.add_node(node, **attrs)
+                    if not self._graph.has_node(node):
+                        raise KeyError(f"Node {node} not found in graph")
+                    self.set_node_data(node, **attrs)
                 else:
-                    self.add_node(node_data)
+                    self.add_node(label=node_data)
         
         if edges:
             for edge_data in edges:
@@ -662,15 +721,13 @@ class Graph:
         
     def clear(self):
         """Remove all nodes and edges from the graph."""
+        self._ensure_topology_mutable(op='clear')
         self._graph.clear()
         self._invalidate_caches()
     
     def set_node_attributes(self, node, attributes):
         """Set attributes for a node."""
-        current_data = self._graph.get_node_data(node)
-        if not isinstance(current_data, dict):
-            current_data = {}
-        current_data.update(attributes)
+        self._apply_node_data_mutation(node=node, attrs=attributes, op='set_node_attributes', replace=False)
     
     def clear_node_attributes(self, nodes=None):
         """Clear attributes of specified nodes or all nodes.
@@ -680,10 +737,11 @@ class Graph:
         nodes : list, optional
             Specific nodes to clear attributes for, or None for all nodes.
         """
+        self._ensure_node_attr_mutable(op='clear_node_attributes')
         nodes_to_clear = nodes if nodes is not None else self._graph.node_indices()
         for node in nodes_to_clear:
             if node in self:
-                self._graph[node] = {}
+                self._apply_node_data_mutation(node=node, attrs={}, op='clear_node_attributes', replace=True)
         
     def renumber_nodes(self, method='default'):
         """Renumber the nodes in the graph to consecutive integers.
@@ -929,6 +987,8 @@ class Graph:
         new_graph._graph = self._graph.copy()
         new_graph._meta = copy.deepcopy(self._meta, memo)
         new_graph._structure_version = 0
+        new_graph._topology_mutable = self._is_topology_mutable()
+        new_graph._node_attr_mutable = self._is_node_attr_mutable()
         
         return new_graph
 
@@ -950,14 +1010,19 @@ class GraphNodeView:
     
     def __getitem__(self, node):
         node_data = self._graph._graph.get_node_data(node)
-        return node_data if isinstance(node_data, dict) else {}
+        if not isinstance(node_data, dict):
+            return MappingProxyType({})
+        return MappingProxyType(node_data)
     
     def __call__(self, data=False):
         """Return nodes with optional data."""
         if data:
             for idx in self._graph._graph.node_indices():
                 node_data = self._graph._graph.get_node_data(idx)
-                yield (idx, node_data if isinstance(node_data, dict) else {})
+                if isinstance(node_data, dict):
+                    yield (idx, MappingProxyType(node_data))
+                else:
+                    yield (idx, MappingProxyType({}))
         else:
             for idx in self._graph._graph.node_indices():
                 yield idx

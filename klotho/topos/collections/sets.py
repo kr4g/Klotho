@@ -990,7 +990,7 @@ class CombinationSet:
         n_nodes = len(self._combos)
         G = Graph.complete_graph(n_nodes)
         for i, combo in enumerate(sorted(self._combos)):
-            G[i]['combo'] = combo
+            G.set_node_data(i, combo=combo)
         return G
     
     def __str__(self):    

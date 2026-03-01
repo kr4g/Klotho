@@ -61,6 +61,7 @@ class Lattice(Graph):
         self._materialized_coords = set(self._coord_to_node.keys())
         
         self._meta = pd.DataFrame(index=[''])
+        self._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
     
     def _estimate_size(self):
         """Estimate total lattice size."""

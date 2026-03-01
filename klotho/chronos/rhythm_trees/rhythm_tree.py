@@ -250,13 +250,46 @@ class RhythmTree(Tree):
                 new_s = (1,)
             self._list = Group((self._list.D, new_s))
 
-    def _post_mutation(self, scope_node=None, op=None):
+    def _before_post_mutation(self, scope_node=None, op=None):
         for node in self.nodes:
-            node_data = self[node]
+            node_data = self._graph[node]
             if 'proportion' not in node_data:
-                node_data['proportion'] = node_data.get('label', 1)
-                node_data.pop('label', None)
-        super()._post_mutation(scope_node=scope_node, op=op)
+                node_data['proportion'] = 1
+
+    def _normalize_node_attrs(self, node, attrs, op=None):
+        normalized = dict(attrs) if isinstance(attrs, dict) else {}
+        if 'label' in normalized:
+            raise ValueError("RhythmTree does not accept 'label'; use 'proportion'")
+
+        if 'tied' in normalized and 'proportion' not in normalized:
+            current = self[node].get('proportion', 1)
+            normalized['proportion'] = float(current) if normalized['tied'] else int(current)
+
+        if 'proportion' in normalized and 'tied' in normalized:
+            if normalized['tied']:
+                normalized['proportion'] = float(normalized['proportion'])
+            else:
+                normalized['proportion'] = int(normalized['proportion'])
+
+        return normalized
+
+    def _validate_node_attrs(self, node, attrs, op=None):
+        mutable_keys = {'proportion', 'tied'}
+        illegal = [k for k in attrs if k not in mutable_keys]
+        if illegal:
+            raise ValueError(f"Illegal RhythmTree node attribute update: {illegal}")
+        if 'metric_duration' in attrs or 'metric_onset' in attrs:
+            raise ValueError("metric_duration and metric_onset are derived and cannot be set directly")
+
+    def _resolve_data_update_scope(self, node, changed_keys, op=None):
+        if 'proportion' in changed_keys or 'tied' in changed_keys:
+            if node == self.root:
+                return self.root
+            parent = self.parent(node)
+            return self.root if parent is None else parent
+        return super()._resolve_data_update_scope(node=node, changed_keys=changed_keys, op=op)
+
+    def _after_post_mutation(self, scope_node=None, op=None):
         self._evaluate(scope_node)
     
     @property
@@ -353,7 +386,7 @@ class RhythmTree(Tree):
         """
         if root_node is None:
             root_node = self.root
-        self[self.root]['metric_duration'] = self.meas * self.span
+        self._graph[self.root]['metric_duration'] = self.meas * self.span
         parent_ratio = self.span * self.meas.to_fraction() if root_node == self.root else Fraction(self[root_node]['metric_duration'])
 
         leaf_onset_acc = [Fraction(0)]
@@ -361,6 +394,7 @@ class RhythmTree(Tree):
         def _process_child(child, div, parent_ratio, parent_is_negative):
             child_data = self[child]
             s = child_data.get('proportion', 1)
+            child_is_tied = isinstance(s, float) or bool(child_data.get('tied', False))
             if 'meta' in child_data:
                 s = s * child_data['meta']['span']
             s = int(s) if isinstance(s, float) else s
@@ -369,28 +403,29 @@ class RhythmTree(Tree):
             ratio = Fraction(s, div) * parent_ratio
             if s < 0:
                 ratio = -abs(ratio)
-            self[child]['metric_duration'] = ratio
-            self[child]['proportion'] = s
+            self._graph[child]['metric_duration'] = ratio
+            self._graph[child]['tied'] = child_is_tied
+            self._graph[child]['proportion'] = float(s) if child_is_tied else s
             if self.out_degree(child) > 0:
                 _process_subtree(child, ratio)
             else:
-                self[child]['metric_onset'] = leaf_onset_acc[0]
+                self._graph[child]['metric_onset'] = leaf_onset_acc[0]
                 leaf_onset_acc[0] += abs(ratio)
 
         def _process_subtree(node, parent_ratio):
-            node_data = self[node]
+            node_data = self._graph[node]
             if 'meta' in node_data:
                 node_data['proportion'] = node_data.get('proportion', 1) * node_data['meta']['span']
             label = node_data.get('proportion', 1)
-            is_tied = isinstance(label, float)
-            self[node]['tied'] = is_tied
+            is_tied = isinstance(label, float) or bool(node_data.get('tied', False))
+            self._graph[node]['tied'] = is_tied
             label_value = int(label) if is_tied else label
-            self[node]['proportion'] = label_value
+            self._graph[node]['proportion'] = float(label_value) if is_tied else label_value
             children = list(self.successors(node))
             if not children:
                 ratio = Fraction(label_value) * parent_ratio
-                self[node]['metric_duration'] = ratio
-                self[node]['metric_onset'] = leaf_onset_acc[0]
+                self._graph[node]['metric_duration'] = ratio
+                self._graph[node]['metric_onset'] = leaf_onset_acc[0]
                 leaf_onset_acc[0] += abs(ratio)
                 return
             div = int(sum(
@@ -401,7 +436,7 @@ class RhythmTree(Tree):
             node_is_negative = label_value < 0
             for child in children:
                 _process_child(child, div, parent_ratio, node_is_negative)
-            self[node]['metric_onset'] = self[children[0]]['metric_onset']
+            self._graph[node]['metric_onset'] = self[children[0]]['metric_onset']
 
         if root_node != self.root:
             for n in self.leaf_nodes:
@@ -414,13 +449,13 @@ class RhythmTree(Tree):
         if root_node != self.root:
             leaves_after = [n for n in self.leaf_nodes if list(self.leaf_nodes).index(n) > max(list(self.leaf_nodes).index(l) for l in self.subtree_leaves(root_node))]
             for n in leaves_after:
-                self[n]['metric_onset'] = leaf_onset_acc[0]
+                self._graph[n]['metric_onset'] = leaf_onset_acc[0]
                 leaf_onset_acc[0] += abs(Fraction(self[n]['metric_duration']))
             for node in reversed(list(self.topological_sort())):
                 if self.out_degree(node) > 0 and node != root_node:
                     if node not in self.descendants(root_node):
                         children = list(self.successors(node))
-                        self[node]['metric_onset'] = self[children[0]]['metric_onset']
+                        self._graph[node]['metric_onset'] = self[children[0]]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)
@@ -580,7 +615,7 @@ class RhythmTree(Tree):
         descendants_to_modify = [node] + list(self.descendants(node))
         
         for n in descendants_to_modify:
-            node_data = self[n]
+            node_data = self._graph[n]
             if 'proportion' in node_data and node_data['proportion'] > 0:
                 node_data['proportion'] = -abs(node_data['proportion'])
                 node_data['metric_duration'] = -abs(node_data['metric_duration'])

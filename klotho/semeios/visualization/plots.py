@@ -529,7 +529,9 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
     
     for node, (x, y) in pos.items():
         if attributes is None:
-            label_text = str(tree[node].get('label', node)) if tree[node].get('label') is not None else str(node)
+            value_attr = getattr(tree, '_node_value_attr', 'label')
+            value = tree[node].get(value_attr)
+            label_text = str(value) if value is not None else str(node)
         else:
             label_parts = []
             for attr in attributes:

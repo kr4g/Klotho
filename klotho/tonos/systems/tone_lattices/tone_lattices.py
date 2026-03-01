@@ -243,8 +243,9 @@ class ToneLattice(Lattice):
         node_data = super().__getitem__(coord)
         
         if 'ratio' not in node_data:
-            ratio = self._coord_to_ratio(coord)
-            node_data['ratio'] = ratio
+            node_data = dict(node_data)
+            node_data['ratio'] = self._coord_to_ratio(coord)
+            return node_data
         
         return node_data
     
@@ -265,10 +266,6 @@ class ToneLattice(Lattice):
                 ratio = node_data['ratio']
         if ratio is None:
             ratio = self._coord_to_ratio(coord)
-        if node_id is not None:
-            node_data = self._graph.get_node_data(node_id)
-            if isinstance(node_data, dict):
-                node_data['ratio'] = ratio
         return ratio
     
     def _sorted_matches_for_ratio(self, ratio: Fraction) -> List[Tuple[int, ...]]:

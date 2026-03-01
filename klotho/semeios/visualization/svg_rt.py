@@ -337,6 +337,7 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                f'height="{fy(y_max_frac - y_min_frac):.2f}" fill="black"/>')
 
     vertical_line_positions = set()
+    node_layout = {}
 
     if rt.span > 1 and barlines:
         top_bar_height = level_height * 0.5 * get_node_scaling(rt.root, rt)
@@ -411,8 +412,7 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                         els.append(_svg_text(cx_px, fy(y_pos), str(rt.meas),
                                              font_size=font_size, fill=text_color))
 
-                    rt[node]['_x_start'] = 0
-                    rt[node]['_width'] = 1
+                    node_layout[node] = (0.0, 1.0)
                     continue
                 else:
                     x_start = 0
@@ -421,7 +421,7 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                     is_last_child = True
             else:
                 siblings = nodes_by_parent[parent]
-                parent_data = rt[parent]
+                parent_x_start, parent_width = node_layout.get(parent, (0.0, 1.0))
 
                 is_first_child = siblings[0] == node
                 is_last_child = siblings[-1] == node
@@ -433,14 +433,10 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                         break
                     preceding_proportion += abs(rt[sib].get('proportion', 1))
 
-                parent_x_start = parent_data.get('_x_start', 0)
-                parent_width = parent_data.get('_width', 1)
-
                 x_start = float(parent_x_start + (preceding_proportion / total_proportion) * parent_width)
                 w = float((abs(proportion) / total_proportion) * parent_width)
 
-            rt[node]['_x_start'] = x_start
-            rt[node]['_width'] = w
+            node_layout[node] = (x_start, w)
 
             is_leaf = rt.out_degree(node) == 0
             is_rest = Fraction(str(ratio)) < 0
@@ -665,6 +661,7 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
         level_positions.append(y_pos)
 
     pos = {}
+    node_layout = {}
     for level in range(max_depth + 1):
         nodes = rt.at_depth(level)
         y_pos = level_positions[level]
@@ -696,20 +693,17 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
                 width = 1
             else:
                 siblings = nodes_by_parent[parent]
-                parent_data = rt[parent]
+                parent_x_start, parent_width = node_layout.get(parent, (0.0, 1.0))
                 total_proportion = sum(abs(rt[sib].get('proportion', 1)) for sib in siblings)
                 preceding_proportion = 0
                 for sib in siblings:
                     if sib == node:
                         break
                     preceding_proportion += abs(rt[sib].get('proportion', 1))
-                parent_x_start = parent_data.get('_x_start', 0)
-                parent_width = parent_data.get('_width', 1)
                 x_start = parent_x_start + (preceding_proportion / total_proportion) * parent_width
                 width = (abs(proportion) / total_proportion) * parent_width
 
-            rt[node]['_x_start'] = x_start
-            rt[node]['_width'] = width
+            node_layout[node] = (x_start, width)
             pos[node] = ((x_start + width / 2) * width_px, y_pos * height_px)
 
     x_pad = 15

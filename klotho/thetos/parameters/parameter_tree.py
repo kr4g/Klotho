@@ -32,7 +32,7 @@ class ParameterTree(Tree):
     def __init__(self, root, children:tuple):
         super().__init__(root, children)
         for node in self.nodes:
-            super().__getitem__(node).pop('label', None)
+            self._graph[node].pop('label', None)
         self._meta['pfields'] = set()
         self._meta['mfields'] = set()
         self._node_instruments = {}
@@ -77,6 +77,8 @@ class ParameterTree(Tree):
         return None
 
     def set_instrument(self, node, instrument):
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
         self._meta['pfields'].update(instrument.keys())
         self._node_instruments[node] = instrument
 
@@ -88,6 +90,43 @@ class ParameterTree(Tree):
 
     def subtree(self, node, renumber=True):
         return super().subtree(node, renumber)
+
+    def _map_parallel_nodes(self, other_tree, other_node, this_node, mapping):
+        mapping[other_node] = this_node
+        other_children = list(other_tree.successors(other_node))
+        this_children = list(self.successors(this_node))
+        if len(other_children) != len(this_children):
+            raise ValueError("Topology mismatch while mapping grafted subtree")
+        for o_child, t_child in zip(other_children, this_children):
+            self._map_parallel_nodes(other_tree, o_child, t_child, mapping)
+
+    def graft_subtree(self, target_node, subtree, mode='replace'):
+        if not isinstance(subtree, Tree):
+            raise TypeError("subtree must be a Tree instance")
+
+        graft_result = super().graft_subtree(target_node, subtree, mode)
+
+        if isinstance(subtree, ParameterTree):
+            mapping = {}
+            if mode == 'replace':
+                self._map_parallel_nodes(subtree, subtree.root, graft_result, mapping)
+            else:
+                target_children = list(self.successors(target_node))
+                subtree_root_children = list(subtree.successors(subtree.root))
+                for o_child, t_child in zip(subtree_root_children, target_children[-len(subtree_root_children):]):
+                    self._map_parallel_nodes(subtree, o_child, t_child, mapping)
+
+            self._meta['pfields'].update(subtree._meta.get('pfields', set()))
+            self._meta['mfields'].update(subtree._meta.get('mfields', set()))
+
+            for old_node, instrument in subtree._node_instruments.items():
+                mapped = mapping.get(old_node)
+                if mapped is not None:
+                    self._node_instruments[mapped] = copy.deepcopy(instrument)
+
+            self._effective_cache = None
+
+        return graft_result
 
     def __getitem__(self, node):
         return ParameterNode(self, node)
@@ -101,13 +140,17 @@ class ParameterTree(Tree):
         return sorted(self._meta['mfields'])
 
     def set_pfields(self, node, **kwargs):
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
         self._meta['pfields'].update(kwargs.keys())
-        self.nodes[node].update(kwargs)
+        self._graph[node].update(kwargs)
         self._effective_cache = None
 
     def set_mfields(self, node, **kwargs):
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
         self._meta['mfields'].update(kwargs.keys())
-        self.nodes[node].update(kwargs)
+        self._graph[node].update(kwargs)
         self._effective_cache = None
 
     def get_instrument(self, node):
