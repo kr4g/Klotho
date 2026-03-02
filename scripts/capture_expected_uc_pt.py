@@ -252,9 +252,9 @@ def _build_entertain_me_melody_before():
 
     for b, branch in enumerate(uc_mel.rt.at_depth(2)):
         for k, leaf in enumerate(uc_mel.rt.descendants(branch)):
-            offset = uc_mel.get_parameter(leaf, "offset")
-            idx = uc_mel.get_parameter(leaf, "idx")
-            drct = uc_mel.get_parameter(leaf, "drct")
+            offset = uc_mel.get_mfield(leaf, "offset")
+            idx = uc_mel.get_mfield(leaf, "idx")
+            drct = uc_mel.get_mfield(leaf, "drct")
             scl_idx = offset + idx + drct * k
             uc_mel.set_pfields(leaf, freq=scale[scl_idx].freq)
 

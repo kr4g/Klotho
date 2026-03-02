@@ -36,14 +36,13 @@ def _normalize_sc_pfields(pfields):
     return normalized
 
 
-def _resolve_event_synth(event, instrument, default_synth):
-    explicit = event.get_parameter('defName')
-    if explicit:
-        return explicit
+def _resolve_event_synth(instrument, default_synth):
+    if isinstance(instrument, str):
+        return instrument
     if isinstance(instrument, SynthDefInstrument):
-        return getattr(instrument, 'defName', None) or default_synth
-    if instrument is not None:
-        return getattr(instrument, 'defName', None) or default_synth
+        return instrument.defName or default_synth
+    if instrument is not None and hasattr(instrument, 'defName'):
+        return instrument.defName or default_synth
     return default_synth
 
 
@@ -85,10 +84,10 @@ def lower_compositional_ir_to_sc_assembly(
     for event in events_iterable:
         if event.is_rest:
             continue
-        slur_id = event.get_parameter('_slur_id')
+        slur_id = event.get_mfield('_slur_id')
         if slur_id is None:
             continue
-        if event.get_parameter('_slur_end', 0):
+        if event.get_mfield('_slur_end', 0):
             slur_end_events[slur_id] = event
 
     time_offset = 0.0
@@ -115,14 +114,14 @@ def lower_compositional_ir_to_sc_assembly(
             continue
 
         instrument = obj.get_instrument(event.node_id)
-        def_name = _resolve_event_synth(event, instrument, default_synth)
+        def_name = _resolve_event_synth(instrument, default_synth)
         release_mode = _release_mode(instrument)
         is_gated = release_mode in GATED_RELEASE_MODES
         is_ungated = release_mode in FREE_RELEASE_MODES
-        group = event.get_parameter('group')
-        is_slur_start = event.get_parameter('_slur_start', 0)
-        is_slur_end = event.get_parameter('_slur_end', 0)
-        slur_id = event.get_parameter('_slur_id')
+        group = event.get_mfield('group')
+        is_slur_start = event.get_mfield('_slur_start', 0)
+        is_slur_end = event.get_mfield('_slur_end', 0)
+        slur_id = event.get_mfield('_slur_id')
         voice_events = lower_event_ir_to_voice_events(event, step_index=step_idx)
 
         for voice_event in voice_events:

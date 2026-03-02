@@ -382,8 +382,8 @@ class TestTemporalUnitSequence:
         uts.extend([uc] * 2)
         leaf0 = uts[0].rt.leaf_nodes[0]
         uts[0].set_pfields(leaf0, freq=100)
-        assert uts[0].get_parameter(leaf0, 'freq') == 100
-        assert uts[1].get_parameter(uts[1].rt.leaf_nodes[0], 'freq') is None
+        assert uts[0].get_pfield(leaf0, 'freq') == 100
+        assert uts[1].get_pfield(uts[1].rt.leaf_nodes[0], 'freq') is None
 
 
 class TestTemporalBlock:
@@ -464,11 +464,11 @@ class TestCompositionalUnit:
         limb0_leaves = list(uc.rt.subtree_leaves(limbs[0]))
         limb1_leaves = list(uc.rt.subtree_leaves(limbs[1]))
         for leaf in limb0_leaves:
-            assert uc.get_parameter(leaf, 'idx') == 0
-            assert uc.get_parameter(leaf, 'drct') == 1
+            assert uc.get_mfield(leaf, 'idx') == 0
+            assert uc.get_mfield(leaf, 'drct') == 1
         for leaf in limb1_leaves:
-            assert uc.get_parameter(leaf, 'idx') == 5
-            assert uc.get_parameter(leaf, 'drct') == -1
+            assert uc.get_mfield(leaf, 'idx') == 5
+            assert uc.get_mfield(leaf, 'drct') == -1
 
     def test_make_rest(self):
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=120, inst=JsInst.Kalimba())
@@ -491,8 +491,8 @@ class TestCompositionalUnit:
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=120, inst=JsInst.Kick())
         uc_copy = uc.copy()
         uc.set_pfields(1, freq=999)
-        assert uc.get_parameter(1, 'freq') == 999
-        assert uc_copy.get_parameter(1, 'freq') != 999
+        assert uc.get_pfield(1, 'freq') == 999
+        assert uc_copy.get_pfield(1, 'freq') != 999
 
 
 class TestCompositionalUnitUseCases:
@@ -698,7 +698,7 @@ class TestCompositionalUnitRT_PTSync:
         uc.subdivide(leaf, (1, 1, 1))
         new_leaves = list(uc._rt.successors(leaf))
         for n in new_leaves:
-            assert uc.get_parameter(n, 'freq') == 100
+            assert uc.get_pfield(n, 'freq') == 100
 
     def test_add_child_keeps_rt_pt_same_structure_and_ids(self):
         uc = UC(tempus='4/4', prolatio=(1, 1), beat='1/4', bpm=120)

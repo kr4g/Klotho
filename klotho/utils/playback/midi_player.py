@@ -387,12 +387,17 @@ def _create_midi_from_compositional_unit(compositional_unit, max_channels=128, b
                     program = 1 if is_drum else instrument.prgm
                     note_param = expanded_voice["pfields"].get('note', instrument['note'])
                     velocity = expanded_voice["pfields"].get('velocity', instrument['velocity'])
+                elif isinstance(instrument, int):
+                    is_drum = False
+                    program = instrument
+                    note_param = expanded_voice["pfields"].get('note', 60)
+                    velocity = expanded_voice["pfields"].get('velocity', DEFAULT_VELOCITY)
                 else:
-                    is_drum = expanded_voice["pfields"].get('is_drum', event.get_parameter('is_drum', False))
+                    is_drum = expanded_voice["pfields"].get('is_drum', event.get_pfield('is_drum', False))
                     default_program = 1 if is_drum else 0
-                    program = expanded_voice["pfields"].get('program', event.get_parameter('program', default_program))
+                    program = expanded_voice["pfields"].get('program', event.get_pfield('program', default_program))
                     note_param = expanded_voice["pfields"].get('note', DEFAULT_DRUM_NOTE if is_drum else 60)
-                    velocity = expanded_voice["pfields"].get('velocity', event.get_parameter('velocity', DEFAULT_VELOCITY))
+                    velocity = expanded_voice["pfields"].get('velocity', event.get_pfield('velocity', DEFAULT_VELOCITY))
 
                 voice_id = f"voice_{voice_counter}"
                 voice_counter += 1
@@ -512,19 +517,24 @@ def _collect_note_events_from_unit(unit, note_events, time_offset, voice_counter
                 instrument = unit.get_instrument(event._node_id)
                 expanded_voices = lower_event_ir_to_voice_events(event)
                 if debug:
-                    print(f"[DEBUG] Collection event node {event._node_id}: instrument={instrument.name if instrument else 'None'}, is_Drum={instrument.is_Drum if instrument else 'N/A'}")
+                    print(f"[DEBUG] Collection event node {event._node_id}: instrument={getattr(instrument, 'name', instrument)}, is_Drum={getattr(instrument, 'is_Drum', 'N/A')}")
                 for expanded_voice in expanded_voices:
                     if isinstance(instrument, MidiInstrument):
                         is_drum = instrument.is_Drum
                         program = 1 if is_drum else instrument.prgm
                         note_param = expanded_voice["pfields"].get('note', instrument['note'])
                         velocity = expanded_voice["pfields"].get('velocity', instrument['velocity'])
+                    elif isinstance(instrument, int):
+                        is_drum = False
+                        program = instrument
+                        note_param = expanded_voice["pfields"].get('note', 60)
+                        velocity = expanded_voice["pfields"].get('velocity', DEFAULT_VELOCITY)
                     else:
-                        is_drum = expanded_voice["pfields"].get('is_drum', event.get_parameter('is_drum', False))
+                        is_drum = expanded_voice["pfields"].get('is_drum', event.get_pfield('is_drum', False))
                         default_program = 1 if is_drum else 0
-                        program = expanded_voice["pfields"].get('program', event.get_parameter('program', default_program))
+                        program = expanded_voice["pfields"].get('program', event.get_pfield('program', default_program))
                         note_param = expanded_voice["pfields"].get('note', DEFAULT_DRUM_NOTE if is_drum else 60)
-                        velocity = expanded_voice["pfields"].get('velocity', event.get_parameter('velocity', DEFAULT_VELOCITY))
+                        velocity = expanded_voice["pfields"].get('velocity', event.get_pfield('velocity', DEFAULT_VELOCITY))
 
                     voice_id = f"collection_voice_{voice_counter}"
                     voice_counter += 1
@@ -621,19 +631,20 @@ def _collect_events_from_unit_with_offset(unit, all_events, time_offset=0.0):
                 
                 if isinstance(instrument, MidiInstrument):
                     is_drum = instrument.is_Drum
-                    # For drums: ignore instrument.prgm, always use Standard Drum Kit (1)
-                    # For melodic: use instrument.prgm
                     program = 1 if is_drum else instrument.prgm
-                    note_param = event.get_parameter('note', instrument['note'])
-                    velocity = event.get_parameter('velocity', instrument['velocity'])
+                    note_param = event.get_pfield('note', instrument['note'])
+                    velocity = event.get_pfield('velocity', instrument['velocity'])
+                elif isinstance(instrument, int):
+                    is_drum = False
+                    program = instrument
+                    note_param = event.get_pfield('note', 60)
+                    velocity = event.get_pfield('velocity', DEFAULT_VELOCITY)
                 else:
-                    # Fallback for non-MidiInstrument cases
-                    is_drum = event.get_parameter('is_drum', False)
-                    # Fix: Don't default to Piano (0) - use sensible defaults
-                    default_program = 1 if is_drum else 1  # Default to Standard Drum Kit for rhythmic content
-                    program = event.get_parameter('program', default_program)
-                    note_param = event.get_parameter('note', DEFAULT_DRUM_NOTE if is_drum else 60)
-                    velocity = event.get_parameter('velocity', DEFAULT_VELOCITY)
+                    is_drum = event.get_pfield('is_drum', False)
+                    default_program = 1 if is_drum else 0
+                    program = event.get_pfield('program', default_program)
+                    note_param = event.get_pfield('note', DEFAULT_DRUM_NOTE if is_drum else 60)
+                    velocity = event.get_pfield('velocity', DEFAULT_VELOCITY)
                 
                 start_time = event.start  # Events already have absolute timing
                 duration = abs(event.duration)

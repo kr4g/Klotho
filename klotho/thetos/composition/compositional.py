@@ -60,7 +60,7 @@ def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) 
     pt = uc._pt
     inst = pt.get_instrument(node)
     pfields = {}
-    inst_pfields = inst.pfields if inst is not None else {}
+    inst_pfields = inst.pfields if (inst is not None and hasattr(inst, 'pfields')) else {}
     for k in pt._meta['pfields']:
         v = pt.get_pfield(node, k)
         if v is None and inst is not None:
@@ -125,13 +125,13 @@ class Parametron(Chronon):
         """
         result = {}
         inst = self._resolve_instrument()
-        if inst is not None:
+        if inst is not None and hasattr(inst, 'pfields'):
             result.update(dict(inst.pfields))
         for k in self._pt._meta['pfields']:
             v = self._pt.get_pfield(self._node_id, k)
             if v is not None:
                 result[k] = v
-            elif inst is not None:
+            elif inst is not None and hasattr(inst, 'pfields'):
                 inst_pfields = inst.pfields
                 if k in inst_pfields:
                     result[k] = inst_pfields[k]
@@ -161,55 +161,14 @@ class Parametron(Chronon):
         value = self._pt.get_mfield(self._node_id, key)
         return default if value is None else value
 
-    def get_parameter(self, key: str, default=None):
-        """
-        Get a specific parameter value for this event.
-        
-        Parameters
-        ----------
-        key : str
-            The parameter field name to retrieve
-        default : Any, optional
-            Default value if parameter not found
-            
-        Returns
-        -------
-        Any
-            The parameter value or default
-        """
-        value = self._pt.get_pfield(self._node_id, key)
-        if value is not None:
-            return value
-        value = self._pt.get_mfield(self._node_id, key)
-        if value is not None:
-            return value
-        instrument = self._resolve_instrument()
-        if instrument is not None:
-            if key == 'defName' and hasattr(instrument, 'defName'):
-                return instrument.defName
-            inst_pfields = instrument.pfields
-            if key in inst_pfields:
-                return inst_pfields[key]
-        return default
-    
     def __getitem__(self, key: str):
-        """
-        Access temporal or parameter attributes by key.
-        
-        Parameters
-        ----------
-        key : str
-            Attribute name (temporal property or parameter field)
-            
-        Returns
-        -------
-        Any
-            The requested attribute value
-        """
         temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_duration', 'metric_onset', 'node_id', 'is_rest', 'real_onset', 'real_duration'}
         if key in temporal_attrs:
             return getattr(self, key)
-        return self.get_parameter(key)
+        v = self.get_pfield(key)
+        if v is not None:
+            return v
+        return self.get_mfield(key)
 
 
 class UCNodeView:
@@ -588,8 +547,24 @@ class CompositionalUnit(TemporalUnit):
         events = self._materialize_events()
         base_data = []
         for event in events:
+            inst = self.get_instrument(event.node_id)
+            if inst is None:
+                inst_display = None
+            elif isinstance(inst, (str, int)):
+                inst_display = inst
+            elif hasattr(inst, 'name') and inst.name not in (None, 'default'):
+                inst_display = inst.name
+            elif hasattr(inst, 'defName'):
+                inst_display = inst.defName
+            elif hasattr(inst, 'tonejs_class'):
+                inst_display = inst.tonejs_class
+            elif hasattr(inst, 'prgm'):
+                inst_display = inst.prgm
+            else:
+                inst_display = str(inst)
             event_dict = {
                 'node_id': event.node_id,
+                'instrument': inst_display,
                 'start': event.start,
                 'duration': event.duration,
                 'end': event.end,
@@ -600,7 +575,7 @@ class CompositionalUnit(TemporalUnit):
                 'mfields': event.mfields,
             }
             base_data.append(event_dict)
-        
+
         return pd.DataFrame(base_data, index=range(len(events)))
     
     def _distribute_to_targets(self, targets, fields, include_rests, setter='pfields'):
@@ -984,14 +959,19 @@ class CompositionalUnit(TemporalUnit):
         node : int or list/tuple of int
             Target node(s). Single node: instrument set on that node, inherits
             to descendants. List of nodes: instrument evaluated once per node.
-        instrument : Instrument, Pattern, or callable
-            - Instrument: set directly on node (current behavior)
+        instrument : Instrument, str, int, Pattern, or callable
+            - Instrument: set directly on node with pfield defaults
+            - str: raw synth reference (defName for SC, tonejs_class for Tone.js)
+            - int: raw program number (MIDI)
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
         """
         targets = [node] if isinstance(node, int) else list(node)
 
-        if isinstance(instrument, Instrument):
+        if isinstance(instrument, (str, int)):
+            for n in targets:
+                self._pt.set_instrument(n, instrument)
+        elif isinstance(instrument, Instrument):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
         elif callable(instrument) or isinstance(instrument, Pattern):
@@ -1094,21 +1074,6 @@ class CompositionalUnit(TemporalUnit):
         value = self._pt.get_mfield(node, key)
         return default if value is None else value
 
-    def get_parameter(self, node: int, key: str, default=None):
-        value = self._pt.get_pfield(node, key)
-        if value is not None:
-            return value
-        value = self._pt.get_mfield(node, key)
-        if value is not None:
-            return value
-        instrument = self._pt.get_instrument(node)
-        if instrument is not None:
-            if key == 'defName' and hasattr(instrument, 'defName'):
-                return instrument.defName
-            inst_pfields = instrument.pfields
-            if key in inst_pfields:
-                return inst_pfields[key]
-        return default
     
     def clear_parameters(self, node: int = None) -> None:
         """

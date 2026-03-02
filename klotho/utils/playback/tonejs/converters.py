@@ -130,7 +130,11 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
             continue
 
         instrument = obj.get_instrument(event.node_id)
-        if not isinstance(instrument, ToneInstrument):
+        if instrument is None:
+            instrument = ToneInstrument('Synth', 'Synth')
+        elif isinstance(instrument, str):
+            instrument = ToneInstrument(instrument, instrument)
+        elif not isinstance(instrument, ToneInstrument):
             if animation:
                 events.append({
                     "start": start_time,

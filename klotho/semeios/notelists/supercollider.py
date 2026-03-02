@@ -204,10 +204,14 @@ class Scheduler:
         for event in uc:
             if event.is_rest:
                 continue
-            event_def_name = event.get_parameter('defName')
-            if not event_def_name:
-                continue
-            event_group = event.get_parameter('group')
+            instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
+            if isinstance(instrument, str):
+                event_def_name = instrument
+            elif instrument is not None and hasattr(instrument, 'defName'):
+                event_def_name = instrument.defName
+            else:
+                event_def_name = 'kl_tri'
+            event_group = event.get_mfield('group')
             pfields = {k: v for k, v in event.pfields.items() if k != 'group'}
             uid = self.new_node(
                 def_name=event_def_name,
@@ -215,7 +219,6 @@ class Scheduler:
                 group=event_group,
                 **pfields
             )
-            instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
             release_mode = (getattr(instrument, 'release_mode', '') or '').lower() if instrument is not None else 'gate'
             if release_mode not in ('gate', 'free'):
                 release_mode = 'gate'

@@ -30,9 +30,12 @@ class _FakeEvent:
     def mfields(self):
         return dict(self._mfields)
 
-    def get_parameter(self, key, default=None):
+    def get_pfield(self, key, default=None):
         if key in self.pfields:
             return self.pfields[key]
+        return default
+
+    def get_mfield(self, key, default=None):
         if key in self._mfields:
             return self._mfields[key]
         return default
@@ -185,8 +188,10 @@ def test_sort_sc_events_orders_type_priority_at_same_start():
 def test_scheduler_accepts_arbitrary_def_name_from_uc():
     uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), pfields={"note": 60, "amp": 0.2}, mfields={"group": "default"})
     leaves = tuple(uc._rt.leaf_nodes)
-    uc.set_pfields(leaves[0], defName='custom_poly_synth', note=(60, 64), amp=0.25)
-    uc.set_pfields(leaves[1], defName='custom_poly_synth', note=67, amp=0.2)
+    uc.set_instrument(leaves[0], 'custom_poly_synth')
+    uc.set_instrument(leaves[1], 'custom_poly_synth')
+    uc.set_pfields(leaves[0], note=(60, 64), amp=0.25)
+    uc.set_pfields(leaves[1], note=67, amp=0.2)
 
     scheduler = Scheduler()
     scheduler.add(uc)
