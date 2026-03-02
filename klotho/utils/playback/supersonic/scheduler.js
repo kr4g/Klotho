@@ -38,7 +38,6 @@
       this._playStartPerfMs = 0;
       this._batchTimeoutId = null;
       this._finishTimeoutId = null;
-      this._loopTickId = null;
       this._deferredRings = [];
 
       this.drawScheduler = new DrawScheduler();
@@ -71,13 +70,10 @@
     }
 
     _freeGroup() {
-      var gid = this._scoreGroupId || this._groupId;
-      if (gid == null) return;
-      try { this.sonic.send('/g_freeAll', gid); } catch(e) {}
-      try { this.sonic.send('/n_free', gid); } catch(e) {}
-      this._scoreGroupId = null;
+      if (this._groupId == null) return;
+      try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
+      try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
       this._groupId = null;
-      this._freeBuffers();
     }
 
     _freeGroupDeferred(groupId) {
@@ -447,7 +443,7 @@
       return dur;
     }
 
-    _scheduleBatch(evts, startIdx, pieceDur, token, relOffset, suppressFinish, idPrefix) {
+    _scheduleBatch(evts, startIdx, pieceDur, token, relOffset, loopState) {
       if (token !== this.stopToken) return;
 
       var now = getNTP();
@@ -458,7 +454,8 @@
       var self = this;
 
       relOffset = relOffset || 0;
-      suppressFinish = !!suppressFinish;
+      var cycleIndex = (loopState && loopState.cycleIndex) || 0;
+      var idPrefix = loopState ? "c" + cycleIndex : null;
 
       while (idx < evts.length && count < MAX_EVENTS_PER_BATCH) {
         var ev = evts[idx];
@@ -466,7 +463,7 @@
         if (idPrefix != null) {
           evSched = {};
           for (var kCopy in ev) evSched[kCopy] = ev[kCopy];
-          evSched.id = String(idPrefix) + ":" + ev.id;
+          evSched.id = idPrefix + ":" + ev.id;
         }
         if (batchStart < 0) batchStart = ev.start;
         batchEnd = ev.start;
@@ -498,24 +495,50 @@
         var nextBatchNTP = this._playStartNTP + relOffset + batchStart + overlapTime;
         var delay = (nextBatchNTP - now) * 1000;
         this._batchTimeoutId = setTimeout(function() {
-          self._scheduleBatch(evts, idx, pieceDur, token, relOffset, suppressFinish, idPrefix);
+          self._scheduleBatch(evts, idx, pieceDur, token, relOffset, loopState);
         }, Math.max(1, delay));
-      } else {
-        if (!suppressFinish) {
-          var freeGid = this._scoreGroupId || this._groupId;
+      } else if (loopState) {
+        var nextCycle = cycleIndex + 1;
+        if (loopState.finiteCycles > 0 && nextCycle >= loopState.finiteCycles) {
           var endNTP = this._playStartNTP + relOffset + pieceDur;
           var remaining = (endNTP - now) * 1000;
           this._finishTimeoutId = setTimeout(function() {
             if (token !== self.stopToken) return;
             self.isPlaying = false;
             if (self.onFinish) self.onFinish();
-            if (freeGid != null) {
-              self._freeGroupDeferred(freeGid);
-              self._scoreGroupId = null;
+            if (self._groupId != null) {
+              self._freeGroupDeferred(self._groupId);
               self._groupId = null;
             }
           }, Math.max(1, remaining));
+        } else {
+          var cycleDur = pieceDur + (loopState.tailPause || 0);
+          var nextRelOffset = relOffset + cycleDur;
+          var nextLoopState = {
+            cycleIndex: nextCycle,
+            finiteCycles: loopState.finiteCycles,
+            tailPause: loopState.tailPause
+          };
+          var nextCycleNTP = this._playStartNTP + nextRelOffset;
+          var lookahead = Math.min(pieceDur * (1 - BATCH_OVERLAP_RATIO), 2.0);
+          var scheduleAt = nextCycleNTP - lookahead;
+          var delay2 = (scheduleAt - now) * 1000;
+          this._batchTimeoutId = setTimeout(function() {
+            self._scheduleBatch(evts, 0, pieceDur, token, nextRelOffset, nextLoopState);
+          }, Math.max(1, delay2));
         }
+      } else {
+        var endNTP = this._playStartNTP + relOffset + pieceDur;
+        var remaining = (endNTP - now) * 1000;
+        this._finishTimeoutId = setTimeout(function() {
+          if (token !== self.stopToken) return;
+          self.isPlaying = false;
+          if (self.onFinish) self.onFinish();
+          if (self._groupId != null) {
+            self._freeGroupDeferred(self._groupId);
+            self._groupId = null;
+          }
+        }, Math.max(1, remaining));
       }
     }
 
@@ -525,21 +548,12 @@
       var token = this.stopToken;
 
       this.isPlaying = false;
-      clearInterval(this._loopTickId);
-      this._loopTickId = null;
       clearTimeout(this._batchTimeoutId);
       this._batchTimeoutId = null;
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
 
-      var prevGid = this._scoreGroupId || this._groupId;
-      if (options._skipStop && prevGid != null) {
-        this._freeGroupDeferred(prevGid);
-        this._scoreGroupId = null;
-        this._groupId = null;
-      } else if (prevGid != null) {
-        this._freeGroup();
-      }
+      this._freeGroup();
 
       this.nodeMap.clear();
       this._defNames.clear();
@@ -562,13 +576,8 @@
 
       var now = getNTP();
       var nowPerf = performance.now();
-      if (!options._skipStop) {
-        this._playStartNTP = now + STARTUP_DELAY;
-        this._playStartPerfMs = nowPerf + STARTUP_DELAY * 1000;
-      } else {
-        this._playStartNTP = now;
-        this._playStartPerfMs = nowPerf;
-      }
+      this._playStartNTP = now + STARTUP_DELAY;
+      this._playStartPerfMs = nowPerf + STARTUP_DELAY * 1000;
 
       var scoreMeta = options.meta || null;
       var scoreControlData = options.controlData || null;
@@ -587,116 +596,28 @@
 
       this._scheduleControlSynths(token);
 
-      var pieceDur = this._computePieceDur(evts) + Math.max(0, options.tailPause || 0);
+      var basePieceDur = this._computePieceDur(evts);
+      var tailPause = Math.max(0, options.tailPause || 0);
+      var pieceDur = basePieceDur + tailPause;
       var loopFinite = (typeof options.loop === "number" && Number.isFinite(options.loop) && options.loop > 1)
         ? Math.floor(options.loop)
         : 0;
+
+      var loopState = null;
       if (options.loop || loopFinite > 0) {
-        this.playLoop(evts, {
-          onEvent: this.onEvent,
-          onFinish: this.onFinish,
-          tailPause: options.tailPause != null ? options.tailPause : 0,
-          finiteCycles: options.finiteCycles != null ? options.finiteCycles : (loopFinite > 0 ? loopFinite : null),
-          lookaheadSec: options.lookaheadSec,
-          tickMs: options.tickMs,
-        });
-        return;
+        loopState = {
+          cycleIndex: 0,
+          finiteCycles: loopFinite > 0 ? loopFinite : 0,
+          tailPause: tailPause
+        };
       }
 
-      this._scheduleBatch(evts, 0, pieceDur, token, 0, false, null);
-    }
-
-    playLoop(events, options) {
-      options = options || {};
-      this.stopToken++;
-      var token = this.stopToken;
-
-      this.isPlaying = false;
-      clearInterval(this._loopTickId);
-      this._loopTickId = null;
-      clearTimeout(this._batchTimeoutId);
-      this._batchTimeoutId = null;
-      clearTimeout(this._finishTimeoutId);
-      this._finishTimeoutId = null;
-
-      if (token !== this.stopToken) return;
-
-      var evts = events || [];
-      this.onEvent = options.onEvent || null;
-      this.onFinish = options.onFinish || null;
-      if (evts.length === 0) {
-        if (this.onFinish) this.onFinish();
-        return;
-      }
-
-      var basePieceDur = this._computePieceDur(evts);
-      var tailPause = Math.max(0, options.tailPause || 0);
-      var cycleDur = basePieceDur + tailPause;
-      if (cycleDur <= 0) cycleDur = basePieceDur > 0 ? basePieceDur : 0.001;
-
-      var lookaheadSec = options.lookaheadSec != null ? Math.max(0.1, options.lookaheadSec) : Math.max(0.8, Math.min(2.0, cycleDur));
-      var tickMs = options.tickMs != null ? Math.max(10, options.tickMs) : 40;
-      var finiteCycles = (typeof options.finiteCycles === "number" && Number.isFinite(options.finiteCycles) && options.finiteCycles > 0)
-        ? Math.floor(options.finiteCycles)
-        : 0;
-
-      this.isPlaying = true;
-
-      if (finiteCycles > 0) {
-        var freeGid = this._scoreGroupId || this._groupId;
-        var endNTP = this._playStartNTP + (cycleDur * finiteCycles);
-        var selfFinish = this;
-        var finishToken = token;
-        var finishRemaining = (endNTP - getNTP()) * 1000;
-        this._finishTimeoutId = setTimeout(function() {
-          if (finishToken !== selfFinish.stopToken) return;
-          selfFinish.stopToken++;
-          selfFinish.isPlaying = false;
-          clearInterval(selfFinish._loopTickId);
-          selfFinish._loopTickId = null;
-          clearTimeout(selfFinish._batchTimeoutId);
-          selfFinish._batchTimeoutId = null;
-          if (selfFinish.onFinish) selfFinish.onFinish();
-          if (freeGid != null) {
-            selfFinish._freeGroupDeferred(freeGid);
-            selfFinish._scoreGroupId = null;
-            selfFinish._groupId = null;
-          }
-        }, Math.max(1, finishRemaining));
-      }
-
-      var self = this;
-      var nextCycleIndex = 0;
-
-      function enqueueReadyCycles() {
-        if (token !== self.stopToken || !self.isPlaying) return;
-        var nowRel = getNTP() - self._playStartNTP;
-        var horizonRel = nowRel + lookaheadSec;
-        while ((nextCycleIndex * cycleDur) <= horizonRel) {
-          if (finiteCycles > 0 && nextCycleIndex >= finiteCycles) break;
-          var relOffset = nextCycleIndex * cycleDur;
-          self._scheduleBatch(
-            evts,
-            0,
-            basePieceDur,
-            token,
-            relOffset,
-            true,
-            "loop" + nextCycleIndex
-          );
-          nextCycleIndex += 1;
-        }
-      }
-
-      enqueueReadyCycles();
-      this._loopTickId = setInterval(enqueueReadyCycles, tickMs);
+      this._scheduleBatch(evts, 0, basePieceDur, token, 0, loopState);
     }
 
     async stop() {
       this.stopToken++;
       this.isPlaying = false;
-      clearInterval(this._loopTickId);
-      this._loopTickId = null;
       clearTimeout(this._batchTimeoutId);
       this._batchTimeoutId = null;
       clearTimeout(this._finishTimeoutId);

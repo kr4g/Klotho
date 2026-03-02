@@ -190,18 +190,9 @@
           if (onFinish) onFinish();
           return;
         }
-        if ((loopInfinite || loopFinite > 0) && typeof _ssScheduler.playLoop === "function") {
-          _ssScheduler.playLoop(evts, {
-            tailPause: _pause,
-            finiteCycles: loopFinite > 0 ? loopFinite : null,
-            onEvent: onEvent || function(){},
-            onFinish: onFinish || null,
-          });
-          return;
-        }
-
         _ssScheduler.play(evts, {
           tailPause: _pause,
+          loop: loopInfinite ? true : (loopFinite > 0 ? loopFinite : false),
           onEvent: onEvent || function(){},
           onFinish: onFinish || null,
         });

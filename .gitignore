@@ -156,3 +156,10 @@ tests/**/__pycache__/
 !tutorials/
 !tutorials/.gitkeep
 
+# SuperSonic assets (always tracked)
+!klotho/utils/playback/supersonic/assets/**
+!klotho/utils/playback/supersonic/assets/build_synthdefs.scd
+!klotho/utils/playback/supersonic/assets/manifest.json
+!klotho/utils/playback/supersonic/assets/synthdefs/
+!klotho/utils/playback/supersonic/assets/synthdefs/*.scsyndef
+

@@ -41,10 +41,13 @@
             + "margin-left:0;background:#ef4444";
     }
 
-    loopBtn.onclick = function() {
+    loopBtn.onclick = async function() {
         looping = !looping;
         loopBtn.style.opacity = looping ? "1" : "0.5";
         loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
+        if (scheduler && scheduler.isPlaying) {
+            doPlay();
+        }
     };
 
     function ensureSharedSonic() {
@@ -118,7 +121,7 @@
     statusEl.style.color = "#f0ad4e";
     ensureReady();
 
-    function doPlay(skipStop) {
+    function doPlay() {
         var evts = allEvents;
         if (evts.length === 0) return;
 
@@ -127,17 +130,13 @@
         statusEl.style.color = "#4ade80";
 
         scheduler.play(evts, {
-            _skipStop: !!skipStop,
             meta: meta,
             controlData: controlData,
+            loop: looping,
             onFinish: function() {
-                if (looping) {
-                    doPlay(true);
-                } else {
-                    setPlayIcon();
-                    statusEl.textContent = "ready";
-                    statusEl.style.color = "#4ade80";
-                }
+                setPlayIcon();
+                statusEl.textContent = "ready";
+                statusEl.style.color = "#4ade80";
             }
         });
     }
@@ -156,7 +155,7 @@
         if (sonic.audioContext && sonic.audioContext.state === "suspended") {
             await sonic.audioContext.resume();
         }
-        doPlay(false);
+        doPlay();
     };
 
     var _orphanCheckId = setInterval(function() {
