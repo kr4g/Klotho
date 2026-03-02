@@ -16,6 +16,14 @@ class Instrument:
     def pfields(self):
         return self._pfields.copy()
 
+    def __eq__(self, other):
+        if not isinstance(other, Instrument):
+            return NotImplemented
+        return self._name == other._name and dict(self._pfields) == dict(other._pfields)
+
+    def __hash__(self):
+        return hash((self._name, tuple(sorted(self._pfields.items()))))
+
     def __getitem__(self, key):
         return self._pfields[key]
 

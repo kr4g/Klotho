@@ -1,4 +1,4 @@
-from klotho.thetos import ParameterTree
+from klotho.thetos import ParameterTree, Instrument
 
 
 def _node_at_path(tree, path):
@@ -63,24 +63,24 @@ def test_parameter_tree_graft_replace_preserves_structure_and_effective_fields()
     source = ParameterTree(1, (11, (12, ("a", "b", "c")), 13))
     source.set_pfields(_node_at_path(source, tuple()), tempo=120, amp=0.5)
     source.set_mfields(_node_at_path(source, (1,)), articulation="tenuto")
-    source.set_instrument(_node_at_path(source, (1,)), {"name": "pad", "channel": 2})
+    source.set_instrument(_node_at_path(source, (1,)), Instrument("pad", {"channel": 2}))
 
     subtree = ParameterTree(9, (31, (32, ("u", "v", "w")), 33))
     subtree.set_pfields(_node_at_path(subtree, tuple()), cutoff=1800)
     subtree.set_pfields(_node_at_path(subtree, (1, 1)), resonance=0.7)
     subtree.set_mfields(_node_at_path(subtree, (1,)), region="upper")
-    subtree.set_instrument(_node_at_path(subtree, tuple()), {"name": "lead", "channel": 3})
+    subtree.set_instrument(_node_at_path(subtree, tuple()), Instrument("lead", {"channel": 3}))
 
     source.graft_subtree(_node_at_path(source, (2,)), subtree, mode="replace")
 
     expected = ParameterTree(1, (11, (12, ("a", "b", "c")), (9, (31, (32, ("u", "v", "w")), 33))))
     expected.set_pfields(_node_at_path(expected, tuple()), tempo=120, amp=0.5)
     expected.set_mfields(_node_at_path(expected, (1,)), articulation="tenuto")
-    expected.set_instrument(_node_at_path(expected, (1,)), {"name": "pad", "channel": 2})
+    expected.set_instrument(_node_at_path(expected, (1,)), Instrument("pad", {"channel": 2}))
     expected.set_pfields(_node_at_path(expected, (2,)), cutoff=1800)
     expected.set_pfields(_node_at_path(expected, (2, 1, 1)), resonance=0.7)
     expected.set_mfields(_node_at_path(expected, (2, 1)), region="upper")
-    expected.set_instrument(_node_at_path(expected, (2,)), {"name": "lead", "channel": 3})
+    expected.set_instrument(_node_at_path(expected, (2,)), Instrument("lead", {"channel": 3}))
 
     _assert_parameter_tree_equivalent(source, expected)
 
@@ -90,7 +90,7 @@ def test_parameter_tree_graft_adopt_preserves_structure_and_effective_fields():
     source.set_pfields(_node_at_path(source, tuple()), tempo=98)
     source.set_pfields(_node_at_path(source, (1,)), amp=0.35)
     source.set_mfields(_node_at_path(source, (1,)), role="target")
-    source.set_instrument(_node_at_path(source, (1,)), {"name": "bass", "channel": 4})
+    source.set_instrument(_node_at_path(source, (1,)), Instrument("bass", {"channel": 4}))
 
     subtree = ParameterTree(20, (21, 22, 23))
     subtree.set_pfields(_node_at_path(subtree, tuple()), cutoff=900)
@@ -104,7 +104,7 @@ def test_parameter_tree_graft_adopt_preserves_structure_and_effective_fields():
     expected._meta["pfields"].add("cutoff")
     expected.set_mfields(_node_at_path(expected, (1,)), role="target")
     expected.set_mfields(_node_at_path(expected, (1, 0)), region="low")
-    expected.set_instrument(_node_at_path(expected, (1,)), {"name": "bass", "channel": 4})
+    expected.set_instrument(_node_at_path(expected, (1,)), Instrument("bass", {"channel": 4}))
 
     _assert_parameter_tree_equivalent(source, expected)
 

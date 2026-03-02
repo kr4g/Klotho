@@ -7,7 +7,7 @@ from klotho import (
     Pattern,
     Envelope,
 )
-from klotho.thetos import JsInstrument as JsInst
+from klotho.thetos import ToneInstrument as JsInst
 from klotho.utils.playback.tonejs.converters import (
     compositional_unit_to_events,
     temporal_sequence_to_events,

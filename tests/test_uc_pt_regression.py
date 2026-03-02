@@ -16,7 +16,7 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 from klotho.chronos import TemporalUnitSequence as UTS, TemporalBlock as BT
-from klotho.thetos import CompositionalUnit as UC, JsInstrument as JsInst
+from klotho.thetos import CompositionalUnit as UC, ToneInstrument as JsInst
 from klotho.tonos import Scale
 from klotho.topos import Pattern
 

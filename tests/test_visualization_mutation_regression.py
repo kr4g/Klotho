@@ -1,7 +1,7 @@
 import pytest
 
 from klotho.chronos import RhythmTree
-from klotho.semeios.visualization.plot_rt import _plot_rt
+from klotho.semeios.visualization._dispatch.plot_rt import _plot_rt
 from klotho.tonos import Spectrum
 
 

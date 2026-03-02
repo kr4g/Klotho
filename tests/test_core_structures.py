@@ -29,7 +29,7 @@ from klotho.chronos import (
 )
 from klotho.thetos import (
     CompositionalUnit as UC,
-    JsInstrument as JsInst,
+    ToneInstrument as JsInst,
     ParameterTree,
 )
 from klotho.dynatos import Envelope
@@ -452,7 +452,8 @@ class TestCompositionalUnit:
         expected_synths = ['Kick', 'Snare', 'HatClosed', 'Kick']
         expected_vels = [0.6498, 0.8803, 0.7928, 0.7395]
         for e, synth, vel in zip(events, expected_synths, expected_vels):
-            assert (e.pfields.get('synth_name') or e.pfields.get('synthName')) == synth
+            inst = e._resolve_instrument()
+            assert inst.tonejs_class == synth
             assert abs(e.pfields.get('vel') - vel) < 0.001
 
     def test_set_mfields_inheritance(self):
@@ -511,14 +512,14 @@ class TestCompositionalUnitUseCases:
         expected_synths_0 = ['Kick', 'Snare', 'HatClosed', 'Kick']
         expected_vels_0 = [0.768911, 0.695231, 0.830198, 0.512579]
         for e, synth, vel in zip(unit0_events, expected_synths_0, expected_vels_0):
-            assert (e.pfields.get('synth_name') or e.pfields.get('synthName')) == synth
+            assert e._resolve_instrument().tonejs_class == synth
             assert abs(e.pfields.get('vel') - vel) < 0.001
 
         unit1_events = list(uts[1])
         expected_synths_1 = ['Snare', 'HatClosed', 'Kick', 'Snare']
         expected_vels_1 = [0.823220, 0.726247, 0.619049, 0.518678]
         for e, synth, vel in zip(unit1_events, expected_synths_1, expected_vels_1):
-            assert (e.pfields.get('synth_name') or e.pfields.get('synthName')) == synth
+            assert e._resolve_instrument().tonejs_class == synth
             assert abs(e.pfields.get('vel') - vel) < 0.001
 
     def test_multi_voice_block(self):

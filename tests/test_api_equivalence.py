@@ -34,7 +34,7 @@ from klotho.chronos import (
 )
 from klotho.thetos import (
     CompositionalUnit as UC,
-    JsInstrument as JsInst,
+    ToneInstrument as JsInst,
 )
 from klotho.topos import Pattern
 from klotho.tonos import Scale
@@ -47,12 +47,13 @@ def extract_unit_events(unit):
     events = []
     for e in unit:
         pf = e.pfields
+        inst = e._resolve_instrument()
         events.append({
             'node_id': e.node_id,
             'start': e.start,
             'duration': e.duration,
             'is_rest': e.is_rest,
-            'synth_name': pf.get('synth_name') or pf.get('synthName'),
+            'instrument_name': inst.name if inst is not None else None,
             'freq': pf.get('freq'),
             'vel': pf.get('vel'),
         })
@@ -71,8 +72,8 @@ def assert_events_equal(events_a, events_b):
             f"Event {i}: dur {a['duration']} != {b['duration']}")
         assert a['is_rest'] == b['is_rest'], (
             f"Event {i}: is_rest {a['is_rest']} != {b['is_rest']}")
-        assert a['synth_name'] == b['synth_name'], (
-            f"Event {i}: synth {a['synth_name']} != {b['synth_name']}")
+        assert a['instrument_name'] == b['instrument_name'], (
+            f"Event {i}: instrument {a['instrument_name']} != {b['instrument_name']}")
         if a['freq'] is not None and b['freq'] is not None:
             assert abs(a['freq'] - b['freq']) < FLOAT_TOL, (
                 f"Event {i}: freq {a['freq']} != {b['freq']}")
@@ -161,10 +162,10 @@ class TestChronostasisEquivalence:
         rows = list(block)
         v1_u0 = extract_unit_events(rows[0][0])
         assert len(v1_u0) == 14
-        assert v1_u0[0]['synth_name'] == 'HatClosed'
+        assert v1_u0[0]['instrument_name'] == 'HatClosed'
         assert abs(v1_u0[0]['vel'] - 0.09426) < 0.001
         v2_u0 = extract_unit_events(rows[1][0])
-        assert v2_u0[0]['synth_name'] == 'kick_punchy'
+        assert v2_u0[0]['instrument_name'] == 'kick_punchy'
         assert abs(v2_u0[0]['vel'] - 0.838862) < 0.001
 
     def test_after_matches_before(self):
@@ -304,9 +305,9 @@ class TestEntertainMeDrumsEquivalence:
     def test_before_produces_expected(self):
         uc = _build_entertain_me_drums_before()
         events = [e for e in uc if not e.is_rest]
-        synths = [e.pfields.get('synth_name') or e.pfields.get('synthName') for e in events]
-        assert 'Kick' in synths
-        assert 'HatClosed' in synths
+        inst_names = [e._resolve_instrument().name for e in events if e._resolve_instrument() is not None]
+        assert 'Kick' in inst_names
+        assert 'HatClosed' in inst_names
 
     def test_after_matches_before(self):
         uc_before = _build_entertain_me_drums_before()
