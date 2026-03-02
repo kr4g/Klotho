@@ -6,6 +6,9 @@
   var NTP_EPOCH_OFFSET = 2208988800;
   var STARTUP_DELAY = 0.1;
   var DEFAULT_RING_TIME = 5;
+  var FIRST_PRIVATE_BUS = 16;
+  var BUS_CHANNELS = 2;
+  var CTRL_ENVELOPE_CHUNK = 200;
 
   function getNTP() {
     return (performance.timeOrigin + performance.now()) / 1000 + NTP_EPOCH_OFFSET;
@@ -21,7 +24,15 @@
       this.stopToken = 0;
       this.nodeMap = new Map();
       this._defNames = new Map();
+
+      this._scoreGroupId = null;
       this._groupId = null;
+      this._trackMap = null;
+      this._controlGroupId = null;
+      this._controlBusMap = [];
+      this._nextAudioBus = FIRST_PRIVATE_BUS;
+      this._nextControlBus = 0;
+      this._activeBuffers = [];
 
       this._playStartNTP = 0;
       this._playStartPerfMs = 0;
@@ -35,6 +46,24 @@
       this.onFinish = null;
     }
 
+    _allocAudioBus() {
+      var idx = this._nextAudioBus;
+      this._nextAudioBus += BUS_CHANNELS;
+      return idx;
+    }
+
+    _allocControlBus() {
+      return this._nextControlBus++;
+    }
+
+    _createScoreGroup() {
+      var gid = this.sonic.nextNodeId();
+      this.sonic.send('/g_new', gid, 0, 0);
+      this._scoreGroupId = gid;
+      this._groupId = gid;
+      return gid;
+    }
+
     _createGroup() {
       var gid = this.sonic.nextNodeId();
       this.sonic.send('/g_new', gid, 0, 0);
@@ -42,20 +71,36 @@
     }
 
     _freeGroup() {
-      if (this._groupId == null) return;
-      try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
-      try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
+      var gid = this._scoreGroupId || this._groupId;
+      if (gid == null) return;
+      try { this.sonic.send('/g_freeAll', gid); } catch(e) {}
+      try { this.sonic.send('/n_free', gid); } catch(e) {}
+      this._scoreGroupId = null;
       this._groupId = null;
+      this._freeBuffers();
     }
 
     _freeGroupDeferred(groupId) {
       var sonic = this.sonic;
+      var self = this;
       var ringMs = this.ringTime * 1000;
+      var bufs = this._activeBuffers.slice();
       var tid = setTimeout(function() {
         try { sonic.send('/g_freeAll', groupId); } catch(e) {}
         try { sonic.send('/n_free', groupId); } catch(e) {}
+        for (var i = 0; i < bufs.length; i++) {
+          try { sonic.send('/b_free', bufs[i]); } catch(e) {}
+        }
       }, ringMs);
       this._deferredRings.push({ tid: tid, gid: groupId });
+      this._activeBuffers = [];
+    }
+
+    _freeBuffers() {
+      for (var i = 0; i < this._activeBuffers.length; i++) {
+        try { this.sonic.send('/b_free', this._activeBuffers[i]); } catch(e) {}
+      }
+      this._activeBuffers = [];
     }
 
     _cancelAllDeferredRings() {
@@ -68,21 +113,253 @@
       this._deferredRings = [];
     }
 
+    async setupTracks(meta, scoreGroupId) {
+      if (!meta || (!meta.groups && !meta.inserts)) {
+        this._trackMap = null;
+        return;
+      }
+
+      var sonic = this.sonic;
+      var trackNames = (meta.groups || []).slice();
+      var insertSpecs = meta.inserts || {};
+      var trackMap = {};
+      var manifestInserts = this.manifest.inserts || {};
+
+      for (var t = 0; t < trackNames.length; t++) {
+        var nm = trackNames[t];
+        var parentGid = sonic.nextNodeId();
+        var srcGid = sonic.nextNodeId();
+        var fxGid = sonic.nextNodeId();
+        var srcBus = this._allocAudioBus();
+        var fxBus = this._allocAudioBus();
+
+        sonic.send('/g_new', parentGid, 1, scoreGroupId);
+        sonic.send('/g_new', srcGid, 0, parentGid);
+        sonic.send('/g_new', fxGid, 3, srcGid);
+
+        trackMap[nm] = {
+          parentGroup: parentGid,
+          srcGroup: srcGid,
+          fxGroup: fxGid,
+          srcBus: srcBus,
+          fxBus: fxBus,
+          insertNodes: {}
+        };
+      }
+
+      var mainParentGid = sonic.nextNodeId();
+      var mainSrcGid = sonic.nextNodeId();
+      var mainFxGid = sonic.nextNodeId();
+      var mainSrcBus = this._allocAudioBus();
+      var mainFxBus = this._allocAudioBus();
+
+      sonic.send('/g_new', mainParentGid, 1, scoreGroupId);
+      sonic.send('/g_new', mainSrcGid, 0, mainParentGid);
+      sonic.send('/g_new', mainFxGid, 3, mainSrcGid);
+
+      trackMap["main"] = {
+        parentGroup: mainParentGid,
+        srcGroup: mainSrcGid,
+        fxGroup: mainFxGid,
+        srcBus: mainSrcBus,
+        fxBus: mainFxBus,
+        insertNodes: {}
+      };
+
+      var allTracks = trackNames.concat(["main"]);
+      for (var ti = 0; ti < allTracks.length; ti++) {
+        var tName = allTracks[ti];
+        var track = trackMap[tName];
+        var specs = insertSpecs[tName];
+
+        if (!specs || specs.length === 0) {
+          var bypassId = sonic.nextNodeId();
+          sonic.send('/s_new', '__busRouter', bypassId, 0, track.fxGroup,
+            'inBus', track.srcBus, 'outBus', track.fxBus, 'gain', 1.0);
+          track.insertNodes['__bypass'] = bypassId;
+        } else {
+          var prevBus = track.srcBus;
+          for (var fi = 0; fi < specs.length; fi++) {
+            var spec = specs[fi];
+            var nextBus = (fi < specs.length - 1) ? this._allocAudioBus() : track.fxBus;
+            var fxDefName = spec.defName;
+            var fxUid = spec.uid;
+            var fxArgs = spec.args || {};
+
+            var mInsert = manifestInserts[fxDefName] || {};
+            var inParam = mInsert.inParam || 'inBus';
+            var outParam = mInsert.outParam || 'outBus';
+
+            var fxNodeId = sonic.nextNodeId();
+            var fxArgList = [fxDefName, fxNodeId, 1, track.fxGroup,
+              inParam, prevBus, outParam, nextBus];
+            var argKeys = Object.keys(fxArgs);
+            for (var ai = 0; ai < argKeys.length; ai++) {
+              fxArgList.push(argKeys[ai], fxArgs[argKeys[ai]]);
+            }
+            sonic.send.apply(sonic, ['/s_new'].concat(fxArgList));
+
+            track.insertNodes[fxUid] = fxNodeId;
+            this.nodeMap.set(fxUid, fxNodeId);
+            this._defNames.set(fxUid, fxDefName);
+
+            prevBus = nextBus;
+          }
+        }
+      }
+
+      for (var ri = 0; ri < trackNames.length; ri++) {
+        var rName = trackNames[ri];
+        var rTrack = trackMap[rName];
+        var routerId = sonic.nextNodeId();
+        sonic.send('/s_new', '__busRouter', routerId, 1, rTrack.parentGroup,
+          'inBus', rTrack.fxBus, 'outBus', mainSrcBus, 'gain', 1.0);
+      }
+
+      var mainRouterId = sonic.nextNodeId();
+      sonic.send('/s_new', '__busRouter', mainRouterId, 1, trackMap["main"].parentGroup,
+        'inBus', mainFxBus, 'outBus', 0, 'gain', 1.0);
+
+      if (!trackMap["default"]) {
+        trackMap["default"] = trackMap["main"];
+      }
+
+      await sonic.sync();
+      this._trackMap = trackMap;
+    }
+
+    async setupControlEnvelopes(controlData, scoreGroupId) {
+      if (!controlData || !controlData.bufferB64 || !controlData.descriptors || controlData.descriptors.length === 0) {
+        this._controlBusMap = [];
+        return;
+      }
+
+      var sonic = this.sonic;
+
+      var raw = atob(controlData.bufferB64);
+      var ab = new ArrayBuffer(raw.length);
+      var u8 = new Uint8Array(ab);
+      for (var i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+      var floats = new Float32Array(ab);
+
+      var bufnum = 0;
+      var sharedState = globalThis.__klothoSonic;
+      if (sharedState && sharedState._nextBufnum != null) {
+        bufnum = sharedState._nextBufnum++;
+      } else if (sharedState) {
+        sharedState._nextBufnum = 1;
+        bufnum = 0;
+      }
+
+      sonic.send('/b_alloc', bufnum, controlData.numFrames, 1);
+      await sonic.sync();
+
+      for (var off = 0; off < floats.length; off += CTRL_ENVELOPE_CHUNK) {
+        var end = Math.min(off + CTRL_ENVELOPE_CHUNK, floats.length);
+        var chunk = [];
+        for (var ci = off; ci < end; ci++) chunk.push(floats[ci]);
+        sonic.send.apply(sonic, ['/b_setn', bufnum, off, chunk.length].concat(chunk));
+      }
+      await sonic.sync();
+
+      var ctrlGid = sonic.nextNodeId();
+      sonic.send('/g_new', ctrlGid, 0, scoreGroupId);
+      this._controlGroupId = ctrlGid;
+      this._activeBuffers.push(bufnum);
+
+      var descs = controlData.descriptors;
+      var blockSize = controlData.blockSize || 512;
+      this._controlBusMap = [];
+
+      for (var di = 0; di < descs.length; di++) {
+        var desc = descs[di];
+        var ctrlBus = this._allocControlBus();
+        this._controlBusMap.push({
+          bus: ctrlBus,
+          param: (desc.pfields && desc.pfields.length > 0) ? desc.pfields[0] : 'amp',
+          targetIds: desc.targetIds || [],
+          start: desc.start,
+          dur: desc.dur,
+          bufnum: bufnum,
+          startFrame: desc.blockIndex * blockSize,
+          numFrames: blockSize,
+          controlGroupId: ctrlGid
+        });
+      }
+    }
+
+    _scheduleControlSynths(token) {
+      if (!this._controlBusMap || this._controlBusMap.length === 0) return;
+      var sonic = this.sonic;
+      for (var i = 0; i < this._controlBusMap.length; i++) {
+        var cm = this._controlBusMap[i];
+        var ntp = this._playStartNTP + cm.start;
+        var ctrlNodeId = sonic.nextNodeId();
+        var args = ['__klEnvCtrl', ctrlNodeId, 0, cm.controlGroupId,
+          'bufnum', cm.bufnum, 'bus', cm.bus, 'dur', cm.dur,
+          'startFrame', cm.startFrame, 'numFrames', cm.numFrames];
+        var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/s_new', args);
+        sonic.sendOSC(bundle);
+        cm.nodeId = ctrlNodeId;
+      }
+    }
+
+    _getControlMappingsForEvent(evId) {
+      if (!this._controlBusMap || this._controlBusMap.length === 0) return null;
+      var mappings = null;
+      for (var i = 0; i < this._controlBusMap.length; i++) {
+        var cm = this._controlBusMap[i];
+        if (!cm.targetIds) continue;
+        for (var j = 0; j < cm.targetIds.length; j++) {
+          if (cm.targetIds[j] === evId) {
+            if (!mappings) mappings = [];
+            mappings.push({ param: cm.param, bus: cm.bus });
+            break;
+          }
+        }
+      }
+      return mappings;
+    }
+
     _bundleNew(ev, ntp) {
       if (ev.defName === "__rest__") return;
       var defName = this._resolveDefName(ev.defName);
       var nodeId = this.sonic.nextNodeId();
-      var target = this._groupId != null ? this._groupId : 0;
-      var args = [defName, nodeId, 0, target];
+
+      var target;
       var pf = this._resolveDefPfields(defName, ev.pfields || {});
+
+      if (this._trackMap) {
+        var group = ev.group || "default";
+        var trackInfo = this._trackMap[group] || this._trackMap["default"] || this._trackMap["main"];
+        target = trackInfo ? trackInfo.srcGroup : (this._scoreGroupId || this._groupId || 0);
+        if (trackInfo) {
+          pf.out = trackInfo.srcBus;
+        }
+      } else {
+        target = this._groupId != null ? this._groupId : 0;
+      }
+
+      var args = [defName, nodeId, 0, target];
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
-        args.push(key, pf[key]);
+        var v = pf[key];
+        if (v === undefined || v === null || typeof v === 'object') continue;
+        args.push(key, v);
       }
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/s_new', args);
       this.sonic.sendOSC(bundle);
       this.nodeMap.set(ev.id, nodeId);
       this._defNames.set(ev.id, defName);
+
+      var mappings = this._getControlMappingsForEvent(ev.id);
+      if (mappings) {
+        for (var mi = 0; mi < mappings.length; mi++) {
+          var mapArgs = [nodeId, mappings[mi].param, mappings[mi].bus];
+          var mapBundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_map', mapArgs);
+          this.sonic.sendOSC(mapBundle);
+        }
+      }
     }
 
     _bundleSet(ev, ntp) {
@@ -93,7 +370,9 @@
       var pf = this._resolveDefPfields(defName, ev.pfields || {});
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
-        args.push(key, pf[key]);
+        var v = pf[key];
+        if (v === undefined || v === null || typeof v === 'object') continue;
+        args.push(key, v);
       }
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_set', args);
       this.sonic.sendOSC(bundle);
@@ -223,14 +502,16 @@
         }, Math.max(1, delay));
       } else {
         if (!suppressFinish) {
+          var freeGid = this._scoreGroupId || this._groupId;
           var endNTP = this._playStartNTP + relOffset + pieceDur;
           var remaining = (endNTP - now) * 1000;
           this._finishTimeoutId = setTimeout(function() {
             if (token !== self.stopToken) return;
             self.isPlaying = false;
             if (self.onFinish) self.onFinish();
-            if (self._groupId != null) {
-              self._freeGroupDeferred(self._groupId);
+            if (freeGid != null) {
+              self._freeGroupDeferred(freeGid);
+              self._scoreGroupId = null;
               self._groupId = null;
             }
           }, Math.max(1, remaining));
@@ -251,16 +532,22 @@
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
 
-      if (options._skipStop && this._groupId != null) {
-        this._freeGroupDeferred(this._groupId);
+      var prevGid = this._scoreGroupId || this._groupId;
+      if (options._skipStop && prevGid != null) {
+        this._freeGroupDeferred(prevGid);
+        this._scoreGroupId = null;
         this._groupId = null;
-      } else {
+      } else if (prevGid != null) {
         this._freeGroup();
       }
 
       this.nodeMap.clear();
       this._defNames.clear();
       this.drawScheduler.clear();
+      this._trackMap = null;
+      this._controlBusMap = [];
+      this._nextAudioBus = FIRST_PRIVATE_BUS;
+      this._nextControlBus = 0;
 
       if (token !== this.stopToken) return;
 
@@ -283,8 +570,22 @@
         this._playStartPerfMs = nowPerf;
       }
 
-      this._createGroup();
+      var scoreMeta = options.meta || null;
+      var scoreControlData = options.controlData || null;
+
+      if (scoreMeta && (scoreMeta.groups || scoreMeta.inserts)) {
+        this._createScoreGroup();
+        await this.setupTracks(scoreMeta, this._scoreGroupId);
+        if (scoreControlData && scoreControlData.bufferB64) {
+          await this.setupControlEnvelopes(scoreControlData, this._scoreGroupId);
+        }
+      } else {
+        this._createGroup();
+      }
+
       this.isPlaying = true;
+
+      this._scheduleControlSynths(token);
 
       var pieceDur = this._computePieceDur(evts) + Math.max(0, options.tailPause || 0);
       var loopFinite = (typeof options.loop === "number" && Number.isFinite(options.loop) && options.loop > 1)
@@ -318,11 +619,6 @@
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
 
-      this._freeGroup();
-      this.nodeMap.clear();
-      this._defNames.clear();
-      this.drawScheduler.clear();
-
       if (token !== this.stopToken) return;
 
       var evts = events || [];
@@ -344,15 +640,10 @@
         ? Math.floor(options.finiteCycles)
         : 0;
 
-      var now = getNTP();
-      var nowPerf = performance.now();
-      this._playStartNTP = now + STARTUP_DELAY;
-      this._playStartPerfMs = nowPerf + STARTUP_DELAY * 1000;
-
-      this._createGroup();
       this.isPlaying = true;
 
       if (finiteCycles > 0) {
+        var freeGid = this._scoreGroupId || this._groupId;
         var endNTP = this._playStartNTP + (cycleDur * finiteCycles);
         var selfFinish = this;
         var finishToken = token;
@@ -366,8 +657,9 @@
           clearTimeout(selfFinish._batchTimeoutId);
           selfFinish._batchTimeoutId = null;
           if (selfFinish.onFinish) selfFinish.onFinish();
-          if (selfFinish._groupId != null) {
-            selfFinish._freeGroupDeferred(selfFinish._groupId);
+          if (freeGid != null) {
+            selfFinish._freeGroupDeferred(freeGid);
+            selfFinish._scoreGroupId = null;
             selfFinish._groupId = null;
           }
         }, Math.max(1, finishRemaining));
@@ -413,6 +705,8 @@
       this._freeGroup();
       this.nodeMap.clear();
       this._defNames.clear();
+      this._trackMap = null;
+      this._controlBusMap = [];
       this.drawScheduler.clear();
     }
   };

@@ -220,6 +220,14 @@ class Envelope:
             current_time += t * self._time_scale
             result.append(current_time)
         return result
+
+    @property
+    def normalized_times(self):
+        """Cumulative breakpoint times normalized to the [0, 1] range."""
+        total = self.total_time
+        if total <= 0:
+            return [0.0] * len(self._values)
+        return [t / total for t in self.breakpoint_times]
     
     @lru_cache(maxsize=128)
     def at_time(self, time):

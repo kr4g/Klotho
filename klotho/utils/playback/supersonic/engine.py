@@ -62,8 +62,10 @@ def _load_widget_template():
 
 
 class SuperSonicEngine:
-    def __init__(self, events, ring_time=5):
+    def __init__(self, events, meta=None, control_data=None, ring_time=5):
         self.events = _convert_numpy_types(events)
+        self.meta = meta or {}
+        self.control_data = control_data or {"buffer": None, "blockSize": 512, "descriptors": []}
         self.ring_time = ring_time
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         self.manifest = _load_manifest()
@@ -76,7 +78,23 @@ class SuperSonicEngine:
                 name = ev["defName"]
                 if name != "__rest__":
                     names.add(name)
+        for track_inserts in self.meta.get("inserts", {}).values():
+            for ins in track_inserts:
+                dn = ins.get("defName")
+                if dn:
+                    names.add(dn)
+        if self.control_data.get("descriptors"):
+            names.add("__klEnvCtrl")
         return names
+
+    def _serialize_control_data(self):
+        cd = self.control_data
+        result = {"blockSize": cd.get("blockSize", 512), "descriptors": cd.get("descriptors", []), "bufferB64": None, "numFrames": 0}
+        buf = cd.get("buffer")
+        if buf is not None:
+            result["bufferB64"] = base64.b64encode(buf.tobytes()).decode("ascii")
+            result["numFrames"] = len(buf)
+        return result
 
     def _generate_html(self):
         events_json = json.dumps(self.events)
@@ -97,6 +115,9 @@ class SuperSonicEngine:
         needed_json = json.dumps(list(needed))
         wid = self.widget_id
 
+        meta_json = json.dumps(self.meta)
+        control_data_json = json.dumps(self._serialize_control_data())
+
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
@@ -104,6 +125,8 @@ class SuperSonicEngine:
                      .replace('__SYNTHDEF_ASSETS_JSON__', synthdef_assets_json)
                      .replace('__NEEDED_JSON__', needed_json)
                      .replace('__SS_CONFIG_JSON__', config_json)
+                     .replace('__META_JSON__', meta_json)
+                     .replace('__CONTROL_DATA_JSON__', control_data_json)
                      .replace('__RING_TIME__', str(self.ring_time)))
 
         html = f'''

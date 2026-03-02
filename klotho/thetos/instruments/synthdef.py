@@ -1,6 +1,6 @@
 import copy
 
-from .base import Instrument
+from .base import Instrument, InsertBase
 from ._shared import ss_synth_meta
 
 
@@ -85,3 +85,36 @@ class SynthDefInstrument(Instrument):
 
     def __str__(self):
         return f"SynthDefInstrument(name='{self._name}', defName='{self._defName}', pfields={dict(self._pfields)})"
+
+
+class Insert(InsertBase):
+    """A SynthDef-backed insert effect for use in a Score track's FX chain.
+
+    Each ``Insert`` instance represents a unique FX node.  Two instances of
+    the same ``defName`` with identical args are still two distinct nodes
+    (different ``uid`` values).  The Python object itself serves as the
+    handle -- pass it to ``Score.track()`` to place it in a chain, and to
+    ``UC.set_instrument()`` to automate its parameters.
+
+    Parameters
+    ----------
+    defName : str
+        SuperCollider SynthDef name (e.g. ``"__reverb"``).
+    **initial_args
+        Initial parameter values set on the node at creation time.
+    """
+
+    def __init__(self, defName, **initial_args):
+        super().__init__(name=defName, pfields=initial_args)
+        self._defName = defName
+
+    @property
+    def defName(self):
+        return self._defName
+
+    @property
+    def args(self):
+        return dict(self._pfields)
+
+    def __str__(self):
+        return f"Insert(defName='{self._defName}', uid='{self._uid}', args={dict(self._pfields)})"

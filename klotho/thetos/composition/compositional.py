@@ -18,6 +18,7 @@ from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
+from klotho.thetos.instruments.base import InsertBase
 from klotho.dynatos.envelopes import Envelope
 from klotho.topos.collections.sequences import Pattern
 
@@ -262,6 +263,7 @@ class CompositionalUnit(TemporalUnit):
         
         self._slur_specs = {}
         self._next_slur_id = 0
+        self._control_envelopes = []
 
     @property
     def nodes(self):
@@ -691,13 +693,35 @@ class CompositionalUnit(TemporalUnit):
                 env_value = scaled_envelope.values[0] if relative_time <= 0 else scaled_envelope.values[-1]
             self._pt.set_pfields(node, **{pfield: env_value for pfield in pfields_list})
 
+    def _record_control_envelope(self, selected, envelope, pfields_list, endpoint):
+        self._ensure_timing_cache()
+        sounding = [n for n in selected if self.nodes[n].get('proportion', 1) >= 0]
+        if not sounding:
+            return
+
+        self._bake_envelope(sounding, envelope, pfields_list, endpoint)
+
+        start_time = min(self.nodes[n]['real_onset'] for n in sounding)
+        if endpoint:
+            end_time = max(self.nodes[n]['real_onset'] + abs(self.nodes[n]['real_duration']) for n in sounding)
+        else:
+            end_time = max(self.nodes[n]['real_onset'] for n in sounding)
+
+        self._control_envelopes.append({
+            "envelope": envelope,
+            "pfields": list(pfields_list),
+            "target_nodes": list(sounding),
+            "time_span": (start_time, end_time),
+        })
+
     def apply_envelope(self,
                        envelope: Envelope,
                        pfields: Union[str, list],
                        node: Union[int, list, tuple, set],
                        offset: int = 0,
                        take: Union[int, None] = None,
-                       mode: Literal["span", "per_node"] = "span",
+                       scope: Literal["span", "per_node"] = "span",
+                       control: bool = False,
                        endpoint: bool = True) -> Union[int, list[int]]:
         """
         Apply an envelope to a contiguous leaf span within this UC.
@@ -711,43 +735,52 @@ class CompositionalUnit(TemporalUnit):
             but rejected for overlapping spans on the same field.
         node : int | list | tuple | set
             Node selector. A single node resolves to subtree leaves. An iterable
-            can be treated either as one combined span (`mode=\"span\"`) or as
-            independent per-node applications (`mode=\"per_node\"`).
+            can be treated either as one combined span (``scope="span"``) or as
+            independent per-node applications (``scope="per_node"``).
         offset : int, default=0
             Leaf offset into the resolved contiguous selection.
         take : int, optional
-            Number of leaves to include from `offset`. If omitted, uses all leaves
-            from `offset` to the end of the resolved selection.
-        mode : {"span", "per_node"}, default="span"
-            Selection interpretation mode.
+            Number of leaves to include from ``offset``. If omitted, uses all
+            leaves from ``offset`` to the end of the resolved selection.
+        scope : {"span", "per_node"}, default="span"
+            How the node selection is interpreted.  ``"span"`` treats all
+            resolved leaves as one contiguous group.  ``"per_node"`` gives
+            each node in the iterable its own independent envelope.
+        control : bool, default=False
+            When ``True``, values are still baked into the ParameterTree
+            (for inspection) but a control-envelope descriptor is also
+            recorded for runtime bus-based automation via a
+            ``__klEnvCtrl`` control synth.
         endpoint : bool, default=True
-            If True, envelope span is onset-to-end of the selected sounding leaves.
-            If False, span is onset-to-onset.
+            If True, envelope span is onset-to-end of the selected sounding
+            leaves.  If False, span is onset-to-onset.
             
         Returns
         -------
         int | list[int]
-            Envelope identifier, or list of identifiers when `mode="per_node"`
-            applies. In per-node mode, the return value is always a list.
+            Envelope identifier, or list of identifiers when
+            ``scope="per_node"``. In per-node scope, the return value is
+            always a list.
 
         Raises
         ------
         ValueError
-            If selection is invalid/non-contiguous, offset/take overflows bounds,
-            a same-pfield overlap is detected, or mode is invalid.
+            If selection is invalid/non-contiguous, offset/take overflows
+            bounds, a same-pfield overlap is detected, or scope is invalid.
         """
         pfields_list = pfields if isinstance(pfields, list) else [pfields]
-        if mode == "span":
+        apply_fn = self._record_control_envelope if control else self._bake_envelope
+        if scope == "span":
             selected = self._resolve_leaf_selection(node=node)
             selected = self._apply_offset_take(selected, offset=offset, take=take)
-            self._bake_envelope(selected, envelope, pfields_list, endpoint)
-        elif mode == "per_node":
+            apply_fn(selected, envelope, pfields_list, endpoint)
+        elif scope == "per_node":
             groups = self._resolve_per_node_leaf_groups(node)
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
-                self._bake_envelope(selected, envelope, pfields_list, endpoint)
+                apply_fn(selected, envelope, pfields_list, endpoint)
         else:
-            raise ValueError(f"Unknown mode: {mode}")
+            raise ValueError(f"Unknown scope: {scope}")
 
     def _partition_non_rest_segments(self, leaves, rest_set):
         segments = []
@@ -971,7 +1004,7 @@ class CompositionalUnit(TemporalUnit):
         if isinstance(instrument, (str, int)):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
-        elif isinstance(instrument, Instrument):
+        elif isinstance(instrument, (Instrument, InsertBase)):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
         elif callable(instrument) or isinstance(instrument, Pattern):

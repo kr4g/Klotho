@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from klotho.thetos.instruments.instrument import SynthDefInstrument
+from klotho.thetos.instruments.base import InsertBase
 from klotho.utils.playback._amplitude import single_voice_amplitude
 from klotho.utils.playback._converter_base import (
     _merge_pfields,
@@ -65,6 +66,10 @@ def _attach_poly_meta(event_record, voice_event):
     return event_record
 
 
+def _is_insert_instrument(instrument):
+    return isinstance(instrument, InsertBase)
+
+
 def lower_compositional_ir_to_sc_assembly(
     obj,
     extra_pfields=None,
@@ -73,8 +78,10 @@ def lower_compositional_ir_to_sc_assembly(
     include_ungated_release=True,
     normalize_sc_pfields=True,
     sort_output=True,
+    return_node_map=False,
 ):
     events = []
+    node_to_event_ids = {}
     leaf_nodes = obj._rt.leaf_nodes if animation else None
     node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)} if animation else None)
     events_iterable = tuple(obj)
@@ -114,6 +121,28 @@ def lower_compositional_ir_to_sc_assembly(
             continue
 
         instrument = obj.get_instrument(event.node_id)
+
+        if _is_insert_instrument(instrument):
+            voice_events = lower_event_ir_to_voice_events(event, step_index=step_idx)
+            for voice_event in voice_events:
+                voice_start = voice_event["start"] - time_offset if animation else voice_event["start"]
+                voice_pfields = {
+                    k: v for k, v in voice_event["pfields"].items()
+                    if k != 'group'
+                }
+                if normalize_sc_pfields:
+                    voice_pfields = _normalize_sc_pfields(voice_pfields)
+                merged_pfields = _merge_pfields(voice_pfields, extra_pfields)
+                set_event = {
+                    "type": "set",
+                    "id": instrument.uid,
+                    "start": voice_start,
+                    "pfields": merged_pfields,
+                }
+                events.append(_attach_poly_meta(set_event, voice_event))
+                node_to_event_ids.setdefault(event.node_id, []).append(instrument.uid)
+            continue
+
         def_name = _resolve_event_synth(instrument, default_synth)
         release_mode = _release_mode(instrument)
         is_gated = release_mode in GATED_RELEASE_MODES
@@ -167,6 +196,7 @@ def lower_compositional_ir_to_sc_assembly(
                     new_event["group"] = group
                 events.append(_attach_poly_meta(new_event, voice_event))
                 slur_uids[voice_slur_key] = slur_uid
+                node_to_event_ids.setdefault(event.node_id, []).append(slur_uid)
                 if is_slur_end and is_gated:
                     release_event = {
                         "type": "release",
@@ -205,6 +235,7 @@ def lower_compositional_ir_to_sc_assembly(
             if group is not None:
                 new_event["group"] = group
             events.append(_attach_poly_meta(new_event, voice_event))
+            node_to_event_ids.setdefault(event.node_id, []).append(uid)
 
             if is_gated or include_ungated_release:
                 release_event = {
@@ -214,4 +245,7 @@ def lower_compositional_ir_to_sc_assembly(
                 }
                 events.append(_attach_poly_meta(release_event, voice_event))
 
-    return sort_sc_assembly_events(events) if sort_output else events
+    result = sort_sc_assembly_events(events) if sort_output else events
+    if return_node_map:
+        return result, node_to_event_ids
+    return result

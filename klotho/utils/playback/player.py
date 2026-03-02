@@ -16,12 +16,15 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
     delegates to its ``.play()`` method to display an animated figure
     with audio.
 
+    If *obj* is a :class:`Score`, delegates to its ``.play()`` method
+    for multi-track playback with insert FX and control envelopes.
+
     Parameters
     ----------
     obj : object
         A Klotho musical object (e.g. ``Pitch``, ``Chord``, ``Scale``,
-        ``RhythmTree``, ``TemporalUnit``, ``CompositionalUnit``) or a
-        ``KlothoPlot`` returned by :func:`plot`.
+        ``RhythmTree``, ``TemporalUnit``, ``CompositionalUnit``),
+        a ``Score``, or a ``KlothoPlot`` returned by :func:`plot`.
     engine : str or None, optional
         Audio engine to use: ``'tone'`` (Tone.js) or ``'supersonic'``
         (SuperSonic / browser scsynth).  When ``None``, uses the global
@@ -42,6 +45,10 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
         The displayed HTML widget handle, or the KlothoPlot after
         triggering its animation.
     """
+    from klotho.thetos.composition.score import Score
+    if isinstance(obj, Score):
+        return obj.play(**kwargs)
+
     from klotho.semeios.visualization._dispatch import KlothoPlot
     if isinstance(obj, KlothoPlot):
         return obj.play(**kwargs)

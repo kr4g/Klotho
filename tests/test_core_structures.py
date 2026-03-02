@@ -639,7 +639,7 @@ class TestCompositionalUnitArticulations:
             envelope=Envelope([0.0, 1.0], times=[1.0]),
             pfields='amp',
             node=inner_nodes,
-            mode="per_node"
+            scope="per_node"
         )
         ev = uc.events
         assert ev['pfields'].apply(lambda d: 'amp' in d).all()

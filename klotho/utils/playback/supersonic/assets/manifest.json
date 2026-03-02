@@ -1,0 +1,288 @@
+{
+  "synths": {
+    "default": {
+      "releaseMode": "gate",
+      "gateParam": "gate",
+      "controls": {
+        "freq": 440.0,
+        "amp": 0.1,
+        "pan": 0.0,
+        "gate": 1,
+        "out": 0
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "freq": { "min": 20.0, "max": 20000.0, "warp": "exp" },
+        "pan": { "min": -1.0, "max": 1.0, "warp": "lin" }
+      }
+    },
+    "kl_tri": {
+      "releaseMode": "gate",
+      "gateParam": "gate",
+      "controls": {
+        "freq": 440.0,
+        "amp": 0.5,
+        "pan": 0.0,
+        "gate": 1,
+        "out": 0,
+        "portamento": 0.1,
+        "vibRate": 5.0,
+        "vibDepth": 0.0,
+        "toneLPFRatio": 2.0,
+        "filterEnvAmt": 0.2,
+        "softDrive": 1.1,
+        "softMix": 0.08,
+        "attackTime": 0.05,
+        "decayTime": 0.08,
+        "sustainLevel": 0.75,
+        "releaseTime": 0.25,
+        "peakLevel": 1.0,
+        "attackCurve": -4.0,
+        "decayCurve": -2.0,
+        "releaseCurve": -4.0
+      },
+      "paths": {
+        "envelope.attack": "attackTime",
+        "envelope.decay": "decayTime",
+        "envelope.sustain": "sustainLevel",
+        "envelope.release": "releaseTime"
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "freq": { "min": 20.0, "max": 20000.0, "warp": "exp" },
+        "pan": { "min": -1.0, "max": 1.0, "warp": "lin" }
+      }
+    },
+    "kl_sine": {
+      "releaseMode": "gate",
+      "gateParam": "gate",
+      "controls": {
+        "freq": 440.0,
+        "amp": 0.3,
+        "pan": 0.0,
+        "gate": 1,
+        "out": 0,
+        "portamento": 0.1,
+        "vibRate": 5.0,
+        "vibDepth": 0.0,
+        "attackTime": 0.05,
+        "decayTime": 0.15,
+        "sustainLevel": 0.8,
+        "releaseTime": 0.8,
+        "peakLevel": 1.0,
+        "attackCurve": -4.0,
+        "decayCurve": -2.0,
+        "releaseCurve": -4.0
+      },
+      "paths": {
+        "envelope.attack": "attackTime",
+        "envelope.decay": "decayTime",
+        "envelope.sustain": "sustainLevel",
+        "envelope.release": "releaseTime"
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "freq": { "min": 20.0, "max": 20000.0, "warp": "exp" },
+        "pan": { "min": -1.0, "max": 1.0, "warp": "lin" }
+      }
+    },
+    "kl_sqr": {
+      "releaseMode": "gate",
+      "gateParam": "gate",
+      "controls": {
+        "freq": 440.0,
+        "amp": 0.4,
+        "pan": 0.0,
+        "gate": 1,
+        "out": 0,
+        "portamento": 0.1,
+        "vibRate": 5.0,
+        "vibDepth": 0.0,
+        "width": 0.5,
+        "toneLPFRatio": 2.0,
+        "filterEnvAmt": 0.2,
+        "softDrive": 1.1,
+        "softMix": 0.08,
+        "attackTime": 0.05,
+        "decayTime": 0.07,
+        "sustainLevel": 0.65,
+        "releaseTime": 0.2,
+        "peakLevel": 1.0,
+        "attackCurve": -3.0,
+        "decayCurve": -2.0,
+        "releaseCurve": -4.0
+      },
+      "paths": {
+        "envelope.attack": "attackTime",
+        "envelope.decay": "decayTime",
+        "envelope.sustain": "sustainLevel",
+        "envelope.release": "releaseTime",
+        "oscillator.width": "width"
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "freq": { "min": 20.0, "max": 20000.0, "warp": "exp" },
+        "pan": { "min": -1.0, "max": 1.0, "warp": "lin" }
+      }
+    },
+    "kl_saw": {
+      "releaseMode": "gate",
+      "gateParam": "gate",
+      "controls": {
+        "freq": 440.0,
+        "amp": 0.35,
+        "pan": 0.0,
+        "gate": 1,
+        "out": 0,
+        "portamento": 0.1,
+        "vibRate": 5.0,
+        "vibDepth": 0.0,
+        "toneLPFRatio": 2.0,
+        "filterEnvAmt": 0.2,
+        "softDrive": 1.1,
+        "softMix": 0.08,
+        "attackTime": 0.05,
+        "decayTime": 0.1,
+        "sustainLevel": 0.7,
+        "releaseTime": 0.25,
+        "peakLevel": 1.0,
+        "attackCurve": -4.0,
+        "decayCurve": -2.0,
+        "releaseCurve": -4.0
+      },
+      "paths": {
+        "envelope.attack": "attackTime",
+        "envelope.decay": "decayTime",
+        "envelope.sustain": "sustainLevel",
+        "envelope.release": "releaseTime"
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "freq": { "min": 20.0, "max": 20000.0, "warp": "exp" },
+        "pan": { "min": -1.0, "max": 1.0, "warp": "lin" }
+      }
+    },
+    "kl_noisebpf": {
+      "releaseMode": "gate",
+      "gateParam": "gate",
+      "controls": {
+        "freq": 440.0,
+        "amp": 0.2,
+        "pan": 0.0,
+        "gate": 1,
+        "out": 0,
+        "portamento": 0.1,
+        "rq": 0.001,
+        "attackTime": 0.05,
+        "decayTime": 0.12,
+        "sustainLevel": 0.85,
+        "releaseTime": 0.35,
+        "peakLevel": 1.0,
+        "attackCurve": -4.0,
+        "decayCurve": -2.0,
+        "releaseCurve": -4.0
+      },
+      "paths": {
+        "envelope.attack": "attackTime",
+        "envelope.decay": "decayTime",
+        "envelope.sustain": "sustainLevel",
+        "envelope.release": "releaseTime",
+        "filter.q": "rq"
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "freq": { "min": 20.0, "max": 20000.0, "warp": "exp" },
+        "pan": { "min": -1.0, "max": 1.0, "warp": "lin" }
+      }
+    },
+    "kl_kicktone": {
+      "releaseMode": "free",
+      "controls": {
+        "amp": 0.85,
+        "pan": 0.0,
+        "out": 0,
+        "dur": 0.6,
+        "baseFreq": 55.0,
+        "pitchDrop": 2.0,
+        "pitchDropTime": 0.04,
+        "pitchCurve": -6.0,
+        "clickAmp": 0.004,
+        "clickHPF": 1800.0,
+        "clickLPF": 6500.0,
+        "clickAtk": 0.001,
+        "clickDec": 0.01,
+        "clickCurve": -2.0,
+        "bodyAtk": 0.001,
+        "bodyDec": 0.16,
+        "bodyCurve": -5.0,
+        "sustainAtk": 0.004,
+        "sustainRel": 0.1,
+        "sustainCurve": -3.0,
+        "sustainMix": 0.45,
+        "sustainLPF": 1800.0,
+        "drive": 1.03
+      },
+      "specs": {
+        "amp": { "min": 0.0, "max": 1.0, "warp": "lin" },
+        "dur": { "min": 0.01, "max": 8.0, "warp": "exp" }
+      }
+    }
+  },
+  "inserts": {
+    "__busRouter": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "gain": 1.0 }
+    },
+    "__busRouterMonitor": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "gain": 1.0, "id": 0 }
+    },
+    "__chainLimiter": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "gain": 1.0, "preGain": 1.0, "limitLevel": 0.95, "lookAhead": 0.01 }
+    },
+    "__klReverb": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "mix": 0.3, "room": 0.7, "damp": 0.5, "gain": 1.0 }
+    },
+    "__klDelay": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "delayTime": 0.25, "decayTime": 1.0, "maxDelay": 2.0, "gain": 1.0 }
+    },
+    "__klDistortion": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "dist": 0.5, "gain": 1.0 }
+    },
+    "__klBitcrush": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "bits": 8, "crush": 4, "gain": 1.0 }
+    },
+    "__klLPF": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "freq": 1200, "rq": 1.0, "gain": 1.0 }
+    },
+    "__klHPF": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "freq": 200, "rq": 1.0, "gain": 1.0 }
+    },
+    "__klTremolo": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "rate": 4.0, "depth": 0.5, "gain": 1.0 }
+    },
+    "__klChop": {
+      "inParam": "inBus", "outParam": "outBus",
+      "controls": { "inBus": 0, "outBus": 0, "rate": 4.0, "gain": 1.0 }
+    }
+  },
+  "control": {
+    "__klEnvCtrl": {
+      "controls": {
+        "bufnum": 0,
+        "bus": 0,
+        "dur": 1,
+        "startFrame": 0,
+        "numFrames": 512
+      }
+    }
+  }
+}

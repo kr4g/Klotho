@@ -1,7 +1,8 @@
 // SuperSonic standalone playback widget.
 // Python replaces: __WID__, __EVENTS_JSON__, __MANIFEST_JSON__,
 //                  __SYNTHDEF_ASSETS_JSON__, __NEEDED_JSON__,
-//                  __SS_CONFIG_JSON__, __RING_TIME__
+//                  __SS_CONFIG_JSON__, __META_JSON__,
+//                  __CONTROL_DATA_JSON__, __RING_TIME__
 
 (function __klothoSSInit___WID__() {
     var wid = "__WID__";
@@ -19,6 +20,8 @@
     var synthdefAssets = __SYNTHDEF_ASSETS_JSON__;
     var neededSynthdefs = __NEEDED_JSON__;
     var ssConfig = __SS_CONFIG_JSON__;
+    var meta = __META_JSON__;
+    var controlData = __CONTROL_DATA_JSON__;
 
     var looping = false;
     var scheduler = null;
@@ -125,6 +128,8 @@
 
         scheduler.play(evts, {
             _skipStop: !!skipStop,
+            meta: meta,
+            controlData: controlData,
             onFinish: function() {
                 if (looping) {
                     doPlay(true);

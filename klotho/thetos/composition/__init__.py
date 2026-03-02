@@ -6,10 +6,12 @@ that span multiple domains (temporal, tonal, parametric, etc.).
 """
 
 from .compositional import CompositionalUnit, Parametron, DistributionContext, PFieldContext
+from .score import Score
 
 __all__ = [
     'CompositionalUnit',
     'Parametron',
     'DistributionContext',
     'PFieldContext',
+    'Score',
 ] 
