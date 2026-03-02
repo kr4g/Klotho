@@ -1084,6 +1084,7 @@ class CompositionalUnit(TemporalUnit):
         mfields = {k: v for k, v in parent_data.items() if k in self._pt._meta['mfields']}
 
         self._rt.subdivide(node, S)
+        self._invalidate_timing_cache()
         new_children = list(self._rt.successors(node))
 
         for _ in new_children:
