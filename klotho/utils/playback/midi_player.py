@@ -23,7 +23,7 @@ from klotho.thetos.instruments.instrument import MidiInstrument
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
 from klotho.tonos.pitch.pitch import Pitch
 from klotho.tonos.scales.scale import Scale
-from klotho.tonos.chords.chord import Chord, Voicing, Sonority, ChordSequence
+from klotho.tonos.chords.chord import Chord, Voicing, ChordSequence
 from klotho.utils.playback._converter_base import lower_event_ir_to_voice_events
 
 DEFAULT_DRUM_NOTE = 77
@@ -81,17 +81,17 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, Scale, Chord, Voicing, Sonority, or ChordSequence
+          PitchCollection, Scale, Chord, Voicing, or ChordSequence
         The musical object to play. Different object types have different playback behaviors:
         - RhythmTree/TemporalUnit: Rhythmic playback with default pitch
         - PitchCollection: Sequential pitch playback
         - Scale: Ascending then descending playback
-        - Chord/Voicing/Sonority: Block chord or arpeggiated playback
-        - ChordSequence: Sequential playback of chords/sonorities
+        - Chord/Voicing: Block chord or arpeggiated playback
+        - ChordSequence: Sequential playback of chords
     dur : float, optional
         Duration in seconds. Defaults depend on object type:
         - PitchCollection/Scale: 0.5 seconds per note
-        - Chord/Voicing/Sonority: 3.0 seconds total (or per note if arpeggiated)
+        - Chord/Voicing: 3.0 seconds total (or per note if arpeggiated)
         - ChordSequence: 3.0 seconds per chord
     arp : bool, optional
         For chords only: if True, arpeggiate the chord (default False)
@@ -148,14 +148,14 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
             if isinstance(obj, Scale):
                 midi_file = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, Voicing, Sonority)):
+            elif isinstance(obj, (Chord, Voicing)):
                 midi_file = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
                 midi_file = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
                                                              max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, Scale, Chord, Voicing, Sonority, ChordSequence.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, Scale, Chord, Voicing, ChordSequence.")
     
     return _midi_to_audio(midi_file, soundfont_path=soundfont_path, max_polyphony=max_polyphony)
 
@@ -170,7 +170,7 @@ def create_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphon
     Parameters
     ----------
     obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, Scale, Chord, Voicing, Sonority, or ChordSequence
+          PitchCollection, Scale, Chord, Voicing, or ChordSequence
         The musical object to convert to MIDI. Same as play_midi().
     dur : float, optional
         Duration in seconds. Same as play_midi().
@@ -226,14 +226,14 @@ def create_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphon
             if isinstance(obj, Scale):
                 midi_file = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, Voicing, Sonority)):
+            elif isinstance(obj, (Chord, Voicing)):
                 midi_file = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
                 midi_file = _create_midi_from_pitch_collection(obj, dur=dur or 0.5, prgm=prgm, 
                                                              max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
         case _:
-            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, Scale, Chord, Voicing, Sonority, ChordSequence.")
+            raise TypeError(f"Unsupported object type: {type(obj)}. Supported types: RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock, PitchCollection, Scale, Chord, Voicing, ChordSequence.")
     
     return midi_file
 
@@ -1643,7 +1643,7 @@ def compare_midi_files(obj, **kwargs):
             if isinstance(obj, Scale):
                 midi_from_play = _create_midi_from_scale(obj, dur=dur or 0.5, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
-            elif isinstance(obj, (Chord, Voicing, Sonority)):
+            elif isinstance(obj, (Chord, Voicing)):
                 midi_from_play = _create_midi_from_chord(obj, dur=dur or 3.0, arp=arp, prgm=prgm, 
                                                   max_channels=max_channels, bend_sensitivity_semitones=bend_sensitivity_semitones, debug=debug)
             else:
@@ -1861,82 +1861,6 @@ def _create_midi_from_free_pitch_collection(collection, dur=0.5, prgm=0, max_cha
         })
         
         current_time += dur
-    
-    _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
-    
-    writer.finalize(bpm)
-    return writer.get_midi_file()
-
-
-def _create_midi_from_free_sonority(collection, dur=3.0, arp=False, prgm=0, max_channels=128, bend_sensitivity_semitones=12, debug=False):
-    """Create a MIDI file from a FreeSonority (block chord or arpeggiated) using absolute timing."""
-    bpm = 120
-    
-    max_concurrent = len(collection) if hasattr(collection, '__len__') else 16
-    max_concurrent = min(max_concurrent, max_channels)
-    
-    writer = MultiPortMidiWriter(max_voices=max_concurrent)
-    allocator = ChannelAllocator(writer.num_ports, bend_sensitivity_semitones=bend_sensitivity_semitones)
-    
-    writer.add_meta_event(MetaMessage('set_tempo', tempo=int(60_000_000 / bpm), time=0))
-    
-    if debug:
-        print(f"[DEBUG] FreeSonority: {max_concurrent} voices, {writer.num_ports} ports, arp={arp}")
-    
-    note_events = []
-    voice_counter = 0
-    
-    if arp:
-        current_time = 0.0
-        for pitch in collection:
-            voice_id = f"free_sonority_voice_{voice_counter}"
-            voice_counter += 1
-            
-            try:
-                port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=prgm)
-            except RuntimeError:
-                continue
-            
-            midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, bend_sensitivity_semitones)
-            
-            note_events.append({
-                'voice_id': voice_id,
-                'port': port,
-                'channel': channel,
-                'start_time': current_time,
-                'duration': dur,
-                'midi_note': midi_note,
-                'velocity': DEFAULT_VELOCITY,
-                'program': prgm,
-                'is_drum': False,
-                'pitch_bend': pitch_bend
-            })
-            
-            current_time += dur
-    else:
-        for pitch in collection:
-            voice_id = f"free_sonority_voice_{voice_counter}"
-            voice_counter += 1
-            
-            try:
-                port, channel = allocator.allocate_voice(voice_id, is_drum=False, program=prgm)
-            except RuntimeError:
-                continue
-            
-            midi_note, pitch_bend = _calculate_base_note_and_bend(pitch, bend_sensitivity_semitones)
-            
-            note_events.append({
-                'voice_id': voice_id,
-                'port': port,
-                'channel': channel,
-                'start_time': 0.0,
-                'duration': dur,
-                'midi_note': midi_note,
-                'velocity': DEFAULT_VELOCITY,
-                'program': prgm,
-                'is_drum': False,
-                'pitch_bend': pitch_bend
-            })
     
     _generate_multi_port_events(note_events, writer, allocator, bpm, debug)
     

@@ -40,7 +40,7 @@ from .pitch import (
 )
 from .scales import Scale
 from .scales.scale import InstancedScale
-from .chords import Chord, Voicing, Sonority, ChordSequence, FreeSonority
+from .chords import Chord, Voicing, ChordSequence
 from .chords.chord import InstancedChord, InstancedVoicing
 from .pitch import Contour
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany, MasterSet
@@ -81,8 +81,6 @@ __all__ = [
     'Scale',
     'Chord',
     'Voicing',
-    'Sonority',
-    'FreeSonority',
     
     # Sequences
     'ChordSequence',

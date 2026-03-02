@@ -3,9 +3,7 @@ from .chord import (
     InstancedChord,
     Voicing,
     InstancedVoicing,
-    Sonority,
     ChordSequence,
-    FreeSonority,
 )
 
 __all__ = [
@@ -13,7 +11,5 @@ __all__ = [
     'InstancedChord',
     'Voicing',
     'InstancedVoicing',
-    'Sonority',
     'ChordSequence',
-    'FreeSonority',
 ]

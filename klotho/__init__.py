@@ -26,7 +26,7 @@ from .topos.collections import Pattern, CombinationSet, PartitionSet
 
 from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
 
-from .tonos import Pitch, Scale, Chord, Voicing, Sonority, ChordSequence, Contour
+from .tonos import Pitch, Scale, Chord, Voicing, ChordSequence, Contour
 
 from .dynatos import Envelope, DynamicRange
 
@@ -44,4 +44,4 @@ __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils', 'plot',
 ]
 
-__version__ = '5.0.13'
+__version__ = '5.0.14'

@@ -3,7 +3,7 @@ import numpy as np
 from fractions import Fraction
 from klotho.tonos.pitch import Pitch, PitchCollection, PitchCollectionBase, RootedPitchCollection
 from klotho.tonos.scales import Scale
-from klotho.tonos.chords import Chord, Voicing, Sonority
+from klotho.tonos.chords import Chord, Voicing
 
 
 class TestPitch:
@@ -397,10 +397,9 @@ class TestBasicIntegration:
         with pytest.raises(ValueError):
             Voicing.from_collection(pc)
 
-    def test_absolute_sonority_wraps_absolute_collection(self):
+    def test_absolute_collection_from_pitches(self):
         pc = PitchCollection.from_pitch(["C4", "E4", "G4"])
-        sonority = Sonority(pc.pitches)
-        assert len(sonority) == 3
+        assert len(pc) == 3
 
 
 class TestCentsAndMixedOperations:

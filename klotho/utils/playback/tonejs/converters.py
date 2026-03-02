@@ -2,7 +2,7 @@ import copy
 
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
-from klotho.tonos.chords.chord import Chord, Voicing, Sonority, ChordSequence
+from klotho.tonos.chords.chord import Chord, Voicing, ChordSequence
 from klotho.tonos.scales.scale import Scale
 from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
@@ -488,7 +488,7 @@ def convert_to_events(obj, **kwargs):
         return scale_to_events(obj, duration=duration, equaves=equaves, amp=amp,
                                pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
 
-    if isinstance(obj, (Chord, Voicing, Sonority)):
+    if isinstance(obj, (Chord, Voicing)):
         return chord_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
                                amp=amp, extra_pfields=extra_pfields)
 

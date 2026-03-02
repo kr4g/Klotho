@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
-from klotho.tonos.chords.chord import Chord, Voicing, Sonority, ChordSequence
+from klotho.tonos.chords.chord import Chord, Voicing, ChordSequence
 from klotho.tonos.scales.scale import Scale
 from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree

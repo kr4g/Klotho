@@ -610,56 +610,15 @@ class Voicing(RelativePitchCollection):
         )
 
 
-class Sonority(AbsolutePitchCollection):
-    """
-    A sonority of absolute Pitch objects without interval structure.
-
-    Sonority stores Pitch objects directly without deriving them from
-    intervals and a reference pitch. Represents simultaneous pitches.
-
-    Parameters
-    ----------
-    pitches : list of Pitch or str
-        Pitch objects or pitch strings (e.g., ``"C4"``, ``"D#5"``).
-    equave : float, Fraction, int, str, or None, optional
-        Interval of equivalence for cyclic indexing.
-    reference_pitch : Pitch, str, or None, optional
-        Optional reference pitch for partial calculations.
-
-    Examples
-    --------
-    >>> s = Sonority(["C4", "E4", "G4"])
-    >>> s[0]
-    Pitch(C4, 261.63 Hz)
-    """
-    
-    def __init__(self, pitches: Union[List[Pitch], List[str]],
-                 equave: Union[float, Fraction, int, str, None] = None,
-                 reference_pitch: Union[Pitch, str, None] = None):
-        super().__init__(pitches, equave, reference_pitch)
-    
-    def __getitem__(self, index: Union[int, slice, Sequence[int], np.ndarray]) -> Union[Pitch, 'Sonority']:
-        result = super().__getitem__(index)
-        if isinstance(result, PitchCollectionBase) and not isinstance(result, Sonority):
-            sonority = Sonority(result.pitches, result.equave, result.reference_pitch)
-            sonority._equave_cyclic = result.equave_cyclic
-            return sonority
-        return result
-
-
-FreeSonority = Sonority
-
-
 class ChordSequence:
     """
-    An ordered sequence of Chord, Voicing, or Sonority objects.
+    An ordered sequence of Chord or Voicing objects.
 
     Provides a container for chord progressions or harmonic sequences.
-    Accepts both relative (Chord, Voicing) and absolute (Sonority) types.
 
     Parameters
     ----------
-    chords : list of Chord, Voicing, or Sonority, optional
+    chords : list of Chord or Voicing, optional
         The chord objects in the sequence.
 
     Examples
@@ -671,18 +630,18 @@ class ChordSequence:
     2
     """
     
-    def __init__(self, chords: List[Union[Chord, Voicing, Sonority]] = None):
+    def __init__(self, chords: List[Union[Chord, Voicing]] = None):
         self._chords = chords if chords is not None else []
     
     @property
-    def chords(self) -> List[Union[Chord, Voicing, Sonority]]:
+    def chords(self) -> List[Union[Chord, Voicing]]:
         """list : A copy of the chord objects in this sequence."""
         return self._chords.copy()
     
     def __len__(self) -> int:
         return len(self._chords)
     
-    def __getitem__(self, index: Union[int, slice]) -> Union[Chord, Voicing, Sonority, 'ChordSequence']:
+    def __getitem__(self, index: Union[int, slice]) -> Union[Chord, Voicing, 'ChordSequence']:
         if isinstance(index, slice):
             return ChordSequence(self._chords[index])
         return self._chords[index]
