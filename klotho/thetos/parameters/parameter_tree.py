@@ -179,11 +179,14 @@ class ParameterTree(Tree):
     def clear(self, node=None):
         if node is None:
             for n in self.nodes:
-                super().__getitem__(n).clear()
+                self._graph[n].clear()
+            self._node_instruments.clear()
         else:
-            super().__getitem__(node).clear()
+            self._graph[node].clear()
+            self._node_instruments.pop(node, None)
             for descendant in self.descendants(node):
-                super().__getitem__(descendant).clear()
+                self._graph[descendant].clear()
+                self._node_instruments.pop(descendant, None)
         self._effective_cache = None
 
     def items(self, node):

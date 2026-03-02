@@ -219,10 +219,9 @@ class Score:
 
     def _collect_control_envelopes(self, uc: CompositionalUnit, id_map: dict[str, str], node_to_event_ids: dict | None = None):
         node_to_event_ids = node_to_event_ids or {}
-        for desc in getattr(uc, '_control_envelopes', []):
-            target_node_ids = desc.get("target_nodes", [])
+        for desc in uc.resolved_control_envelopes():
             remapped = []
-            for nid in target_node_ids:
+            for nid in desc["target_nodes"]:
                 assembly_eids = node_to_event_ids.get(nid, [])
                 for eid in assembly_eids:
                     score_uid = id_map.get(eid, eid)
@@ -232,8 +231,7 @@ class Score:
             if not remapped:
                 continue
 
-            start = desc["time_span"][0]
-            end = desc["time_span"][1]
+            start, end = desc["time_span"]
             self._control_descriptors.append({
                 "envelope": desc["envelope"],
                 "pfields": desc["pfields"],

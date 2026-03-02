@@ -10,6 +10,38 @@ if TYPE_CHECKING:
     from klotho.thetos.composition.compositional import CompositionalUnit
 
 
+def _snip_slur_into_sub_uc(original_uc, sub_uc, depth_node, sounding_leaves):
+    def _path_sig(tree, root, target):
+        branch = list(tree.branch(target))
+        root_idx = branch.index(root)
+        sig = []
+        for j in range(root_idx + 1, len(branch)):
+            parent = branch[j - 1]
+            current = branch[j]
+            sig.append(list(tree.successors(parent)).index(current))
+        return tuple(sig)
+
+    def _node_from_sig(tree, root, sig):
+        current = root
+        for idx in sig:
+            current = list(tree.successors(current))[idx]
+        return current
+
+    mapped = []
+    for old_leaf in sounding_leaves:
+        try:
+            sig = _path_sig(original_uc._rt, depth_node, old_leaf)
+            new_leaf = _node_from_sig(sub_uc._rt, sub_uc._rt.root, sig)
+            mapped.append(new_leaf)
+        except (ValueError, IndexError):
+            continue
+    if len(mapped) >= 2:
+        try:
+            sub_uc.apply_slur(node=mapped)
+        except ValueError:
+            pass
+
+
 # def segment_ut(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:
 #     """
 #     Segments a temporal unit into a new unit with the given ratio. eg, a ratio of 1/3 means
@@ -73,11 +105,9 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
             subtree = ut._rt.subtree(node)
             
             if isinstance(ut, CompositionalUnit):
-                # Create a CompositionalUnit from the subtree
                 cu_subtree = ut.from_subtree(node)
                 units.append(cu_subtree)
             else:
-                # Create a regular TemporalUnit
                 unit = TemporalUnit(
                     span     = 1,
                     tempus   = subtree[subtree.root]['metric_duration'],
@@ -86,6 +116,28 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
                     bpm      = ut._bpm
                 )
                 units.append(unit)
+
+        if isinstance(ut, CompositionalUnit) and getattr(ut, '_slur_specs', None):
+            depth_leaf_sets = {
+                node: set(ut._rt.subtree_leaves(node))
+                for node in nodes_at_depth
+            }
+            for slur_spec in ut._slur_specs.values():
+                slur_leaves = list(slur_spec['leaf_nodes'])
+                slur_leaf_set = set(slur_leaves)
+                for i, depth_node in enumerate(nodes_at_depth):
+                    local_leaves = depth_leaf_sets[depth_node]
+                    if slur_leaf_set.issubset(local_leaves):
+                        break
+                    portion = [l for l in slur_leaves if l in local_leaves]
+                    sounding = [
+                        l for l in portion
+                        if ut._rt[l].get('proportion', 1) >= 0
+                    ]
+                    if len(sounding) < 2:
+                        continue
+                    cu_sub = units[i]
+                    _snip_slur_into_sub_uc(ut, cu_sub, depth_node, sounding)
         
         return TemporalUnitSequence(units)
     else:
@@ -163,7 +215,6 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
     new_tempus = Meas(ut.tempus * ut.span * ratio)
     
     if isinstance(ut, CompositionalUnit):
-        # Create a new CompositionalUnit with the same ParameterTree structure
         new_cu = CompositionalUnit(
             span=1,
             tempus=new_tempus,
@@ -172,10 +223,10 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
             bpm=bpm,
             pfields=ut.pfields
         )
-        # Copy the parameter tree data
         new_cu._pt = ut._pt.copy()
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
+        new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
         return new_cu
     else:
         return TemporalUnit(
@@ -215,7 +266,6 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
     ratio = beat_duration(str(tempus * span), ut.bpm, ut.beat) / beat_duration(str(ut.tempus * ut.span), ut.bpm, ut.beat)
 
     if isinstance(ut, CompositionalUnit):
-        # Create a new CompositionalUnit with the same ParameterTree structure
         new_cu = CompositionalUnit(
             span=span,
             tempus=tempus,
@@ -224,10 +274,10 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
             bpm=ut.bpm * ratio,
             pfields=ut.pfields
         )
-        # Copy the parameter tree data
         new_cu._pt = ut._pt.copy()
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
+        new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
         return new_cu
     else:
         return TemporalUnit(
