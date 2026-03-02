@@ -42,7 +42,7 @@ class Scheduler:
         self.event_counter = 0  # sorting for final tiebreaker
         self.meta = {}
         
-    def new_node(self, synth_name: str, start: float = 0, dur: Union[float, None] = None, group: str = None, **pfields):
+    def new_node(self, def_name: str, start: float = 0, dur: Union[float, None] = None, group: str = None, **pfields):
         """Create a new synth node event.
 
         Pushes a ``"new"`` event onto the scheduler heap.  If *dur* is
@@ -51,7 +51,7 @@ class Scheduler:
 
         Parameters
         ----------
-        synth_name : str
+        def_name : str
             Name of the SuperCollider SynthDef to instantiate.
         start : float, optional
             Start time in seconds (default ``0``).
@@ -73,7 +73,7 @@ class Scheduler:
         event = {
             "type": "new",
             "id": uid,
-            "synthName": synth_name,
+            "defName": def_name,
             "start": start,
             "pfields": pfields
         }
@@ -172,14 +172,14 @@ class Scheduler:
             )
             id_map = {}
             for event in assembly_events:
-                if event.get("synthName") == "__rest__":
+                if event.get("defName") == "__rest__":
                     continue
                 event_type = event.get("type")
                 if event_type == "new":
                     pfields = dict(event.get("pfields", {}))
                     group = event.get("group", pfields.pop("group", None))
                     created_uid = self.new_node(
-                        synth_name=event.get("synthName"),
+                        def_name=event.get("defName"),
                         start=event.get("start", 0.0),
                         group=group,
                         **pfields
@@ -204,13 +204,13 @@ class Scheduler:
         for event in uc:
             if event.is_rest:
                 continue
-            event_synth_name = event.get_parameter('defName') or event.get_parameter('synthName')
-            if not event_synth_name:
+            event_def_name = event.get_parameter('defName')
+            if not event_def_name:
                 continue
             event_group = event.get_parameter('group')
-            pfields = {k: v for k, v in event.pfields.items() if k not in ('defName', 'synthName', 'group')}
+            pfields = {k: v for k, v in event.pfields.items() if k != 'group'}
             uid = self.new_node(
-                synth_name=event_synth_name,
+                def_name=event_def_name,
                 start=event.start,
                 group=event_group,
                 **pfields

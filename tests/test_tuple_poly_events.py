@@ -122,7 +122,7 @@ def test_supersonic_compositional_unit_poly_strum_animation_metadata():
     )
     cu = _FakeCU([event], _SimpleSCInstrument())
     sc_events = compositional_unit_to_sc_events(cu, animation=True)
-    new_events = [ev for ev in sc_events if ev["type"] == "new" and ev["synthName"] != "__rest__"]
+    new_events = [ev for ev in sc_events if ev["type"] == "new" and ev["defName"] != "__rest__"]
     release_events = [ev for ev in sc_events if ev["type"] == "release"]
 
     assert len(new_events) == 3
@@ -176,13 +176,13 @@ def test_sort_sc_events_orders_type_priority_at_same_start():
     unsorted_events = [
         {"type": "release", "start": 1.0, "id": "a"},
         {"type": "set", "start": 1.0, "id": "a", "pfields": {"note": 62}},
-        {"type": "new", "start": 1.0, "id": "a", "synthName": "custom", "pfields": {"note": 60}},
+        {"type": "new", "start": 1.0, "id": "a", "defName": "custom", "pfields": {"note": 60}},
     ]
     sorted_events = sort_sc_assembly_events(unsorted_events)
     assert [event["type"] for event in sorted_events] == ["new", "set", "release"]
 
 
-def test_scheduler_accepts_arbitrary_synth_name_from_uc():
+def test_scheduler_accepts_arbitrary_def_name_from_uc():
     uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), pfields={"note": 60, "amp": 0.2}, mfields={"group": "default"})
     leaves = tuple(uc._rt.leaf_nodes)
     uc.set_pfields(leaves[0], defName='custom_poly_synth', note=(60, 64), amp=0.25)
@@ -193,7 +193,7 @@ def test_scheduler_accepts_arbitrary_synth_name_from_uc():
     scheduled_events = [event for *_, event in scheduler.events]
     new_events = [event for event in scheduled_events if event["type"] == "new"]
 
-    assert any(event.get("synthName") == 'custom_poly_synth' for event in new_events)
+    assert any(event.get("defName") == 'custom_poly_synth' for event in new_events)
 
 
 def test_slur_markers_live_in_mfields_not_pfields():

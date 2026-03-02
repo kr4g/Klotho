@@ -37,7 +37,7 @@ def _normalize_sc_pfields(pfields):
 
 
 def _resolve_event_synth(event, instrument, default_synth):
-    explicit = event.get_parameter('defName') or event.get_parameter('synthName')
+    explicit = event.get_parameter('defName')
     if explicit:
         return explicit
     if isinstance(instrument, SynthDefInstrument):
@@ -105,7 +105,7 @@ def lower_compositional_ir_to_sc_assembly(
                 rest = {
                     "type": "new",
                     "id": uuid4().hex,
-                    "synthName": "__rest__",
+                    "defName": "__rest__",
                     "start": event.start - time_offset,
                     "pfields": {},
                 }
@@ -115,7 +115,7 @@ def lower_compositional_ir_to_sc_assembly(
             continue
 
         instrument = obj.get_instrument(event.node_id)
-        synth_name = _resolve_event_synth(event, instrument, default_synth)
+        def_name = _resolve_event_synth(event, instrument, default_synth)
         release_mode = _release_mode(instrument)
         is_gated = release_mode in GATED_RELEASE_MODES
         is_ungated = release_mode in FREE_RELEASE_MODES
@@ -130,7 +130,7 @@ def lower_compositional_ir_to_sc_assembly(
             voice_end = voice_event["end"] - time_offset if animation else voice_event["end"]
             voice_pfields = {
                 k: v for k, v in voice_event["pfields"].items()
-                if k not in ('defName', 'synthName', 'group')
+                if k != 'group'
             }
 
             if is_ungated:
@@ -160,7 +160,7 @@ def lower_compositional_ir_to_sc_assembly(
                 new_event = {
                     "type": "new",
                     "id": slur_uid,
-                    "synthName": synth_name,
+                    "defName": def_name,
                     "start": voice_start,
                     "pfields": merged_pfields,
                 }
@@ -199,7 +199,7 @@ def lower_compositional_ir_to_sc_assembly(
             new_event = {
                 "type": "new",
                 "id": uid,
-                "synthName": synth_name,
+                "defName": def_name,
                 "start": voice_start,
                 "pfields": merged_pfields,
             }

@@ -342,7 +342,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         preview_config = {
             "dur": kwargs.get("dur", dur) if kwargs else dur,
             "amp": kwargs.get("amp", amp) if kwargs else amp,
-            "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
             "engine": engine_name,
         }
         svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
@@ -390,7 +390,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             preview_config = {
                 "dur": kwargs.get("dur", dur) if kwargs else dur,
                 "amp": kwargs.get("amp", amp) if kwargs else amp,
-                "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+                "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
                 "engine": engine_name,
             }
             svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,

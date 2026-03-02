@@ -50,5 +50,5 @@ def load_ss_manifest():
     return _SS_MANIFEST_CACHE
 
 
-def ss_synth_meta(synth_name):
-    return load_ss_manifest().get('synths', {}).get(synth_name, {})
+def ss_synth_meta(def_name):
+    return load_ss_manifest().get('synths', {}).get(def_name, {})

@@ -270,7 +270,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
         preview_config = {
             "dur": kwargs.get("dur", dur) if kwargs else dur,
             "amp": kwargs.get("amp", amp) if kwargs else amp,
-            "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
             "engine": engine_name,
         }
         from klotho.utils.playback.animation_events import build_path_engine_payload
@@ -316,7 +316,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
         preview_config = {
             "dur": kwargs.get("dur", dur) if kwargs else dur,
             "amp": kwargs.get("amp", amp) if kwargs else amp,
-            "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
             "engine": engine_name,
         }
         from klotho.utils.playback.animation_events import build_shape_engine_payload

@@ -36,7 +36,7 @@ def _uid():
     return uuid4().hex
 
 
-def _release_mode_for_synth(synth_name):
+def _release_mode_for_synth(def_name):
     global _SS_RELEASE_MODE_CACHE
     if _SS_RELEASE_MODE_CACHE is None:
         _SS_RELEASE_MODE_CACHE = {}
@@ -48,11 +48,11 @@ def _release_mode_for_synth(synth_name):
                 _SS_RELEASE_MODE_CACHE[name] = mode if mode in ("gate", "free") else "gate"
         except Exception:
             _SS_RELEASE_MODE_CACHE = {}
-    return _SS_RELEASE_MODE_CACHE.get(synth_name, "gate")
+    return _SS_RELEASE_MODE_CACHE.get(def_name, "gate")
 
 
-def _synth_needs_release(synth_name):
-    return _release_mode_for_synth(synth_name) == "gate"
+def _synth_needs_release(def_name):
+    return _release_mode_for_synth(def_name) == "gate"
 
 
 def _gated_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=None):
@@ -61,7 +61,7 @@ def _gated_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=
     new_ev = {
         "type": "new",
         "id": uid,
-        "synthName": synth,
+        "defName": synth,
         "start": start,
         "pfields": pf,
     }
@@ -87,7 +87,7 @@ def _perc_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=N
     new_ev = {
         "type": "new",
         "id": uid,
-        "synthName": synth,
+        "defName": synth,
         "start": start,
         "pfields": pf,
     }
@@ -237,7 +237,7 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfi
                 events.append({
                     "type": "new",
                     "id": _uid(),
-                    "synthName": "__rest__",
+                    "defName": "__rest__",
                     "start": start,
                     "pfields": {},
                     "_stepIndex": step_idx,
@@ -466,7 +466,7 @@ def tonejs_events_to_sc(tone_events):
             rest_ev = {
                 "type": "new",
                 "id": uid,
-                "synthName": "__rest__",
+                "defName": "__rest__",
                 "start": start,
                 "pfields": {},
             }
@@ -488,7 +488,7 @@ def tonejs_events_to_sc(tone_events):
         new_ev = {
             "type": "new",
             "id": uid,
-            "synthName": synth,
+            "defName": synth,
             "start": start,
             "pfields": pfields,
         }

@@ -20,7 +20,7 @@
       this.isPlaying = false;
       this.stopToken = 0;
       this.nodeMap = new Map();
-      this._synthNames = new Map();
+      this._defNames = new Map();
       this._groupId = null;
 
       this._playStartNTP = 0;
@@ -69,12 +69,12 @@
     }
 
     _bundleNew(ev, ntp) {
-      if (ev.synthName === "__rest__") return;
-      var synthName = this._resolveSynthName(ev.synthName);
+      if (ev.defName === "__rest__") return;
+      var defName = this._resolveDefName(ev.defName);
       var nodeId = this.sonic.nextNodeId();
       var target = this._groupId != null ? this._groupId : 0;
-      var args = [synthName, nodeId, 0, target];
-      var pf = this._resolveSynthPfields(synthName, ev.pfields || {});
+      var args = [defName, nodeId, 0, target];
+      var pf = this._resolveDefPfields(defName, ev.pfields || {});
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
         args.push(key, pf[key]);
@@ -82,15 +82,15 @@
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/s_new', args);
       this.sonic.sendOSC(bundle);
       this.nodeMap.set(ev.id, nodeId);
-      this._synthNames.set(ev.id, synthName);
+      this._defNames.set(ev.id, defName);
     }
 
     _bundleSet(ev, ntp) {
       var intId = this.nodeMap.get(ev.id);
       if (intId == null) return;
       var args = [intId];
-      var synthName = this._synthNames.get(ev.id);
-      var pf = this._resolveSynthPfields(synthName, ev.pfields || {});
+      var defName = this._defNames.get(ev.id);
+      var pf = this._resolveDefPfields(defName, ev.pfields || {});
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
         args.push(key, pf[key]);
@@ -111,7 +111,7 @@
       return cur;
     }
 
-    _resolveSynthPfields(synthName, pfields) {
+    _resolveDefPfields(defName, pfields) {
       var out = {};
       for (var key in pfields) {
         if (!pfields.hasOwnProperty(key)) continue;
@@ -120,7 +120,7 @@
         if (typeof val === 'object') continue;
         out[key] = val;
       }
-      var meta = (this.manifest.synths || {})[synthName] || {};
+      var meta = (this.manifest.synths || {})[defName] || {};
       var paths = meta.paths || {};
       for (var srcPath in paths) {
         if (!paths.hasOwnProperty(srcPath)) continue;
@@ -133,7 +133,7 @@
       return out;
     }
 
-    _resolveSynthName(name) {
+    _resolveDefName(name) {
       if (name === "__rest__") return "__rest__";
       if (!name || name === "sonic-pi-beep") return "kl_tri";
       return name;
@@ -142,8 +142,8 @@
     _bundleRelease(ev, ntp) {
       var intId = this.nodeMap.get(ev.id);
       if (intId == null) return;
-      var synthName = this._synthNames.get(ev.id);
-      var meta = (this.manifest.synths || {})[synthName];
+      var defName = this._defNames.get(ev.id);
+      var meta = (this.manifest.synths || {})[defName];
       if (meta && meta.releaseMode === "free") return;
       var gateParam = (meta && meta.gateParam) || 'gate';
       var args = [intId, gateParam, 0];
@@ -259,7 +259,7 @@
       }
 
       this.nodeMap.clear();
-      this._synthNames.clear();
+      this._defNames.clear();
       this.drawScheduler.clear();
 
       if (token !== this.stopToken) return;
@@ -320,7 +320,7 @@
 
       this._freeGroup();
       this.nodeMap.clear();
-      this._synthNames.clear();
+      this._defNames.clear();
       this.drawScheduler.clear();
 
       if (token !== this.stopToken) return;
@@ -412,7 +412,7 @@
       this._cancelAllDeferredRings();
       this._freeGroup();
       this.nodeMap.clear();
-      this._synthNames.clear();
+      this._defNames.clear();
       this.drawScheduler.clear();
     }
   };

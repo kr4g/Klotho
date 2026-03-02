@@ -249,7 +249,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
         if(!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
         var previewAmp = Number(previewCfg.amp);
         if(!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
-        var previewSynth = previewCfg.synthName || "kl_tri";
+        var previewSynth = previewCfg.defName || "kl_tri";
         var previewEngine = previewCfg.engine || "supersonic";
         try{{
             if(typeof globalThis.KlothoPlaybackBridge !== "function"){{
@@ -266,7 +266,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
                 freq: freq,
                 dur: previewDur,
                 amp: previewAmp,
-                synthName: previewSynth
+                defName: previewSynth
             }});
         }}catch(e){{}}
     }}

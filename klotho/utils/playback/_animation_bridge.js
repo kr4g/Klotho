@@ -246,17 +246,17 @@
       if (!Number.isFinite(amp) || amp <= 0) amp = 0.3;
       var dur = Number(params.dur);
       if (!Number.isFinite(dur) || dur <= 0) dur = 1.0;
-      var synthName = (params.synthName || "kl_tri") + "";
+      var defName = (params.defName || "kl_tri") + "";
 
       if (engine === "supersonic") {
         var ready = await _ensureSSReady();
         if (!ready || !_ssSonic || typeof _ssSonic.send !== "function") return false;
         var manifest = (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : { synths: {}, inserts: {} };
-        var meta = (manifest.synths || {})[synthName] || {};
+        var meta = (manifest.synths || {})[defName] || {};
         var releaseMode = ((meta.releaseMode || "gate") + "").toLowerCase();
         var gateParam = meta.gateParam || "gate";
         var nodeId = _ssSonic.nextNodeId();
-        _ssSonic.send("/s_new", synthName, nodeId, 0, 0, "freq", freq, "amp", amp, gateParam, 1);
+        _ssSonic.send("/s_new", defName, nodeId, 0, 0, "freq", freq, "amp", amp, gateParam, 1);
         if (releaseMode !== "free") {
           setTimeout(function() {
             try { _ssSonic.send("/n_set", nodeId, gateParam, 0); } catch(_) {}

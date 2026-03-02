@@ -13,7 +13,7 @@ def normalize_animation_payload_for_engine(audio_payload, engine):
     return audio_payload
 
 
-def _release_mode_for_synth(synth_name):
+def _release_mode_for_synth(def_name):
     global _SS_RELEASE_MODE_CACHE
     if _SS_RELEASE_MODE_CACHE is None:
         _SS_RELEASE_MODE_CACHE = {}
@@ -25,11 +25,11 @@ def _release_mode_for_synth(synth_name):
                 _SS_RELEASE_MODE_CACHE[name] = mode if mode in ("gate", "free") else "gate"
         except Exception:
             _SS_RELEASE_MODE_CACHE = {}
-    return _SS_RELEASE_MODE_CACHE.get(synth_name, "gate")
+    return _SS_RELEASE_MODE_CACHE.get(def_name, "gate")
 
 
-def _synth_needs_release(synth_name):
-    return _release_mode_for_synth(synth_name) == "gate"
+def _synth_needs_release(def_name):
+    return _release_mode_for_synth(def_name) == "gate"
 
 
 def _plan_from_path(freqs, dur, amp=None, pause=0.0):
@@ -121,7 +121,7 @@ def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0):
         events.append({
             "type": "new",
             "id": uid,
-            "synthName": synth,
+            "defName": synth,
             "start": ev["start"],
             "pfields": pfields,
             "_stepIndex": ev["step"],

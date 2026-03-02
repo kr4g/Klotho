@@ -451,7 +451,7 @@ def _static_threejs_html(sd):
                 freq: freq,
                 dur: 1.0,
                 amp: 0.3,
-                synthName: "kl_tri"
+                defName: "kl_tri"
             }});
         }} catch(e) {{}}
     }}

@@ -162,7 +162,7 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
         expanded_voices = lower_event_ir_to_voice_events(event, step_index=step_idx)
         for expanded_voice in expanded_voices:
             pfields = {k: v for k, v in expanded_voice["pfields"].items()
-                       if k not in ('defName', 'synthName', 'group')}
+                       if k != 'group'}
             pfields = _normalize_event_pfields(pfields)
             default_pfields = instruments[routing_key].get('preset', {})
             effective_pfields = _deep_merge(default_pfields, pfields)

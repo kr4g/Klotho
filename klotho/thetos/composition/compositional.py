@@ -64,9 +64,7 @@ def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) 
     for k in pt._meta['pfields']:
         v = pt.get_pfield(node, k)
         if v is None and inst is not None:
-            if k == 'defName' and hasattr(inst, 'defName'):
-                v = inst.defName
-            elif k in inst_pfields:
+            if k in inst_pfields:
                 v = inst_pfields[k]
         pfields[k] = v
     mfields = {k: pt.get_mfield(node, k) for k in pt._meta['mfields']}
@@ -117,7 +115,7 @@ class Parametron(Chronon):
         """
         Get parameter field values for this event (for playback, etc.).
         
-        Returns pfield values with instrument fallback, including defName.
+        Returns pfield values with instrument fallback.
         Use ``get_mfield`` for meta fields to avoid key collisions.
         
         Returns
@@ -129,17 +127,13 @@ class Parametron(Chronon):
         inst = self._resolve_instrument()
         if inst is not None:
             result.update(dict(inst.pfields))
-            if hasattr(inst, 'defName'):
-                result['defName'] = inst.defName
         for k in self._pt._meta['pfields']:
             v = self._pt.get_pfield(self._node_id, k)
             if v is not None:
                 result[k] = v
             elif inst is not None:
                 inst_pfields = inst.pfields
-                if k == 'defName' and hasattr(inst, 'defName'):
-                    result[k] = inst.defName
-                elif k in inst_pfields:
+                if k in inst_pfields:
                     result[k] = inst_pfields[k]
         return result
 

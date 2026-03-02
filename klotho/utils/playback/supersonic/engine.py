@@ -72,8 +72,8 @@ class SuperSonicEngine:
     def _needed_synthdefs(self):
         names = set()
         for ev in self.events:
-            if ev.get("type") == "new" and ev.get("synthName"):
-                name = ev["synthName"]
+            if ev.get("type") == "new" and ev.get("defName"):
+                name = ev["defName"]
                 if name != "__rest__":
                     names.add(name)
         return names
