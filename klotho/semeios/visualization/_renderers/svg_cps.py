@@ -3,12 +3,12 @@ import numpy as np
 from collections import defaultdict
 from html import escape as html_escape
 
-from ._colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
-from ._svg_utils import (
+from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
+from .._shared.svg_utils import (
     SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
     svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
 )
-from ._svg_shared import compute_svg_layout, render_shape_groups, render_tooltip_system, BASE_ARC_OFFSET
+from .._shared.svg_shared import compute_svg_layout, render_shape_groups, render_tooltip_system, BASE_ARC_OFFSET
 
 
 class SvgCPSData(SvgFigureData):
@@ -25,7 +25,7 @@ class SvgCPSData(SvgFigureData):
 def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
              mute_background=False, figsize=(12, 12),
              node_size=30, text_size=12, show_labels=True, title=None,
-             shape=None):
+             shape=None, preview_config=None):
     """
     Build a 2D SVG representation of a Combination Product Set.
 
@@ -336,7 +336,8 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
     has_selection = has_path or has_shape
     tooltip_html = render_tooltip_system(uid, hover_texts,
                                          is_active=is_active_list if has_selection else None,
-                                         node_freqs=node_freqs if has_selection else None)
+                                         node_freqs=node_freqs if has_selection else None,
+                                         preview_config=preview_config)
     svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
     return SvgCPSData(

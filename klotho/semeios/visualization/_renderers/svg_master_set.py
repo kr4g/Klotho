@@ -2,8 +2,8 @@ import math
 import json
 from html import escape as html_escape
 
-from ._svg_utils import SvgFigureData, svg_wrap
-from ._svg_shared import render_tooltip_system
+from .._shared.svg_utils import SvgFigureData, svg_wrap
+from .._shared.svg_shared import render_tooltip_system
 
 
 class SvgMasterSetData(SvgFigureData):

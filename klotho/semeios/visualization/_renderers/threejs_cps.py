@@ -4,7 +4,7 @@ from .threejs_lattice import ThreejsLatticeData
 
 def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
                     node_size=30, text_size=12, show_labels=True,
-                    title=None, nodes=None):
+                    title=None, nodes=None, preview_engine='supersonic'):
     """
     Build a Three.js 3D scene for a Combination Product Set.
 
@@ -126,6 +126,7 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
             'zTicks': [],
             'labels': ['', '', ''],
         },
+        'previewEngine': preview_engine,
     }
 
     return ThreejsLatticeData(

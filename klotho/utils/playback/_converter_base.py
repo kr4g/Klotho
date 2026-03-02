@@ -169,3 +169,25 @@ def lower_event_ir_to_voice_events(event, step_index=None):
         })
 
     return voices
+
+
+def iter_group_sequence(groups, dur, arp=False, strum=0, direction='u', pause=0.0):
+    current_time = 0.0
+    for gi, group in enumerate(groups):
+        values = list(group)
+        if direction.lower() == 'd':
+            values = list(reversed(values))
+
+        if arp:
+            n = len(values)
+            voice_dur = dur / max(1, n)
+            for i, value in enumerate(values):
+                yield gi, i, current_time + i * voice_dur, voice_dur, value
+        else:
+            strum_val = max(0, min(1, strum))
+            num = len(values)
+            for i, value in enumerate(values):
+                start_offset = (strum_val * dur * i) / num if num > 1 else 0
+                yield gi, i, current_time + start_offset, dur - start_offset, value
+
+        current_time += dur + max(0.0, pause)

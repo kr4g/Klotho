@@ -29,12 +29,10 @@ import plotly.graph_objects as go
 import math
 from sklearn.manifold import MDS, SpectralEmbedding
 
-from .plot_rt import _plot_rt
-from .plot_cps import _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions
-from .plot_lattice import _plot_lattice
-from .klotho_plot import KlothoPlot
+from ._dispatch import _plot_rt, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
+from ._dispatch import KlothoPlot
 
-__all__ = ['plot', 'KlothoPlot']
+__all__ = ['plot']
 
 def plot(obj, **kwargs):
     """

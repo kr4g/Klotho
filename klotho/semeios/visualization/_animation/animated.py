@@ -9,7 +9,7 @@ from klotho.utils.playback.tonejs.cdn import (
 from klotho.utils.playback._config import get_audio_engine
 from klotho.utils.playback.animation_events import normalize_animation_payload_for_engine
 
-from ._animation_base import (
+from .base import (
     build_session_preamble, build_control_bar_html,
     build_nav_controls_html, build_scripts_html, build_playback_js,
     build_shape_playback_js,
@@ -37,11 +37,12 @@ class AnimatedLattice3dFigure:
         Seconds between animation steps.
     """
 
-    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None, ring_time=5):
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False):
         self.scene_data = scene_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
+        self.loop = loop
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
 
@@ -72,7 +73,7 @@ class AnimatedLattice3dFigure:
         orbit_cdn = THREEJS_ORBIT_CDN
         trackball_cdn = THREEJS_TRACKBALL_CDN
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time)
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -510,20 +511,25 @@ class AnimatedLattice3dFigure:
         canvas.style.cursor = "default";
     }});
 
-    var _clickCtx3d = null;
-    function _playFreq3d(freq) {{
+    async function _playFreq3d(freq) {{
         if (!freq || freq <= 0) return;
         try {{
-            if (!_clickCtx3d) _clickCtx3d = new (window.AudioContext || window.webkitAudioContext)();
-            if (_clickCtx3d.state === "suspended") _clickCtx3d.resume();
-            var osc = _clickCtx3d.createOscillator();
-            var gain = _clickCtx3d.createGain();
-            osc.type = "sine";
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.3, _clickCtx3d.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, _clickCtx3d.currentTime + 0.6);
-            osc.connect(gain); gain.connect(_clickCtx3d.destination);
-            osc.start(); osc.stop(_clickCtx3d.currentTime + 0.65);
+            if (typeof globalThis.KlothoPlaybackBridge !== "function") {{
+                return;
+            }}
+            var bridge = globalThis.KlothoPlaybackBridge({{
+                engine: "{eng}",
+                audioPayload: null,
+                ringTime: 5
+            }});
+            await bridge.ensureReady();
+            await bridge.resumeAudio();
+            await bridge.preview({{
+                freq: freq,
+                dur: 1.0,
+                amp: 0.3,
+                synthName: "kl_tri"
+            }});
         }} catch(e) {{}}
     }}
     if (_nodeFreqs3d) {{
@@ -616,12 +622,13 @@ class AnimatedRTSvgFigure:
         Enable halo glow on the active leaf node.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, engine=None, ring_time=5):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, engine=None, ring_time=5, loop=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.glow = glow
         self.ring_time = ring_time
+        self.loop = loop
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
@@ -650,7 +657,7 @@ class AnimatedRTSvgFigure:
         converted = _maybe_convert_payload(self.audio_payload, eng)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, engine=eng, ring_time=self.ring_time)
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, engine=eng, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -748,11 +755,12 @@ class AnimatedLatticeSvgFigure:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
+        self.loop = loop
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_slat_{uuid.uuid4().hex[:8]}"
 
@@ -778,7 +786,7 @@ class AnimatedLatticeSvgFigure:
         converted = _maybe_convert_payload(self.audio_payload, eng)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time)
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -899,11 +907,12 @@ class _AnimatedShapeFigureBase:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
+        self.loop = loop
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
 
@@ -934,7 +943,7 @@ class _AnimatedShapeFigureBase:
 
         shape_js = build_shape_playback_js(
             wid, self.dur * 1000, total_groups,
-            engine=eng, ring_time=self.ring_time)
+            engine=eng, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}

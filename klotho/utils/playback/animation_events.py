@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
+from klotho.utils.playback._converter_base import iter_group_sequence
 
 
 _SS_MANIFEST_PATH = Path(__file__).resolve().parent / "supersonic" / "assets" / "manifest.json"
@@ -49,40 +50,21 @@ def _plan_from_path(freqs, dur, amp=None, pause=0.0):
 
 def _plan_from_shape(freq_groups, dur, arp=False, strum=0, direction='u', amp=None, pause=0.25):
     plan = []
-    current_time = 0.0
-
-    for gi, freqs in enumerate(freq_groups):
-        if direction.lower() == 'd':
-            freqs = list(reversed(freqs))
-
-        if arp:
-            n = len(freqs)
-            voice_dur = dur / max(1, n)
-            for i, freq in enumerate(freqs):
-                plan.append({
-                    "start": round(current_time + i * voice_dur, 6),
-                    "duration": voice_dur,
-                    "instrument": "synth",
-                    "freq": round(freq, 4),
-                    "amp": round(single_voice_amplitude(freq, amp), 4),
-                    "step": gi,
-                })
-            current_time += dur + max(0.0, pause)
-        else:
-            num_notes = len(freqs)
-            voice_amps = compute_voice_amplitudes(freqs, amp)
-            strum_val = max(0, min(1, strum))
-            for i, freq in enumerate(freqs):
-                start_offset = (strum_val * dur * i) / num_notes if num_notes > 1 else 0
-                plan.append({
-                    "start": round(current_time + start_offset, 6),
-                    "duration": dur - start_offset,
-                    "instrument": "synth",
-                    "freq": round(freq, 4),
-                    "amp": round(voice_amps[i], 4),
-                    "step": gi,
-                })
-            current_time += dur + max(0.0, pause)
+    group_voice_amps = [
+        compute_voice_amplitudes(group, amp) for group in freq_groups
+    ]
+    for gi, vi, start_time, voice_dur, freq in iter_group_sequence(
+        freq_groups, dur, arp=arp, strum=strum, direction=direction, pause=pause
+    ):
+        amp_value = single_voice_amplitude(freq, amp) if arp else group_voice_amps[gi][vi]
+        plan.append({
+            "start": round(start_time, 6),
+            "duration": voice_dur,
+            "instrument": "synth",
+            "freq": round(freq, 4),
+            "amp": round(amp_value, 4),
+            "step": gi,
+        })
 
     return plan
 

@@ -15,7 +15,7 @@ from klotho.utils.playback._converter_base import (
     DEFAULT_SPECTRUM_DURATION, DEFAULT_DRUM_FREQ,
     KNOWN_KWARGS,
     _get_addressed_collection, _merge_pfields,
-    scale_pitch_sequence, extract_convert_kwargs, lower_event_ir_to_voice_events,
+    scale_pitch_sequence, extract_convert_kwargs, lower_event_ir_to_voice_events, iter_group_sequence,
 )
 
 
@@ -221,7 +221,7 @@ def pitch_collection_to_events(obj, duration=None, mode="seq", arp=False, strum=
         if arp:
             dur = duration if duration is not None else DEFAULT_CHORD_DURATION
             return _payload(_build_seq_events(pitches, 0, "synth", amp=amp,
-                                              total_dur=dur, pause=pause, extra_pfields=extra_pfields))
+                                              total_dur=dur, pause=0.0, extra_pfields=extra_pfields))
         else:
             dur = duration if duration is not None else DEFAULT_CHORD_DURATION
             return _payload(_build_chord_events(pitches, 0, dur, strum, "synth",
@@ -240,7 +240,7 @@ def scale_to_events(obj, duration=None, equaves=1, amp=None, pause=0.0, extra_pf
 
 
 def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u',
-                    amp=None, pause=0.0, extra_pfields=None):
+                    amp=None, extra_pfields=None):
     addressed = _get_addressed_collection(obj)
     pitches = [addressed[i] for i in range(len(addressed))]
 
@@ -250,7 +250,7 @@ def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u',
     if arp:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
         return _payload(_build_seq_events(pitches, 0, "synth", amp=amp,
-                                          total_dur=dur, pause=pause, extra_pfields=extra_pfields))
+                                          total_dur=dur, pause=0.0, extra_pfields=extra_pfields))
     else:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
         return _payload(_build_chord_events(pitches, 0, dur, strum, "synth",
@@ -260,50 +260,48 @@ def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u',
 def chord_sequence_to_events(obj, duration=None, arp=False, strum=0, direction='u',
                              amp=None, pause=0.25, extra_pfields=None):
     events = []
-    current_time = 0.0
+    dur = duration if duration is not None else DEFAULT_CHORD_DURATION
+    groups = []
+    for chord in obj:
+        addressed = _get_addressed_collection(chord)
+        groups.append([addressed[i] for i in range(len(addressed))])
+    group_voice_amps = [
+        compute_voice_amplitudes([p.freq for p in group], amp)
+        for group in groups
+    ]
 
     if arp:
-        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-
-        for chord in obj:
-            addressed = _get_addressed_collection(chord)
-            pitches = [addressed[i] for i in range(len(addressed))]
-            if direction.lower() == 'd':
-                pitches = list(reversed(pitches))
-
-            n = len(pitches)
-            voice_dur = dur / max(1, n)
-            for i, pitch in enumerate(pitches):
-                pf = {
-                    "freq": pitch.freq,
-                    "vel": single_voice_amplitude(pitch.freq, amp),
-                }
-                pf = _merge_pfields(pf, extra_pfields)
-                events.append({
-                    "start": current_time + i * voice_dur,
-                    "duration": voice_dur,
-                    "instrument": "synth",
-                    "pfields": pf,
-                })
-            current_time += dur + max(0.0, pause)
+        for _, _, start, voice_dur, pitch in iter_group_sequence(groups, dur, arp=True, direction=direction, pause=pause):
+            pf = {
+                "freq": pitch.freq,
+                "vel": single_voice_amplitude(pitch.freq, amp),
+            }
+            pf = _merge_pfields(pf, extra_pfields)
+            events.append({
+                "start": start,
+                "duration": voice_dur,
+                "instrument": "synth",
+                "pfields": pf,
+            })
     else:
-        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-
-        for chord in obj:
-            addressed = _get_addressed_collection(chord)
-            pitches = [addressed[i] for i in range(len(addressed))]
-            if direction.lower() == 'd':
-                pitches = list(reversed(pitches))
-
-            events.extend(_build_chord_events(pitches, current_time, dur, strum, "synth",
-                                              amp=amp, dur_factor=1.0, extra_pfields=extra_pfields))
-            current_time += dur + max(0.0, pause)
+        for gi, vi, start, voice_dur, pitch in iter_group_sequence(groups, dur, arp=False, strum=strum, direction=direction, pause=pause):
+            pf = {
+                "freq": pitch.freq,
+                "vel": group_voice_amps[gi][vi],
+            }
+            pf = _merge_pfields(pf, extra_pfields)
+            events.append({
+                "start": start,
+                "duration": voice_dur,
+                "instrument": "synth",
+                "pfields": pf,
+            })
 
     return _payload(events)
 
 
 def spectrum_to_events(obj, duration=None, arp=False, strum=0, direction='u',
-                       amp=None, pause=0.0, extra_pfields=None):
+                       amp=None, extra_pfields=None):
     pitches = [row['pitch'] for _, row in obj.data.iterrows()]
 
     if direction.lower() == 'd':
@@ -313,7 +311,7 @@ def spectrum_to_events(obj, duration=None, arp=False, strum=0, direction='u',
     if arp:
         dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
         return _payload(_build_seq_events(pitches, 0, "sine", amp=target,
-                                          total_dur=dur, pause=pause, extra_pfields=extra_pfields))
+                                          total_dur=dur, pause=0.0, extra_pfields=extra_pfields))
     else:
         dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
         return _payload(_build_chord_events(pitches, 0, dur, strum, "sine",
@@ -460,12 +458,12 @@ def convert_to_events(obj, **kwargs):
 
     if isinstance(obj, Spectrum):
         return spectrum_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                  amp=amp, pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
+                                  amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, HarmonicTree):
         spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
         return spectrum_to_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction,
-                                  amp=amp, pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
+                                  amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, RhythmTree):
         return rhythm_tree_to_events(obj, beat=beat, bpm=bpm, amp=amp, extra_pfields=extra_pfields)
@@ -492,14 +490,14 @@ def convert_to_events(obj, **kwargs):
 
     if isinstance(obj, (Chord, Voicing, Sonority)):
         return chord_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                               amp=amp, pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
+                               amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, PitchCollectionBase):
         effective_mode = mode if mode else "sequential"
         if effective_mode == "chord":
             return pitch_collection_to_events(obj, duration=duration, mode="chord", arp=arp, strum=strum,
                                               direction=direction, amp=amp,
-                                              pause=(0.0 if pause is None else pause),
+                                              pause=0.0,
                                               extra_pfields=extra_pfields)
         return pitch_collection_to_events(obj, duration=duration, mode="sequential",
                                           amp=amp, pause=(0.0 if pause is None else pause),

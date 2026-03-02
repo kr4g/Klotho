@@ -2,8 +2,8 @@ import math
 from fractions import Fraction
 from html import escape as html_escape
 
-from ._svg_utils import SvgFigureData, svg_wrap_viewbox, svg_text
-from ._svg_shared import render_tooltip_system
+from .._shared.svg_utils import SvgFigureData, svg_wrap_viewbox, svg_text
+from .._shared.svg_shared import render_tooltip_system
 
 
 _HALO_NOTE_COLOR = (100, 160, 255)

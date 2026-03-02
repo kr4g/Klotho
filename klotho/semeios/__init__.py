@@ -9,7 +9,6 @@ from .notelists import *
 from . import visualization
 from . import notelists
 
-from .visualization import plots
-from .visualization.plots import *
+from .visualization import plot
 
-__all__ = []
+__all__ = ["plot"]

@@ -55,7 +55,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     SvgRTData or AnimatedRTSvgFigure
         Renderable SVG data or animated figure.
     """
-    from klotho.semeios.visualization.svg_rt import (
+    from .._renderers.svg_rt import (
         _svg_rt_ratios, _svg_rt_containers, _svg_rt_tree,
     )
 
@@ -82,7 +82,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     if not animate:
         return svg_data
 
-    from klotho.semeios.visualization.animated import AnimatedRTSvgFigure
+    from .._animation import AnimatedRTSvgFigure
     from klotho.utils.playback._config import get_audio_engine
     from klotho.chronos.temporal_units.temporal import TemporalUnit as _TemporalUnit
     from klotho.thetos.composition.compositional import CompositionalUnit as _CompositionalUnit
@@ -126,5 +126,7 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         dur=dur,
         glow=glow,
         engine=engine,
+        ring_time=kwargs.get("ring_time", 5),
+        loop=kwargs.get("loop", False),
     )
 

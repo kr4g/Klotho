@@ -2,37 +2,24 @@
 
 import math
 import json
+from pathlib import Path
 from collections import defaultdict
-from html import escape as html_escape
 
-from ._colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
-from ._svg_utils import (
-    svg_radial_halo, svg_arrow_polygon,
-    svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
+from .colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
+from .svg_utils import (
+    svg_radial_halo,
+    svg_arrow_polygon,
+    svg_glow_edge,
+    svg_path_edge,
+    compute_quadratic_bezier_midpoint,
 )
 
 BASE_ARC_OFFSET = 0.15
+_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / "utils" / "playback" / "_animation_bridge.js"
+_ANIMATION_BRIDGE_JS = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
 
 
-def render_path_edges(path, positions_fn, next_eid, path_cmap='viridis'):
-    """Render path edges with bezier curves for overlapping edges.
-
-    Parameters
-    ----------
-    path : list
-        Ordered sequence of keys. *positions_fn(key)* must return
-        ``(data_x, data_y, px, py)`` -- data-space and pixel-space
-        coordinates.
-    next_eid : callable
-        ``next_eid(prefix)`` returns unique SVG element IDs.
-    path_cmap : str
-        Matplotlib colormap name.
-
-    Returns
-    -------
-    tuple
-        ``(path_els, step_group_ids, halo_ids, all_path_el_ids, colors)``
-    """
+def render_path_edges(path, positions_fn, next_eid, path_cmap="viridis"):
     path_els = []
     step_group_ids = []
     halo_ids = []
@@ -54,7 +41,6 @@ def render_path_edges(path, positions_fn, next_eid, path_cmap='viridis'):
 
         x1, y1, px1, py1 = info1
         x2, y2, px2, py2 = info2
-
         path_color_hex = _rgba_to_hex(colors[i])
 
         edge_key = tuple(sorted([key1, key2]))
@@ -83,12 +69,11 @@ def render_path_edges(path, positions_fn, next_eid, path_cmap='viridis'):
             ctrl_x = (x1 + x2) / 2 + side * perp_x * offset_mag
             ctrl_y = (y1 + y2) / 2 + side * perp_y * offset_mag
 
-            cpx = positions_fn._tx(ctrl_x) if hasattr(positions_fn, '_tx') else ctrl_x
-            cpy = positions_fn._ty(ctrl_y) if hasattr(positions_fn, '_ty') else ctrl_y
+            cpx = positions_fn._tx(ctrl_x) if hasattr(positions_fn, "_tx") else ctrl_x
+            cpy = positions_fn._ty(ctrl_y) if hasattr(positions_fn, "_ty") else ctrl_y
 
             svg_d = f"M{px1:.2f},{py1:.2f} Q{cpx:.2f},{cpy:.2f} {px2:.2f},{py2:.2f}"
-            mid_px, mid_py, arrow_angle = compute_quadratic_bezier_midpoint(
-                px1, py1, cpx, cpy, px2, py2)
+            mid_px, mid_py, arrow_angle = compute_quadratic_bezier_midpoint(px1, py1, cpx, cpy, px2, py2)
 
         glow_id = next_eid("pg")
         edge_id = next_eid("pe")
@@ -129,24 +114,6 @@ def render_path_edges(path, positions_fn, next_eid, path_cmap='viridis'):
 
 
 def render_shape_groups(shape_groups, edge_set_fn, positions_fn, next_eid):
-    """Render shape (chord) group edges.
-
-    Parameters
-    ----------
-    shape_groups : list of list
-        Groups of node keys.
-    edge_set_fn : callable
-        ``edge_set_fn(n1, n2)`` returns True if an edge exists.
-    positions_fn : callable
-        ``positions_fn(key)`` returns ``(px, py)`` or ``None``.
-    next_eid : callable
-        Unique ID generator.
-
-    Returns
-    -------
-    tuple
-        ``(shape_els, group_edge_ids, all_shape_el_ids, used_colors, node_colors_map)``
-    """
     shape_els = []
     group_edge_ids_list = []
     all_shape_el_ids = []
@@ -161,7 +128,7 @@ def render_shape_groups(shape_groups, edge_set_fn, positions_fn, next_eid):
             node_colors_map[n] = color
 
         for i, n1 in enumerate(group):
-            for n2 in group[i + 1:]:
+            for n2 in group[i + 1 :]:
                 if not edge_set_fn(n1, n2):
                     continue
                 pos1 = positions_fn(n1)
@@ -184,23 +151,15 @@ def render_shape_groups(shape_groups, edge_set_fn, positions_fn, next_eid):
     return shape_els, group_edge_ids_list, all_shape_el_ids, used_colors, node_colors_map
 
 
-def compute_svg_layout(positions_dict_or_list, figsize, margin_left=20, margin_right=20,
-                       margin_top=50, margin_bottom=20, pad_fraction=0.15):
-    """Compute SVG viewport and coordinate transforms.
-
-    Parameters
-    ----------
-    positions_dict_or_list : dict or list
-        Either ``{key: (x, y)}`` or a flat list of ``(x, y)`` tuples.
-    figsize : tuple of float
-        ``(width_inches, height_inches)`` at 100 dpi.
-
-    Returns
-    -------
-    dict
-        ``width_px``, ``height_px``, ``tx``, ``ty``, ``ox``, ``oy``,
-        ``actual_w``, ``actual_h``.
-    """
+def compute_svg_layout(
+    positions_dict_or_list,
+    figsize,
+    margin_left=20,
+    margin_right=20,
+    margin_top=50,
+    margin_bottom=20,
+    pad_fraction=0.15,
+):
     if isinstance(positions_dict_or_list, dict):
         xs = [pos[0] for pos in positions_dict_or_list.values()]
         ys = [pos[1] for pos in positions_dict_or_list.values()]
@@ -246,48 +205,25 @@ def compute_svg_layout(positions_dict_or_list, figsize, margin_left=20, margin_r
         return oy + actual_h - (val - data_y_min) / data_h * actual_h
 
     return {
-        'width_px': width_px,
-        'height_px': height_px,
-        'tx': tx,
-        'ty': ty,
-        'ox': ox,
-        'oy': oy,
-        'actual_w': actual_w,
-        'actual_h': actual_h,
+        "width_px": width_px,
+        "height_px": height_px,
+        "tx": tx,
+        "ty": ty,
+        "ox": ox,
+        "oy": oy,
+        "actual_w": actual_w,
+        "actual_h": actual_h,
     }
 
 
-def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None):
-    """Generate a tooltip div + JS for instant mouseover and click-to-play.
-
-    Each node ``<circle>`` should have ``data-idx="N"`` and
-    ``data-tip-uid="<svg_uid>"`` set by the caller instead of a child
-    ``<title>`` element.
-
-    Parameters
-    ----------
-    svg_uid : str
-        Unique identifier prefix matching the SVG container's ID
-        namespace.
-    hover_texts : list of str
-        Per-node tooltip strings (index corresponds to ``data-idx``).
-    is_active : list of bool or None
-        Per-node active/inactive flag for styling.  ``None`` means all
-        nodes use the default (dark-bg) style.
-    node_freqs : list of float or None
-        Per-node frequency in Hz for click-to-play.  ``None`` disables
-        click-to-play entirely.
-
-    Returns
-    -------
-    str
-        HTML + JS snippet to append after the ``</svg>`` closing tag.
-    """
+def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None, preview_config=None):
     data_json = json.dumps(hover_texts)
     active_json = json.dumps(is_active) if is_active is not None else "null"
     freqs_json = json.dumps(node_freqs) if node_freqs is not None else "null"
+    preview_json = json.dumps(preview_config or {})
 
-    return f'''<div id="{svg_uid}_tip" style="
+    return f"""<script>{_ANIMATION_BRIDGE_JS}</script>
+<div id="{svg_uid}_tip" style="
     display:none;position:absolute;pointer-events:none;
     background:rgba(30,30,30,0.92);color:#eee;font-family:monospace;
     font-size:11px;padding:6px 10px;border-radius:4px;
@@ -299,6 +235,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None)
     var data={data_json};
     var active={active_json};
     var freqs={freqs_json};
+    var previewCfg={preview_json};
     var tip=document.getElementById("{svg_uid}_tip");
     if(!tip){{ setTimeout(_klothoTip_{svg_uid},50); return; }}
     var wrap=tip.parentElement;
@@ -306,20 +243,31 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None)
     var circles=document.querySelectorAll("[data-tip-uid='{svg_uid}']");
     if(!circles.length){{ setTimeout(_klothoTip_{svg_uid},50); return; }}
 
-    var _clickCtx=null;
-    function _playFreq(freq){{
+    async function _playFreq(freq){{
         if(!freq||freq<=0) return;
+        var previewDur = Number(previewCfg.dur);
+        if(!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
+        var previewAmp = Number(previewCfg.amp);
+        if(!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
+        var previewSynth = previewCfg.synthName || "kl_tri";
+        var previewEngine = previewCfg.engine || "supersonic";
         try{{
-            if(!_clickCtx) _clickCtx=new (window.AudioContext||window.webkitAudioContext)();
-            if(_clickCtx.state==="suspended") _clickCtx.resume();
-            var osc=_clickCtx.createOscillator();
-            var gain=_clickCtx.createGain();
-            osc.type="sine";
-            osc.frequency.value=freq;
-            gain.gain.setValueAtTime(0.3,_clickCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001,_clickCtx.currentTime+0.6);
-            osc.connect(gain);gain.connect(_clickCtx.destination);
-            osc.start();osc.stop(_clickCtx.currentTime+0.65);
+            if(typeof globalThis.KlothoPlaybackBridge !== "function"){{
+                return;
+            }}
+            var bridge = globalThis.KlothoPlaybackBridge({{
+                engine: previewEngine,
+                audioPayload: null,
+                ringTime: 5
+            }});
+            await bridge.ensureReady();
+            await bridge.resumeAudio();
+            await bridge.preview({{
+                freq: freq,
+                dur: previewDur,
+                amp: previewAmp,
+                synthName: previewSynth
+            }});
         }}catch(e){{}}
     }}
 
@@ -357,4 +305,4 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None)
         }}
     }});
 }})();
-</script>'''
+</script>"""

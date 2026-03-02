@@ -174,7 +174,13 @@
 
     async function play(events, options) {
       options = options || {};
-      var loop = !!options.loop;
+      var loopInfinite = false;
+      var loopFinite = 0;
+      if (options.loop === true) {
+        loopInfinite = true;
+      } else if (typeof options.loop === "number" && Number.isFinite(options.loop) && options.loop > 1) {
+        loopFinite = Math.floor(options.loop);
+      }
       var onEvent = options.onEvent || null;
       var onFinish = options.onFinish || null;
 
@@ -184,19 +190,21 @@
           if (onFinish) onFinish();
           return;
         }
-        var first = true;
-        function playOnce() {
-          _ssScheduler.play(evts, {
-            _skipStop: !first,
+        if ((loopInfinite || loopFinite > 0) && typeof _ssScheduler.playLoop === "function") {
+          _ssScheduler.playLoop(evts, {
+            tailPause: _pause,
+            finiteCycles: loopFinite > 0 ? loopFinite : null,
             onEvent: onEvent || function(){},
-            onFinish: function() {
-              if (loop) playOnce();
-              else if (onFinish) onFinish();
-            }
+            onFinish: onFinish || null,
           });
-          first = false;
+          return;
         }
-        playOnce();
+
+        _ssScheduler.play(evts, {
+          tailPause: _pause,
+          onEvent: onEvent || function(){},
+          onFinish: onFinish || null,
+        });
         return;
       }
 
@@ -205,12 +213,85 @@
         if (onFinish) onFinish();
         return;
       }
+      if (loopFinite > 0) {
+        var remaining = loopFinite;
+        var playFiniteToneCycle = async function() {
+          await _aPlayer.play(toneEvts, _aInstruments, {
+            loop: false,
+            onEvent: onEvent || function(){},
+            onStop: function() {},
+            onFinish: async function() {
+              remaining -= 1;
+              if (remaining > 0) await playFiniteToneCycle();
+              else if (onFinish) onFinish();
+            },
+          });
+        };
+        await playFiniteToneCycle();
+        return;
+      }
       await _aPlayer.play(toneEvts, _aInstruments, {
-        loop: loop,
+        loop: loopInfinite,
         onEvent: onEvent || function(){},
         onStop: function() { if (onFinish) onFinish(); },
         onFinish: function() { if (onFinish) onFinish(); },
       });
+    }
+
+    async function preview(params) {
+      params = params || {};
+      var freq = Number(params.freq);
+      if (!Number.isFinite(freq) || freq <= 0) return false;
+      var amp = Number(params.amp);
+      if (!Number.isFinite(amp) || amp <= 0) amp = 0.3;
+      var dur = Number(params.dur);
+      if (!Number.isFinite(dur) || dur <= 0) dur = 1.0;
+      var synthName = (params.synthName || "kl_tri") + "";
+
+      if (engine === "supersonic") {
+        var ready = await _ensureSSReady();
+        if (!ready || !_ssSonic || typeof _ssSonic.send !== "function") return false;
+        var manifest = (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : { synths: {}, inserts: {} };
+        var meta = (manifest.synths || {})[synthName] || {};
+        var releaseMode = ((meta.releaseMode || "gate") + "").toLowerCase();
+        var gateParam = meta.gateParam || "gate";
+        var nodeId = _ssSonic.nextNodeId();
+        _ssSonic.send("/s_new", synthName, nodeId, 0, 0, "freq", freq, "amp", amp, gateParam, 1);
+        if (releaseMode !== "free") {
+          setTimeout(function() {
+            try { _ssSonic.send("/n_set", nodeId, gateParam, 0); } catch(_) {}
+          }, Math.max(1, Math.round(dur * 1000)));
+        }
+        return true;
+      }
+
+      if (engine === "tone") {
+        if (typeof Tone === "undefined") return false;
+        try {
+          if (Tone.context && Tone.context.state === "suspended") {
+            try { await Tone.start(); } catch(_) {}
+            try { await Tone.context.resume(); } catch(_) {}
+          }
+          var synth = new Tone.Synth({
+            oscillator: { type: "sine" },
+            envelope: {
+              attack: 0.001,
+              decay: 0.01,
+              sustain: 1.0,
+              release: Math.max(0.01, dur),
+            },
+          }).toDestination();
+          synth.triggerAttackRelease(freq, dur, undefined, Math.min(1, Math.max(0, amp)));
+          setTimeout(function() {
+            try { synth.dispose(); } catch(_) {}
+          }, Math.max(20, Math.round((dur + 0.2) * 1000)));
+          return true;
+        } catch(_) {
+          return false;
+        }
+      }
+
+      return false;
     }
 
     return {
@@ -221,6 +302,7 @@
       stop: stop,
       resumeAudio: resumeAudio,
       play: play,
+      preview: preview,
       getEvents: function() { return engine === "supersonic" ? _scEvents() : _toneEvents(); },
       filterEventsForGroup: filterEventsForGroup,
       reorderEventsFrom: reorderEventsFrom,

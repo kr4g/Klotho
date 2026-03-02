@@ -5,7 +5,7 @@ from sklearn.manifold import MDS, SpectralEmbedding
 
 from klotho.topos.graphs.lattices import Lattice
 
-from ._colors import SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
+from .._shared.colors import SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
 
 
 def _coerce_to_tuples(items):
@@ -251,6 +251,8 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                               figsize, node_size, title, path_cmap,
                               dur, arp, strum, direction, amp, kwargs):
     has_shape = len(lattice_shape_groups) > 0
+    from klotho.utils.playback._config import get_audio_engine
+    engine_name = get_audio_engine()
 
     svg_threejs_kwargs = dict(
         lattice=lattice, coords=coords, G=G, path=path, nodes=None,
@@ -265,7 +267,12 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
     )
 
     if path and len(path) > 1:
-        from klotho.utils.playback._config import get_audio_engine
+        preview_config = {
+            "dur": kwargs.get("dur", dur) if kwargs else dur,
+            "amp": kwargs.get("amp", amp) if kwargs else amp,
+            "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "engine": engine_name,
+        }
         from klotho.utils.playback.animation_events import build_path_engine_payload
 
         ref_freq = 261.63
@@ -276,33 +283,42 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                 freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
             except Exception:
                 freqs.append(ref_freq)
-        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
         audio_payload = build_path_engine_payload(
             freqs,
             dur,
-            engine=get_audio_engine(),
+            engine=engine_name,
             amp=amp,
             extra_pfields=extra_synth_kwargs,
             pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
         )
 
         if effective_dimensionality <= 2:
-            from .animated import AnimatedLatticeSvgFigure
-            from .svg_lattice import _svg_lattice_2d
-            svg_data = _svg_lattice_2d(**svg_threejs_kwargs)
+            from .._animation import AnimatedLatticeSvgFigure
+            from .._renderers.svg_lattice import _svg_lattice_2d
+            svg_data = _svg_lattice_2d(**svg_threejs_kwargs, preview_config=preview_config)
             return AnimatedLatticeSvgFigure(
-                svg_data=svg_data, audio_payload=audio_payload, dur=dur
+                svg_data=svg_data, audio_payload=audio_payload, dur=dur,
+                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+                loop=kwargs.get("loop", False) if kwargs else False,
             )
         else:
-            from .animated import AnimatedLattice3dFigure
-            from .threejs_lattice import _threejs_lattice_3d
-            threejs_data = _threejs_lattice_3d(**svg_threejs_kwargs)
+            from .._animation import AnimatedLattice3dFigure
+            from .._renderers.threejs_lattice import _threejs_lattice_3d
+            threejs_data = _threejs_lattice_3d(**svg_threejs_kwargs, preview_engine=engine_name)
             return AnimatedLattice3dFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur
+                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
+                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+                loop=kwargs.get("loop", False) if kwargs else False,
             )
 
     if has_shape:
-        from klotho.utils.playback._config import get_audio_engine
+        preview_config = {
+            "dur": kwargs.get("dur", dur) if kwargs else dur,
+            "amp": kwargs.get("amp", amp) if kwargs else amp,
+            "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "engine": engine_name,
+        }
         from klotho.utils.playback.animation_events import build_shape_engine_payload
 
         ref_freq = 261.63
@@ -317,11 +333,11 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                     group_freqs.append(ref_freq)
             freq_groups.append(group_freqs)
 
-        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
         audio_payload = build_shape_engine_payload(
             freq_groups,
             dur,
-            engine=get_audio_engine(),
+            engine=engine_name,
             arp=arp,
             strum=strum,
             direction=direction,
@@ -331,11 +347,13 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
         )
 
         if effective_dimensionality <= 2:
-            from .animated import AnimatedLatticeShapeFigure
-            from .svg_lattice import _svg_lattice_2d
-            svg_data = _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups)
+            from .._animation import AnimatedLatticeShapeFigure
+            from .._renderers.svg_lattice import _svg_lattice_2d
+            svg_data = _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups, preview_config=preview_config)
             return AnimatedLatticeShapeFigure(
-                svg_data=svg_data, audio_payload=audio_payload, dur=dur
+                svg_data=svg_data, audio_payload=audio_payload, dur=dur,
+                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+                loop=kwargs.get("loop", False) if kwargs else False,
             )
 
     return None
@@ -471,8 +489,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         )
     )
 
-    from .svg_lattice import _svg_lattice_2d
-    from .threejs_lattice import _threejs_lattice_3d
+    from .._renderers.svg_lattice import _svg_lattice_2d
+    from .._renderers.threejs_lattice import _threejs_lattice_3d
+    from klotho.utils.playback._config import get_audio_engine
 
     svg_threejs_kwargs = dict(
         lattice=lattice, coords=coords, G=G, path=path, nodes=nodes,
@@ -485,12 +504,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         coord_label=coord_label, gen_labels=gen_labels,
         path_cmap=path_cmap,
     )
+    preview_engine = get_audio_engine()
 
     if not animate:
         if effective_dimensionality <= 2:
             return _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups if lattice_shape_groups else None)
         else:
-            return _threejs_lattice_3d(**svg_threejs_kwargs)
+            return _threejs_lattice_3d(**svg_threejs_kwargs, preview_engine=preview_engine)
 
     animated_fig = _setup_lattice_animation(
         lattice, coords, G, original_coords, coord_mapping,
@@ -507,4 +527,4 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
 
     if effective_dimensionality <= 2:
         return _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups if lattice_shape_groups else None)
-    return _threejs_lattice_3d(**svg_threejs_kwargs)
+    return _threejs_lattice_3d(**svg_threejs_kwargs, preview_engine=preview_engine)

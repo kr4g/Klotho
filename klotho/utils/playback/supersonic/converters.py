@@ -16,7 +16,7 @@ from klotho.utils.playback._converter_base import (
     DEFAULT_SPECTRUM_DURATION, DEFAULT_DRUM_FREQ,
     KNOWN_KWARGS, perc_env_pfields,
     _get_addressed_collection, _merge_pfields,
-    scale_pitch_sequence, extract_convert_kwargs,
+    scale_pitch_sequence, extract_convert_kwargs, iter_group_sequence,
 )
 from klotho.utils.playback._sc_assembly import (
     lower_compositional_ir_to_sc_assembly,
@@ -127,7 +127,7 @@ def pitch_collection_to_sc_events(obj, duration=None, mode="seq", arp=False, str
         if arp:
             dur = duration if duration is not None else DEFAULT_CHORD_DURATION
             return _build_seq_sc_events(pitches, 0, synth=DEFAULT_COLLECTION_SYNTH, amp=amp,
-                                        total_dur=dur, pause=pause, extra_pfields=extra_pfields)
+                                        total_dur=dur, pause=0.0, extra_pfields=extra_pfields)
         else:
             dur = duration if duration is not None else DEFAULT_CHORD_DURATION
             return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_COLLECTION_SYNTH,
@@ -146,7 +146,7 @@ def scale_to_sc_events(obj, duration=None, equaves=1, amp=None, pause=0.0, extra
 
 
 def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
-                       amp=None, pause=0.0, extra_pfields=None):
+                       amp=None, extra_pfields=None):
     addressed = _get_addressed_collection(obj)
     pitches = [addressed[i] for i in range(len(addressed))]
 
@@ -156,7 +156,7 @@ def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
     if arp:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
         return _build_seq_sc_events(pitches, 0, synth=DEFAULT_COLLECTION_SYNTH, amp=amp,
-                                    total_dur=dur, pause=pause, extra_pfields=extra_pfields)
+                                    total_dur=dur, pause=0.0, extra_pfields=extra_pfields)
     else:
         dur = duration if duration is not None else DEFAULT_CHORD_DURATION
         return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_COLLECTION_SYNTH,
@@ -166,54 +166,38 @@ def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
 def chord_sequence_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
                                 amp=None, pause=0.25, extra_pfields=None):
     events = []
-    current_time = 0.0
-    step = 0
+    dur = duration if duration is not None else DEFAULT_CHORD_DURATION
+    groups = []
+    for chord in obj:
+        addressed = _get_addressed_collection(chord)
+        groups.append([addressed[i] for i in range(len(addressed))])
+    group_voice_amps = [
+        compute_voice_amplitudes([p.freq for p in group], amp)
+        for group in groups
+    ]
 
     if arp:
-        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-        for chord in obj:
-            addressed = _get_addressed_collection(chord)
-            pitches = [addressed[i] for i in range(len(addressed))]
-            if direction.lower() == 'd':
-                pitches = list(reversed(pitches))
-            n = len(pitches)
-            voice_dur = dur / max(1, n)
-            for i, p in enumerate(pitches):
-                uid = _uid()
-                events.extend(_gated_note(uid, DEFAULT_COLLECTION_SYNTH, current_time + i * voice_dur,
-                    voice_dur, {
-                        "freq": p.freq,
-                        "amp": single_voice_amplitude(p.freq, amp),
-                    }, step_index=step, extra_pfields=extra_pfields))
-            current_time += dur + max(0.0, pause)
-            step += 1
+        for gi, _, start_time, voice_dur, p in iter_group_sequence(groups, dur, arp=True, direction=direction, pause=pause):
+            uid = _uid()
+            events.extend(_gated_note(uid, DEFAULT_COLLECTION_SYNTH, start_time,
+                voice_dur, {
+                    "freq": p.freq,
+                    "amp": single_voice_amplitude(p.freq, amp),
+                }, step_index=gi, extra_pfields=extra_pfields))
     else:
-        dur = duration if duration is not None else DEFAULT_CHORD_DURATION
-        for chord in obj:
-            addressed = _get_addressed_collection(chord)
-            pitches = [addressed[i] for i in range(len(addressed))]
-            if direction.lower() == 'd':
-                pitches = list(reversed(pitches))
-            freqs = [p.freq for p in pitches]
-            voice_amps = compute_voice_amplitudes(freqs, amp)
-            strum_val = max(0, min(1, strum))
-            num = len(pitches)
-            for i, p in enumerate(pitches):
-                uid = _uid()
-                start_offset = (strum_val * dur * i) / num if num > 1 else 0
-                events.extend(_gated_note(uid, DEFAULT_COLLECTION_SYNTH, current_time + start_offset,
-                    dur - start_offset, {
-                        "freq": p.freq,
-                        "amp": voice_amps[i],
-                    }, step_index=step, extra_pfields=extra_pfields))
-            current_time += dur + max(0.0, pause)
-            step += 1
+        for gi, vi, start_time, voice_dur, p in iter_group_sequence(groups, dur, arp=False, strum=strum, direction=direction, pause=pause):
+            uid = _uid()
+            events.extend(_gated_note(uid, DEFAULT_COLLECTION_SYNTH, start_time,
+                voice_dur, {
+                    "freq": p.freq,
+                    "amp": group_voice_amps[gi][vi],
+                }, step_index=gi, extra_pfields=extra_pfields))
 
     return events
 
 
 def spectrum_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
-                          amp=None, pause=0.0, extra_pfields=None):
+                          amp=None, extra_pfields=None):
     pitches = [row['pitch'] for _, row in obj.data.iterrows()]
     if direction.lower() == 'd':
         pitches = list(reversed(pitches))
@@ -222,7 +206,7 @@ def spectrum_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
     if arp:
         dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
         return _build_seq_sc_events(pitches, 0, synth=DEFAULT_SPECTRUM_SYNTH, amp=target,
-                                    total_dur=dur, pause=pause, extra_pfields=extra_pfields)
+                                    total_dur=dur, pause=0.0, extra_pfields=extra_pfields)
     else:
         dur = duration if duration is not None else DEFAULT_SPECTRUM_DURATION
         return _build_chord_sc_events(pitches, 0, dur, strum, DEFAULT_SPECTRUM_SYNTH,
@@ -413,12 +397,12 @@ def convert_to_sc_events(obj, **kwargs):
 
     if isinstance(obj, Spectrum):
         return spectrum_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                    amp=amp, pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
+                                    amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, HarmonicTree):
         spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
         return spectrum_to_sc_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction,
-                                    amp=amp, pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
+                                    amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, RhythmTree):
         return rhythm_tree_to_sc_events(obj, beat=beat, bpm=bpm, amp=amp, extra_pfields=extra_pfields)
@@ -445,14 +429,14 @@ def convert_to_sc_events(obj, **kwargs):
 
     if isinstance(obj, (Chord, Voicing, Sonority)):
         return chord_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                  amp=amp, pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
+                                  amp=amp, extra_pfields=extra_pfields)
 
     if isinstance(obj, PitchCollectionBase):
         effective_mode = mode if mode else "sequential"
         if effective_mode == "chord":
             return pitch_collection_to_sc_events(obj, duration=duration, mode="chord", arp=arp, strum=strum,
                                                  direction=direction, amp=amp,
-                                                 pause=(0.0 if pause is None else pause),
+                                                 pause=0.0,
                                                  extra_pfields=extra_pfields)
         return pitch_collection_to_sc_events(obj, duration=duration, mode="sequential",
                                              amp=amp, pause=(0.0 if pause is None else pause),

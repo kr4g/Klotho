@@ -10,7 +10,15 @@ _PLAYBACK_JS_PATH = Path(__file__).parent / '_playback.js'
 _SHAPE_PLAYBACK_JS_PATH = Path(__file__).parent / '_shape_playback.js'
 _PLAYBACK_JS_TEMPLATE = None
 _SHAPE_PLAYBACK_JS_TEMPLATE = None
-_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / '_animation_bridge.js'
+_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / '_animation_bridge.js'
+
+
+def normalize_loop_policy(loop):
+    if isinstance(loop, bool):
+        return ("infinite", 0, loop)
+    if isinstance(loop, int) and loop > 1:
+        return ("finite", int(loop), True)
+    return ("infinite", 0, False)
 
 
 def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False,
@@ -100,26 +108,34 @@ def build_scripts_html(instruments_js, player_js):
 <script>{bridge_js}</script>'''
 
 
-def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring_time=5):
+def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring_time=5, loop=False):
     global _PLAYBACK_JS_TEMPLATE
     if _PLAYBACK_JS_TEMPLATE is None:
         _PLAYBACK_JS_TEMPLATE = _PLAYBACK_JS_PATH.read_text()
     boundary_op = ">" if use_gt_for_boundary else ">="
+    loop_mode, loop_count, loop_enabled = normalize_loop_policy(loop)
     return (_PLAYBACK_JS_TEMPLATE
             .replace('__WID__', wid)
             .replace('__DUR_MS__', str(dur_ms))
             .replace('__BOUNDARY_OP__', boundary_op)
             .replace('__ENGINE_TYPE__', engine)
-            .replace('__RING_TIME__', str(ring_time)))
+            .replace('__RING_TIME__', str(ring_time))
+            .replace('__LOOP_MODE__', loop_mode)
+            .replace('__LOOP_COUNT__', str(loop_count))
+            .replace('__LOOP_ENABLED__', 'true' if loop_enabled else 'false'))
 
 
-def build_shape_playback_js(wid, dur_ms, total_groups, engine="tone", ring_time=5):
+def build_shape_playback_js(wid, dur_ms, total_groups, engine="tone", ring_time=5, loop=False):
     global _SHAPE_PLAYBACK_JS_TEMPLATE
     if _SHAPE_PLAYBACK_JS_TEMPLATE is None:
         _SHAPE_PLAYBACK_JS_TEMPLATE = _SHAPE_PLAYBACK_JS_PATH.read_text()
+    loop_mode, loop_count, loop_enabled = normalize_loop_policy(loop)
     return (_SHAPE_PLAYBACK_JS_TEMPLATE
             .replace('__WID__', wid)
             .replace('__DUR_MS__', str(dur_ms))
             .replace('__TOTAL_GROUPS__', str(total_groups))
             .replace('__ENGINE_TYPE__', engine)
-            .replace('__RING_TIME__', str(ring_time)))
+            .replace('__RING_TIME__', str(ring_time))
+            .replace('__LOOP_MODE__', loop_mode)
+            .replace('__LOOP_COUNT__', str(loop_count))
+            .replace('__LOOP_ENABLED__', 'true' if loop_enabled else 'false'))

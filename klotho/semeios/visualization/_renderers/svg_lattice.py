@@ -3,12 +3,12 @@ import numpy as np
 from collections import defaultdict
 from html import escape as html_escape
 
-from ._colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
-from ._svg_utils import (
+from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
+from .._shared.svg_utils import (
     SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
     svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
 )
-from ._svg_shared import render_tooltip_system
+from .._shared.svg_shared import render_tooltip_system
 
 
 class SvgLatticeData(SvgFigureData):
@@ -27,7 +27,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                     effective_dimensionality, use_dimmed, mute_background,
                     path_mode, figsize, node_size, title,
                     is_tone_lattice, coord_label, gen_labels,
-                    path_cmap='viridis', shape=None):
+                    path_cmap='viridis', shape=None, preview_config=None):
     """
     Build a 2D SVG representation of a lattice.
 
@@ -593,7 +593,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     has_selection = has_path or has_shape or (nodes and len(nodes) > 0)
     tooltip_html = render_tooltip_system(uid, hover_texts,
                                          is_active=is_active_list if use_dimmed else None,
-                                         node_freqs=node_freqs if has_selection else None)
+                                         node_freqs=node_freqs if has_selection else None,
+                                         preview_config=preview_config)
     svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
     return SvgLatticeData(

@@ -1,12 +1,19 @@
 // Shared playback controller for animated Klotho figures.
-// Python replaces placeholders: __WID__, __DUR_MS__, __BOUNDARY_OP__, __ENGINE_TYPE__
+// Python replaces placeholders: __WID__, __DUR_MS__, __BOUNDARY_OP__, __ENGINE_TYPE__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
 // Caller must define: audioPayload, totalSteps, onStep, onBeforePlay, onReset
 
 var toggleBtn = document.getElementById("__WID___toggle");
 var iconEl    = document.getElementById("__WID___icon");
 var loopBtn   = document.getElementById("__WID___loop");
 var loopSvg   = document.getElementById("__WID___loop_svg");
-var looping = false, playing = false;
+var playing = false;
+var loopMode = "__LOOP_MODE__";
+var loopCount = Number("__LOOP_COUNT__");
+if (!Number.isFinite(loopCount)) loopCount = 0;
+var loopEnabled = "__LOOP_ENABLED__" === "true";
+var loopInfinite = loopMode === "infinite";
+var loopFiniteCount = loopMode === "finite" ? Math.max(2, Math.floor(loopCount)) : 0;
+var loopCyclesRemaining = loopFiniteCount;
 var engineType = "__ENGINE_TYPE__";
 var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
     ? globalThis.KlothoPlaybackBridge({
@@ -31,10 +38,24 @@ function setStopIcon() {
         + "margin-left:0;background:#ef4444";
 }
 
+function _setLoopUi() {
+    if (loopMode === "off") {
+        loopBtn.style.opacity = "0.3";
+        loopBtn.style.cursor = "not-allowed";
+        loopSvg.setAttribute("stroke", "#666");
+        return;
+    }
+    loopBtn.style.opacity = loopEnabled ? "1" : "0.5";
+    loopBtn.style.cursor = "pointer";
+    loopSvg.setAttribute("stroke", loopEnabled ? "#4ade80" : "#a0a0a0");
+}
+_setLoopUi();
+
 loopBtn.onclick = function() {
-    looping = !looping;
-    loopBtn.style.opacity = looping ? "1" : "0.5";
-    loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
+    if (loopMode === "off") return;
+    loopEnabled = !loopEnabled;
+    if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
+    _setLoopUi();
 };
 
 var _timerId = null;
@@ -43,7 +64,8 @@ var durMs = __DUR_MS__;
 function _runAnimation(stepIdx) {
     if (!playing) return;
     if (stepIdx __BOUNDARY_OP__ totalSteps) {
-        if (looping) {
+        if (loopEnabled && (loopInfinite || loopCyclesRemaining > 1)) {
+            if (!loopInfinite) loopCyclesRemaining -= 1;
             onBeforePlay();
             _timerId = setTimeout(function(){ _runAnimation(0); }, durMs);
         } else { finishPlayback(); }
@@ -74,7 +96,7 @@ toggleBtn.onclick = async function() {
         setStopIcon();
         onBeforePlay();
         await bridge.play(null, {
-            loop: looping,
+            loop: loopEnabled ? (loopInfinite ? true : loopFiniteCount) : false,
             onEvent: function(stepIdx) { if (playing) onStep(stepIdx); },
             onFinish: function() { finishPlayback(); },
         });
@@ -82,6 +104,7 @@ toggleBtn.onclick = async function() {
         playing = true;
         setStopIcon();
         onBeforePlay();
+        if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
         _runAnimation(0);
     }
 };

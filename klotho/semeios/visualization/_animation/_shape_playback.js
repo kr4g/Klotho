@@ -1,5 +1,5 @@
 // Shape playback controller for animated Klotho shape figures.
-// Python replaces: __WID__, __DUR_MS__, __ENGINE_TYPE__, __RING_TIME__, __TOTAL_GROUPS__
+// Python replaces: __WID__, __DUR_MS__, __ENGINE_TYPE__, __RING_TIME__, __TOTAL_GROUPS__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
 // Caller must define: groupNodeIndices, groupEdgeIds, shapeColors,
 //                     allShapeEdgeIds, allNodeIds, dimmedColor, audioPayload
 
@@ -12,12 +12,25 @@ var nextBtn   = document.getElementById("__WID___next");
 var counterEl = document.getElementById("__WID___counter");
 var soloBox   = document.getElementById("__WID___solo");
 
-var looping = false, playing = false;
+var playing = false;
+var loopMode = "__LOOP_MODE__";
+var loopCount = Number("__LOOP_COUNT__");
+if (!Number.isFinite(loopCount)) loopCount = 0;
+var loopEnabled = "__LOOP_ENABLED__" === "true";
+var loopInfinite = loopMode === "infinite";
+var loopFiniteCount = loopMode === "finite" ? Math.max(2, Math.floor(loopCount)) : 0;
+var loopCyclesRemaining = loopFiniteCount;
 var currentView = 0;
 var playbackOrigin = 0;
 var engineType = "__ENGINE_TYPE__";
 var totalGroups = __TOTAL_GROUPS__;
 var durMs = __DUR_MS__;
+var pauseMs = 0;
+if (audioPayload && typeof audioPayload === "object" && audioPayload.pause != null) {
+    var p = Number(audioPayload.pause);
+    if (!Number.isNaN(p) && p > 0) pauseMs = p * 1000;
+}
+var stepMs = durMs + pauseMs;
 var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
     ? globalThis.KlothoPlaybackBridge({
         engine: engineType,
@@ -115,10 +128,24 @@ if (nextBtn) {
     };
 }
 
+function _setLoopUi() {
+    if (loopMode === "off") {
+        loopBtn.style.opacity = "0.3";
+        loopBtn.style.cursor = "not-allowed";
+        loopSvg.setAttribute("stroke", "#666");
+        return;
+    }
+    loopBtn.style.opacity = loopEnabled ? "1" : "0.5";
+    loopBtn.style.cursor = "pointer";
+    loopSvg.setAttribute("stroke", loopEnabled ? "#4ade80" : "#a0a0a0");
+}
+_setLoopUi();
+
 loopBtn.onclick = function() {
-    looping = !looping;
-    loopBtn.style.opacity = looping ? "1" : "0.5";
-    loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
+    if (loopMode === "off") return;
+    loopEnabled = !loopEnabled;
+    if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
+    _setLoopUi();
 };
 
 var _timerId = null;
@@ -131,15 +158,18 @@ function _stopAll() {
 function _runAnimation(step) {
     if (!playing) return;
     if (step >= totalGroups) {
-        if (looping) {
+        if (loopEnabled && (loopInfinite || loopCyclesRemaining > 1)) {
+            if (!loopInfinite) loopCyclesRemaining -= 1;
             dimAllNodes(); hideAllShapeEdges();
-            _timerId = setTimeout(function() { _runAnimation(0); }, durMs);
-        } else { finishPlayback(); }
+            _timerId = setTimeout(function() { _runAnimation(0); }, stepMs);
+        } else {
+            _timerId = setTimeout(function() { finishPlayback(); }, pauseMs);
+        }
         return;
     }
     var gi = (currentView + step) % totalGroups;
     revealAndTrack(gi);
-    _timerId = setTimeout(function() { _runAnimation(step + 1); }, durMs);
+    _timerId = setTimeout(function() { _runAnimation(step + 1); }, stepMs);
 }
 
 toggleBtn.onclick = async function() {
@@ -163,7 +193,7 @@ toggleBtn.onclick = async function() {
             var soloEvts = filterEventsForGroup(allEvts, currentView);
             revealAndTrack(currentView);
             await bridge.play(soloEvts, {
-                loop: looping,
+                loop: loopEnabled ? (loopInfinite ? true : loopFiniteCount) : false,
                 onEvent: function() {},
                 onFinish: function() { finishPlayback(); },
             });
@@ -172,7 +202,7 @@ toggleBtn.onclick = async function() {
             dimAllNodes();
             hideAllShapeEdges();
             await bridge.play(reordered.events, {
-                loop: looping,
+                loop: loopEnabled ? (loopInfinite ? true : loopFiniteCount) : false,
                 onEvent: function(stepIdx) {
                     if (playing) revealAndTrack(reordered.seqMap[stepIdx]);
                 },
@@ -185,6 +215,7 @@ toggleBtn.onclick = async function() {
         setStopIcon();
         dimAllNodes();
         hideAllShapeEdges();
+        if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
         _runAnimation(0);
     }
 };

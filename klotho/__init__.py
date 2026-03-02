@@ -33,8 +33,7 @@ from .dynatos import Envelope, DynamicRange
 from .thetos import ParameterTree, ParameterField, Instrument, SynthDefInstrument, MidiInstrument, ToneInstrument, CompositionalUnit, Parametron, types
 from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
-from .semeios.visualization.plots import plot
-from .semeios.visualization.klotho_plot import KlothoPlot
+from .semeios.visualization import plot
 from .semeios.notelists.supercollider import Scheduler
 
 from .utils.playback.player import play
@@ -42,7 +41,7 @@ from .utils.playback.midi_player import play_midi, create_midi
 from .utils.playback._config import set_audio_engine, get_audio_engine
 
 __all__ = [
-    'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
+    'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils', 'plot',
 ]
 
-__version__ = '5.0.12'
+__version__ = '5.0.13'

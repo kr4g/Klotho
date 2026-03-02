@@ -2,7 +2,8 @@ from .threejs_lattice import ThreejsLatticeData
 
 
 def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
-                           show_labels=True, title=None, override_positions=None):
+                           show_labels=True, title=None, override_positions=None,
+                           preview_engine='supersonic'):
     """
     Build a Three.js 3D scene for a MasterSet.
 
@@ -94,6 +95,7 @@ def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
             'zTicks': [],
             'labels': ['', '', ''],
         },
+        'previewEngine': preview_engine,
     }
 
     return ThreejsLatticeData(

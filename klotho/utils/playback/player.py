@@ -42,7 +42,7 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
         The displayed HTML widget handle, or the KlothoPlot after
         triggering its animation.
     """
-    from klotho.semeios.visualization.klotho_plot import KlothoPlot
+    from klotho.semeios.visualization._dispatch import KlothoPlot
     if isinstance(obj, KlothoPlot):
         return obj.play(**kwargs)
 

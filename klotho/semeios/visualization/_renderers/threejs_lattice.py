@@ -1,10 +1,14 @@
 import math
 import numpy as np
+from pathlib import Path
 from collections import defaultdict
 
-from ._colors import _path_color_array, _rgba_to_hex
-from ._geometry import bezier_3d as _bezier_3d, rodrigues_rotate as _rodrigues_rotate, get_perp as _get_perp, unpack3 as _unpack3
-from ._svg_utils import SvgFigureData
+from .._shared.colors import _path_color_array, _rgba_to_hex
+from .._shared.geometry import bezier_3d as _bezier_3d, rodrigues_rotate as _rodrigues_rotate, get_perp as _get_perp, unpack3 as _unpack3
+from .._shared.svg_utils import SvgFigureData
+
+_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / '_animation_bridge.js'
+_ANIMATION_BRIDGE_JS = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
 
 
 class ThreejsLatticeData(SvgFigureData):
@@ -88,6 +92,7 @@ def _static_threejs_html(sd):
         ">Trackball</button>
     </div>
 </div>
+<script>{_ANIMATION_BRIDGE_JS}</script>
 <script>
 (function _klotho3dStaticInit() {{
     if (typeof THREE === "undefined") {{
@@ -429,20 +434,25 @@ def _static_threejs_html(sd):
         canvas.style.cursor = "default";
     }});
 
-    var _clickCtx = null;
-    function _playFreq(freq) {{
+    async function _playFreq(freq) {{
         if (!freq || freq <= 0) return;
         try {{
-            if (!_clickCtx) _clickCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (_clickCtx.state === "suspended") _clickCtx.resume();
-            var osc = _clickCtx.createOscillator();
-            var gain = _clickCtx.createGain();
-            osc.type = "sine";
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.3, _clickCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, _clickCtx.currentTime + 0.6);
-            osc.connect(gain); gain.connect(_clickCtx.destination);
-            osc.start(); osc.stop(_clickCtx.currentTime + 0.65);
+            if (typeof globalThis.KlothoPlaybackBridge !== "function") {{
+                return;
+            }}
+            var bridge = globalThis.KlothoPlaybackBridge({{
+                engine: sceneData.previewEngine || "supersonic",
+                audioPayload: null,
+                ringTime: 5
+            }});
+            await bridge.ensureReady();
+            await bridge.resumeAudio();
+            await bridge.preview({{
+                freq: freq,
+                dur: 1.0,
+                amp: 0.3,
+                synthName: "kl_tri"
+            }});
         }} catch(e) {{}}
     }}
     if (_nodeFreqs) {{
@@ -474,7 +484,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
                         effective_dimensionality, use_dimmed, mute_background,
                         path_mode, figsize, node_size, title,
                         is_tone_lattice, coord_label, gen_labels,
-                        path_cmap='viridis'):
+                        path_cmap='viridis', preview_engine='supersonic'):
     """
     Build a Three.js 3D scene for a lattice.
 
@@ -805,6 +815,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
             'labels': axis_labels,
         },
         'camera': {'eye': [1.5, 1.5, 1.5]},
+        'previewEngine': preview_engine,
     }
 
     return ThreejsLatticeData(

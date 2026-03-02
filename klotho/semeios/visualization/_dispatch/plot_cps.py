@@ -39,19 +39,20 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
     dim = ms.dimensionality
     override_positions = None
     if dim > 3:
-        from klotho.semeios.visualization.plots import _reduce_positions
         override_positions = _reduce_positions(ms.positions, target_dims=3)
         dim = 3
     is_3d = dim == 3
 
     if is_3d:
-        from .threejs_master_set import _threejs_master_set_3d
+        from .._renderers.threejs_master_set import _threejs_master_set_3d
+        from klotho.utils.playback._config import get_audio_engine
         return _threejs_master_set_3d(ms, figsize=figsize, node_size=node_size,
                                       text_size=text_size, show_labels=show_labels,
                                       title=title,
-                                      override_positions=override_positions)
+                                      override_positions=override_positions,
+                                      preview_engine=get_audio_engine())
     else:
-        from .svg_master_set import _svg_master_set_2d
+        from .._renderers.svg_master_set import _svg_master_set_2d
         return _svg_master_set_2d(ms, figsize=figsize, node_size=node_size,
                                   text_size=text_size, show_labels=show_labels,
                                   title=title)
@@ -325,20 +326,30 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         pos_dim = 3
     is_3d = pos_dim >= 3 and any(abs(p[2]) > 1e-12 for p in node_positions.values())
     if is_3d:
-        from .threejs_cps import _threejs_cps_3d
+        from .._renderers.threejs_cps import _threejs_cps_3d
+        from klotho.utils.playback._config import get_audio_engine
         return _threejs_cps_3d(cps, node_positions, G, figsize=figsize,
                                node_size=node_size, text_size=text_size,
-                               show_labels=show_labels, title=title, nodes=nodes)
+                               show_labels=show_labels, title=title, nodes=nodes,
+                               preview_engine=get_audio_engine())
 
     if animate and path:
-        from .svg_cps import _svg_cps
-        from .animated import AnimatedCPSSvgFigure
+        from .._renderers.svg_cps import _svg_cps
+        from .._animation import AnimatedCPSSvgFigure
         from klotho.utils.playback._config import get_audio_engine
         from klotho.utils.playback.animation_events import build_path_engine_payload
+        engine_name = get_audio_engine()
+        preview_config = {
+            "dur": kwargs.get("dur", dur) if kwargs else dur,
+            "amp": kwargs.get("amp", amp) if kwargs else amp,
+            "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "engine": engine_name,
+        }
         svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                             mute_background=mute_background, figsize=figsize,
                             node_size=node_size, text_size=text_size,
-                            show_labels=show_labels, title=title)
+                            show_labels=show_labels, title=title,
+                            preview_config=preview_config)
         ref_freq = 261.63
         freqs = []
         for node_id in path:
@@ -347,16 +358,22 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 freqs.append(ref_freq * ratio)
             except Exception:
                 freqs.append(ref_freq)
-        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
         audio_payload = build_path_engine_payload(
             freqs,
             dur,
-            engine=get_audio_engine(),
+            engine=engine_name,
             amp=amp,
             extra_pfields=extra_synth_kwargs,
             pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
         )
-        return AnimatedCPSSvgFigure(svg_data, audio_payload=audio_payload, dur=dur)
+        return AnimatedCPSSvgFigure(
+            svg_data,
+            audio_payload=audio_payload,
+            dur=dur,
+            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+            loop=kwargs.get("loop", False) if kwargs else False,
+        )
 
     if shape is not None and len(shape) > 0:
         if isinstance(shape[0], (list, tuple)):
@@ -365,15 +382,23 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             shape_groups = [list(shape)]
 
         if animate:
-            from .svg_cps import _svg_cps
-            from .animated import AnimatedCPSShapeFigure
+            from .._renderers.svg_cps import _svg_cps
+            from .._animation import AnimatedCPSShapeFigure
             from klotho.utils.playback._config import get_audio_engine
             from klotho.utils.playback.animation_events import build_shape_engine_payload
+            engine_name = get_audio_engine()
+            preview_config = {
+                "dur": kwargs.get("dur", dur) if kwargs else dur,
+                "amp": kwargs.get("amp", amp) if kwargs else amp,
+                "synthName": (kwargs.get("synthName") if kwargs else None) or (kwargs.get("defName") if kwargs else None) or "kl_tri",
+                "engine": engine_name,
+            }
             svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                                 mute_background=mute_background, figsize=figsize,
                                 node_size=node_size, text_size=text_size,
                                 show_labels=show_labels, title=title,
-                                shape=shape)
+                                shape=shape,
+                                preview_config=preview_config)
             ref_freq = 261.63
             freq_groups = []
             for group in shape_groups:
@@ -386,11 +411,11 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                         group_freqs.append(ref_freq)
                 freq_groups.append(group_freqs)
 
-            extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k != "pause"} if kwargs else None)
+            extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
             audio_payload = build_shape_engine_payload(
                 freq_groups,
                 dur,
-                engine=get_audio_engine(),
+                engine=engine_name,
                 arp=arp,
                 strum=strum,
                 direction=direction,
@@ -398,9 +423,15 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                 extra_pfields=extra_synth_kwargs,
                 pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
             )
-            return AnimatedCPSShapeFigure(svg_data, audio_payload=audio_payload, dur=dur)
+            return AnimatedCPSShapeFigure(
+                svg_data,
+                audio_payload=audio_payload,
+                dur=dur,
+                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+                loop=kwargs.get("loop", False) if kwargs else False,
+            )
 
-    from .svg_cps import _svg_cps
+    from .._renderers.svg_cps import _svg_cps
     return _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                     mute_background=mute_background, figsize=figsize,
                     node_size=node_size, text_size=text_size,
