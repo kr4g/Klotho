@@ -118,7 +118,7 @@ class AnimatedLattice3dFigure:
 {controls_html}
 {scripts_html}
 <script>
-setTimeout(function _klotho3dInit() {{
+(function _klotho3dInit() {{
     if (typeof THREE === "undefined") {{
         if (!document.querySelector('script[data-klotho-three]')) {{
             var s = document.createElement("script");
@@ -597,7 +597,7 @@ setTimeout(function _klotho3dInit() {{
     function onStep(stepIdx) {{ revealStep(stepIdx); }}
 
     {playback_js}
-}}, 0);
+}})();
 </script>
 '''
         return html
@@ -665,7 +665,7 @@ class AnimatedRTSvgFigure:
 {controls_html}
 {scripts_html}
 <script>
-setTimeout(function() {{
+(function() {{
     var elCache = {{}};
     function getEl(id) {{ if (!elCache[id]) elCache[id] = document.getElementById(id); return elCache[id]; }}
 
@@ -733,7 +733,7 @@ setTimeout(function() {{
     function onStep(stepIdx) {{ highlightLeaf(stepIdx); }}
 
     {playback_js}
-}}, 0);
+}})();
 </script>
 '''
         return html
@@ -794,7 +794,7 @@ class AnimatedLatticeSvgFigure:
 {controls_html}
 {scripts_html}
 <script>
-setTimeout(function() {{
+(function() {{
     var steps = {steps_json};
     var haloIds = {halos_json};
     var allPathIds = {all_path_json};
@@ -880,7 +880,7 @@ setTimeout(function() {{
     function onStep(stepIdx) {{ revealStep(stepIdx); }}
 
     {playback_js}
-}}, 0);
+}})();
 </script>
 '''
         return html
@@ -977,7 +977,7 @@ class _AnimatedShapeFigureBase:
     </div>
 {scripts_html}
 <script>
-setTimeout(function() {{
+(function() {{
     var groupNodeIndices = {group_node_indices_json};
     var groupEdgeIds = {group_edge_ids_json};
     var shapeColors = {shape_colors_json};
@@ -987,7 +987,7 @@ setTimeout(function() {{
     var audioPayload = {payload_json};
 
     {shape_js}
-}}, 0);
+}})();
 </script>
 '''
         return html

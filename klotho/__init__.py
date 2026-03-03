@@ -44,4 +44,4 @@ __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils', 'plot',
 ]
 
-__version__ = '5.3.11'
+__version__ = '5.3.12'
