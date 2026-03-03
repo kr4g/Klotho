@@ -231,7 +231,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
     line-height:1.4;
 "></div>
 <script>
-(typeof requestIdleCallback==='function'?requestIdleCallback:function(f){{setTimeout(f,0)}})(function _klothoTip_{svg_uid}(){{
+setTimeout(function _klothoTip_{svg_uid}(){{
     var data={data_json};
     var active={active_json};
     var freqs={freqs_json};
@@ -304,5 +304,5 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
             }});
         }}
     }});
-}})();
+}}, 0);
 </script>"""

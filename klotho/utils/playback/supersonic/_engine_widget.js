@@ -3,7 +3,7 @@
 //                  __NEEDED_JSON__, __SS_CONFIG_JSON__, __META_JSON__,
 //                  __CONTROL_DATA_JSON__, __RING_TIME__
 
-(typeof requestIdleCallback==='function'?requestIdleCallback:function(f){setTimeout(f,0)})(function __klothoSSInit___WID__() {
+setTimeout(function __klothoSSInit___WID__() {
     var wid = "__WID__";
     var toggleBtn = document.getElementById(wid + "_toggle");
     if (!toggleBtn) {
@@ -155,4 +155,4 @@
             clearInterval(_orphanCheckId);
         }
     }, 1000);
-})();
+}, 0);
