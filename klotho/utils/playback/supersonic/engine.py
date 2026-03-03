@@ -43,15 +43,32 @@ def _load_manifest():
     return {"synths": {}, "inserts": {}}
 
 
-def _load_synthdef_assets():
-    assets = {}
-    if SYNTHDEFS_DIR.exists():
-        for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
-            name = path.stem
-            assets[name] = base64.b64encode(path.read_bytes()).decode("ascii")
-    if "default" not in assets and "kl_tri" in assets:
-        assets["default"] = assets["kl_tri"]
-    return assets
+_ALL_SYNTHDEF_ASSETS = None
+
+def _load_all_synthdef_assets():
+    global _ALL_SYNTHDEF_ASSETS
+    if _ALL_SYNTHDEF_ASSETS is None:
+        assets = {}
+        if SYNTHDEFS_DIR.exists():
+            for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
+                assets[path.stem] = base64.b64encode(path.read_bytes()).decode("ascii")
+        if "default" not in assets and "kl_tri" in assets:
+            assets["default"] = assets["kl_tri"]
+        _ALL_SYNTHDEF_ASSETS = assets
+    return _ALL_SYNTHDEF_ASSETS
+
+
+_INFRA_SYNTHDEFS = frozenset({'__busRouter', '__busRouterMonitor', '__chainLimiter'})
+
+
+def _filter_synthdef_assets(all_assets, needed):
+    filtered = {}
+    for name in needed | _INFRA_SYNTHDEFS:
+        if name in all_assets:
+            filtered[name] = all_assets[name]
+    if "default" not in filtered and "kl_tri" in all_assets:
+        filtered["default"] = all_assets["kl_tri"]
+    return filtered
 
 
 def _load_widget_template():
@@ -69,11 +86,12 @@ class SuperSonicEngine:
         self.ring_time = ring_time
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         self.manifest = _load_manifest()
-        self.synthdef_assets = _load_synthdef_assets()
         from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta
         validate_sc_events(self.events)
         if self.meta:
             validate_sc_meta(self.meta)
+        needed = self._needed_synthdefs()
+        self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), needed)
 
     def _needed_synthdefs(self):
         names = set()
@@ -104,7 +122,7 @@ class SuperSonicEngine:
         events_json = json.dumps(self.events)
         manifest_json = json.dumps(self.manifest)
         synthdef_assets_json = json.dumps(self.synthdef_assets)
-        needed = self._needed_synthdefs()
+        needed = set(self.synthdef_assets.keys())
 
         config_json = json.dumps({
             "baseURL": f"{SUPERSONIC_CDN}/dist/",
