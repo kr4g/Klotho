@@ -12,10 +12,12 @@ from klotho.utils.playback.supersonic.cdn import (
     SUPERSONIC_SAMPLES_CDN,
 )
 
-MANIFEST_PATH = Path(__file__).parent / "assets" / "manifest.json"
-SYNTHDEFS_DIR = Path(__file__).parent / "assets" / "synthdefs"
 _WIDGET_JS_PATH = Path(__file__).parent / "_engine_widget.js"
+_SCHED_SCORE_PATH = Path(__file__).parent / "scheduler_score.js"
 _WIDGET_JS_TEMPLATE = None
+_SCHED_SCORE_JS = None
+
+_INFRA_SYNTHDEFS = frozenset({'__busRouter', '__busRouterMonitor', '__chainLimiter'})
 
 
 def _convert_numpy_types(obj):
@@ -35,45 +37,18 @@ def _convert_numpy_types(obj):
         return obj
 
 
-def _load_manifest():
-    if MANIFEST_PATH.exists():
-        return json.loads(MANIFEST_PATH.read_text())
-    return {"synths": {}, "inserts": {}}
-
-
-_ALL_SYNTHDEF_ASSETS = None
-
-def _load_all_synthdef_assets():
-    global _ALL_SYNTHDEF_ASSETS
-    if _ALL_SYNTHDEF_ASSETS is None:
-        assets = {}
-        if SYNTHDEFS_DIR.exists():
-            for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
-                assets[path.stem] = base64.b64encode(path.read_bytes()).decode("ascii")
-        if "default" not in assets and "kl_tri" in assets:
-            assets["default"] = assets["kl_tri"]
-        _ALL_SYNTHDEF_ASSETS = assets
-    return _ALL_SYNTHDEF_ASSETS
-
-
-_INFRA_SYNTHDEFS = frozenset({'__busRouter', '__busRouterMonitor', '__chainLimiter'})
-
-
-def _filter_synthdef_assets(all_assets, needed):
-    filtered = {}
-    for name in needed | _INFRA_SYNTHDEFS:
-        if name in all_assets:
-            filtered[name] = all_assets[name]
-    if "default" not in filtered and "kl_tri" in all_assets:
-        filtered["default"] = all_assets["kl_tri"]
-    return filtered
-
-
 def _load_widget_template():
     global _WIDGET_JS_TEMPLATE
     if _WIDGET_JS_TEMPLATE is None:
         _WIDGET_JS_TEMPLATE = _WIDGET_JS_PATH.read_text()
     return _WIDGET_JS_TEMPLATE
+
+
+def _load_scheduler_score():
+    global _SCHED_SCORE_JS
+    if _SCHED_SCORE_JS is None:
+        _SCHED_SCORE_JS = _SCHED_SCORE_PATH.read_text() if _SCHED_SCORE_PATH.exists() else ""
+    return _SCHED_SCORE_JS
 
 
 class SuperSonicEngine:
@@ -88,7 +63,7 @@ class SuperSonicEngine:
         if self.meta:
             validate_sc_meta(self.meta)
         self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
-        self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), self._needed)
+        self._is_score = bool(self.meta.get("groups") or self.meta.get("inserts"))
 
     def _needed_synthdefs(self):
         names = set()
@@ -117,7 +92,6 @@ class SuperSonicEngine:
 
     def _generate_html(self):
         events_json = json.dumps(self.events)
-        synthdef_assets_json = json.dumps(self.synthdef_assets)
         needed_json = json.dumps(list(self._needed))
 
         config_json = json.dumps({
@@ -135,12 +109,14 @@ class SuperSonicEngine:
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
-                     .replace('__SYNTHDEF_ASSETS_JSON__', synthdef_assets_json)
+                     .replace('__SYNTHDEF_ASSETS_JSON__', '{}')
                      .replace('__NEEDED_JSON__', needed_json)
                      .replace('__SS_CONFIG_JSON__', config_json)
                      .replace('__META_JSON__', meta_json)
                      .replace('__CONTROL_DATA_JSON__', control_data_json)
                      .replace('__RING_TIME__', str(self.ring_time)))
+
+        score_js = _load_scheduler_score() if self._is_score else ""
 
         html = f'''
 <div id="{wid}" style="
@@ -202,6 +178,7 @@ class SuperSonicEngine:
 </div>
 
 <script>
+{score_js}
 {widget_js}
 </script>
 '''
