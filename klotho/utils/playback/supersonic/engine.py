@@ -10,6 +10,7 @@ from klotho.utils.playback.supersonic.cdn import (
     SUPERSONIC_CORE_CDN,
     SUPERSONIC_SYNTHDEFS_CDN,
     SUPERSONIC_SAMPLES_CDN,
+    DRAW_JS_PATH,
 )
 
 SYNTHDEFS_DIR = Path(__file__).parent / "assets" / "synthdefs"
@@ -128,6 +129,10 @@ class SuperSonicEngine:
             "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
         })
 
+        draw_js = DRAW_JS_PATH.read_text() if DRAW_JS_PATH.exists() else ""
+        _SCHED_CORE_PATH = Path(__file__).parent / "scheduler_core.js"
+        sched_core_js = _SCHED_CORE_PATH.read_text() if _SCHED_CORE_PATH.exists() else ""
+
         wid = self.widget_id
 
         meta_json = json.dumps(self.meta)
@@ -205,6 +210,10 @@ class SuperSonicEngine:
 </div>
 
 <script>
+{draw_js}
+
+{sched_core_js}
+
 {score_js}
 {widget_js}
 </script>
