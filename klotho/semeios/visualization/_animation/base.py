@@ -107,11 +107,12 @@ _DRAW_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' 
 
 def build_scripts_html(instruments_js, player_js, engine="tone"):
     if engine == "supersonic":
-        import json
+        import json, base64
         from klotho.utils.playback.supersonic.cdn import (
             SUPERSONIC_CDN, SUPERSONIC_CORE_CDN,
             SUPERSONIC_SYNTHDEFS_CDN, SUPERSONIC_SAMPLES_CDN,
         )
+        _SYNTHDEFS_DIR = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'synthdefs'
         draw_js = _DRAW_JS_PATH.read_text() if _DRAW_JS_PATH.exists() else ""
         sched_core_js = _SCHED_CORE_PATH.read_text() if _SCHED_CORE_PATH.exists() else ""
         ss_config = json.dumps({
@@ -120,6 +121,16 @@ def build_scripts_html(instruments_js, player_js, engine="tone"):
             "synthdefBaseURL": SUPERSONIC_SYNTHDEFS_CDN,
             "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
         })
+        needed = {'kl_tri', 'kl_kicktone', 'kl_sine', 'kl_saw', 'kl_sqr', 'kl_noisebpf',
+                  '__busRouter', '__busRouterMonitor', '__chainLimiter', '__klEnvCtrl'}
+        assets = {}
+        if _SYNTHDEFS_DIR.exists():
+            for p in _SYNTHDEFS_DIR.glob("*.scsyndef"):
+                if p.stem in needed:
+                    assets[p.stem] = base64.b64encode(p.read_bytes()).decode("ascii")
+        if "default" not in assets and "kl_tri" in assets:
+            assets["default"] = assets["kl_tri"]
+        synthdef_json = json.dumps(assets)
         ss_init = f'''if (!globalThis.__klothoSonic) {{
     globalThis.__klothoSonic = {{ instance: null, promise: null, loadedDefs: new Set() }};
     globalThis.__klothoSonic.promise = (async function() {{
@@ -142,7 +153,23 @@ if (!globalThis.__ensureSuperSonic) {{
         if (state.promise) return state.promise;
         return Promise.resolve(null);
     }};
-}}'''
+}}
+(async function() {{
+    var state = globalThis.__klothoSonic;
+    if (!state || !state.promise) return;
+    var sonic = await state.promise;
+    if (!sonic) return;
+    var assets = {synthdef_json};
+    var loaded = state.loadedDefs || new Set();
+    for (var name in assets) {{
+        if (!assets.hasOwnProperty(name)) continue;
+        if (loaded.has(name)) continue;
+        var b64 = assets[name];
+        var bytes = Uint8Array.from(atob(b64), function(c) {{ return c.charCodeAt(0); }});
+        try {{ await sonic.loadSynthDef(bytes); loaded.add(name); }} catch(e) {{}}
+    }}
+    state.loadedDefs = loaded;
+}})();'''
         return f'''<script>{ss_init}</script>
 <script>{draw_js}</script>
 <script>{sched_core_js}</script>'''
