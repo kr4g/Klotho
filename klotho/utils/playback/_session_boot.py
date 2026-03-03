@@ -41,8 +41,13 @@ def boot_supersonic():
         "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
     })
 
+    manifest_json = _load_manifest_json()
+    synthdef_assets_json = _load_synthdef_assets_json()
+
     boot_js = f"""<script>
 if (!globalThis.__klothoSonic) {{
+    globalThis.__klothoManifest = {manifest_json};
+    globalThis.__klothoSynthdefAssets = {synthdef_assets_json};
     globalThis.__klothoSonic = {{ instance: null, promise: null, loadedDefs: new Set() }};
     globalThis.__klothoSonic.promise = (async function() {{
         try {{
@@ -51,6 +56,14 @@ if (!globalThis.__klothoSonic) {{
             globalThis.SuperSonic = mod.SuperSonic;
             var sonic = new mod.SuperSonic(config);
             await sonic.init();
+            var assets = globalThis.__klothoSynthdefAssets || {{}};
+            var loaded = globalThis.__klothoSonic.loadedDefs;
+            for (var name in assets) {{
+                if (!assets.hasOwnProperty(name)) continue;
+                if (loaded.has(name)) continue;
+                var bytes = Uint8Array.from(atob(assets[name]), function(c) {{ return c.charCodeAt(0); }});
+                try {{ await sonic.loadSynthDef(bytes); loaded.add(name); }} catch(e) {{}}
+            }}
             globalThis.__klothoSonic.instance = sonic;
             return sonic;
         }} catch(e) {{
@@ -104,43 +117,15 @@ def build_supersonic_session_preamble(include_plotly=False, include_threejs=Fals
         include_threejs=include_threejs,
     )
 
-    manifest_json = _load_manifest_json()
-    synthdef_assets_json = _load_synthdef_assets_json()
-
     ss_boot_js = f'''
 var __ssConfig = {ss_config};
-var __klothoManifest = {manifest_json};
-var __klothoSynthdefAssets = {synthdef_assets_json};
-async function __loadKlothoSynthdefsOnce(sonic, state) {{
-    var loaded = state.loadedDefs || new Set();
-    for (var name in __klothoSynthdefAssets) {{
-        if (!__klothoSynthdefAssets.hasOwnProperty(name)) continue;
-        if (loaded.has(name)) continue;
-        var b64 = __klothoSynthdefAssets[name];
-        var bytes = Uint8Array.from(atob(b64), function(c) {{ return c.charCodeAt(0); }});
-        try {{
-            await sonic.loadSynthDef(bytes);
-            loaded.add(name);
-        }} catch(e) {{}}
-    }}
-    state.loadedDefs = loaded;
-}}
+var __klothoManifest = globalThis.__klothoManifest || {{}};
+var __klothoSynthdefAssets = globalThis.__klothoSynthdefAssets || {{}};
 if (!globalThis.__ensureSuperSonic) {{
     globalThis.__ensureSuperSonic = function() {{
         var state = globalThis.__klothoSonic;
-        if (state && state.instance) {{
-            return __loadKlothoSynthdefsOnce(state.instance, state).then(function() {{
-                return state.instance;
-            }});
-        }}
-        if (state && state.promise) {{
-            return state.promise.then(function(sonic) {{
-                if (!sonic) return sonic;
-                return __loadKlothoSynthdefsOnce(sonic, state).then(function() {{
-                    return sonic;
-                }});
-            }});
-        }}
+        if (state && state.instance) return Promise.resolve(state.instance);
+        if (state && state.promise) return state.promise;
         if (!state) {{
             state = {{ instance: null, promise: null, loadedDefs: new Set() }};
             globalThis.__klothoSonic = state;
@@ -151,7 +136,14 @@ if (!globalThis.__ensureSuperSonic) {{
                 globalThis.SuperSonic = mod.SuperSonic;
                 var sonic = new mod.SuperSonic(__ssConfig);
                 await sonic.init();
-                await __loadKlothoSynthdefsOnce(sonic, state);
+                var assets = globalThis.__klothoSynthdefAssets || {{}};
+                var loaded = state.loadedDefs;
+                for (var name in assets) {{
+                    if (!assets.hasOwnProperty(name)) continue;
+                    if (loaded.has(name)) continue;
+                    var bytes = Uint8Array.from(atob(assets[name]), function(c) {{ return c.charCodeAt(0); }});
+                    try {{ await sonic.loadSynthDef(bytes); loaded.add(name); }} catch(e) {{}}
+                }}
                 state.instance = sonic;
                 return sonic;
             }} catch(e) {{

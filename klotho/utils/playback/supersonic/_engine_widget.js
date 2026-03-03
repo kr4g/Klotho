@@ -1,6 +1,5 @@
 // SuperSonic standalone playback widget.
-// Python replaces: __WID__, __EVENTS_JSON__, __MANIFEST_JSON__,
-//                  __SYNTHDEF_ASSETS_JSON__, __NEEDED_JSON__,
+// Python replaces: __WID__, __EVENTS_JSON__, __NEEDED_JSON__,
 //                  __SS_CONFIG_JSON__, __META_JSON__,
 //                  __CONTROL_DATA_JSON__, __RING_TIME__
 
@@ -16,8 +15,7 @@
     var loopSvg = document.getElementById(wid + "_loop_svg");
     var statusEl = document.getElementById(wid + "_status");
     var allEvents = __EVENTS_JSON__;
-    var manifest = __MANIFEST_JSON__;
-    var synthdefAssets = __SYNTHDEF_ASSETS_JSON__;
+    var manifest = globalThis.__klothoManifest || {};
     var neededSynthdefs = __NEEDED_JSON__;
     var ssConfig = __SS_CONFIG_JSON__;
     var meta = __META_JSON__;
@@ -73,22 +71,20 @@
 
     async function loadDefs(sonic) {
         var loaded = globalThis.__klothoSonic.loadedDefs;
-        for (var name in synthdefAssets) {
-            if (!synthdefAssets.hasOwnProperty(name)) continue;
-            if (loaded.has(name)) continue;
-            var b64 = synthdefAssets[name];
-            var bytes = Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
-            await sonic.loadSynthDef(bytes);
-            loaded.add(name);
-        }
+        var globalAssets = globalThis.__klothoSynthdefAssets || {};
         for (var i = 0; i < neededSynthdefs.length; i++) {
             var sname = neededSynthdefs[i];
             if (loaded.has(sname)) continue;
-            if (synthdefAssets[sname]) continue;
-            try {
-                await sonic.loadSynthDef(sname);
+            if (globalAssets[sname]) {
+                var bytes = Uint8Array.from(atob(globalAssets[sname]), function(c) { return c.charCodeAt(0); });
+                await sonic.loadSynthDef(bytes);
                 loaded.add(sname);
-            } catch(e) {}
+            } else {
+                try {
+                    await sonic.loadSynthDef(sname);
+                    loaded.add(sname);
+                } catch(e) {}
+            }
         }
     }
 

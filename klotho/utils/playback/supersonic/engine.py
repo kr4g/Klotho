@@ -90,8 +90,7 @@ class SuperSonicEngine:
         validate_sc_events(self.events)
         if self.meta:
             validate_sc_meta(self.meta)
-        needed = self._needed_synthdefs()
-        self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), needed)
+        self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
 
     def _needed_synthdefs(self):
         names = set()
@@ -120,9 +119,7 @@ class SuperSonicEngine:
 
     def _generate_html(self):
         events_json = json.dumps(self.events)
-        manifest_json = json.dumps(self.manifest)
-        synthdef_assets_json = json.dumps(self.synthdef_assets)
-        needed = set(self.synthdef_assets.keys())
+        needed_json = json.dumps(list(self._needed))
 
         config_json = json.dumps({
             "baseURL": f"{SUPERSONIC_CDN}/dist/",
@@ -134,7 +131,6 @@ class SuperSonicEngine:
         draw_js = DRAW_JS_PATH.read_text() if DRAW_JS_PATH.exists() else ""
         scheduler_js = SCHEDULER_JS_PATH.read_text() if SCHEDULER_JS_PATH.exists() else ""
 
-        needed_json = json.dumps(list(needed))
         wid = self.widget_id
 
         meta_json = json.dumps(self.meta)
@@ -143,8 +139,6 @@ class SuperSonicEngine:
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
-                     .replace('__MANIFEST_JSON__', manifest_json)
-                     .replace('__SYNTHDEF_ASSETS_JSON__', synthdef_assets_json)
                      .replace('__NEEDED_JSON__', needed_json)
                      .replace('__SS_CONFIG_JSON__', config_json)
                      .replace('__META_JSON__', meta_json)
