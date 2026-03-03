@@ -1,7 +1,7 @@
 import copy
 
-from .base import Instrument, InsertBase
-from ._shared import ss_synth_meta
+from .base import Instrument, Effect
+from ._shared import ss_synth_meta, load_ss_manifest
 
 
 class SynthDefInstrument(Instrument):
@@ -55,42 +55,14 @@ class SynthDefInstrument(Instrument):
             specs=meta.get('specs', {}),
         )
 
-    @classmethod
-    def Default(cls, name: str = None, **kwargs):
-        return cls.from_manifest('default', name=name, **kwargs)
-
-    @classmethod
-    def KlTri(cls, name: str = None, **kwargs):
-        return cls.from_manifest('kl_tri', name=name, **kwargs)
-
-    @classmethod
-    def KlSine(cls, name: str = None, **kwargs):
-        return cls.from_manifest('kl_sine', name=name, **kwargs)
-
-    @classmethod
-    def KlSqr(cls, name: str = None, **kwargs):
-        return cls.from_manifest('kl_sqr', name=name, **kwargs)
-
-    @classmethod
-    def KlSaw(cls, name: str = None, **kwargs):
-        return cls.from_manifest('kl_saw', name=name, **kwargs)
-
-    @classmethod
-    def KlNoiseBPF(cls, name: str = None, **kwargs):
-        return cls.from_manifest('kl_noisebpf', name=name, **kwargs)
-
-    @classmethod
-    def KlKicktone(cls, name: str = None, **kwargs):
-        return cls.from_manifest('kl_kicktone', name=name, **kwargs)
-
     def __str__(self):
         return f"SynthDefInstrument(name='{self._name}', defName='{self._defName}', pfields={dict(self._pfields)})"
 
 
-class Insert(InsertBase):
+class SynthDefFX(Effect):
     """A SynthDef-backed insert effect for use in a Score track's FX chain.
 
-    Each ``Insert`` instance represents a unique FX node.  Two instances of
+    Each ``SynthDefFX`` instance represents a unique FX node.  Two instances of
     the same ``defName`` with identical args are still two distinct nodes
     (different ``uid`` values).  The Python object itself serves as the
     handle -- pass it to ``Score.track()`` to place it in a chain, and to
@@ -117,4 +89,60 @@ class Insert(InsertBase):
         return dict(self._pfields)
 
     def __str__(self):
-        return f"Insert(defName='{self._defName}', uid='{self._uid}', args={dict(self._pfields)})"
+        return f"SynthDefFX(defName='{self._defName}', uid='{self._uid}', args={dict(self._pfields)})"
+
+
+def _clean_method_name(name: str) -> str:
+    cleaned = ''.join(ch if (ch.isalnum() or ch == '_') else '_' for ch in name).strip('_')
+    if not cleaned:
+        return 'synth'
+    if cleaned[0].isdigit():
+        cleaned = f"synth_{cleaned}"
+    return cleaned
+
+
+def _base_method_name_for_def(def_name: str) -> str:
+    if def_name == 'default':
+        return 'default'
+    if def_name.startswith('kl_') or def_name.startswith('fd_'):
+        return _clean_method_name(def_name[3:])
+    return _clean_method_name(def_name)
+
+
+def _make_synth_classmethod(def_name: str, method_name: str):
+    def _ctor(cls, name: str = None, **kwargs):
+        return cls.from_manifest(def_name, name=name or method_name, **kwargs)
+    _ctor.__name__ = method_name
+    return classmethod(_ctor)
+
+
+_ss_synths = load_ss_manifest().get('synths', {})
+_registered_method_names = set()
+
+
+def _def_sort_key(def_name: str):
+    if def_name == 'default':
+        return (0, def_name)
+    if def_name.startswith('kl_'):
+        return (1, def_name)
+    if def_name.startswith('fd_'):
+        return (2, def_name)
+    return (3, def_name)
+
+
+for _def_name in sorted(_ss_synths.keys(), key=_def_sort_key):
+    _base_name = _base_method_name_for_def(_def_name)
+    _method_name = _base_name
+    if hasattr(SynthDefInstrument, _method_name) or (_method_name in _registered_method_names):
+        if _def_name.startswith('fd_'):
+            _method_name = f"{_base_name}_fd"
+        elif _def_name.startswith('kl_'):
+            _method_name = f"{_base_name}_kl"
+        else:
+            _method_name = f"{_base_name}_synth"
+    _suffix = 2
+    while hasattr(SynthDefInstrument, _method_name) or (_method_name in _registered_method_names):
+        _method_name = f"{_base_name}_{_suffix}"
+        _suffix += 1
+    _registered_method_names.add(_method_name)
+    setattr(SynthDefInstrument, _method_name, _make_synth_classmethod(_def_name, _method_name))

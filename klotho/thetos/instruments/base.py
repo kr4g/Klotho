@@ -36,10 +36,10 @@ class Instrument:
         return self.__str__()
 
 
-class InsertBase:
+class Effect:
     """Base class for insert effects -- long-lived FX nodes in a track's chain.
 
-    Unlike ``Instrument`` (which represents a per-note voice), an InsertBase
+    Unlike ``Instrument`` (which represents a per-note voice), an Effect
     represents a persistent node whose parameters are automated via ``set``
     events.  Identity is by ``uid``, not by name or pfields.
     """
@@ -64,7 +64,7 @@ class InsertBase:
         return self._pfields.copy()
 
     def __eq__(self, other):
-        if not isinstance(other, InsertBase):
+        if not isinstance(other, Effect):
             return NotImplemented
         return self._uid == other._uid
 
@@ -75,7 +75,7 @@ class InsertBase:
         return self._pfields[key]
 
     def __str__(self):
-        return f"InsertBase(name='{self._name}', uid='{self._uid}', pfields={dict(self._pfields)})"
+        return f"Effect(name='{self._name}', uid='{self._uid}', pfields={dict(self._pfields)})"
 
     def __repr__(self):
         return self.__str__()

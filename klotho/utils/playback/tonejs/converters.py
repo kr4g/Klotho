@@ -8,7 +8,7 @@ from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
-from klotho.thetos.instruments.instrument import ToneInstrument
+from klotho.thetos.instruments.tone import ToneInstrument
 from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
 from klotho.utils.playback._converter_base import (
     DEFAULT_NOTE_DURATION, DEFAULT_CHORD_DURATION,

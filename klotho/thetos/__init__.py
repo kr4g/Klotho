@@ -10,7 +10,7 @@ from . import parameters
 from . import composition
 
 from .parameters import ParameterTree, ParameterField
-from .instruments import Instrument, InsertBase, SynthDefInstrument, Insert, MidiInstrument, ToneInstrument
+from .instruments import Instrument, Effect, SynthDefInstrument, SynthDefFX, MidiInstrument, ToneInstrument
 from .composition import CompositionalUnit, Parametron, Score
 from .types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
@@ -21,8 +21,8 @@ __all__ = [
     'ParameterTree',
     'ParameterField',
     'Instrument',
-    'InsertBase',
-    'Insert',
+    'Effect',
+    'SynthDefFX',
     'CompositionalUnit',
     'Parametron',
     'Score',

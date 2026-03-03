@@ -1,6 +1,6 @@
-from .base import Instrument, InsertBase
-from .synthdef import SynthDefInstrument, Insert
+from .base import Instrument, Effect
+from .synthdef import SynthDefInstrument, SynthDefFX
 from .midi import MidiInstrument
 from .tone import ToneInstrument
 
-__all__ = ['Instrument', 'InsertBase', 'SynthDefInstrument', 'Insert', 'MidiInstrument', 'ToneInstrument']
+__all__ = ['Instrument', 'Effect', 'SynthDefInstrument', 'SynthDefFX', 'MidiInstrument', 'ToneInstrument']

@@ -18,7 +18,7 @@ from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
-from klotho.thetos.instruments.base import InsertBase
+from klotho.thetos.instruments.base import Effect
 from klotho.dynatos.envelopes import Envelope
 from klotho.topos.collections.sequences import Pattern
 
@@ -1144,7 +1144,7 @@ class CompositionalUnit(TemporalUnit):
         if isinstance(instrument, (str, int)):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
-        elif isinstance(instrument, (Instrument, InsertBase)):
+        elif isinstance(instrument, (Instrument, Effect)):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
         elif callable(instrument) or isinstance(instrument, Pattern):

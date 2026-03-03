@@ -19,7 +19,7 @@ except ImportError:
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
-from klotho.thetos.instruments.instrument import MidiInstrument
+from klotho.thetos.instruments.midi import MidiInstrument
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
 from klotho.tonos.pitch.pitch import Pitch
 from klotho.tonos.scales.scale import Scale

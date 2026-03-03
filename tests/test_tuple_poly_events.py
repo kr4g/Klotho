@@ -2,7 +2,8 @@ from mido import MidiFile
 
 from klotho import CompositionalUnit
 from klotho.semeios.notelists.supercollider import Scheduler
-from klotho.thetos.instruments.instrument import ToneInstrument, MidiInstrument
+from klotho.thetos.instruments.tone import ToneInstrument
+from klotho.thetos.instruments.midi import MidiInstrument
 from klotho.utils.playback._converter_base import lower_event_ir_to_voice_events, lower_poly_pfields_to_voices
 from klotho.utils.playback.midi_player import _create_midi_from_compositional_unit
 from klotho.utils.playback._sc_assembly import sort_sc_assembly_events

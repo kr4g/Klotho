@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from klotho.thetos.instruments.instrument import SynthDefInstrument
-from klotho.thetos.instruments.base import InsertBase
+from klotho.thetos.instruments.synthdef import SynthDefInstrument
+from klotho.thetos.instruments.base import Effect
 from klotho.utils.playback._amplitude import single_voice_amplitude
 from klotho.utils.playback._converter_base import (
     _merge_pfields,
@@ -67,7 +67,7 @@ def _attach_poly_meta(event_record, voice_event):
 
 
 def _is_insert_instrument(instrument):
-    return isinstance(instrument, InsertBase)
+    return isinstance(instrument, Effect)
 
 
 def lower_compositional_ir_to_sc_assembly(

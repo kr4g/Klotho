@@ -17,7 +17,7 @@ from typing import Union
 from uuid import uuid4
 
 from klotho.thetos.composition.compositional import CompositionalUnit
-from klotho.thetos.instruments.base import InsertBase
+from klotho.thetos.instruments.base import Effect
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
@@ -37,7 +37,7 @@ class Score:
     Examples
     --------
     >>> s = Score()
-    >>> s.track("melody", inserts=[Insert("__reverb", mix=0.3)])
+    >>> s.track("melody", inserts=[SynthDefFX("__reverb", mix=0.3)])
     >>> s.add(my_uc, track="melody")
     >>> s.play()
     """
@@ -74,8 +74,8 @@ class Score:
         if name != "main" and name in self._tracks:
             raise ValueError(f"Track '{name}' already exists")
         for ins in (inserts or []):
-            if not isinstance(ins, InsertBase):
-                raise TypeError(f"Expected Insert, got {type(ins).__name__}")
+            if not isinstance(ins, Effect):
+                raise TypeError(f"Expected SynthDefFX, got {type(ins).__name__}")
             if ins.uid in self._insert_registry:
                 existing = self._insert_registry[ins.uid]
                 raise ValueError(

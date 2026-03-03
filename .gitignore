@@ -158,6 +158,7 @@ tests/**/__pycache__/
 
 # SuperSonic assets (always tracked)
 !klotho/utils/playback/supersonic/assets/**/*.scd
+klotho/utils/playback/supersonic/assets/foxdot_random_tester.scd
 !klotho/utils/playback/supersonic/assets/**/*.scsyndef
 !klotho/utils/playback/supersonic/assets/manifest.json
 
