@@ -85,12 +85,12 @@ class SuperSonicEngine:
         self.control_data = control_data or {"buffer": None, "blockSize": 512, "descriptors": []}
         self.ring_time = ring_time
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
-        self.manifest = _load_manifest()
         from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta
         validate_sc_events(self.events)
         if self.meta:
             validate_sc_meta(self.meta)
         self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
+        self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), self._needed)
 
     def _needed_synthdefs(self):
         names = set()
@@ -119,6 +119,7 @@ class SuperSonicEngine:
 
     def _generate_html(self):
         events_json = json.dumps(self.events)
+        synthdef_assets_json = json.dumps(self.synthdef_assets)
         needed_json = json.dumps(list(self._needed))
 
         config_json = json.dumps({
@@ -139,6 +140,7 @@ class SuperSonicEngine:
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
+                     .replace('__SYNTHDEF_ASSETS_JSON__', synthdef_assets_json)
                      .replace('__NEEDED_JSON__', needed_json)
                      .replace('__SS_CONFIG_JSON__', config_json)
                      .replace('__META_JSON__', meta_json)
