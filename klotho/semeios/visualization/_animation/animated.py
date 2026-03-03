@@ -118,7 +118,7 @@ class AnimatedLattice3dFigure:
 {controls_html}
 {scripts_html}
 <script>
-(function _klotho3dInit() {{
+(typeof requestIdleCallback==='function'?requestIdleCallback:function(f){{setTimeout(f,0)}})(function _klotho3dInit() {{
     if (typeof THREE === "undefined") {{
         if (!document.querySelector('script[data-klotho-three]')) {{
             var s = document.createElement("script");
@@ -665,7 +665,7 @@ class AnimatedRTSvgFigure:
 {controls_html}
 {scripts_html}
 <script>
-(function() {{
+(typeof requestIdleCallback==='function'?requestIdleCallback:function(f){{setTimeout(f,0)}})(function() {{
     var elCache = {{}};
     function getEl(id) {{ if (!elCache[id]) elCache[id] = document.getElementById(id); return elCache[id]; }}
 
@@ -794,7 +794,7 @@ class AnimatedLatticeSvgFigure:
 {controls_html}
 {scripts_html}
 <script>
-(function() {{
+(typeof requestIdleCallback==='function'?requestIdleCallback:function(f){{setTimeout(f,0)}})(function() {{
     var steps = {steps_json};
     var haloIds = {halos_json};
     var allPathIds = {all_path_json};
@@ -977,7 +977,7 @@ class _AnimatedShapeFigureBase:
     </div>
 {scripts_html}
 <script>
-(function() {{
+(typeof requestIdleCallback==='function'?requestIdleCallback:function(f){{setTimeout(f,0)}})(function() {{
     var groupNodeIndices = {group_node_indices_json};
     var groupEdgeIds = {group_edge_ids_json};
     var shapeColors = {shape_colors_json};
