@@ -138,6 +138,8 @@ def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0):
             })
 
     events.sort(key=lambda e: e["start"])
+    from klotho.utils.playback._sc_validate import validate_sc_events
+    validate_sc_events(events, animation=True)
     return {"events": events, "_engine": "supersonic", "pause": max(0.0, float(pause or 0.0))}
 
 

@@ -70,6 +70,10 @@ class SuperSonicEngine:
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         self.manifest = _load_manifest()
         self.synthdef_assets = _load_synthdef_assets()
+        from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta
+        validate_sc_events(self.events)
+        if self.meta:
+            validate_sc_meta(self.meta)
 
     def _needed_synthdefs(self):
         names = set()

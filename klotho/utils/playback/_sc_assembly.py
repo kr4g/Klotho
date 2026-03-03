@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from klotho.thetos.instruments.synthdef import SynthDefInstrument
 from klotho.thetos.instruments.base import Effect
+from klotho.thetos.instruments.base import Kit
 from klotho.utils.playback._amplitude import single_voice_amplitude
 from klotho.utils.playback._converter_base import (
     _merge_pfields,
@@ -143,8 +144,13 @@ def lower_compositional_ir_to_sc_assembly(
                 node_to_event_ids.setdefault(event.node_id, []).append(instrument.uid)
             continue
 
-        def_name = _resolve_event_synth(instrument, default_synth)
-        release_mode = _release_mode(instrument)
+        resolved_instrument = instrument
+        if isinstance(instrument, Kit):
+            selector_val = event.get_pfield(instrument.selector)
+            resolved_instrument = instrument._resolve(selector_val)
+
+        def_name = _resolve_event_synth(resolved_instrument, default_synth)
+        release_mode = _release_mode(resolved_instrument)
         is_gated = release_mode in GATED_RELEASE_MODES
         is_ungated = release_mode in FREE_RELEASE_MODES
         group = event.get_mfield('group')
@@ -153,20 +159,21 @@ def lower_compositional_ir_to_sc_assembly(
         slur_id = event.get_mfield('_slur_id')
         voice_events = lower_event_ir_to_voice_events(event, step_index=step_idx)
 
+        _kit_selector = instrument.selector if isinstance(instrument, Kit) else None
         for voice_event in voice_events:
             voice_start = voice_event["start"] - time_offset if animation else voice_event["start"]
             voice_end = voice_event["end"] - time_offset if animation else voice_event["end"]
             voice_pfields = {
                 k: v for k, v in voice_event["pfields"].items()
-                if k != 'group'
+                if k != 'group' and k != _kit_selector
             }
 
             if is_ungated:
-                instrument_id = id(instrument) if instrument is not None else None
+                instrument_id = id(resolved_instrument) if resolved_instrument is not None else None
                 sustain_param = sustain_param_cache.get(instrument_id)
                 if instrument_id is not None and instrument_id not in sustain_param_cache:
                     sustain_param = None
-                    lower_to_key = {k.lower(): k for k in instrument.pfields.keys()}
+                    lower_to_key = {k.lower(): k for k in resolved_instrument.pfields.keys()}
                     for param in ('sustaintime', 'releasetime'):
                         if param in lower_to_key:
                             sustain_param = lower_to_key[param]

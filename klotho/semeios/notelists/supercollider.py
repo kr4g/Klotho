@@ -12,6 +12,7 @@ import os
 from typing import Union
 
 from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.thetos.instruments.base import Kit
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
@@ -205,21 +206,28 @@ class Scheduler:
             if event.is_rest:
                 continue
             instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
-            if isinstance(instrument, str):
-                event_def_name = instrument
-            elif instrument is not None and hasattr(instrument, 'defName'):
-                event_def_name = instrument.defName
+            resolved = instrument
+            kit_selector = None
+            if isinstance(instrument, Kit):
+                kit_selector = instrument.selector
+                selector_val = event.get_pfield(kit_selector) if hasattr(event, 'get_pfield') else None
+                resolved = instrument._resolve(selector_val)
+            if isinstance(resolved, str):
+                event_def_name = resolved
+            elif resolved is not None and hasattr(resolved, 'defName'):
+                event_def_name = resolved.defName
             else:
                 event_def_name = 'kl_tri'
             event_group = event.get_mfield('group')
-            pfields = {k: v for k, v in event.pfields.items() if k != 'group'}
+            pfields = {k: v for k, v in event.pfields.items()
+                       if k != 'group' and k != kit_selector}
             uid = self.new_node(
                 def_name=event_def_name,
                 start=event.start,
                 group=event_group,
                 **pfields
             )
-            release_mode = (getattr(instrument, 'release_mode', '') or '').lower() if instrument is not None else 'gate'
+            release_mode = (getattr(resolved, 'release_mode', '') or '').lower() if resolved is not None else 'gate'
             if release_mode not in ('gate', 'free'):
                 release_mode = 'gate'
             if release_mode == 'gate':

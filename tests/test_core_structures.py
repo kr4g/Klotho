@@ -601,8 +601,8 @@ class TestCompositionalUnitArticulations:
         uc.apply_envelope(envelope=env, pfields='amp', node=inner_nodes[0])
         uc.apply_envelope(envelope=env, pfields='vel', node=inner_nodes[0])
         ev = uc.events
-        assert ev['pfields'].apply(lambda d: 'amp' in d).all()
-        assert ev['pfields'].apply(lambda d: 'vel' in d).all()
+        assert 'amp' in ev.columns
+        assert 'vel' in ev.columns
 
     def test_apply_envelope_skips_rests_without_error(self):
         uc = self._make_uc()
@@ -642,7 +642,7 @@ class TestCompositionalUnitArticulations:
             scope="per_node"
         )
         ev = uc.events
-        assert ev['pfields'].apply(lambda d: 'amp' in d).all()
+        assert 'amp' in ev.columns
 
     def test_slur_per_node_mode_is_atomic_on_failure(self):
         uc = self._make_uc()
@@ -738,8 +738,7 @@ class TestCompositionalUnitRT_PTSync:
         uc = UC(tempus='4/4', prolatio=(1, 1, 1), beat='1/4', bpm=120, pfields=['freq'])
         leaf = uc._rt.leaf_nodes[0]
         uc.subdivide(leaf, (1, 1))
-        events_df = uc.events
-        event_node_ids = events_df['node_id'].tolist()
+        event_node_ids = [e.node_id for e in uc]
         assert set(event_node_ids) <= set(uc._rt.nodes)
         assert set(event_node_ids) <= set(uc._pt.nodes)
         assert len(event_node_ids) == 4

@@ -19,6 +19,7 @@ from klotho.chronos.temporal_units.temporal import Chronon
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
 from klotho.thetos.instruments.base import Effect
+from klotho.thetos.instruments.base import Kit
 from klotho.dynatos.envelopes import Envelope
 from klotho.topos.collections.sequences import Pattern
 
@@ -57,14 +58,22 @@ class DistributionContext:
 PFieldContext = DistributionContext
 
 
+def _resolve_kit_member(inst, pt, node):
+    if isinstance(inst, Kit):
+        selector_val = pt.get_pfield(node, inst.selector)
+        return inst._resolve(selector_val)
+    return inst
+
+
 def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) -> DistributionContext:
     pt = uc._pt
     inst = pt.get_instrument(node)
+    effective = _resolve_kit_member(inst, pt, node) if inst is not None else inst
     pfields = {}
-    inst_pfields = inst.pfields if (inst is not None and hasattr(inst, 'pfields')) else {}
+    inst_pfields = effective.pfields if (effective is not None and hasattr(effective, 'pfields')) else {}
     for k in pt._meta['pfields']:
         v = pt.get_pfield(node, k)
-        if v is None and inst is not None:
+        if v is None and effective is not None:
             if k in inst_pfields:
                 v = inst_pfields[k]
         pfields[k] = v
@@ -116,8 +125,9 @@ class Parametron(Chronon):
         """
         Get parameter field values for this event (for playback, etc.).
         
-        Returns pfield values with instrument fallback.
-        Use ``get_mfield`` for meta fields to avoid key collisions.
+        Returns pfield values with instrument fallback.  When the governing
+        instrument is a Kit, defaults come from the resolved member (based
+        on the selector pfield at this node), not the Kit shell.
         
         Returns
         -------
@@ -126,16 +136,17 @@ class Parametron(Chronon):
         """
         result = {}
         inst = self._resolve_instrument()
-        if inst is not None and hasattr(inst, 'pfields'):
-            result.update(dict(inst.pfields))
+        effective = _resolve_kit_member(inst, self._pt, self._node_id) if inst is not None else inst
+        if effective is not None and hasattr(effective, 'pfields'):
+            result.update(dict(effective.pfields))
         for k in self._pt._meta['pfields']:
             v = self._pt.get_pfield(self._node_id, k)
             if v is not None:
                 result[k] = v
-            elif inst is not None and hasattr(inst, 'pfields'):
-                inst_pfields = inst.pfields
-                if k in inst_pfields:
-                    result[k] = inst_pfields[k]
+            elif effective is not None and hasattr(effective, 'pfields'):
+                eff_pfields = effective.pfields
+                if k in eff_pfields:
+                    result[k] = eff_pfields[k]
         return result
 
     @property
@@ -536,49 +547,73 @@ class CompositionalUnit(TemporalUnit):
         """
         return self._pt.mfields
     
+    @staticmethod
+    def _instrument_display(inst):
+        if inst is None:
+            return None
+        if isinstance(inst, (str, int)):
+            return inst
+        if hasattr(inst, 'name') and inst.name not in (None, 'default'):
+            return inst.name
+        if hasattr(inst, 'defName'):
+            return inst.defName
+        if hasattr(inst, 'tonejs_class'):
+            return inst.tonejs_class
+        if hasattr(inst, 'prgm'):
+            return inst.prgm
+        return str(inst)
+
     @property
     def events(self):
         """
-        Enhanced events DataFrame including both temporal and parameter data.
-        
+        Flattened event DataFrame for inspection.
+
+        Columns (left to right):
+        ``node_id``, ``start``, ``dur``, ``metric_dur``, ``instrument``,
+        then one column per pfield key, then one column per mfield key.
+        Rests are indicated by negative ``metric_dur``.  Pfield/mfield
+        columns are the union across all events; missing keys are ``None``.
+
         Returns
         -------
         pandas.DataFrame
-            DataFrame with temporal properties and all parameter fields
         """
         events = self._materialize_events()
-        base_data = []
+        all_pf_keys: list[str] = []
+        all_mf_keys: list[str] = []
+        pf_seen: set[str] = set()
+        mf_seen: set[str] = set()
+        rows = []
         for event in events:
             inst = self.get_instrument(event.node_id)
-            if inst is None:
-                inst_display = None
-            elif isinstance(inst, (str, int)):
-                inst_display = inst
-            elif hasattr(inst, 'name') and inst.name not in (None, 'default'):
-                inst_display = inst.name
-            elif hasattr(inst, 'defName'):
-                inst_display = inst.defName
-            elif hasattr(inst, 'tonejs_class'):
-                inst_display = inst.tonejs_class
-            elif hasattr(inst, 'prgm'):
-                inst_display = inst.prgm
-            else:
-                inst_display = str(inst)
-            event_dict = {
-                'node_id': event.node_id,
-                'instrument': inst_display,
-                'start': event.start,
-                'duration': event.duration,
-                'end': event.end,
-                'is_rest': event.is_rest,
-                's': event.proportion,
-                'metric_duration': event.metric_duration,
-                'pfields': event.pfields,
-                'mfields': event.mfields,
-            }
-            base_data.append(event_dict)
+            pf = event.pfields
+            mf = event.mfields
+            for k in pf:
+                if k not in pf_seen:
+                    pf_seen.add(k)
+                    all_pf_keys.append(k)
+            for k in mf:
+                if k not in mf_seen:
+                    mf_seen.add(k)
+                    all_mf_keys.append(k)
+            rows.append((event, inst, pf, mf))
 
-        return pd.DataFrame(base_data, index=range(len(events)))
+        data = []
+        for event, inst, pf, mf in rows:
+            row = {
+                'node_id': event.node_id,
+                'start': event.start,
+                'dur': event.duration,
+                'metric_dur': event.metric_duration,
+                'instrument': self._instrument_display(inst),
+            }
+            for k in all_pf_keys:
+                row[k] = pf.get(k)
+            for k in all_mf_keys:
+                row[k] = mf.get(k)
+            data.append(row)
+
+        return pd.DataFrame(data, index=range(len(rows)))
     
     def _distribute_to_targets(self, targets, fields, include_rests, setter='pfields'):
         if not include_rests:
@@ -1133,7 +1168,10 @@ class CompositionalUnit(TemporalUnit):
             Target node(s). Single node: instrument set on that node, inherits
             to descendants. List of nodes: instrument evaluated once per node.
         instrument : Instrument, str, int, Pattern, or callable
-            - Instrument: set directly on node with pfield defaults
+            - Instrument: set directly on node with pfield defaults.
+              If the instrument carries an ``_ensemble_family`` tag (i.e. it
+              was accessed through an Ensemble family view), the ``group``
+              mfield is automatically set to the family name.
             - str: raw synth reference (defName for SC, tonejs_class for Tone.js)
             - int: raw program number (MIDI)
             - Pattern: next() called once per target node
@@ -1145,8 +1183,11 @@ class CompositionalUnit(TemporalUnit):
             for n in targets:
                 self._pt.set_instrument(n, instrument)
         elif isinstance(instrument, (Instrument, Effect)):
+            family = getattr(instrument, '_ensemble_family', None)
             for n in targets:
                 self._pt.set_instrument(n, instrument)
+                if family is not None:
+                    self._pt.set_mfields(n, group=family)
         elif callable(instrument) or isinstance(instrument, Pattern):
             total = len(targets)
             for i, n in enumerate(targets):
@@ -1161,6 +1202,9 @@ class CompositionalUnit(TemporalUnit):
                     inst = instrument(ctx) if arity >= 1 else instrument()
                 if inst is not None:
                     self._pt.set_instrument(n, inst)
+                    family = getattr(inst, '_ensemble_family', None)
+                    if family is not None:
+                        self._pt.set_mfields(n, group=family)
 
     def set(self, node, inst=None, mfields=None, pfields=None,
             include_rests=False):

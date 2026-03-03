@@ -255,6 +255,8 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfi
 
     if animation:
         events.sort(key=lambda ev: ev["start"])
+    from klotho.utils.playback._sc_validate import validate_sc_events
+    validate_sc_events(events, animation=animation)
     return events
 
 
@@ -276,7 +278,7 @@ def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None, amp=None, extra
 
 
 def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
-    return lower_compositional_ir_to_sc_assembly(
+    events = lower_compositional_ir_to_sc_assembly(
         obj,
         extra_pfields=extra_pfields,
         animation=animation,
@@ -285,6 +287,9 @@ def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
         normalize_sc_pfields=True,
         sort_output=True,
     )
+    from klotho.utils.playback._sc_validate import validate_sc_events
+    validate_sc_events(events, animation=animation)
+    return events
 
 
 def compositional_unit_to_sc_animation_events(obj, extra_pfields=None):

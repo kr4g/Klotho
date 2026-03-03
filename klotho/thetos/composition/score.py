@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.base import Effect
+from klotho.thetos.instruments.base import Kit
 from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
@@ -185,15 +186,23 @@ class Score:
             if event.is_rest:
                 continue
             instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
-            if isinstance(instrument, str):
-                def_name = instrument
-            elif instrument is not None and hasattr(instrument, 'defName'):
-                def_name = instrument.defName
+            resolved = instrument
+            kit_selector = None
+            if isinstance(instrument, Kit):
+                kit_selector = instrument.selector
+                selector_val = event.get_pfield(kit_selector) if hasattr(event, 'get_pfield') else None
+                resolved = instrument._resolve(selector_val)
+
+            if isinstance(resolved, str):
+                def_name = resolved
+            elif resolved is not None and hasattr(resolved, 'defName'):
+                def_name = resolved.defName
             else:
                 def_name = 'kl_tri'
 
             group = track or (event.get_mfield('group') if hasattr(event, 'get_mfield') else None) or 'default'
-            pfields = {k: v for k, v in event.pfields.items() if k != 'group'}
+            pfields = {k: v for k, v in event.pfields.items()
+                       if k != 'group' and k != kit_selector}
 
             uid = uuid4().hex
             new_event = {
@@ -206,7 +215,7 @@ class Score:
             }
             self._push_event(new_event)
 
-            release_mode = (getattr(instrument, 'release_mode', '') or '').lower() if instrument is not None else 'gate'
+            release_mode = (getattr(resolved, 'release_mode', '') or '').lower() if resolved is not None else 'gate'
             if release_mode not in ('gate', 'free'):
                 release_mode = 'gate'
             if release_mode == 'gate':
@@ -402,6 +411,36 @@ class Score:
                 print(f"Score: wrote control buffer to {os.path.abspath(buf_path)}")
             except ImportError:
                 print("Score: scipy not available; skipping .wav buffer export")
+
+    # ------------------------------------------------------------------
+    # Ensemble integration
+    # ------------------------------------------------------------------
+
+    def from_ensemble(self, ensemble) -> 'Score':
+        """Create tracks and insert chains from an Ensemble's family structure.
+
+        Each family becomes a track.  Insert FX are copied with fresh
+        ``uid`` values so that every Score gets independent FX nodes.
+
+        Parameters
+        ----------
+        ensemble : Ensemble
+            The ensemble whose families define the track layout.
+
+        Returns
+        -------
+        Score
+            ``self``, for chaining.
+        """
+        from klotho.thetos.instruments.ensemble import _copy_inserts_with_fresh_uids
+        for family_name in ensemble.families:
+            raw_inserts = ensemble.inserts(family_name)
+            if raw_inserts:
+                inserts = _copy_inserts_with_fresh_uids(raw_inserts)
+            else:
+                inserts = None
+            self.track(family_name, inserts=inserts)
+        return self
 
     # ------------------------------------------------------------------
     # Utilities

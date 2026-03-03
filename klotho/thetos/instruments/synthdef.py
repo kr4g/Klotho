@@ -1,6 +1,6 @@
 import copy
 
-from .base import Instrument, Effect
+from .base import Instrument, Kit, Effect
 from ._shared import ss_synth_meta, load_ss_manifest
 
 
@@ -90,6 +90,58 @@ class SynthDefFX(Effect):
 
     def __str__(self):
         return f"SynthDefFX(defName='{self._defName}', uid='{self._uid}', args={dict(self._pfields)})"
+
+
+class SynthDefKit(Kit):
+    """A Kit whose members are SynthDefInstruments.
+
+    Extends :class:`Kit` with SuperCollider-specific properties and
+    a ``from_manifest`` factory.  Each member may have a different
+    ``defName`` and ``release_mode``; the assembly layer resolves the
+    correct member per event, so these properties delegate to the
+    *default* member only as a display/fallback hint.
+
+    Parameters
+    ----------
+    members : dict[str, SynthDefInstrument]
+        Named SynthDef instruments.
+    default : str or None
+        Key of the default member.
+    selector : str
+        Pfield name for the selector (default ``'voice'``).
+    """
+
+    @property
+    def defName(self):
+        return getattr(self._members[self._default], 'defName', None)
+
+    @property
+    def release_mode(self):
+        return getattr(self._members[self._default], 'release_mode', 'gate')
+
+    @classmethod
+    def from_manifest(cls, members: dict, default=None, selector='voice', **overrides):
+        """Build a SynthDefKit from manifest defNames.
+
+        Parameters
+        ----------
+        members : dict[str, str]
+            Mapping of selector keys to SynthDef defNames.
+        default : str or None
+            Default selector key.
+        selector : str
+            Pfield name for the selector.
+        **overrides
+            Passed to ``SynthDefInstrument.from_manifest`` for every member.
+        """
+        built = {}
+        for key, def_name in members.items():
+            built[key] = SynthDefInstrument.from_manifest(def_name, name=key, **overrides)
+        return cls(built, default=default, selector=selector)
+
+    def __str__(self):
+        keys = list(self._members.keys())
+        return f"SynthDefKit(members={keys}, default='{self._default}', selector='{self._selector}')"
 
 
 def _clean_method_name(name: str) -> str:
