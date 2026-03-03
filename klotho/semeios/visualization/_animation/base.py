@@ -101,7 +101,9 @@ def build_nav_controls_html(wid, total_groups):
     </span>'''
 
 
-def build_scripts_html(instruments_js, player_js):
+def build_scripts_html(instruments_js, player_js, engine="tone"):
+    if engine == "supersonic":
+        return ""
     bridge_js = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
     return f'''<script>{instruments_js}</script>
 <script>{player_js}</script>

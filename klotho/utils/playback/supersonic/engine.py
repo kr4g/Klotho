@@ -10,8 +10,6 @@ from klotho.utils.playback.supersonic.cdn import (
     SUPERSONIC_CORE_CDN,
     SUPERSONIC_SYNTHDEFS_CDN,
     SUPERSONIC_SAMPLES_CDN,
-    SCHEDULER_JS_PATH,
-    DRAW_JS_PATH,
 )
 
 MANIFEST_PATH = Path(__file__).parent / "assets" / "manifest.json"
@@ -129,9 +127,6 @@ class SuperSonicEngine:
             "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
         })
 
-        draw_js = DRAW_JS_PATH.read_text() if DRAW_JS_PATH.exists() else ""
-        scheduler_js = SCHEDULER_JS_PATH.read_text() if SCHEDULER_JS_PATH.exists() else ""
-
         wid = self.widget_id
 
         meta_json = json.dumps(self.meta)
@@ -207,10 +202,6 @@ class SuperSonicEngine:
 </div>
 
 <script>
-{draw_js}
-
-{scheduler_js}
-
 {widget_js}
 </script>
 '''
