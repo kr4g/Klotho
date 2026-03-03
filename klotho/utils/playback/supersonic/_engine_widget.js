@@ -115,8 +115,6 @@
         return _loadPromise;
     }
 
-    statusEl.textContent = "loading...";
-    statusEl.style.color = "#f0ad4e";
     ensureReady();
 
     function doPlay() {
