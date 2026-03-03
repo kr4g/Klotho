@@ -12,12 +12,37 @@ from klotho.utils.playback.supersonic.cdn import (
     SUPERSONIC_SAMPLES_CDN,
 )
 
+SYNTHDEFS_DIR = Path(__file__).parent / "assets" / "synthdefs"
 _WIDGET_JS_PATH = Path(__file__).parent / "_engine_widget.js"
 _SCHED_SCORE_PATH = Path(__file__).parent / "scheduler_score.js"
 _WIDGET_JS_TEMPLATE = None
 _SCHED_SCORE_JS = None
+_ALL_SYNTHDEF_ASSETS = None
 
 _INFRA_SYNTHDEFS = frozenset({'__busRouter', '__busRouterMonitor', '__chainLimiter'})
+
+
+def _load_all_synthdef_assets():
+    global _ALL_SYNTHDEF_ASSETS
+    if _ALL_SYNTHDEF_ASSETS is None:
+        assets = {}
+        if SYNTHDEFS_DIR.exists():
+            for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
+                assets[path.stem] = base64.b64encode(path.read_bytes()).decode("ascii")
+        if "default" not in assets and "kl_tri" in assets:
+            assets["default"] = assets["kl_tri"]
+        _ALL_SYNTHDEF_ASSETS = assets
+    return _ALL_SYNTHDEF_ASSETS
+
+
+def _filter_synthdef_assets(all_assets, needed):
+    filtered = {}
+    for name in needed | _INFRA_SYNTHDEFS:
+        if name in all_assets:
+            filtered[name] = all_assets[name]
+    if "default" not in filtered and "kl_tri" in all_assets:
+        filtered["default"] = all_assets["kl_tri"]
+    return filtered
 
 
 def _convert_numpy_types(obj):
@@ -63,6 +88,7 @@ class SuperSonicEngine:
         if self.meta:
             validate_sc_meta(self.meta)
         self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
+        self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), self._needed)
         self._is_score = bool(self.meta.get("groups") or self.meta.get("inserts"))
 
     def _needed_synthdefs(self):
@@ -92,6 +118,7 @@ class SuperSonicEngine:
 
     def _generate_html(self):
         events_json = json.dumps(self.events)
+        synthdef_assets_json = json.dumps(self.synthdef_assets)
         needed_json = json.dumps(list(self._needed))
 
         config_json = json.dumps({
@@ -109,7 +136,7 @@ class SuperSonicEngine:
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
-                     .replace('__SYNTHDEF_ASSETS_JSON__', '{}')
+                     .replace('__SYNTHDEF_ASSETS_JSON__', synthdef_assets_json)
                      .replace('__NEEDED_JSON__', needed_json)
                      .replace('__SS_CONFIG_JSON__', config_json)
                      .replace('__META_JSON__', meta_json)
