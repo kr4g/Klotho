@@ -107,9 +107,44 @@ _DRAW_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' 
 
 def build_scripts_html(instruments_js, player_js, engine="tone"):
     if engine == "supersonic":
+        import json
+        from klotho.utils.playback.supersonic.cdn import (
+            SUPERSONIC_CDN, SUPERSONIC_CORE_CDN,
+            SUPERSONIC_SYNTHDEFS_CDN, SUPERSONIC_SAMPLES_CDN,
+        )
         draw_js = _DRAW_JS_PATH.read_text() if _DRAW_JS_PATH.exists() else ""
         sched_core_js = _SCHED_CORE_PATH.read_text() if _SCHED_CORE_PATH.exists() else ""
-        return f'''<script>{draw_js}</script>
+        ss_config = json.dumps({
+            "baseURL": f"{SUPERSONIC_CDN}/dist/",
+            "coreBaseURL": SUPERSONIC_CORE_CDN,
+            "synthdefBaseURL": SUPERSONIC_SYNTHDEFS_CDN,
+            "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
+        })
+        ss_init = f'''if (!globalThis.__klothoSonic) {{
+    globalThis.__klothoSonic = {{ instance: null, promise: null, loadedDefs: new Set() }};
+    globalThis.__klothoSonic.promise = (async function() {{
+        try {{
+            var config = {ss_config};
+            var mod = await import("{SUPERSONIC_CDN}");
+            globalThis.SuperSonic = mod.SuperSonic;
+            var sonic = new mod.SuperSonic(config);
+            await sonic.init();
+            globalThis.__klothoSonic.instance = sonic;
+            return sonic;
+        }} catch(e) {{ globalThis.__klothoSonic.promise = null; return null; }}
+    }})();
+}}
+if (!globalThis.__ensureSuperSonic) {{
+    globalThis.__ensureSuperSonic = function() {{
+        var state = globalThis.__klothoSonic;
+        if (!state) {{ state = {{ instance: null, promise: null, loadedDefs: new Set() }}; globalThis.__klothoSonic = state; }}
+        if (state.instance) return Promise.resolve(state.instance);
+        if (state.promise) return state.promise;
+        return Promise.resolve(null);
+    }};
+}}'''
+        return f'''<script>{ss_init}</script>
+<script>{draw_js}</script>
 <script>{sched_core_js}</script>'''
     bridge_js = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
     return f'''<script>{instruments_js}</script>
