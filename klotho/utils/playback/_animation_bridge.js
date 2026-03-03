@@ -46,9 +46,16 @@
 
     async function _ensureSSReady() {
       if (_ssReady) return true;
-      if (typeof globalThis.__ensureSuperSonic !== "function") return false;
       try {
-        var sonic = await globalThis.__ensureSuperSonic();
+        var sonic = null;
+        if (typeof globalThis.__ensureSuperSonic === "function") {
+          sonic = await globalThis.__ensureSuperSonic();
+        }
+        if (!sonic) {
+          var state = globalThis.__klothoSonic;
+          if (state && state.instance) { sonic = state.instance; }
+          else if (state && state.promise) { sonic = await state.promise; }
+        }
         if (!sonic) return false;
         _ssSonic = sonic;
         _ssScheduler = new globalThis.BrowserScheduler({
