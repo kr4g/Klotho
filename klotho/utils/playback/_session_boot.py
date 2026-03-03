@@ -44,10 +44,14 @@ def boot_supersonic():
     manifest_json = _load_manifest_json()
     synthdef_assets_json = _load_synthdef_assets_json()
 
-    boot_js = f"""<script>
+    boot_html = f"""<script type="application/json" id="__klotho_manifest">{manifest_json}</script>
+<script type="application/json" id="__klotho_synthdefs">{synthdef_assets_json}</script>
+<script>
 if (!globalThis.__klothoSonic) {{
-    globalThis.__klothoManifest = {manifest_json};
-    globalThis.__klothoSynthdefAssets = {synthdef_assets_json};
+    var _m = document.getElementById("__klotho_manifest");
+    var _s = document.getElementById("__klotho_synthdefs");
+    globalThis.__klothoManifest = _m ? JSON.parse(_m.textContent) : {{}};
+    globalThis.__klothoSynthdefAssets = _s ? JSON.parse(_s.textContent) : {{}};
     globalThis.__klothoSonic = {{ instance: null, promise: null, loadedDefs: new Set() }};
     globalThis.__klothoSonic.promise = (async function() {{
         try {{
@@ -74,7 +78,7 @@ if (!globalThis.__klothoSonic) {{
     }})();
 }}
 </script>"""
-    display(HTML(boot_js))
+    display(HTML(boot_html))
 
 
 def _load_manifest_json():
