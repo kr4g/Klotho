@@ -38,14 +38,14 @@
             + "margin-left:0;background:#ef4444";
     }
 
-    loopBtn.onclick = async function() {
+    loopBtn.addEventListener("click", async function() {
         looping = !looping;
         loopBtn.style.opacity = looping ? "1" : "0.5";
         loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
         if (scheduler && scheduler.isPlaying) {
             doPlay();
         }
-    };
+    });
 
     function ensureSharedSonic() {
         var state = globalThis.__klothoSonic;
@@ -127,11 +127,18 @@
         });
     }
 
-    toggleBtn.onclick = async function() {
+    toggleBtn.addEventListener("click", async function() {
         if (scheduler && scheduler.isPlaying) {
             await scheduler.stop();
             setPlayIcon();
             return;
+        }
+        if (_loadPromise && !ready) {
+            _loadPromise = null;
+            var sharedState = globalThis.__klothoSonic;
+            if (sharedState && !sharedState.instance) {
+                sharedState.promise = null;
+            }
         }
         var ok = await ensureReady();
         if (!ok) return;
@@ -140,7 +147,7 @@
             await sonic.audioContext.resume();
         }
         doPlay();
-    };
+    });
 
     var _orphanCheckId = setInterval(function() {
         if (toggleBtn && !toggleBtn.isConnected) {

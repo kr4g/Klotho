@@ -112,20 +112,20 @@ if (totalGroups > 0) {
 }
 
 if (prevBtn) {
-    prevBtn.onclick = function() {
+    prevBtn.addEventListener("click", function() {
         if (playing) return;
         currentView = (currentView - 1 + totalGroups) % totalGroups;
         revealGroup(currentView);
         updateCounter();
-    };
+    });
 }
 if (nextBtn) {
-    nextBtn.onclick = function() {
+    nextBtn.addEventListener("click", function() {
         if (playing) return;
         currentView = (currentView + 1) % totalGroups;
         revealGroup(currentView);
         updateCounter();
-    };
+    });
 }
 
 function _setLoopUi() {
@@ -141,12 +141,12 @@ function _setLoopUi() {
 }
 _setLoopUi();
 
-loopBtn.onclick = function() {
+loopBtn.addEventListener("click", function() {
     if (loopMode === "off") return;
     loopEnabled = !loopEnabled;
     if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
     _setLoopUi();
-};
+});
 
 var _timerId = null;
 
@@ -172,12 +172,15 @@ function _runAnimation(step) {
     _timerId = setTimeout(function() { _runAnimation(step + 1); }, stepMs);
 }
 
-toggleBtn.onclick = async function() {
+toggleBtn.addEventListener("click", async function() {
     if (playing) {
         _stopAll();
         finishPlayback();
         return;
     }
+
+    var _ss = globalThis.__klothoSonic;
+    if (_ss && !_ss.instance && _ss.promise) { _ss.promise = null; }
 
     var ok = bridge ? await bridge.ensureReady() : false;
     var allEvts = ok && bridge ? bridge.getEvents() : [];
@@ -218,7 +221,7 @@ toggleBtn.onclick = async function() {
         if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
         _runAnimation(0);
     }
-};
+});
 
 var _orphanCheckId = setInterval(function() {
     if (toggleBtn && !toggleBtn.isConnected) {

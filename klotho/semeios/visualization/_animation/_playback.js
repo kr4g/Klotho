@@ -51,12 +51,12 @@ function _setLoopUi() {
 }
 _setLoopUi();
 
-loopBtn.onclick = function() {
+loopBtn.addEventListener("click", function() {
     if (loopMode === "off") return;
     loopEnabled = !loopEnabled;
     if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
     _setLoopUi();
-};
+});
 
 var _timerId = null;
 var durMs = __DUR_MS__;
@@ -80,12 +80,15 @@ function _stopAll() {
     if (bridge) bridge.stop();
 }
 
-toggleBtn.onclick = async function() {
+toggleBtn.addEventListener("click", async function() {
     if (playing) {
         _stopAll();
         finishPlayback();
         return;
     }
+
+    var _ss = globalThis.__klothoSonic;
+    if (_ss && !_ss.instance && _ss.promise) { _ss.promise = null; }
 
     var ok = bridge ? await bridge.ensureReady() : false;
     var hasEvents = ok && bridge && bridge.hasPlayableEvents();
@@ -107,7 +110,7 @@ toggleBtn.onclick = async function() {
         if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
         _runAnimation(0);
     }
-};
+});
 
 var _orphanCheckId = setInterval(function() {
     if (toggleBtn && !toggleBtn.isConnected) {
