@@ -13,7 +13,6 @@
     var iconEl = document.getElementById(wid + "_icon");
     var loopBtn = document.getElementById(wid + "_loop");
     var loopSvg = document.getElementById(wid + "_loop_svg");
-    var statusEl = document.getElementById(wid + "_status");
     var allEvents = __EVENTS_JSON__;
     var synthdefAssets = __SYNTHDEF_ASSETS_JSON__;
     var neededSynthdefs = __NEEDED_JSON__;
@@ -97,8 +96,6 @@
             var sonic = await ensureSharedSonic();
             if (!sonic) {
                 _loadPromise = null;
-                statusEl.textContent = "error";
-                statusEl.style.color = "#ef4444";
                 return false;
             }
             await loadDefs(sonic);
@@ -108,8 +105,6 @@
                 ringTime: __RING_TIME__,
             });
             ready = true;
-            statusEl.textContent = "ready";
-            statusEl.style.color = "#4ade80";
             return true;
         })();
         return _loadPromise;
@@ -122,17 +117,12 @@
         if (evts.length === 0) return;
 
         setStopIcon();
-        statusEl.textContent = "playing";
-        statusEl.style.color = "#4ade80";
-
         scheduler.play(evts, {
             meta: meta,
             controlData: controlData,
             loop: looping,
             onFinish: function() {
                 setPlayIcon();
-                statusEl.textContent = "ready";
-                statusEl.style.color = "#4ade80";
             }
         });
     }
@@ -141,8 +131,6 @@
         if (scheduler && scheduler.isPlaying) {
             await scheduler.stop();
             setPlayIcon();
-            statusEl.textContent = "ready";
-            statusEl.style.color = "#4ade80";
             return;
         }
         var ok = await ensureReady();
