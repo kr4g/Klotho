@@ -101,9 +101,16 @@ def build_nav_controls_html(wid, total_groups):
     </span>'''
 
 
+_SCHED_CORE_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' / 'scheduler_core.js'
+_DRAW_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' / 'draw.js'
+
+
 def build_scripts_html(instruments_js, player_js, engine="tone"):
     if engine == "supersonic":
-        return ""
+        draw_js = _DRAW_JS_PATH.read_text() if _DRAW_JS_PATH.exists() else ""
+        sched_core_js = _SCHED_CORE_PATH.read_text() if _SCHED_CORE_PATH.exists() else ""
+        return f'''<script>{draw_js}</script>
+<script>{sched_core_js}</script>'''
     bridge_js = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
     return f'''<script>{instruments_js}</script>
 <script>{player_js}</script>
