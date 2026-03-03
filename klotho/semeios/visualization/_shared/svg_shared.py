@@ -16,7 +16,14 @@ from .svg_utils import (
 
 BASE_ARC_OFFSET = 0.15
 _ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / "utils" / "playback" / "_animation_bridge.js"
-_ANIMATION_BRIDGE_JS = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
+_ANIMATION_BRIDGE_JS_CACHE = None
+
+
+def _get_animation_bridge_js():
+    global _ANIMATION_BRIDGE_JS_CACHE
+    if _ANIMATION_BRIDGE_JS_CACHE is None:
+        _ANIMATION_BRIDGE_JS_CACHE = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
+    return _ANIMATION_BRIDGE_JS_CACHE
 
 
 def render_path_edges(path, positions_fn, next_eid, path_cmap="viridis"):
@@ -222,7 +229,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
     freqs_json = json.dumps(node_freqs) if node_freqs is not None else "null"
     preview_json = json.dumps(preview_config or {})
 
-    return f"""<script>{_ANIMATION_BRIDGE_JS}</script>
+    return f"""<script>{_get_animation_bridge_js()}</script>
 <div id="{svg_uid}_tip" style="
     display:none;position:absolute;pointer-events:none;
     background:rgba(30,30,30,0.92);color:#eee;font-family:monospace;

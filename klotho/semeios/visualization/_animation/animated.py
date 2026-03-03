@@ -20,6 +20,19 @@ def _maybe_convert_payload(audio_payload, engine):
     return normalize_animation_payload_for_engine(audio_payload, engine)
 
 
+def _extract_needed_synthdefs(audio_payload):
+    if not audio_payload:
+        return None
+    events = audio_payload if isinstance(audio_payload, list) else audio_payload.get("events", [])
+    names = set()
+    for ev in events:
+        if isinstance(ev, dict) and ev.get("type") == "new":
+            dn = ev.get("defName")
+            if dn and dn != "__rest__":
+                names.add(dn)
+    return names if names else None
+
+
 class AnimatedLattice3dFigure:
     """Animated Three.js 3D lattice figure with step-by-step path reveal.
 
@@ -57,7 +70,8 @@ class AnimatedLattice3dFigure:
             include_threejs=True,
             engine=eng)
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng)
+        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
+                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
@@ -642,7 +656,8 @@ class AnimatedRTSvgFigure:
             include_tone=(bool(self.audio_payload) and eng == "tone"),
             engine=eng)
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng)
+        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
+                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         leaf_path_ids_json = json.dumps(sd.leaf_path_ids)
         all_anim_ids_json = json.dumps(sd.all_animated_ids)
@@ -774,7 +789,8 @@ class AnimatedLatticeSvgFigure:
             include_tone=(bool(self.audio_payload) and eng == "tone"),
             engine=eng)
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng)
+        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
+                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         steps_json = json.dumps(sd.step_group_ids)
         halos_json = json.dumps(sd.halo_ids)
@@ -926,7 +942,8 @@ class _AnimatedShapeFigureBase:
             include_tone=(bool(self.audio_payload) and eng == "tone"),
             engine=eng)
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng)
+        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
+                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         group_node_indices_json = json.dumps(sd.shape_group_node_indices)
         group_edge_ids_json = json.dumps(sd.shape_group_edge_ids)

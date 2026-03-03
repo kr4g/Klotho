@@ -6,38 +6,7 @@ from IPython.display import HTML, display
 from klotho.utils.playback.tonejs.cdn import (
     cdn_scripts, INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
 )
-
-
-def _convert_numpy_types(obj):
-    """
-    Recursively convert NumPy scalar types to native Python types.
-
-    Parameters
-    ----------
-    obj : object
-        Value or nested structure (dict, list) potentially containing
-        NumPy numeric scalars.
-
-    Returns
-    -------
-    object
-        The same structure with NumPy scalars replaced by ``int``
-        or ``float``.
-    """
-    try:
-        import numpy as np
-        if isinstance(obj, dict):
-            return {k: _convert_numpy_types(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [_convert_numpy_types(v) for v in obj]
-        elif isinstance(obj, (np.floating, np.float64, np.float32)):
-            return float(obj)
-        elif isinstance(obj, (np.integer, np.int64, np.int32)):
-            return int(obj)
-        else:
-            return obj
-    except ImportError:
-        return obj
+from klotho.utils.playback._helpers import convert_numpy_types
 
 
 class ToneEngine:
@@ -58,7 +27,7 @@ class ToneEngine:
     """
 
     def __init__(self, events, custom_js_path=None, custom_js=None):
-        self.events = _convert_numpy_types(events)
+        self.events = convert_numpy_types(events)
         self.custom_js_path = Path(custom_js_path) if custom_js_path else None
         self.custom_js = custom_js
         self.widget_id = f"klotho_{uuid.uuid4().hex[:8]}"

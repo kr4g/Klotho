@@ -11,6 +11,14 @@ _SHAPE_PLAYBACK_JS_PATH = Path(__file__).parent / '_shape_playback.js'
 _PLAYBACK_JS_TEMPLATE = None
 _SHAPE_PLAYBACK_JS_TEMPLATE = None
 _ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / '_animation_bridge.js'
+_ANIMATION_BRIDGE_JS_CACHE = None
+
+
+def _get_animation_bridge_js():
+    global _ANIMATION_BRIDGE_JS_CACHE
+    if _ANIMATION_BRIDGE_JS_CACHE is None:
+        _ANIMATION_BRIDGE_JS_CACHE = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
+    return _ANIMATION_BRIDGE_JS_CACHE
 
 
 def normalize_loop_policy(loop):
@@ -42,32 +50,8 @@ def build_session_preamble(include_plotly=False, include_tone=False, include_thr
 
 
 def build_control_bar_html(wid):
-    return f'''<div id="{wid}_controls" style="
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #1a1a2e; border-radius: 6px;
-    user-select: none; margin-top: 4px;">
-    <button id="{wid}_toggle" style="
-        width: 32px; height: 32px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0;">
-        <span id="{wid}_icon" style="
-            width: 0; height: 0;
-            border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-            border-left: 12px solid #4ade80; margin-left: 3px;"></span>
-    </button>
-    <button id="{wid}_loop" style="
-        width: 28px; height: 28px; border: none; border-radius: 4px;
-        background: #16213e; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; padding: 0; opacity: 0.5;">
-        <svg id="{wid}_loop_svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="#a0a0a0" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-            <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
-        </svg>
-    </button>
-</div>'''
+    from klotho.utils.playback.supersonic._js_fragments import control_bar_html
+    return control_bar_html(wid)
 
 
 def build_nav_controls_html(wid, total_groups):
@@ -101,79 +85,37 @@ def build_nav_controls_html(wid, total_groups):
     </span>'''
 
 
-_SCHED_CORE_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' / 'scheduler_core.js'
-_DRAW_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' / 'draw.js'
-
-
-def build_scripts_html(instruments_js, player_js, engine="tone"):
+def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdefs=None):
     if engine == "supersonic":
-        import json, base64
-        from klotho.utils.playback.supersonic.cdn import (
-            SUPERSONIC_CDN, SUPERSONIC_CORE_CDN,
-            SUPERSONIC_SYNTHDEFS_CDN, SUPERSONIC_SAMPLES_CDN,
+        import json
+        from klotho.utils.playback.supersonic._js_fragments import (
+            ss_init_js, draw_scheduler_js, scheduler_core_js,
+            synthdef_registry_merge_js, synthdef_loader_js,
         )
-        _SYNTHDEFS_DIR = Path(__file__).parents[3] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'synthdefs'
-        draw_js = _DRAW_JS_PATH.read_text() if _DRAW_JS_PATH.exists() else ""
-        sched_core_js = _SCHED_CORE_PATH.read_text() if _SCHED_CORE_PATH.exists() else ""
-        ss_config = json.dumps({
-            "baseURL": f"{SUPERSONIC_CDN}/dist/",
-            "coreBaseURL": SUPERSONIC_CORE_CDN,
-            "synthdefBaseURL": SUPERSONIC_SYNTHDEFS_CDN,
-            "sampleBaseURL": SUPERSONIC_SAMPLES_CDN,
-        })
-        needed = {'kl_tri', 'kl_kicktone', 'kl_sine', 'kl_saw', 'kl_sqr', 'kl_noisebpf',
-                  '__busRouter', '__busRouterMonitor', '__chainLimiter', '__klEnvCtrl'}
-        assets = {}
-        if _SYNTHDEFS_DIR.exists():
-            for p in _SYNTHDEFS_DIR.glob("*.scsyndef"):
-                if p.stem in needed:
-                    assets[p.stem] = base64.b64encode(p.read_bytes()).decode("ascii")
-        if "default" not in assets and "kl_tri" in assets:
-            assets["default"] = assets["kl_tri"]
-        synthdef_json = json.dumps(assets)
-        ss_init = f'''if (!globalThis.__klothoSonic) {{
-    globalThis.__klothoSonic = {{ instance: null, promise: null, loadedDefs: new Set() }};
-    globalThis.__klothoSonic.promise = (async function() {{
-        try {{
-            var config = {ss_config};
-            var mod = await import("{SUPERSONIC_CDN}");
-            globalThis.SuperSonic = mod.SuperSonic;
-            var sonic = new mod.SuperSonic(config);
-            await sonic.init();
-            globalThis.__klothoSonic.instance = sonic;
-            return sonic;
-        }} catch(e) {{ globalThis.__klothoSonic.promise = null; return null; }}
-    }})();
-}}
-if (!globalThis.__ensureSuperSonic) {{
-    globalThis.__ensureSuperSonic = function() {{
-        var state = globalThis.__klothoSonic;
-        if (!state) {{ state = {{ instance: null, promise: null, loadedDefs: new Set() }}; globalThis.__klothoSonic = state; }}
-        if (state.instance) return Promise.resolve(state.instance);
-        if (state.promise) return state.promise;
-        return Promise.resolve(null);
-    }};
-}}
-(async function() {{
-    var state = globalThis.__klothoSonic;
-    if (!state || !state.promise) return;
-    var sonic = await state.promise;
-    if (!sonic) return;
-    var assets = {synthdef_json};
-    var loaded = state.loadedDefs || new Set();
-    for (var name in assets) {{
-        if (!assets.hasOwnProperty(name)) continue;
-        if (loaded.has(name)) continue;
-        var b64 = assets[name];
-        var bytes = Uint8Array.from(atob(b64), function(c) {{ return c.charCodeAt(0); }});
-        try {{ await sonic.loadSynthDef(bytes); loaded.add(name); }} catch(e) {{}}
-    }}
-    state.loadedDefs = loaded;
-}})();'''
-        return f'''<script>{ss_init}</script>
-<script>{draw_js}</script>
-<script>{sched_core_js}</script>'''
-    bridge_js = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
+        from klotho.utils.playback.supersonic.engine import (
+            _load_all_synthdef_assets, _filter_synthdef_assets, _INFRA_SYNTHDEFS,
+        )
+
+        if needed_synthdefs is None:
+            needed_synthdefs = {'kl_tri', 'kl_kicktone', 'kl_sine', 'kl_saw', 'kl_sqr', 'kl_noisebpf'}
+        needed_synthdefs = needed_synthdefs | _INFRA_SYNTHDEFS | {'__klEnvCtrl'}
+
+        all_assets = _load_all_synthdef_assets()
+        assets = _filter_synthdef_assets(all_assets, needed_synthdefs)
+        assets_json = json.dumps(assets)
+        needed_json = json.dumps(list(needed_synthdefs))
+
+        bridge_js = _get_animation_bridge_js()
+        return f'''<script>
+{ss_init_js()}
+{draw_scheduler_js()}
+{scheduler_core_js()}
+{synthdef_registry_merge_js(assets_json)}
+{synthdef_loader_js(needed_json)}
+{bridge_js}
+</script>'''
+
+    bridge_js = _get_animation_bridge_js()
     return f'''<script>{instruments_js}</script>
 <script>{player_js}</script>
 <script>{bridge_js}</script>'''
