@@ -9,6 +9,10 @@
   var FIRST_PRIVATE_BUS = 16;
   var BUS_CHANNELS = 2;
 
+  if (!globalThis.__klothoBusAlloc) {
+    globalThis.__klothoBusAlloc = { nextAudio: FIRST_PRIVATE_BUS, nextControl: 0 };
+  }
+
   function getNTP() {
     return (performance.timeOrigin + performance.now()) / 1000 + NTP_EPOCH_OFFSET;
   }
@@ -29,8 +33,8 @@
       this._trackMap = null;
       this._controlGroupId = null;
       this._controlBusMap = [];
-      this._nextAudioBus = FIRST_PRIVATE_BUS;
-      this._nextControlBus = 0;
+      this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
+      this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
       this._activeBuffers = [];
 
       this._playStartNTP = 0;
@@ -55,6 +59,7 @@
       try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
       try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
       this._groupId = null;
+      this._scoreGroupId = null;
     }
 
     _freeGroupDeferred(groupId) {
@@ -327,15 +332,17 @@
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
 
+      this._cancelAllDeferredRings();
       this._freeGroup();
+      this._freeBuffers();
 
       this.nodeMap.clear();
       this._defNames.clear();
       this.drawScheduler.clear();
       this._trackMap = null;
       this._controlBusMap = [];
-      this._nextAudioBus = FIRST_PRIVATE_BUS;
-      this._nextControlBus = 0;
+      this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
+      this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
 
       if (token !== this.stopToken) return;
 

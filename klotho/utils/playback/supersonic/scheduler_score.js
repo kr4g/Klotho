@@ -11,11 +11,16 @@
   proto._allocAudioBus = function() {
     var idx = this._nextAudioBus;
     this._nextAudioBus += BUS_CHANNELS;
+    var g = globalThis.__klothoBusAlloc;
+    if (this._nextAudioBus > g.nextAudio) g.nextAudio = this._nextAudioBus;
     return idx;
   };
 
   proto._allocControlBus = function() {
-    return this._nextControlBus++;
+    var idx = this._nextControlBus++;
+    var g = globalThis.__klothoBusAlloc;
+    if (this._nextControlBus > g.nextControl) g.nextControl = this._nextControlBus;
+    return idx;
   };
 
   proto._createScoreGroup = function() {
