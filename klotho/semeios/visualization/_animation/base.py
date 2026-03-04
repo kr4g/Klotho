@@ -1,24 +1,12 @@
 from pathlib import Path
 
-from klotho.utils.playback.tonejs.cdn import (
-    cdn_scripts,
-    INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
-)
-from klotho.utils.playback._session_boot import build_supersonic_session_preamble
+from klotho.utils.playback.tonejs.cdn import cdn_scripts
+from klotho.utils.playback._helpers import get_animation_bridge_js
 
 _PLAYBACK_JS_PATH = Path(__file__).parent / '_playback.js'
 _SHAPE_PLAYBACK_JS_PATH = Path(__file__).parent / '_shape_playback.js'
 _PLAYBACK_JS_TEMPLATE = None
 _SHAPE_PLAYBACK_JS_TEMPLATE = None
-_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / '_animation_bridge.js'
-_ANIMATION_BRIDGE_JS_CACHE = None
-
-
-def _get_animation_bridge_js():
-    global _ANIMATION_BRIDGE_JS_CACHE
-    if _ANIMATION_BRIDGE_JS_CACHE is None:
-        _ANIMATION_BRIDGE_JS_CACHE = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
-    return _ANIMATION_BRIDGE_JS_CACHE
 
 
 def normalize_loop_policy(loop):
@@ -31,18 +19,16 @@ def normalize_loop_policy(loop):
 
 def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False,
                            engine="tone"):
-    if engine == "supersonic":
-        return build_supersonic_session_preamble(
-            include_plotly=include_plotly,
-            include_threejs=include_threejs,
-        )
-
     cdn_html = cdn_scripts(
         include_plotly=include_plotly,
-        include_tone=include_tone,
+        include_tone=(include_tone and engine != "supersonic"),
         include_threejs=include_threejs,
     )
 
+    if engine == "supersonic":
+        return cdn_html, "", ""
+
+    from klotho.utils.playback.tonejs.cdn import INSTRUMENTS_JS_PATH, PLAYER_JS_PATH
     instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
     player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
 
@@ -54,35 +40,33 @@ def build_control_bar_html(wid):
     return control_bar_html(wid)
 
 
-def build_nav_controls_html(wid, total_groups):
-    return f'''
-    <span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;">
+def build_nav_controls_html(wid, total_groups, display="inline-flex"):
+    return f'''    <div id="{wid}_nav" style="display:{display};align-items:center;gap:4px;margin-left:4px;">
         <button id="{wid}_prev" style="
-            width: 28px; height: 28px; border: none; border-radius: 4px;
-            background: #16213e; cursor: pointer; display: flex;
-            align-items: center; justify-content: center; padding: 0;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                 stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            width:24px;height:24px;border:none;border-radius:4px;
+            background:#16213e;cursor:pointer;display:flex;
+            align-items:center;justify-content:center;padding:0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="#a0a0a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
         </button>
-        <span id="{wid}_counter" style="
-            color:#a0a0a0;font-size:12px;min-width:40px;text-align:center;">
-            1 / {total_groups}
-        </span>
+        <span id="{wid}_counter" style="color:#a0a0a0;font-size:11px;min-width:36px;text-align:center;">1 / {total_groups}</span>
         <button id="{wid}_next" style="
-            width: 28px; height: 28px; border: none; border-radius: 4px;
-            background: #16213e; cursor: pointer; display: flex;
-            align-items: center; justify-content: center; padding: 0;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                 stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            width:24px;height:24px;border:none;border-radius:4px;
+            background:#16213e;cursor:pointer;display:flex;
+            align-items:center;justify-content:center;padding:0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="#a0a0a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
         </button>
-        <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;color:#a0a0a0;font-size:12px;cursor:pointer;">
-            <input id="{wid}_solo" type="checkbox" style="cursor:pointer;">Solo
+        <label style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;cursor:pointer;">
+            <input id="{wid}_solo" type="checkbox" style="
+                width:13px;height:13px;accent-color:#4ade80;cursor:pointer;margin:0;">
+            <span style="color:#a0a0a0;font-size:11px;">solo</span>
         </label>
-    </span>'''
+    </div>'''
 
 
 def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdefs=None):
@@ -105,8 +89,8 @@ def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdef
         assets_json = json.dumps(assets)
         needed_json = json.dumps(list(needed_synthdefs))
 
-        bridge_js = _get_animation_bridge_js()
-        return f'''<script>
+        bridge_js = get_animation_bridge_js()
+        return f'''<script type="module">
 {ss_init_js()}
 {draw_scheduler_js()}
 {scheduler_core_js()}
@@ -115,10 +99,10 @@ def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdef
 {bridge_js}
 </script>'''
 
-    bridge_js = _get_animation_bridge_js()
-    return f'''<script>{instruments_js}</script>
-<script>{player_js}</script>
-<script>{bridge_js}</script>'''
+    bridge_js = get_animation_bridge_js()
+    return f'''<script type="module">{instruments_js}</script>
+<script type="module">{player_js}</script>
+<script type="module">{bridge_js}</script>'''
 
 
 def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring_time=5, loop=False):

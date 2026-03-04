@@ -1,5 +1,3 @@
-from klotho.utils.playback.tonejs.cdn import cdn_scripts
-
 _booted = False
 
 
@@ -24,18 +22,9 @@ def boot_supersonic():
         ss_init_js, draw_scheduler_js, scheduler_core_js,
     )
 
-    boot_js = f"""<script>
+    boot_js = f"""<script type="module">
 {ss_init_js()}
 {draw_scheduler_js()}
 {scheduler_core_js()}
 </script>"""
     display(HTML(boot_js))
-
-
-def build_supersonic_session_preamble(include_plotly=False, include_threejs=False):
-    cdn_html = cdn_scripts(
-        include_plotly=include_plotly,
-        include_tone=False,
-        include_threejs=include_threejs,
-    )
-    return cdn_html, "", ""

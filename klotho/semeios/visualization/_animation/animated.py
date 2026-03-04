@@ -131,7 +131,7 @@ class AnimatedLattice3dFigure:
 </div>
 {controls_html}
 {scripts_html}
-<script>
+<script type="module">
 (function _klotho3dInit() {{
     if (typeof THREE === "undefined") {{
         if (!document.querySelector('script[data-klotho-three]')) {{
@@ -679,7 +679,7 @@ class AnimatedRTSvgFigure:
 {sd.svg_str}
 {controls_html}
 {scripts_html}
-<script>
+<script type="module">
 (function() {{
     var elCache = {{}};
     function getEl(id) {{ if (!elCache[id]) elCache[id] = document.getElementById(id); return elCache[id]; }}
@@ -809,7 +809,7 @@ class AnimatedLatticeSvgFigure:
 {sd.svg_str}
 {controls_html}
 {scripts_html}
-<script>
+<script type="module">
 (function() {{
     var steps = {steps_json};
     var haloIds = {halos_json};
@@ -966,34 +966,9 @@ class _AnimatedShapeFigureBase:
 {cdn_html}
 {sd.svg_str}
 {controls_html}
-    <div id="{wid}_nav" style="display:{nav_display};align-items:center;gap:4px;margin-left:4px;">
-        <button id="{wid}_prev" style="
-            width:24px;height:24px;border:none;border-radius:4px;
-            background:#16213e;cursor:pointer;display:flex;
-            align-items:center;justify-content:center;padding:0;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                 stroke="#a0a0a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-        </button>
-        <span id="{wid}_counter" style="color:#a0a0a0;font-size:11px;min-width:36px;text-align:center;">1 / {total_groups}</span>
-        <button id="{wid}_next" style="
-            width:24px;height:24px;border:none;border-radius:4px;
-            background:#16213e;cursor:pointer;display:flex;
-            align-items:center;justify-content:center;padding:0;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                 stroke="#a0a0a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-        </button>
-        <label style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;cursor:pointer;">
-            <input id="{wid}_solo" type="checkbox" style="
-                width:13px;height:13px;accent-color:#4ade80;cursor:pointer;margin:0;">
-            <span style="color:#a0a0a0;font-size:11px;">solo</span>
-        </label>
-    </div>
+{build_nav_controls_html(wid, total_groups, display=nav_display)}
 {scripts_html}
-<script>
+<script type="module">
 (function() {{
     var groupNodeIndices = {group_node_indices_json};
     var groupEdgeIds = {group_edge_ids_json};

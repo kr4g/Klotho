@@ -2,7 +2,6 @@
 
 import math
 import json
-from pathlib import Path
 from collections import defaultdict
 
 from .colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
@@ -13,17 +12,9 @@ from .svg_utils import (
     svg_path_edge,
     compute_quadratic_bezier_midpoint,
 )
+from klotho.utils.playback._helpers import get_animation_bridge_js
 
 BASE_ARC_OFFSET = 0.15
-_ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / "utils" / "playback" / "_animation_bridge.js"
-_ANIMATION_BRIDGE_JS_CACHE = None
-
-
-def _get_animation_bridge_js():
-    global _ANIMATION_BRIDGE_JS_CACHE
-    if _ANIMATION_BRIDGE_JS_CACHE is None:
-        _ANIMATION_BRIDGE_JS_CACHE = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
-    return _ANIMATION_BRIDGE_JS_CACHE
 
 
 def render_path_edges(path, positions_fn, next_eid, path_cmap="viridis"):
@@ -229,7 +220,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
     freqs_json = json.dumps(node_freqs) if node_freqs is not None else "null"
     preview_json = json.dumps(preview_config or {})
 
-    return f"""<script>{_get_animation_bridge_js()}</script>
+    return f"""<script type="module">{get_animation_bridge_js()}</script>
 <div id="{svg_uid}_tip" style="
     display:none;position:absolute;pointer-events:none;
     background:rgba(30,30,30,0.92);color:#eee;font-family:monospace;
@@ -237,7 +228,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
     white-space:pre;max-width:320px;z-index:10;
     line-height:1.4;
 "></div>
-<script>
+<script type="module">
 (function _klothoTip_{svg_uid}(){{
     var data={data_json};
     var active={active_json};

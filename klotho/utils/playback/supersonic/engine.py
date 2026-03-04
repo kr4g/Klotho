@@ -115,7 +115,7 @@ class SuperSonicEngine:
         html = f'''
 {bar_html}
 
-<script>
+<script type="module">
 {ss_init_js()}
 {draw_scheduler_js()}
 {scheduler_core_js()}
