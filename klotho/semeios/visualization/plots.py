@@ -4,7 +4,7 @@ from klotho.topos.graphs.lattices import Lattice
 from klotho.thetos.parameters.parameter_fields import ParameterField
 
 from klotho.chronos.rhythm_trees import RhythmTree
-from klotho.chronos.temporal_units import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock
+from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
 
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet, MasterSet
 from klotho.tonos.scales import Scale
@@ -121,20 +121,14 @@ def plot(obj, **kwargs):
             return _show(_plot_dynamic_range(obj, **kwargs))
         case Envelope():
             return _show(_plot_envelope(obj, **kwargs))
-        case TemporalMeta():
-            match obj:
-                case TemporalUnit():
-                    match obj:
-                        case CompositionalUnit():
-                            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
-                        case _:
-                            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
-                case TemporalUnitSequence():
-                    raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
-                case TemporalBlock():
-                    raise NotImplementedError("Plotting for temporal blocks not yet implemented")
-                case _:
-                    raise NotImplementedError("Must be a TemporalUnit, TemporalUnitSequence, or TemporalBlock")
+        case CompositionalUnit():
+            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
+        case TemporalUnit():
+            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
+        case TemporalUnitSequence():
+            raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
+        case TemporalBlock():
+            raise NotImplementedError("Plotting for temporal blocks not yet implemented")
         case _ if hasattr(obj, 'nodes') and hasattr(obj, 'edges'):
             return _show(_plot_graph(obj, **kwargs))
         case _:

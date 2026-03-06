@@ -225,7 +225,7 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfi
     if use_absolute_time:
         time_offset = 0
     else:
-        time_offset = min(c.start for c in obj if not c.is_rest) if any(not c.is_rest for c in obj) else 0
+        time_offset = min(c.start for c in obj) if len(obj) > 0 else 0
 
     for chronon in obj:
         start = chronon.start - time_offset

@@ -27,7 +27,8 @@ def _coerce_to_tuples(items):
 def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
                                  dim_reduction, target_dims,
                                  mds_metric, mds_max_iter,
-                                 spectral_affinity, spectral_gamma):
+                                 spectral_affinity, spectral_gamma,
+                                 shape=None):
     if lattice.dimensionality > 3 and dim_reduction is None:
         raise ValueError(
             f"Plotting dimensionality > 3 requires dim_reduction. "
@@ -53,7 +54,21 @@ def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
             expected_total = float('inf')
             break
 
-    has_selection = bool(nodes) or bool(path)
+    shape_coords = []
+    if shape is not None and len(shape) > 0:
+        if isinstance(shape[0], (list, tuple)) and shape[0] and isinstance(shape[0][0], (list, tuple, int)):
+            if isinstance(shape[0][0], (list, tuple)):
+                for g in shape:
+                    for c in g:
+                        shape_coords.append(tuple(c) if not isinstance(c, tuple) else c)
+            else:
+                for c in shape:
+                    shape_coords.append(tuple(c) if not isinstance(c, tuple) else c)
+        else:
+            for c in shape:
+                shape_coords.append(tuple(c) if not isinstance(c, tuple) else c)
+
+    has_selection = bool(nodes) or bool(path) or bool(shape_coords)
 
     fit_mode = None
     if fit is True:
@@ -63,7 +78,7 @@ def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
 
     if has_selection and fit_mode:
         import itertools
-        all_coords_to_fit = list(nodes or []) + list(path or [])
+        all_coords_to_fit = list(nodes or []) + list(path or []) + shape_coords
 
         if all_coords_to_fit:
             ndim = lattice.dimensionality
@@ -452,12 +467,30 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     path = _coerce_to_tuples(path)
 
     if nodes is not None:
+        expected_dim = lattice.dimensionality
+        wrong_dim = [c for c in nodes if hasattr(c, '__len__') and len(c) != expected_dim]
+        if wrong_dim:
+            raise ValueError(
+                f"Node coordinates must be {expected_dim}-dimensional to match "
+                f"the lattice, but received {len(wrong_dim[0])}-dimensional "
+                f"coordinates (e.g. {wrong_dim[0]}). Provide full lattice "
+                f"coordinates; dim_reduction handles projection automatically."
+            )
         invalid = [c for c in nodes if c not in lattice]
         if invalid:
             raise ValueError(
                 f"The following node coordinates are outside the lattice bounds: {invalid}"
             )
     if path is not None:
+        expected_dim = lattice.dimensionality
+        wrong_dim = [c for c in path if hasattr(c, '__len__') and len(c) != expected_dim]
+        if wrong_dim:
+            raise ValueError(
+                f"Path coordinates must be {expected_dim}-dimensional to match "
+                f"the lattice, but received {len(wrong_dim[0])}-dimensional "
+                f"coordinates (e.g. {wrong_dim[0]}). Provide full lattice "
+                f"coordinates; dim_reduction handles projection automatically."
+            )
         invalid = [c for c in path if c not in lattice]
         if invalid:
             raise ValueError(
@@ -470,6 +503,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             dim_reduction, target_dims,
             mds_metric, mds_max_iter,
             spectral_affinity, spectral_gamma,
+            shape=shape,
         )
     )
 
