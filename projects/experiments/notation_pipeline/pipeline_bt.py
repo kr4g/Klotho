@@ -14,6 +14,7 @@ from fractions import Fraction
 
 from klotho.chronos import TemporalUnit, TemporalUnitSequence, TemporalBlock
 
+from .constants import BAR_X, END_PAD
 from .models import NotatedMeasure, NotatedSystem, NotatedScore
 from .pipeline import notate
 from .pipeline_uts import notate_uts, should_show_time_sig
@@ -27,9 +28,6 @@ from .spacing.om_packet import (
     space_size_offset_measure,
     space_size_offset_note,
 )
-
-
-BAR_X = 44.0
 
 
 def notate_bt(
@@ -309,8 +307,6 @@ def _recompute_barlines(
     timebpf: dict[float, float],
     measure_left_x: dict[tuple[int, int], float],
 ):
-    from .render.svg_renderer import END_PAD
-
     ut_list = _row_to_ut_list(row)
     prev_right: float | None = None
 

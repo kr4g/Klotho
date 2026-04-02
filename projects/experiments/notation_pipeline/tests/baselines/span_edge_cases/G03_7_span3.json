@@ -1,0 +1,124 @@
+{
+  "time_signature": "4/4",
+  "event_count": 7,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "3/7",
+      "onset": "0",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 68.0
+    },
+    {
+      "node_id": 2,
+      "duration": "3/7",
+      "onset": "3/7",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 100.8959
+    },
+    {
+      "node_id": 3,
+      "duration": "3/7",
+      "onset": "6/7",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 133.7917
+    },
+    {
+      "node_id": 4,
+      "duration": "3/7",
+      "onset": "9/7",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 201.7415
+    },
+    {
+      "node_id": 5,
+      "duration": "3/7",
+      "onset": "12/7",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 234.6374
+    },
+    {
+      "node_id": 6,
+      "duration": "3/7",
+      "onset": "15/7",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 293.9373
+    },
+    {
+      "node_id": 7,
+      "duration": "3/7",
+      "onset": "18/7",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/7",
+      "x": 326.8331
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 7,
+      "normal": 4,
+      "inner_note_type": "HALF",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "group_node_id": 0
+    }
+  ],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    147.7917,
+    248.6374,
+    340.8331
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "span_edge_cases",
+    "name": "G03_7_span3",
+    "meas": "4/4",
+    "span": 3
+  }
+}

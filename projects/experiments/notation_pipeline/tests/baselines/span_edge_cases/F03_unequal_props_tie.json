@@ -1,0 +1,136 @@
+{
+  "time_signature": "4/4",
+  "event_count": 8,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "1/2",
+      "onset": "0",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 68.0
+    },
+    {
+      "node_id": 2,
+      "duration": "1/6",
+      "onset": "1/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 104.0
+    },
+    {
+      "node_id": 3,
+      "duration": "1/3",
+      "onset": "2/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 124.0
+    },
+    {
+      "node_id": 4,
+      "duration": "1/3",
+      "onset": "1",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 166.0
+    },
+    {
+      "node_id": 5,
+      "duration": "1/6",
+      "onset": "4/3",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": true,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 194.3985
+    },
+    {
+      "node_id": 6,
+      "duration": "1/6",
+      "onset": "3/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 214.3985
+    },
+    {
+      "node_id": 7,
+      "duration": "1/6",
+      "onset": "5/3",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 234.3985
+    },
+    {
+      "node_id": 8,
+      "duration": "1/6",
+      "onset": "11/6",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 254.3985
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 12,
+      "normal": 8,
+      "inner_note_type": "QUARTER",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "group_node_id": 0
+    }
+  ],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    138.0,
+    268.3985
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "span_edge_cases",
+    "name": "F03_unequal_props_tie",
+    "meas": "4/4",
+    "span": 2
+  }
+}

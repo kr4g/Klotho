@@ -1,0 +1,160 @@
+{
+  "time_signature": "4/4",
+  "event_count": 10,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "1/4",
+      "onset": "0",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 68.0
+    },
+    {
+      "node_id": 2,
+      "duration": "1/4",
+      "onset": "1/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 92.0
+    },
+    {
+      "node_id": 3,
+      "duration": "1/4",
+      "onset": "1/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 116.0
+    },
+    {
+      "node_id": 5,
+      "duration": "1/8",
+      "onset": "3/4",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 140.0
+    },
+    {
+      "node_id": 6,
+      "duration": "1/8",
+      "onset": "7/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 160.0
+    },
+    {
+      "node_id": 8,
+      "duration": "1/8",
+      "onset": "1",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 202.0
+    },
+    {
+      "node_id": 9,
+      "duration": "1/8",
+      "onset": "9/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 222.0
+    },
+    {
+      "node_id": 10,
+      "duration": "1/4",
+      "onset": "5/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 242.0
+    },
+    {
+      "node_id": 11,
+      "duration": "1/4",
+      "onset": "3/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 266.0
+    },
+    {
+      "node_id": 12,
+      "duration": "1/4",
+      "onset": "7/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 290.0
+    }
+  ],
+  "tuplets": [],
+  "beam_groups": [
+    {
+      "event_indices": [
+        3,
+        4
+      ],
+      "max_beam_level": 1,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        5,
+        6
+      ],
+      "max_beam_level": 1,
+      "group_node_id": -1
+    }
+  ],
+  "barline_x_positions": [
+    44.0,
+    174.0,
+    304.0
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "rt",
+    "name": "32_span2_beam_near_barline",
+    "meas": "4/4",
+    "span": 2
+  }
+}

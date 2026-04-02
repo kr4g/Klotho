@@ -1,0 +1,164 @@
+{
+  "time_signature": "4/4",
+  "event_count": 9,
+  "events": [
+    {
+      "node_id": 3,
+      "duration": "1/30",
+      "onset": "0",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 68.0
+    },
+    {
+      "node_id": 4,
+      "duration": "1/30",
+      "onset": "1/30",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 88.0
+    },
+    {
+      "node_id": 5,
+      "duration": "1/30",
+      "onset": "1/15",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 108.0
+    },
+    {
+      "node_id": 6,
+      "duration": "1/10",
+      "onset": "1/10",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 128.0
+    },
+    {
+      "node_id": 7,
+      "duration": "1/10",
+      "onset": "1/5",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 148.0
+    },
+    {
+      "node_id": 8,
+      "duration": "1/10",
+      "onset": "3/10",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 168.0
+    },
+    {
+      "node_id": 9,
+      "duration": "1/10",
+      "onset": "2/5",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 188.0
+    },
+    {
+      "node_id": 11,
+      "duration": "1/4",
+      "onset": "1/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 208.0
+    },
+    {
+      "node_id": 12,
+      "duration": "1/4",
+      "onset": "3/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 232.0
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 5,
+      "normal": 4,
+      "inner_note_type": "EIGHTH",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "group_node_id": 1
+    },
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "N32ND",
+      "event_indices": [
+        0,
+        1,
+        2
+      ],
+      "group_node_id": 2
+    }
+  ],
+  "beam_groups": [
+    {
+      "event_indices": [
+        0,
+        1,
+        2
+      ],
+      "max_beam_level": 2,
+      "group_node_id": -1
+    }
+  ],
+  "barline_x_positions": [],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "rt",
+    "name": "18_quintuplet_with_inner_triplet",
+    "meas": "4/4",
+    "span": 1
+  }
+}

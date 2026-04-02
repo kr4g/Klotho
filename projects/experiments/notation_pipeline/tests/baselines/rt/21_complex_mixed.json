@@ -1,0 +1,209 @@
+{
+  "time_signature": "3/4",
+  "event_count": 12,
+  "events": [
+    {
+      "node_id": 2,
+      "duration": "3/44",
+      "onset": "0",
+      "note_type": "N16TH",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 68.0
+    },
+    {
+      "node_id": 4,
+      "duration": "1/22",
+      "onset": "3/44",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": true,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 94.0
+    },
+    {
+      "node_id": 5,
+      "duration": "1/22",
+      "onset": "5/44",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 112.0
+    },
+    {
+      "node_id": 6,
+      "duration": "1/22",
+      "onset": "7/44",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 132.0
+    },
+    {
+      "node_id": 8,
+      "duration": "3/44",
+      "onset": "9/44",
+      "note_type": "N16TH",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 152.0
+    },
+    {
+      "node_id": 9,
+      "duration": "3/22",
+      "onset": "3/11",
+      "note_type": "EIGHTH",
+      "dots": 1,
+      "is_rest": true,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 178.0
+    },
+    {
+      "node_id": 11,
+      "duration": "3/88",
+      "onset": "9/22",
+      "note_type": "N32ND",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 202.0
+    },
+    {
+      "node_id": 12,
+      "duration": "3/88",
+      "onset": "39/88",
+      "note_type": "N32ND",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 228.0
+    },
+    {
+      "node_id": 13,
+      "duration": "3/44",
+      "onset": "21/44",
+      "note_type": "N16TH",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 254.0
+    },
+    {
+      "node_id": 15,
+      "duration": "3/44",
+      "onset": "6/11",
+      "note_type": "N16TH",
+      "dots": 1,
+      "is_rest": true,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 280.0
+    },
+    {
+      "node_id": 16,
+      "duration": "3/44",
+      "onset": "27/44",
+      "note_type": "N16TH",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 304.0
+    },
+    {
+      "node_id": 17,
+      "duration": "3/44",
+      "onset": "15/22",
+      "note_type": "N16TH",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/11",
+      "x": 330.0
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 11,
+      "normal": 8,
+      "inner_note_type": "N16TH",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "group_node_id": 0
+    }
+  ],
+  "beam_groups": [
+    {
+      "event_indices": [
+        2,
+        3
+      ],
+      "max_beam_level": 2,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        6,
+        7
+      ],
+      "max_beam_level": 3,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        10,
+        11
+      ],
+      "max_beam_level": 2,
+      "group_node_id": -1
+    }
+  ],
+  "barline_x_positions": [],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "rt",
+    "name": "21_complex_mixed",
+    "meas": "3/4",
+    "span": 1
+  }
+}

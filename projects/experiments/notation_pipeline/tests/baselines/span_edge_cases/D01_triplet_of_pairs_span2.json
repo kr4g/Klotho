@@ -1,0 +1,110 @@
+{
+  "time_signature": "4/4",
+  "event_count": 6,
+  "events": [
+    {
+      "node_id": 2,
+      "duration": "1/3",
+      "onset": "0",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 68.0
+    },
+    {
+      "node_id": 3,
+      "duration": "1/3",
+      "onset": "1/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 96.3985
+    },
+    {
+      "node_id": 5,
+      "duration": "1/3",
+      "onset": "2/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 124.797
+    },
+    {
+      "node_id": 6,
+      "duration": "1/3",
+      "onset": "1",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 166.797
+    },
+    {
+      "node_id": 8,
+      "duration": "1/3",
+      "onset": "4/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 195.1956
+    },
+    {
+      "node_id": 9,
+      "duration": "1/3",
+      "onset": "5/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 223.5941
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "WHOLE",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "group_node_id": 0
+    }
+  ],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    138.797,
+    237.5941
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "span_edge_cases",
+    "name": "D01_triplet_of_pairs_span2",
+    "meas": "4/4",
+    "span": 2
+  }
+}

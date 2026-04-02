@@ -1,0 +1,259 @@
+{
+  "measure_count": 3,
+  "measures": [
+    {
+      "time_signature": "4/4",
+      "event_count": 5,
+      "events": [
+        {
+          "node_id": 2,
+          "duration": "1/8",
+          "onset": "0",
+          "note_type": "EIGHTH",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 68.0
+        },
+        {
+          "node_id": 3,
+          "duration": "1/8",
+          "onset": "1/8",
+          "note_type": "EIGHTH",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 88.0
+        },
+        {
+          "node_id": 4,
+          "duration": "1/4",
+          "onset": "1/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 108.0
+        },
+        {
+          "node_id": 5,
+          "duration": "1/4",
+          "onset": "1/2",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 128.0
+        },
+        {
+          "node_id": 6,
+          "duration": "1/4",
+          "onset": "3/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 148.0
+        }
+      ],
+      "tuplets": [],
+      "beam_groups": [
+        {
+          "event_indices": [
+            0,
+            1
+          ],
+          "max_beam_level": 1,
+          "group_node_id": -1
+        }
+      ],
+      "barline_x_positions": [],
+      "show_barlines": true,
+      "tempo_beat": "1/4",
+      "tempo_bpm": 120.0,
+      "end_barline_type": "single"
+    },
+    {
+      "time_signature": "4/4",
+      "event_count": 6,
+      "events": [
+        {
+          "node_id": 1,
+          "duration": "1/4",
+          "onset": "0",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 72.0
+        },
+        {
+          "node_id": 2,
+          "duration": "1/4",
+          "onset": "1/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 92.0
+        },
+        {
+          "node_id": 4,
+          "duration": "1/12",
+          "onset": "1/2",
+          "note_type": "EIGHTH",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": "2/3",
+          "x": 112.0
+        },
+        {
+          "node_id": 5,
+          "duration": "1/12",
+          "onset": "7/12",
+          "note_type": "EIGHTH",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": "2/3",
+          "x": 132.0
+        },
+        {
+          "node_id": 6,
+          "duration": "1/12",
+          "onset": "2/3",
+          "note_type": "EIGHTH",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": "2/3",
+          "x": 152.0
+        },
+        {
+          "node_id": 7,
+          "duration": "1/4",
+          "onset": "3/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 172.0
+        }
+      ],
+      "tuplets": [
+        {
+          "actual": 3,
+          "normal": 2,
+          "inner_note_type": "EIGHTH",
+          "event_indices": [
+            2,
+            3,
+            4
+          ],
+          "group_node_id": 3
+        }
+      ],
+      "beam_groups": [
+        {
+          "event_indices": [
+            2,
+            3,
+            4
+          ],
+          "max_beam_level": 1,
+          "group_node_id": -1
+        }
+      ],
+      "barline_x_positions": [],
+      "show_barlines": true,
+      "tempo_beat": "1/4",
+      "tempo_bpm": 120.0,
+      "end_barline_type": "single"
+    },
+    {
+      "time_signature": "4/4",
+      "event_count": 4,
+      "events": [
+        {
+          "node_id": 1,
+          "duration": "1/4",
+          "onset": "0",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 72.0
+        },
+        {
+          "node_id": 2,
+          "duration": "1/4",
+          "onset": "1/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 92.0
+        },
+        {
+          "node_id": 3,
+          "duration": "1/4",
+          "onset": "1/2",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 112.0
+        },
+        {
+          "node_id": 4,
+          "duration": "1/4",
+          "onset": "3/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 132.0
+        }
+      ],
+      "tuplets": [],
+      "beam_groups": [],
+      "barline_x_positions": [],
+      "show_barlines": true,
+      "tempo_beat": "1/4",
+      "tempo_bpm": 120.0,
+      "end_barline_type": "single"
+    }
+  ],
+  "_meta": {
+    "category": "uts",
+    "name": "uts_09_same_tempo_throughout"
+  }
+}

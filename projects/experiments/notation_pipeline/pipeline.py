@@ -20,7 +20,8 @@ from .core.tie_split import (
 )
 from .core.tuplet import collect_tuplets, get_tuplet_scale_for_leaf
 from .core.beam import assign_beams
-from .spacing.modes import BAR_X, space_hybrid, space_proportional, space_traditional, space_with_barlines
+from .constants import BAR_X, TS_DIGIT_W, TS_BARLINE_GAP, TS_NOTE_GAP
+from .spacing.modes import space_hybrid, space_proportional, space_traditional, space_with_barlines
 from .spacing.om_packet import (
     DEFAULT_OM_SIZE,
     layout_single_measure_events_om,
@@ -74,13 +75,9 @@ def notate(
 
     # Compute left_margin to accommodate time sig (OM: get-chiffrage-space)
     if barlines and meas is not None:
-        _TS_DIGIT_W = 8.5   # matches renderer's TS_DIGIT_W at TS_FONT=20
-        _TS_BAR_GAP = 4     # matches renderer's TS_BARLINE_GAP
-        _TS_NOTE_GAP = 10   # gap between time sig right edge and first note
-        _BAR_X = 44.0       # matches renderer's BAR_X
         max_digits = max(len(str(meas.numerator)), len(str(meas.denominator)))
-        ts_w = max_digits * _TS_DIGIT_W + 2
-        left_margin = max(left_margin, _BAR_X + _TS_BAR_GAP + ts_w + _TS_NOTE_GAP)
+        ts_w = max_digits * TS_DIGIT_W + 2
+        left_margin = max(left_margin, BAR_X + TS_BARLINE_GAP + ts_w + TS_NOTE_GAP)
 
     # --- Pass 1: Tuplet detection (must happen first to build cache) ---
     tuplets, tuplet_cache = collect_tuplets(rt)

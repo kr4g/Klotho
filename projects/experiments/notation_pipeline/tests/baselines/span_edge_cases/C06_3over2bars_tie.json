@@ -1,0 +1,71 @@
+{
+  "time_signature": "4/4",
+  "event_count": 3,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "2/3",
+      "onset": "0",
+      "note_type": "WHOLE",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 68.0
+    },
+    {
+      "node_id": 2,
+      "duration": "2/3",
+      "onset": "2/3",
+      "note_type": "WHOLE",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": true,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 110.5978
+    },
+    {
+      "node_id": 3,
+      "duration": "2/3",
+      "onset": "4/3",
+      "note_type": "WHOLE",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "2/3",
+      "x": 180.9963
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "WHOLE",
+      "event_indices": [
+        0,
+        1,
+        2
+      ],
+      "group_node_id": 0
+    }
+  ],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    124.5978,
+    194.9963
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "span_edge_cases",
+    "name": "C06_3over2bars_tie",
+    "meas": "4/4",
+    "span": 2
+  }
+}

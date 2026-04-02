@@ -22,6 +22,7 @@ from ..models import (
 )
 from ..core.duration import beam_count
 from . import smufl
+from ..constants import BAR_X, END_PAD, TS_DIGIT_W, TS_BARLINE_GAP, TS_NOTE_GAP
 
 # ── Dimensions (SVG px) ───────────────────────────────────────────────
 # SMuFL convention: 1 staff-space = font_size / 4
@@ -47,16 +48,10 @@ TUPLET_HOOK = 4
 TUPLET_FONT = 11
 
 TS_FONT = 20
-TS_SP = TS_FONT / 4               # 5 px — one staff-space at TS_FONT size
-TS_DIGIT_W = 1.7 * TS_SP          # ~8.5 px per digit (from Bravura bbox avg)
-TS_BARLINE_GAP = 4                # Gap between barline and time sig
-TS_NOTE_GAP = 10                  # Gap between time sig right edge and first note
 TS_NUM_Y_OFF = -7                 # Numerator center offset above staff line
 TS_DEN_Y_OFF = 7                  # Denominator center offset below staff line
-BAR_X = 44
 NOTE_X0 = 62
 BAR_EXT = 8
-END_PAD = 14          # Fixed gap: last note glyph → barline (matches modes.py)
 RT_Y_OFF = 34
 RT_FONT = 9.5
 
@@ -118,17 +113,17 @@ def render_measure(
             dwg.add(dwg.line(start=(bl_start, STAFF_Y), end=(bl_end, STAFF_Y),
                               stroke="black", stroke_width=0.8))
             for bx in measure.barline_x_positions:
-                _barline(dwg, bx)
+                _barline_at(dwg, bx)
         else:
             # Single measure: compute right edge from events
             rx = (max(e.x for e in measure.events) + END_PAD) if measure.events else width - 20
             rx = min(rx, width - 20)
             dwg.add(dwg.line(start=(BAR_X, STAFF_Y), end=(rx, STAFF_Y),
                               stroke="black", stroke_width=0.8))
-            _barline(dwg, BAR_X)
-            _barline(dwg, rx)
+            _barline_at(dwg, BAR_X)
+            _barline_at(dwg, rx)
         if measure.time_signature is not None:
-            _time_sig(dwg, measure.time_signature)
+            _time_sig_at(dwg, measure.time_signature, BAR_X + TS_BARLINE_GAP)
     else:
         # No barlines: just the staff line spanning the events
         if measure.events:
@@ -140,7 +135,7 @@ def render_measure(
                           stroke="black", stroke_width=0.8))
 
     if measure.tempo_beat is not None and measure.tempo_bpm is not None:
-        _tempo_marking(dwg, measure.tempo_beat, measure.tempo_bpm)
+        _tempo_marking_at_y(dwg, measure.tempo_beat, measure.tempo_bpm, NOTE_X0)
 
     beamed = set()
     for bg in measure.beam_groups:
@@ -149,18 +144,18 @@ def render_measure(
 
     for i, ev in enumerate(measure.events):
         if ev.is_rest:
-            _rest(dwg, ev)
+            _rest_at(dwg, ev)
         else:
-            _note(dwg, ev, flagged=(i not in beamed))
+            _note_at(dwg, ev, flagged=(i not in beamed))
 
     for bg in measure.beam_groups:
-        _beams(dwg, bg, measure.events)
+        _beams_at(dwg, bg, measure.events)
 
     for i in range(len(measure.events) - 1):
         if measure.events[i].is_tied_forward or measure.events[i + 1].is_continuation_tie:
-            _tie(dwg, measure.events[i], measure.events[i + 1])
+            _tie_at(dwg, measure.events[i], measure.events[i + 1])
 
-    _tuplets(dwg, measure.tuplets, measure.events)
+    _tuplets_at(dwg, measure.tuplets, measure.events)
 
     if show_rt_text and measure.rt_text:
         _rt_text(dwg, measure.rt_text)
@@ -273,19 +268,12 @@ def render_system(
         else:
             x_offset = 0.0
 
-        # Draw opening barline
-        _barline(dwg, cursor)
+        _barline_at(dwg, cursor)
 
-        # Draw time signature if changed
-        if m.show_barlines and m.time_signature:
-            if should_show_time_sig(m.time_signature, prev_time_sig):
-                _time_sig_at(dwg, m.time_signature, cursor + TS_BARLINE_GAP)
-            prev_time_sig = m.time_signature
-
-        # Draw tempo marking if changed
         show_tempo = should_show_tempo(
             m.tempo_beat, m.tempo_bpm, prev_tempo_beat, prev_tempo_bpm
         )
+        tempo_x = None
         if show_tempo and m.tempo_beat is not None and m.tempo_bpm is not None:
             if show_ts:
                 tempo_x = (
@@ -296,51 +284,26 @@ def render_system(
                 )
             else:
                 tempo_x = cursor + (FIRST_MEAS_PAD if i == 0 else MEAS_LEFT_PAD)
-            _tempo_marking_at(dwg, m.tempo_beat, m.tempo_bpm, tempo_x)
+
+        shifted_events = [dc_replace(ev, x=ev.x + x_offset) for ev in m.events]
+        end_bl_x = cursor + measure_widths[i]
+
+        _draw_measure_contents(
+            dwg, m, shifted_events, cursor,
+            show_ts=show_ts,
+            show_tempo=(tempo_x is not None),
+            tempo_x=tempo_x,
+            is_last_measure=(i == len(measures) - 1),
+            end_barline_x=end_bl_x,
+        )
+
+        if m.show_barlines and m.time_signature:
+            prev_time_sig = m.time_signature
         if m.tempo_beat is not None:
             prev_tempo_beat = m.tempo_beat
         if m.tempo_bpm is not None:
             prev_tempo_bpm = m.tempo_bpm
-
-        # Draw events (offset by x_offset)
-        beamed = set()
-        for bg in m.beam_groups:
-            for idx in bg.event_indices:
-                beamed.add(idx)
-
-        for j, ev in enumerate(m.events):
-            shifted = dc_replace(ev, x=ev.x + x_offset)
-            if shifted.is_rest:
-                _rest(dwg, shifted)
-            else:
-                _note(dwg, shifted, flagged=(j not in beamed))
-
-        # Draw beams (with offset)
-        shifted_events = [dc_replace(ev, x=ev.x + x_offset) for ev in m.events]
-        for bg in m.beam_groups:
-            _beams(dwg, bg, shifted_events)
-
-        # Draw ties
-        for j in range(len(shifted_events) - 1):
-            if shifted_events[j].is_tied_forward or shifted_events[j + 1].is_continuation_tie:
-                _tie(dwg, shifted_events[j], shifted_events[j + 1])
-
-        # Draw tuplet brackets
-        _tuplets(dwg, m.tuplets, shifted_events)
-
-        # Draw internal barlines for multi-bar measures
-        if m.barline_x_positions and len(m.barline_x_positions) > 2:
-            for bx in m.barline_x_positions[1:-1]:
-                _barline(dwg, bx + x_offset)
-
-        # Advance cursor
-        cursor += measure_widths[i]
-
-        # Draw end barline for this measure
-        bl_type = m.end_barline_type
-        if i == len(measures) - 1 and bl_type == 'single':
-            bl_type = 'final'  # Last measure of system gets a final barline
-        _styled_barline(dwg, cursor, bl_type)
+        cursor = end_bl_x
 
     return dwg
 
@@ -523,6 +486,56 @@ def _bt_row_max_x_world(system: NotatedSystem, row_start_x: float) -> float:
     return max(xs) + 30 if len(xs) > 1 else 200.0
 
 
+def _draw_measure_contents(
+    dwg,
+    measure: NotatedMeasure,
+    events: list[EngravingLeaf],
+    cursor: float,
+    staff_y: float = STAFF_Y,
+    show_ts: bool = False,
+    show_tempo: bool = False,
+    tempo_x: float | None = None,
+    is_last_measure: bool = False,
+    end_barline_x: float | None = None,
+):
+    if show_ts:
+        _time_sig_at(dwg, measure.time_signature, cursor + TS_BARLINE_GAP, staff_y)
+
+    if show_tempo and tempo_x is not None:
+        _tempo_marking_at_y(dwg, measure.tempo_beat, measure.tempo_bpm, tempo_x, staff_y)
+
+    beamed = set()
+    for bg in measure.beam_groups:
+        for idx in bg.event_indices:
+            beamed.add(idx)
+
+    for j, ev in enumerate(events):
+        if ev.is_rest:
+            _rest_at(dwg, ev, staff_y)
+        else:
+            _note_at(dwg, ev, staff_y, flagged=(j not in beamed))
+
+    for bg in measure.beam_groups:
+        _beams_at(dwg, bg, events, staff_y)
+
+    for j in range(len(events) - 1):
+        if events[j].is_tied_forward or events[j + 1].is_continuation_tie:
+            _tie_at(dwg, events[j], events[j + 1], staff_y)
+
+    _tuplets_at(dwg, measure.tuplets, events, staff_y)
+
+    if measure.barline_x_positions and len(measure.barline_x_positions) > 2:
+        bl_dx = cursor - measure.barline_x_positions[0]
+        for bx in measure.barline_x_positions[1:-1]:
+            _barline_at(dwg, bx + bl_dx, staff_y)
+
+    if end_barline_x is not None:
+        bl_type = measure.end_barline_type
+        if is_last_measure and bl_type == 'single':
+            bl_type = 'final'
+        _styled_barline_at(dwg, end_barline_x, staff_y, bl_type)
+
+
 def _render_row(
     dwg, system: NotatedSystem, staff_y: float, show_rt_text: bool,
     score_tempo: tuple | None = None,
@@ -589,17 +602,10 @@ def _render_row(
 
         draw_events = [dc_replace(ev, x=ev.x + row_dx) for ev in m.events]
 
-        ts_end_x = cursor
-        if m.show_barlines and m.time_signature:
-            if should_show_time_sig(m.time_signature, prev_time_sig):
-                ts_x = cursor + TS_BARLINE_GAP
-                _time_sig_at(dwg, m.time_signature, ts_x, staff_y=staff_y)
-                ts_end_x = ts_x + _ts_glyph_width(m.time_signature) + 2
-            prev_time_sig = m.time_signature
-
         show_tempo = should_show_tempo(
             m.tempo_beat, m.tempo_bpm, prev_tempo_beat, prev_tempo_bpm
         )
+        tempo_x = None
         if show_tempo and m.tempo_beat is not None and m.tempo_bpm is not None:
             is_score_tempo = (
                 score_tempo is not None
@@ -609,6 +615,9 @@ def _render_row(
                 and m.tempo_bpm == score_tempo[1]
             )
             if not is_score_tempo:
+                ts_end_x = cursor
+                if show_ts:
+                    ts_end_x = cursor + TS_BARLINE_GAP + _ts_glyph_width(m.time_signature) + 2
                 if show_ts:
                     t0 = (
                         cursor
@@ -623,42 +632,6 @@ def _render_row(
                     t0,
                     (draw_events[0].x if draw_events else t0),
                 )
-                _tempo_marking_at_y(dwg, m.tempo_beat, m.tempo_bpm,
-                                    tempo_x, staff_y)
-        if m.tempo_beat is not None:
-            prev_tempo_beat = m.tempo_beat
-        if m.tempo_bpm is not None:
-            prev_tempo_bpm = m.tempo_bpm
-
-        # ── Events (notes/rests) ──────────────────────────────────────
-        beamed = set()
-        for bg in m.beam_groups:
-            for idx in bg.event_indices:
-                beamed.add(idx)
-
-        for j, ev in enumerate(draw_events):
-            if ev.is_rest:
-                _rest_at(dwg, ev, staff_y)
-            else:
-                _note_at(dwg, ev, staff_y, flagged=(j not in beamed))
-
-        # ── Beams ─────────────────────────────────────────────────────
-        for bg in m.beam_groups:
-            _beams_at(dwg, bg, draw_events, staff_y)
-
-        # ── Ties ──────────────────────────────────────────────────────
-        for j in range(len(draw_events) - 1):
-            if draw_events[j].is_tied_forward or draw_events[j + 1].is_continuation_tie:
-                _tie_at(dwg, draw_events[j], draw_events[j + 1], staff_y)
-
-        # ── Tuplet brackets ───────────────────────────────────────────
-        _tuplets_at(dwg, m.tuplets, draw_events, staff_y)
-
-        # ── Barlines (per-row, independent) ───────────────────────────
-        # Internal barlines for multi-bar measures
-        if m.barline_x_positions and len(m.barline_x_positions) > 2:
-            for bx in m.barline_x_positions[1:-1]:
-                _barline_at(dwg, bx + row_dx, staff_y)
 
         if m.barline_x_positions:
             end_x = m.barline_x_positions[-1] + row_dx
@@ -667,25 +640,33 @@ def _render_row(
         else:
             end_x = cursor + 50
 
+        _draw_measure_contents(
+            dwg, m, draw_events, cursor,
+            staff_y=staff_y,
+            show_ts=show_ts,
+            show_tempo=(tempo_x is not None),
+            tempo_x=tempo_x,
+            is_last_measure=(i == len(measures) - 1),
+            end_barline_x=end_x,
+        )
+
         end_x_prev = end_x
+        if m.show_barlines and m.time_signature:
+            prev_time_sig = m.time_signature
+        if m.tempo_beat is not None:
+            prev_tempo_beat = m.tempo_beat
+        if m.tempo_bpm is not None:
+            prev_tempo_bpm = m.tempo_bpm
 
-        # Draw end barline
-        bl_type = m.end_barline_type
-        if i == len(measures) - 1 and bl_type == 'single':
-            bl_type = 'final'
-        _styled_barline_at(dwg, end_x, staff_y, bl_type)
 
-
-# ── Y-parameterized helpers (for multi-staff rendering) ───────────────
-
-def _barline_at(dwg, x, staff_y):
+def _barline_at(dwg, x, staff_y: float = STAFF_Y):
     dwg.add(dwg.line(
         start=(x, staff_y - BAR_EXT), end=(x, staff_y + BAR_EXT),
         stroke="black", stroke_width=1.2,
     ))
 
 
-def _styled_barline_at(dwg, x, staff_y, style='single'):
+def _styled_barline_at(dwg, x, staff_y: float = STAFF_Y, style='single'):
     if style == 'none':
         return
     if style == 'double':
@@ -704,10 +685,8 @@ def _styled_barline_at(dwg, x, staff_y, style='single'):
         _barline_at(dwg, x, staff_y)
 
 
-def _note_at(dwg, ev: EngravingLeaf, staff_y: float, flagged=True):
-    """Draw a note at the given staff_y."""
+def _note_at(dwg, ev: EngravingLeaf, staff_y: float = STAFF_Y, flagged=True):
     x = ev.x
-    dy = staff_y - STAFF_Y
 
     g = smufl.notehead_glyph(ev.note_type)
     _glyph(dwg, g, x - NH, staff_y)
@@ -715,8 +694,8 @@ def _note_at(dwg, ev: EngravingLeaf, staff_y: float, flagged=True):
     has_stem = ev.note_type not in (NoteType.WHOLE,)
     if has_stem:
         sx = _stem_x(ev)
-        s_bot = _stem_bottom() + dy
-        s_top = _stem_top() + dy
+        s_bot = _stem_bottom(staff_y)
+        s_top = _stem_top(staff_y)
         dwg.add(dwg.line(start=(sx, s_bot), end=(sx, s_top),
                           stroke="black", stroke_width=STEM_W))
 
@@ -731,17 +710,16 @@ def _note_at(dwg, ev: EngravingLeaf, staff_y: float, flagged=True):
         dwg.add(dwg.circle(center=(dx, dot_y), r=DOT_R, fill="black"))
 
 
-def _rest_at(dwg, ev: EngravingLeaf, staff_y: float):
+def _rest_at(dwg, ev: EngravingLeaf, staff_y: float = STAFF_Y):
     g = smufl.rest_glyph(ev.note_type)
     _glyph(dwg, g, ev.x, staff_y, size=REST_FONT_SIZE, anchor="middle")
 
 
-def _beams_at(dwg, group: BeamGroup, events: list[EngravingLeaf], staff_y: float):
+def _beams_at(dwg, group: BeamGroup, events: list[EngravingLeaf], staff_y: float = STAFF_Y):
     if len(group.event_indices) < 2:
         return
     idx = group.event_indices
-    dy = staff_y - STAFF_Y
-    top = _stem_top() + dy
+    top = _stem_top(staff_y)
 
     for lv in range(1, group.max_beam_level + 1):
         by = top + (lv - 1) * (BEAM_H + BEAM_GAP)
@@ -764,7 +742,7 @@ def _beams_at(dwg, group: BeamGroup, events: list[EngravingLeaf], staff_y: float
                 i += 1
 
 
-def _tie_at(dwg, a: EngravingLeaf, b: EngravingLeaf, staff_y: float):
+def _tie_at(dwg, a: EngravingLeaf, b: EngravingLeaf, staff_y: float = STAFF_Y):
     x1 = a.x + NH + 2
     x2 = b.x - NH - 2
     y = staff_y + 6
@@ -775,7 +753,7 @@ def _tie_at(dwg, a: EngravingLeaf, b: EngravingLeaf, staff_y: float):
 
 
 def _tuplets_at(dwg, tuplets: list[TupletBracket], events: list[EngravingLeaf],
-                staff_y: float):
+                staff_y: float = STAFF_Y):
     if not tuplets:
         return
     dy = staff_y - STAFF_Y
@@ -797,8 +775,7 @@ def _tuplets_at(dwg, tuplets: list[TupletBracket], events: list[EngravingLeaf],
         _bracket(dwg, t, events, y)
 
 
-def _tempo_marking_at_y(dwg, beat, bpm, x, staff_y):
-    """Draw a tempo marking at (x, tempo_y) relative to staff_y."""
+def _tempo_marking_at_y(dwg, beat, bpm, x, staff_y: float = STAFF_Y):
     from fractions import Fraction
     dy = staff_y - STAFF_Y
     tempo_y = TEMPO_Y + dy
@@ -859,37 +836,14 @@ def _stem_x(ev: EngravingLeaf) -> float:
     return ev.x - NH + NH_W  # = ev.x + NH
 
 
-def _stem_bottom() -> float:
+def _stem_bottom(staff_y: float = STAFF_Y) -> float:
     """Stem bottom y = staff line + stem attachment offset (goes INTO notehead)."""
-    return STAFF_Y + STEM_ATTACH_DY
+    return staff_y + STEM_ATTACH_DY
 
 
-def _stem_top() -> float:
+def _stem_top(staff_y: float = STAFF_Y) -> float:
     """Stem tip y."""
-    return _stem_bottom() - STEM_LEN
-
-
-def _barline(dwg, x):
-    dwg.add(dwg.line(start=(x, STAFF_Y - BAR_EXT), end=(x, STAFF_Y + BAR_EXT),
-                      stroke="black", stroke_width=1.2))
-
-
-def _styled_barline(dwg, x, style='single'):
-    """Draw a barline with the given style at x."""
-    if style == 'none':
-        return
-    if style == 'double':
-        # Two thin lines, 4px apart
-        _barline(dwg, x - 4)
-        _barline(dwg, x)
-    elif style == 'final':
-        # Thin line + thick line
-        dwg.add(dwg.line(start=(x - 5, STAFF_Y - BAR_EXT), end=(x - 5, STAFF_Y + BAR_EXT),
-                          stroke="black", stroke_width=1.2))
-        dwg.add(dwg.line(start=(x, STAFF_Y - BAR_EXT), end=(x, STAFF_Y + BAR_EXT),
-                          stroke="black", stroke_width=3.0))
-    else:
-        _barline(dwg, x)
+    return _stem_bottom(staff_y) - STEM_LEN
 
 
 def _ts_glyph_width(meas) -> float:
@@ -898,123 +852,20 @@ def _ts_glyph_width(meas) -> float:
     return max_digits * TS_DIGIT_W + 2  # +2 for small right padding
 
 
-def _time_sig(dwg, meas):
-    """Draw a time signature after the opening barline using SMuFL glyphs."""
-    _time_sig_at(dwg, meas, BAR_X + TS_BARLINE_GAP)
-
-
-def _time_sig_at(dwg, meas, x, staff_y=None):
-    """Draw a time signature at an arbitrary x position using SMuFL glyphs."""
-    sy = staff_y if staff_y is not None else STAFF_Y
+def _time_sig_at(dwg, meas, x, staff_y: float = STAFF_Y):
     num_glyphs, den_glyphs = smufl.time_sig_glyphs(meas.numerator, meas.denominator)
-    # Center numerator and denominator horizontally relative to each other
     num_w = len(str(meas.numerator)) * TS_DIGIT_W
     den_w = len(str(meas.denominator)) * TS_DIGIT_W
     max_w = max(num_w, den_w)
     num_x = x + (max_w - num_w) / 2
     den_x = x + (max_w - den_w) / 2
-    _glyph(dwg, num_glyphs, num_x, sy + TS_NUM_Y_OFF, size=TS_FONT)
-    _glyph(dwg, den_glyphs, den_x, sy + TS_DEN_Y_OFF, size=TS_FONT)
+    _glyph(dwg, num_glyphs, num_x, staff_y + TS_NUM_Y_OFF, size=TS_FONT)
+    _glyph(dwg, den_glyphs, den_x, staff_y + TS_DEN_Y_OFF, size=TS_FONT)
 
 
 def _glyph(dwg, char, x, y, size=FONT_SIZE, anchor="start"):
     dwg.add(dwg.text(char, insert=(x, y),
                       font_family=_FAMILY, font_size=size, text_anchor=anchor))
-
-
-def _note(dwg, ev: EngravingLeaf, flagged=True):
-    x = ev.x
-
-    # Notehead: left edge at (x - NH), baseline at STAFF_Y.
-    # SMuFL: glyph centered vertically on baseline = staff line position.
-    g = smufl.notehead_glyph(ev.note_type)
-    _glyph(dwg, g, x - NH, STAFF_Y)
-
-    # Stem (up-stem)
-    has_stem = ev.note_type not in (NoteType.WHOLE,)
-    if has_stem:
-        sx = _stem_x(ev)
-        s_bot = _stem_bottom()
-        s_top = _stem_top()
-        dwg.add(dwg.line(start=(sx, s_bot), end=(sx, s_top),
-                          stroke="black", stroke_width=STEM_W))
-
-        # Flag
-        if flagged:
-            fg = smufl.flag_glyph(ev.note_type, stem_up=True)
-            if fg:
-                _glyph(dwg, fg, sx, s_top, size=FLAG_SIZE)
-
-    # Dots
-    for d in range(ev.dots):
-        dx = x + NH + 4 + d * 6
-        dy = STAFF_Y - 4
-        dwg.add(dwg.circle(center=(dx, dy), r=DOT_R, fill="black"))
-
-
-def _rest(dwg, ev: EngravingLeaf):
-    g = smufl.rest_glyph(ev.note_type)
-    _glyph(dwg, g, ev.x, STAFF_Y, size=REST_FONT_SIZE, anchor="middle")
-
-
-def _beams(dwg, group: BeamGroup, events: list[EngravingLeaf]):
-    if len(group.event_indices) < 2:
-        return
-    idx = group.event_indices
-    top = _stem_top()
-
-    for lv in range(1, group.max_beam_level + 1):
-        by = top + (lv - 1) * (BEAM_H + BEAM_GAP)
-        i = 0
-        while i < len(idx):
-            if beam_count(events[idx[i]].note_type) >= lv:
-                rs = i
-                while i < len(idx) and beam_count(events[idx[i]].note_type) >= lv:
-                    i += 1
-                re = i - 1
-                x1 = _stem_x(events[idx[rs]])
-                x2 = _stem_x(events[idx[re]])
-                if rs == re:
-                    d = -1 if rs > 0 else 1
-                    s = x1 + min(0, d * 8)
-                    dwg.add(dwg.rect(insert=(s, by), size=(8, BEAM_H), fill="black"))
-                else:
-                    dwg.add(dwg.rect(insert=(x1, by), size=(x2 - x1, BEAM_H), fill="black"))
-            else:
-                i += 1
-
-
-def _tie(dwg, a: EngravingLeaf, b: EngravingLeaf):
-    x1 = a.x + NH + 2
-    x2 = b.x - NH - 2
-    y = STAFF_Y + 6
-    mx = (x1 + x2) / 2
-    cy = y + TIE_H
-    dwg.add(dwg.path(d=f"M{x1},{y} Q{mx},{cy} {x2},{y}",
-                      fill="none", stroke="black", stroke_width=1.2))
-
-
-def _tuplets(dwg, tuplets: list[TupletBracket], events: list[EngravingLeaf]):
-    if not tuplets:
-        return
-    # Compute nesting depth: how many other brackets strictly contain this one
-    st = sorted(tuplets, key=lambda t: len(t.event_indices), reverse=True)
-    dep = {}
-    for t in st:
-        ts = set(t.event_indices)
-        dep[t.group_node_id] = sum(
-            1 for o in st
-            if o.group_node_id != t.group_node_id and ts < set(o.event_indices)
-        )
-    max_depth = max(dep.values()) if dep else 0
-
-    for t in tuplets:
-        if not t.event_indices:
-            continue
-        d = dep.get(t.group_node_id, 0)
-        # Innermost (max depth) at TUPLET_INNER_Y, outer brackets go higher (lower y)
-        y = TUPLET_INNER_Y - (max_depth - d) * TUPLET_STEP
-        _bracket(dwg, t, events, y)
 
 
 def _bracket(dwg, t: TupletBracket, events: list[EngravingLeaf], y: float):
@@ -1054,46 +905,6 @@ def _tuplet_label_glyphs(actual: int, normal: int) -> tuple[str, int]:
 
 TEMPO_Y = 50       # Y position for tempo marking (above tuplet brackets)
 TEMPO_FONT = 14    # Font size for tempo text
-
-
-def _tempo_marking(dwg, beat, bpm):
-    """Draw a tempo marking (e.g., ♩ = 120) above the first measure."""
-    from fractions import Fraction
-    beat = Fraction(beat)
-    note_glyph, n_dots = smufl.metronome_glyph_and_dots(beat)
-    x = NOTE_X0
-    # Metronome note glyph
-    _glyph(dwg, note_glyph, x, TEMPO_Y, size=TEMPO_FONT)
-    # Augmentation dots using SMuFL glyph (same font family for consistency)
-    glyph_w = TEMPO_FONT * 0.55  # approx width of metronome note glyph
-    dot_x = x + glyph_w
-    dot_glyph = smufl.GLYPH_CODEPOINTS["metAugmentationDot"]
-    for d in range(n_dots):
-        _glyph(dwg, dot_glyph, dot_x + d * 5, TEMPO_Y, size=TEMPO_FONT)
-    # " = BPM" text with proper spacing
-    bpm_str = str(int(bpm)) if bpm == int(bpm) else f"{bpm:.1f}"
-    eq_x = dot_x + (n_dots * 5 + 3 if n_dots else 3)
-    dwg.add(dwg.text(f"= {bpm_str}", insert=(eq_x, TEMPO_Y),
-                      font_family="serif", font_size=TEMPO_FONT - 1,
-                      font_weight="bold"))
-
-
-def _tempo_marking_at(dwg, beat, bpm, x):
-    """Draw a tempo marking at an arbitrary x position."""
-    from fractions import Fraction
-    beat = Fraction(beat)
-    note_glyph, n_dots = smufl.metronome_glyph_and_dots(beat)
-    _glyph(dwg, note_glyph, x, TEMPO_Y, size=TEMPO_FONT)
-    glyph_w = TEMPO_FONT * 0.55
-    dot_x = x + glyph_w
-    dot_glyph = smufl.GLYPH_CODEPOINTS["metAugmentationDot"]
-    for d in range(n_dots):
-        _glyph(dwg, dot_glyph, dot_x + d * 5, TEMPO_Y, size=TEMPO_FONT)
-    bpm_str = str(int(bpm)) if bpm == int(bpm) else f"{bpm:.1f}"
-    eq_x = dot_x + (n_dots * 5 + 3 if n_dots else 3)
-    dwg.add(dwg.text(f"= {bpm_str}", insert=(eq_x, TEMPO_Y),
-                      font_family="serif", font_size=TEMPO_FONT - 1,
-                      font_weight="bold"))
 
 
 def _rt_text(dwg, text: str):

@@ -1,0 +1,171 @@
+{
+  "measure_count": 2,
+  "measures": [
+    {
+      "time_signature": "4/4",
+      "event_count": 8,
+      "events": [
+        {
+          "node_id": 1,
+          "duration": "1/4",
+          "onset": "0",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 68.0
+        },
+        {
+          "node_id": 2,
+          "duration": "1/4",
+          "onset": "1/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 88.0
+        },
+        {
+          "node_id": 3,
+          "duration": "1/4",
+          "onset": "1/2",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 108.0
+        },
+        {
+          "node_id": 4,
+          "duration": "1/4",
+          "onset": "3/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 128.0
+        },
+        {
+          "node_id": 5,
+          "duration": "1/4",
+          "onset": "1",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 170.0
+        },
+        {
+          "node_id": 6,
+          "duration": "1/4",
+          "onset": "5/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 190.0
+        },
+        {
+          "node_id": 7,
+          "duration": "1/4",
+          "onset": "3/2",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 210.0
+        },
+        {
+          "node_id": 8,
+          "duration": "1/4",
+          "onset": "7/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 230.0
+        }
+      ],
+      "tuplets": [],
+      "beam_groups": [],
+      "barline_x_positions": [
+        44.0,
+        142.0,
+        244.0
+      ],
+      "show_barlines": true,
+      "tempo_beat": "1/4",
+      "tempo_bpm": 120.0,
+      "end_barline_type": "single"
+    },
+    {
+      "time_signature": "3/4",
+      "event_count": 3,
+      "events": [
+        {
+          "node_id": 1,
+          "duration": "1/4",
+          "onset": "0",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 80.0
+        },
+        {
+          "node_id": 2,
+          "duration": "1/4",
+          "onset": "1/4",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 100.0
+        },
+        {
+          "node_id": 3,
+          "duration": "1/4",
+          "onset": "1/2",
+          "note_type": "QUARTER",
+          "dots": 0,
+          "is_rest": false,
+          "is_continuation_tie": false,
+          "is_tied_forward": false,
+          "tuplet_scale": null,
+          "x": 120.0
+        }
+      ],
+      "tuplets": [],
+      "beam_groups": [],
+      "barline_x_positions": [],
+      "show_barlines": true,
+      "tempo_beat": "1/4",
+      "tempo_bpm": 120.0,
+      "end_barline_type": "single"
+    }
+  ],
+  "_meta": {
+    "category": "uts",
+    "name": "uts_07_span2_unit_in_uts"
+  }
+}

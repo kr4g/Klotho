@@ -1,0 +1,95 @@
+{
+  "time_signature": "4/4",
+  "event_count": 6,
+  "events": [
+    {
+      "node_id": 2,
+      "duration": "3/8",
+      "onset": "0",
+      "note_type": "QUARTER",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 68.0
+    },
+    {
+      "node_id": 3,
+      "duration": "3/8",
+      "onset": "3/8",
+      "note_type": "QUARTER",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 98.4241
+    },
+    {
+      "node_id": 5,
+      "duration": "1/4",
+      "onset": "3/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": true,
+      "tuplet_scale": null,
+      "x": 128.8482
+    },
+    {
+      "node_id": 5,
+      "duration": "3/8",
+      "onset": "1",
+      "note_type": "QUARTER",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": true,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 170.8482
+    },
+    {
+      "node_id": 6,
+      "duration": "1/2",
+      "onset": "11/8",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": true,
+      "tuplet_scale": null,
+      "x": 201.2724
+    },
+    {
+      "node_id": 6,
+      "duration": "1/8",
+      "onset": "15/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": true,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 237.2724
+    }
+  ],
+  "tuplets": [],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    142.8482,
+    251.2724
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "barline_splits",
+    "name": "N02_nest_3_5",
+    "meas": "4/4",
+    "span": 2
+  }
+}

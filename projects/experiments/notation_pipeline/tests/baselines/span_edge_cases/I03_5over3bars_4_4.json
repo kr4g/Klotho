@@ -1,0 +1,98 @@
+{
+  "time_signature": "4/4",
+  "event_count": 5,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "3/5",
+      "onset": "0",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 68.0
+    },
+    {
+      "node_id": 2,
+      "duration": "3/5",
+      "onset": "3/5",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 108.0517
+    },
+    {
+      "node_id": 3,
+      "duration": "3/5",
+      "onset": "6/5",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 171.1148
+    },
+    {
+      "node_id": 4,
+      "duration": "3/5",
+      "onset": "9/5",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 211.1664
+    },
+    {
+      "node_id": 5,
+      "duration": "3/5",
+      "onset": "12/5",
+      "note_type": "HALF",
+      "dots": 1,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/5",
+      "x": 284.7611
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 5,
+      "normal": 4,
+      "inner_note_type": "HALF",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "group_node_id": 0
+    }
+  ],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    122.0517,
+    225.1664,
+    298.7611
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "span_edge_cases",
+    "name": "I03_5over3bars_4_4",
+    "meas": "4/4",
+    "span": 3
+  }
+}

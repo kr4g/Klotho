@@ -1,0 +1,182 @@
+{
+  "time_signature": "4/4",
+  "event_count": 9,
+  "events": [
+    {
+      "node_id": 2,
+      "duration": "2/9",
+      "onset": "0",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 68.0
+    },
+    {
+      "node_id": 3,
+      "duration": "2/9",
+      "onset": "2/9",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 90.4021
+    },
+    {
+      "node_id": 4,
+      "duration": "2/9",
+      "onset": "4/9",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 112.8042
+    },
+    {
+      "node_id": 6,
+      "duration": "2/9",
+      "onset": "2/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 135.2063
+    },
+    {
+      "node_id": 7,
+      "duration": "2/9",
+      "onset": "8/9",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 157.6084
+    },
+    {
+      "node_id": 8,
+      "duration": "2/9",
+      "onset": "10/9",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 214.5432
+    },
+    {
+      "node_id": 10,
+      "duration": "2/9",
+      "onset": "4/3",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 236.9453
+    },
+    {
+      "node_id": 11,
+      "duration": "2/9",
+      "onset": "14/9",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 259.3474
+    },
+    {
+      "node_id": 12,
+      "duration": "2/9",
+      "onset": "16/9",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "4/9",
+      "x": 281.7495
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "WHOLE",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "group_node_id": 0
+    },
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "QUARTER",
+      "event_indices": [
+        0,
+        1,
+        2
+      ],
+      "group_node_id": 1
+    },
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "QUARTER",
+      "event_indices": [
+        3,
+        4,
+        5
+      ],
+      "group_node_id": 5
+    },
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "QUARTER",
+      "event_indices": [
+        6,
+        7,
+        8
+      ],
+      "group_node_id": 9
+    }
+  ],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    171.6084,
+    295.7495
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "span_edge_cases",
+    "name": "D02_triplet_of_triplets_span2",
+    "meas": "4/4",
+    "span": 2
+  }
+}

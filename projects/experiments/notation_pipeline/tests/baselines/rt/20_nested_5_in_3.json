@@ -1,0 +1,320 @@
+{
+  "time_signature": "4/4",
+  "event_count": 17,
+  "events": [
+    {
+      "node_id": 3,
+      "duration": "1/30",
+      "onset": "0",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 68.0
+    },
+    {
+      "node_id": 4,
+      "duration": "1/30",
+      "onset": "1/30",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 88.0
+    },
+    {
+      "node_id": 5,
+      "duration": "1/30",
+      "onset": "1/15",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 108.0
+    },
+    {
+      "node_id": 6,
+      "duration": "1/30",
+      "onset": "1/10",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 128.0
+    },
+    {
+      "node_id": 7,
+      "duration": "1/30",
+      "onset": "2/15",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 148.0
+    },
+    {
+      "node_id": 9,
+      "duration": "1/30",
+      "onset": "1/6",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 168.0
+    },
+    {
+      "node_id": 10,
+      "duration": "1/30",
+      "onset": "1/5",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 188.0
+    },
+    {
+      "node_id": 11,
+      "duration": "1/30",
+      "onset": "7/30",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 208.0
+    },
+    {
+      "node_id": 12,
+      "duration": "1/30",
+      "onset": "4/15",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 228.0
+    },
+    {
+      "node_id": 13,
+      "duration": "1/30",
+      "onset": "3/10",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 248.0
+    },
+    {
+      "node_id": 15,
+      "duration": "1/30",
+      "onset": "1/3",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 268.0
+    },
+    {
+      "node_id": 16,
+      "duration": "1/30",
+      "onset": "11/30",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 288.0
+    },
+    {
+      "node_id": 17,
+      "duration": "1/30",
+      "onset": "2/5",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 308.0
+    },
+    {
+      "node_id": 18,
+      "duration": "1/30",
+      "onset": "13/30",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 328.0
+    },
+    {
+      "node_id": 19,
+      "duration": "1/30",
+      "onset": "7/15",
+      "note_type": "N16TH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": "8/15",
+      "x": 348.0
+    },
+    {
+      "node_id": 21,
+      "duration": "1/4",
+      "onset": "1/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 368.0
+    },
+    {
+      "node_id": 22,
+      "duration": "1/4",
+      "onset": "3/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 392.0
+    }
+  ],
+  "tuplets": [
+    {
+      "actual": 3,
+      "normal": 2,
+      "inner_note_type": "QUARTER",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "group_node_id": 1
+    },
+    {
+      "actual": 5,
+      "normal": 4,
+      "inner_note_type": "N32ND",
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "group_node_id": 2
+    },
+    {
+      "actual": 5,
+      "normal": 4,
+      "inner_note_type": "N32ND",
+      "event_indices": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "group_node_id": 8
+    },
+    {
+      "actual": 5,
+      "normal": 4,
+      "inner_note_type": "N32ND",
+      "event_indices": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "group_node_id": 14
+    }
+  ],
+  "beam_groups": [
+    {
+      "event_indices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "max_beam_level": 2,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "max_beam_level": 2,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "max_beam_level": 2,
+      "group_node_id": -1
+    }
+  ],
+  "barline_x_positions": [],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "rt",
+    "name": "20_nested_5_in_3",
+    "meas": "4/4",
+    "span": 1
+  }
+}

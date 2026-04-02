@@ -1,0 +1,148 @@
+{
+  "time_signature": "4/4",
+  "event_count": 8,
+  "events": [
+    {
+      "node_id": 2,
+      "duration": "1/8",
+      "onset": "0",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 68.0
+    },
+    {
+      "node_id": 3,
+      "duration": "1/8",
+      "onset": "1/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 88.0
+    },
+    {
+      "node_id": 5,
+      "duration": "1/8",
+      "onset": "1/4",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 108.0
+    },
+    {
+      "node_id": 6,
+      "duration": "1/8",
+      "onset": "3/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 128.0
+    },
+    {
+      "node_id": 8,
+      "duration": "1/8",
+      "onset": "1/2",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 148.0
+    },
+    {
+      "node_id": 9,
+      "duration": "1/8",
+      "onset": "5/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 168.0
+    },
+    {
+      "node_id": 11,
+      "duration": "1/8",
+      "onset": "3/4",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 188.0
+    },
+    {
+      "node_id": 12,
+      "duration": "1/8",
+      "onset": "7/8",
+      "note_type": "EIGHTH",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 208.0
+    }
+  ],
+  "tuplets": [],
+  "beam_groups": [
+    {
+      "event_indices": [
+        0,
+        1
+      ],
+      "max_beam_level": 1,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        2,
+        3
+      ],
+      "max_beam_level": 1,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        4,
+        5
+      ],
+      "max_beam_level": 1,
+      "group_node_id": -1
+    },
+    {
+      "event_indices": [
+        6,
+        7
+      ],
+      "max_beam_level": 1,
+      "group_node_id": -1
+    }
+  ],
+  "barline_x_positions": [],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "rt",
+    "name": "07_all_eighths_nested",
+    "meas": "4/4",
+    "span": 1
+  }
+}

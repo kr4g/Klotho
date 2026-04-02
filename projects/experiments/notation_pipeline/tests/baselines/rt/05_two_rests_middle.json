@@ -1,0 +1,67 @@
+{
+  "time_signature": "4/4",
+  "event_count": 4,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "1/4",
+      "onset": "0",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 68.0
+    },
+    {
+      "node_id": 2,
+      "duration": "1/4",
+      "onset": "1/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": true,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 92.0
+    },
+    {
+      "node_id": 3,
+      "duration": "1/4",
+      "onset": "1/2",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": true,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 116.0
+    },
+    {
+      "node_id": 4,
+      "duration": "1/4",
+      "onset": "3/4",
+      "note_type": "QUARTER",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 140.0
+    }
+  ],
+  "tuplets": [],
+  "beam_groups": [],
+  "barline_x_positions": [],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "rt",
+    "name": "05_two_rests_middle",
+    "meas": "4/4",
+    "span": 1
+  }
+}

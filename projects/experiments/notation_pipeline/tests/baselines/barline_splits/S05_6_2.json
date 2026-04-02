@@ -1,0 +1,59 @@
+{
+  "time_signature": "4/4",
+  "event_count": 3,
+  "events": [
+    {
+      "node_id": 1,
+      "duration": "1",
+      "onset": "0",
+      "note_type": "WHOLE",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": true,
+      "tuplet_scale": null,
+      "x": 68.0
+    },
+    {
+      "node_id": 1,
+      "duration": "1/2",
+      "onset": "1",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": true,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 110.0
+    },
+    {
+      "node_id": 2,
+      "duration": "1/2",
+      "onset": "3/2",
+      "note_type": "HALF",
+      "dots": 0,
+      "is_rest": false,
+      "is_continuation_tie": false,
+      "is_tied_forward": false,
+      "tuplet_scale": null,
+      "x": 146.0
+    }
+  ],
+  "tuplets": [],
+  "beam_groups": [],
+  "barline_x_positions": [
+    44.0,
+    82.0,
+    160.0
+  ],
+  "show_barlines": true,
+  "tempo_beat": null,
+  "tempo_bpm": null,
+  "end_barline_type": "single",
+  "_meta": {
+    "category": "barline_splits",
+    "name": "S05_6_2",
+    "meas": "4/4",
+    "span": 2
+  }
+}

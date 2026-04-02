@@ -6,6 +6,7 @@ import math
 from fractions import Fraction
 from dataclasses import replace
 
+from ..constants import BAR_X, END_PAD
 from ..models import EngravingLeaf, NoteType
 
 
@@ -17,7 +18,6 @@ STEM_WIDTH = 2.0
 REST_WIDTH = 12.0
 
 # Multi-bar barline layout constants
-BAR_X = 44.0         # Must match svg_renderer.BAR_X
 DEFAULT_BUFFER = 18.0  # Buffer between barline and adjacent note (= NOTE_X0 - BAR_X)
 
 
@@ -185,7 +185,6 @@ def space_with_barlines(
         barline_x_positions includes start, internal, and end barlines.
     """
     LEFT_PAD = left_margin - BAR_X  # 18 px — barline → first note
-    END_PAD = 14.0                  # Fixed gap: last note glyph → barline
 
     meas_dur = Fraction(meas.numerator, meas.denominator)
     n_measures = len(barline_onsets) + 1

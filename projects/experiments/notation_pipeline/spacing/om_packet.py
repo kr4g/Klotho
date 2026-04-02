@@ -242,7 +242,7 @@ def space_with_barlines_om(
     """Multi-bar single staff: OM packet per measure; barlines after END_PAD."""
     from dataclasses import replace
 
-    from .modes import BAR_X
+    from ..constants import BAR_X
 
     meas_dur = Fraction(meas.numerator, meas.denominator)
     n_measures = len(barline_onsets) + 1
