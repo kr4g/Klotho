@@ -2111,7 +2111,7 @@ def _plot_field(field: ParameterField, figsize: tuple[float, float] = (12, 12),
         coord_matrix = np.array([list(coord) for coord in coords])
         
         if dim_reduction == 'mds':
-            reducer = MDS(n_components=target_dims, metric=mds_metric, max_iter=mds_max_iter, n_init=4, random_state=42)
+            reducer = MDS(n_components=target_dims, metric_mds=mds_metric, max_iter=mds_max_iter, init='random', n_init=4, random_state=42)
             reduced_coords = reducer.fit_transform(coord_matrix)
         elif dim_reduction == 'spectral':
             if spectral_affinity == 'precomputed':

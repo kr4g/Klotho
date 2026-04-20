@@ -24,7 +24,7 @@ setup(
         'tabulate',
         'networkx',
         'rustworkx',
-        'scikit-learn',
+        'scikit-learn>=1.8',
         'mido',
         'IPython',
     ],
