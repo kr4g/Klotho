@@ -161,7 +161,7 @@ def _reduce_positions(node_positions, target_dims=3):
     from sklearn.manifold import MDS
     nodes = list(node_positions.keys())
     coords = np.array([list(node_positions[n]) for n in nodes])
-    reducer = MDS(n_components=target_dims, random_state=42, normalized_stress='auto')
+    reducer = MDS(n_components=target_dims, n_init=4, random_state=42, normalized_stress='auto')
     reduced = reducer.fit_transform(coords)
     return {nodes[i]: tuple(reduced[i]) for i in range(len(nodes))}
 
