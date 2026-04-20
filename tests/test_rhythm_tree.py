@@ -1,7 +1,7 @@
 """Tests for RhythmTree."""
 import pytest
 from fractions import Fraction
-from klotho import RhythmTree as RT
+from klotho.chronos import RhythmTree as RT
 from tree_helpers import assert_rt_matches_expected
 from conftest import get_expected_trees
 

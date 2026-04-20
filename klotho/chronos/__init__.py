@@ -9,6 +9,8 @@ the god of time. His representation often symbolizes the endless passage of time
 cycles of creation and destruction within the universe.
 """
 from . import rhythm_pairs
+from . import types as _types
+from .types import *
 from . import rhythm_trees
 from . import temporal_units
 from . import utils
@@ -38,7 +40,7 @@ __all__ = [
     'TemporalUnit',
     'TemporalUnitSequence',
     'TemporalBlock',
-]
+] + getattr(_types, '__all__', [])
 
 __all__.extend(beat_all)
 __all__.extend(tempo_all)

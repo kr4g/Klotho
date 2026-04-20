@@ -21,7 +21,7 @@ import warnings
 from fractions import Fraction
 
 
-from klotho import RhythmTree as RT
+from klotho.chronos import RhythmTree as RT
 from klotho.chronos import (
     TemporalUnit as UT,
     TemporalUnitSequence as UTS,

@@ -68,6 +68,6 @@ Compositional Units
 Types
 -----
 
-.. automodule:: klotho.thetos.types
+.. automodule:: klotho.types
    :members:
    :show-inheritance:

@@ -22,6 +22,8 @@ that prevail, and upon the skill and the soul of the composer."
 --------------------------------------------------------------------------------------
 '''
 from . import utils
+from . import types as _types
+from .types import *
 from . import systems
 from . import scales
 from . import chords
@@ -136,4 +138,4 @@ __all__ = [
     'reduce_sequence_relative',
     'fold_interval',
     'reduce_freq',
-]
+] + getattr(_types, '__all__', [])

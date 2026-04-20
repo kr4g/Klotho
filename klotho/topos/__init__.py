@@ -25,6 +25,8 @@ to unite philosphical insight with mathematical explicitness.
 from . import collections
 from . import formal_grammars
 from . import graphs
+from . import types as _types
+from .types import *
 
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
 from .collections import autoref, autoref_rotmat, permute_list
@@ -43,4 +45,4 @@ __all__ = [
     'patterns', 'sequences', 'sets',
     'alphabets', 'grammars',
     'trees',
-]
+] + getattr(_types, '__all__', [])

@@ -1,12 +1,9 @@
 import numpy as np
 
-from klotho import (
-    CompositionalUnit as UC,
-    TemporalUnitSequence as UTS,
-    TemporalBlock as BT,
-    Pattern,
-    Envelope,
-)
+from klotho.chronos import TemporalUnitSequence as UTS, TemporalBlock as BT
+from klotho.thetos import CompositionalUnit as UC
+from klotho.topos import Pattern
+from klotho.dynatos import Envelope
 from klotho.thetos import ToneInstrument as JsInst
 from klotho.utils.playback.tonejs.converters import (
     compositional_unit_to_events,

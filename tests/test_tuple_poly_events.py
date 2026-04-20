@@ -1,6 +1,6 @@
 from mido import MidiFile
 
-from klotho import CompositionalUnit
+from klotho.thetos import CompositionalUnit
 from klotho.semeios.notelists.supercollider import Scheduler
 from klotho.thetos.instruments.tone import ToneInstrument
 from klotho.thetos.instruments.midi import MidiInstrument

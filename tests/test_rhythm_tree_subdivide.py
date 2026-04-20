@@ -4,7 +4,7 @@ rt.subdivide(leaf, S) should match RT built from equivalent nested structure.
 Node IDs may differ between direct build and subdivide; compare by structure.
 """
 import pytest
-from klotho import RhythmTree as RT
+from klotho.chronos import RhythmTree as RT
 from tree_helpers import assert_rt_structurally_equivalent
 
 

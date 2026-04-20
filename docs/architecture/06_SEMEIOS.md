@@ -263,7 +263,7 @@ Exports Klotho composition data as a JSON event list compatible with
 SuperCollider's pattern system:
 
 ```python
-from klotho import Scheduler
+from klotho.semeios.notelists.supercollider import Scheduler
 
 sched = Scheduler(compositional_unit)
 sched.to_json('output.json')

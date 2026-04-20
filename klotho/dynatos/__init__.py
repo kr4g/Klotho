@@ -6,6 +6,8 @@ deals with the expressive aspects of music that affect how we perceive sound.
 """
 
 from . import dynamics
+from . import types as _types
+from .types import *
 from . import envelopes
 
 from .dynamics import Dynamic, DynamicRange, ampdb, dbamp, freq_amp_scale
@@ -23,4 +25,4 @@ __all__ = [
     'line', 
     'arch', 
     'map_curve',
-]
+] + getattr(_types, '__all__', [])

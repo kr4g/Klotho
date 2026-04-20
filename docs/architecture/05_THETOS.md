@@ -114,9 +114,9 @@ Amplitude ↔ Decibel conversions use `ampdb` / `dbamp` from dynatos.
 Lowercase convenience constructors exported at the top level:
 
 ```python
-from klotho import frequency, midi, midicent, cent
-from klotho import amplitude, decibel
-from klotho import real_onset, real_duration, metric_onset, metric_duration
+from klotho.types import frequency, midi, midicent, cent
+from klotho.types import amplitude, decibel
+from klotho.types import real_onset, real_duration, metric_onset, metric_duration
 ```
 
 ---

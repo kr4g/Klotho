@@ -15,11 +15,13 @@ scale, apply a dynamic envelope, and play it through the SuperSonic
 engine.
 
 ```python
-from klotho import (
-    RhythmTree, TemporalUnit, CompositionalUnit,
-    Scale, Envelope, SynthDefInstrument, Pattern,
-    frequency, play
-)
+from klotho.chronos import RhythmTree, TemporalUnit
+from klotho.thetos import CompositionalUnit, SynthDefInstrument
+from klotho.tonos import Scale
+from klotho.dynatos import Envelope
+from klotho.topos import Pattern
+from klotho.types import frequency
+from klotho import play
 ```
 
 ---

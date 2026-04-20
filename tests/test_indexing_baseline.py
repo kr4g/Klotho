@@ -769,7 +769,7 @@ class TestContourImports:
         assert len(c) == 3
     
     def test_contour_from_klotho(self):
-        from klotho import Contour
+        from klotho.tonos import Contour
         c = Contour([0, 1, 2])
         assert len(c) == 3
 

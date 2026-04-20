@@ -22,26 +22,17 @@ from . import semeios
 from . import utils
 
 from .topos.graphs import Graph, Tree, Lattice, Group
-from .topos.collections import Pattern, CombinationSet, PartitionSet
-
-from .chronos import RhythmPair, RhythmTree, TemporalUnit, TemporalUnitSequence, TemporalBlock
-
-from .tonos import Pitch, Scale, Chord, Voicing, ChordSequence, Contour
-
-from .dynatos import Envelope, DynamicRange
-
-from .thetos import ParameterTree, ParameterField, Instrument, Effect, SynthDefInstrument, SynthDefFX, MidiInstrument, ToneInstrument, Kit, SynthDefKit, Ensemble, CompositionalUnit, Parametron, Score, types
-from .thetos.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 from .semeios.visualization import plot
-from .semeios.notelists.supercollider import Scheduler
 
 from .utils.playback.player import play
 from .utils.playback.midi_player import play_midi, create_midi
 from .utils.playback._config import set_audio_engine, get_audio_engine
 
 __all__ = [
-    'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils', 'plot',
+    'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
+    'plot', 'play', 'play_midi', 'create_midi', 'set_audio_engine', 'get_audio_engine',
+    'Graph', 'Tree', 'Lattice', 'Group',
 ]
 
-__version__ = '5.3.22'
+__version__ = '6.0.0'

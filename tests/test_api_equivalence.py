@@ -26,7 +26,7 @@ import pytest
 import numpy as np
 from fractions import Fraction
 
-from klotho import RhythmTree as RT
+from klotho.chronos import RhythmTree as RT
 from klotho.chronos import (
     TemporalUnit as UT,
     TemporalUnitSequence as UTS,
