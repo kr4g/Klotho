@@ -315,7 +315,11 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
         else:
             from .._animation import AnimatedLattice3dFigure
             from .._renderers.threejs_lattice import _threejs_lattice_3d
-            threejs_data = _threejs_lattice_3d(**svg_threejs_kwargs, preview_engine=engine_name)
+            threejs_data = _threejs_lattice_3d(
+                **svg_threejs_kwargs,
+                preview_engine=engine_name,
+                preview_config=preview_config,
+            )
             return AnimatedLattice3dFigure(
                 scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
                 ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
@@ -536,12 +540,26 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         path_cmap=path_cmap,
     )
     preview_engine = get_audio_engine()
+    animate_preview_config = {
+        "dur": kwargs.get("dur", dur) if kwargs else dur,
+        "amp": kwargs.get("amp", amp) if kwargs else amp,
+        "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
+        "engine": preview_engine,
+    } if (animate and is_tone_lattice) else None
 
     if not animate:
         if effective_dimensionality <= 2:
-            return _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups if lattice_shape_groups else None)
+            return _svg_lattice_2d(
+                **svg_threejs_kwargs,
+                shape=lattice_shape_groups if lattice_shape_groups else None,
+                preview_config=None,
+            )
         else:
-            return _threejs_lattice_3d(**svg_threejs_kwargs, preview_engine=preview_engine)
+            return _threejs_lattice_3d(
+                **svg_threejs_kwargs,
+                preview_engine=preview_engine,
+                preview_config=None,
+            )
 
     animated_fig = _setup_lattice_animation(
         lattice, coords, G, original_coords, coord_mapping,
@@ -557,5 +575,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         return animated_fig
 
     if effective_dimensionality <= 2:
-        return _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups if lattice_shape_groups else None)
-    return _threejs_lattice_3d(**svg_threejs_kwargs, preview_engine=preview_engine)
+        return _svg_lattice_2d(
+            **svg_threejs_kwargs,
+            shape=lattice_shape_groups if lattice_shape_groups else None,
+            preview_config=animate_preview_config,
+        )
+    return _threejs_lattice_3d(
+        **svg_threejs_kwargs,
+        preview_engine=preview_engine,
+        preview_config=animate_preview_config,
+    )

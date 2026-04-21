@@ -590,10 +590,9 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             svg_shape_group_node_indices.append(indices)
 
     all_svg = '\n'.join(els + path_els + shape_els + node_els)
-    has_selection = has_path or has_shape or (nodes and len(nodes) > 0)
     tooltip_html = render_tooltip_system(uid, hover_texts,
                                          is_active=is_active_list if use_dimmed else None,
-                                         node_freqs=node_freqs if has_selection else None,
+                                         node_freqs=node_freqs if preview_config else None,
                                          preview_config=preview_config)
     svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 

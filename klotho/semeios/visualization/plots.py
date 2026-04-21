@@ -106,7 +106,7 @@ def plot(obj, **kwargs):
                 case _:
                     return _show(_plot_graph(obj._graph, **kwargs))
         case MasterSet():
-            return _show(_plot_master_set(obj, **kwargs))
+            return _wrap(_plot_master_set, obj, dict(kwargs))
         case CombinationSet():
             match obj:
                 case CombinationProductSet():

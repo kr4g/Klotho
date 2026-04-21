@@ -531,8 +531,15 @@ class AnimatedLattice3dFigure:
             if (typeof globalThis.KlothoPlaybackBridge !== "function") {{
                 return;
             }}
+            var previewCfg = sceneData.previewConfig || {{}};
+            var previewDur = Number(previewCfg.dur);
+            if (!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
+            var previewAmp = Number(previewCfg.amp);
+            if (!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
+            var previewSynth = previewCfg.defName || "kl_tri";
+            var previewEngine = previewCfg.engine || sceneData.previewEngine || "{eng}";
             var bridge = globalThis.KlothoPlaybackBridge({{
-                engine: "{eng}",
+                engine: previewEngine,
                 audioPayload: null,
                 ringTime: 5
             }});
@@ -540,9 +547,9 @@ class AnimatedLattice3dFigure:
             await bridge.resumeAudio();
             await bridge.preview({{
                 freq: freq,
-                dur: 1.0,
-                amp: 0.3,
-                defName: "kl_tri"
+                dur: previewDur,
+                amp: previewAmp,
+                defName: previewSynth
             }});
         }} catch(e) {{}}
     }}

@@ -294,4 +294,4 @@ def shortest_path(lattice: Lattice, start_coord: Tuple[int, ...],
             f"No path exists between {start_coord} and {end_coord}"
         )
 
-    return [lattice._node_to_coord[n] for n in [start_node] + list(node_paths[end_node])]
+    return [lattice._node_to_coord[n] for n in node_paths[end_node]]

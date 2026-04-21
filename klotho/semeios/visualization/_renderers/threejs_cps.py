@@ -4,7 +4,8 @@ from .threejs_lattice import ThreejsLatticeData
 
 def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
                     node_size=30, text_size=12, show_labels=True,
-                    title=None, nodes=None, preview_engine='supersonic'):
+                    title=None, nodes=None, preview_engine='supersonic',
+                    preview_config=None):
     """
     Build a Three.js 3D scene for a Combination Product Set.
 
@@ -94,7 +95,7 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
     xs = [n[0] for n in scene_nodes]
     ys = [n[1] for n in scene_nodes]
     zs = [n[2] for n in scene_nodes]
-    pad = 0.15
+    pad = 0.08
     x_span = (max(xs) - min(xs)) or 1.0
     y_span = (max(ys) - min(ys)) or 1.0
     z_span = (max(zs) - min(zs)) or 1.0
@@ -115,7 +116,7 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
         'pathNodeIndices': [],
         'pathNodeColors': [],
         'hoverData': hover_data,
-        'nodeFreqs': node_freqs if has_selection else None,
+        'nodeFreqs': node_freqs if preview_config else None,
         'isActive': is_active_list if has_selection else None,
         'axisConfig': {
             'xRange': [min(xs) - x_span * pad, max(xs) + x_span * pad],
@@ -127,6 +128,7 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
             'labels': ['', '', ''],
         },
         'previewEngine': preview_engine,
+        'previewConfig': preview_config,
     }
 
     return ThreejsLatticeData(

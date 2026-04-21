@@ -137,6 +137,12 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
     width_px = int(figsize[0] * 100)
     height_px = int(figsize[1] * 100)
 
+    x_pad_frac = 0.015
+    inner_span = 1.0 - 2 * x_pad_frac
+
+    def tx_px(p):
+        return (x_pad_frac + p * inner_span) * width_px
+
     ratios = rt.durations
     leaf_nodes = rt.leaf_nodes
 
@@ -175,8 +181,8 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
         color = 'rgba(128,128,128,0.4)' if is_rest else '#e6e6e6'
         bright = '#ffffff' if not is_rest else 'rgba(160,160,160,0.6)'
 
-        x0 = pos * width_px
-        w = sw * width_px
+        x0 = tx_px(pos)
+        w = tx_px(pos + sw) - x0
 
         eid = f"{uid}_r{i}"
         node_id = leaf_nodes[i]
@@ -194,7 +200,7 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
         )
 
     for pos in positions + [1.0]:
-        px = pos * width_px
+        px = tx_px(pos)
         els.append(
             f'<line x1="{px:.2f}" y1="{bdy0:.2f}" x2="{px:.2f}" y2="{bdy1:.2f}" '
             f'stroke="#aaaaaa" stroke-width="2"/>'
@@ -204,9 +210,9 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
     leaf_halo_ids = []
     leaf_x_positions = []
     for i, (pos, sw, ratio) in enumerate(zip(positions, segment_widths, ratios)):
-        cx = (pos + sw / 2) * width_px
+        cx = tx_px(pos + sw / 2)
         cy = (by0 + by1) / 2
-        hw = (sw / 2 * 1.1) * width_px
+        hw = (sw / 2 * 1.1) * inner_span * width_px
         hh = (by1 - by0) / 2 * 2.0
         leaf_x_positions.append(cx)
         if ratio < 0:
@@ -279,6 +285,12 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
     width_px = int(figsize[0] * 100)
     height_px = int(figsize[1] * 100)
 
+    x_pad_frac = 0.015
+    inner_span = 1.0 - 2 * x_pad_frac
+
+    def tx_px(p):
+        return (x_pad_frac + p * inner_span) * width_px
+
     def get_node_scaling(node, rt, min_scale=0.5):
         if rt.out_degree(node) == 0:
             return min_scale
@@ -296,6 +308,9 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
         return 1.0 - ((1.0 - min_scale) * min(1.0, (max_levels_for_scaling - levels_to_leaf) / max_levels_for_scaling))
 
     max_depth = rt.depth
+    onset_font_size = 10
+    onset_text_y_frac = -0.015
+    onset_text_budget_frac = max(0.04, (onset_font_size + 4) / max(height_px, 1))
     margin_frac = 0.01
     ratio_space_frac = 0.15
     usable_height = 1.0 - (2 * margin_frac) - ratio_space_frac
@@ -309,9 +324,8 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
             y_pos = margin_frac + ratio_space_frac + (level * level_height) + (level_height / 2)
         level_positions.append(y_pos)
 
-    onset_text_y_frac = -0.015
     line_cutoff_frac = onset_text_y_frac + (margin_frac * 3.0)
-    y_min_frac = onset_text_y_frac - 0.02
+    y_min_frac = onset_text_y_frac - onset_text_budget_frac
     y_max_frac = 1.005
 
     def fy(frac):
@@ -345,9 +359,10 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
             x_pos = i / rt.span
             y_top = fy(level_positions[0] + top_bar_height / 2)
             y_bot = fy(line_cutoff_frac)
+            bar_px = tx_px(x_pos)
             els.append(
-                f'<line x1="{x_pos * width_px:.2f}" y1="{y_bot:.2f}" '
-                f'x2="{x_pos * width_px:.2f}" y2="{y_top:.2f}" '
+                f'<line x1="{bar_px:.2f}" y1="{y_bot:.2f}" '
+                f'x2="{bar_px:.2f}" y2="{y_top:.2f}" '
                 f'stroke="{barline_color}" stroke-width="1.5" '
                 f'stroke-dasharray="4 6" opacity="0.3"/>'
             )
@@ -389,8 +404,8 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                         color = '#404040' if is_rest else ('#e6e6e6' if is_leaf else '#c8c8c8')
                         bar_h = level_height * 0.5 * get_node_scaling(node, rt)
 
-                        bx0 = x_start * width_px
-                        bw = w * width_px
+                        bx0 = tx_px(x_start)
+                        bw = tx_px(x_start + w) - bx0
                         by0_px = fy(y_pos - bar_h / 2)
                         bh_px = fy(bar_h)
 
@@ -408,7 +423,7 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
 
                         text_color = 'white' if is_rest else 'black'
                         font_size = 12 * get_node_scaling(node, rt, 9 / 12)
-                        cx_px = (x_start + w / 2) * width_px
+                        cx_px = tx_px(x_start + w / 2)
                         els.append(_svg_text(cx_px, fy(y_pos), str(rt.meas),
                                              font_size=font_size, fill=text_color))
 
@@ -443,8 +458,8 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
             color = '#404040' if is_rest else ('#e6e6e6' if is_leaf else '#c8c8c8')
 
             bar_h = level_height * 0.5 * get_node_scaling(node, rt)
-            bx0 = x_start * width_px
-            bw = w * width_px
+            bx0 = tx_px(x_start)
+            bw = tx_px(x_start + w) - bx0
             by0_px = fy(y_pos - bar_h / 2)
             bh_px = fy(bar_h)
 
@@ -471,8 +486,11 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
 
             text_color = 'white' if is_rest else 'black'
             font_size = 12 * get_node_scaling(node, rt, 9 / 12)
-            cx_px = (x_start + w / 2) * width_px
-            label_text = f"{ratio}" if ratio is not None else ""
+            cx_px = tx_px(x_start + w / 2)
+            if parent is None:
+                label_text = str(rt.meas)
+            else:
+                label_text = f"{ratio}" if ratio is not None else ""
             els.append(_svg_text(cx_px, fy(y_pos), label_text,
                                  font_size=font_size, fill=text_color))
 
@@ -484,9 +502,10 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                     vertical_line_positions.add(left_x)
                     y_top = fy(y_pos - bar_h / 2)
                     y_bot = fy(line_cutoff_frac)
+                    left_px = tx_px(left_x)
                     els.append(
-                        f'<line x1="{left_x * width_px:.2f}" y1="{y_bot:.2f}" '
-                        f'x2="{left_x * width_px:.2f}" y2="{y_top:.2f}" '
+                        f'<line x1="{left_px:.2f}" y1="{y_bot:.2f}" '
+                        f'x2="{left_px:.2f}" y2="{y_top:.2f}" '
                         f'stroke="{subdivision_line_color}" stroke-width="0.8" '
                         f'stroke-dasharray="2 4" opacity="0.9"/>'
                     )
@@ -495,9 +514,10 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
                     vertical_line_positions.add(right_x)
                     y_top = fy(y_pos - bar_h / 2)
                     y_bot = fy(line_cutoff_frac)
+                    right_px = tx_px(right_x)
                     els.append(
-                        f'<line x1="{right_x * width_px:.2f}" y1="{y_bot:.2f}" '
-                        f'x2="{right_x * width_px:.2f}" y2="{y_top:.2f}" '
+                        f'<line x1="{right_px:.2f}" y1="{y_bot:.2f}" '
+                        f'x2="{right_px:.2f}" y2="{y_top:.2f}" '
                         f'stroke="{subdivision_line_color}" stroke-width="0.8" '
                         f'stroke-dasharray="2 4" opacity="0.9"/>'
                     )
@@ -508,15 +528,18 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
         top_bar_top = fy(top_y_pos + (top_bar_height / 2) - 0.001)
         lc = fy(line_cutoff_frac)
 
+        left_edge = tx_px(0.0)
+        right_edge = tx_px(1.0)
         if 0 not in vertical_line_positions:
             els.append(
-                f'<line x1="0" y1="{lc:.2f}" x2="0" y2="{top_bar_top:.2f}" '
+                f'<line x1="{left_edge:.2f}" y1="{lc:.2f}" '
+                f'x2="{left_edge:.2f}" y2="{top_bar_top:.2f}" '
                 f'stroke="{barline_color}" stroke-width="1.5" opacity="0.9"/>'
             )
         if 1 not in vertical_line_positions:
             els.append(
-                f'<line x1="{width_px}" y1="{lc:.2f}" '
-                f'x2="{width_px}" y2="{top_bar_top:.2f}" '
+                f'<line x1="{right_edge:.2f}" y1="{lc:.2f}" '
+                f'x2="{right_edge:.2f}" y2="{top_bar_top:.2f}" '
                 f'stroke="{barline_color}" stroke-width="1.5" opacity="0.9"/>'
             )
 
@@ -536,8 +559,8 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
 
     for i, (pos, sw, ratio) in enumerate(zip(positions, seg_widths, durations)):
         color = '#404040' if ratio < 0 else '#e6e6e6'
-        rx0 = pos * width_px
-        rw = sw * width_px
+        rx0 = tx_px(pos)
+        rw = tx_px(pos + sw) - rx0
 
         leaf_id = leaf_nodes[i]
         eid = next_eid("rb")
@@ -558,7 +581,7 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
         tip_idx[0] += 1
 
     for pos in positions + [1.0]:
-        px = pos * width_px
+        px = tx_px(pos)
         els.append(
             f'<line x1="{px:.2f}" y1="{ry0:.2f}" x2="{px:.2f}" y2="{ry1:.2f}" '
             f'stroke="{subdivision_line_color}" stroke-width="2"/>'
@@ -566,9 +589,9 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
 
     for i, onset in enumerate(rt.onsets):
         if i < len(positions):
-            px = positions[i] * width_px
+            px = tx_px(positions[i])
             els.append(_svg_text(px, fy(onset_text_y_frac), str(onset),
-                                 font_size=10, fill='white'))
+                                 font_size=onset_font_size, fill='white'))
 
     halo_els = []
     leaf_halo_ids = []
@@ -576,7 +599,7 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
     for i, leaf in enumerate(rt.leaf_nodes):
         geom = leaf_block_geom.get(leaf)
         if i < len(positions) and i < len(seg_widths):
-            leaf_x_positions.append((positions[i] + seg_widths[i] / 2) * width_px)
+            leaf_x_positions.append(tx_px(positions[i] + seg_widths[i] / 2))
         else:
             leaf_x_positions.append(0.0)
         if geom:
@@ -706,7 +729,7 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
             node_layout[node] = (x_start, width)
             pos[node] = ((x_start + width / 2) * width_px, y_pos * height_px)
 
-    x_pad = 15
+    x_pad = 4
     y_pad = 15
 
     max_breadth = max(len(rt.at_depth(level)) for level in range(rt.depth + 1))

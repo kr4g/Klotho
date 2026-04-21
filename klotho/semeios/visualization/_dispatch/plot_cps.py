@@ -9,13 +9,19 @@ from .._projections import apply_projection
 
 def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      show_labels=True, title=None, output_file=None,
-                     dim_reduction='mds'):
+                     dim_reduction='mds', nodes=None, path=None,
+                     path_cmap='viridis', mute_background=False,
+                     animate=False, dur=0.5, shape=None,
+                     arp=False, strum=0, direction='u', amp=None,
+                     **kwargs):
     """
     Render a MasterSet as a 2D SVG or 3D Three.js network diagram.
 
     Automatically chooses a 3D renderer when the master set has three or
     more effective dimensions, falling back to 2D SVG otherwise.
     High-dimensional positions are reduced via ``dim_reduction``.
+    Supports the full CPS plotting surface (``path``, ``shape``,
+    ``nodes``, ``animate``, click-to-play).
 
     Parameters
     ----------
@@ -37,12 +43,36 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
         Projection method used when ``ms.dimensionality > 3``. One of
         ``'mds'`` (default), ``'pca'``, ``'ortho_best'``, or
         ``'ortho_first'``.
+    nodes : list or None, optional
+        Alias labels to highlight.
+    path : list or None, optional
+        Alias labels defining a traversal path through the MasterSet.
+    path_cmap : str, optional
+        Matplotlib colormap name for path edge colouring.
+    mute_background : bool, optional
+        Dim non-selected nodes when a path or shape is active.
+    animate : bool, optional
+        Return an animated figure with playback controls when ``True``.
+    dur : float, optional
+        Seconds between animation steps.
+    shape : list or None, optional
+        Alias labels (a chord) or list of lists (chord sequence).
+    arp : bool, optional
+        Arpeggiate chord notes sequentially instead of block chord.
+    strum : float, optional
+        Strum offset (0--1) for per-note timing in a chord.
+    direction : str, optional
+        ``'u'`` for ascending or ``'d'`` for descending pitch order.
+    amp : float or None, optional
+        Amplitude for playback.
 
     Returns
     -------
-    SvgMasterSetData or ThreejsLatticeData
+    SvgMasterSetData, ThreejsLatticeData, or animated figure
         Renderable figure data.
     """
+    from klotho.utils.playback._config import get_audio_engine
+
     dim = ms.dimensionality
     override_positions = None
     if dim > 3:
@@ -51,19 +81,145 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
         dim = 3
     is_3d = dim == 3
 
+    engine_name = get_audio_engine()
+    animate_preview_config = {
+        "dur": kwargs.get("dur", dur) if kwargs else dur,
+        "amp": kwargs.get("amp", amp) if kwargs else amp,
+        "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
+        "engine": engine_name,
+    } if animate else None
+
+    if shape is not None and len(shape) > 0 and isinstance(shape[0], (list, tuple)):
+        shape_groups = [list(g) for g in shape]
+    elif shape is not None and len(shape) > 0:
+        shape_groups = [list(shape)]
+    else:
+        shape_groups = []
+    has_shape = len(shape_groups) > 0
+
+    if animate and path and len(path) > 1:
+        from .._renderers.svg_master_set import _svg_master_set_2d
+        from .._renderers.threejs_master_set import _threejs_master_set_3d
+        from .._animation import AnimatedCPSSvgFigure, AnimatedLattice3dFigure
+        from klotho.utils.playback.animation_events import build_path_engine_payload
+
+        ref_freq = 261.63
+        nd = ms.node_data()
+        freqs = []
+        for label in path:
+            info = nd.get(label, {})
+            try:
+                if 'ratio' in info:
+                    freqs.append(ref_freq * float(info['ratio']))
+                else:
+                    freqs.append(ref_freq)
+            except (TypeError, ValueError):
+                freqs.append(ref_freq)
+
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
+        audio_payload = build_path_engine_payload(
+            freqs,
+            dur,
+            engine=engine_name,
+            amp=amp,
+            extra_pfields=extra_synth_kwargs,
+            pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
+        )
+
+        if is_3d:
+            threejs_data = _threejs_master_set_3d(
+                ms, figsize=figsize, node_size=node_size, text_size=text_size,
+                show_labels=show_labels, title=title,
+                override_positions=override_positions,
+                preview_engine=engine_name, preview_config=animate_preview_config,
+                nodes=nodes, path=path, path_cmap=path_cmap,
+                mute_background=mute_background,
+            )
+            return AnimatedLattice3dFigure(
+                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
+                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+                loop=kwargs.get("loop", False) if kwargs else False,
+            )
+
+        svg_data = _svg_master_set_2d(
+            ms, figsize=figsize, node_size=node_size, text_size=text_size,
+            show_labels=show_labels, title=title,
+            nodes=nodes, path=path, path_cmap=path_cmap,
+            mute_background=mute_background,
+            preview_config=animate_preview_config,
+        )
+        return AnimatedCPSSvgFigure(
+            svg_data, audio_payload=audio_payload, dur=dur,
+            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+            loop=kwargs.get("loop", False) if kwargs else False,
+        )
+
+    if animate and has_shape:
+        from .._renderers.svg_master_set import _svg_master_set_2d
+        from .._animation import AnimatedCPSShapeFigure
+        from klotho.utils.playback.animation_events import build_shape_engine_payload
+
+        ref_freq = 261.63
+        nd = ms.node_data()
+        freq_groups = []
+        for group in shape_groups:
+            group_freqs = []
+            for label in group:
+                info = nd.get(label, {})
+                try:
+                    if 'ratio' in info:
+                        group_freqs.append(ref_freq * float(info['ratio']))
+                    else:
+                        group_freqs.append(ref_freq)
+                except (TypeError, ValueError):
+                    group_freqs.append(ref_freq)
+            freq_groups.append(group_freqs)
+
+        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
+        audio_payload = build_shape_engine_payload(
+            freq_groups,
+            dur,
+            engine=engine_name,
+            arp=arp,
+            strum=strum,
+            direction=direction,
+            amp=amp,
+            extra_pfields=extra_synth_kwargs,
+            pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
+        )
+
+        svg_data = _svg_master_set_2d(
+            ms, figsize=figsize, node_size=node_size, text_size=text_size,
+            show_labels=show_labels, title=title,
+            nodes=nodes, path=path, path_cmap=path_cmap,
+            mute_background=mute_background, shape=shape,
+            preview_config=animate_preview_config,
+        )
+        return AnimatedCPSShapeFigure(
+            svg_data, audio_payload=audio_payload, dur=dur,
+            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+            loop=kwargs.get("loop", False) if kwargs else False,
+        )
+
     if is_3d:
         from .._renderers.threejs_master_set import _threejs_master_set_3d
-        from klotho.utils.playback._config import get_audio_engine
-        return _threejs_master_set_3d(ms, figsize=figsize, node_size=node_size,
-                                      text_size=text_size, show_labels=show_labels,
-                                      title=title,
-                                      override_positions=override_positions,
-                                      preview_engine=get_audio_engine())
-    else:
-        from .._renderers.svg_master_set import _svg_master_set_2d
-        return _svg_master_set_2d(ms, figsize=figsize, node_size=node_size,
-                                  text_size=text_size, show_labels=show_labels,
-                                  title=title)
+        return _threejs_master_set_3d(
+            ms, figsize=figsize, node_size=node_size, text_size=text_size,
+            show_labels=show_labels, title=title,
+            override_positions=override_positions,
+            preview_engine=engine_name, preview_config=animate_preview_config,
+            nodes=nodes, path=path, path_cmap=path_cmap,
+            mute_background=mute_background,
+        )
+
+    from .._renderers.svg_master_set import _svg_master_set_2d
+    return _svg_master_set_2d(
+        ms, figsize=figsize, node_size=node_size, text_size=text_size,
+        show_labels=show_labels, title=title,
+        nodes=nodes, path=path, path_cmap=path_cmap,
+        mute_background=mute_background, shape=shape,
+        preview_config=animate_preview_config,
+    )
 
 
 def _detect_faces(G, node_positions, max_size=8):
@@ -342,10 +498,18 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     if is_3d:
         from .._renderers.threejs_cps import _threejs_cps_3d
         from klotho.utils.playback._config import get_audio_engine
+        _engine_name_3d = get_audio_engine()
+        _preview_cfg_3d = {
+            "dur": kwargs.get("dur", dur) if kwargs else dur,
+            "amp": kwargs.get("amp", amp) if kwargs else amp,
+            "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
+            "engine": _engine_name_3d,
+        } if animate else None
         return _threejs_cps_3d(cps, node_positions, G, figsize=figsize,
                                node_size=node_size, text_size=text_size,
                                show_labels=show_labels, title=title, nodes=nodes,
-                               preview_engine=get_audio_engine())
+                               preview_engine=_engine_name_3d,
+                               preview_config=_preview_cfg_3d)
 
     if animate and path:
         from .._renderers.svg_cps import _svg_cps
@@ -353,7 +517,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         from klotho.utils.playback._config import get_audio_engine
         from klotho.utils.playback.animation_events import build_path_engine_payload
         engine_name = get_audio_engine()
-        preview_config = {
+        animate_preview_config = {
             "dur": kwargs.get("dur", dur) if kwargs else dur,
             "amp": kwargs.get("amp", amp) if kwargs else amp,
             "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
@@ -363,7 +527,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                             mute_background=mute_background, figsize=figsize,
                             node_size=node_size, text_size=text_size,
                             show_labels=show_labels, title=title,
-                            preview_config=preview_config)
+                            preview_config=animate_preview_config)
         ref_freq = 261.63
         freqs = []
         for node_id in path:
@@ -401,7 +565,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             from klotho.utils.playback._config import get_audio_engine
             from klotho.utils.playback.animation_events import build_shape_engine_payload
             engine_name = get_audio_engine()
-            preview_config = {
+            animate_preview_config = {
                 "dur": kwargs.get("dur", dur) if kwargs else dur,
                 "amp": kwargs.get("amp", amp) if kwargs else amp,
                 "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
@@ -412,7 +576,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
                                 node_size=node_size, text_size=text_size,
                                 show_labels=show_labels, title=title,
                                 shape=shape,
-                                preview_config=preview_config)
+                                preview_config=animate_preview_config)
             ref_freq = 261.63
             freq_groups = []
             for group in shape_groups:
@@ -446,8 +610,17 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             )
 
     from .._renderers.svg_cps import _svg_cps
+    from klotho.utils.playback._config import get_audio_engine as _get_audio_engine
+    engine_name = _get_audio_engine()
+    fallback_preview_config = {
+        "dur": kwargs.get("dur", dur) if kwargs else dur,
+        "amp": kwargs.get("amp", amp) if kwargs else amp,
+        "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
+        "engine": engine_name,
+    } if animate else None
     return _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
                     mute_background=mute_background, figsize=figsize,
                     node_size=node_size, text_size=text_size,
-                    show_labels=show_labels, title=title, shape=shape)
+                    show_labels=show_labels, title=title, shape=shape,
+                    preview_config=fallback_preview_config)
 

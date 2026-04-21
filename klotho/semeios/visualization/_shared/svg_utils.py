@@ -15,10 +15,11 @@ class SvgFigureData:
 
 def svg_wrap(inner_svg, width_px, height_px, background="black"):
     return (
-        f'<div style="overflow-x:auto;overflow-y:hidden;background:{background}">'
+        f'<div style="overflow-x:auto;overflow-y:hidden;max-width:100%;">'
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{width_px}" height="{height_px}" '
-        f'style="display:block;background:{background}">'
+        f'viewBox="0 0 {width_px} {height_px}" '
+        f'style="display:block;background:{background};">'
         f"{inner_svg}</svg></div>"
     )
 
@@ -27,12 +28,12 @@ def svg_wrap_viewbox(inner_svg, width_px, height_px, y_min, y_max, background="b
     vb_y = -y_max
     vb_h = y_max - y_min
     return (
-        f'<div style="overflow-x:auto;overflow-y:hidden;background:{background}">'
+        f'<div style="overflow-x:auto;overflow-y:hidden;max-width:100%;">'
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{width_px}" height="{height_px}" '
         f'viewBox="0 {vb_y:.4f} {width_px} {vb_h:.4f}" '
-        f'style="display:block;background:{background}" '
-        f'preserveAspectRatio="none">'
+        f'preserveAspectRatio="none" '
+        f'style="display:block;background:{background};">'
         f'<g transform="scale(1,-1)">'
         f"{inner_svg}"
         f"</g>"

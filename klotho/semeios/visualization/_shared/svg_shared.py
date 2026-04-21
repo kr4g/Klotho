@@ -156,7 +156,7 @@ def compute_svg_layout(
     margin_right=20,
     margin_top=50,
     margin_bottom=20,
-    pad_fraction=0.15,
+    pad_fraction=0.08,
 ):
     if isinstance(positions_dict_or_list, dict):
         xs = [pos[0] for pos in positions_dict_or_list.values()]
@@ -269,24 +269,27 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
         }}catch(e){{}}
     }}
 
+    function _resetTipStyle(){{
+        tip.style.background="rgba(30,30,30,0.92)";
+        tip.style.color="#eee";
+    }}
+
     circles.forEach(function(c){{
         c.addEventListener("mouseenter",function(ev){{
             var idx=parseInt(c.getAttribute("data-idx"),10);
             if(isNaN(idx)||idx<0||idx>=data.length) return;
             tip.textContent=data[idx];
-            if(active){{
-                if(active[idx]){{
-                    tip.style.background="rgba(245,245,245,0.95)";
-                    tip.style.color="#222";
-                }}else{{
-                    tip.style.background="rgba(30,30,30,0.92)";
-                    tip.style.color="#eee";
-                }}
+            if(active && active[idx]){{
+                tip.style.background="rgba(245,245,245,0.95)";
+                tip.style.color="#222";
+            }}else{{
+                _resetTipStyle();
             }}
             tip.style.display="block";
         }});
         c.addEventListener("mouseleave",function(){{
             tip.style.display="none";
+            _resetTipStyle();
         }});
         c.addEventListener("mousemove",function(ev){{
             var r=wrap.getBoundingClientRect();

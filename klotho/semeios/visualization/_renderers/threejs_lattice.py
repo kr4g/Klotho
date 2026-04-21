@@ -440,8 +440,15 @@ def _static_threejs_html(sd):
             if (typeof globalThis.KlothoPlaybackBridge !== "function") {{
                 return;
             }}
+            var previewCfg = sceneData.previewConfig || {{}};
+            var previewDur = Number(previewCfg.dur);
+            if (!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
+            var previewAmp = Number(previewCfg.amp);
+            if (!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
+            var previewSynth = previewCfg.defName || "kl_tri";
+            var previewEngine = previewCfg.engine || sceneData.previewEngine || "supersonic";
             var bridge = globalThis.KlothoPlaybackBridge({{
-                engine: sceneData.previewEngine || "supersonic",
+                engine: previewEngine,
                 audioPayload: null,
                 ringTime: 5
             }});
@@ -449,9 +456,9 @@ def _static_threejs_html(sd):
             await bridge.resumeAudio();
             await bridge.preview({{
                 freq: freq,
-                dur: 1.0,
-                amp: 0.3,
-                defName: "kl_tri"
+                dur: previewDur,
+                amp: previewAmp,
+                defName: previewSynth
             }});
         }} catch(e) {{}}
     }}
@@ -484,7 +491,8 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
                         effective_dimensionality, use_dimmed, mute_background,
                         path_mode, figsize, node_size, title,
                         is_tone_lattice, coord_label, gen_labels,
-                        path_cmap='viridis', preview_engine='supersonic'):
+                        path_cmap='viridis', preview_engine='supersonic',
+                        preview_config=None):
     """
     Build a Three.js 3D scene for a lattice.
 
@@ -800,7 +808,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         'nodeColors': node_colors,
         'nodeSize': 2,
         'hoverData': hover_texts,
-        'nodeFreqs': node_freqs if has_selection else None,
+        'nodeFreqs': node_freqs if preview_config else None,
         'isActive': is_active_list if use_dimmed else None,
         'dimmedNodeColor': dimmed_node_color,
         'pathNodeIndices': path_node_indices,
@@ -816,6 +824,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         },
         'camera': {'eye': [1.5, 1.5, 1.5]},
         'previewEngine': preview_engine,
+        'previewConfig': preview_config,
     }
 
     return ThreejsLatticeData(
