@@ -1,11 +1,11 @@
 import math
 import numpy as np
 import networkx as nx
-from sklearn.manifold import MDS, SpectralEmbedding
 
 from klotho.topos.graphs.lattices import Lattice
 
 from .._shared.colors import SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
+from .._projections import apply_projection
 
 
 def _coerce_to_tuples(items):
@@ -29,12 +29,8 @@ def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
                                  mds_metric, mds_max_iter,
                                  spectral_affinity, spectral_gamma,
                                  shape=None):
-    if lattice.dimensionality > 3 and dim_reduction is None:
-        raise ValueError(
-            f"Plotting dimensionality > 3 requires dim_reduction. "
-            f"Got dimensionality={lattice.dimensionality}. "
-            f"Use dim_reduction='mds' or 'spectral'"
-        )
+    if dim_reduction is None:
+        dim_reduction = 'mds'
     if target_dims not in [2, 3]:
         raise ValueError(f"target_dims must be 2 or 3, got {target_dims}")
 
@@ -176,32 +172,31 @@ def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
     if lattice.dimensionality > 3:
         coord_matrix = np.array([list(coord) for coord in coords])
 
-        if dim_reduction == 'mds':
-            reducer = MDS(n_components=target_dims, metric_mds=mds_metric, max_iter=mds_max_iter, init='random', n_init=4, random_state=42)
-            reduced_coords = reducer.fit_transform(coord_matrix)
-        elif dim_reduction == 'spectral':
-            if spectral_affinity == 'precomputed':
-                coord_to_idx = {coord: i for i, coord in enumerate(coords)}
-                n = len(coords)
-                adjacency_matrix = np.zeros((n, n))
-                spec_ndim = len(coords[0]) if coords else 0
-                for coord in coords:
-                    ci = coord_to_idx[coord]
-                    for d in range(spec_ndim):
-                        neighbor = list(coord)
-                        neighbor[d] += 1
-                        neighbor = tuple(neighbor)
-                        if neighbor in coord_to_idx:
-                            adjacency_matrix[ci, coord_to_idx[neighbor]] = 1
-                            adjacency_matrix[coord_to_idx[neighbor], ci] = 1
-                reducer = SpectralEmbedding(n_components=target_dims, affinity='precomputed', random_state=42)
-                reduced_coords = reducer.fit_transform(adjacency_matrix)
-            else:
-                reducer = SpectralEmbedding(n_components=target_dims, affinity=spectral_affinity,
-                                            gamma=spectral_gamma, random_state=42)
-                reduced_coords = reducer.fit_transform(coord_matrix)
-        else:
-            raise ValueError(f"Unknown dim_reduction method: {dim_reduction}. Use 'mds' or 'spectral'")
+        adjacency_matrix = None
+        if dim_reduction == 'spectral' and spectral_affinity == 'precomputed':
+            coord_to_idx = {coord: i for i, coord in enumerate(coords)}
+            n = len(coords)
+            adjacency_matrix = np.zeros((n, n))
+            spec_ndim = len(coords[0]) if coords else 0
+            for coord in coords:
+                ci = coord_to_idx[coord]
+                for d in range(spec_ndim):
+                    neighbor = list(coord)
+                    neighbor[d] += 1
+                    neighbor = tuple(neighbor)
+                    if neighbor in coord_to_idx:
+                        adjacency_matrix[ci, coord_to_idx[neighbor]] = 1
+                        adjacency_matrix[coord_to_idx[neighbor], ci] = 1
+
+        reduced_coords = apply_projection(
+            coord_matrix, dim_reduction,
+            target_dims=target_dims,
+            mds_metric=mds_metric,
+            mds_max_iter=mds_max_iter,
+            spectral_affinity=spectral_affinity,
+            spectral_gamma=spectral_gamma,
+            adjacency=adjacency_matrix,
+        )
 
         coords = [tuple(reduced_coords[i]) for i in range(len(coords))]
         effective_dimensionality = target_dims
@@ -377,7 +372,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
 def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  node_size: float = 8, title: str = None,
                  output_file: str = None,
-                 dim_reduction: str = None, target_dims: int = 3,
+                 dim_reduction: str = 'mds', target_dims: int = 3,
                  mds_metric: bool = True, mds_max_iter: int = 300,
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
@@ -406,8 +401,10 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         Plot title.  Auto-generated when ``None``.
     output_file : str or None, optional
         Path to save the figure.
-    dim_reduction : str or None, optional
-        ``'mds'``, ``'spectral'``, or ``None`` (raises for dim > 3).
+    dim_reduction : str, optional
+        Dimensionality-reduction method used when ``lattice.dimensionality``
+        exceeds 3. One of ``'mds'`` (default), ``'spectral'``, ``'pca'``,
+        ``'ortho_best'``, or ``'ortho_first'``.
     target_dims : int, optional
         Target dimensions after reduction (2 or 3).
     mds_metric : bool, optional

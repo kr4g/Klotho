@@ -4,15 +4,18 @@ import numpy as np
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet, MasterSet
 from klotho.tonos.systems.combination_product_sets.master_set import MASTER_SETS
 
+from .._projections import apply_projection
+
 
 def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
-                     show_labels=True, title=None, output_file=None):
+                     show_labels=True, title=None, output_file=None,
+                     dim_reduction='mds'):
     """
     Render a MasterSet as a 2D SVG or 3D Three.js network diagram.
 
     Automatically chooses a 3D renderer when the master set has three or
     more effective dimensions, falling back to 2D SVG otherwise.
-    High-dimensional positions are reduced via MDS.
+    High-dimensional positions are reduced via ``dim_reduction``.
 
     Parameters
     ----------
@@ -30,6 +33,10 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
         Plot title.  Auto-generated when ``None``.
     output_file : str or None, optional
         Path to save the figure.
+    dim_reduction : str, optional
+        Projection method used when ``ms.dimensionality > 3``. One of
+        ``'mds'`` (default), ``'pca'``, ``'ortho_best'``, or
+        ``'ortho_first'``.
 
     Returns
     -------
@@ -39,7 +46,8 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
     dim = ms.dimensionality
     override_positions = None
     if dim > 3:
-        override_positions = _reduce_positions(ms.positions, target_dims=3)
+        override_positions = _reduce_positions(
+            ms.positions, target_dims=3, dim_reduction=dim_reduction)
         dim = 3
     is_3d = dim == 3
 
@@ -142,9 +150,9 @@ _FACE_COLORS = [
 ]
 
 
-def _reduce_positions(node_positions, target_dims=3):
+def _reduce_positions(node_positions, target_dims=3, dim_reduction='mds'):
     """
-    Reduce high-dimensional node positions via MDS.
+    Reduce high-dimensional node positions to ``target_dims``.
 
     Parameters
     ----------
@@ -152,17 +160,18 @@ def _reduce_positions(node_positions, target_dims=3):
         Mapping of node IDs to coordinate tuples.
     target_dims : int, optional
         Number of output dimensions (default 3).
+    dim_reduction : str, optional
+        One of ``'mds'`` (default), ``'pca'``, ``'ortho_best'``,
+        or ``'ortho_first'``.
 
     Returns
     -------
     dict
         Mapping of node IDs to reduced-dimension coordinate tuples.
     """
-    from sklearn.manifold import MDS
     nodes = list(node_positions.keys())
     coords = np.array([list(node_positions[n]) for n in nodes])
-    reducer = MDS(n_components=target_dims, init='random', n_init=4, random_state=42, normalized_stress='auto')
-    reduced = reducer.fit_transform(coords)
+    reduced = apply_projection(coords, dim_reduction, target_dims=target_dims)
     return {nodes[i]: tuple(reduced[i]) for i in range(len(nodes))}
 
 
@@ -255,7 +264,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              animate: bool = False, dur: float = 0.5,
              shape: list = None,
              arp: bool = False, strum: float = 0, direction: str = 'u',
-             amp: float = None, **kwargs):
+             amp: float = None, dim_reduction: str = 'mds', **kwargs):
     """
     Render a Combination Product Set as an interactive network diagram.
 
@@ -300,6 +309,10 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         Strum offset (0--1) for per-note timing in a chord.
     direction : str, optional
         ``'u'`` for ascending or ``'d'`` for descending pitch order.
+    dim_reduction : str, optional
+        Projection method used when the CPS's master-set positions live
+        in more than 3 dimensions. One of ``'mds'`` (default), ``'pca'``,
+        ``'ortho_best'``, or ``'ortho_first'``.
 
     Returns
     -------
@@ -322,7 +335,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
 
     pos_dim = max((len(p) for p in node_positions.values()), default=2)
     if pos_dim > 3:
-        node_positions = _reduce_positions(node_positions, target_dims=3)
+        node_positions = _reduce_positions(
+            node_positions, target_dims=3, dim_reduction=dim_reduction)
         pos_dim = 3
     is_3d = pos_dim >= 3 and any(abs(p[2]) > 1e-12 for p in node_positions.values())
     if is_3d:
