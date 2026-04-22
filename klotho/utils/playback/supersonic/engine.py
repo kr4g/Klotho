@@ -53,8 +53,12 @@ def _load_widget_template():
 class SuperSonicEngine:
     def __init__(self, events, meta=None, control_data=None, ring_time=5):
         self.events = convert_numpy_types(events)
-        self.meta = meta or {}
-        self.control_data = control_data or {"buffer": None, "blockSize": 512, "descriptors": []}
+        self.meta = convert_numpy_types(meta or {})
+        raw_control = control_data or {"buffer": None, "blockSize": 512, "descriptors": []}
+        raw_buffer = raw_control.get("buffer")
+        control_without_buffer = {k: v for k, v in raw_control.items() if k != "buffer"}
+        self.control_data = convert_numpy_types(control_without_buffer)
+        self.control_data["buffer"] = raw_buffer
         self.ring_time = ring_time
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta

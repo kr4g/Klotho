@@ -227,6 +227,7 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
         new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
+        new_cu._next_envelope_id = ut._next_envelope_id
         return new_cu
     else:
         return TemporalUnit(
@@ -278,6 +279,7 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
         new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
+        new_cu._next_envelope_id = ut._next_envelope_id
         return new_cu
     else:
         return TemporalUnit(

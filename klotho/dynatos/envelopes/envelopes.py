@@ -7,7 +7,6 @@ curve shapes and normalization options.
 """
 
 import numpy as np
-from functools import lru_cache
 
 __all__ = [
     'Envelope',
@@ -81,6 +80,7 @@ class Envelope:
         self._times = times
         self._curve = curve
         self._time_scale = time_scale
+        self._at_time_cache: dict = {}
     
     @classmethod
     def perc(cls, attackTime=0.01, releaseTime=1.0, curve=-4.0, time_scale=1.0):
@@ -229,56 +229,73 @@ class Envelope:
             return [0.0] * len(self._values)
         return [t / total for t in self.breakpoint_times]
     
-    @lru_cache(maxsize=128)
     def at_time(self, time):
         """
         Get the envelope value at a specific time.
-        
+
+        Results are memoized on a per-instance cache keyed by the requested
+        time, so repeated queries against the same envelope are O(1) after
+        the first. The cache lifetime is bound to the envelope instance
+        itself (unlike a module-level ``lru_cache``, which would keep every
+        envelope alive for the life of the interpreter).
+
         Parameters
         ----------
         time : float
             Time point to query (must be within [0, total_time]).
-            
+
         Returns
         -------
         float
             Interpolated envelope value at the given time.
-            
+
         Raises
         ------
         ValueError
             If time is outside the envelope duration.
         """
+        cached = self._at_time_cache.get(time)
+        if cached is not None:
+            return cached
+
         if time < 0 or time > self.total_time:
             raise ValueError(f"Time {time} is outside envelope duration [0, {self.total_time}]")
-        
+
         if time == 0:
-            return self._values[0]
+            result = self._values[0]
+            self._at_time_cache[time] = result
+            return result
         if time == self.total_time:
-            return self._values[-1]
-        
+            result = self._values[-1]
+            self._at_time_cache[time] = result
+            return result
+
         scaled_times = [t * self._time_scale for t in self._times]
         current_time = 0
-        
+
         for i in range(len(self._values) - 1):
             segment_duration = scaled_times[i]
             segment_end_time = current_time + segment_duration
-            
+
             if time <= segment_end_time:
                 segment_progress = (time - current_time) / segment_duration
                 start_val = self._values[i]
                 end_val = self._values[i + 1]
                 curve_val = self._curve[i]
-                
+
                 if curve_val == 0:
-                    return start_val + (end_val - start_val) * segment_progress
+                    result = start_val + (end_val - start_val) * segment_progress
                 else:
                     curved_progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
-                    return start_val + (end_val - start_val) * curved_progress
-            
+                    result = start_val + (end_val - start_val) * curved_progress
+                self._at_time_cache[time] = result
+                return result
+
             current_time = segment_end_time
-        
-        return self._values[-1]
+
+        result = self._values[-1]
+        self._at_time_cache[time] = result
+        return result
 
     def __str__(self):
         def format_list(lst):

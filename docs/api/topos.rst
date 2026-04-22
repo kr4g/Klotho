@@ -31,13 +31,6 @@ Sets
 Formal Grammars
 ---------------
 
-Alphabets
-~~~~~~~~~
-
-.. automodule:: klotho.topos.formal_grammars.alphabets
-   :members:
-   :show-inheritance:
-
 Grammars
 ~~~~~~~~
 

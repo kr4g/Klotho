@@ -83,11 +83,17 @@ def lower_compositional_ir_to_sc_assembly(
 ):
     events = []
     node_to_event_ids = {}
+    uid_first_start: dict = {}
     leaf_nodes = obj._rt.leaf_nodes if animation else None
     node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)} if animation else None)
     events_iterable = tuple(obj)
     slur_end_events = {}
     sustain_param_cache = {}
+
+    def _record(node_id, uid, synth_start):
+        if uid not in uid_first_start:
+            uid_first_start[uid] = synth_start
+        node_to_event_ids.setdefault(node_id, []).append((uid, uid_first_start[uid]))
 
     for event in events_iterable:
         if event.is_rest:
@@ -141,7 +147,7 @@ def lower_compositional_ir_to_sc_assembly(
                     "pfields": merged_pfields,
                 }
                 events.append(_attach_poly_meta(set_event, voice_event))
-                node_to_event_ids.setdefault(event.node_id, []).append(instrument.uid)
+                _record(event.node_id, instrument.uid, 0.0)
             continue
 
         resolved_instrument = instrument
@@ -231,7 +237,7 @@ def lower_compositional_ir_to_sc_assembly(
                 while len(active_uids) <= voice_index:
                     active_uids.append(None)
                 active_uids[voice_index] = slur_uid
-                node_to_event_ids.setdefault(event.node_id, []).append(slur_uid)
+                _record(event.node_id, slur_uid, voice_start)
                 continue
 
             if slur_id is not None:
@@ -244,7 +250,7 @@ def lower_compositional_ir_to_sc_assembly(
                         "pfields": merged_pfields,
                     }
                     events.append(_attach_poly_meta(set_event, voice_event))
-                    node_to_event_ids.setdefault(event.node_id, []).append(target_uid)
+                    _record(event.node_id, target_uid, voice_start)
                 else:
                     slur_uid = uuid4().hex
                     new_event = {
@@ -260,7 +266,7 @@ def lower_compositional_ir_to_sc_assembly(
                     while len(active_uids) <= voice_index:
                         active_uids.append(None)
                     active_uids[voice_index] = slur_uid
-                    node_to_event_ids.setdefault(event.node_id, []).append(slur_uid)
+                    _record(event.node_id, slur_uid, voice_start)
                 continue
 
             uid = uuid4().hex
@@ -274,7 +280,7 @@ def lower_compositional_ir_to_sc_assembly(
             if group is not None:
                 new_event["group"] = group
             events.append(_attach_poly_meta(new_event, voice_event))
-            node_to_event_ids.setdefault(event.node_id, []).append(uid)
+            _record(event.node_id, uid, voice_start)
 
             if is_gated or include_ungated_release:
                 release_event = {

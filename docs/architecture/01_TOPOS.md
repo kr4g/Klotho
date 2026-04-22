@@ -21,7 +21,6 @@ topos/
 │   ├── sequences.py       # Nørgård infinity series, Pattern iterator
 │   └── sets.py            # Operations, Sieve, GenCol, CombinationSet, PartitionSet
 ├── formal_grammars/
-│   ├── alphabets.py       # symbolic alphabet enums
 │   └── grammars.py        # context-free grammar engine
 └── graphs/
     ├── graphs.py          # Graph base class (RustworkX)
@@ -465,18 +464,6 @@ A context-free grammar engine:
 | `constrain_rules(rules, constraints)` | Filter rules by constraints |
 | `apply_rules(string, rules)` | One step of rule application |
 | `gen_str(axiom, rules, n)` | Generate string after *n* derivation steps |
-
-### `alphabets.py`
-
-Enum-based symbolic alphabets for grammar terminals:
-
-- `ANCIENT_GREEK`
-- `RUNIC`
-- `LOGOGRAPHIC`
-- `CUNEIFORM`
-- `MATHEMATICAL`
-
-Uses `DirectValueEnumMeta` for direct member-value access.
 
 ---
 

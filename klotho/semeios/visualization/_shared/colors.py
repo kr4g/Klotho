@@ -1,12 +1,12 @@
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 
 SHAPE_COLORS = ["#90EE90", "#FFD700", "#FF6B6B", "#87CEEB", "#DDA0DD", "#FFA07A"]
 
 
 def _path_color_array(cmap_name, n):
-    cmap = plt.cm.get_cmap(cmap_name)
+    cmap = mpl.colormaps[cmap_name]
     return cmap(np.linspace(0.15, 1, n))
 
 

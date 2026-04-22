@@ -195,7 +195,7 @@
       this._controlBusMap.push({
         bus: ctrlBus,
         param: (desc.pfields && desc.pfields.length > 0) ? desc.pfields[0] : 'amp',
-        targetIds: desc.targetIds || [],
+        targets: desc.targets || [],
         start: desc.start,
         dur: desc.dur,
         bufnum: bufnum,
@@ -222,16 +222,23 @@
     }
   };
 
-  proto._getControlMappingsForEvent = function(evId) {
+  proto._getControlMappingsForEvent = function(evId, evStart) {
     if (!this._controlBusMap || this._controlBusMap.length === 0) return null;
     var mappings = null;
     for (var i = 0; i < this._controlBusMap.length; i++) {
       var cm = this._controlBusMap[i];
-      if (!cm.targetIds) continue;
-      for (var j = 0; j < cm.targetIds.length; j++) {
-        if (cm.targetIds[j] === evId) {
+      if (!cm.targets) continue;
+      for (var j = 0; j < cm.targets.length; j++) {
+        var tgt = cm.targets[j];
+        if (tgt && tgt.id === evId) {
           if (!mappings) mappings = [];
-          mappings.push({ param: cm.param, bus: cm.bus });
+          var deferred = (evStart != null) && (tgt.startTime > evStart + 1e-9);
+          mappings.push({
+            param: cm.param,
+            bus: cm.bus,
+            startTime: tgt.startTime,
+            deferred: deferred
+          });
           break;
         }
       }

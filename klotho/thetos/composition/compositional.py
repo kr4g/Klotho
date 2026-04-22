@@ -274,7 +274,8 @@ class CompositionalUnit(TemporalUnit):
         
         self._slur_specs = {}
         self._next_slur_id = 0
-        self._control_envelopes = []
+        self._control_envelopes: dict[int, dict] = {}
+        self._next_envelope_id = 0
 
     @property
     def nodes(self):
@@ -706,18 +707,30 @@ class CompositionalUnit(TemporalUnit):
         self._ensure_timing_cache()
         sounding = [n for n in selected if self.nodes[n].get('proportion', 1) >= 0]
         if not sounding:
+            warnings.warn(
+                "apply_envelope: selection resolves to no sounding leaves; envelope not applied",
+                RuntimeWarning, stacklevel=3
+            )
             return
+        if len(sounding) == 1 and not endpoint:
+            warnings.warn(
+                "apply_envelope: endpoint=False with a single sounding leaf "
+                "collapses envelope duration to 0; falling back to endpoint=True",
+                RuntimeWarning, stacklevel=3
+            )
+            endpoint = True
         start_time = min(self.nodes[n]['real_onset'] for n in sounding)
         if endpoint:
             end_time = max(self.nodes[n]['real_onset'] + abs(self.nodes[n]['real_duration']) for n in sounding)
         else:
             end_time = max(self.nodes[n]['real_onset'] for n in sounding)
         duration = end_time - start_time
+        raw_total = sum(envelope.times)
         scaled_envelope = Envelope(
             values=envelope.values,
             times=envelope.times,
             curve=envelope._curve,
-            time_scale=duration / envelope.total_time if envelope.total_time > 0 else 1.0
+            time_scale=duration / raw_total if raw_total > 0 else 1.0
         )
         for node in sounding:
             event_time = self.nodes[node]['real_onset']
@@ -740,6 +753,26 @@ class CompositionalUnit(TemporalUnit):
             candidates = [n for n in leaf_subset if n in current_leaves]
         return [n for n in candidates if self._rt[n].get('proportion', 1) >= 0]
 
+    @staticmethod
+    def _leaf_subset_contains(leaf_subset, value):
+        return value in leaf_subset
+
+    @staticmethod
+    def _leaf_subset_intersects(leaf_subset, other):
+        other_set = other if isinstance(other, (set, frozenset)) else set(other)
+        return any(n in other_set for n in leaf_subset)
+
+    @staticmethod
+    def _leaf_subset_subtract(leaf_subset, other):
+        other_set = other if isinstance(other, (set, frozenset)) else set(other)
+        return tuple(n for n in leaf_subset if n not in other_set)
+
+    @staticmethod
+    def _leaf_subset_union(leaf_subset, other):
+        seen = set(leaf_subset)
+        extras = tuple(n for n in other if n not in seen)
+        return tuple(leaf_subset) + extras
+
     def _resolve_control_envelope_time_span(self, desc, sounding=None):
         if sounding is None:
             sounding = self._resolve_control_envelope_leaves(desc)
@@ -756,12 +789,19 @@ class CompositionalUnit(TemporalUnit):
     def _check_envelope_overlap(self, new_pfields, new_leaves):
         new_pf_set = set(new_pfields)
         new_leaf_set = set(new_leaves)
-        for desc in self._control_envelopes:
-            if not new_pf_set.intersection(desc["pfields"]):
+        for desc in self._control_envelopes.values():
+            shared_pf = new_pf_set.intersection(desc["pfields"])
+            if not shared_pf:
                 continue
             existing_leaves = set(self._resolve_control_envelope_leaves(desc))
-            if new_leaf_set.intersection(existing_leaves):
-                raise ValueError("Overlapping control envelopes on the same pfield")
+            shared_leaves = new_leaf_set.intersection(existing_leaves)
+            if shared_leaves:
+                raise ValueError(
+                    "Overlapping control envelopes on the same pfield "
+                    f"(pfields={sorted(shared_pf)}, "
+                    f"shared_leaves={sorted(shared_leaves)}, "
+                    f"existing_pfields={sorted(desc['pfields'])})"
+                )
 
     def _rebake_control_envelope(self, desc):
         sounding = self._resolve_control_envelope_leaves(desc)
@@ -772,6 +812,10 @@ class CompositionalUnit(TemporalUnit):
         self._ensure_timing_cache()
         sounding = [n for n in selected if self._rt[n].get('proportion', 1) >= 0]
         if not sounding:
+            warnings.warn(
+                "apply_envelope: selection resolves to no sounding leaves; envelope not applied",
+                RuntimeWarning, stacklevel=3
+            )
             return
 
         anchor_node = selected[0]
@@ -779,23 +823,26 @@ class CompositionalUnit(TemporalUnit):
             anchor_node = self._rt.lowest_common_ancestor(anchor_node, n)
 
         all_anchor_leaves = set(self._rt.subtree_leaves(anchor_node))
-        leaf_subset = None if set(selected) == all_anchor_leaves else frozenset(selected)
+        leaf_subset = None if set(selected) == all_anchor_leaves else tuple(selected)
 
         self._check_envelope_overlap(pfields_list, sounding)
         self._bake_envelope(sounding, envelope, pfields_list, endpoint)
 
-        self._control_envelopes.append({
+        env_id = self._next_envelope_id
+        self._next_envelope_id += 1
+        self._control_envelopes[env_id] = {
             "envelope": envelope,
             "pfields": list(pfields_list),
             "endpoint": endpoint,
             "anchor_node": anchor_node,
             "leaf_subset": leaf_subset,
-        })
+        }
+        return env_id
 
     def resolved_control_envelopes(self):
         self._ensure_timing_cache()
         result = []
-        for desc in self._control_envelopes:
+        for desc in self._control_envelopes.values():
             leaves = self._resolve_control_envelope_leaves(desc)
             if not leaves:
                 continue
@@ -807,6 +854,37 @@ class CompositionalUnit(TemporalUnit):
                 "time_span": (start, end),
             })
         return result
+
+    def remove_envelope(self, env_id: int) -> None:
+        """
+        Remove a previously-applied control envelope by handle.
+
+        The baked pfield values written by this envelope are unset so that
+        each affected leaf falls back to its inherited (parent/instrument)
+        default. Only control-mode envelopes allocate handles; bake-mode
+        envelopes are one-shot writes with no state to remove.
+
+        Parameters
+        ----------
+        env_id : int
+            The identifier returned by ``apply_envelope(..., control=True)``.
+
+        Raises
+        ------
+        KeyError
+            If ``env_id`` is not a live envelope handle on this UC.
+        """
+        if env_id not in self._control_envelopes:
+            raise KeyError(f"No control envelope with id {env_id}")
+        desc = self._control_envelopes.pop(env_id)
+        leaves = self._resolve_control_envelope_leaves(desc)
+        for leaf in leaves:
+            if leaf not in self._pt:
+                continue
+            node_data = self._pt._graph[leaf]
+            for pfield in desc["pfields"]:
+                node_data.pop(pfield, None)
+        self._pt._effective_cache = None
 
     def apply_envelope(self,
                        envelope: Envelope,
@@ -867,12 +945,14 @@ class CompositionalUnit(TemporalUnit):
         if scope == "span":
             selected = self._resolve_leaf_selection(node=node)
             selected = self._apply_offset_take(selected, offset=offset, take=take)
-            apply_fn(selected, envelope, pfields_list, endpoint)
+            return apply_fn(selected, envelope, pfields_list, endpoint)
         elif scope == "per_node":
             groups = self._resolve_per_node_leaf_groups(node)
+            results = []
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
-                apply_fn(selected, envelope, pfields_list, endpoint)
+                results.append(apply_fn(selected, envelope, pfields_list, endpoint))
+            return results
         else:
             raise ValueError(f"Unknown scope: {scope}")
 
@@ -1032,11 +1112,11 @@ class CompositionalUnit(TemporalUnit):
                 self._register_slur(segment)
 
     def _heal_envelopes_after_subdivide(self, old_leaf, new_leaves):
-        new_leaf_set = frozenset(new_leaves)
-        for desc in self._control_envelopes:
+        for desc in self._control_envelopes.values():
             needs_rebake = False
             if desc["leaf_subset"] is not None and old_leaf in desc["leaf_subset"]:
-                desc["leaf_subset"] = (desc["leaf_subset"] - {old_leaf}) | new_leaf_set
+                without_old = self._leaf_subset_subtract(desc["leaf_subset"], {old_leaf})
+                desc["leaf_subset"] = self._leaf_subset_union(without_old, new_leaves)
                 needs_rebake = True
             elif desc["leaf_subset"] is None:
                 ancestor_set = set(self._rt.descendants(desc["anchor_node"])) | {desc["anchor_node"]}
@@ -1046,40 +1126,51 @@ class CompositionalUnit(TemporalUnit):
                 self._rebake_control_envelope(desc)
 
     def _filter_envelopes_for_rests(self, affected_leaves):
-        for desc in list(self._control_envelopes):
+        for env_id, desc in list(self._control_envelopes.items()):
             touched = False
             if desc["leaf_subset"] is not None:
-                if desc["leaf_subset"].intersection(affected_leaves):
-                    desc["leaf_subset"] = desc["leaf_subset"] - affected_leaves
+                if self._leaf_subset_intersects(desc["leaf_subset"], affected_leaves):
+                    desc["leaf_subset"] = self._leaf_subset_subtract(
+                        desc["leaf_subset"], affected_leaves
+                    )
                     touched = True
             else:
                 anchor_leaves = set(self._rt.subtree_leaves(desc["anchor_node"]))
                 if anchor_leaves.intersection(affected_leaves):
                     touched = True
-            if touched and not self._resolve_control_envelope_leaves(desc):
+            if not touched:
+                continue
+            if not self._resolve_control_envelope_leaves(desc):
                 warnings.warn(
                     "Control envelope removed: all target leaves are now rests",
                     RuntimeWarning, stacklevel=3
                 )
-                self._control_envelopes.remove(desc)
+                del self._control_envelopes[env_id]
+            else:
+                self._rebake_control_envelope(desc)
 
     def _invalidate_envelopes_for_removed_nodes(self, removed_set):
-        for desc in list(self._control_envelopes):
+        for env_id, desc in list(self._control_envelopes.items()):
             if desc["anchor_node"] in removed_set:
                 warnings.warn(
                     "Control envelope removed: anchor node was destroyed",
                     RuntimeWarning, stacklevel=3
                 )
-                self._control_envelopes.remove(desc)
+                del self._control_envelopes[env_id]
                 continue
-            if desc["leaf_subset"] is not None and desc["leaf_subset"].intersection(removed_set):
-                desc["leaf_subset"] = desc["leaf_subset"] - removed_set
+            if (desc["leaf_subset"] is not None
+                    and self._leaf_subset_intersects(desc["leaf_subset"], removed_set)):
+                desc["leaf_subset"] = self._leaf_subset_subtract(
+                    desc["leaf_subset"], removed_set
+                )
                 if not self._resolve_control_envelope_leaves(desc):
                     warnings.warn(
                         "Control envelope removed: all target leaves were destroyed",
                         RuntimeWarning, stacklevel=3
                     )
-                    self._control_envelopes.remove(desc)
+                    del self._control_envelopes[env_id]
+                else:
+                    self._rebake_control_envelope(desc)
 
     def make_rest(self, node: int) -> None:
         """
@@ -1411,26 +1502,28 @@ class CompositionalUnit(TemporalUnit):
                     new_cu.apply_slur(node=mapped)
 
         subtree_node_set = set(original_subtree_nodes)
-        for desc in self._control_envelopes:
+        for desc in self._control_envelopes.values():
             if desc["anchor_node"] not in subtree_node_set:
                 continue
             new_anchor = old_to_new_mapping[desc["anchor_node"]]
             new_leaf_subset = None
             if desc["leaf_subset"] is not None:
-                mapped_leaves = frozenset(
+                mapped_leaves = tuple(
                     old_to_new_mapping[n] for n in desc["leaf_subset"]
                     if n in old_to_new_mapping
                 )
                 if not mapped_leaves:
                     continue
                 new_leaf_subset = mapped_leaves
-            new_cu._control_envelopes.append({
+            new_env_id = new_cu._next_envelope_id
+            new_cu._next_envelope_id += 1
+            new_cu._control_envelopes[new_env_id] = {
                 "envelope": desc["envelope"],
                 "pfields": list(desc["pfields"]),
                 "endpoint": desc["endpoint"],
                 "anchor_node": new_anchor,
                 "leaf_subset": new_leaf_subset,
-            })
+            }
 
         return new_cu
     

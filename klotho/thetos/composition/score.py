@@ -229,24 +229,29 @@ class Score:
     def _collect_control_envelopes(self, uc: CompositionalUnit, id_map: dict[str, str], node_to_event_ids: dict | None = None):
         node_to_event_ids = node_to_event_ids or {}
         for desc in uc.resolved_control_envelopes():
-            remapped = []
+            env_start, env_end = desc["time_span"]
+            target_map: OrderedDict[str, float] = OrderedDict()
             for nid in desc["target_nodes"]:
-                assembly_eids = node_to_event_ids.get(nid, [])
-                for eid in assembly_eids:
+                for entry in node_to_event_ids.get(nid, []):
+                    eid, synth_start = entry
                     score_uid = id_map.get(eid, eid)
-                    if score_uid not in remapped:
-                        remapped.append(score_uid)
+                    mapping_start = max(float(synth_start), float(env_start))
+                    if score_uid in target_map:
+                        if mapping_start < target_map[score_uid]:
+                            target_map[score_uid] = mapping_start
+                    else:
+                        target_map[score_uid] = mapping_start
 
-            if not remapped:
+            if not target_map:
                 continue
 
-            start, end = desc["time_span"]
+            targets = [{"id": uid, "startTime": start} for uid, start in target_map.items()]
             self._control_descriptors.append({
                 "envelope": desc["envelope"],
                 "pfields": desc["pfields"],
-                "start": start,
-                "duration": end - start,
-                "targetIds": remapped,
+                "start": env_start,
+                "duration": env_end - env_start,
+                "targets": targets,
             })
 
     # ------------------------------------------------------------------
@@ -302,7 +307,7 @@ class Score:
                 "start": desc["start"],
                 "dur": desc["duration"],
                 "pfields": desc["pfields"],
-                "targetIds": desc["targetIds"],
+                "targets": desc["targets"],
             })
 
         buffer_data = np.concatenate(blocks)
@@ -395,9 +400,21 @@ class Score:
         meta = self._build_meta()
         ctrl = self._build_control_data()
 
+        time_shift = 0.0
+        if start_time is not None and self._event_heap:
+            min_start = min(item[0] for item in self._event_heap)
+            time_shift = start_time - min_start
+
+        shifted_descriptors = []
+        for d in ctrl["descriptors"]:
+            d_copy = dict(d)
+            d_copy["start"] = (d["start"] + time_shift) * time_scale
+            d_copy["dur"] = d["dur"] * time_scale
+            shifted_descriptors.append(d_copy)
+
         output: dict = {"meta": meta, "events": events}
-        if ctrl["descriptors"]:
-            output["meta"]["controlEnvelopes"] = ctrl["descriptors"]
+        if shifted_descriptors:
+            output["meta"]["controlEnvelopes"] = shifted_descriptors
 
         with open(filepath, 'w') as f:
             json.dump(output, f, indent=2)

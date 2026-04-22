@@ -166,11 +166,15 @@
       this._defNames.set(ev.id, defName);
 
       if (typeof this._getControlMappingsForEvent === 'function') {
-        var mappings = this._getControlMappingsForEvent(ev.id);
+        var mappings = this._getControlMappingsForEvent(ev.id, ev.start);
         if (mappings) {
           for (var mi = 0; mi < mappings.length; mi++) {
-            var mapArgs = [nodeId, mappings[mi].param, mappings[mi].bus];
-            var mapBundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_map', mapArgs);
+            var mp = mappings[mi];
+            var mapArgs = [nodeId, mp.param, mp.bus];
+            var mapNtp = mp.deferred
+              ? (this._playStartNTP + mp.startTime)
+              : ntp;
+            var mapBundle = globalThis.SuperSonic.osc.encodeSingleBundle(mapNtp, '/n_map', mapArgs);
             this.sonic.sendOSC(mapBundle);
           }
         }
@@ -407,6 +411,7 @@
       this._finishTimeoutId = null;
       this._cancelAllDeferredRings();
       this._freeGroup();
+      this._freeBuffers();
       this.nodeMap.clear();
       this._defNames.clear();
       this._trackMap = null;
