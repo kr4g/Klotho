@@ -3668,7 +3668,10 @@ class Test_ut_accel_120bpm:
 class Test_ut_offset:
     @pytest.fixture
     def ut(self):
-        return UT(tempus='4/4', prolatio='p', bpm=60, offset=2.5)
+        from klotho.thetos.composition.score import Score
+        s = Score()
+        item = s.add(UT(tempus='4/4', prolatio='p', bpm=60), name='t', at=2.5)
+        return item.unit
 
     def test_full_structural_equivalence(self, ut):
         _ = ut.events

@@ -233,14 +233,20 @@ class CompositionalUnit(TemporalUnit):
         Beat unit for tempo (e.g., Fraction(1,4) for quarter note)
     bpm : Union[None, int, float], optional
         Beats per minute
-    offset : float, default=0
-        Start time offset in seconds
     pfields : Union[dict, list, None], optional
         Parameter fields to initialize. Can be:
         - dict: {field_name: default_value, ...}
         - list: [field_name1, field_name2, ...] (defaults to 0.0)
         - None: No parameter fields initially
-        
+
+    Notes
+    -----
+    Outside a :class:`~klotho.thetos.composition.score.Score`, a
+    ``CompositionalUnit`` always starts at time 0 and its duration is
+    fixed after construction.  Placement and duration editing are handled
+    by :class:`~klotho.thetos.composition.score.ScoreItem` once the UC
+    has been added to a Score.
+
     Attributes
     ----------
     pt : ParameterTree
@@ -255,12 +261,11 @@ class CompositionalUnit(TemporalUnit):
                  prolatio : Union[tuple, str]                      = 'd',
                  beat     : Union[None, Fraction, int, float, str] = None,
                  bpm      : Union[None, int, float]                = None,
-                 offset   : float                                  = 0,
                  inst     : Union[Instrument, None]                = None,
                  mfields  : Union[dict, list, None]                = None,
                  pfields  : Union[dict, list, None]                = None):
         
-        super().__init__(span, tempus, prolatio, beat, bpm, offset)
+        super().__init__(span, tempus, prolatio, beat, bpm)
         
         if mfields is None:
             mfields = {}
@@ -311,7 +316,6 @@ class CompositionalUnit(TemporalUnit):
                    prolatio = rt.subdivisions,
                    beat     = beat,
                    bpm      = bpm,
-                   offset   = 0,
                    pfields  = pfields,
                    mfields  = mfields,
                    inst     = inst)
@@ -337,15 +341,19 @@ class CompositionalUnit(TemporalUnit):
         CompositionalUnit
             A new CompositionalUnit with the temporal unit's structure.
         """
-        return cls(span     = ut.span,
-                   tempus   = ut.tempus,
-                   prolatio = ut.prolationis,
-                   beat     = ut.beat,
-                   bpm      = ut.bpm,
-                   offset   = ut.offset,
-                   pfields  = pfields,
-                   mfields  = mfields,
-                   inst     = inst)
+        new_uc = cls(
+            span     = ut.span,
+            tempus   = ut.tempus,
+            prolatio = ut.prolationis,
+            beat     = ut.beat,
+            bpm      = ut.bpm,
+            pfields  = pfields,
+            mfields  = mfields,
+            inst     = inst,
+        )
+        new_uc._offset = ut._offset
+        new_uc._invalidate_timing_cache()
+        return new_uc
     
     def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None], mfields: Union[dict, list, None] = None) -> ParameterTree:
         """
@@ -1530,11 +1538,63 @@ class CompositionalUnit(TemporalUnit):
     def copy(self):
         """
         Create a deep copy of this CompositionalUnit.
-        
+
+        The copy preserves the original time signature (``tempus``),
+        span, pfield / mfield data, instruments, envelopes, slurs, and
+        internal placement (``_offset``) so that containers
+        (``TemporalUnitSequence``, ``TemporalBlock``) and
+        :class:`~klotho.thetos.composition.score.Score` can rebuild
+        their layouts cleanly.
+
         Returns
         -------
         CompositionalUnit
             A new CompositionalUnit with identical structure, parameters,
             instruments, envelopes, and slurs.
         """
-        return self.from_subtree(self.rt.root)
+        c = self.__class__(
+            span     = self.span,
+            tempus   = self.tempus,
+            prolatio = self.prolationis,
+            beat     = self.beat,
+            bpm      = self.bpm,
+        )
+
+        for old_node in self._rt.nodes:
+            old_proportion = self._rt[old_node].get('proportion')
+            if old_proportion is not None and old_proportion < 0:
+                if c._rt[old_node].get('proportion', 1) >= 0:
+                    c.make_rest(old_node)
+
+        for node in self._pt.nodes:
+            node_data = self._pt.items(node)
+            c._pt._graph[node] = dict(node_data)
+        c._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
+        c._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
+        for inst_node, inst in self._pt._node_instruments.items():
+            c._pt.set_instrument(inst_node, inst)
+
+        for slur_id, spec in self._slur_specs.items():
+            c._slur_specs[slur_id] = {
+                'leaf_nodes': tuple(spec['leaf_nodes']),
+                'leaf_set': set(spec['leaf_set']),
+                'index_range': tuple(spec['index_range']),
+            }
+        c._next_slur_id = self._next_slur_id
+
+        for env_id, desc in self._control_envelopes.items():
+            c._control_envelopes[env_id] = {
+                "envelope": desc["envelope"],
+                "pfields": list(desc["pfields"]),
+                "endpoint": desc["endpoint"],
+                "anchor_node": desc["anchor_node"],
+                "leaf_subset": (
+                    tuple(desc["leaf_subset"])
+                    if desc["leaf_subset"] is not None else None
+                ),
+            }
+        c._next_envelope_id = self._next_envelope_id
+
+        c._offset = self._offset
+        c._invalidate_timing_cache()
+        return c

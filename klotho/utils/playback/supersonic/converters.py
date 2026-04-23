@@ -351,7 +351,7 @@ def _merge_sub_sc(target_events, sub_events, time_offset):
 
 def temporal_sequence_to_sc_events(obj, extra_pfields=None):
     events = []
-    seq_offset = obj.offset
+    seq_offset = obj.start
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
@@ -368,7 +368,7 @@ def temporal_sequence_to_sc_events(obj, extra_pfields=None):
 
 def temporal_block_to_sc_events(obj, extra_pfields=None):
     events = []
-    block_offset = obj.offset
+    block_offset = obj.start
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
@@ -376,9 +376,9 @@ def temporal_block_to_sc_events(obj, extra_pfields=None):
         elif isinstance(row, TemporalUnit):
             _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True, extra_pfields=extra_pfields), block_offset)
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.start)
         elif isinstance(row, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
+            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.start)
 
     return sort_sc_assembly_events(events)
 
@@ -448,6 +448,229 @@ def convert_to_sc_events(obj, **kwargs):
                                              extra_pfields=extra_pfields)
 
     raise TypeError(f"Unsupported object type: {type(obj)}")
+
+
+_SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
+_DEFAULT_SCORE_BLOCK_SIZE = 512
+
+
+def _iter_ucs(unit):
+    """Yield every :class:`CompositionalUnit` contained in a (possibly
+    nested) temporal structure.
+
+    Bare :class:`TemporalUnit` nodes are not expected inside a
+    :class:`~klotho.thetos.composition.score.Score` — they are promoted
+    on ``Score.add``.
+    """
+    if isinstance(unit, CompositionalUnit):
+        yield unit
+    elif isinstance(unit, TemporalUnitSequence):
+        for member in unit._seq:
+            yield from _iter_ucs(member)
+    elif isinstance(unit, TemporalBlock):
+        for row in unit._rows:
+            yield from _iter_ucs(row)
+
+
+def _build_score_meta(score) -> dict:
+    """Build the SuperSonic ``meta`` dict (tracks + inserts) for a Score."""
+    groups = [name for name in score._tracks if name != "main"]
+    inserts: dict[str, list] = {}
+    for name, track_data in score._tracks.items():
+        if track_data["inserts"]:
+            inserts[name] = [
+                {"uid": ins.uid, "defName": ins.defName, "args": ins.args}
+                for ins in track_data["inserts"]
+            ]
+    meta: dict = {}
+    if groups:
+        meta["groups"] = groups
+    if inserts:
+        meta["inserts"] = inserts
+    return meta
+
+
+def _build_score_control_data(control_descriptors, block_size):
+    """Build ``{buffer, blockSize, descriptors}`` for SuperSonic from the
+    per-UC resolved control-envelope descriptors collected during
+    lowering."""
+    if not control_descriptors:
+        return {"buffer": None, "blockSize": block_size, "descriptors": []}
+
+    import numpy as np
+
+    t = np.linspace(0.0, 1.0, block_size, dtype=np.float64)
+    blocks = []
+    serializable: list[dict] = []
+
+    for i, desc in enumerate(control_descriptors):
+        env = desc["envelope"]
+        total = env.total_time
+        if total <= 0:
+            bp_times = [0.0] * len(env.values)
+        else:
+            cumulative = [0.0]
+            for seg_t in env.times:
+                cumulative.append(cumulative[-1] + seg_t * env.time_scale)
+            bp_times = [c / total for c in cumulative]
+
+        samples = np.interp(
+            t,
+            np.array(bp_times, dtype=np.float64),
+            np.array(env.values, dtype=np.float64),
+        ).astype(np.float32)
+        blocks.append(samples)
+
+        serializable.append({
+            "blockIndex": i,
+            "start": desc["start"],
+            "dur": desc["duration"],
+            "pfields": desc["pfields"],
+            "targets": desc["targets"],
+        })
+
+    buffer_data = np.concatenate(blocks)
+    return {
+        "buffer": buffer_data,
+        "blockSize": block_size,
+        "descriptors": serializable,
+    }
+
+
+def _lower_score_uc(uc, track_override):
+    """Lower one UC to SC events + collect per-envelope targets.
+
+    Returns a tuple ``(events, control_descriptors)`` where each event
+    carries its ``group`` (from *track_override* or its own ``group``
+    mfield), all event IDs are freshly regenerated (so that the same UC
+    can appear in multiple items without uid collisions), and control
+    descriptors are already re-keyed against the fresh IDs.
+    """
+    from uuid import uuid4
+
+    from klotho.utils.playback._sc_assembly import (
+        lower_compositional_ir_to_sc_assembly,
+    )
+
+    assembly_events, node_to_event_ids = lower_compositional_ir_to_sc_assembly(
+        uc,
+        extra_pfields=None,
+        animation=False,
+        default_synth='kl_tri',
+        include_ungated_release=False,
+        normalize_sc_pfields=False,
+        sort_output=True,
+        return_node_map=True,
+    )
+
+    id_map: dict[str, str] = {}
+    events: list[dict] = []
+
+    for event in assembly_events:
+        if event.get("defName") == "__rest__":
+            continue
+
+        event_type = event.get("type")
+
+        if track_override is not None:
+            event["group"] = track_override
+        elif "group" not in event:
+            event["group"] = "default"
+
+        if event_type == "new":
+            new_uid = uuid4().hex
+            id_map[event["id"]] = new_uid
+            event["id"] = new_uid
+            events.append(event)
+        elif event_type == "set":
+            orig_id = event.get("id")
+            mapped_uid = id_map.get(orig_id, orig_id)
+            event["id"] = mapped_uid
+            events.append(event)
+        elif event_type == "release":
+            mapped_uid = id_map.get(event.get("id"))
+            if mapped_uid is None:
+                continue
+            event["id"] = mapped_uid
+            events.append(event)
+
+    from collections import OrderedDict
+    control_descriptors: list[dict] = []
+    for desc in uc.resolved_control_envelopes():
+        env_start, env_end = desc["time_span"]
+        target_map: "OrderedDict[str, float]" = OrderedDict()
+        for nid in desc["target_nodes"]:
+            for entry in node_to_event_ids.get(nid, []):
+                eid, synth_start = entry
+                score_uid = id_map.get(eid, eid)
+                mapping_start = max(float(synth_start), float(env_start))
+                if score_uid in target_map:
+                    if mapping_start < target_map[score_uid]:
+                        target_map[score_uid] = mapping_start
+                else:
+                    target_map[score_uid] = mapping_start
+        if not target_map:
+            continue
+        targets = [
+            {"id": uid, "startTime": start} for uid, start in target_map.items()
+        ]
+        control_descriptors.append({
+            "envelope": desc["envelope"],
+            "pfields": desc["pfields"],
+            "start": env_start,
+            "duration": env_end - env_start,
+            "targets": targets,
+        })
+
+    return events, control_descriptors
+
+
+def convert_score_to_sc_events(score, **kwargs) -> dict:
+    """Lower every item in a Score to a SuperCollider event payload.
+
+    The converter iterates items in insertion order, walks each item's
+    owned unit to collect its :class:`CompositionalUnit` leaves, and
+    lowers each UC via
+    :func:`klotho.utils.playback._sc_assembly.lower_compositional_ir_to_sc_assembly`.
+    Event IDs are regenerated per lowering so the same external UC
+    reused across multiple items does not collide.
+
+    Parameters
+    ----------
+    score : Score
+        The score to lower.
+    **kwargs
+        Reserved for future engine options; unused today.
+
+    Returns
+    -------
+    dict
+        ``{"events": [...], "meta": {...}, "control_data": {...}}``.
+        ``control_data`` is a SuperSonic-ready payload with ``buffer``,
+        ``blockSize``, and ``descriptors``.
+    """
+    all_events: list[dict] = []
+    control_descriptors: list[dict] = []
+
+    for item in score.items():
+        for uc in _iter_ucs(item.unit):
+            uc_events, uc_ctrl = _lower_score_uc(uc, item.track)
+            all_events.extend(uc_events)
+            control_descriptors.extend(uc_ctrl)
+
+    all_events.sort(
+        key=lambda e: (e["start"], _SC_EVENT_PRIORITY.get(e["type"], 3))
+    )
+
+    block_size = getattr(score, "_block_size", _DEFAULT_SCORE_BLOCK_SIZE)
+    meta = _build_score_meta(score)
+    control_data = _build_score_control_data(control_descriptors, block_size)
+
+    return {
+        "events": all_events,
+        "meta": meta,
+        "control_data": control_data,
+    }
 
 
 def tonejs_events_to_sc(tone_events):

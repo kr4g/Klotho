@@ -1,70 +1,260 @@
 """
-Score: an orchestrator for multi-track SuperCollider / SuperSonic playback.
+Score: a timeline container for :class:`CompositionalUnit` objects.
 
-Accumulates :class:`CompositionalUnit` objects, manages tracks with insert
-FX chains, collects control-envelope metadata, and produces either a
-browser-based SuperSonic widget (via :meth:`play`) or a JSON file for the
-native SC EventScheduler (via :meth:`write`).
+A ``Score`` is an ordered, inspectable collection of
+:class:`ScoreItem` wrappers.  Each item owns a copy of the unit submitted
+to :meth:`Score.add`, so mutations through the external reference do not
+leak into the score and vice versa.  Bare :class:`TemporalUnit` inputs
+are auto-promoted to :class:`CompositionalUnit` on entry.
+
+Placement is handled at ``add`` time via the mutually-exclusive kwargs
+``at``, ``after``, and ``before``.  Convenience methods :meth:`append`
+and :meth:`prepend` shift the timeline automatically.
+
+Lowering to audio events is deferred: :func:`klotho.play` (not a method
+on ``Score``) invokes a converter that produces the SC event payload at
+playback time.  This keeps the Score a stable "what's in the composition"
+view that timeline tooling can read, and removes the opacity of the old
+"events accumulated eagerly on add" design.
 """
 
 from __future__ import annotations
 
-import heapq
-import json
-import os
 from collections import OrderedDict
-from typing import Union
-from uuid import uuid4
+from dataclasses import dataclass, field
+from typing import Iterable, Optional, Union
 
+from klotho.chronos.temporal_units import (
+    TemporalBlock,
+    TemporalUnit,
+    TemporalUnitSequence,
+)
+from klotho.chronos.temporal_units.temporal import _reoffset
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.instruments.base import Effect
-from klotho.thetos.instruments.base import Kit
-from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, TemporalBlock
-from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
 
-_SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
 _DEFAULT_BLOCK_SIZE = 512
 
+TemporalLike = Union[
+    TemporalUnit, TemporalUnitSequence, TemporalBlock, CompositionalUnit
+]
 
-class Score:
-    """Multi-track score that accumulates events, tracks, and control envelopes.
+
+# ---------------------------------------------------------------------------
+# Auto-promotion: bare UT → UC
+# ---------------------------------------------------------------------------
+
+
+def _promote_to_uc(unit: TemporalLike) -> TemporalLike:
+    """Recursively promote bare :class:`TemporalUnit` nodes to
+    :class:`CompositionalUnit`.
+
+    Containers (:class:`TemporalUnitSequence`, :class:`TemporalBlock`) are
+    walked and rebuilt with promoted members; existing
+    :class:`CompositionalUnit` instances pass through unchanged.  The
+    outer structure's private ``_offset`` is preserved so that internal
+    cascades (``_set_offsets`` / ``_align_rows``) re-align correctly after
+    reconstruction.
+    """
+    if isinstance(unit, CompositionalUnit):
+        return unit
+    if isinstance(unit, TemporalUnit):
+        return CompositionalUnit.from_ut(unit)
+    if isinstance(unit, TemporalUnitSequence):
+        new_seq = [_promote_to_uc(u) for u in unit._seq]
+        new_uts = TemporalUnitSequence(ut_seq=new_seq)
+        new_uts._offset = unit._offset
+        new_uts._set_offsets()
+        return new_uts
+    if isinstance(unit, TemporalBlock):
+        new_rows = [_promote_to_uc(r) for r in unit._rows]
+        new_bt = TemporalBlock(
+            rows=new_rows, axis=unit._axis, sort_rows=unit._sort_rows
+        )
+        new_bt._offset = unit._offset
+        new_bt._align_rows()
+        return new_bt
+    raise TypeError(f"Unsupported unit type: {type(unit).__name__}")
+
+
+# ---------------------------------------------------------------------------
+# ScoreItem: wrapper with name, track, and time-manipulation methods
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ScoreItem:
+    """A named, owned wrapper around a temporal unit inside a
+    :class:`Score`.
+
+    A ``ScoreItem`` exposes read-only time queries (:attr:`start`,
+    :attr:`end`, :attr:`duration`) and provides the only API for
+    mutating a unit's total duration after it has entered a Score.
+
+    Attribute access not matched on the item falls through to the owned
+    unit, so ``score['verse'].leaf_nodes``,
+    ``score['verse'].set_pfields(...)``, and so on work transparently.
 
     Parameters
     ----------
-    block_size : int, optional
-        Number of samples per control-envelope block (default 512).
+    unit : TemporalUnit, TemporalUnitSequence, TemporalBlock, or CompositionalUnit
+        The wrapped unit.  Ownership belongs to the score; external
+        references to the unit are not held (``Score.add`` always copies).
+    name : str
+        Unique identifier within the owning score.
+    track : str or None
+        Track assignment used during lowering (overrides any per-event
+        ``group`` mfield when set).
+    frozen : bool
+        When True, :meth:`set_duration` raises :class:`RuntimeError`.
+    """
+
+    unit: TemporalLike
+    name: str
+    track: Optional[str] = None
+    frozen: bool = False
+    _score: Optional["Score"] = field(default=None, repr=False)
+
+    @property
+    def start(self) -> float:
+        """Absolute start time in seconds."""
+        return self.unit._offset
+
+    @property
+    def end(self) -> float:
+        """Absolute end time in seconds."""
+        return self.unit._offset + self.unit.duration
+
+    @property
+    def duration(self) -> float:
+        """Total duration in seconds."""
+        return self.unit.duration
+
+    def set_duration(self, target: float, *, ripple: bool = False) -> None:
+        """Scale bpm(s) on the owned unit so that its total duration
+        matches *target*.
+
+        Parameters
+        ----------
+        target : float
+            Target total duration in seconds. Must be positive.
+        ripple : bool, default=False
+            When True, every item whose ``start`` is at or after this
+            item's current ``end`` is shifted by the duration delta so
+            that the rest of the timeline reflows.
+
+        Raises
+        ------
+        RuntimeError
+            If the item is :attr:`frozen`.
+        ValueError
+            If *target* is not positive.
+        """
+        if self.frozen:
+            raise RuntimeError(f"ScoreItem '{self.name}' is frozen")
+        if target <= 0:
+            raise ValueError("Target duration must be positive")
+
+        old_duration = self.unit.duration
+        if old_duration == 0:
+            raise ValueError(
+                f"Cannot scale duration of item '{self.name}' with zero duration"
+            )
+        old_end = self.end
+
+        factor = old_duration / target
+        self.unit._scale_bpm(factor)
+
+        if ripple and self._score is not None:
+            delta = target - old_duration
+            self._score._shift_items_at_or_after(
+                exclude_name=self.name, pivot=old_end, by=delta
+            )
+
+    def stretch(self, factor: float, *, ripple: bool = False) -> None:
+        """Multiply the total duration by *factor* (``factor=2`` doubles
+        the duration by halving the bpm).
+
+        See :meth:`set_duration` for ripple semantics.
+        """
+        if factor <= 0:
+            raise ValueError("Stretch factor must be positive")
+        self.set_duration(self.unit.duration * factor, ripple=ripple)
+
+    def freeze(self) -> None:
+        """Disallow subsequent :meth:`set_duration` / :meth:`stretch`
+        calls on this item."""
+        self.frozen = True
+
+    def __getattr__(self, name: str):
+        if name.startswith("_") or name in (
+            "unit", "name", "track", "frozen", "start", "end",
+            "duration", "set_duration", "stretch", "freeze",
+        ):
+            raise AttributeError(name)
+        return getattr(self.__dict__["unit"], name)
+
+    def __repr__(self) -> str:
+        return (
+            f"ScoreItem(name={self.name!r}, track={self.track!r}, "
+            f"start={self.start:.3f}, end={self.end:.3f}, "
+            f"unit={type(self.unit).__name__})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Score
+# ---------------------------------------------------------------------------
+
+
+class Score:
+    """Ordered collection of :class:`ScoreItem` objects on a shared
+    timeline, with optional per-track FX chains.
+
+    Units submitted to :meth:`add` are always copied (via
+    ``unit.copy()``) so the external reference is never mutated through
+    the score, and score-internal mutations (e.g.
+    ``score['verse'].set_pfields(...)``) do not leak out.  Bare
+    :class:`TemporalUnit` nodes are auto-promoted to
+    :class:`CompositionalUnit` on entry.
+
+    Rendering and export are handled outside the class:
+
+    * ``play(score)`` — render an interactive SuperSonic widget via the
+      universal :func:`klotho.play` dispatcher.
+    * :meth:`write` — serialize the lowered event payload to JSON (for
+      the native SC ``EventScheduler``).
 
     Examples
     --------
     >>> s = Score()
     >>> s.track("melody", inserts=[SynthDefFX("__reverb", mix=0.3)])
-    >>> s.add(my_uc, track="melody")
-    >>> s.play()
+    >>> s.add(my_uc, name="intro", track="melody")
+    >>> s.add(other_uc, name="verse", after="intro")
+    >>> play(s)
     """
 
     def __init__(self, block_size: int = _DEFAULT_BLOCK_SIZE):
         self._block_size = block_size
-        self._tracks: OrderedDict[str, dict] = OrderedDict()
-        self._event_heap: list = []
-        self._event_counter: int = 0
-        self._total_events: int = 0
-        self._control_descriptors: list[dict] = []
+        self._tracks: "OrderedDict[str, dict]" = OrderedDict()
+        self._items: "OrderedDict[str, ScoreItem]" = OrderedDict()
         self._insert_registry: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Track management
     # ------------------------------------------------------------------
 
-    def track(self, name: str, inserts=None) -> 'Score':
+    def track(self, name: str, inserts: Optional[Iterable[Effect]] = None) -> "Score":
         """Register a named track with optional insert effects.
 
         Parameters
         ----------
         name : str
-            Unique track name.  ``"main"`` is implicit and always exists;
-            calling ``track("main", inserts=[...])`` sets master inserts.
-        inserts : list of Insert or None
+            Unique track name.  ``"main"`` is implicit and always
+            exists; calling ``track("main", inserts=[...])`` sets master
+            inserts.
+        inserts : list of Effect or None
             Insert FX instances to place in this track's chain.
 
         Returns
@@ -80,374 +270,263 @@ class Score:
             if ins.uid in self._insert_registry:
                 existing = self._insert_registry[ins.uid]
                 raise ValueError(
-                    f"Insert '{ins.name}' (uid={ins.uid}) already assigned to track '{existing}'"
+                    f"Insert '{ins.name}' (uid={ins.uid}) already assigned to "
+                    f"track '{existing}'"
                 )
             self._insert_registry[ins.uid] = name
         self._tracks[name] = {"inserts": list(inserts or [])}
         return self
 
     # ------------------------------------------------------------------
-    # Event ingestion
+    # Item placement
     # ------------------------------------------------------------------
-
-    def _push_event(self, event: dict, priority: int | None = None):
-        if priority is None:
-            priority = _SC_EVENT_PRIORITY.get(event.get("type"), 3)
-        start = event.get("start", 0.0)
-        uid = event.get("id", uuid4().hex)
-        heapq.heappush(
-            self._event_heap,
-            (start, priority, uid, self._event_counter, event),
-        )
-        self._event_counter += 1
-        self._total_events += 1
 
     def add(
         self,
-        uc: Union[CompositionalUnit, TemporalUnit, TemporalUnitSequence, TemporalBlock],
-        track: str | None = None,
-    ) -> 'Score':
-        """Add events from a musical structure.
+        unit: TemporalLike,
+        *,
+        name: Optional[str] = None,
+        track: Optional[str] = None,
+        at: Union[float, str, None] = None,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+    ) -> ScoreItem:
+        """Add a temporal unit to the score with optional placement.
+
+        The unit is always copied (``unit.copy()``) so the external
+        reference is unaffected by subsequent mutations through the
+        score.  Bare ``TemporalUnit`` nodes are auto-promoted to
+        ``CompositionalUnit`` on entry.
 
         Parameters
         ----------
-        uc : CompositionalUnit, TemporalUnit, TemporalUnitSequence, or TemporalBlock
-            The musical structure whose events should be scheduled.
-        track : str or None
-            Override the track for all events from this UC.  If ``None``,
-            the ``group`` mfield on each event is used (defaulting to
-            ``"default"``).
+        unit : TemporalUnit, TemporalUnitSequence, TemporalBlock, or CompositionalUnit
+            The unit to place.
+        name : str, optional
+            Item name; must be unique.  Auto-generated (``"item_N"``) if
+            omitted.
+        track : str, optional
+            Track name (registered via :meth:`track`).  Defaults to
+            each event's own ``group`` mfield (or ``"default"``).
+        at : float or str, optional
+            Absolute start time in seconds, or the name of an existing
+            item whose ``start`` will be matched.  Default is 0 when no
+            placement kwarg is supplied.
+        after : str, optional
+            Name of an existing item; the new item starts at that
+            item's ``end``.
+        before : str, optional
+            Name of an existing item; the new item ends at that item's
+            ``start``.
 
         Returns
         -------
-        Score
-            ``self``, for chaining.
-        """
-        if isinstance(uc, (TemporalUnitSequence, TemporalBlock)):
-            for unit in uc:
-                self.add(unit, track=track)
-            return self
+        ScoreItem
+            The registered item (also retrievable via
+            ``score[name]``).
 
-        if isinstance(uc, CompositionalUnit):
-            self._add_compositional_unit(uc, track=track)
+        Raises
+        ------
+        ValueError
+            If more than one of ``at``, ``after``, ``before`` is
+            supplied, or if *name* already exists, or if *track* is not
+            registered.
+        KeyError
+            If ``at=<str>``, ``after``, or ``before`` references a
+            non-existent item.
+        """
+        placement_count = sum(
+            1 for x in (at, after, before) if x is not None
+        )
+        if placement_count > 1:
+            provided = [
+                lbl for lbl, v in (('at', at), ('after', after), ('before', before))
+                if v is not None
+            ]
+            raise ValueError(
+                f"Specify at most one of 'at', 'after', 'before' "
+                f"(got {', '.join(provided)})"
+            )
+
+        for arg_name, arg_val in (('after', after), ('before', before)):
+            if arg_val is not None and arg_val not in self._items:
+                raise KeyError(
+                    f"No item named {arg_val!r} (for {arg_name}=); "
+                    f"existing: {list(self._items)}"
+                )
+        if isinstance(at, str) and at not in self._items:
+            raise KeyError(
+                f"No item named {at!r} (for at=); existing: {list(self._items)}"
+            )
+
+        owned = _promote_to_uc(unit).copy()
+
+        if after is not None:
+            t = self._items[after].end
+        elif before is not None:
+            t = self._items[before].start - owned.duration
+        elif isinstance(at, str):
+            t = self._items[at].start
+        elif isinstance(at, (int, float)):
+            t = float(at)
         else:
-            self._add_temporal_unit(uc, track=track)
+            t = 0.0
 
-        return self
+        _reoffset(owned, t)
 
-    def _add_compositional_unit(self, uc: CompositionalUnit, track: str | None):
-        assembly_events, node_to_event_ids = lower_compositional_ir_to_sc_assembly(
-            uc,
-            extra_pfields=None,
-            animation=False,
-            default_synth='kl_tri',
-            include_ungated_release=False,
-            normalize_sc_pfields=False,
-            sort_output=True,
-            return_node_map=True,
-        )
+        if name is None:
+            name = f"item_{len(self._items)}"
+        if name in self._items:
+            raise ValueError(f"Item {name!r} already exists")
 
-        id_map: dict[str, str] = {}
+        if track is not None and track != 'main' and track not in self._tracks:
+            raise ValueError(
+                f"Track {track!r} not registered; call score.track() first"
+            )
 
-        for event in assembly_events:
-            if event.get("defName") == "__rest__":
-                continue
+        item = ScoreItem(unit=owned, name=name, track=track, _score=self)
+        self._items[name] = item
+        return item
 
-            event_type = event.get("type")
+    def append(
+        self,
+        unit: TemporalLike,
+        *,
+        name: Optional[str] = None,
+        track: Optional[str] = None,
+    ) -> ScoreItem:
+        """Append *unit* so it starts at the current latest ``end`` of
+        the score (or at 0 if the score is empty)."""
+        if not self._items:
+            return self.add(unit, name=name, track=track)
+        latest_name = max(self._items, key=lambda n: self._items[n].end)
+        return self.add(unit, name=name, track=track, after=latest_name)
 
-            if track is not None:
-                event["group"] = track
-            elif "group" not in event:
-                event["group"] = "default"
+    def prepend(
+        self,
+        unit: TemporalLike,
+        *,
+        name: Optional[str] = None,
+        track: Optional[str] = None,
+    ) -> ScoreItem:
+        """Prepend *unit* at time 0, shifting every existing item right
+        by ``unit.duration``."""
+        owned = _promote_to_uc(unit).copy()
+        shift_by = owned.duration
 
-            if event_type == "new":
-                new_uid = uuid4().hex
-                id_map[event["id"]] = new_uid
-                event["id"] = new_uid
-                self._push_event(event)
+        for existing in self._items.values():
+            _reoffset(existing.unit, existing.unit._offset + shift_by)
 
-            elif event_type == "set":
-                orig_id = event.get("id")
-                mapped_uid = id_map.get(orig_id, orig_id)
-                event["id"] = mapped_uid
-                self._push_event(event)
+        _reoffset(owned, 0.0)
 
-            elif event_type == "release":
-                mapped_uid = id_map.get(event.get("id"))
-                if mapped_uid is None:
-                    continue
-                event["id"] = mapped_uid
-                self._push_event(event)
+        if name is None:
+            name = f"item_{len(self._items)}"
+        if name in self._items:
+            raise ValueError(f"Item {name!r} already exists")
+        if track is not None and track != 'main' and track not in self._tracks:
+            raise ValueError(
+                f"Track {track!r} not registered; call score.track() first"
+            )
 
-        self._collect_control_envelopes(uc, id_map, node_to_event_ids)
-
-    def _add_temporal_unit(self, uc: TemporalUnit, track: str | None):
-        for event in uc:
-            if event.is_rest:
-                continue
-            instrument = uc.get_instrument(event.node_id) if hasattr(uc, 'get_instrument') else None
-            resolved = instrument
-            kit_selector = None
-            if isinstance(instrument, Kit):
-                kit_selector = instrument.selector
-                selector_val = event.get_pfield(kit_selector) if hasattr(event, 'get_pfield') else None
-                resolved = instrument._resolve(selector_val)
-
-            if isinstance(resolved, str):
-                def_name = resolved
-            elif resolved is not None and hasattr(resolved, 'defName'):
-                def_name = resolved.defName
-            else:
-                def_name = 'kl_tri'
-
-            group = track or (event.get_mfield('group') if hasattr(event, 'get_mfield') else None) or 'default'
-            pfields = {k: v for k, v in event.pfields.items()
-                       if k != 'group' and k != kit_selector}
-
-            uid = uuid4().hex
-            new_event = {
-                "type": "new",
-                "id": uid,
-                "defName": def_name,
-                "start": event.start,
-                "group": group,
-                "pfields": pfields,
-            }
-            self._push_event(new_event)
-
-            release_mode = (getattr(resolved, 'release_mode', '') or '').lower() if resolved is not None else 'gate'
-            if release_mode not in ('gate', 'free'):
-                release_mode = 'gate'
-            if release_mode == 'gate':
-                rel_event = {"type": "release", "id": uid, "start": event.end}
-                self._push_event(rel_event)
+        item = ScoreItem(unit=owned, name=name, track=track, _score=self)
+        new_items: "OrderedDict[str, ScoreItem]" = OrderedDict()
+        new_items[name] = item
+        for k, v in self._items.items():
+            new_items[k] = v
+        self._items = new_items
+        return item
 
     # ------------------------------------------------------------------
-    # Control envelope collection
+    # Access
     # ------------------------------------------------------------------
 
-    def _collect_control_envelopes(self, uc: CompositionalUnit, id_map: dict[str, str], node_to_event_ids: dict | None = None):
-        node_to_event_ids = node_to_event_ids or {}
-        for desc in uc.resolved_control_envelopes():
-            env_start, env_end = desc["time_span"]
-            target_map: OrderedDict[str, float] = OrderedDict()
-            for nid in desc["target_nodes"]:
-                for entry in node_to_event_ids.get(nid, []):
-                    eid, synth_start = entry
-                    score_uid = id_map.get(eid, eid)
-                    mapping_start = max(float(synth_start), float(env_start))
-                    if score_uid in target_map:
-                        if mapping_start < target_map[score_uid]:
-                            target_map[score_uid] = mapping_start
-                    else:
-                        target_map[score_uid] = mapping_start
+    def __getitem__(self, name: str) -> ScoreItem:
+        if name not in self._items:
+            raise KeyError(
+                f"No item named {name!r}; existing: {list(self._items)}"
+            )
+        return self._items[name]
 
-            if not target_map:
-                continue
+    def __iter__(self):
+        return iter(self._items.values())
 
-            targets = [{"id": uid, "startTime": start} for uid, start in target_map.items()]
-            self._control_descriptors.append({
-                "envelope": desc["envelope"],
-                "pfields": desc["pfields"],
-                "start": env_start,
-                "duration": env_end - env_start,
-                "targets": targets,
-            })
+    def __contains__(self, name: str) -> bool:
+        return name in self._items
 
-    # ------------------------------------------------------------------
-    # Metadata builders
-    # ------------------------------------------------------------------
+    def __len__(self) -> int:
+        return len(self._items)
 
-    def _build_meta(self) -> dict:
-        groups = [name for name in self._tracks if name != "main"]
-        inserts: dict[str, list] = {}
-        for name, track_data in self._tracks.items():
-            if track_data["inserts"]:
-                inserts[name] = [
-                    {"uid": ins.uid, "defName": ins.defName, "args": ins.args}
-                    for ins in track_data["inserts"]
-                ]
-        meta: dict = {}
-        if groups:
-            meta["groups"] = groups
-        if inserts:
-            meta["inserts"] = inserts
-        return meta
+    def items(self):
+        """Iterable view of all :class:`ScoreItem` objects in insertion order."""
+        return self._items.values()
 
-    def _build_control_data(self) -> dict:
-        if not self._control_descriptors:
-            return {"buffer": None, "blockSize": self._block_size, "descriptors": []}
+    def names(self) -> list[str]:
+        """List of item names in insertion order."""
+        return list(self._items.keys())
 
-        import numpy as np
+    def remove(self, name: str) -> ScoreItem:
+        """Remove and return the item named *name*.
 
-        t = np.linspace(0.0, 1.0, self._block_size, dtype=np.float64)
-        blocks = []
-        serializable: list[dict] = []
-
-        for i, desc in enumerate(self._control_descriptors):
-            env = desc["envelope"]
-            total = env.total_time
-            if total <= 0:
-                bp_times = [0.0] * len(env.values)
-            else:
-                cumulative = [0.0]
-                for seg_t in env.times:
-                    cumulative.append(cumulative[-1] + seg_t * env.time_scale)
-                bp_times = [c / total for c in cumulative]
-
-            samples = np.interp(
-                t,
-                np.array(bp_times, dtype=np.float64),
-                np.array(env.values, dtype=np.float64),
-            ).astype(np.float32)
-            blocks.append(samples)
-
-            serializable.append({
-                "blockIndex": i,
-                "start": desc["start"],
-                "dur": desc["duration"],
-                "pfields": desc["pfields"],
-                "targets": desc["targets"],
-            })
-
-        buffer_data = np.concatenate(blocks)
-        return {
-            "buffer": buffer_data,
-            "blockSize": self._block_size,
-            "descriptors": serializable,
-        }
+        Other items' placements are not adjusted; use
+        :meth:`ScoreItem.set_duration` with ``ripple=True`` to reflow a
+        timeline."""
+        if name not in self._items:
+            raise KeyError(
+                f"No item named {name!r}; existing: {list(self._items)}"
+            )
+        return self._items.pop(name)
 
     # ------------------------------------------------------------------
-    # Event drain (non-destructive)
+    # Time queries
     # ------------------------------------------------------------------
 
-    def _drain_events(self, start_time: float | None = None, time_scale: float = 1.0) -> list[dict]:
-        events_copy = list(self._event_heap)
-        sorted_events: list[dict] = []
-        if not events_copy:
-            return sorted_events
+    @property
+    def start(self) -> float:
+        """Earliest ``start`` across items, or 0 if the score is empty."""
+        if not self._items:
+            return 0.0
+        return min(item.start for item in self._items.values())
 
-        time_shift = 0.0
-        if start_time is not None:
-            min_start = min(s for s, _, _, _, _ in events_copy)
-            time_shift = start_time - min_start
+    @property
+    def end(self) -> float:
+        """Latest ``end`` across items, or 0 if the score is empty."""
+        if not self._items:
+            return 0.0
+        return max(item.end for item in self._items.values())
 
-        while events_copy:
-            start, _, _, _, event = heapq.heappop(events_copy)
-            event_copy = dict(event)
-            event_copy["start"] = (start + time_shift) * time_scale
-            sorted_events.append(event_copy)
-
-        return sorted_events
+    @property
+    def duration(self) -> float:
+        """``end - start`` across the whole score."""
+        return self.end - self.start
 
     # ------------------------------------------------------------------
-    # Playback (SuperSonic browser widget)
+    # Ripple edit support
     # ------------------------------------------------------------------
 
-    def play(self, ring_time: int = 5, **kwargs):
-        """Render and display a SuperSonic playback widget.
+    def _shift_items_at_or_after(
+        self, *, exclude_name: str, pivot: float, by: float
+    ) -> None:
+        """Shift every item (except ``exclude_name``) whose ``start`` is
+        at or after *pivot* by *by* seconds.
 
-        Parameters
-        ----------
-        ring_time : int
-            Seconds of ring-out time after playback ends.
-        **kwargs
-            Forwarded to the engine.
-
-        Returns
-        -------
-        IPython.display.DisplayHandle
+        Called by :meth:`ScoreItem.set_duration` when ``ripple=True``.
         """
-        from klotho.utils.playback._session_boot import boot_supersonic
-        from klotho.utils.playback.supersonic import SuperSonicEngine
-
-        boot_supersonic()
-
-        events = self._drain_events()
-        meta = self._build_meta()
-        ctrl = self._build_control_data()
-
-        engine = SuperSonicEngine(
-            events,
-            meta=meta,
-            control_data=ctrl,
-            ring_time=ring_time,
-        )
-        return engine.display()
-
-    # ------------------------------------------------------------------
-    # Export (native SC EventScheduler JSON)
-    # ------------------------------------------------------------------
-
-    def write(self, filepath: str, start_time: float | None = None, time_scale: float = 1.0):
-        """Serialize events and metadata to a JSON file.
-
-        If control envelopes are present, a companion ``.wav`` file
-        containing the buffer data is written alongside the JSON.
-
-        Parameters
-        ----------
-        filepath : str
-            Output path for the JSON data.
-        start_time : float or None
-            Shift the earliest event to this time.
-        time_scale : float
-            Multiplicative factor for all event times.
-        """
-        from pathlib import Path
-
-        events = self._drain_events(start_time=start_time, time_scale=time_scale)
-        meta = self._build_meta()
-        ctrl = self._build_control_data()
-
-        time_shift = 0.0
-        if start_time is not None and self._event_heap:
-            min_start = min(item[0] for item in self._event_heap)
-            time_shift = start_time - min_start
-
-        shifted_descriptors = []
-        for d in ctrl["descriptors"]:
-            d_copy = dict(d)
-            d_copy["start"] = (d["start"] + time_shift) * time_scale
-            d_copy["dur"] = d["dur"] * time_scale
-            shifted_descriptors.append(d_copy)
-
-        output: dict = {"meta": meta, "events": events}
-        if shifted_descriptors:
-            output["meta"]["controlEnvelopes"] = shifted_descriptors
-
-        with open(filepath, 'w') as f:
-            json.dump(output, f, indent=2)
-        print(f"Score: wrote {self._total_events} events to {os.path.abspath(filepath)}")
-
-        if ctrl["buffer"] is not None:
-            try:
-                import scipy.io.wavfile as wavfile
-                buf_path = str(Path(filepath).with_suffix('.wav'))
-                wavfile.write(buf_path, 44100, ctrl["buffer"])
-                print(f"Score: wrote control buffer to {os.path.abspath(buf_path)}")
-            except ImportError:
-                print("Score: scipy not available; skipping .wav buffer export")
+        for item in self._items.values():
+            if item.name == exclude_name:
+                continue
+            if item.unit._offset >= pivot:
+                _reoffset(item.unit, item.unit._offset + by)
 
     # ------------------------------------------------------------------
     # Ensemble integration
     # ------------------------------------------------------------------
 
-    def from_ensemble(self, ensemble) -> 'Score':
-        """Create tracks and insert chains from an Ensemble's family structure.
+    def from_ensemble(self, ensemble) -> "Score":
+        """Create tracks (with insert chains) from an Ensemble's family
+        structure.
 
         Each family becomes a track.  Insert FX are copied with fresh
-        ``uid`` values so that every Score gets independent FX nodes.
-
-        Parameters
-        ----------
-        ensemble : Ensemble
-            The ensemble whose families define the track layout.
-
-        Returns
-        -------
-        Score
-            ``self``, for chaining.
+        ``uid`` values so every Score gets independent FX nodes.
         """
         from klotho.thetos.instruments.ensemble import _copy_inserts_with_fresh_uids
         for family_name in ensemble.families:
@@ -460,27 +539,105 @@ class Score:
         return self
 
     # ------------------------------------------------------------------
+    # Export (native SC EventScheduler JSON)
+    # ------------------------------------------------------------------
+
+    def write(
+        self,
+        filepath: str,
+        start_time: Optional[float] = None,
+        time_scale: float = 1.0,
+    ) -> None:
+        """Serialize the lowered event payload to a JSON file.
+
+        If control envelopes are present, a companion ``.wav`` file
+        containing the buffer data is written alongside the JSON.
+
+        Parameters
+        ----------
+        filepath : str
+            Output path for the JSON data.
+        start_time : float or None
+            Shift the earliest event to this time.  When None, events
+            retain their absolute times as recorded in the score.
+        time_scale : float
+            Multiplicative factor for all event / envelope times.
+        """
+        import json
+        import os
+        from pathlib import Path
+
+        from klotho.utils.playback.supersonic.converters import (
+            convert_score_to_sc_events,
+        )
+
+        payload = convert_score_to_sc_events(self)
+        events = payload["events"]
+        meta = payload.get("meta") or {}
+        ctrl = payload.get("control_data") or {
+            "buffer": None, "blockSize": self._block_size, "descriptors": []
+        }
+
+        time_shift = 0.0
+        if start_time is not None and events:
+            min_start = min(ev["start"] for ev in events)
+            time_shift = start_time - min_start
+
+        shifted_events = []
+        for ev in events:
+            ev_copy = dict(ev)
+            ev_copy["start"] = (ev["start"] + time_shift) * time_scale
+            shifted_events.append(ev_copy)
+
+        shifted_descriptors = []
+        for d in ctrl.get("descriptors", []):
+            d_copy = dict(d)
+            d_copy["start"] = (d["start"] + time_shift) * time_scale
+            d_copy["dur"] = d["dur"] * time_scale
+            shifted_descriptors.append(d_copy)
+
+        output: dict = {"meta": dict(meta), "events": shifted_events}
+        if shifted_descriptors:
+            output["meta"]["controlEnvelopes"] = shifted_descriptors
+
+        with open(filepath, 'w') as f:
+            json.dump(output, f, indent=2)
+        print(
+            f"Score: wrote {len(shifted_events)} events to "
+            f"{os.path.abspath(filepath)}"
+        )
+
+        buffer = ctrl.get("buffer")
+        if buffer is not None:
+            try:
+                import scipy.io.wavfile as wavfile
+                buf_path = str(Path(filepath).with_suffix('.wav'))
+                wavfile.write(buf_path, 44100, buffer)
+                print(
+                    f"Score: wrote control buffer to {os.path.abspath(buf_path)}"
+                )
+            except ImportError:
+                print("Score: scipy not available; skipping .wav buffer export")
+
+    # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
 
-    def clear(self) -> 'Score':
-        """Remove all events, tracks, and control envelope descriptors."""
-        self._event_heap.clear()
-        self._event_counter = 0
-        self._total_events = 0
+    def clear(self) -> "Score":
+        """Remove all items, tracks, and insert registrations."""
+        self._items.clear()
         self._tracks.clear()
-        self._control_descriptors.clear()
         self._insert_registry.clear()
         return self
 
     @property
-    def total_events(self) -> int:
-        return self._total_events
-
-    @property
     def tracks(self) -> dict:
+        """Dict view of registered tracks."""
         return dict(self._tracks)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         tracks = list(self._tracks.keys()) or ["(none)"]
-        return f"Score(events={self._total_events}, tracks={tracks})"
+        return (
+            f"Score(items={len(self._items)}, duration={self.duration:.3f}, "
+            f"tracks={tracks})"
+        )

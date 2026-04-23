@@ -185,8 +185,13 @@ class TemporalUnit(metaclass=TemporalMeta):
 
     A ``TemporalUnit`` combines a :class:`RhythmTree` (defined by
     *tempus* and *prolatio*) with a tempo specification (*beat*, *bpm*)
-    and an optional time *offset* to produce concrete onset times and
-    durations in seconds.
+    to produce concrete onset times and durations in seconds.
+
+    Outside a :class:`~klotho.thetos.composition.score.Score`, a temporal
+    unit always starts at time 0 and its duration is fixed after
+    construction.  Placement within a timeline and duration adjustment are
+    handled by :class:`~klotho.thetos.composition.score.ScoreItem` after
+    the unit has been added to a Score.
 
     Parameters
     ----------
@@ -203,8 +208,6 @@ class TemporalUnit(metaclass=TemporalMeta):
         denominator of the time signature is used. Default is None.
     bpm : int, float, or None, optional
         Beats per minute. Default is None (falls back to 60).
-    offset : float, optional
-        Absolute start time in seconds. Default is 0.
 
     Examples
     --------
@@ -218,7 +221,6 @@ class TemporalUnit(metaclass=TemporalMeta):
                  prolatio : Union[tuple,str]                   = 'd',
                  beat     : Union[None,Fraction,int,float,str] = None,
                  bpm      : Union[None,int,float]              = None,
-                 offset   : float                              = 0
         ):
         
         self._type   = None
@@ -228,7 +230,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         
         self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
         self._bpm    = bpm if bpm else 60
-        self._offset = offset
+        self._offset = 0.0
 
         self._timing_dirty = True
     
@@ -328,8 +330,13 @@ class TemporalUnit(metaclass=TemporalMeta):
         return self._type
     
     @property
-    def offset(self):
-        """The offset (or absolute start time) in seconds of the TemporalUnit."""
+    def start(self) -> float:
+        """Absolute start time in seconds.
+
+        Always ``0`` for a unit outside a Score.  Inside a Score the start
+        time is assigned by placement kwargs on
+        :meth:`~klotho.thetos.composition.score.Score.add`.
+        """
         return self._offset
     
     @property
@@ -352,6 +359,11 @@ class TemporalUnit(metaclass=TemporalMeta):
                              bpm        = self.bpm
                 )
     
+    @property
+    def end(self) -> float:
+        """Absolute end time in seconds (``start + duration``)."""
+        return self._offset + self.duration
+
     @property
     def time(self):
         """The absolute start and end times (in seconds) of the TemporalUnit."""
@@ -378,36 +390,15 @@ class TemporalUnit(metaclass=TemporalMeta):
             'metric_duration': c.metric_duration,
         } for c in events], index=range(len(events)))
         
-    @offset.setter
-    def offset(self, offset:float):
-        """Sets the offset (or absolute start time) in seconds of the TemporalUnit."""
-        self._offset = offset
-        self._invalidate_timing_cache()
-        
-    def set_duration(self, target_duration: float) -> None:
+    def _scale_bpm(self, factor: float) -> None:
+        """Multiply bpm by ``factor`` (private; used by ``ScoreItem``).
+
+        A factor of ``0.5`` halves the bpm, doubling the resulting duration.
+        This method is deliberately private: outside a Score, a unit's
+        duration is immutable; duration editing is mediated by
+        :meth:`klotho.thetos.composition.score.ScoreItem.set_duration`.
         """
-        Set the tempo (bpm) to achieve a specific total duration.
-
-        Calculates and sets the appropriate bpm so that this unit's
-        total duration matches *target_duration*.
-
-        Parameters
-        ----------
-        target_duration : float
-            The desired duration in seconds.
-
-        Raises
-        ------
-        ValueError
-            If *target_duration* is not positive.
-        """
-        if target_duration <= 0:
-            raise ValueError("Target duration must be positive")
-            
-        current_duration = self.duration
-        ratio = current_duration / target_duration
-        new_bpm = self._bpm * ratio
-        self._bpm = new_bpm
+        self._bpm = self._bpm * factor
         self._invalidate_timing_cache()
 
     def make_rest(self, node: int) -> None:
@@ -603,9 +594,21 @@ class TemporalUnit(metaclass=TemporalMeta):
         return uts
 
     def copy(self):
-        """Create a deep copy of this TemporalUnit."""
-        # return copy.deepcopy(self)
-        return TemporalUnit(span=self.span, tempus=self.tempus, prolatio=self.prolationis, beat=self.beat, bpm=self.bpm, offset=self.offset)
+        """Create a deep copy of this TemporalUnit.
+
+        The copy preserves any internal placement (``_offset``) so that
+        containers like :class:`TemporalUnitSequence` can rebuild cleanly.
+        """
+        c = TemporalUnit(
+            span=self.span,
+            tempus=self.tempus,
+            prolatio=self.prolationis,
+            beat=self.beat,
+            bpm=self.bpm,
+        )
+        c._offset = self._offset
+        c._invalidate_timing_cache()
+        return c
 
 
 class TemporalUnitSequence(metaclass=TemporalMeta):
@@ -614,28 +617,33 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     consecutive temporal events.
 
     Units are automatically offset so that each begins where the previous
-    one ends.
+    one ends.  Outside a :class:`~klotho.thetos.composition.score.Score`,
+    a sequence always starts at time 0 and its duration is fixed after
+    construction.
 
     Parameters
     ----------
     ut_seq : list of TemporalUnit, optional
         Initial sequence of temporal units. Default is an empty list.
-    offset : float, optional
-        Absolute start time in seconds. Default is 0.
     """
     
-    def __init__(self, ut_seq:Union[list[TemporalUnit], None]=None, offset:float=0):
+    def __init__(self, ut_seq:Union[list[TemporalUnit], None]=None):
         if ut_seq is None:
             ut_seq = []
-        self._seq    = [ut.copy() for ut in ut_seq] # XXX - this needs to be ut.copy()
-        self._offset = offset
+        self._seq    = [ut.copy() for ut in ut_seq]
+        self._offset = 0.0
         self._set_offsets()
     
     def _set_offsets(self):
-        """Updates the offsets of all TemporalUnits based on their position in the sequence."""
+        """Updates the offsets of all members based on their position in the sequence.
+
+        Members may be ``TemporalUnit``, ``CompositionalUnit``,
+        ``TemporalUnitSequence``, or ``TemporalBlock``; ``_reoffset``
+        dispatches the correct cascade for each.
+        """
         running_offset = self._offset
         for ut in self._seq:
-            ut.offset = running_offset
+            _reoffset(ut, running_offset)
             running_offset += ut.duration
 
     @property
@@ -659,10 +667,15 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         return sum(abs(d) for d in self.durations)
     
     @property
-    def offset(self):
-        """The offset (or absolute start time) in seconds of the sequence."""
+    def start(self) -> float:
+        """Absolute start time in seconds (``0`` outside a Score)."""
         return self._offset
-    
+
+    @property
+    def end(self) -> float:
+        """Absolute end time in seconds (``start + duration``)."""
+        return self._offset + self.duration
+
     @property
     def size(self):
         """The total number of events across all TemporalUnits in the sequence."""
@@ -671,46 +684,20 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
     @property
     def time(self):
         """The absolute start and end times (in seconds) of the sequence."""
-        return self.offset, self.offset + self.duration
-        
-    @offset.setter
-    def offset(self, offset:float):
-        """Sets the offset (or absolute start time) in seconds of the sequence."""
-        self._offset = offset
-        self._set_offsets()
-    
-    def set_duration(self, target_duration: float) -> None:
+        return self._offset, self._offset + self.duration
+
+    def _scale_bpm(self, factor: float) -> None:
+        """Multiply every member's bpm by ``factor`` and recompute offsets.
+
+        Private; used by :class:`~klotho.thetos.composition.score.ScoreItem`
+        to stretch a sequence's total duration while preserving the relative
+        durations between its members.
         """
-        Scale the tempo of all units to achieve a specific total duration.
-
-        Relative durations between units are preserved by applying the same
-        scaling factor to every bpm value.
-
-        Parameters
-        ----------
-        target_duration : float
-            The desired total duration in seconds.
-
-        Raises
-        ------
-        ValueError
-            If *target_duration* is not positive or the sequence is empty.
-        """
-        if target_duration <= 0:
-            raise ValueError("Target duration must be positive")
-        
-        if not self._seq:
-            raise ValueError("Cannot set duration of empty sequence")
-            
-        current_duration = self.duration
-        ratio = current_duration / target_duration
-        
         for ut in self._seq:
-            ut._bpm = ut.bpm * ratio
-            ut._invalidate_timing_cache()
-        
+            ut._scale_bpm(factor)
         self._set_offsets()
-        
+
+    
     def append(self, ut: TemporalUnit, repeat: int = 1) -> None:
         """
         Append a temporal unit to the end of the sequence.
@@ -845,8 +832,16 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         return self.__str__()
 
     def copy(self):
-        """Create a deep copy of this TemporalUnitSequence."""
-        return TemporalUnitSequence(ut_seq=[ut.copy() for ut in self._seq], offset=self._offset)
+        """Create a deep copy of this TemporalUnitSequence.
+
+        Internal placement (``_offset``) is preserved on the copy so that
+        :class:`TemporalBlock` and :class:`~klotho.thetos.composition.score.Score`
+        can rebuild their layouts cleanly.
+        """
+        c = TemporalUnitSequence(ut_seq=[ut.copy() for ut in self._seq])
+        c._offset = self._offset
+        c._set_offsets()
+        return c
 
 
 class TemporalBlock(metaclass=TemporalMeta):
@@ -865,18 +860,25 @@ class TemporalBlock(metaclass=TemporalMeta):
     axis : float, optional
         Alignment axis from -1 (left) through 0 (center) to 1 (right).
         Default is -1.
-    offset : float, optional
-        Initial time offset in seconds. Default is 0.
     sort_rows : bool, optional
         Whether to sort rows by duration (longest first). Default is True.
+
+    Notes
+    -----
+    Outside a :class:`~klotho.thetos.composition.score.Score`, a block
+    always starts at time 0 and its total duration is fixed after
+    construction.
     """
     
-    def __init__(self, rows:Union[list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']], None]=None, axis:float = -1, offset:float=0, sort_rows:bool=True):
+    def __init__(self,
+                 rows:Union[list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']], None]=None,
+                 axis:float = -1,
+                 sort_rows:bool=True):
         if rows is None:
             rows = []
-        self._rows = [row.copy() for row in rows] if rows else [] # XXX - this needs to be row.copy()
+        self._rows = [row.copy() for row in rows] if rows else []
         self._axis = axis
-        self._offset = offset
+        self._offset = 0.0
         self._sort_rows = sort_rows
         
         self._align_rows()
@@ -942,12 +944,12 @@ class TemporalBlock(metaclass=TemporalMeta):
 
         for row, row_duration in row_duration_pairs:
             if row_duration == max_duration:
-                row.offset = self._offset
+                _reoffset(row, self._offset)
                 continue
 
             duration_diff = max_duration - row_duration
             adjustment = duration_diff * (self._axis + 1) / 2
-            row.offset = self._offset + adjustment
+            _reoffset(row, self._offset + adjustment)
 
     @property
     def height(self):
@@ -970,9 +972,14 @@ class TemporalBlock(metaclass=TemporalMeta):
         return self._axis
     
     @property
-    def offset(self):
-        """The offset (or absolute start time) in seconds of the block."""
+    def start(self) -> float:
+        """Absolute start time in seconds (``0`` outside a Score)."""
         return self._offset
+
+    @property
+    def end(self) -> float:
+        """Absolute end time in seconds (``start + duration``)."""
+        return self._offset + self.duration
 
     @property
     def sort_rows(self):
@@ -984,12 +991,6 @@ class TemporalBlock(metaclass=TemporalMeta):
         self._sort_rows = sort_rows
         self._align_rows()
         
-    @offset.setter
-    def offset(self, offset):
-        """Sets the offset (or absolute start time) in seconds of the block."""
-        self._offset = offset
-        self._align_rows()
-    
     @axis.setter
     def axis(self, axis: float):
         """
@@ -1010,38 +1011,16 @@ class TemporalBlock(metaclass=TemporalMeta):
             raise ValueError("Axis must be between -1 and 1")
         self._axis = float(axis)
         self._align_rows()
-        
-    def set_duration(self, target_duration: float) -> None:
+
+    def _scale_bpm(self, factor: float) -> None:
+        """Multiply every row's bpm(s) by ``factor`` and realign.
+
+        Private; used by :class:`~klotho.thetos.composition.score.ScoreItem`
+        to stretch a block's total duration while preserving the relative
+        durations of its rows.
         """
-        Scale the tempo of all rows to achieve a specific total duration.
-
-        Relative durations between rows are preserved by applying the same
-        scaling factor.
-
-        Parameters
-        ----------
-        target_duration : float
-            The desired total duration in seconds.
-
-        Raises
-        ------
-        ValueError
-            If *target_duration* is not positive or the block is empty.
-        """
-        if target_duration <= 0:
-            raise ValueError("Target duration must be positive")
-        
-        if not self._rows:
-            raise ValueError("Cannot set duration of empty block")
-            
-        current_duration = self.duration
-        ratio = current_duration / target_duration
-        
         for row in self._rows:
-            if hasattr(row, 'set_duration'):
-                row_target = row.duration / ratio
-                row.set_duration(row_target)
-        
+            row._scale_bpm(factor)
         self._align_rows()
 
     def prepend(self, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
@@ -1168,5 +1147,33 @@ class TemporalBlock(metaclass=TemporalMeta):
         return self.__str__()
 
     def copy(self):
-        """Create a deep copy of this TemporalBlock."""
-        return TemporalBlock(rows=[row.copy() for row in self._rows], axis=self._axis, offset=self._offset, sort_rows=self._sort_rows)
+        """Create a deep copy of this TemporalBlock.
+
+        Internal placement (``_offset``) is preserved on the copy so that
+        :class:`~klotho.thetos.composition.score.Score` can rebuild its
+        timeline cleanly.
+        """
+        c = TemporalBlock(
+            rows=[row.copy() for row in self._rows],
+            axis=self._axis,
+            sort_rows=self._sort_rows,
+        )
+        c._offset = self._offset
+        c._align_rows()
+        return c
+
+
+def _reoffset(unit, t: float) -> None:
+    """Assign ``t`` as the internal offset of *unit* and cascade.
+
+    Used by containers (``TemporalBlock``) and
+    :class:`~klotho.thetos.composition.score.Score` to position a unit at
+    an absolute time without going through a public setter.
+    """
+    unit._offset = float(t)
+    if isinstance(unit, TemporalUnitSequence):
+        unit._set_offsets()
+    elif isinstance(unit, TemporalBlock):
+        unit._align_rows()
+    elif hasattr(unit, '_invalidate_timing_cache'):
+        unit._invalidate_timing_cache()

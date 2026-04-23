@@ -372,9 +372,9 @@ class TestTemporalUnitSequence:
         ut_b = UT(tempus='3/4', prolatio=(1, 1, 1), beat='1/4', bpm=120)
         uts = UTS()
         uts.extend([ut_a, ut_b, ut_a])
-        assert uts[0].offset == 0
-        assert uts[1].offset == 2.0
-        assert uts[2].offset == 3.5
+        assert uts[0].start == 0
+        assert uts[1].start == 2.0
+        assert uts[2].start == 3.5
 
     def test_copies_are_independent(self):
         uc = UC(tempus='10/16', prolatio=((3, (1,)*4), (4, (1,)*6), (3, (1,)*4)), beat='1/16', bpm=140)
@@ -400,6 +400,43 @@ class TestTemporalBlock:
         assert len(rows) == 2
         assert rows[0].duration == 5.5
         assert rows[1].duration == 3.5
+
+
+class TestNestedContainers:
+    """Containers should accept any temporal type as a member; offset
+    cascades must dispatch to the right reallignment method for each."""
+
+    def test_uts_of_block(self):
+        ut_a = UT(tempus='4/4', prolatio='p', bpm=120)
+        ut_b = UT(tempus='3/4', prolatio='p', bpm=120)
+        bt = BT([ut_a, ut_b])
+        uts = UTS([bt])
+        assert uts.duration == bt.duration
+        assert uts.start == 0.0
+
+    def test_uts_mixed_with_block(self):
+        ut_a = UT(tempus='4/4', prolatio='p', bpm=120)
+        ut_b = UT(tempus='3/4', prolatio='p', bpm=120)
+        bt = BT([ut_a, ut_b])
+        uts = UTS([bt, ut_a, bt])
+        starts = [m.start for m in uts]
+        assert starts[0] == 0.0
+        assert starts[1] == pytest.approx(bt.duration)
+        assert starts[2] == pytest.approx(bt.duration + ut_a.duration)
+
+    def test_block_of_uts_and_unit(self):
+        ut_a = UT(tempus='4/4', prolatio='p', bpm=120)
+        ut_b = UT(tempus='3/4', prolatio='p', bpm=120)
+        uts = UTS([ut_a, ut_b])
+        bt = BT([uts, ut_a])
+        assert bt.duration == max(uts.duration, ut_a.duration)
+
+    def test_nested_block_in_block(self):
+        ut_a = UT(tempus='4/4', prolatio='p', bpm=120)
+        ut_b = UT(tempus='3/4', prolatio='p', bpm=120)
+        inner_bt = BT([ut_a, ut_b])
+        outer_bt = BT([inner_bt, ut_a])
+        assert outer_bt.duration == max(inner_bt.duration, ut_a.duration)
 
 
 class TestCompositionalUnit:

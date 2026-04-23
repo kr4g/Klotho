@@ -11,7 +11,7 @@ from . import composition
 
 from .parameters import ParameterTree, ParameterField
 from .instruments import Instrument, Effect, SynthDefInstrument, SynthDefFX, MidiInstrument, ToneInstrument, Kit, SynthDefKit, Ensemble
-from .composition import CompositionalUnit, Parametron, Score
+from .composition import CompositionalUnit, Parametron, Score, ScoreItem
 from klotho.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     'CompositionalUnit',
     'Parametron',
     'Score',
+    'ScoreItem',
     'frequency', 
     'cent', 
     'midicent', 

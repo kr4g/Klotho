@@ -195,7 +195,9 @@ class TestEnsembleAssemblyFormat:
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), bpm=120)
         uc.set_instrument(uc.rt.root, ens.melody['lead'])
         s.add(uc)
-        assert s.total_events > 0
+        from klotho.utils.playback.supersonic.converters import convert_score_to_sc_events
+        payload = convert_score_to_sc_events(s)
+        assert len(payload["events"]) > 0
 
 
 class TestInsertFXAssemblyFormat:

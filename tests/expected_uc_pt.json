@@ -5,7 +5,7 @@
         "num_nodes": 18,
         "depth": 2,
         "span": 1,
-        "meas": "5/8",
+        "meas": "10/16",
         "root": 0,
         "leaf_nodes": [
           2,
@@ -57,7 +57,7 @@
         ],
         "node_data": {
           "0": {
-            "proportion": 5,
+            "proportion": 10,
             "metric_duration": "5/8",
             "metric_onset": "0"
           },
@@ -705,7 +705,7 @@
         "at_depth": [
           [
             [
-              5,
+              10,
               "5/8",
               "0"
             ]
@@ -1968,7 +1968,7 @@
         "num_nodes": 18,
         "depth": 2,
         "span": 1,
-        "meas": "5/8",
+        "meas": "10/16",
         "root": 0,
         "leaf_nodes": [
           2,
@@ -2020,7 +2020,7 @@
         ],
         "node_data": {
           "0": {
-            "proportion": 5,
+            "proportion": 10,
             "metric_duration": "5/8",
             "metric_onset": "0"
           },
@@ -2668,7 +2668,7 @@
         "at_depth": [
           [
             [
-              5,
+              10,
               "5/8",
               "0"
             ]
@@ -3931,7 +3931,7 @@
         "num_nodes": 13,
         "depth": 2,
         "span": 1,
-        "meas": "5/8",
+        "meas": "10/16",
         "root": 0,
         "leaf_nodes": [
           2,
@@ -3971,7 +3971,7 @@
         ],
         "node_data": {
           "0": {
-            "proportion": 5,
+            "proportion": 10,
             "metric_duration": "5/8",
             "metric_onset": "0"
           },
@@ -4438,7 +4438,7 @@
         "at_depth": [
           [
             [
-              5,
+              10,
               "5/8",
               "0"
             ]
@@ -5333,7 +5333,7 @@
         "num_nodes": 13,
         "depth": 2,
         "span": 1,
-        "meas": "5/8",
+        "meas": "10/16",
         "root": 0,
         "leaf_nodes": [
           2,
@@ -5373,7 +5373,7 @@
         ],
         "node_data": {
           "0": {
-            "proportion": 5,
+            "proportion": 10,
             "metric_duration": "5/8",
             "metric_onset": "0"
           },
@@ -5840,7 +5840,7 @@
         "at_depth": [
           [
             [
-              5,
+              10,
               "5/8",
               "0"
             ]
@@ -12427,9 +12427,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12466,9 +12466,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12505,9 +12505,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12544,9 +12544,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12583,9 +12583,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12622,9 +12622,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12661,9 +12661,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12700,9 +12700,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12739,9 +12739,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12778,9 +12778,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12817,9 +12817,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12856,9 +12856,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12895,9 +12895,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12934,9 +12934,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -12973,9 +12973,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -13012,9 +13012,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -13051,9 +13051,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -13090,9 +13090,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -13129,9 +13129,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -13168,9 +13168,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 0,
             "offset": 0,
+            "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -13207,9 +13207,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 5,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13246,9 +13246,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 5,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13285,9 +13285,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 5,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13324,9 +13324,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 4,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13363,9 +13363,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 4,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13402,9 +13402,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 4,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13441,9 +13441,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 3,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13480,9 +13480,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 3,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13519,9 +13519,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 3,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13558,9 +13558,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 2,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13597,9 +13597,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 2,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13636,9 +13636,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 2,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13675,9 +13675,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 1,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13714,9 +13714,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 1,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         },
@@ -13753,9 +13753,9 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
-            "idx": 7,
             "offset": 1,
+            "idx": 7,
+            "group": "default",
             "drct": -1
           }
         }
@@ -19411,7 +19411,7 @@
         "num_nodes": 114,
         "depth": 4,
         "span": 1,
-        "meas": "7/4",
+        "meas": "28/16",
         "root": 0,
         "leaf_nodes": [
           3,
@@ -19679,7 +19679,7 @@
         ],
         "node_data": {
           "0": {
-            "proportion": 7,
+            "proportion": 28,
             "metric_duration": "7/4",
             "metric_onset": "0"
           },
@@ -25600,7 +25600,7 @@
         "at_depth": [
           [
             [
-              7,
+              28,
               "7/4",
               "0"
             ]
@@ -38202,7 +38202,7 @@
         "num_nodes": 114,
         "depth": 4,
         "span": 1,
-        "meas": "7/4",
+        "meas": "28/16",
         "root": 0,
         "leaf_nodes": [
           3,
@@ -38470,7 +38470,7 @@
         ],
         "node_data": {
           "0": {
-            "proportion": 7,
+            "proportion": 28,
             "metric_duration": "7/4",
             "metric_onset": "0"
           },
@@ -44391,7 +44391,7 @@
         "at_depth": [
           [
             [
-              7,
+              28,
               "7/4",
               "0"
             ]
@@ -59226,8 +59226,8 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -59264,8 +59264,8 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -59302,8 +59302,8 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
+            "group": "default",
             "drct": 1
           }
         },
@@ -59340,8 +59340,8 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
             "idx": 5,
+            "group": "default",
             "drct": -1
           }
         },
@@ -59378,8 +59378,8 @@
             "vel": 0.6
           },
           "mfields": {
-            "group": "default",
             "idx": 5,
+            "group": "default",
             "drct": -1
           }
         }

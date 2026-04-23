@@ -33,12 +33,14 @@ def _inst(name='tri', defName='kl_tri', **pf):
 
 def _score_artifacts(uc, track=None):
     """Return (events, ctrl_descriptors, score) for a single-UC Score."""
+    from klotho.utils.playback.supersonic.converters import convert_score_to_sc_events
+
     score = Score()
     if track is not None:
         score.track(track)
     score.add(uc, track=track)
-    ctrl = score._build_control_data()
-    return score._drain_events(), ctrl["descriptors"], score
+    payload = convert_score_to_sc_events(score)
+    return payload["events"], payload["control_data"]["descriptors"], score
 
 
 def _baked_pfield_series(uc, field):

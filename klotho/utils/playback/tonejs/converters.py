@@ -408,7 +408,7 @@ def _merge_sub_payload(target_events, target_instruments, sub_payload, time_offs
 def temporal_sequence_to_events(obj, extra_pfields=None):
     events = []
     instruments = {}
-    seq_offset = obj.offset
+    seq_offset = obj.start
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
@@ -427,7 +427,7 @@ def temporal_sequence_to_events(obj, extra_pfields=None):
 def temporal_block_to_events(obj, extra_pfields=None):
     events = []
     instruments = {}
-    block_offset = obj.offset
+    block_offset = obj.start
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
@@ -435,9 +435,9 @@ def temporal_block_to_events(obj, extra_pfields=None):
         elif isinstance(row, TemporalUnit):
             _merge_sub_payload(events, instruments, temporal_unit_to_events(row, use_absolute_time=True, extra_pfields=extra_pfields), block_offset)
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_payload(events, instruments, temporal_sequence_to_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
+            _merge_sub_payload(events, instruments, temporal_sequence_to_events(row, extra_pfields=extra_pfields), block_offset + row.start)
         elif isinstance(row, TemporalBlock):
-            _merge_sub_payload(events, instruments, temporal_block_to_events(row, extra_pfields=extra_pfields), block_offset + row.offset)
+            _merge_sub_payload(events, instruments, temporal_block_to_events(row, extra_pfields=extra_pfields), block_offset + row.start)
 
     events.sort(key=lambda ev: ev["start"])
     return _payload(events, instruments)

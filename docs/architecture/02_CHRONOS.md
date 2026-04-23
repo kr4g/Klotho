@@ -207,7 +207,8 @@ classDiagram
         +events : DataFrame
         +onsets : list[float]
         +durations : list[float]
-        +set_duration(dur)
+        +start : float  %% read-only; 0 outside a Score
+        +end : float
         +make_rest(node)
         +subdivide(node, subdivs)
         +sparsify(density)
@@ -254,9 +255,18 @@ The formula:
 ```
 beat_dur = 60 / bpm
 whole_note_dur = beat_dur / beat  (beat as fraction of whole note)
-real_onset = metric_onset × whole_note_dur + offset
+real_onset = metric_onset × whole_note_dur + _offset
 real_duration = |metric_duration| × whole_note_dur
 ```
+
+The unit's private ``_offset`` is ``0`` outside a
+:class:`~klotho.thetos.composition.score.Score`.  Placement within a
+timeline is assigned by placement kwargs on
+:meth:`~klotho.thetos.composition.score.Score.add` (``at``, ``after``,
+``before``).  The public read-only :attr:`start` property exposes this
+value.  Duration editing outside a Score is not supported; use
+:meth:`~klotho.thetos.composition.score.ScoreItem.set_duration` after
+an item has entered a Score.
 
 ### Chronon
 
@@ -285,7 +295,13 @@ flowchart LR
 | `remove(i)` | Remove at index |
 | `replace(i, ut)` | Replace at index |
 | `extend(uts)` | Append multiple |
-| `set_duration(dur)` | Scale to target total duration |
+
+A sequence's total duration is determined by the sum of its members'
+durations and is fixed after construction.  To change the duration of a
+sequence that lives inside a
+:class:`~klotho.thetos.composition.score.Score`, use
+:meth:`~klotho.thetos.composition.score.ScoreItem.set_duration` on the
+owning :class:`~klotho.thetos.composition.score.ScoreItem`.
 
 ---
 

@@ -358,7 +358,7 @@ stateDiagram-v2
     Dirty --> Computing : _ensure_timing_cache() called\n(on .onsets, .durations, .events, etc.)
     Computing --> Clean : _compute_timing_cache()\n→ real_onset, real_duration for all nodes
 
-    Clean --> Dirty : _invalidate_timing_cache()\n(triggered by bpm change,\noffset change, subdivide,\nmake_rest, set_duration)
+    Clean --> Dirty : _invalidate_timing_cache()\n(triggered by subdivide,\nmake_rest, container re-alignment,\nor Score placement / ScoreItem.set_duration)
 
     Clean --> Clean : read operations\n(.onsets, .durations, .events)
 ```
@@ -367,13 +367,20 @@ stateDiagram-v2
 
 | Operation | Invalidates timing? |
 |---|---|
-| `set_duration(dur)` | Yes (changes bpm) |
+| `ScoreItem.set_duration(dur)` | Yes (scales owned unit's bpm) |
+| `ScoreItem.stretch(factor)` | Yes (scales owned unit's bpm) |
 | `make_rest(node)` | Yes |
 | `subdivide(node, S)` | Yes |
-| `offset = new_val` | Yes |
+| Score placement (``add(at=)`` / ``after=`` / ``before=``) | Yes |
+| Container re-alignment (``_set_offsets``, ``_align_rows``) | Yes |
 | `set_pfields(…)` | No |
 | `set_instrument(…)` | No |
 | `apply_envelope(…)` | No (reads timing, doesn't change it) |
+
+Outside a :class:`~klotho.thetos.composition.score.Score`, a temporal
+unit's time is immutable: there is no public offset setter and no
+``set_duration`` method.  All time mutation is mediated by
+:class:`~klotho.thetos.composition.score.ScoreItem`.
 
 ---
 

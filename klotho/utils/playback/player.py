@@ -16,8 +16,11 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
     delegates to its ``.play()`` method to display an animated figure
     with audio.
 
-    If *obj* is a :class:`Score`, delegates to its ``.play()`` method
-    for multi-track playback with insert FX and control envelopes.
+    If *obj* is a :class:`Score`, the universal dispatcher lowers its
+    items via
+    :func:`klotho.utils.playback.supersonic.converters.convert_score_to_sc_events`
+    and renders a SuperSonic widget with track / FX metadata and
+    control-envelope buses.
 
     Parameters
     ----------
@@ -37,7 +40,8 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
         (Tone.js engine only).
     **kwargs
         Forwarded to the converter (e.g. ``dur``, ``arp``,
-        ``strum``, ``mode``).
+        ``strum``, ``mode``).  For :class:`Score`, ``ring_time`` is
+        supported.
 
     Returns
     -------
@@ -47,7 +51,20 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
     """
     from klotho.thetos.composition.score import Score
     if isinstance(obj, Score):
-        return obj.play(**kwargs)
+        from klotho.utils.playback.supersonic import SuperSonicEngine
+        from klotho.utils.playback.supersonic.converters import (
+            convert_score_to_sc_events,
+        )
+        boot_supersonic()
+        ring_time = kwargs.pop('ring_time', 5)
+        payload = convert_score_to_sc_events(obj, **kwargs)
+        engine_obj = SuperSonicEngine(
+            payload["events"],
+            meta=payload.get("meta"),
+            control_data=payload.get("control_data"),
+            ring_time=ring_time,
+        )
+        return engine_obj.display()
 
     from klotho.semeios.visualization._dispatch import KlothoPlot
     if isinstance(obj, KlothoPlot):
