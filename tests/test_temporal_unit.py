@@ -84,7 +84,7 @@ class Test_default_ut:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -128,7 +128,7 @@ class Test_default_ut:
         for node in ut.nodes:
             assert ut.nodes[node]['metric_duration'] == ut._rt[node]['metric_duration']
             assert ut.nodes[node]['proportion'] == ut._rt[node]['proportion']
-        for i, node in enumerate(ut.leaf_nodes):
+        for i, node in enumerate(ut.leaves):
             assert ut.nodes[node]['real_onset'] == pytest.approx(float(ut[i].start), abs=1e-10)
             assert ut.nodes[node]['real_duration'] == pytest.approx(float(ut[i].duration), abs=1e-10)
 
@@ -174,7 +174,7 @@ class Test_default_ut_120bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -242,7 +242,7 @@ class Test_ut_3_4_pulse_alt:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -334,7 +334,7 @@ class Test_ut_6_8_pulse_90bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5, 6,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -462,7 +462,7 @@ class Test_ut_4_4_subdivisions:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -566,7 +566,7 @@ class Test_ut_3_4_subdivisions:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (2, 4, 5, 6, 8, 9, 11, 12, 13, 15, 16, 17, 19, 20,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -862,7 +862,7 @@ class Test_ut_5_4_span2:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (2, 3, 4, 5, 6, 8, 9, 10,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1038,7 +1038,7 @@ class Test_ut_7_8_120bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1130,7 +1130,7 @@ class Test_ut_rest:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1198,7 +1198,7 @@ class Test_ut_duration:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1266,7 +1266,7 @@ class Test_ut_2_4_pulse:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1346,7 +1346,7 @@ class Test_ut_3_4_pulse:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1438,7 +1438,7 @@ class Test_ut_5_8_pulse:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1554,7 +1554,7 @@ class Test_ut_7_8_pulse:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5, 6, 7,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1694,7 +1694,7 @@ class Test_ut_6_4_pulse:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5, 6,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1822,7 +1822,7 @@ class Test_ut_2_4_60bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1902,7 +1902,7 @@ class Test_ut_2_4_90bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -1982,7 +1982,7 @@ class Test_ut_2_4_120bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2062,7 +2062,7 @@ class Test_ut_2_4_200bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2142,7 +2142,7 @@ class Test_ut_3_8_60bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2234,7 +2234,7 @@ class Test_ut_3_8_90bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2326,7 +2326,7 @@ class Test_ut_3_8_120bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2418,7 +2418,7 @@ class Test_ut_3_8_200bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2510,7 +2510,7 @@ class Test_ut_5_4_60bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2626,7 +2626,7 @@ class Test_ut_5_4_90bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2742,7 +2742,7 @@ class Test_ut_5_4_120bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2858,7 +2858,7 @@ class Test_ut_5_4_200bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -2974,7 +2974,7 @@ class Test_ut_span1_4_4:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -3078,7 +3078,7 @@ class Test_ut_span2_4_4:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -3182,7 +3182,7 @@ class Test_ut_span3_4_4:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -3286,7 +3286,7 @@ class Test_ut_span4_4_4:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -3390,7 +3390,7 @@ class Test_ut_nested_complex:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (2, 3, 5, 6, 7, 8, 9,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -3554,7 +3554,7 @@ class Test_ut_accel_120bpm:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4, 5, 6, 7, 8,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events
@@ -3709,7 +3709,7 @@ class Test_ut_offset:
     def test_leaf_nodes_order(self, ut):
         _ = ut.events
         expected = (1, 2, 3, 4,)
-        assert ut.leaf_nodes == expected
+        assert ut.leaves == expected
 
     def test_node_0_proportion(self, ut):
         _ = ut.events

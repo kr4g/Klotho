@@ -139,8 +139,8 @@ def _build_chronostasis_after():
     uc1 = UC(tempus=tempus, prolatio=S1, beat=beat, bpm=bpm)
     uts1 = uc1.repeat(n_bars)
     for unit in uts1:
-        unit.set_instrument(unit.leaf_nodes, inst_pat_1)
-        unit.set_pfields(unit.leaf_nodes, vel=lambda: np.random.uniform(0.001, 0.25))
+        unit.set_instrument(unit.leaves, inst_pat_1)
+        unit.set_pfields(unit.leaves, vel=lambda: np.random.uniform(0.001, 0.25))
 
     inst_pat_2 = Pattern([[[JsInst.Kick('kick_punchy', punch=16),
         JsInst.Kick('kick_pitchy', pitchDecay=0.05, decay=0.9)],
@@ -148,8 +148,8 @@ def _build_chronostasis_after():
     uc2 = UC(tempus=tempus, prolatio=S2, beat=beat, bpm=bpm)
     uts2 = uc2.repeat(n_bars)
     for unit in uts2:
-        unit.set_instrument(unit.leaf_nodes, inst_pat_2)
-        unit.set_pfields(unit.leaf_nodes, vel=lambda: np.random.uniform(0.75, 0.9))
+        unit.set_instrument(unit.leaves, inst_pat_2)
+        unit.set_pfields(unit.leaves, vel=lambda: np.random.uniform(0.75, 0.9))
 
     return BT([uts1, uts2])
 
@@ -228,12 +228,12 @@ def _build_entertain_me_melody_after():
     uc_mel.set_mfields(limbs[0], idx=0, drct=1, offset=0)
     uc_mel.set_mfields(limbs[1], idx=len(scale), drct=-1, offset=0)
     uc_mel.set_mfields(
-        list(uc_mel.successors(limbs[-1])),
+        list(uc_mel.successors(limbs.last)),
         offset=lambda c: c.total - c.index)
 
     for branch in uc_mel.at_depth(2):
         uc_mel.set_pfields(
-            uc_mel.subtree_leaves(branch),
+            uc_mel.leaves_of(branch),
             freq=lambda c: scale[
                 c.mfields['offset'] + c.mfields['idx'] + c.mfields['drct'] * c.index
             ].freq)
@@ -291,10 +291,10 @@ def _build_entertain_me_drums_after():
     limbs = uc_ds.at_depth(1)
 
     uc_ds.set_instrument(
-        uc_ds.subtree_leaves(limbs[0]),
+        uc_ds.leaves_of(limbs.first),
         Pattern([[JsInst.Kick(), JsInst.Snare()], JsInst.HatClosed()]))
     uc_ds.set_instrument(
-        uc_ds.subtree_leaves(limbs[-1]),
+        uc_ds.leaves_of(limbs.last),
         lambda c: JsInst.HatOpen(vel=0.1) if c.index % 2 == 0 else JsInst.HatClosed())
 
     return uc_ds
@@ -368,7 +368,7 @@ def _build_polyriddim_bass_after():
     uts3 = uc3.repeat(n_bars)
     for unit in uts3:
         unit.sparsify(0.67)
-        unit.set_pfields(unit.leaf_nodes,
+        unit.set_pfields(unit.leaves,
                          freq=lambda: scale[next(scl_pat)].freq,
                          vel=lambda: np.random.uniform(0.1, 0.5))
     return uts3
@@ -420,37 +420,46 @@ class TestPolyriddimBassEquivalence:
 # __getattr__ delegation tests (Change 1)
 # ---------------------------------------------------------------------------
 
-class TestGetAttrDelegation:
+class TestUCTraversalSurface:
+    """UC traversal returns selectors bound to the UC; raw tree access remains
+    available via ``uc._rt`` / ``uc.rt`` for dropped methods."""
 
-    def test_leaf_nodes_delegation(self):
+    def test_leaves_selector_matches_rt_leaf_nodes(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
-        assert uc.leaf_nodes == uc.rt.leaf_nodes
+        assert uc.leaves == uc.rt.leaf_nodes
 
-    def test_at_depth_delegation(self):
+    def test_at_depth_selector_matches_rt_at_depth(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
         assert uc.at_depth(1) == uc.rt.at_depth(1)
 
-    def test_subtree_leaves_delegation(self):
+    def test_leaves_of_selector_matches_rt_subtree_leaves(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
-        assert uc.subtree_leaves(1) == uc.rt.subtree_leaves(1)
+        assert uc.leaves_of(1) == uc.rt.subtree_leaves(1)
 
-    def test_successors_delegation(self):
+    def test_successors_selector_matches_rt_successors(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
         assert list(uc.successors(0)) == list(uc.rt.successors(0))
 
-    def test_descendants_delegation(self):
+    def test_descendants_via_rt_escape_hatch(self):
+        # Descendants dropped from UC surface; still reachable via uc._rt
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
-        assert list(uc.descendants(1)) == list(uc.rt.descendants(1))
+        assert list(uc._rt.descendants(1)) == list(uc.rt.descendants(1))
+        with pytest.raises(AttributeError):
+            uc.descendants(1)
 
-    def test_ancestors_delegation(self):
+    def test_ancestors_via_rt_escape_hatch(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
-        assert uc.ancestors(4) == uc.rt.ancestors(4)
+        assert uc._rt.ancestors(4) == uc.rt.ancestors(4)
+        with pytest.raises(AttributeError):
+            uc.ancestors(4)
 
-    def test_parent_delegation(self):
+    def test_parent_via_rt_escape_hatch(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
-        assert uc.parent(2) == uc.rt.parent(2)
+        assert uc._rt.parent(2) == uc.rt.parent(2)
+        with pytest.raises(AttributeError):
+            uc.parent(2)
 
-    def test_depth_delegation(self):
+    def test_depth_scalar_forward(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
         assert uc.depth == uc.rt.depth
 

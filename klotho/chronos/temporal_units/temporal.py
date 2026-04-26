@@ -9,8 +9,9 @@ concrete onset times and durations in seconds. Temporal units can be
 collected into sequences and blocks for polyphonic or multi-layered timing
 structures.
 """
+from dataclasses import dataclass
 from fractions import Fraction
-from typing import Union
+from typing import Any, Callable, Iterable, Iterator, Union
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms import auto_subdiv
 from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms
@@ -45,6 +46,195 @@ class ProlatioTypes(Enum):
 class TemporalMeta(type):
     """Metaclass for all temporal structures."""
     pass
+
+
+@dataclass(frozen=True)
+class NodeContext:
+    """Context object passed to predicates in ``UTNodeSelector.filter``.
+
+    Attributes
+    ----------
+    node : int
+        The node ID being evaluated.
+    index : int
+        Zero-based position within the current selection.
+    total : int
+        Total number of nodes in the current selection.
+    """
+
+    node: int
+    index: int
+    total: int
+
+
+class UTNodeSelector:
+    """An ordered, owner-bound collection of node IDs with fluent selection ops.
+
+    Carries UT-level structural verbs (``make_rest``, ``subdivide``,
+    ``sparsify``). Subclasses add domain-specific action verbs; in particular,
+    :class:`~klotho.thetos.composition.compositional.UCNodeSelector` adds
+    parameter/envelope/slur verbs.
+
+    The selector preserves ownership identity: operations that return another
+    selector always point at the same owner (UT/UC) so that subsequent verb
+    calls dispatch to the owning object's mutators.
+
+    Indexing, slicing, fancy-indexing, ``filter``, ``where``, and set-algebra
+    operations all return a new selector of the same concrete subclass.
+
+    Equality is strict: two selectors compare equal iff they share the same
+    owner (``is``) and hold the same ids in the same order; a selector also
+    compares equal to a ``tuple`` or ``list`` with matching ids (enabling
+    tuple-based test assertions). Any other type returns ``NotImplemented`` -
+    in particular, ``selector == int`` is always False via Python's fallback,
+    surfacing mistakes loudly rather than silently.
+    """
+
+    __slots__ = ('_owner', '_ids')
+
+    def __init__(self, owner: Any, ids: Iterable[int]):
+        object.__setattr__(self, '_owner', owner)
+        object.__setattr__(self, '_ids', tuple(ids))
+
+    # --- Sequence protocol ---
+    def __len__(self) -> int:
+        return len(self._ids)
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._ids)
+
+    def __contains__(self, node) -> bool:
+        return node in self._ids
+
+    def __bool__(self) -> bool:
+        return bool(self._ids)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({list(self._ids)})"
+
+    def __eq__(self, other):
+        if isinstance(other, UTNodeSelector):
+            return self._owner is other._owner and self._ids == other._ids
+        if isinstance(other, (tuple, list)):
+            return self._ids == tuple(other)
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash((id(self._owner), self._ids))
+
+    # --- Raw access ---
+    @property
+    def ids(self) -> tuple:
+        """Underlying tuple of node IDs."""
+        return self._ids
+
+    @property
+    def first(self) -> int:
+        """The first node ID in the selection."""
+        return self._ids[0]
+
+    @property
+    def last(self) -> int:
+        """The last node ID in the selection."""
+        return self._ids[-1]
+
+    @property
+    def owner(self):
+        """The UT/UC this selector is bound to."""
+        return self._owner
+
+    # --- Indexing (always returns same subclass) ---
+    def __getitem__(self, key) -> 'UTNodeSelector':
+        if isinstance(key, int):
+            return type(self)(self._owner, (self._ids[key],))
+        if isinstance(key, slice):
+            return type(self)(self._owner, self._ids[key])
+        if isinstance(key, (list, tuple)):
+            return type(self)(self._owner, tuple(self._ids[i] for i in key))
+        raise TypeError(
+            f"Invalid selector index: {type(key).__name__}; "
+            f"expected int, slice, or list/tuple of ints"
+        )
+
+    # --- Sub-selection on the underlying tree ---
+    @property
+    def leaves(self) -> 'UTNodeSelector':
+        """Expand this selection to the union of leaves under each selected node.
+
+        If a selected node is itself a leaf, it is included. Order-preserving
+        (left-to-right within each subtree, scenarios preserved in selection
+        order) and de-duplicated. Enables chaining like
+        ``uc.at_depth(1)[0].leaves.set_pfields(...)``.
+        """
+        rt = self._owner._rt
+        leaf_set = set(rt.leaf_nodes)
+        seen: set = set()
+        result: list = []
+        for n in self._ids:
+            if n in leaf_set:
+                if n not in seen:
+                    seen.add(n)
+                    result.append(n)
+            else:
+                for lf in rt.subtree_leaves(n):
+                    if lf not in seen:
+                        seen.add(lf)
+                        result.append(lf)
+        return type(self)(self._owner, tuple(result))
+
+    # --- Composition (all preserve subclass) ---
+    def filter(self, predicate: Callable[['NodeContext'], bool]) -> 'UTNodeSelector':
+        """Keep nodes for which ``predicate(NodeContext)`` returns truthy."""
+        total = len(self._ids)
+        return type(self)(self._owner, tuple(
+            n for i, n in enumerate(self._ids)
+            if predicate(NodeContext(node=n, index=i, total=total))
+        ))
+
+    def where(self, mask: Iterable[bool]) -> 'UTNodeSelector':
+        """Keep nodes where the corresponding mask entry is truthy."""
+        mask_list = list(mask)
+        if len(mask_list) != len(self._ids):
+            raise ValueError(
+                f"where() mask length mismatch: got {len(mask_list)}, "
+                f"expected {len(self._ids)}"
+            )
+        return type(self)(
+            self._owner,
+            tuple(n for n, m in zip(self._ids, mask_list) if m),
+        )
+
+    def __or__(self, other):
+        if not isinstance(other, UTNodeSelector) or other._owner is not self._owner:
+            return NotImplemented
+        seen = set(self._ids)
+        tail = tuple(n for n in other._ids if n not in seen)
+        return type(self)(self._owner, self._ids + tail)
+
+    def __and__(self, other):
+        if not isinstance(other, UTNodeSelector) or other._owner is not self._owner:
+            return NotImplemented
+        other_set = set(other._ids)
+        return type(self)(self._owner, tuple(n for n in self._ids if n in other_set))
+
+    def __sub__(self, other):
+        if not isinstance(other, UTNodeSelector) or other._owner is not self._owner:
+            return NotImplemented
+        other_set = set(other._ids)
+        return type(self)(self._owner, tuple(n for n in self._ids if n not in other_set))
+
+    # --- UT-level mutators ---
+    def make_rest(self):
+        """Rest every node in the selection (and its subtree)."""
+        return self._owner.make_rest(list(self._ids))
+
+    def subdivide(self, S):
+        """Subdivide every node in the selection with structure ``S``."""
+        return self._owner.subdivide(list(self._ids), S)
+
+    def sparsify(self, probability):
+        """Sparsify leaves under the selection's nodes with ``probability``."""
+        return self._owner.sparsify(probability, node=list(self._ids))
 
 
 class UTNodeView:
@@ -258,27 +448,72 @@ class TemporalUnit(metaclass=TemporalMeta):
                    beat     = beat,
                    bpm      = bpm)
     
-    _RT_QUERY_METHODS = frozenset({
-        'leaf_nodes', 'at_depth', 'subtree_leaves', 'successors',
-        'descendants', 'ancestors', 'parent', 'depth', 'depth_of',
-        'k', 'root', 'out_degree', 'topological_sort', 'branch',
-    })
+    _node_selector_class = UTNodeSelector
 
     @property
     def nodes(self):
         return UTNodeView(self)
 
-    def __getattr__(self, name):
-        if name in TemporalUnit._RT_QUERY_METHODS:
-            try:
-                rt = object.__getattribute__(self, '_rt')
-            except AttributeError:
-                raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
-            return getattr(rt, name)
-        raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+    # ------------------------------------------------------------------
+    # Node-returning traversal (returns selector bound to this UT/UC)
+    # ------------------------------------------------------------------
 
-    def __dir__(self):
-        return list(super().__dir__()) + list(self._RT_QUERY_METHODS) + ['nodes']
+    @property
+    def leaves(self):
+        """All leaves in left-to-right order (selector form of RT.leaf_nodes)."""
+        return self._node_selector_class(self, self._rt.leaf_nodes)
+
+    @property
+    def root(self):
+        """1-element selector for the root node.
+
+        Chain mutations: ``uc.root.set_pfields(amp=0.3)``.
+        """
+        return self._node_selector_class(self, (self._rt.root,))
+
+    def leaves_of(self, node: int):
+        """Leaves of the subtree rooted at ``node`` (selector form of RT.subtree_leaves)."""
+        return self._node_selector_class(self, self._rt.subtree_leaves(node))
+
+    def at_depth(self, d: int, operator: str = '=='):
+        """Nodes at a specific depth (selector form of RT.at_depth)."""
+        return self._node_selector_class(self, self._rt.at_depth(d, operator))
+
+    def successors(self, node: int):
+        """Direct children of ``node`` (selector form of RT.successors)."""
+        return self._node_selector_class(self, self._rt.successors(node))
+
+    def select(self, *ids):
+        """Build an ad-hoc selector from ints or a single iterable of ints."""
+        if len(ids) == 1 and not isinstance(ids[0], int):
+            return self._node_selector_class(self, tuple(ids[0]))
+        return self._node_selector_class(self, ids)
+
+    # ------------------------------------------------------------------
+    # Non-node scalar forwards (unchanged return types)
+    # ------------------------------------------------------------------
+
+    @property
+    def depth(self):
+        """Maximum depth of the underlying RT."""
+        return self._rt.depth
+
+    @property
+    def k(self):
+        """Maximum branching factor of the underlying RT."""
+        return self._rt.k
+
+    def depth_of(self, node):
+        """Depth of ``node`` in the underlying RT."""
+        return self._rt.depth_of(node)
+
+    def out_degree(self, node):
+        """Out-degree of ``node`` in the underlying RT."""
+        return self._rt.out_degree(node)
+
+    def topological_sort(self):
+        """Topological sort of the underlying RT's nodes."""
+        return self._rt.topological_sort()
 
     @property
     def span(self):
@@ -401,23 +636,26 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._bpm = self._bpm * factor
         self._invalidate_timing_cache()
 
-    def make_rest(self, node: int) -> None:
+    def make_rest(self, node) -> None:
         """
-        Turn a node and all its descendants into rests.
+        Turn a node (or each node in an iterable) and all descendants into rests.
 
-        Delegates to :meth:`RhythmTree.make_rest` and re-evaluates timing.
+        Delegates to :meth:`RhythmTree.make_rest` and re-evaluates timing once
+        at the end (batched across all provided nodes).
 
         Parameters
         ----------
-        node : int
-            The node ID to convert to a rest.
+        node : int or iterable of int
+            A single node ID, or an iterable of node IDs, to convert to rests.
 
         Raises
         ------
         ValueError
-            If the node is not found in the rhythm tree.
+            If any node is not found in the rhythm tree.
         """
-        self._rt.make_rest(node)
+        nodes = [node] if isinstance(node, int) else list(node)
+        for n in nodes:
+            self._rt.make_rest(n)
         self._invalidate_timing_cache()
 
     def subdivide(self, node: int, S) -> None:

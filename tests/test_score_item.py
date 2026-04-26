@@ -122,10 +122,12 @@ class TestFrozen:
 
 
 class TestGetAttrPassthrough:
-    def test_leaf_nodes_via_item(self):
+    def test_leaves_via_item(self):
         s = Score()
         item = s.add(_uc(), name='a')
-        assert tuple(item.leaf_nodes) == item.unit.rt.leaf_nodes
+        # ScoreItem.__getattr__ forwards to the owned UC's new `leaves` selector;
+        # equality vs the underlying RT leaf tuple works via selector __eq__.
+        assert item.leaves == item.unit.rt.leaf_nodes
 
     def test_set_pfields_via_item(self):
         s = Score()

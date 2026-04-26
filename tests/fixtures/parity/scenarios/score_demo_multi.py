@@ -1,0 +1,44 @@
+"""Parity scenario: multi-UC Score with two tracks, FX insert, root pfields + Pattern leaves."""
+
+import numpy as np
+
+from klotho.thetos import (
+    CompositionalUnit as UC,
+    Score,
+    SynthDefInstrument,
+    SynthDefFX,
+)
+from klotho.topos.collections.sequences import Pattern
+
+
+SEED = 7
+
+
+def build():
+    np.random.seed(SEED)
+    tri = SynthDefInstrument.tri()
+    saw = SynthDefInstrument.saw()
+
+    mel = UC(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=120, inst=tri)
+    mel.set_pfields(
+        list(mel._rt.leaf_nodes),
+        freq=Pattern([261.63, 293.66, 329.63, 349.23]),
+    )
+    mel.set_pfields(mel._rt.root, amp=0.3)
+
+    bass = UC(tempus='4/4', prolatio=(1, 1), bpm=120, inst=saw)
+    bass.set_pfields(
+        list(bass._rt.leaf_nodes),
+        freq=Pattern([65.4, 98.0]),
+    )
+    bass.set_pfields(bass._rt.root, amp=0.5)
+
+    reverb = SynthDefFX('kl_reverb', mix=0.3, room=0.7)
+
+    s = Score()
+    s.track('melody', inserts=[reverb])
+    s.track('bass')
+    s.add(mel, name='mel', track='melody')
+    s.add(bass, name='bass', track='bass')
+
+    return {"score": s}

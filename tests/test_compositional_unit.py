@@ -52,7 +52,7 @@ class Test_uc_default:
     def test_leaf_nodes_order(self, uc):
         _ = uc.events
         expected = (1,)
-        assert uc.leaf_nodes == expected
+        assert uc.leaves == expected
 
     def test_node_0_proportion(self, uc):
         _ = uc.events
@@ -118,7 +118,7 @@ class Test_uc_4_2_1_1:
     def test_leaf_nodes_order(self, uc):
         _ = uc.events
         expected = (1, 2, 3, 4,)
-        assert uc.leaf_nodes == expected
+        assert uc.leaves == expected
 
     def test_node_0_proportion(self, uc):
         _ = uc.events
@@ -220,7 +220,7 @@ class Test_uc_pulse:
     def test_leaf_nodes_order(self, uc):
         _ = uc.events
         expected = (1, 2, 3, 4,)
-        assert uc.leaf_nodes == expected
+        assert uc.leaves == expected
 
     def test_node_0_proportion(self, uc):
         _ = uc.events
@@ -322,7 +322,7 @@ class Test_uc_nested:
     def test_leaf_nodes_order(self, uc):
         _ = uc.events
         expected = (2, 3, 4, 5, 6, 7,)
-        assert uc.leaf_nodes == expected
+        assert uc.leaves == expected
 
     def test_node_0_proportion(self, uc):
         _ = uc.events

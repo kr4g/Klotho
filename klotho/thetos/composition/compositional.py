@@ -15,7 +15,7 @@ import warnings
 import pandas as pd
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
-from klotho.chronos.temporal_units.temporal import Chronon
+from klotho.chronos.temporal_units.temporal import Chronon, UTNodeSelector
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
 from klotho.thetos.instruments.base import Effect
@@ -183,6 +183,75 @@ class Parametron(Chronon):
         return self.get_mfield(key)
 
 
+class UCNodeSelector(UTNodeSelector):
+    """Selector for :class:`CompositionalUnit` owners.
+
+    Extends :class:`UTNodeSelector` with UC-specific verbs that delegate to
+    the owning UC's parameter / envelope / slur / instrument mutators. Every
+    verb just passes ``list(self._ids)`` as the ``node`` argument - no new
+    dispatch logic is introduced here. Existing UC setter semantics
+    (callable-per-node, Pattern-cycling, static tuple-as-poly-event,
+    ``include_rests`` filtering, ensemble-family side effects, slur/envelope
+    healing) are preserved verbatim.
+    """
+
+    # --- Parameter verbs ---
+    def set_pfields(self, include_rests: bool = False, **kwargs) -> None:
+        """Set parameter field values on every selected node."""
+        return self._owner.set_pfields(
+            list(self._ids), include_rests=include_rests, **kwargs
+        )
+
+    def set_mfields(self, include_rests: bool = False, **kwargs) -> None:
+        """Set meta field values on every selected node."""
+        return self._owner.set_mfields(
+            list(self._ids), include_rests=include_rests, **kwargs
+        )
+
+    def set_instrument(self, instrument):
+        """Assign an instrument (or Pattern/callable thereof) to the selection."""
+        return self._owner.set_instrument(list(self._ids), instrument)
+
+    def apply_envelope(self, envelope, pfields, *, offset=0, take=None,
+                       scope: str = 'span', control: bool = False,
+                       endpoint: bool = True):
+        """Apply an envelope to the selection. See :meth:`CompositionalUnit.apply_envelope`."""
+        return self._owner.apply_envelope(
+            envelope, pfields, node=list(self._ids),
+            offset=offset, take=take, scope=scope,
+            control=control, endpoint=endpoint,
+        )
+
+    def apply_slur(self, *, offset=0, take=None, mode: str = 'span'):
+        """Apply a slur over the selection. See :meth:`CompositionalUnit.apply_slur`."""
+        return self._owner.apply_slur(
+            node=list(self._ids), offset=offset, take=take, mode=mode,
+        )
+
+    def clear_parameters(self) -> None:
+        """Clear parameter values on every selected node (and its subtree)."""
+        for n in self._ids:
+            self._owner.clear_parameters(n)
+
+    def set(self, *, inst=None, mfields=None, pfields=None,
+            include_rests: bool = False):
+        """Set instrument / mfields / pfields in one call across the selection."""
+        return self._owner.set(
+            list(self._ids), inst=inst, mfields=mfields,
+            pfields=pfields, include_rests=include_rests,
+        )
+
+    # --- Per-node getters (return list aligned with self._ids) ---
+    def get_pfield(self, key: str, default=None) -> list:
+        return [self._owner.get_pfield(n, key, default) for n in self._ids]
+
+    def get_mfield(self, key: str, default=None) -> list:
+        return [self._owner.get_mfield(n, key, default) for n in self._ids]
+
+    def get_instrument(self) -> list:
+        return [self._owner.get_instrument(n) for n in self._ids]
+
+
 class UCNodeView:
     """View of UC nodes; subscripting returns a Parametron for that node."""
 
@@ -254,7 +323,9 @@ class CompositionalUnit(TemporalUnit):
     pfields : list
         List of all available parameter field names
     """
-    
+
+    _node_selector_class = UCNodeSelector
+
     def __init__(self,
                  span     : Union[int, float, Fraction]            = 1,
                  tempus   : Union[Meas, Fraction, int, float, str] = '4/4',
@@ -1180,20 +1251,28 @@ class CompositionalUnit(TemporalUnit):
                 else:
                     self._rebake_control_envelope(desc)
 
-    def make_rest(self, node: int) -> None:
+    def make_rest(self, node) -> None:
         """
-        Make a node (and its subtree) a rest, splitting intersecting slurs
-        and filtering control envelopes.
-        
+        Make one or more nodes (and their subtrees) rests, splitting
+        intersecting slurs and filtering control envelopes.
+
+        When multiple nodes are passed, the affected-leaf set is collected
+        across all of them before slur splitting and envelope filtering, so
+        slurs/envelopes that touch the combined set are healed exactly once.
+
         Parameters
         ----------
-        node : int
-            The node ID to convert to a rest.
+        node : int or iterable of int
+            The node ID (or iterable of node IDs) to convert to rests.
         """
-        affected = set([node] + list(self._rt.descendants(node)))
+        nodes = [node] if isinstance(node, int) else list(node)
+        affected: set = set()
+        for n in nodes:
+            affected.add(n)
+            affected.update(self._rt.descendants(n))
         affected_leaves = {n for n in affected if n in self._rt.leaf_nodes}
         self._split_slurs_for_rests(affected_leaves)
-        super().make_rest(node)
+        super().make_rest(nodes)
         self._filter_envelopes_for_rests(affected_leaves)
 
     def subdivide(self, node: int, S) -> None:

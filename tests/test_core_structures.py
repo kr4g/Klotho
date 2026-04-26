@@ -789,7 +789,7 @@ class TestCompositionalUnitRT_PTSync:
         _ = expected.events
         assert uc.durations == expected.durations
         assert uc.onsets == expected.onsets
-        assert len(uc.leaf_nodes) == len(expected.leaf_nodes)
+        assert len(uc.leaves) == len(expected.leaves)
         _assert_rt_structurally_equivalent(uc._rt, expected._rt)
         _assert_rt_pt_same_structure_and_ids(uc)
 
@@ -802,7 +802,7 @@ class TestCompositionalUnitRT_PTSync:
         _ = expected.events
         assert uc.durations == expected.durations
         assert uc.onsets == expected.onsets
-        assert len(uc.leaf_nodes) == len(expected.leaf_nodes)
+        assert len(uc.leaves) == len(expected.leaves)
         _assert_rt_structurally_equivalent(uc._rt, expected._rt)
         _assert_rt_pt_same_structure_and_ids(uc)
 

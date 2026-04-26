@@ -1,0 +1,975 @@
+{
+  "sc_assembly_per_uc": null,
+  "sc_score_payload": {
+    "control_data": {
+      "blockSize": 512,
+      "buffer_shape": [
+        4096
+      ],
+      "descriptors": [
+        {
+          "blockIndex": 0,
+          "dur": 2.6666666666666665,
+          "pfields": [
+            "amp"
+          ],
+          "start": 0.0,
+          "targets": [
+            {
+              "id": "__id_0",
+              "startTime": 0.0
+            },
+            {
+              "id": "__id_1",
+              "startTime": 0.4444444444444444
+            },
+            {
+              "id": "__id_2",
+              "startTime": 0.8888888888888888
+            },
+            {
+              "id": "__id_3",
+              "startTime": 1.3333333333333333
+            },
+            {
+              "id": "__id_4",
+              "startTime": 2.0
+            }
+          ]
+        },
+        {
+          "blockIndex": 1,
+          "dur": 1.3333333333333333,
+          "pfields": [
+            "cutoff"
+          ],
+          "start": 0.0,
+          "targets": [
+            {
+              "id": "__id_0",
+              "startTime": 0.0
+            },
+            {
+              "id": "__id_1",
+              "startTime": 0.4444444444444444
+            },
+            {
+              "id": "__id_2",
+              "startTime": 0.8888888888888888
+            }
+          ]
+        },
+        {
+          "blockIndex": 2,
+          "dur": 1.3333333333333333,
+          "pfields": [
+            "cutoff"
+          ],
+          "start": 1.3333333333333333,
+          "targets": [
+            {
+              "id": "__id_3",
+              "startTime": 1.3333333333333333
+            },
+            {
+              "id": "__id_4",
+              "startTime": 2.0
+            }
+          ]
+        },
+        {
+          "blockIndex": 3,
+          "dur": 0.4444444444444444,
+          "pfields": [
+            "vib"
+          ],
+          "start": 0.0,
+          "targets": [
+            {
+              "id": "__id_0",
+              "startTime": 0.0
+            }
+          ]
+        },
+        {
+          "blockIndex": 4,
+          "dur": 0.4444444444444444,
+          "pfields": [
+            "vib"
+          ],
+          "start": 0.4444444444444444,
+          "targets": [
+            {
+              "id": "__id_1",
+              "startTime": 0.4444444444444444
+            }
+          ]
+        },
+        {
+          "blockIndex": 5,
+          "dur": 0.4444444444444444,
+          "pfields": [
+            "vib"
+          ],
+          "start": 0.8888888888888888,
+          "targets": [
+            {
+              "id": "__id_2",
+              "startTime": 0.8888888888888888
+            }
+          ]
+        },
+        {
+          "blockIndex": 6,
+          "dur": 0.6666666666666667,
+          "pfields": [
+            "vib"
+          ],
+          "start": 1.3333333333333333,
+          "targets": [
+            {
+              "id": "__id_3",
+              "startTime": 1.3333333333333333
+            }
+          ]
+        },
+        {
+          "blockIndex": 7,
+          "dur": 0.6666666666666665,
+          "pfields": [
+            "vib"
+          ],
+          "start": 2.0,
+          "targets": [
+            {
+              "id": "__id_4",
+              "startTime": 2.0
+            }
+          ]
+        }
+      ]
+    },
+    "events": [
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_5",
+        "_polyGroupId": "__id_5",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "defName": "kl_sine",
+        "group": "voice",
+        "id": "__id_0",
+        "pfields": {
+          "amp": 0.05,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.1,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "freq": 220.0,
+          "gate": 1,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        "start": 0.0,
+        "type": "new"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_6",
+        "_polyGroupId": "__id_6",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "defName": "kl_sine",
+        "group": "voice",
+        "id": "__id_1",
+        "pfields": {
+          "amp": 0.2788640014863411,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.43333333333333335,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "freq": 220.0,
+          "gate": 1,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        "start": 0.4444444444444444,
+        "type": "new"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_5",
+        "_polyGroupId": "__id_5",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "group": "voice",
+        "id": "__id_0",
+        "start": 0.4444444444444444,
+        "type": "release"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_7",
+        "_polyGroupId": "__id_7",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "defName": "kl_sine",
+        "group": "voice",
+        "id": "__id_2",
+        "pfields": {
+          "amp": 0.3783278865240663,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.43333333333333335,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "freq": 220.0,
+          "gate": 1,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        "start": 0.8888888888888888,
+        "type": "new"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_6",
+        "_polyGroupId": "__id_6",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "group": "voice",
+        "id": "__id_1",
+        "start": 0.8888888888888888,
+        "type": "release"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_8",
+        "_polyGroupId": "__id_8",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "defName": "kl_sine",
+        "group": "voice",
+        "id": "__id_3",
+        "pfields": {
+          "amp": 0.37832788652406635,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.1,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "freq": 220.0,
+          "gate": 1,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        "start": 1.3333333333333333,
+        "type": "new"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_7",
+        "_polyGroupId": "__id_7",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "group": "voice",
+        "id": "__id_2",
+        "start": 1.3333333333333333,
+        "type": "release"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_9",
+        "_polyGroupId": "__id_9",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "defName": "kl_sine",
+        "group": "voice",
+        "id": "__id_4",
+        "pfields": {
+          "amp": 0.27886400148634116,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.5999999999999999,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "freq": 220.0,
+          "gate": 1,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        "start": 2.0,
+        "type": "new"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_8",
+        "_polyGroupId": "__id_8",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "group": "voice",
+        "id": "__id_3",
+        "start": 2.0,
+        "type": "release"
+      },
+      {
+        "_animate": true,
+        "_logicalStepId": "__id_9",
+        "_polyGroupId": "__id_9",
+        "_polyLeader": true,
+        "_polyVoiceCount": 1,
+        "_polyVoiceIndex": 0,
+        "group": "voice",
+        "id": "__id_4",
+        "start": 2.6666666666666665,
+        "type": "release"
+      }
+    ],
+    "meta": {
+      "groups": [
+        "voice"
+      ]
+    }
+  },
+  "scenario": "score_control_envs_3layer",
+  "score": {
+    "items": [
+      "uc"
+    ],
+    "tracks": [
+      "voice"
+    ]
+  },
+  "seed": 11,
+  "ucs": {
+    "uc": {
+      "control_envelopes": {
+        "0": {
+          "anchor_node": 0,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              -2,
+              2
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.4,
+              0.6
+            ],
+            "values": [
+              0.05,
+              0.4,
+              0.05
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "amp"
+          ]
+        },
+        "1": {
+          "anchor_node": 1,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.1,
+              0.6,
+              0.1
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "cutoff"
+          ]
+        },
+        "2": {
+          "anchor_node": 5,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.1,
+              0.6,
+              0.1
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "cutoff"
+          ]
+        },
+        "3": {
+          "anchor_node": 2,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "vib"
+          ]
+        },
+        "4": {
+          "anchor_node": 3,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "vib"
+          ]
+        },
+        "5": {
+          "anchor_node": 4,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "vib"
+          ]
+        },
+        "6": {
+          "anchor_node": 6,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "vib"
+          ]
+        },
+        "7": {
+          "anchor_node": 7,
+          "endpoint": true,
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "leaf_subset": null,
+          "pfields": [
+            "vib"
+          ]
+        }
+      },
+      "events": [
+        {
+          "amp": 0.05,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.1,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "dur": 0.4444444444444444,
+          "freq": 220.0,
+          "gate": 1,
+          "group": "default",
+          "instrument": "sine",
+          "metric_dur": "1/6",
+          "node_id": 2,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "start": 0.0,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        {
+          "amp": 0.2788640014863411,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.43333333333333335,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "dur": 0.4444444444444444,
+          "freq": 220.0,
+          "gate": 1,
+          "group": "default",
+          "instrument": "sine",
+          "metric_dur": "1/6",
+          "node_id": 3,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "start": 0.4444444444444444,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        {
+          "amp": 0.3783278865240663,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.43333333333333335,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "dur": 0.4444444444444444,
+          "freq": 220.0,
+          "gate": 1,
+          "group": "default",
+          "instrument": "sine",
+          "metric_dur": "1/6",
+          "node_id": 4,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "start": 0.8888888888888888,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        {
+          "amp": 0.37832788652406635,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.1,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "dur": 0.6666666666666666,
+          "freq": 220.0,
+          "gate": 1,
+          "group": "default",
+          "instrument": "sine",
+          "metric_dur": "1/4",
+          "node_id": 6,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "start": 1.3333333333333333,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        },
+        {
+          "amp": 0.27886400148634116,
+          "attackCurve": -4.0,
+          "attackTime": 0.05,
+          "cutoff": 0.5999999999999999,
+          "decayCurve": -2.0,
+          "decayTime": 0.15,
+          "dur": 0.6666666666666666,
+          "freq": 220.0,
+          "gate": 1,
+          "group": "default",
+          "instrument": "sine",
+          "metric_dur": "1/4",
+          "node_id": 7,
+          "out": 0,
+          "pan": 0.0,
+          "peakLevel": 1.0,
+          "portamento": 0.1,
+          "releaseCurve": -4.0,
+          "releaseTime": 0.8,
+          "start": 2.0,
+          "sustainLevel": 0.8,
+          "vib": 0.0,
+          "vibDepth": 0.0,
+          "vibRate": 5.0
+        }
+      ],
+      "resolved_control_envelopes": [
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              -2,
+              2
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.4,
+              0.6
+            ],
+            "values": [
+              0.05,
+              0.4,
+              0.05
+            ]
+          },
+          "pfields": [
+            "amp"
+          ],
+          "target_nodes": [
+            2,
+            3,
+            4,
+            6,
+            7
+          ],
+          "time_span": [
+            0.0,
+            2.6666666666666665
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.1,
+              0.6,
+              0.1
+            ]
+          },
+          "pfields": [
+            "cutoff"
+          ],
+          "target_nodes": [
+            2,
+            3,
+            4
+          ],
+          "time_span": [
+            0.0,
+            1.3333333333333333
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.1,
+              0.6,
+              0.1
+            ]
+          },
+          "pfields": [
+            "cutoff"
+          ],
+          "target_nodes": [
+            6,
+            7
+          ],
+          "time_span": [
+            1.3333333333333333,
+            2.6666666666666665
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "pfields": [
+            "vib"
+          ],
+          "target_nodes": [
+            2
+          ],
+          "time_span": [
+            0.0,
+            0.4444444444444444
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "pfields": [
+            "vib"
+          ],
+          "target_nodes": [
+            3
+          ],
+          "time_span": [
+            0.4444444444444444,
+            0.8888888888888888
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "pfields": [
+            "vib"
+          ],
+          "target_nodes": [
+            4
+          ],
+          "time_span": [
+            0.8888888888888888,
+            1.3333333333333333
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "pfields": [
+            "vib"
+          ],
+          "target_nodes": [
+            6
+          ],
+          "time_span": [
+            1.3333333333333333,
+            2.0
+          ]
+        },
+        {
+          "envelope": {
+            "__type__": "Envelope",
+            "curve": [
+              0.0,
+              0.0
+            ],
+            "time_scale": 1.0,
+            "times": [
+              0.5,
+              0.5
+            ],
+            "values": [
+              0.0,
+              0.3,
+              0.0
+            ]
+          },
+          "pfields": [
+            "vib"
+          ],
+          "target_nodes": [
+            7
+          ],
+          "time_span": [
+            2.0,
+            2.6666666666666665
+          ]
+        }
+      ],
+      "slur_specs": {}
+    }
+  }
+}
