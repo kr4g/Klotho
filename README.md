@@ -6,7 +6,7 @@
 
 *Klotho*, from the Ancient Greek *κλώθω* (klṓthō), meaning "to spin." The mythological figure Clotho, one of the three Fates, takes her name from this same word.
 
-**Klotho** is an open source computer-assisted composition toolkit implemented in Python. It is designed to work in tandem with external synthesis applications and as a resource for the methods, models, works, and frameworks associated with music composition and metacomposition.
+**Klotho** is an open source computer-assisted composition toolkit implemented in Python. It is designed to work in tandem with external synthesis applications and as a resource for the methods and models associated with musical abstraction and computation.
 
 Klotho adapts to multiple Python workflows, supporting traditional scripting, interactive notebook environments, and immediate computational tasks through the interpreter.
 
@@ -22,7 +22,7 @@ Readable directly in your browser with no installation required.
 
 ---
 
-## About
+<!-- ## About
 
 Klotho extends from a lineage of computer-assisted composition (CAC) theories, practices, and software environments. It draws particular influence from the computational paradigms explored in patching-based systems such as [OpenMusic](https://openmusic-project.github.io/) and the [Bach](https://www.bachproject.net/)/[Cage](https://www.bachproject.net/cage/) ecosystem, while diverging from visual patching in favor of a scripting-first workflow.
 
@@ -30,7 +30,7 @@ In that sense, Klotho overlaps with the motivation behind [OpusModus](https://op
 
 While Klotho supports conventional musical materials, its strengths are best realized when working with complex, abstract, or otherwise unconventional structures that are awkward to express—or difficult to iterate on—within traditional notation software or digital audio workstations.
 
----
+--- -->
 
 ## Installation
 
