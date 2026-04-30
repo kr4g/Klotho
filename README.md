@@ -14,7 +14,7 @@ Klotho adapts to multiple Python workflows, supporting traditional scripting, in
 
 ## Companion Book
 
-An interactive Jupyter Book exploring the theory, mathematics, and CAC practice behind Klotho — foundational graph structures, formal grammars, evolutionary algorithms, quantum fields, and beyond.
+An interactive Jupyter Book exploring the theory, mathematics, and CAC practice behind Klotho. This is a work in progress, but will ultimately cover such topics as foundational graph structures, formal grammars, evolutionary algorithms, quantum fields, and beyond.
 
 Readable directly in your browser with no installation required.
 
