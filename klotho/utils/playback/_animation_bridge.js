@@ -255,18 +255,19 @@
       if (engine === "supersonic") {
         var ready = await _ensureSSReady();
         if (!ready || !_ssSonic || typeof _ssSonic.send !== "function") return false;
-        var manifest = (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : {};
-        var controls = manifest[defName] || {};
-        var hasGate = ('gate' in controls);
+        // Click-to-play preview: trigger one synth for ``dur`` seconds.
+        // We always send ``gate, 1`` on /s_new and ``/n_set gate 0`` after
+        // ``dur`` regardless of whether the manifest happens to be loaded
+        // on the page. For non-gated synths, scsynth silently ignores the
+        // unknown control name; for gated synths this gives the proper
+        // release tail. This keeps click-to-play independent of whether
+        // a SuperSonic ``play()`` widget has injected ``__klothoManifest``.
         var nodeId = _ssSonic.nextNodeId();
-        var newArgs = ["/s_new", defName, nodeId, 0, 0, "freq", freq, "amp", amp];
-        if (hasGate) newArgs.push("gate", 1);
-        _ssSonic.send.apply(_ssSonic, newArgs);
-        if (hasGate) {
-          setTimeout(function() {
-            try { _ssSonic.send("/n_set", nodeId, "gate", 0); } catch(_) {}
-          }, Math.max(1, Math.round(dur * 1000)));
-        }
+        _ssSonic.send("/s_new", defName, nodeId, 0, 0,
+                      "freq", freq, "amp", amp, "gate", 1);
+        setTimeout(function() {
+          try { _ssSonic.send("/n_set", nodeId, "gate", 0); } catch(_) {}
+        }, Math.max(1, Math.round(dur * 1000)));
         return true;
       }
 
