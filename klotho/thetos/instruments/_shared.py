@@ -41,14 +41,37 @@ GM_PROGRAM_NAMES = (
 
 
 def load_ss_manifest():
+    """Return the flat ``{synth_name: {control_name: default_value}}`` dict.
+
+    The on-disk manifest is auto-regenerated from compiled ``.scsyndef``
+    files via
+    ``klotho.utils.playback.supersonic.scripts.regenerate_manifest``.  See
+    ``07_PLAYBACK.md`` for the schema.
+    """
     global _SS_MANIFEST_CACHE
     if _SS_MANIFEST_CACHE is None:
         if _SS_MANIFEST_PATH.exists():
             _SS_MANIFEST_CACHE = json.loads(_SS_MANIFEST_PATH.read_text())
         else:
-            _SS_MANIFEST_CACHE = {'synths': {}, 'inserts': {}}
+            _SS_MANIFEST_CACHE = {}
     return _SS_MANIFEST_CACHE
 
 
+def ss_synth_controls(def_name):
+    """Return the ``{control_name: default_value}`` dict for ``def_name``.
+
+    Returns an empty dict if the synth is not in the manifest.
+    """
+    return load_ss_manifest().get(def_name, {})
+
+
+def synth_has_gate(def_name):
+    """Return ``True`` if the synthdef declares a ``gate`` control."""
+    return 'gate' in ss_synth_controls(def_name)
+
+
+# Deprecated: kept for backward compatibility with external callers that
+# expected the old wrapped-meta shape ({'controls': ..., 'releaseMode': ...}).
+# Returns just the controls dict now.
 def ss_synth_meta(def_name):
-    return load_ss_manifest().get('synths', {}).get(def_name, {})
+    return ss_synth_controls(def_name)

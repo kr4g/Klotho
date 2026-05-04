@@ -9,16 +9,24 @@ from klotho.topos.collections.sequences import Pattern
 from klotho.utils.playback._sc_assembly import lower_compositional_ir_to_sc_assembly
 
 
-def _make_inst(name, defName, release_mode='gate', **pf):
-    defaults = {'amp': 0.1, 'freq': 440.0, 'pan': 0.0, 'gate': 1, 'out': 0}
+def _make_inst(name, defName, has_gate=True, **pf):
+    """Build a SynthDefInstrument with sensible defaults.
+
+    ``has_gate`` is a derived property of the pfields: when ``True`` we
+    include a ``gate`` pfield, when ``False`` we omit it. This is the
+    only way to mark an instrument as one-shot (no separate flag).
+    """
+    defaults = {'amp': 0.1, 'freq': 440.0, 'pan': 0.0, 'out': 0}
+    if has_gate:
+        defaults['gate'] = 1
     defaults.update(pf)
-    return SynthDefInstrument(name=name, defName=defName, release_mode=release_mode, pfields=defaults)
+    return SynthDefInstrument(name=name, defName=defName, pfields=defaults)
 
 
 KICK = _make_inst('kick', 'kl_kicktone', freq=60.0)
 SNARE = _make_inst('snare', 'kl_noisebpf', freq=200.0)
 HAT = _make_inst('hat', 'kl_noisebpf', freq=8000.0)
-FREE_INST = _make_inst('free_synth', 'kl_sine', release_mode='free')
+FREE_INST = _make_inst('free_synth', 'kl_sine', has_gate=False)
 
 
 # ---- Base Kit ----
@@ -161,9 +169,9 @@ class TestSynthDefKit:
         kit = SynthDefKit({'kick': KICK, 'snare': SNARE}, default='snare')
         assert kit.defName == 'kl_noisebpf'
 
-    def test_release_mode_delegates_to_default(self):
+    def test_has_gate_delegates_to_default(self):
         kit = SynthDefKit({'kick': KICK, 'snare': SNARE})
-        assert kit.release_mode == 'gate'
+        assert kit.has_gate is True
 
     def test_str_says_synthdefkit(self):
         kit = SynthDefKit({'kick': KICK, 'snare': SNARE})
@@ -184,13 +192,18 @@ class TestSynthDefKit:
         assert kit.selector == 'patch'
 
 
-class TestMixedReleaseModes:
-    def test_members_can_have_different_release_modes(self):
+class TestMixedHasGate:
+    def test_members_can_have_different_has_gate(self):
         kit = SynthDefKit({'gated': KICK, 'free': FREE_INST})
-        assert kit._resolve('gated').release_mode == 'gate'
-        assert kit._resolve('free').release_mode == 'free'
+        assert kit._resolve('gated').has_gate is True
+        assert kit._resolve('free').has_gate is False
 
-    def test_assembly_uses_resolved_release_mode(self):
+    def test_assembly_emits_release_after_on_terminal(self):
+        """Both gated and free voices emit ``releaseAfter:true`` on the
+        terminal event of each uid's chain. The scheduler is responsible
+        for skipping the gate-off when the synth has no ``gate`` control
+        (free voices); the lowering layer emits uniform metadata.
+        """
         kit = SynthDefKit({'gated': KICK, 'free': FREE_INST}, default='gated')
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), bpm=120)
         uc.set_instrument(uc.rt.root, kit)
@@ -198,17 +211,17 @@ class TestMixedReleaseModes:
         uc.set_pfields(leaves[0], voice='gated')
         uc.set_pfields(leaves[1], voice='free')
 
-        events = lower_compositional_ir_to_sc_assembly(
-            uc, sort_output=True, include_ungated_release=False,
-        )
+        events = lower_compositional_ir_to_sc_assembly(uc, sort_output=True)
         new_events = [e for e in events if e['type'] == 'new']
-        release_events = [e for e in events if e['type'] == 'release']
         assert new_events[0]['defName'] == 'kl_kicktone'
         assert new_events[1]['defName'] == 'kl_sine'
-        gated_releases = [r for r in release_events if r['id'] == new_events[0]['id']]
-        free_releases = [r for r in release_events if r['id'] == new_events[1]['id']]
-        assert len(gated_releases) == 1
-        assert len(free_releases) == 0
+        # No more explicit type:release events; lowering uses releaseAfter.
+        assert all(e['type'] != 'release' for e in events)
+        # Every terminal new carries releaseAfter=true and a positive dur.
+        assert new_events[0].get('releaseAfter') is True
+        assert new_events[1].get('releaseAfter') is True
+        assert new_events[0].get('dur', 0) > 0
+        assert new_events[1].get('dur', 0) > 0
 
 
 # ---- Assembly Integration ----

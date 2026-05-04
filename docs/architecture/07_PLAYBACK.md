@@ -29,8 +29,12 @@ utils/playback/
     ├── engine.py              # SuperSonicEngine — HTML widget
     ├── converters.py          # convert_to_sc_events()
     ├── cdn.py                 # SuperSonic CDN URLs
+    ├── _vendor/
+    │   └── synthdef_parser/   # vendored .scsyndef parser (MIT)
+    ├── scripts/
+    │   └── regenerate_manifest.py  # rebuilds flat manifest.json from .scsyndef
     └── assets/
-        ├── manifest.json      # registered synthdefs
+        ├── manifest.json      # flat {name: {control: default}} dict
         └── *.scsyndef         # compiled synth definition files
 ```
 
@@ -262,7 +266,45 @@ Three message types:
 | `kl_kicktone` | Kick drum tone |
 
 Definitions are compiled `.scsyndef` files in `supersonic/assets/`.
-The `manifest.json` lists registered synthdefs.
+The `manifest.json` lists registered synthdefs as a flat dict
+`{synth_name: {control_name: default_value}}`. It is auto-regenerated
+from the compiled `.scsyndef` blobs by
+
+```bash
+python -m klotho.utils.playback.supersonic.scripts.regenerate_manifest
+```
+
+(use `--dry-run` to preview). The script uses a vendored copy of
+`synthdef_parser` at `supersonic/_vendor/synthdef_parser/` (no external
+install).
+
+### Event-list contract: `dur` + `releaseAfter` (auto-release)
+
+Every `new`/`set` event produced by the lowering layer carries two
+top-level fields beyond the legacy `type, id, defName, start, pfields`:
+
+- `dur: number` — the leaf's duration in seconds.
+- `releaseAfter: bool` — `true` on the terminal event of each uid's
+  chain (the last `set` of a slur, or any single-leaf `new`).
+
+The lowering layer **never emits** explicit `{type:"release", id, start}`
+events for normal lifecycle gate-off any more. Instead, the SuperSonic
+JS scheduler introspects the manifest at fire time: when it sees
+`releaseAfter:true` on a `new`/`set` and `'gate' in manifest[defName]`,
+it NTP-schedules a `/n_set <node> gate 0` at `start + dur` alongside
+the primary OSC bundle. For non-gated synths (no `gate` control) the
+scheduler no-ops, so the lowering layer can emit the same metadata
+uniformly without per-instrument branching.
+
+`type:"release"` events are still accepted by the validator and the
+schedulers as an explicit override path; only the lowering layer was
+updated to stop producing them automatically.
+
+The native SC scheduler (`EventScheduler.sc`) will gain the same
+fire-time inspection path in a follow-up using
+`SynthDescLib.global.at(name).controlDict.includesKey(\gate)`. Until
+that lands, SC scheduling falls back to consuming any explicit
+`type:"release"` events as before.
 
 ### Session Boot
 

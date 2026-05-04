@@ -35,6 +35,12 @@
       this._controlBusMap = [];
       this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
       this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
+      // Track the bus range allocated by THIS play, so it can be reclaimed
+      // when the group is freed. Without this, ``__klothoBusAlloc`` only
+      // grows monotonically and the user runs out of private audio buses
+      // (default scsynth limit: 128 channels) after a few dozen plays.
+      this._audioBusRangeStart = null;
+      this._controlBusRangeStart = null;
       this._activeBuffers = [];
 
       this._playStartNTP = 0;
@@ -54,27 +60,75 @@
       this._groupId = gid;
     }
 
+    _snapshotBusRangeStart() {
+      this._audioBusRangeStart = globalThis.__klothoBusAlloc.nextAudio;
+      this._controlBusRangeStart = globalThis.__klothoBusAlloc.nextControl;
+    }
+
+    // Reclaim a bus range back to the global allocator if no later play
+    // has extended past it. The conditional check protects against
+    // clobbering allocations made by a concurrent widget's scheduler.
+    _reclaimBusRange(audioStart, audioEnd, controlStart, controlEnd) {
+      var g = globalThis.__klothoBusAlloc;
+      if (audioStart != null && audioEnd != null
+          && g.nextAudio === audioEnd && audioStart < audioEnd) {
+        g.nextAudio = audioStart;
+      }
+      if (controlStart != null && controlEnd != null
+          && g.nextControl === controlEnd && controlStart < controlEnd) {
+        g.nextControl = controlStart;
+      }
+    }
+
     _freeGroup() {
       if (this._groupId == null) return;
       try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
       try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
+      this._reclaimBusRange(
+        this._audioBusRangeStart, globalThis.__klothoBusAlloc.nextAudio,
+        this._controlBusRangeStart, globalThis.__klothoBusAlloc.nextControl
+      );
+      this._audioBusRangeStart = null;
+      this._controlBusRangeStart = null;
       this._groupId = null;
       this._scoreGroupId = null;
     }
 
     _freeGroupDeferred(groupId) {
+      var self = this;
       var sonic = this.sonic;
       var ringMs = this.ringTime * 1000;
       var bufs = this._activeBuffers.slice();
-      var tid = setTimeout(function() {
+      // Snapshot this play's bus range; on ring-out, reclaim it so the
+      // global allocator doesn't grow unboundedly.
+      var audioStart = this._audioBusRangeStart;
+      var audioEnd = globalThis.__klothoBusAlloc.nextAudio;
+      var controlStart = this._controlBusRangeStart;
+      var controlEnd = globalThis.__klothoBusAlloc.nextControl;
+      var entry = {
+        gid: groupId,
+        bufs: bufs,
+        audioStart: audioStart,
+        audioEnd: audioEnd,
+        controlStart: controlStart,
+        controlEnd: controlEnd,
+        tid: null,
+      };
+      entry.tid = setTimeout(function() {
         try { sonic.send('/g_freeAll', groupId); } catch(e) {}
         try { sonic.send('/n_free', groupId); } catch(e) {}
         for (var i = 0; i < bufs.length; i++) {
           try { sonic.send('/b_free', bufs[i]); } catch(e) {}
         }
+        self._reclaimBusRange(audioStart, audioEnd, controlStart, controlEnd);
       }, ringMs);
-      this._deferredRings.push({ tid: tid, gid: groupId });
+      this._deferredRings.push(entry);
       this._activeBuffers = [];
+      // Ownership of the range moves onto the deferred entry; clear so
+      // the next play snapshots a fresh range starting from the (still
+      // unreclaimed) global cursor.
+      this._audioBusRangeStart = null;
+      this._controlBusRangeStart = null;
     }
 
     _freeBuffers() {
@@ -86,24 +140,21 @@
 
     _cancelAllDeferredRings() {
       for (var i = 0; i < this._deferredRings.length; i++) {
-        clearTimeout(this._deferredRings[i].tid);
-        var gid = this._deferredRings[i].gid;
-        try { this.sonic.send('/g_freeAll', gid); } catch(e) {}
-        try { this.sonic.send('/n_free', gid); } catch(e) {}
+        var entry = this._deferredRings[i];
+        clearTimeout(entry.tid);
+        try { this.sonic.send('/g_freeAll', entry.gid); } catch(e) {}
+        try { this.sonic.send('/n_free', entry.gid); } catch(e) {}
+        if (entry.bufs) {
+          for (var j = 0; j < entry.bufs.length; j++) {
+            try { this.sonic.send('/b_free', entry.bufs[j]); } catch(e) {}
+          }
+        }
+        this._reclaimBusRange(
+          entry.audioStart, entry.audioEnd,
+          entry.controlStart, entry.controlEnd
+        );
       }
       this._deferredRings = [];
-    }
-
-    _getByPath(obj, path) {
-      if (!obj || !path) return undefined;
-      var parts = path.split('.');
-      var cur = obj;
-      for (var i = 0; i < parts.length; i++) {
-        var key = parts[i];
-        if (cur == null || typeof cur !== 'object' || !(key in cur)) return undefined;
-        cur = cur[key];
-      }
-      return cur;
     }
 
     _resolveDefPfields(defName, pfields) {
@@ -115,17 +166,19 @@
         if (typeof val === 'object') continue;
         out[key] = val;
       }
-      var meta = (this.manifest.synths || {})[defName] || {};
-      var paths = meta.paths || {};
-      for (var srcPath in paths) {
-        if (!paths.hasOwnProperty(srcPath)) continue;
-        var dstKey = paths[srcPath];
-        var mapped = this._getByPath(pfields, srcPath);
-        if (mapped === undefined || mapped === null) continue;
-        if (typeof mapped === 'object') continue;
-        out[dstKey] = mapped;
-      }
       return out;
+    }
+
+    _maybeScheduleAutoRelease(ev, intId, defName, ntp) {
+      if (!ev || !ev.releaseAfter) return;
+      var dur = (typeof ev.dur === 'number') ? ev.dur : null;
+      if (dur === null || !(dur > 0)) return;
+      var controls = (this.manifest || {})[defName];
+      if (!controls || !('gate' in controls)) return;
+      var releaseNtp = ntp + dur;
+      var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(
+        releaseNtp, '/n_set', [intId, 'gate', 0]);
+      this.sonic.sendOSC(bundle);
     }
 
     _resolveDefName(name) {
@@ -164,6 +217,7 @@
       this.sonic.sendOSC(bundle);
       this.nodeMap.set(ev.id, nodeId);
       this._defNames.set(ev.id, defName);
+      this._maybeScheduleAutoRelease(ev, nodeId, defName, ntp);
 
       if (typeof this._getControlMappingsForEvent === 'function') {
         var mappings = this._getControlMappingsForEvent(ev.id, ev.start);
@@ -184,9 +238,19 @@
     _bundleSet(ev, ntp) {
       var intId = this.nodeMap.get(ev.id);
       if (intId == null) return;
-      var args = [intId];
       var defName = this._defNames.get(ev.id);
       var pf = this._resolveDefPfields(defName, ev.pfields || {});
+      // Mirror _bundleNew's track-aware out routing so slurred set events
+      // don't accidentally re-route a running synth from the track's
+      // srcBus back to the synth's baked default (typically out=0).
+      if (this._trackMap) {
+        var group = ev.group || "default";
+        var trackInfo = this._trackMap[group] || this._trackMap["default"] || this._trackMap["main"];
+        if (trackInfo) {
+          pf.out = trackInfo.srcBus;
+        }
+      }
+      var args = [intId];
       for (var key in pf) {
         if (!pf.hasOwnProperty(key)) continue;
         var v = pf[key];
@@ -195,16 +259,16 @@
       }
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_set', args);
       this.sonic.sendOSC(bundle);
+      this._maybeScheduleAutoRelease(ev, intId, defName, ntp);
     }
 
     _bundleRelease(ev, ntp) {
       var intId = this.nodeMap.get(ev.id);
       if (intId == null) return;
       var defName = this._defNames.get(ev.id);
-      var meta = (this.manifest.synths || {})[defName];
-      if (meta && meta.releaseMode === "free") return;
-      var gateParam = (meta && meta.gateParam) || 'gate';
-      var args = [intId, gateParam, 0];
+      var controls = (this.manifest || {})[defName];
+      if (!controls || !('gate' in controls)) return;
+      var args = [intId, 'gate', 0];
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_set', args);
       this.sonic.sendOSC(bundle);
     }
@@ -214,12 +278,9 @@
       for (var i = 0; i < evts.length; i++) {
         var ev = evts[i];
         var evEnd = ev.start;
-        if (ev.type === "new") {
-          var pf = ev.pfields || {};
-          if (pf.dur != null) evEnd += pf.dur;
-        }
-        if (ev.type === "release") {
-          evEnd = ev.start;
+        if ((ev.type === "new" || ev.type === "set")
+            && typeof ev.dur === 'number') {
+          evEnd += ev.dur;
         }
         if (evEnd > dur) dur = evEnd;
       }
@@ -347,6 +408,7 @@
       this._controlBusMap = [];
       this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
       this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
+      this._snapshotBusRangeStart();
 
       if (token !== this.stopToken) return;
 
@@ -358,11 +420,6 @@
         if (this.onFinish) this.onFinish();
         return;
       }
-
-      var now = getNTP();
-      var nowPerf = performance.now();
-      this._playStartNTP = now + STARTUP_DELAY;
-      this._playStartPerfMs = nowPerf + STARTUP_DELAY * 1000;
 
       var scoreMeta = options.meta || null;
       var scoreControlData = options.controlData || null;
@@ -376,6 +433,15 @@
       } else {
         this._createGroup();
       }
+
+      // Compute start time AFTER any async setup so the cushion isn't
+      // eaten by /g_new + /s_new + /sync round-trips during setupTracks.
+      // Otherwise the first batch of events lands with a past NTP and
+      // scsynth processes them mid-block, clipping the first note's attack.
+      var now = getNTP();
+      var nowPerf = performance.now();
+      this._playStartNTP = now + STARTUP_DELAY;
+      this._playStartPerfMs = nowPerf + STARTUP_DELAY * 1000;
 
       this.isPlaying = true;
 

@@ -56,9 +56,9 @@ class _FakeCU:
 
 
 class _SimpleSCInstrument:
-    def __init__(self, defName="test-synth", release_mode="gate"):
+    def __init__(self, defName="test-synth", has_gate=True):
         self.defName = defName
-        self.release_mode = release_mode
+        self.has_gate = has_gate
         self.name = defName
         self.pfields = {}
 
@@ -127,12 +127,18 @@ def test_supersonic_compositional_unit_poly_strum_animation_metadata():
     cu = _FakeCU([event], _SimpleSCInstrument())
     sc_events = compositional_unit_to_sc_events(cu, animation=True)
     new_events = [ev for ev in sc_events if ev["type"] == "new" and ev["defName"] != "__rest__"]
-    release_events = [ev for ev in sc_events if ev["type"] == "release"]
 
+    # The lowering layer no longer emits explicit type:release events;
+    # instead each terminal new carries releaseAfter=true. The scheduler
+    # schedules /n_set gate=0 at start+dur at fire time when the synthdef
+    # has a 'gate' control.
+    assert all(ev["type"] != "release" for ev in sc_events)
     assert len(new_events) == 3
-    assert len(release_events) == 3
     assert [round(ev["start"], 6) for ev in new_events] == [0.0, 0.8, 1.6]
-    assert {round(ev["start"], 6) for ev in release_events} == {4.0}
+    # Every voice is terminal (single leaf), so all carry releaseAfter=true.
+    assert all(ev.get("releaseAfter") is True for ev in new_events)
+    # The scheduler will fire gate-off at start + dur for each.
+    assert {round(ev["start"] + ev.get("dur", 0), 6) for ev in new_events} == {4.0}
     assert all(ev["_stepIndex"] == 0 for ev in new_events)
     assert sum(1 for ev in new_events if ev["_animate"] is True) == 1
     assert len({ev["_polyGroupId"] for ev in new_events}) == 1

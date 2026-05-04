@@ -60,7 +60,7 @@
         _ssSonic = sonic;
         _ssScheduler = new globalThis.BrowserScheduler({
           sonic: sonic,
-          manifest: (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : { synths: {}, inserts: {} },
+          manifest: (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : {},
           ringTime: ringTime,
         });
         _ssReady = true;
@@ -81,11 +81,17 @@
     }
 
     function eventEnd(ev) {
-      var pf = ev && ev.pfields ? ev.pfields : {};
-      if (ev && ev.duration != null) return ev.start + ev.duration;
+      // Prefer the SuperSonic top-level ``dur`` (new event contract).
+      // Falls back to Tone's ``duration`` and the legacy in-pfields ``dur``
+      // (still used by ``_perc_note`` events) so existing payloads keep
+      // working.
+      if (!ev) return 0;
+      if (typeof ev.dur === "number") return ev.start + ev.dur;
+      if (ev.duration != null) return ev.start + ev.duration;
+      var pf = ev.pfields || {};
       if (pf.dur != null) return ev.start + pf.dur;
-      if (ev && ev.type === "release") return ev.start;
-      return ev && ev.start ? ev.start : 0;
+      if (ev.type === "release") return ev.start;
+      return ev.start || 0;
     }
 
     function filterEventsForGroup(allEvents, gi) {
@@ -249,15 +255,16 @@
       if (engine === "supersonic") {
         var ready = await _ensureSSReady();
         if (!ready || !_ssSonic || typeof _ssSonic.send !== "function") return false;
-        var manifest = (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : { synths: {}, inserts: {} };
-        var meta = (manifest.synths || {})[defName] || {};
-        var releaseMode = ((meta.releaseMode || "gate") + "").toLowerCase();
-        var gateParam = meta.gateParam || "gate";
+        var manifest = (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : {};
+        var controls = manifest[defName] || {};
+        var hasGate = ('gate' in controls);
         var nodeId = _ssSonic.nextNodeId();
-        _ssSonic.send("/s_new", defName, nodeId, 0, 0, "freq", freq, "amp", amp, gateParam, 1);
-        if (releaseMode !== "free") {
+        var newArgs = ["/s_new", defName, nodeId, 0, 0, "freq", freq, "amp", amp];
+        if (hasGate) newArgs.push("gate", 1);
+        _ssSonic.send.apply(_ssSonic, newArgs);
+        if (hasGate) {
           setTimeout(function() {
-            try { _ssSonic.send("/n_set", nodeId, gateParam, 0); } catch(_) {}
+            try { _ssSonic.send("/n_set", nodeId, "gate", 0); } catch(_) {}
           }, Math.max(1, Math.round(dur * 1000)));
         }
         return true;

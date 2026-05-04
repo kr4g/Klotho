@@ -11,6 +11,7 @@ from klotho.utils.playback.supersonic._js_fragments import (
     ss_init_js, draw_scheduler_js, scheduler_core_js, scheduler_score_js,
     synthdef_registry_merge_js, control_bar_html,
 )
+from klotho.thetos.instruments._shared import load_ss_manifest
 
 SYNTHDEFS_DIR = Path(__file__).parent / "assets" / "synthdefs"
 _WIDGET_JS_PATH = Path(__file__).parent / "_engine_widget.js"
@@ -102,6 +103,7 @@ class SuperSonicEngine:
         wid = self.widget_id
         meta_json = json.dumps(self.meta)
         control_data_json = json.dumps(self._serialize_control_data())
+        manifest_json = json.dumps(load_ss_manifest())
 
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
@@ -110,6 +112,7 @@ class SuperSonicEngine:
                      .replace('__SS_CONFIG_JSON__', config_json)
                      .replace('__META_JSON__', meta_json)
                      .replace('__CONTROL_DATA_JSON__', control_data_json)
+                     .replace('__MANIFEST_JSON__', manifest_json)
                      .replace('__RING_TIME__', str(self.ring_time)))
 
         score_js = scheduler_score_js() if self._is_score else ""
@@ -124,6 +127,7 @@ class SuperSonicEngine:
 {draw_scheduler_js()}
 {scheduler_core_js()}
 {score_js}
+globalThis.__klothoManifest = {manifest_json};
 {synthdef_registry_merge_js(synthdef_assets_json)}
 {widget_js}
 </script>

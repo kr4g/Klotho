@@ -31,6 +31,21 @@ def _check_pfields(idx, pfields, label="pfields"):
             _err(idx, f"{label}['{k}'] must be numeric, got {type(v).__name__}={v!r}")
 
 
+def _check_optional_dur_release_after(idx, ev):
+    if 'dur' in ev:
+        dur = ev['dur']
+        if dur is None:
+            pass
+        elif not isinstance(dur, (int, float)):
+            _err(idx, f"'dur' must be numeric or null, got {type(dur).__name__}")
+        elif dur < 0:
+            _err(idx, f"'dur' must be >= 0, got {dur}")
+    if 'releaseAfter' in ev:
+        ra = ev['releaseAfter']
+        if not isinstance(ra, bool):
+            _err(idx, f"'releaseAfter' must be a bool, got {type(ra).__name__}")
+
+
 def validate_sc_events(events, animation=False):
     """Validate a list of SC assembly events.
 
@@ -76,6 +91,9 @@ def validate_sc_events(events, animation=False):
                 _err(i, "'new' event missing 'pfields'")
             if defName != '__rest__':
                 _check_pfields(i, ev['pfields'])
+                if 'dur' not in ev:
+                    _err(i, "'new' event missing 'dur'")
+            _check_optional_dur_release_after(i, ev)
             new_ids.add(eid)
             if animation and defName != '__rest__':
                 if '_stepIndex' not in ev and ev.get('_stepIndex') is None:
@@ -84,6 +102,7 @@ def validate_sc_events(events, animation=False):
         elif etype == 'set':
             if 'pfields' not in ev:
                 _err(i, "'set' event missing 'pfields'")
+            _check_optional_dur_release_after(i, ev)
 
         elif etype == 'release':
             if eid not in new_ids:

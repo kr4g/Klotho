@@ -1,6 +1,4 @@
 from uuid import uuid4
-import json
-from pathlib import Path
 
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
@@ -28,57 +26,26 @@ DEFAULT_COLLECTION_SYNTH = "kl_tri"
 DEFAULT_SPECTRUM_SYNTH = "kl_sine"
 DEFAULT_RHYTHM_SYNTH = "kl_kicktone"
 DEFAULT_COMPOSITION_SYNTH = "kl_tri"
-_SS_MANIFEST_PATH = Path(__file__).resolve().parent / "assets" / "manifest.json"
-_SS_RELEASE_MODE_CACHE = None
 
 
 def _uid():
     return uuid4().hex
 
 
-def _release_mode_for_synth(def_name):
-    global _SS_RELEASE_MODE_CACHE
-    if _SS_RELEASE_MODE_CACHE is None:
-        _SS_RELEASE_MODE_CACHE = {}
-        try:
-            data = json.loads(_SS_MANIFEST_PATH.read_text())
-            synths = data.get("synths", {})
-            for name, meta in synths.items():
-                mode = (meta.get("releaseMode") or "gate").lower()
-                _SS_RELEASE_MODE_CACHE[name] = mode if mode in ("gate", "free") else "gate"
-        except Exception:
-            _SS_RELEASE_MODE_CACHE = {}
-    return _SS_RELEASE_MODE_CACHE.get(def_name, "gate")
-
-
-def _synth_needs_release(def_name):
-    return _release_mode_for_synth(def_name) == "gate"
-
-
 def _gated_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=None):
     pf = _merge_pfields(pfields, extra_pfields)
-    events = []
     new_ev = {
         "type": "new",
         "id": uid,
         "defName": synth,
         "start": start,
+        "dur": dur,
+        "releaseAfter": True,
         "pfields": pf,
     }
     if step_index is not None:
         new_ev["_stepIndex"] = step_index
-    events.append(new_ev)
-
-    if _synth_needs_release(synth):
-        rel_ev = {
-            "type": "release",
-            "id": uid,
-            "start": start + dur,
-        }
-        if step_index is not None:
-            rel_ev["_stepIndex"] = step_index
-        events.append(rel_ev)
-    return events
+    return [new_ev]
 
 
 def _perc_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=None):
@@ -89,21 +56,13 @@ def _perc_note(uid, synth, start, dur, pfields, step_index=None, extra_pfields=N
         "id": uid,
         "defName": synth,
         "start": start,
+        "dur": dur,
+        "releaseAfter": True,
         "pfields": pf,
     }
     if step_index is not None:
         new_ev["_stepIndex"] = step_index
-    events = [new_ev]
-    if _synth_needs_release(synth):
-        rel_ev = {
-            "type": "release",
-            "id": uid,
-            "start": start + dur,
-        }
-        if step_index is not None:
-            rel_ev["_stepIndex"] = step_index
-        events.append(rel_ev)
-    return events
+    return [new_ev]
 
 
 def pitch_to_sc_events(pitch, duration=None, amp=None, extra_pfields=None):
@@ -283,7 +242,6 @@ def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
         extra_pfields=extra_pfields,
         animation=animation,
         default_synth=DEFAULT_COMPOSITION_SYNTH,
-        include_ungated_release=True,
         normalize_sc_pfields=True,
         sort_output=True,
     )
@@ -557,7 +515,6 @@ def _lower_score_uc(uc, track_override):
         extra_pfields=None,
         animation=False,
         default_synth='kl_tri',
-        include_ungated_release=False,
         normalize_sc_pfields=False,
         sort_output=True,
         return_node_map=True,
@@ -718,6 +675,8 @@ def tonejs_events_to_sc(tone_events):
             "id": uid,
             "defName": synth,
             "start": start,
+            "dur": dur,
+            "releaseAfter": True,
             "pfields": pfields,
         }
         if step is not None:
@@ -734,27 +693,6 @@ def tonejs_events_to_sc(tone_events):
         if "_polyLeader" in ev:
             new_ev["_polyLeader"] = ev["_polyLeader"]
         sc_events.append(new_ev)
-
-        if _synth_needs_release(synth):
-            rel_ev = {
-                "type": "release",
-                "id": uid,
-                "start": start + dur,
-            }
-            if step is not None:
-                rel_ev["_stepIndex"] = step
-            rel_ev["_animate"] = animate
-            if "_polyGroupId" in ev:
-                rel_ev["_polyGroupId"] = ev["_polyGroupId"]
-            if "_logicalStepId" in ev:
-                rel_ev["_logicalStepId"] = ev["_logicalStepId"]
-            if "_polyVoiceIndex" in ev:
-                rel_ev["_polyVoiceIndex"] = ev["_polyVoiceIndex"]
-            if "_polyVoiceCount" in ev:
-                rel_ev["_polyVoiceCount"] = ev["_polyVoiceCount"]
-            if "_polyLeader" in ev:
-                rel_ev["_polyLeader"] = ev["_polyLeader"]
-            sc_events.append(rel_ev)
 
     sc_events.sort(key=lambda e: e["start"])
     return sc_events

@@ -1,58 +1,44 @@
 import copy
 
 from .base import Instrument, Kit, Effect
-from ._shared import ss_synth_meta, load_ss_manifest
+from ._shared import ss_synth_controls, load_ss_manifest
 
 
 class SynthDefInstrument(Instrument):
-    RELEASE_GATE = 'gate'
-    RELEASE_FREE = 'free'
+    """A SynthDef-backed instrument.
 
-    def __init__(self, name='default', defName=None, release_mode='gate', pfields=None, specs=None):
+    ``has_gate`` is a derived property: an instrument is "gated" iff its
+    ``pfields`` contains a ``'gate'`` key.  There is no separate
+    ``release_mode`` flag to keep in sync; if you want one-shot behavior,
+    omit ``gate`` from the pfields.  The normal way to suppress per-event
+    auto-release is to set ``releaseAfter=False`` on that event, not to
+    mutate the instrument.
+    """
+
+    def __init__(self, name='default', defName=None, pfields=None):
         if pfields is None:
             pfields = {'amp': 0.1, 'freq': 440.0, 'pan': 0.0, 'gate': 1, 'out': 0}
-        if specs is None:
-            specs = {}
         defName = 'default' if defName is None else defName
         super().__init__(name=name, pfields=pfields)
         self._defName = defName
-        self._release_mode = self._normalize_release_mode(release_mode)
-        self._specs = copy.deepcopy(specs)
 
     @property
     def defName(self):
         return self._defName
 
     @property
-    def release_mode(self):
-        return self._release_mode
-
-    @property
-    def specs(self):
-        return copy.deepcopy(self._specs)
-
-    @staticmethod
-    def _normalize_release_mode(release_mode):
-        value = (release_mode or '').strip().lower()
-        if value == SynthDefInstrument.RELEASE_GATE:
-            return SynthDefInstrument.RELEASE_GATE
-        if value == SynthDefInstrument.RELEASE_FREE:
-            return SynthDefInstrument.RELEASE_FREE
-        raise ValueError("release_mode must be 'gate' or 'free'")
+    def has_gate(self) -> bool:
+        return 'gate' in self._pfields
 
     @classmethod
-    def from_manifest(cls, defName: str, name: str = None, release_mode: str = None, **overrides):
-        meta = ss_synth_meta(defName)
-        controls = copy.deepcopy(meta.get('controls', {}))
-        controls.update(overrides)
-        manifest_release_mode = (meta.get('releaseMode') or 'gate').lower()
-        resolved_release_mode = release_mode or manifest_release_mode
+    def from_manifest(cls, defName: str, name: str = None, **overrides):
+        controls = ss_synth_controls(defName)
+        pfields = copy.deepcopy(controls)
+        pfields.update(overrides)
         return cls(
             name=name or defName,
             defName=defName,
-            release_mode=resolved_release_mode,
-            pfields=controls,
-            specs=meta.get('specs', {}),
+            pfields=pfields,
         )
 
     def __str__(self):
@@ -97,8 +83,8 @@ class SynthDefKit(Kit):
 
     Extends :class:`Kit` with SuperCollider-specific properties and
     a ``from_manifest`` factory.  Each member may have a different
-    ``defName`` and ``release_mode``; the assembly layer resolves the
-    correct member per event, so these properties delegate to the
+    ``defName`` and may or may not be gated; the assembly layer resolves
+    the correct member per event, so ``has_gate`` here delegates to the
     *default* member only as a display/fallback hint.
 
     Parameters
@@ -116,8 +102,8 @@ class SynthDefKit(Kit):
         return getattr(self._members[self._default], 'defName', None)
 
     @property
-    def release_mode(self):
-        return getattr(self._members[self._default], 'release_mode', 'gate')
+    def has_gate(self) -> bool:
+        return getattr(self._members[self._default], 'has_gate', False)
 
     @classmethod
     def from_manifest(cls, members: dict, default=None, selector='voice', **overrides):
@@ -168,7 +154,7 @@ def _make_synth_classmethod(def_name: str, method_name: str):
     return classmethod(_ctor)
 
 
-_ss_synths = load_ss_manifest().get('synths', {})
+_ss_synths = load_ss_manifest()
 _registered_method_names = set()
 
 

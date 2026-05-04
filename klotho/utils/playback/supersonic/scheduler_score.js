@@ -41,7 +41,6 @@
     var trackNames = (meta.groups || []).slice();
     var insertSpecs = meta.inserts || {};
     var trackMap = {};
-    var manifestInserts = this.manifest.inserts || {};
 
     for (var t = 0; t < trackNames.length; t++) {
       var nm = trackNames[t];
@@ -104,9 +103,8 @@
           var fxUid = spec.uid;
           var fxArgs = spec.args || {};
 
-          var mInsert = manifestInserts[fxDefName] || {};
-          var inParam = mInsert.inParam || 'inBus';
-          var outParam = mInsert.outParam || 'outBus';
+          var inParam = 'inBus';
+          var outParam = 'outBus';
 
           var fxNodeId = sonic.nextNodeId();
           var fxArgList = [fxDefName, fxNodeId, 1, track.fxGroup,

@@ -258,7 +258,7 @@ classDiagram
 
     class SynthDefInstrument {
         +defName : str
-        +release_mode : str
+        +has_gate : bool
         +from_manifest()$
         +KlTri$
         +KlSine$
@@ -286,9 +286,13 @@ Wraps a SuperCollider synth definition.  Default synthdefs (`KlTri`,
 `KlSine`, etc.) are loaded from `.scsyndef` files in
 `utils/playback/supersonic/assets/`.
 
-Key property: `release_mode` (`'free'` or `'gate'`) — determines
-whether events use `\set + \release` or just `\new` with a fixed
-duration.
+Key property: **`has_gate`** — a derived `bool` (`'gate' in self._pfields`).
+If the synthdef has a `gate` control, events emitted for it carry
+`releaseAfter:true` and the runtime scheduler fires `gate=0` at
+`start + dur` at fire time. There is no separate `release_mode` flag
+to keep in sync; to make an instrument "one-shot," omit `gate` from
+its pfields. To suppress auto-release on a single event, set
+`releaseAfter=False` on that event.
 
 ### MidiInstrument (General MIDI)
 

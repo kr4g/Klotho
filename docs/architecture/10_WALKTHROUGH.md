@@ -321,14 +321,16 @@ flowchart TD
     F --> G["for each Parametron in uc.events:"]
     G --> H["resolve pfields: {defName, freq, amp, ...}"]
     H --> I["resolve mfields: {group, slur, ...}"]
-    I --> J{"release_mode?"}
-    J -->|"free"| K["emit: {type: 'new', defName: 'kl_tri',<br/>args: {freq, amp, dur}, nodeId: N}"]
-    J -->|"gate"| L["emit: {type: 'new'} + {type: 'release'}"]
+    I --> J["emit: {type:'new', defName, dur, releaseAfter, args, nodeId}"]
+    J --> K["scheduler at fire time:<br/>'gate' in manifest[defName]?"]
+    K -->|"yes"| L["NTP-schedule /n_set node 'gate' 0<br/>at start + dur"]
+    K -->|"no"| M["no follow-up<br/>(synth self-frees via Done.freeSelf)"]
 
-    K --> M["event list (JSON)"]
-    L --> M
-    M --> N["SuperSonicEngine(events)"]
-    N --> O["engine.display()"]
+    L --> N0["event list (JSON)"]
+    M --> N0
+    J --> N0
+    N0 --> N1["SuperSonicEngine(events)"]
+    N1 --> O["engine.display()"]
     O --> P["HTML widget with<br/>scsynth WASM + play controls"]
 ```
 

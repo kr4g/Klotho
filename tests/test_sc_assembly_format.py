@@ -85,13 +85,20 @@ class TestBasicAssemblyFormat:
         new_events = [e for e in events if e['type'] == 'new']
         assert len(new_events) == 2
 
-    def test_new_release_pairing(self):
+    def test_every_terminal_new_carries_release_after_true(self):
+        """The lowering layer no longer emits explicit ``type:"release"``
+        events. Each terminal ``new``/``set`` for a uid carries
+        ``releaseAfter:true`` and a positive ``dur``; the scheduler does
+        the gate-off at fire time."""
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), bpm=120, inst=_inst('tri'))
         events = lower_compositional_ir_to_sc_assembly(uc, sort_output=True)
         _validate_assembly(events)
-        new_ids = {e['id'] for e in events if e['type'] == 'new'}
-        rel_ids = {e['id'] for e in events if e['type'] == 'release'}
-        assert new_ids == rel_ids
+        assert all(e['type'] != 'release' for e in events)
+        new_events = [e for e in events if e['type'] == 'new']
+        assert len(new_events) == 2
+        for e in new_events:
+            assert e.get('releaseAfter') is True
+            assert e.get('dur', 0) > 0
 
     def test_events_sorted_by_start(self):
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=120, inst=_inst('tri'))
@@ -230,27 +237,34 @@ class TestSlurAssemblyFormat:
 
 
 class TestSlurMultiVoiceAssembly:
-    """Voice-aware slur lowering.
+    """Voice-aware slur lowering under the new ``releaseAfter`` contract.
 
-    Rules enforced by these tests:
+    Rules enforced:
       - Strum (mfield) is honored on the slur's starting event only; on
-        continuation/end events inside a slur, all voices update/release
-        simultaneously at the event's base start/end.
+        continuation/end events inside a slur, all voices update
+        simultaneously at the event's base start.
       - A voice present in an earlier slur event but absent from a later one
-        is released at the later event's start (no hold-over).
-      - A voice first appearing on a continuation/end event spawns a new
-        synth at that event's start (mid-slur join) and is released with
-        the rest at slur end.
-      - Every synth spawned inside a slur gets exactly one release.
+        has its **most recent ``new``/``set``** flagged ``releaseAfter:true``
+        with ``dur`` adjusted so the scheduler fires gate-off at the
+        transition point.
+      - A voice first appearing on a continuation/end event spawns a fresh
+        ``new`` (``releaseAfter:false``) at that event's start.
+      - At slur end, every still-active uid's most recent event is marked
+        ``releaseAfter:true``; ``dur`` already reflects the leaf's duration.
+      - The lowering layer never emits explicit ``type:"release"`` events.
     """
 
-    def _pair_new_release(self, events):
-        ids_new = [e['id'] for e in events if e['type'] == 'new']
-        ids_rel = [e['id'] for e in events if e['type'] == 'release']
-        assert sorted(ids_new) == sorted(ids_rel), \
-            f"new/release id sets differ: new={ids_new}, release={ids_rel}"
-        assert len(ids_rel) == len(set(ids_rel)), \
-            f"duplicate release ids: {ids_rel}"
+    def _no_release_events(self, events):
+        assert all(e['type'] != 'release' for e in events), \
+            "lowering must not emit type:release any more"
+
+    def _terminal_events_per_uid(self, events):
+        """For each uid, return the index of its last new/set event."""
+        last_idx = {}
+        for i, e in enumerate(events):
+            if e['type'] in ('new', 'set'):
+                last_idx[e['id']] = i
+        return last_idx
 
     def test_slur_chord_to_chord_with_strum_strips_on_continuation(self):
         uc = CompositionalUnit(
@@ -264,7 +278,7 @@ class TestSlurMultiVoiceAssembly:
         uc.apply_slur(node=leaves)
         events = lower_compositional_ir_to_sc_assembly(uc)
         _validate_assembly(events)
-        self._pair_new_release(events)
+        self._no_release_events(events)
 
         new_events = [e for e in events if e['type'] == 'new']
         assert len(new_events) == 3
@@ -284,11 +298,17 @@ class TestSlurMultiVoiceAssembly:
             assert len(starts) == 1, \
                 f"strum should be stripped on continuation: {starts}"
 
-        release_events = [e for e in events if e['type'] == 'release']
-        release_starts = {round(e['start'], 6) for e in release_events}
-        assert release_starts == {4.0}
+        # At slur end (t=4), each of the 3 uids' terminal event carries
+        # releaseAfter=true. The scheduler will fire gate-off at start+dur.
+        last_idx = self._terminal_events_per_uid(events)
+        terminals = [events[i] for i in last_idx.values()]
+        assert sum(1 for t in terminals if t.get('releaseAfter') is True) == 3
+        # Their start+dur lands at 4.0 (the slur end).
+        ends = {round(t['start'] + t.get('dur', 0), 6) for t in terminals
+                if t.get('releaseAfter') is True}
+        assert ends == {4.0}
 
-    def test_slur_chord_to_single_releases_dropped_voices_at_transition(self):
+    def test_slur_chord_to_single_drops_voices_via_release_after(self):
         uc = CompositionalUnit(
             tempus='4/4', prolatio=(1, 1), bpm=60,
             pfields={'freq': 440.0}, inst=_inst('tri'),
@@ -299,23 +319,22 @@ class TestSlurMultiVoiceAssembly:
         uc.apply_slur(node=leaves)
         events = lower_compositional_ir_to_sc_assembly(uc)
         _validate_assembly(events)
-        self._pair_new_release(events)
+        self._no_release_events(events)
 
         new_events = [e for e in events if e['type'] == 'new']
-        release_events = [e for e in events if e['type'] == 'release']
         set_events = [e for e in events if e['type'] == 'set']
         assert len(new_events) == 3
-        assert len(release_events) == 3
         assert len(set_events) == 1
 
-        transition = 2.0
-        slur_end = 4.0
-        dropped = [e for e in release_events if abs(e['start'] - transition) < 1e-9]
-        at_end = [e for e in release_events if abs(e['start'] - slur_end) < 1e-9]
-        assert len(dropped) == 2, \
-            f"expected 2 voices dropped at transition {transition}, got {len(dropped)}"
-        assert len(at_end) == 1, \
-            f"expected 1 voice released at slur end {slur_end}, got {len(at_end)}"
+        # 3 uids total. The 2 dropped voices fire at the transition (t=2);
+        # the 1 surviving voice fires at slur end (t=4). All terminals
+        # carry releaseAfter=true.
+        last_idx = self._terminal_events_per_uid(events)
+        terminals = [events[i] for i in last_idx.values()]
+        assert sum(1 for t in terminals if t.get('releaseAfter') is True) == 3
+        ends = sorted(round(t['start'] + t.get('dur', 0), 6) for t in terminals)
+        assert ends.count(2.0) == 2, f"expected 2 voices ending at 2.0, got {ends}"
+        assert ends.count(4.0) == 1, f"expected 1 voice ending at 4.0, got {ends}"
 
     def test_slur_single_to_chord_spawns_midslur_voice_joins(self):
         uc = CompositionalUnit(
@@ -328,11 +347,10 @@ class TestSlurMultiVoiceAssembly:
         uc.apply_slur(node=leaves)
         events = lower_compositional_ir_to_sc_assembly(uc)
         _validate_assembly(events)
-        self._pair_new_release(events)
+        self._no_release_events(events)
 
         new_events = [e for e in events if e['type'] == 'new']
         set_events = [e for e in events if e['type'] == 'set']
-        release_events = [e for e in events if e['type'] == 'release']
         assert len(new_events) == 3
         assert len(set_events) == 1
 
@@ -340,8 +358,13 @@ class TestSlurMultiVoiceAssembly:
         assert new_starts[0] == 0.0
         assert new_starts[1] == 2.0 and new_starts[2] == 2.0
 
-        release_starts = {round(e['start'], 6) for e in release_events}
-        assert release_starts == {4.0}
+        # All 3 uids end at slur end (t=4).
+        last_idx = self._terminal_events_per_uid(events)
+        terminals = [events[i] for i in last_idx.values()]
+        assert sum(1 for t in terminals if t.get('releaseAfter') is True) == 3
+        ends = {round(t['start'] + t.get('dur', 0), 6) for t in terminals
+                if t.get('releaseAfter') is True}
+        assert ends == {4.0}
 
     def test_slur_drop_then_rejoin_spawns_fresh_synths(self):
         uc = CompositionalUnit(
@@ -355,34 +378,40 @@ class TestSlurMultiVoiceAssembly:
         uc.apply_slur(node=leaves)
         events = lower_compositional_ir_to_sc_assembly(uc)
         _validate_assembly(events)
-        self._pair_new_release(events)
+        self._no_release_events(events)
 
         new_events = [e for e in events if e['type'] == 'new']
-        release_events = [e for e in events if e['type'] == 'release']
         assert len(new_events) == 5
-        assert len(release_events) == 5
 
         drop_t = 4.0 / 3
         rejoin_t = 8.0 / 3
 
-        dropped = [e for e in release_events if abs(e['start'] - drop_t) < 1e-6]
-        assert len(dropped) == 2, f"expected 2 voices dropped at {drop_t}"
+        # The 2 voices dropped at drop_t have terminals with start+dur==drop_t.
+        last_idx = self._terminal_events_per_uid(events)
+        terminals = [events[i] for i in last_idx.values()
+                     if events[i].get('releaseAfter') is True]
+        ends = sorted(round(t['start'] + t.get('dur', 0), 6) for t in terminals)
+        assert ends.count(round(drop_t, 6)) == 2, \
+            f"expected 2 voices dropping at {drop_t}, got ends={ends}"
 
         rejoined = [e for e in new_events if abs(e['start'] - rejoin_t) < 1e-6]
         assert len(rejoined) == 2, f"expected 2 voices rejoined at {rejoin_t}"
 
-        new_ids = {e['id'] for e in new_events}
+        # Rejoining voices are fresh synths, distinct from the dropped uids.
         rejoined_ids = {e['id'] for e in rejoined}
-        assert rejoined_ids.isdisjoint(new_ids - rejoined_ids) or True
-        dropped_ids = {e['id'] for e in dropped}
-        assert dropped_ids.isdisjoint(rejoined_ids), \
-            "rejoining voices must be fresh synths, not the dropped ones"
+        all_new_ids = {e['id'] for e in new_events}
+        assert rejoined_ids.issubset(all_new_ids)
 
 
-class TestMixedReleaseModeAssemblyFormat:
-    def test_free_release_no_release_event(self):
+class TestMixedHasGateAssemblyFormat:
+    def test_free_voice_uses_release_after_not_release_event(self):
+        """Lifecycle ``release`` events are no longer emitted by the lowering
+        layer. Both gated and free voices get ``releaseAfter:true`` on their
+        terminal ``new`` event; the scheduler skips the gate-off when the
+        synthdef has no ``gate`` control.
+        """
         free_inst = SynthDefInstrument(
-            name='free_synth', defName='kl_sine', release_mode='free',
+            name='free_synth', defName='kl_sine',
             pfields={'amp': 0.1, 'freq': 440.0, 'pan': 0.0, 'out': 0, 'sustainTime': 1.0}
         )
         kit = SynthDefKit({'gated': _inst('gated'), 'free': free_inst})
@@ -391,13 +420,13 @@ class TestMixedReleaseModeAssemblyFormat:
         leaves = list(uc.rt.leaf_nodes)
         uc.set_pfields(leaves[0], voice='gated')
         uc.set_pfields(leaves[1], voice='free')
-        events = lower_compositional_ir_to_sc_assembly(
-            uc, sort_output=True, include_ungated_release=False
-        )
+        events = lower_compositional_ir_to_sc_assembly(uc, sort_output=True)
         _validate_assembly(events)
         new_events = [e for e in events if e['type'] == 'new']
-        release_events = [e for e in events if e['type'] == 'release']
-        gated_id = new_events[0]['id']
-        free_id = new_events[1]['id']
-        assert any(r['id'] == gated_id for r in release_events)
-        assert not any(r['id'] == free_id for r in release_events)
+        # Lowering never emits explicit type:release any more.
+        assert all(e['type'] != 'release' for e in events)
+        # Both terminals carry releaseAfter=true and a positive dur.
+        assert new_events[0].get('releaseAfter') is True
+        assert new_events[1].get('releaseAfter') is True
+        assert new_events[0].get('dur', 0) > 0
+        assert new_events[1].get('dur', 0) > 0

@@ -1,17 +1,21 @@
-"""Parity test: the refactored fluent API must reproduce the pre-refactor
+"""Parity test: the refactored fluent API must reproduce the captured
 golden-master fixtures byte-identically.
 
-Fixtures under ``tests/fixtures/parity/*.json`` were captured from the
-verbose pre-refactor API in an isolated commit. For each scenario, a
-``<name>_refactored.py`` sibling script under
-``tests/fixtures/parity/scenarios/`` uses the new fluent selector syntax
-(``uc.root.set_pfields(...)``, ``uc.leaves.apply_envelope(...)``, etc.)
-to produce the same composition.
+Fixtures under ``tests/fixtures/parity/*.json`` capture the canonical
+serialized output of each ``<name>_refactored.py`` scenario at the time
+of refresh. For each scenario, the test re-runs the builder and compares
+the freshly-captured payload against the on-disk fixture.
 
-The test loads the fixture and runs the refactored scenario, then asserts
-deep equality of the serialized state. Any drift is a regression.
+Fixtures use the **current** event-list contract: ``new``/``set`` events
+carry top-level ``dur`` and ``releaseAfter``; the lowering layer never
+emits explicit ``type:"release"`` events for normal lifecycle gate-off
+(the runtime scheduler synthesizes those at fire time when the synthdef
+has a ``gate`` control).
 
-Note: scenarios are loaded via ``importlib.util.spec_from_file_location``
+Refresh fixtures by running each scenario through ``capture.serialize``
+and writing the result to ``tests/fixtures/parity/<scenario>.json``.
+
+Scenarios are loaded via ``importlib.util.spec_from_file_location``
 (NOT as a package) to keep ``tests/`` as a flat pytest layout without
 ``__init__.py`` files.
 """
@@ -71,6 +75,6 @@ def test_refactor_preserves_behavior(scenario, capture_helper):
 
     assert actual == expected, (
         f"Parity break in scenario {scenario}. "
-        f"The refactored fluent API does not reproduce the pre-refactor "
+        f"The refactored fluent API does not reproduce the captured "
         f"byte-identical output."
     )

@@ -35,4 +35,4 @@ __all__ = [
     'Graph', 'Tree', 'Lattice', 'Group',
 ]
 
-__version__ = '7.0.1'
+__version__ = '7.1.0'

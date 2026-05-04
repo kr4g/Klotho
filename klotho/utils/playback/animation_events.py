@@ -1,35 +1,9 @@
-import json
-from pathlib import Path
-
 from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
 from klotho.utils.playback._converter_base import iter_group_sequence
 
 
-_SS_MANIFEST_PATH = Path(__file__).resolve().parent / "supersonic" / "assets" / "manifest.json"
-_SS_RELEASE_MODE_CACHE = None
-
-
 def normalize_animation_payload_for_engine(audio_payload, engine):
     return audio_payload
-
-
-def _release_mode_for_synth(def_name):
-    global _SS_RELEASE_MODE_CACHE
-    if _SS_RELEASE_MODE_CACHE is None:
-        _SS_RELEASE_MODE_CACHE = {}
-        try:
-            data = json.loads(_SS_MANIFEST_PATH.read_text())
-            synths = data.get("synths", {})
-            for name, meta in synths.items():
-                mode = (meta.get("releaseMode") or "gate").lower()
-                _SS_RELEASE_MODE_CACHE[name] = mode if mode in ("gate", "free") else "gate"
-        except Exception:
-            _SS_RELEASE_MODE_CACHE = {}
-    return _SS_RELEASE_MODE_CACHE.get(def_name, "gate")
-
-
-def _synth_needs_release(def_name):
-    return _release_mode_for_synth(def_name) == "gate"
 
 
 def _plan_from_path(freqs, dur, amp=None, pause=0.0):
@@ -123,19 +97,12 @@ def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0):
             "id": uid,
             "defName": synth,
             "start": ev["start"],
+            "dur": ev["duration"],
+            "releaseAfter": True,
             "pfields": pfields,
             "_stepIndex": ev["step"],
             "_animate": True,
         })
-
-        if _synth_needs_release(synth):
-            events.append({
-                "type": "release",
-                "id": uid,
-                "start": ev["start"] + ev["duration"],
-                "_stepIndex": ev["step"],
-                "_animate": True,
-            })
 
     events.sort(key=lambda e: e["start"])
     from klotho.utils.playback._sc_validate import validate_sc_events

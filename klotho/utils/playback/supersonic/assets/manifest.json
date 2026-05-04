@@ -1,3809 +1,1240 @@
 {
-  "synths": {
-    "default": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "freq": 440.0,
-        "amp": 0.1,
-        "pan": 0.0,
-        "gate": 1,
-        "out": 0
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "kl_tri": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "freq": 440.0,
-        "amp": 0.5,
-        "pan": 0.0,
-        "gate": 1,
-        "out": 0,
-        "portamento": 0.1,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "toneLPFRatio": 2.0,
-        "filterEnvAmt": 0.2,
-        "softDrive": 1.1,
-        "softMix": 0.08,
-        "attackTime": 0.05,
-        "decayTime": 0.08,
-        "sustainLevel": 0.75,
-        "releaseTime": 0.25,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "kl_sine": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "freq": 440.0,
-        "amp": 0.3,
-        "pan": 0.0,
-        "gate": 1,
-        "out": 0,
-        "portamento": 0.1,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.05,
-        "decayTime": 0.15,
-        "sustainLevel": 0.8,
-        "releaseTime": 0.8,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "kl_sqr": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "freq": 440.0,
-        "amp": 0.4,
-        "pan": 0.0,
-        "gate": 1,
-        "out": 0,
-        "portamento": 0.1,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "width": 0.5,
-        "toneLPFRatio": 2.0,
-        "filterEnvAmt": 0.2,
-        "softDrive": 1.1,
-        "softMix": 0.08,
-        "attackTime": 0.05,
-        "decayTime": 0.07,
-        "sustainLevel": 0.65,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -3.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime",
-        "oscillator.width": "width"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "kl_saw": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "freq": 440.0,
-        "amp": 0.35,
-        "pan": 0.0,
-        "gate": 1,
-        "out": 0,
-        "portamento": 0.1,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "toneLPFRatio": 2.0,
-        "filterEnvAmt": 0.2,
-        "softDrive": 1.1,
-        "softMix": 0.08,
-        "attackTime": 0.05,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.25,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "kl_noisebpf": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "freq": 440.0,
-        "amp": 0.2,
-        "pan": 0.0,
-        "gate": 1,
-        "out": 0,
-        "portamento": 0.1,
-        "rq": 0.001,
-        "attackTime": 0.05,
-        "decayTime": 0.12,
-        "sustainLevel": 0.85,
-        "releaseTime": 0.35,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime",
-        "filter.q": "rq"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "kl_kicktone": {
-      "releaseMode": "free",
-      "controls": {
-        "amp": 0.85,
-        "pan": 0.0,
-        "out": 0,
-        "dur": 0.6,
-        "baseFreq": 55.0,
-        "pitchDrop": 2.0,
-        "pitchDropTime": 0.04,
-        "pitchCurve": -6.0,
-        "clickAmp": 0.004,
-        "clickHPF": 1800.0,
-        "clickLPF": 6500.0,
-        "clickAtk": 0.001,
-        "clickDec": 0.01,
-        "clickCurve": -2.0,
-        "bodyAtk": 0.001,
-        "bodyDec": 0.16,
-        "bodyCurve": -5.0,
-        "sustainAtk": 0.004,
-        "sustainRel": 0.1,
-        "sustainCurve": -3.0,
-        "sustainMix": 0.45,
-        "sustainLPF": 1800.0,
-        "drive": 1.03
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "dur": {
-          "min": 0.01,
-          "max": 8.0,
-          "warp": "exp"
-        }
-      }
-    },
-    "fd_ambi": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_orient": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_spick": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_soft": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_siren": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_klank": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_angel": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_pasha": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_snick": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_spark": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_blip": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_quin": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_swell": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_sawbass": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "cutoff": 1200,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_saw": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_fuzz": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_nylon": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_crunch": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_bug": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_donk": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_marimba": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_scratch": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_dab": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_twang": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_keys": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_varsaw": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_scrap": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_charm": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_glass": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_star": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_soprano": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_feel": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_jbass": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_lazer": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_squish": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_scatter": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_pulse": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_dub": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_donk2": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_pluck": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_gong": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_razz": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_dirt": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_prophet": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "lforate": 6,
-        "lfowidth": 0.5,
-        "cutoff": 1200,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_brass": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_space": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_sinepad": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_arpy": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_viola": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_piano": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_growl": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_longsaw": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_sitar": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_bass": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_creep": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_zap": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_noise": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_pads": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_dbass": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_ripple": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_karp": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_bell": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "decayScale": 1.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_rave": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "portamento": 0.08,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1,
-        "blur": 1,
-        "level": 0.8
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    },
-    "fd_donk1": {
-      "releaseMode": "gate",
-      "gateParam": "gate",
-      "controls": {
-        "out": 0,
-        "freq": 440.0,
-        "amp": 1.0,
-        "gate": 1,
-        "pan": 0.0,
-        "fmod": 0.0,
-        "rate": 0.0,
-        "rq": 0.35,
-        "vibRate": 5.0,
-        "vibDepth": 0.0,
-        "attackTime": 0.01,
-        "decayTime": 0.1,
-        "sustainLevel": 0.7,
-        "releaseTime": 0.2,
-        "peakLevel": 1.0,
-        "attackCurve": -4.0,
-        "decayCurve": -2.0,
-        "releaseCurve": -4.0,
-        "sus": 1
-      },
-      "paths": {
-        "envelope.attack": "attackTime",
-        "envelope.decay": "decayTime",
-        "envelope.sustain": "sustainLevel",
-        "envelope.release": "releaseTime"
-      },
-      "specs": {
-        "amp": {
-          "min": 0.0,
-          "max": 1.0,
-          "warp": "lin"
-        },
-        "freq": {
-          "min": 20.0,
-          "max": 20000.0,
-          "warp": "exp"
-        },
-        "pan": {
-          "min": -1.0,
-          "max": 1.0,
-          "warp": "lin"
-        }
-      }
-    }
+  "__busRouter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
   },
-  "inserts": {
-    "__busRouter": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "gain": 1.0
-      }
-    },
-    "__busRouterMonitor": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "gain": 1.0,
-        "id": 0
-      }
-    },
-    "__chainLimiter": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "gain": 1.0,
-        "preGain": 1.0,
-        "limitLevel": 0.95,
-        "lookAhead": 0.01
-      }
-    },
-    "kl_reverb": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "mix": 0.3,
-        "room": 0.7,
-        "damp": 0.5,
-        "gain": 1.0
-      }
-    },
-    "kl_delay": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "delayTime": 0.25,
-        "decayTime": 1.0,
-        "maxDelay": 2.0,
-        "gain": 1.0
-      }
-    },
-    "kl_distortion": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "dist": 0.5,
-        "gain": 1.0
-      }
-    },
-    "kl_bitcrush": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "bits": 8,
-        "crush": 4,
-        "gain": 1.0
-      }
-    },
-    "kl_lpf": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "freq": 1200,
-        "rq": 1.0,
-        "gain": 1.0
-      }
-    },
-    "kl_hpf": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "freq": 200,
-        "rq": 1.0,
-        "gain": 1.0
-      }
-    },
-    "kl_tremolo": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "rate": 4.0,
-        "depth": 0.5,
-        "gain": 1.0
-      }
-    },
-    "kl_chop": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "rate": 4.0,
-        "gain": 1.0
-      }
-    },
-    "fd_reverb": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "room": 0.5,
-        "mix": 0.3,
-        "damp": 0.5,
-        "gain": 1.0
-      }
-    },
-    "fd_combDelay": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "echo": 0.5,
-        "beatDur": 1.0,
-        "echoTime": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_distortion": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "dist": 0.5,
-        "gain": 1.0
-      }
-    },
-    "fd_overdriveDistortion": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "drive": 0.4,
-        "gain": 1.0
-      }
-    },
-    "fd_bitcrush": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "bits": 8,
-        "crush": 4,
-        "gain": 1.0
-      }
-    },
-    "fd_chop": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "chop": 4.0,
-        "sus": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_tremolo": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "tremolo": 4.0,
-        "beatDur": 1.0,
-        "depth": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_highPassFilter": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "hpf": 200.0,
-        "hpr": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_lowPassFilter": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "lpf": 1200.0,
-        "lpr": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_bandPassFilter": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "bpf": 1200.0,
-        "bpr": 0.6,
-        "bpnoise": 2.0,
-        "sus": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_filterSwell": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "swell": 1.0,
-        "sus": 1.0,
-        "hpr": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_formantFilter": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "formant": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_spinPan": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "spin": 1.0,
-        "sus": 1.0,
-        "gain": 1.0
-      }
-    },
-    "fd_wavesShapeDistortion": {
-      "inParam": "inBus",
-      "outParam": "outBus",
-      "controls": {
-        "inBus": 0,
-        "outBus": 0,
-        "shape": 1.0,
-        "gain": 1.0
-      }
-    }
+  "__busRouterMonitor": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0,
+    "id": 0.0
   },
-  "control": {
-    "__klEnvCtrl": {
-      "controls": {
-        "bufnum": 0,
-        "bus": 0,
-        "dur": 1,
-        "startFrame": 0,
-        "numFrames": 512
-      }
-    }
+  "__chainLimiter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0,
+    "preGain": 1.0,
+    "limitLevel": 0.95,
+    "lookAhead": 0.01
+  },
+  "__klEnvCtrl": {
+    "bufnum": 0.0,
+    "bus": 0.0,
+    "dur": 1.0,
+    "startFrame": 0.0,
+    "numFrames": 512.0
+  },
+  "kl_bitcrush": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bits": 8.0,
+    "crush": 4.0,
+    "gain": 1.0
+  },
+  "kl_chop": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "rate": 4.0,
+    "gain": 1.0
+  },
+  "kl_delay": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "delayTime": 0.25,
+    "decayTime": 1.0,
+    "maxDelay": 2.0,
+    "gain": 1.0
+  },
+  "kl_distortion": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "dist": 0.5,
+    "gain": 1.0
+  },
+  "kl_hpf": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "freq": 200.0,
+    "rq": 1.0,
+    "gain": 1.0
+  },
+  "kl_kicktone": {
+    "out": 0.0,
+    "amp": 0.85,
+    "pan": 0.0,
+    "dur": 0.6,
+    "baseFreq": 110.0,
+    "pitchDrop": 2.0,
+    "pitchDropTime": 0.04,
+    "pitchCurve": -6.0,
+    "clickAmp": 0.004,
+    "clickHPF": 1800.0,
+    "clickLPF": 6500.0,
+    "clickAtk": 0.001,
+    "clickDec": 0.01,
+    "clickCurve": -2.0,
+    "bodyAtk": 0.001,
+    "bodyDec": 0.16,
+    "bodyCurve": -5.0,
+    "sustainAtk": 0.004,
+    "sustainRel": 0.1,
+    "sustainCurve": -3.0,
+    "sustainMix": 0.45,
+    "sustainLPF": 1800.0,
+    "drive": 1.03
+  },
+  "kl_lpf": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "freq": 1200.0,
+    "rq": 1.0,
+    "gain": 1.0
+  },
+  "kl_noisebpf": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 0.2,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.1,
+    "rq": 0.001,
+    "attackTime": 0.05,
+    "decayTime": 0.12,
+    "sustainLevel": 0.85,
+    "releaseTime": 0.35,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "kl_reverb": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "mix": 0.3,
+    "room": 0.7,
+    "damp": 0.5,
+    "gain": 1.0
+  },
+  "kl_saw": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 0.35,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.1,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "toneLPFRatio": 2.0,
+    "filterEnvAmt": 0.2,
+    "softDrive": 1.1,
+    "softMix": 0.08,
+    "attackTime": 0.05,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.25,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "kl_sine": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 0.3,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.1,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.05,
+    "decayTime": 0.15,
+    "sustainLevel": 0.8,
+    "releaseTime": 0.8,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "kl_sqr": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 0.4,
+    "gate": 1.0,
+    "pan": 0.0,
+    "width": 0.5,
+    "portamento": 0.1,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "toneLPFRatio": 2.0,
+    "filterEnvAmt": 0.2,
+    "softDrive": 1.1,
+    "softMix": 0.08,
+    "attackTime": 0.05,
+    "decayTime": 0.07,
+    "sustainLevel": 0.65,
+    "releaseTime": 0.2,
+    "peakLevel": 1.0,
+    "attackCurve": -3.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "kl_tremolo": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "rate": 4.0,
+    "depth": 0.5,
+    "gain": 1.0
+  },
+  "kl_tri": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 0.5,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.1,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "toneLPFRatio": 2.0,
+    "filterEnvAmt": 0.2,
+    "softDrive": 1.1,
+    "softMix": 0.08,
+    "attackTime": 0.05,
+    "decayTime": 0.08,
+    "sustainLevel": 0.75,
+    "releaseTime": 0.25,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_ambi": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "brightness": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 3.0,
+    "vibDepth": 0.07,
+    "attackTime": 1.0,
+    "decayTime": 0.5,
+    "sustainLevel": 0.5,
+    "releaseTime": 2.0,
+    "attackCurve": 0.0,
+    "decayCurve": 2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_angel": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.05,
+    "releaseTime": 2.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_arpy": {
+    "out": 0.0,
+    "freq": 220.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.05,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_bandPassFilter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bpf": 1200.0,
+    "bpr": 0.6,
+    "bpnoise": 2.0,
+    "segmentDur": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_bass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "width": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.02,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_bell": {
+    "out": 0.0,
+    "freq": 880.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "decayScale": 4.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 5.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_bitcrush": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bits": 8.0,
+    "crush": 4.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_blip": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 1.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_brass": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.2,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_bug": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "tremHz": 8.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 1.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_charm": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_chop": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "chop": 4.0,
+    "segmentDur": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_combDelay": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "echo": 0.5,
+    "beatDur": 1.0,
+    "echoTime": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_creep": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_crunch": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.1,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_dab": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.05,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_dbass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.02,
+    "decayTime": 0.01,
+    "releaseTime": 0.2
+  },
+  "fd_dirt": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_distortion": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "dist": 0.5,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_donk": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.001,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_donk1": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.001,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_donk2": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.001,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_dub": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_feel": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_filterSwell": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "swell": 1.0,
+    "segmentDur": 1.0,
+    "hpr": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_formantFilter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "formant": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_fuzz": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_glass": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "spread": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 2.0,
+    "decayTime": 0.3,
+    "sustainLevel": 0.7,
+    "releaseTime": 4.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_gong": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "decayScale": 5.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 10.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_growl": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_highPassFilter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "hpf": 200.0,
+    "hpr": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_jbass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.02,
+    "releaseTime": 0.35,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_karp": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "coef": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.0,
+    "releaseTime": 5.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_keys": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "brightness": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_klank": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_lazer": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.1,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_longsaw": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "brightness": 0.5,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 1.5,
+    "vibDepth": 0.007,
+    "attackTime": 1.25,
+    "decayTime": 1.25,
+    "sustainLevel": 0.5,
+    "releaseTime": 1.0,
+    "attackCurve": 2.0,
+    "decayCurve": 2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_lowPassFilter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "lpf": 1200.0,
+    "lpr": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_marimba": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_noise": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_nylon": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 1.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.000125,
+    "releaseTime": 3.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_orient": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 2.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -8.0
+  },
+  "fd_overdriveDistortion": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "drive": 0.4,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_pads": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 2.0,
+    "decayTime": 0.5,
+    "sustainLevel": 0.5,
+    "releaseTime": 2.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_pasha": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_piano": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 1.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_pluck": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_prophet": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "lforate": 6.0,
+    "lfowidth": 0.5,
+    "cutoff": 1200.0,
+    "attackTime": 0.01,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_pulse": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2
+  },
+  "fd_quin": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_rave": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "chaos": -1.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_razz": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.125,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_reverb": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "room": 0.5,
+    "mix": 0.3,
+    "damp": 0.5,
+    "gain": 1.0
+  },
+  "fd_ripple": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "brightness": 0.5,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 2.5,
+    "decayTime": 0.25,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_saw": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2
+  },
+  "fd_sawbass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "cutoff": 1200.0,
+    "attackTime": 0.01,
+    "decayTime": 0.0,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_scatter": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "width": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.05,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.8,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_scrap": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.001,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_scratch": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_sinepad": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 2.0,
+    "decayTime": 1.5,
+    "sustainLevel": 0.6,
+    "releaseTime": 2.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_siren": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.1,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_sitar": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_snick": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 1.0,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_soft": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "exciterHz": 4.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_soprano": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "fmBias": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.167,
+    "attackTime": 0.25,
+    "decayTime": 0.1,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_space": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "rq": 0.5,
+    "sus": 1.0
+  },
+  "fd_spark": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_spick": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.1,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_spinPan": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "spin": 1.0,
+    "segmentDur": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_squish": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "rate": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_star": {
+    "out": 0.0,
+    "freq": 220.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "releaseTime": 0.2
+  },
+  "fd_swell": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "brightness": 0.5,
+    "pan": 0.0,
+    "lfoRate": 0.1,
+    "rq": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 2.0,
+    "decayTime": 1.0,
+    "sustainLevel": 0.7,
+    "releaseTime": 4.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_tremolo": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "tremolo": 4.0,
+    "beatDur": 1.0,
+    "depth": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_twang": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "stretch": 1.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.01,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "fd_varsaw": {
+    "out": 0.0,
+    "freq": 440.0,
+    "detune": 0.083,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "width": 0.5,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.5,
+    "decayTime": 0.25,
+    "sustainLevel": 0.7,
+    "releaseTime": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_viola": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.03,
+    "attackTime": 0.25,
+    "decayTime": 0.15,
+    "sustainLevel": 0.7,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "fd_wavesShapeDistortion": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "shape": 1.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "fd_zap": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "attackTime": 0.025,
+    "releaseTime": 0.2,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
   }
 }

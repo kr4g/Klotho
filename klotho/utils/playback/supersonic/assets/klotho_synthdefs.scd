@@ -6,29 +6,21 @@ SynthDef(\kl_tri, { |out=0, freq=440, amp=0.5, gate=1, pan=0, portamento=0.1,
     vibRate=5, vibDepth=0, toneLPFRatio=2, filterEnvAmt=0.2, softDrive=1.1, softMix=0.08,
     attackTime=0.05, decayTime=0.08, sustainLevel=0.75, releaseTime=0.25, peakLevel=1.0,
     attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
-    var sig, env, f, vib, vibRateSm, vibDepthSm, ampSm, panSm, cutoff, ratioSm, filterEnvAmtSm, softDriveSm, softMixSm;
-    vibRateSm = Lag.kr(vibRate.max(0.01), \vibRateLag.kr(0.1).max(0.0));
-    vibDepthSm = Lag.kr(vibDepth, \vibDepthLag.kr(0.1).max(0.0));
+    var sig, env, f, vib, cutoff;
     f = VarLag.kr(freq.max(0.001), portamento.max(0.0), warp: \exp);
-    vib = SinOsc.kr(vibRateSm, mul: vibDepthSm).midiratio;
+    vib = SinOsc.kr(vibRate.max(0.01), mul: vibDepth).midiratio;
     f = f * vib;
-    ampSm = Lag.kr(amp, \ampLag.kr(0.1).max(0.0));
-    panSm = Lag.kr(pan, \panLag.kr(0.1).max(0.0));
-    ratioSm = Lag.kr(toneLPFRatio.max(0.25), \toneLPFRatioLag.kr(0.1).max(0.0));
-    filterEnvAmtSm = Lag.kr(filterEnvAmt.clip(0.0, 2.0), \filterEnvAmtLag.kr(0.1).max(0.0));
-    softDriveSm = Lag.kr(softDrive.max(0.1), \softDriveLag.kr(0.1).max(0.0));
-    softMixSm = Lag.kr(softMix.clip(0.0, 1.0), \softMixLag.kr(0.1).max(0.0));
     env = EnvGen.kr(
         Env([0, peakLevel, sustainLevel * peakLevel, 0], [attackTime, decayTime, releaseTime], [attackCurve, decayCurve, releaseCurve], 2),
         gate,
         doneAction: 2
     );
-    cutoff = (f * ratioSm * (1 + (filterEnvAmtSm * env))).clip(40, (f * 8).min(12000));
+    cutoff = (f * toneLPFRatio.max(0.25) * (1 + (filterEnvAmt.clip(0.0, 2.0) * env))).clip(40, (f * 8).min(12000));
     sig = LFTri.ar(f);
     sig = LPF.ar(sig, cutoff);
-    sig = XFade2.ar(sig, tanh(sig * softDriveSm), (softMixSm * 2) - 1);
-    sig = sig * env * ampSm;
-    sig = Pan2.ar(sig, panSm);
+    sig = XFade2.ar(sig, tanh(sig * softDrive.max(0.1)), (softMix.clip(0.0, 1.0) * 2) - 1);
+    sig = sig * env * amp;
+    sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
 }).writeDefFile(outputDir);
 
@@ -36,22 +28,18 @@ SynthDef(\kl_sine, { |out=0, freq=440, amp=0.3, gate=1, pan=0, portamento=0.1,
     vibRate=5, vibDepth=0,
     attackTime=0.05, decayTime=0.15, sustainLevel=0.8, releaseTime=0.8, peakLevel=1.0,
     attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
-    var sig, env, f, vib, vibRateSm, vibDepthSm, ampSm, panSm;
-    vibRateSm = Lag.kr(vibRate.max(0.01), \vibRateLag.kr(0.1).max(0.0));
-    vibDepthSm = Lag.kr(vibDepth, \vibDepthLag.kr(0.1).max(0.0));
+    var sig, env, f, vib;
     f = VarLag.kr(freq.max(0.001), portamento.max(0.0), warp: \exp);
-    vib = SinOsc.kr(vibRateSm, mul: vibDepthSm).midiratio;
+    vib = SinOsc.kr(vibRate.max(0.01), mul: vibDepth).midiratio;
     f = f * vib;
-    ampSm = Lag.kr(amp, \ampLag.kr(0.1).max(0.0));
-    panSm = Lag.kr(pan, \panLag.kr(0.1).max(0.0));
     env = EnvGen.kr(
         Env([0, peakLevel, sustainLevel * peakLevel, 0], [attackTime, decayTime, releaseTime], [attackCurve, decayCurve, releaseCurve], 2),
         gate,
         doneAction: 2
     );
     sig = SinOsc.ar(f);
-    sig = sig * env * ampSm;
-    sig = Pan2.ar(sig, panSm);
+    sig = sig * env * amp;
+    sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
 }).writeDefFile(outputDir);
 
@@ -59,31 +47,22 @@ SynthDef(\kl_sqr, { |out=0, freq=440, amp=0.4, gate=1, pan=0, width=0.5, portame
     vibRate=5, vibDepth=0, toneLPFRatio=2, filterEnvAmt=0.2, softDrive=1.1, softMix=0.08,
     attackTime=0.05, decayTime=0.07, sustainLevel=0.65, releaseTime=0.2, peakLevel=1.0,
     attackCurve=(-3), decayCurve=(-2), releaseCurve=(-4)|
-    var sig, env, f, vib, vibRateSm, vibDepthSm, ampSm, panSm, widthSm, cutoff, ratioSm, filterEnvAmtSm, softDriveSm, softMixSm;
-    vibRateSm = Lag.kr(vibRate.max(0.01), \vibRateLag.kr(0.1).max(0.0));
-    vibDepthSm = Lag.kr(vibDepth, \vibDepthLag.kr(0.1).max(0.0));
+    var sig, env, f, vib, cutoff;
     f = VarLag.kr(freq.max(0.001), portamento.max(0.0), warp: \exp);
-    vib = SinOsc.kr(vibRateSm, mul: vibDepthSm).midiratio;
+    vib = SinOsc.kr(vibRate.max(0.01), mul: vibDepth).midiratio;
     f = f * vib;
-    ampSm = Lag.kr(amp, \ampLag.kr(0.1).max(0.0));
-    panSm = Lag.kr(pan, \panLag.kr(0.1).max(0.0));
-    widthSm = Lag.kr(width.clip(0.01, 0.99), \widthLag.kr(0.1).max(0.0));
-    ratioSm = Lag.kr(toneLPFRatio.max(0.25), \toneLPFRatioLag.kr(0.1).max(0.0));
-    filterEnvAmtSm = Lag.kr(filterEnvAmt.clip(0.0, 2.0), \filterEnvAmtLag.kr(0.1).max(0.0));
-    softDriveSm = Lag.kr(softDrive.max(0.1), \softDriveLag.kr(0.1).max(0.0));
-    softMixSm = Lag.kr(softMix.clip(0.0, 1.0), \softMixLag.kr(0.1).max(0.0));
     env = EnvGen.kr(
         Env([0, peakLevel, sustainLevel * peakLevel, 0], [attackTime, decayTime, releaseTime], [attackCurve, decayCurve, releaseCurve], 2),
         gate,
         doneAction: 2
     );
-    cutoff = (f * ratioSm * (1 + (filterEnvAmtSm * env))).clip(40, (f * 8).min(12000));
-    sig = Pulse.ar(f, widthSm);
+    cutoff = (f * toneLPFRatio.max(0.25) * (1 + (filterEnvAmt.clip(0.0, 2.0) * env))).clip(40, (f * 8).min(12000));
+    sig = Pulse.ar(f, width.clip(0.01, 0.99));
     sig = LPF.ar(sig, cutoff);
-    sig = XFade2.ar(sig, tanh(sig * softDriveSm), (softMixSm * 2) - 1);
-    sig = sig * env * ampSm;
+    sig = XFade2.ar(sig, tanh(sig * softDrive.max(0.1)), (softMix.clip(0.0, 1.0) * 2) - 1);
+    sig = sig * env * amp;
     sig = LeakDC.ar(sig);
-    sig = Pan2.ar(sig, panSm);
+    sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
 }).writeDefFile(outputDir);
 
@@ -91,29 +70,21 @@ SynthDef(\kl_saw, { |out=0, freq=440, amp=0.35, gate=1, pan=0, portamento=0.1,
     vibRate=5, vibDepth=0, toneLPFRatio=2, filterEnvAmt=0.2, softDrive=1.1, softMix=0.08,
     attackTime=0.05, decayTime=0.1, sustainLevel=0.7, releaseTime=0.25, peakLevel=1.0,
     attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
-    var sig, env, f, vib, vibRateSm, vibDepthSm, ampSm, panSm, cutoff, ratioSm, filterEnvAmtSm, softDriveSm, softMixSm;
-    vibRateSm = Lag.kr(vibRate.max(0.01), \vibRateLag.kr(0.1).max(0.0));
-    vibDepthSm = Lag.kr(vibDepth, \vibDepthLag.kr(0.1).max(0.0));
+    var sig, env, f, vib, cutoff;
     f = VarLag.kr(freq.max(0.001), portamento.max(0.0), warp: \exp);
-    vib = SinOsc.kr(vibRateSm, mul: vibDepthSm).midiratio;
+    vib = SinOsc.kr(vibRate.max(0.01), mul: vibDepth).midiratio;
     f = f * vib;
-    ampSm = Lag.kr(amp, \ampLag.kr(0.1).max(0.0));
-    panSm = Lag.kr(pan, \panLag.kr(0.1).max(0.0));
-    ratioSm = Lag.kr(toneLPFRatio.max(0.25), \toneLPFRatioLag.kr(0.1).max(0.0));
-    filterEnvAmtSm = Lag.kr(filterEnvAmt.clip(0.0, 2.0), \filterEnvAmtLag.kr(0.1).max(0.0));
-    softDriveSm = Lag.kr(softDrive.max(0.1), \softDriveLag.kr(0.1).max(0.0));
-    softMixSm = Lag.kr(softMix.clip(0.0, 1.0), \softMixLag.kr(0.1).max(0.0));
     env = EnvGen.kr(
         Env([0, peakLevel, sustainLevel * peakLevel, 0], [attackTime, decayTime, releaseTime], [attackCurve, decayCurve, releaseCurve], 2),
         gate,
         doneAction: 2
     );
-    cutoff = (f * ratioSm * (1 + (filterEnvAmtSm * env))).clip(40, (f * 8).min(12000));
+    cutoff = (f * toneLPFRatio.max(0.25) * (1 + (filterEnvAmt.clip(0.0, 2.0) * env))).clip(40, (f * 8).min(12000));
     sig = Saw.ar(f);
     sig = LPF.ar(sig, cutoff);
-    sig = XFade2.ar(sig, tanh(sig * softDriveSm), (softMixSm * 2) - 1);
-    sig = sig * env * ampSm;
-    sig = Pan2.ar(sig, panSm);
+    sig = XFade2.ar(sig, tanh(sig * softDrive.max(0.1)), (softMix.clip(0.0, 1.0) * 2) - 1);
+    sig = sig * env * amp;
+    sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
 }).writeDefFile(outputDir);
 
@@ -121,20 +92,18 @@ SynthDef(\kl_noisebpf, { |out=0, freq=440, amp=0.2, gate=1, pan=0, portamento=0.
     rq=0.001,
     attackTime=0.05, decayTime=0.12, sustainLevel=0.85, releaseTime=0.35, peakLevel=1.0,
     attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
-    var sig, env, f, ampSm, panSm, rqSm, bpfMul;
+    var sig, env, f, rqClip, bpfMul;
     f = VarLag.kr(freq.max(0.001), portamento.max(0.0), warp: \exp);
-    ampSm = Lag.kr(amp, \ampLag.kr(0.1).max(0.0));
-    panSm = Lag.kr(pan, \panLag.kr(0.1).max(0.0));
-    rqSm = Lag.kr(rq.clip(0.001, 1.0), \rqLag.kr(0.1).max(0.0));
+    rqClip = rq.clip(0.001, 1.0);
     env = EnvGen.kr(
         Env([0, peakLevel, sustainLevel * peakLevel, 0], [attackTime, decayTime, releaseTime], [attackCurve, decayCurve, releaseCurve], 2),
         gate,
         doneAction: 2
     );
-    bpfMul = rqSm.linexp(0.001, 1.0, 16.0, 0.5);
-    sig = BPF.ar(WhiteNoise.ar(1), f.clip(40, 18000), rqSm, bpfMul);
-    sig = sig * env * ampSm;
-    sig = Pan2.ar(sig, panSm);
+    bpfMul = rqClip.linexp(0.001, 1.0, 16.0, 0.5);
+    sig = BPF.ar(WhiteNoise.ar(1), f.clip(40, 18000), rqClip, bpfMul);
+    sig = sig * env * amp;
+    sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
 }).writeDefFile(outputDir);
 
@@ -198,16 +167,14 @@ SynthDef(\kl_reverb, { |inBus=0, outBus=0, mix=0.3, room=0.7, damp=0.5, gain=1.0
     var sig = In.ar(inBus, 2);
     sig = FreeVerb.ar(sig, mix.clip(0, 1), room.clip(0, 1), damp.clip(0, 1));
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_delay, { |inBus=0, outBus=0, delayTime=0.25, decayTime=1.0, maxDelay=2.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = sig + CombL.ar(sig, maxDelay.max(delayTime), delayTime.max(0.001), decayTime);
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, gain=1.0|
@@ -220,32 +187,28 @@ SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, gain=1.0|
     sig = (sig.cubed * 8).softclip * 0.5;
     sig = SelectX.ar(dist.clip(0, 1), [dry, sig]);
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_bitcrush, { |inBus=0, outBus=0, bits=8, crush=4, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = Decimator.ar(sig, rate: (44100 / crush.max(1)).max(100), bits: bits.clip(1, 24));
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_lpf, { |inBus=0, outBus=0, freq=1200, rq=1.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = RLPF.ar(sig, freq.clip(20, 20000), rq.clip(0.01, 2));
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_hpf, { |inBus=0, outBus=0, freq=200, rq=1.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = RHPF.ar(sig, freq.clip(20, 20000), rq.clip(0.01, 2));
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_tremolo, { |inBus=0, outBus=0, rate=4.0, depth=0.5, gain=1.0|
@@ -254,16 +217,14 @@ SynthDef(\kl_tremolo, { |inBus=0, outBus=0, rate=4.0, depth=0.5, gain=1.0|
     mod = SinOsc.kr(rate.max(0.01), mul: depth.clip(0, 1) * 0.5, add: 1 - (depth.clip(0, 1) * 0.5));
     sig = sig * mod;
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 SynthDef(\kl_chop, { |inBus=0, outBus=0, rate=4.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = sig * LFPulse.kr(rate.max(0.01), add: 0.01);
     sig = sig * gain;
-    ReplaceOut.ar(inBus, sig);
-    Out.ar(outBus, sig);
+    ReplaceOut.ar(outBus, sig);
 }).writeDefFile(outputDir);
 
 "All synthdefs compiled to: %".format(outputDir).postln;

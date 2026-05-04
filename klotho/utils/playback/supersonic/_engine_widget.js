@@ -98,7 +98,7 @@
             await loadDefs(sonic);
             scheduler = new BrowserScheduler({
                 sonic: sonic,
-                manifest: {},
+                manifest: __MANIFEST_JSON__,
                 ringTime: __RING_TIME__,
             });
             ready = true;

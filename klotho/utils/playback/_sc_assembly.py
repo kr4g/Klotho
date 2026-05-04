@@ -10,8 +10,6 @@ from klotho.utils.playback._converter_base import (
     freq_to_midi,
 )
 
-GATED_RELEASE_MODES = ('gate',)
-FREE_RELEASE_MODES = ('free',)
 SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
 
 
@@ -48,11 +46,10 @@ def _resolve_event_synth(instrument, default_synth):
     return default_synth
 
 
-def _release_mode(instrument):
+def _has_gate(instrument):
     if instrument is None:
-        return 'gate'
-    raw = (getattr(instrument, 'release_mode', '') or '').lower()
-    return raw if raw in ('gate', 'free') else 'gate'
+        return True
+    return bool(getattr(instrument, 'has_gate', True))
 
 
 def _attach_poly_meta(event_record, voice_event):
@@ -76,14 +73,15 @@ def lower_compositional_ir_to_sc_assembly(
     extra_pfields=None,
     animation=False,
     default_synth='kl_tri',
-    include_ungated_release=True,
     normalize_sc_pfields=True,
     sort_output=True,
     return_node_map=False,
+    include_ungated_release=None,  # deprecated no-op; lifecycle-release emission moved to schedulers
 ):
     events = []
     node_to_event_ids = {}
     uid_first_start: dict = {}
+    last_event_index_by_uid: dict = {}
     leaf_nodes = obj._rt.leaf_nodes if animation else None
     node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)} if animation else None)
     events_iterable = tuple(obj)
@@ -94,6 +92,20 @@ def lower_compositional_ir_to_sc_assembly(
         if uid not in uid_first_start:
             uid_first_start[uid] = synth_start
         node_to_event_ids.setdefault(node_id, []).append((uid, uid_first_start[uid]))
+
+    def _track_event(uid):
+        last_event_index_by_uid[uid] = len(events) - 1
+
+    def _mark_terminal(uid, terminal_time=None):
+        idx = last_event_index_by_uid.get(uid)
+        if idx is None:
+            return
+        ev = events[idx]
+        ev["releaseAfter"] = True
+        if terminal_time is not None:
+            new_dur = terminal_time - ev.get("start", 0.0)
+            if new_dur > 0:
+                ev["dur"] = new_dur
 
     for event in events_iterable:
         if event.is_rest:
@@ -156,9 +168,7 @@ def lower_compositional_ir_to_sc_assembly(
             resolved_instrument = instrument._resolve(selector_val)
 
         def_name = _resolve_event_synth(resolved_instrument, default_synth)
-        release_mode = _release_mode(resolved_instrument)
-        is_gated = release_mode in GATED_RELEASE_MODES
-        is_ungated = release_mode in FREE_RELEASE_MODES
+        has_gate = _has_gate(resolved_instrument)
         group = event.get_mfield('group')
         is_slur_start = event.get_mfield('_slur_start', 0)
         is_slur_end = event.get_mfield('_slur_end', 0)
@@ -175,33 +185,31 @@ def lower_compositional_ir_to_sc_assembly(
         _kit_selector = instrument.selector if isinstance(instrument, Kit) else None
         active_uids = slur_voice_uids.setdefault(slur_id, []) if slur_id is not None else None
 
-        if (slur_id is not None and not is_slur_start and is_gated
+        # Mid-slur: voice count drops. The dropped voice's most recent event
+        # becomes terminal (releaseAfter=true) with dur set so it fires at the
+        # transition point.
+        if (slur_id is not None and not is_slur_start
                 and active_uids is not None and len(active_uids) > len(voice_events)):
             transition_time = (float(event.start)) - (time_offset if animation else 0.0)
             for vi in range(len(voice_events), len(active_uids)):
                 uid = active_uids[vi]
                 if uid is None:
                     continue
-                rep = voice_events[0]
-                release_event = {
-                    "type": "release",
-                    "id": uid,
-                    "start": transition_time,
-                }
-                events.append(_attach_poly_meta(release_event, rep))
+                _mark_terminal(uid, terminal_time=transition_time)
                 active_uids[vi] = None
             while active_uids and active_uids[-1] is None:
                 active_uids.pop()
         for voice_event in voice_events:
             voice_start = voice_event["start"] - time_offset if animation else voice_event["start"]
             voice_end = voice_event["end"] - time_offset if animation else voice_event["end"]
+            voice_dur = max(0.0, voice_end - voice_start)
             voice_index = voice_event["poly_voice_index"]
             voice_pfields = {
                 k: v for k, v in voice_event["pfields"].items()
                 if k != 'group' and k != _kit_selector
             }
 
-            if is_ungated:
+            if not has_gate:
                 instrument_id = id(resolved_instrument) if resolved_instrument is not None else None
                 sustain_param = sustain_param_cache.get(instrument_id)
                 if instrument_id is not None and instrument_id not in sustain_param_cache:
@@ -229,11 +237,14 @@ def lower_compositional_ir_to_sc_assembly(
                     "id": slur_uid,
                     "defName": def_name,
                     "start": voice_start,
+                    "dur": voice_dur,
+                    "releaseAfter": False,
                     "pfields": merged_pfields,
                 }
                 if group is not None:
                     new_event["group"] = group
                 events.append(_attach_poly_meta(new_event, voice_event))
+                _track_event(slur_uid)
                 while len(active_uids) <= voice_index:
                     active_uids.append(None)
                 active_uids[voice_index] = slur_uid
@@ -247,9 +258,12 @@ def lower_compositional_ir_to_sc_assembly(
                         "type": "set",
                         "id": target_uid,
                         "start": voice_start,
+                        "dur": voice_dur,
+                        "releaseAfter": False,
                         "pfields": merged_pfields,
                     }
                     events.append(_attach_poly_meta(set_event, voice_event))
+                    _track_event(target_uid)
                     _record(event.node_id, target_uid, voice_start)
                 else:
                     slur_uid = uuid4().hex
@@ -258,56 +272,44 @@ def lower_compositional_ir_to_sc_assembly(
                         "id": slur_uid,
                         "defName": def_name,
                         "start": voice_start,
+                        "dur": voice_dur,
+                        "releaseAfter": False,
                         "pfields": merged_pfields,
                     }
                     if group is not None:
                         new_event["group"] = group
                     events.append(_attach_poly_meta(new_event, voice_event))
+                    _track_event(slur_uid)
                     while len(active_uids) <= voice_index:
                         active_uids.append(None)
                     active_uids[voice_index] = slur_uid
                     _record(event.node_id, slur_uid, voice_start)
                 continue
 
+            # Non-slur leaf: terminal immediately.
             uid = uuid4().hex
             new_event = {
                 "type": "new",
                 "id": uid,
                 "defName": def_name,
                 "start": voice_start,
+                "dur": voice_dur,
+                "releaseAfter": True,
                 "pfields": merged_pfields,
             }
             if group is not None:
                 new_event["group"] = group
             events.append(_attach_poly_meta(new_event, voice_event))
+            _track_event(uid)
             _record(event.node_id, uid, voice_start)
 
-            if is_gated or include_ungated_release:
-                release_event = {
-                    "type": "release",
-                    "id": uid,
-                    "start": voice_end,
-                }
-                events.append(_attach_poly_meta(release_event, voice_event))
-
-        if slur_id is not None and is_slur_end and is_gated:
-            end_time = (float(event.start) + abs(float(event.duration))) - (time_offset if animation else 0.0)
+        # End-of-slur: the most recent event for each still-active uid is the
+        # terminal one. Mark releaseAfter=true; dur already reflects this leaf.
+        if slur_id is not None and is_slur_end:
             for vi, uid in enumerate(active_uids or []):
                 if uid is None:
                     continue
-                rep = None
-                for ve in voice_events:
-                    if ve["poly_voice_index"] == vi:
-                        rep = ve
-                        break
-                if rep is None:
-                    rep = voice_events[0]
-                release_event = {
-                    "type": "release",
-                    "id": uid,
-                    "start": end_time,
-                }
-                events.append(_attach_poly_meta(release_event, rep))
+                _mark_terminal(uid)
             if slur_id in slur_voice_uids:
                 del slur_voice_uids[slur_id]
 
