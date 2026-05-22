@@ -817,10 +817,161 @@ class TestPattern:
 
     def test_nested_pattern(self):
         pat = Pattern([1, [2, 3]])
+        assert len(pat) == 4
         vals = [next(pat) for _ in range(6)]
         assert vals == [1, 2, 1, 3, 1, 2]
 
+    def test_tuple_is_leaf(self):
+        pat = Pattern([1, (2, 3)])
+        assert len(pat) == 2
+        assert [next(pat) for _ in range(4)] == [1, (2, 3), 1, (2, 3)]
+
+    def test_dict_is_leaf(self):
+        d = {'a': 1}
+        pat = Pattern([d, 2])
+        assert len(pat) == 2
+        assert [next(pat) for _ in range(4)] == [d, 2, d, 2]
+
+    def test_reset(self):
+        pat = Pattern([1, [2, 3]])
+        first = [next(pat) for _ in range(4)]
+        pat.reset()
+        second = [next(pat) for _ in range(4)]
+        assert first == second == [1, 2, 1, 3]
+
+    def test_pattern_delegation(self):
+        p1 = Pattern([10, 20])
+        p2 = Pattern([100, 200])
+        outer = Pattern([p1, p2])
+        assert len(outer) == 4
+        assert [next(outer) for _ in range(4)] == [10, 100, 20, 200]
+
+    def test_cycle_delegation(self):
+        from klotho.topos.collections.sequences import Cyclic
+        c1 = Cyclic([1, 2])
+        c2 = Cyclic([10, 20, 30])
+        outer = Pattern([c1, c2])
+        assert len(outer) == 12
+        assert [next(outer) for _ in range(12)] == [
+            1, 10, 2, 20, 1, 30, 2, 10, 1, 20, 2, 30,
+        ]
+
+    def test_mixed_structural_and_delegation(self):
+        p1 = Pattern([10, 20, 30])
+        pat = Pattern([p1, [2, 3]])
+        assert len(pat) == 12
+        assert [next(pat) for _ in range(12)] == [
+            10, 2, 20, 3, 30, 2, 10, 3, 20, 2, 30, 3,
+        ]
+
+    def test_deeply_nested_structural(self):
+        pat = Pattern([1, [2, [3, 4]]])
+        assert len(pat) == 8
+        assert [next(pat) for _ in range(8)] == [1, 2, 1, 3, 1, 2, 1, 4]
+
+    def test_nested_from_tests(self):
+        pat = Pattern([[0, -1, [0, -3]], [1, [3, 4]]])
+        assert len(pat) == 24
+        self._assert_minimal_period(pat)
+
+    def test_numpy_array_structural(self):
+        pat = Pattern(np.array([1, [2, 3]], dtype=object))
+        assert len(pat) == 4
+        assert [next(pat) for _ in range(4)] == [1, 2, 1, 3]
+
+    def test_materialize_period(self):
+        pat = Pattern([1, [2, 3]])
+        assert pat.materialize_period() == (1, 2, 1, 3)
+        assert pat.position == 0
+
+    def test_itertools_cycle_rejected(self):
+        from itertools import cycle
+        import pytest
+        with pytest.raises(TypeError, match="Cyclic"):
+            Pattern([cycle([1, 2])])
+
+    def test_shared_delegate_length_is_state_realignment(self):
+        p1 = Pattern([10, 20, 30])
+        pat = Pattern([p1, p1])
+        assert len(pat) == 6
+        assert [next(pat) for _ in range(6)] == [10, 20, 30, 10, 20, 30]
+        pat.reset()
+        assert [next(pat) for _ in range(6)] == [10, 20, 30, 10, 20, 30]
+
+    def test_scalar_leaf(self):
+        pat = Pattern(7)
+        assert len(pat) == 1
+        assert [next(pat) for _ in range(3)] == [7, 7, 7]
+
     def test_end_truthy(self):
+        pat = Pattern([10, 20], end=-999)
+        vals = [next(pat) for _ in range(5)]
+        assert vals == [10, 20, -999, -999, -999]
+
+    def test_end_false_default_loops(self):
+        pat = Pattern([10, 20, 30], end=False)
+        vals = [next(pat) for _ in range(6)]
+        assert vals == [10, 20, 30, 10, 20, 30]
+
+    def test_end_none_is_falsy_loops(self):
+        pat = Pattern([10, 20, 30], end=None)
+        vals = [next(pat) for _ in range(6)]
+        assert vals == [10, 20, 30, 10, 20, 30]
+
+    def test_end_zero_is_falsy_loops(self):
+        pat = Pattern([10, 20, 30], end=0)
+        vals = [next(pat) for _ in range(6)]
+        assert vals == [10, 20, 30, 10, 20, 30]
+
+    def test_end_with_sentinel(self):
+        STOP = object()
+        pat = Pattern([10, 20, 30], end=STOP)
+        vals = [next(pat) for _ in range(5)]
+        assert vals[:3] == [10, 20, 30]
+        assert vals[3] is STOP
+        assert vals[4] is STOP
+
+    def test_length_matches_minimal_period_simple_cases(self):
+        cases = [
+            ([1, 2, 3], 3),
+            ([1, [2, 3]], 4),
+            ([1, [2, 3, 4]], 6),
+            ([1, [2, [3, 4]]], 8),
+            ([[1, 2], [3, 4]], 4),
+        ]
+        for structure, expected_len in cases:
+            pat = Pattern(structure)
+            assert len(pat) == expected_len
+            self._assert_minimal_period(pat)
+
+    def test_length_matches_minimal_period_delegation_cases(self):
+        p1 = Pattern([10, 20, 30])
+        p2 = Pattern([100, 200])
+        cases = [
+            (Pattern([p1, p2]), 12),
+            (Pattern([p1, [2, 3]]), 12),
+        ]
+        for pat, expected_len in cases:
+            assert len(pat) == expected_len
+            self._assert_minimal_period(pat)
+
+    @staticmethod
+    def _assert_minimal_period(pat):
+        length = len(pat)
+        period = [next(pat) for _ in range(length)]
+        pat.reset()
+        repeat = [next(pat) for _ in range(length)]
+        assert period == repeat
+        for smaller in range(1, length):
+            if length % smaller != 0:
+                continue
+            pat.reset()
+            trial = [next(pat) for _ in range(length)]
+            if trial[:smaller] == trial[smaller:2 * smaller]:
+                raise AssertionError(
+                    f"len={length} is not minimal; repeats every {smaller}: {trial}"
+                )
+            pat.reset()
         pat = Pattern([10, 20], end=-999)
         vals = [next(pat) for _ in range(5)]
         assert vals == [10, 20, -999, -999, -999]

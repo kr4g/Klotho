@@ -14,6 +14,7 @@ from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
 from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.thetos.parameters.parameter_tree import ParameterTree
+from klotho.topos.collections.sequences import Pattern
 
 try:
     import networkx as nx
@@ -31,6 +32,7 @@ from sklearn.manifold import MDS, SpectralEmbedding
 
 from ._dispatch import _plot_rt, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
 from ._dispatch import KlothoPlot
+from ._plot_pattern import plot_pattern
 
 __all__ = ['plot']
 
@@ -74,11 +76,14 @@ def plot(obj, **kwargs):
         if fig is not None:
             try:
                 from IPython.display import display as ipy_display, HTML
+                import matplotlib.figure
                 if hasattr(fig, 'to_html'):
                     html_str = fig.to_html(full_html=False, include_plotlyjs=True)
                     ipy_display(HTML(html_str))
                 else:
                     ipy_display(fig)
+                    if isinstance(fig, matplotlib.figure.Figure):
+                        plt.close(fig)
             except ImportError:
                 pass
 
@@ -121,6 +126,8 @@ def plot(obj, **kwargs):
             return _show(_plot_dynamic_range(obj, **kwargs))
         case Envelope():
             return _show(_plot_envelope(obj, **kwargs))
+        case Pattern():
+            return _show(plot_pattern(obj, **kwargs))
         case CompositionalUnit():
             return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
         case TemporalUnit():

@@ -1,15 +1,25 @@
-import numpy as np
-from collections.abc import Iterable
-from itertools import cycle
-from math import lcm
+from itertools import cycle, combinations
 from typing import List, Optional, Union, Any, TypeVar
 
+import numpy as np
+
+from klotho.topos.collections._pattern import (
+    Cyclic,
+    NodeSpec,
+    _advance_runtime,
+    _build_runtime,
+    _compile_item,
+    _reset_runtime,
+    child_restore,
+    child_snapshot,
+)
+
 T = TypeVar('T')
-from klotho.utils.algorithms.lists import normalize_sum
 
 __all__ = [
     'Norg',
     'Pattern',
+    'Cyclic',
 ]
 
 class Norg:
@@ -151,7 +161,7 @@ class Norg:
                 if seed_len * i + j < size:
                     p[seed_len * i + j] = p[seed_len * i + j - seed_len] + next(inv_pat_cycle) * delta
         return p
-    
+
     @staticmethod
     def lake():
         """Generate Nørgård's *tone lake* sequence.
@@ -170,151 +180,101 @@ class Norg:
 
 
 class Pattern:
-    """Cyclical pattern iterator built from arbitrarily nested iterables.
-
-    Converts a (possibly nested) iterable into a set of cycling iterators
-    whose combined period equals the least common multiple of the lengths
-    at every nesting level.  Once the full pattern period has been
-    exhausted, subsequent calls to ``__next__`` return *end* (or delegate
-    to *end* if it is itself a ``Pattern``).
-
-    Parameters
-    ----------
-    iterable : Iterable
-        A (possibly nested) iterable defining the cyclic pattern.
-    end : object or Pattern, optional
-        Value returned after the pattern period is exhausted.  If another
-        ``Pattern`` is supplied its ``__next__`` is called instead
-        (default is ``False``, meaning the pattern simply repeats *end*).
-
-    Examples
-    --------
-    >>> p = Pattern([1, [2, 3]])
-    >>> [next(p) for _ in range(6)]
-    [1, 2, 1, 3, 1, 2]
-    """
+    """Cyclical pattern iterator built from nested structure and delegates."""
 
     def __init__(self, iterable, end=False):
-        """Initialise the pattern from a nested iterable.
-
-        Parameters
-        ----------
-        iterable : Iterable
-            Source structure defining the cyclic pattern.
-        end : object or Pattern, optional
-            Sentinel returned once the LCM-period is exceeded
-            (default is ``False``).
-        """
         self._iterable = iterable
-        self._cycles, self._pattern_length = self._create_cycles(iterable)
         self._end = end
+        self._spec = _compile_item(iterable)
+        self._pattern_length = self._spec.period
+        self._root = _build_runtime(self._spec, iterable)
         self._current = 0
-        
+        self._period_cache: Optional[tuple[Any, ...]] = None
+
     @property
-    def length(self):
-        """int : Total pattern length (LCM of all nesting-level lengths)."""
+    def length(self) -> int:
         return self._pattern_length
-    
+
+    @property
+    def spec(self) -> NodeSpec:
+        return self._spec
+
     @property
     def pattern(self):
-        """Iterable : The original nested iterable used to build this pattern."""
         return self._iterable
-    
+
     @property
     def end(self):
-        """object or Pattern : Value returned after the pattern period is exhausted."""
         return self._end
-        
-    def _create_cycles(self, item):
-        if isinstance(item, Iterable) and not isinstance(item, (str, bytes)):
-            sub_results = [self._create_cycles(subitem) for subitem in item]
-            subcycles, lengths = zip(*sub_results)
-            this_level_length = len(item)
-            nested_lengths = [this_level_length * length for length in lengths if length > 0]
-            total_length = lcm(*nested_lengths) if nested_lengths else this_level_length
-            return cycle(subcycles), total_length
-        return item, 1
+
+    @property
+    def position(self) -> int:
+        return self._current
+
+    def reset(self):
+        self._current = 0
+        _reset_runtime(self._root)
+        self._period_cache = None
+
+    def materialize_period(self) -> tuple[Any, ...]:
+        if self._period_cache is None:
+            snap = self._snapshot()
+            try:
+                self._period_cache = tuple(self._next_value() for _ in range(self._pattern_length))
+            finally:
+                self._restore(snap)
+        return self._period_cache
+
+    def _snapshot(self):
+        return {
+            'current': self._current,
+            'root': child_snapshot(self._root),
+        }
+
+    def _restore(self, state):
+        self._current = state['current']
+        child_restore(self._root, state['root'])
+
+    def _next_value(self):
+        if self._current >= self._pattern_length and self._end:
+            return next(self._end) if isinstance(self._end, Pattern) else self._end
+        value = _advance_runtime(self._root)
+        self._current += 1
+        return value
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self._current >= self._pattern_length and self._end:
-            return next(self._end) if isinstance(self._end, Pattern) else self._end
-        self._current += 1
-        return self._get_next(self._cycles)
+        return self._next_value()
 
-    def _get_next(self, cyc):
-        item = next(cyc)
-        while isinstance(item, cycle):
-            item = self._get_next(item)
-        return item
-    
     def __len__(self):
         return self._pattern_length
-    
+
     def __str__(self):
-        return str(list(self._iterable))
+        return str(list(self._iterable)) if isinstance(self._iterable, list) else str(self._iterable)
 
     def __repr__(self):
-        return self.__str__()
-    
+        return f"Pattern({self._iterable!r}, end={self._end!r})"
+
     @staticmethod
-    def from_random(elements: List[T], 
-                    length: int = 5,
-                    max_nesting_level: int = 3,
-                    max_inner_length: int = 3,
-                    weights: Optional[List[float]] = None,
-                    nesting_probability: float = 0.333) -> 'Pattern':
-        """Create a ``Pattern`` with a randomly generated nested structure.
+    def from_random(
+        elements: List[T],
+        length: int = 5,
+        max_nesting_level: int = 3,
+        max_inner_length: int = 3,
+        weights: Optional[List[float]] = None,
+        nesting_probability: float = 0.333,
+    ) -> 'Pattern':
+        from klotho.utils.algorithms.lists import normalize_sum
 
-        Elements are drawn from *elements* according to *weights*, and
-        nesting is introduced stochastically up to *max_nesting_level*
-        deep.
-
-        Parameters
-        ----------
-        elements : list of T
-            Pool of values that may appear as leaves in the pattern.
-        length : int, optional
-            Number of items at the top level of the generated structure
-            (default is 5).
-        max_nesting_level : int, optional
-            Maximum depth of nesting allowed (default is 3).
-        max_inner_length : int, optional
-            Maximum number of items in any nested sub-list (default is 3).
-        weights : list of float or None, optional
-            Selection weights for *elements*.  Must have the same length as
-            *elements*.  Weights are normalised internally (default is
-            ``None``, meaning uniform probability).
-        nesting_probability : float, optional
-            Probability that any given position becomes a nested sub-list
-            rather than a leaf element (default is 0.333).
-
-        Returns
-        -------
-        Pattern
-            A new ``Pattern`` instance built from the generated structure.
-
-        Raises
-        ------
-        ValueError
-            If *weights* is provided and its length differs from *elements*.
-
-        Examples
-        --------
-        >>> import numpy as np; np.random.seed(0)
-        >>> p = Pattern.from_random(['a', 'b', 'c'], length=4)
-        >>> len(p) > 0
-        True
-        """
         if weights is not None:
             if len(weights) != len(elements):
                 raise ValueError("Length of weights must match length of elements")
             normalized_weights = normalize_sum(weights)
         else:
             normalized_weights = [1.0 / len(elements)] * len(elements)
-        
+
         def _generate_structure(target_length: int, current_nesting_level: int) -> List[Union[T, List[Any]]]:
             structure = []
             for _ in range(target_length):
@@ -324,9 +284,55 @@ class Pattern:
                     structure.append(nested_structure)
                 else:
                     index = np.random.choice(len(elements), p=normalized_weights)
-                    element = elements[index]
-                    structure.append(element)
+                    structure.append(elements[index])
             return structure
-        
-        generated_structure = _generate_structure(length, max_nesting_level)
-        return Pattern(generated_structure)
+
+        return Pattern(_generate_structure(length, max_nesting_level))
+
+
+# class Golomb:
+
+#     def __init__(self, length: int, order: int, *, reflections=False):
+#         self._length = length
+#         self._order = order
+#         self._reflections = reflections
+#         self._rulers = self._golomb_rulers_of_length(length, order, reflections=reflections)
+
+#     def _is_golomb_ruler(marks):
+#         diffs = set()
+
+#         for i in range(len(marks)):
+#             for j in range(i + 1, len(marks)):
+#                 d = marks[j] - marks[i]
+#                 if d in diffs:
+#                     return False
+#                 diffs.add(d)
+
+#         return True
+
+#     def _golomb_rulers_of_length(length, order, *, reflections=True):
+#         if order < 1:
+#             raise ValueError("order must be >= 1")
+
+#         if order == 1:
+#             return [[0]] if length == 0 else []
+
+#         if order == 2:
+#             return [[0, length]] if length > 0 else []
+
+#         rulers = []
+
+#         for interior in combinations(range(1, length), order - 2):
+#             marks = [0, *interior, length]
+
+#             if not _is_golomb_ruler(marks):
+#                 continue
+
+#             if not reflections:
+#                 reflected = [length - x for x in reversed(marks)]
+#                 if marks > reflected:
+#                     continue
+
+#             rulers.append(marks)
+
+#         return rulers
