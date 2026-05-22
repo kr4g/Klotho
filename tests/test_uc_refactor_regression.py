@@ -10,6 +10,7 @@ from klotho.utils.playback.tonejs.converters import (
     temporal_sequence_to_events,
     temporal_block_to_events,
 )
+from klotho.utils.playback.supersonic.converters import temporal_sequence_to_sc_events
 from klotho.semeios.notelists.supercollider import Scheduler
 
 
@@ -37,6 +38,27 @@ def test_uts_and_bt_converter_smoke():
 
     assert len(seq_payload["events"]) > 0
     assert len(block_payload["events"]) >= len(seq_payload["events"])
+
+
+def test_nested_bt_offsets_survive_temporal_sequence_conversion():
+    uc1 = UC(tempus='1/4', prolatio='d', beat='1/4', bpm=60, inst=JsInst.Kick())
+    uc2 = UC(tempus='1/4', prolatio='d', beat='1/4', bpm=60, inst=JsInst.Snare())
+
+    seq = UTS()
+    seq.append(BT([uc1]))
+    seq.append(BT([uc2]))
+
+    tone_starts = [ev["start"] for ev in temporal_sequence_to_events(seq)["events"]]
+    sc_starts = [ev["start"] for ev in temporal_sequence_to_sc_events(seq)]
+    assert tone_starts == [0.0, 1.0]
+    assert sc_starts == [0.0, 1.0]
+
+    seq._offset = 5.0
+    seq._set_offsets()
+    tone_shifted = [ev["start"] for ev in temporal_sequence_to_events(seq)["events"]]
+    sc_shifted = [ev["start"] for ev in temporal_sequence_to_sc_events(seq)]
+    assert tone_shifted == [0.0, 1.0]
+    assert sc_shifted == [0.0, 1.0]
 
 
 def test_scheduler_handles_uc_slur_and_env_overlay():

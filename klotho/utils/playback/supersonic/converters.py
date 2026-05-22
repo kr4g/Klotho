@@ -301,44 +301,57 @@ def _build_chord_sc_events(pitches, start, dur, strum, synth, amp=None,
     return events
 
 
-def _merge_sub_sc(target_events, sub_events, time_offset):
-    for ev in sub_events:
-        ev["start"] -= time_offset
+def _merge_sub_sc(target_events, sub_events):
     target_events.extend(sub_events)
 
 
-def temporal_sequence_to_sc_events(obj, extra_pfields=None):
+def _shift_events_to_zero(events):
+    if not events:
+        return events
+    min_start = min(ev.get("start", 0.0) for ev in events)
+    if min_start == 0.0:
+        return events
+    for ev in events:
+        ev["start"] = ev.get("start", 0.0) - min_start
+    return events
+
+
+def temporal_sequence_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True):
     events = []
-    seq_offset = obj.start
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
-            _merge_sub_sc(events, compositional_unit_to_sc_events(unit, extra_pfields=None), seq_offset)
+            _merge_sub_sc(events, compositional_unit_to_sc_events(unit, extra_pfields=None))
         elif isinstance(unit, TemporalUnit):
-            _merge_sub_sc(events, temporal_unit_to_sc_events(unit, use_absolute_time=True, extra_pfields=extra_pfields), seq_offset)
+            _merge_sub_sc(events, temporal_unit_to_sc_events(unit, use_absolute_time=True, extra_pfields=extra_pfields))
         elif isinstance(unit, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(unit, extra_pfields=extra_pfields), seq_offset)
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False))
         elif isinstance(unit, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(unit, extra_pfields=extra_pfields), seq_offset)
+            _merge_sub_sc(events, temporal_block_to_sc_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False))
 
-    return sort_sc_assembly_events(events)
+    events = sort_sc_assembly_events(events)
+    if rebase_to_zero:
+        _shift_events_to_zero(events)
+    return events
 
 
-def temporal_block_to_sc_events(obj, extra_pfields=None):
+def temporal_block_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True):
     events = []
-    block_offset = obj.start
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
-            _merge_sub_sc(events, compositional_unit_to_sc_events(row, extra_pfields=None), block_offset)
+            _merge_sub_sc(events, compositional_unit_to_sc_events(row, extra_pfields=None))
         elif isinstance(row, TemporalUnit):
-            _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True, extra_pfields=extra_pfields), block_offset)
+            _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True, extra_pfields=extra_pfields))
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.start)
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields, rebase_to_zero=False))
         elif isinstance(row, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields), block_offset + row.start)
+            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields, rebase_to_zero=False))
 
-    return sort_sc_assembly_events(events)
+    events = sort_sc_assembly_events(events)
+    if rebase_to_zero:
+        _shift_events_to_zero(events)
+    return events
 
 
 def convert_to_sc_events(obj, **kwargs):

@@ -389,9 +389,7 @@ def rhythm_tree_to_animation_events(obj, beat=None, bpm=None, amp=None, extra_pf
                                             amp=amp, extra_pfields=extra_pfields)
 
 
-def _merge_sub_payload(target_events, target_instruments, sub_payload, time_offset):
-    for ev in sub_payload["events"]:
-        ev["start"] -= time_offset
+def _merge_sub_payload(target_events, target_instruments, sub_payload):
     target_events.extend(sub_payload["events"])
     for key, val in sub_payload["instruments"].items():
         if key in target_instruments:
@@ -405,42 +403,58 @@ def _merge_sub_payload(target_events, target_instruments, sub_payload, time_offs
             target_instruments[key] = val
 
 
-def temporal_sequence_to_events(obj, extra_pfields=None):
+def _shift_payload_events_to_zero(payload):
+    events = payload["events"]
+    if not events:
+        return payload
+    min_start = min(ev.get("start", 0.0) for ev in events)
+    if min_start == 0.0:
+        return payload
+    for ev in events:
+        ev["start"] = ev.get("start", 0.0) - min_start
+    return payload
+
+
+def temporal_sequence_to_events(obj, extra_pfields=None, rebase_to_zero=True):
     events = []
     instruments = {}
-    seq_offset = obj.start
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
-            _merge_sub_payload(events, instruments, compositional_unit_to_events(unit, extra_pfields=None), seq_offset)
+            _merge_sub_payload(events, instruments, compositional_unit_to_events(unit, extra_pfields=None))
         elif isinstance(unit, TemporalUnit):
-            _merge_sub_payload(events, instruments, temporal_unit_to_events(unit, use_absolute_time=True, extra_pfields=extra_pfields), seq_offset)
+            _merge_sub_payload(events, instruments, temporal_unit_to_events(unit, use_absolute_time=True, extra_pfields=extra_pfields))
         elif isinstance(unit, TemporalUnitSequence):
-            _merge_sub_payload(events, instruments, temporal_sequence_to_events(unit, extra_pfields=extra_pfields), seq_offset)
+            _merge_sub_payload(events, instruments, temporal_sequence_to_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False))
         elif isinstance(unit, TemporalBlock):
-            _merge_sub_payload(events, instruments, temporal_block_to_events(unit, extra_pfields=extra_pfields), seq_offset)
+            _merge_sub_payload(events, instruments, temporal_block_to_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False))
 
     events.sort(key=lambda ev: ev["start"])
-    return _payload(events, instruments)
+    payload = _payload(events, instruments)
+    if rebase_to_zero:
+        _shift_payload_events_to_zero(payload)
+    return payload
 
 
-def temporal_block_to_events(obj, extra_pfields=None):
+def temporal_block_to_events(obj, extra_pfields=None, rebase_to_zero=True):
     events = []
     instruments = {}
-    block_offset = obj.start
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
-            _merge_sub_payload(events, instruments, compositional_unit_to_events(row, extra_pfields=None), block_offset)
+            _merge_sub_payload(events, instruments, compositional_unit_to_events(row, extra_pfields=None))
         elif isinstance(row, TemporalUnit):
-            _merge_sub_payload(events, instruments, temporal_unit_to_events(row, use_absolute_time=True, extra_pfields=extra_pfields), block_offset)
+            _merge_sub_payload(events, instruments, temporal_unit_to_events(row, use_absolute_time=True, extra_pfields=extra_pfields))
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_payload(events, instruments, temporal_sequence_to_events(row, extra_pfields=extra_pfields), block_offset + row.start)
+            _merge_sub_payload(events, instruments, temporal_sequence_to_events(row, extra_pfields=extra_pfields, rebase_to_zero=False))
         elif isinstance(row, TemporalBlock):
-            _merge_sub_payload(events, instruments, temporal_block_to_events(row, extra_pfields=extra_pfields), block_offset + row.start)
+            _merge_sub_payload(events, instruments, temporal_block_to_events(row, extra_pfields=extra_pfields, rebase_to_zero=False))
 
     events.sort(key=lambda ev: ev["start"])
-    return _payload(events, instruments)
+    payload = _payload(events, instruments)
+    if rebase_to_zero:
+        _shift_payload_events_to_zero(payload)
+    return payload
 
 
 def convert_to_events(obj, **kwargs):
