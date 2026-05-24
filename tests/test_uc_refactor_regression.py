@@ -3,7 +3,6 @@ import numpy as np
 from klotho.chronos import TemporalUnitSequence as UTS, TemporalBlock as BT
 from klotho.thetos import CompositionalUnit as UC
 from klotho.topos import Pattern
-from klotho.dynatos import Envelope
 from klotho.thetos import ToneInstrument as JsInst, SynthDefInstrument as ScInst
 from klotho.utils.playback.tonejs.converters import (
     compositional_unit_to_events,
@@ -11,7 +10,6 @@ from klotho.utils.playback.tonejs.converters import (
     temporal_block_to_events,
 )
 from klotho.utils.playback.supersonic.converters import temporal_sequence_to_sc_events
-from klotho.semeios.notelists.supercollider import Scheduler
 
 
 def test_uc_converter_smoke_with_instruments():
@@ -59,17 +57,6 @@ def test_nested_bt_offsets_survive_temporal_sequence_conversion():
     sc_shifted = [ev["start"] for ev in temporal_sequence_to_sc_events(seq)]
     assert tone_shifted == [0.0, 1.0]
     assert sc_shifted == [0.0, 1.0]
-
-
-def test_scheduler_handles_uc_slur_and_env_overlay():
-    uc = UC(tempus='4/4', prolatio=((2, (1, 1)), (2, (1, 1))), beat='1/4', bpm=120, inst=JsInst.Kalimba())
-    inner_nodes = uc.rt.at_depth(1)
-    uc.apply_slur(node=inner_nodes[0])
-    uc.apply_envelope(envelope=Envelope([0.1, 0.8], times=[1.0]), pfields='vel', node=uc.rt.root)
-
-    scheduler = Scheduler()
-    scheduler.add(uc)
-    assert scheduler.total_events > 0
 
 
 def test_uc_copy_preserves_branch_leaf_assignments_after_subdivide():

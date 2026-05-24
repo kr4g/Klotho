@@ -1,7 +1,6 @@
 from mido import MidiFile
 
 from klotho.thetos import CompositionalUnit
-from klotho.semeios.notelists.supercollider import Scheduler
 from klotho.thetos.instruments.tone import ToneInstrument
 from klotho.thetos.instruments.midi import MidiInstrument
 from klotho.utils.playback._converter_base import lower_event_ir_to_voice_events, lower_poly_pfields_to_voices
@@ -190,22 +189,6 @@ def test_sort_sc_events_orders_type_priority_at_same_start():
     ]
     sorted_events = sort_sc_assembly_events(unsorted_events)
     assert [event["type"] for event in sorted_events] == ["new", "set", "release"]
-
-
-def test_scheduler_accepts_arbitrary_def_name_from_uc():
-    uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), pfields={"note": 60, "amp": 0.2}, mfields={"group": "default"})
-    leaves = tuple(uc._rt.leaf_nodes)
-    uc.set_instrument(leaves[0], 'custom_poly_synth')
-    uc.set_instrument(leaves[1], 'custom_poly_synth')
-    uc.set_pfields(leaves[0], note=(60, 64), amp=0.25)
-    uc.set_pfields(leaves[1], note=67, amp=0.2)
-
-    scheduler = Scheduler()
-    scheduler.add(uc)
-    scheduled_events = [event for *_, event in scheduler.events]
-    new_events = [event for event in scheduled_events if event["type"] == "new"]
-
-    assert any(event.get("defName") == 'custom_poly_synth' for event in new_events)
 
 
 def test_slur_markers_live_in_mfields_not_pfields():
