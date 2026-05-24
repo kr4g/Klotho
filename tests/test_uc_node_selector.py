@@ -1,9 +1,9 @@
 """Unit tests for UT/UC selector surface (`UTNodeSelector`, `UCNodeSelector`).
 
-These cover the API spelling of the selector: construction from each
-traversal method, fluent-verb delegation, indexing / slicing / fancy
-indexing, filter / where / set algebra, equality spec, bool spec,
-``make_rest`` iterable support, and the fluent-root idioms.
+These cover the node-selection API spelling: construction from each
+traversal method, node-handle iteration, int-index-to-handle behavior,
+slice/fancy selection behavior, filter / where / set algebra, equality
+spec, bool spec, ``make_rest`` iterable support, and fluent-root idioms.
 
 Behavior preservation (that the refactored delegation produces the same
 downstream results as the verbose pre-refactor API) is covered separately
@@ -17,11 +17,12 @@ import pytest
 from klotho.chronos import TemporalUnit as UT
 from klotho.chronos.temporal_units.temporal import (
     NodeContext,
+    UTNodeHandle,
     UTNodeSelector,
 )
 from klotho.dynatos import Envelope
 from klotho.thetos import CompositionalUnit as UC, SynthDefInstrument
-from klotho.thetos.composition.compositional import UCNodeSelector
+from klotho.thetos.composition.compositional import UCNodeHandle, UCNodeSelector
 from klotho.topos.collections.sequences import Pattern
 
 
@@ -71,7 +72,7 @@ class TestSelectorConstruction:
         sel = uc.root
         assert isinstance(sel, UCNodeSelector)
         assert len(sel) == 1
-        assert sel.first == uc._rt.root
+        assert sel.first.id == uc._rt.root
 
     def test_at_depth_returns_selector(self):
         uc = _uc_nested()
@@ -92,6 +93,16 @@ class TestSelectorConstruction:
         assert isinstance(sel, UCNodeSelector)
         assert len(sel) == 2
 
+    def test_leaves_of_rejects_multi_selector_anchor(self):
+        uc = _uc_nested()
+        with pytest.raises(ValueError, match="single-node selector"):
+            uc.leaves_of(uc.at_depth(1))
+
+    def test_successors_rejects_multi_selector_anchor(self):
+        uc = _uc_nested()
+        with pytest.raises(ValueError, match="single-node selector"):
+            uc.successors(uc.at_depth(1))
+
     def test_select_varargs(self):
         uc = _uc_simple()
         leaf_ids = uc._rt.leaf_nodes
@@ -103,6 +114,20 @@ class TestSelectorConstruction:
         leaf_ids = uc._rt.leaf_nodes
         sel = uc.select([leaf_ids[1], leaf_ids[3]])
         assert sel.ids == (leaf_ids[1], leaf_ids[3])
+
+    def test_select_generator_of_singleton_selectors(self):
+        uc = _uc_nested()
+        branches = uc.at_depth(1)
+        sel = uc.select(branch.first_leaf for branch in branches)
+        expected = tuple(branch.first_leaf.id for branch in branches)
+        assert sel.ids == expected
+
+    def test_select_preserves_duplicates(self):
+        uc = _uc_nested()
+        branch = uc.at_depth(1)[0]
+        target = branch.first_leaf
+        sel = uc.select([target, target])
+        assert sel.ids == (target.id, target.id)
 
     def test_ut_traversal_returns_ut_selector(self):
         ut = UT(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=120)
@@ -132,12 +157,12 @@ class TestSelectorConstruction:
 
 
 class TestSequenceProtocol:
-    def test_iter_yields_ints(self):
+    def test_iter_yields_node_handles(self):
         uc = _uc_simple()
         sel = uc.leaves
-        ids = list(sel)
-        assert all(isinstance(n, int) for n in ids)
-        assert tuple(ids) == uc._rt.leaf_nodes
+        items = list(sel)
+        assert all(isinstance(item, UCNodeHandle) for item in items)
+        assert tuple(item.id for item in items) == uc._rt.leaf_nodes
 
     def test_len(self):
         uc = _uc_simple()
@@ -148,7 +173,7 @@ class TestSequenceProtocol:
         uc = _uc_simple()
         first = uc.leaves.first
         assert first in uc.leaves
-        assert (first + 999) not in uc.leaves
+        assert (first.id + 999) not in uc.leaves
 
     def test_bool_empty_is_false(self):
         uc = _uc_simple()
@@ -163,11 +188,18 @@ class TestSequenceProtocol:
 
     def test_set_over_selector(self):
         uc = _uc_simple()
-        assert set(uc.leaves) == set(uc._rt.leaf_nodes)
+        assert set(uc.leaves.ids) == set(uc._rt.leaf_nodes)
 
     def test_list_over_selector(self):
         uc = _uc_simple()
-        assert list(uc.leaves) == list(uc._rt.leaf_nodes)
+        assert list(uc.leaves.ids) == list(uc._rt.leaf_nodes)
+
+    def test_zip_over_selector_yields_handles(self):
+        uc = _uc_simple()
+        values = [10, 20, 30, 40]
+        pairs = list(zip(uc.leaves, values))
+        assert all(isinstance(branch, UCNodeHandle) for branch, _ in pairs)
+        assert [branch.id for branch, _ in pairs] == list(uc.leaves.ids)
 
 
 # ---------------------------------------------------------------------------
@@ -176,19 +208,18 @@ class TestSequenceProtocol:
 
 
 class TestIndexing:
-    def test_int_index_returns_one_element_selector(self):
+    def test_int_index_returns_handle(self):
         uc = _uc_simple()
         sel = uc.leaves
         first_sel = sel[0]
-        assert isinstance(first_sel, UCNodeSelector)
-        assert len(first_sel) == 1
-        assert first_sel.first == sel._ids[0]
+        assert isinstance(first_sel, UCNodeHandle)
+        assert first_sel.id == sel._ids[0]
 
     def test_negative_int_index(self):
         uc = _uc_simple()
         sel = uc.leaves
         last_sel = sel[-1]
-        assert last_sel.first == sel.last
+        assert last_sel.id == sel.last.id
 
     def test_slice_index(self):
         uc = _uc_simple()
@@ -227,13 +258,13 @@ class TestRawAccess:
         assert isinstance(uc.leaves.ids, tuple)
         assert uc.leaves.ids == uc._rt.leaf_nodes
 
-    def test_first_last_are_ints(self):
+    def test_first_last_are_handles(self):
         uc = _uc_simple()
         sel = uc.leaves
-        assert isinstance(sel.first, int)
-        assert isinstance(sel.last, int)
-        assert sel.first == sel._ids[0]
-        assert sel.last == sel._ids[-1]
+        assert isinstance(sel.first, UCNodeHandle)
+        assert isinstance(sel.last, UCNodeHandle)
+        assert sel.first.id == sel._ids[0]
+        assert sel.last.id == sel._ids[-1]
 
     def test_owner_property(self):
         uc = _uc_simple()
@@ -255,7 +286,7 @@ class TestComposition:
         for i, c in enumerate(contexts):
             assert c.index == i
             assert c.total == total
-            assert c.node == uc.leaves._ids[i]
+            assert c.id == uc.leaves._ids[i]
 
     def test_filter_preserves_subclass(self):
         uc = _uc_simple()
@@ -316,33 +347,37 @@ class TestComposition:
 
 
 class TestLeavesSubExpansion:
-    def test_leaves_of_multi_branch_selection_expands(self):
+    def test_leaves_of_multi_branch_selection_raises(self):
         uc = _uc_nested()
         branches = uc.at_depth(1)
-        result = branches.leaves
-        # Expansion should include all leaves (union of each branch's subtree)
-        assert set(result.ids) == set(uc.leaves.ids)
+        with pytest.raises(ValueError, match="single-node selector"):
+            _ = branches.leaves
 
     def test_leaves_of_single_branch(self):
         uc = _uc_nested()
         first_branch = uc.at_depth(1)[0]
         result = first_branch.leaves
-        expected = set(uc._rt.subtree_leaves(first_branch.first))
+        expected = set(uc._rt.subtree_leaves(first_branch.id))
         assert set(result.ids) == expected
 
     def test_leaves_on_leaf_selection_is_identity(self):
         uc = _uc_simple()
-        assert uc.leaves.leaves.ids == uc.leaves.ids
+        with pytest.raises(ValueError, match="single-node selector"):
+            _ = uc.leaves.leaves
 
-    def test_leaves_preserves_order_and_dedups(self):
+    def test_children_of_multi_selection_raises(self):
         uc = _uc_nested()
-        # two overlapping subtrees via ad-hoc selection
         branches = uc.at_depth(1)
-        # Union the branches twice - dedup should kick in
-        dup = uc.select(branches.first, branches.last, branches.first)
-        result = dup.leaves
-        # no duplicate ids
-        assert len(result.ids) == len(set(result.ids))
+        with pytest.raises(ValueError, match="single-node selector"):
+            _ = branches.children
+
+    def test_singleton_leaf_and_child_aliases(self):
+        uc = _uc_nested()
+        branch = uc.at_depth(1)[0]
+        assert branch.first_leaf == branch.leaves[0]
+        assert branch.last_leaf == branch.leaves[-1]
+        assert branch.first_child == branch.children[0]
+        assert branch.last_child == branch.children[-1]
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +464,7 @@ class TestFluentVerbDelegation:
         uc = _uc_simple()
         tri = SynthDefInstrument.tri()
         uc.leaves[0].set_instrument(tri)
-        assert uc.get_instrument(uc.leaves[0].first) is tri
+        assert uc.get_instrument(uc.leaves[0].id) is tri
 
     def test_root_set_pfields_equivalent_to_raw(self):
         uc1 = _uc_simple()

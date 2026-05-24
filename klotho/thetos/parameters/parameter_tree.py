@@ -92,15 +92,6 @@ class ParameterTree(Tree):
     def subtree(self, node, renumber=True):
         return super().subtree(node, renumber)
 
-    def _map_parallel_nodes(self, other_tree, other_node, this_node, mapping):
-        mapping[other_node] = this_node
-        other_children = list(other_tree.successors(other_node))
-        this_children = list(self.successors(this_node))
-        if len(other_children) != len(this_children):
-            raise ValueError("Topology mismatch while mapping grafted subtree")
-        for o_child, t_child in zip(other_children, this_children):
-            self._map_parallel_nodes(other_tree, o_child, t_child, mapping)
-
     def graft_subtree(self, target_node, subtree, mode='replace'):
         if not isinstance(subtree, Tree):
             raise TypeError("subtree must be a Tree instance")
@@ -110,12 +101,19 @@ class ParameterTree(Tree):
         if isinstance(subtree, ParameterTree):
             mapping = {}
             if mode == 'replace':
-                self._map_parallel_nodes(subtree, subtree.root, graft_result, mapping)
+                mapping = subtree.map_parallel_nodes(
+                    self, self_root=subtree.root, other_root=graft_result
+                )
             else:
                 target_children = list(self.successors(target_node))
                 subtree_root_children = list(subtree.successors(subtree.root))
-                for o_child, t_child in zip(subtree_root_children, target_children[-len(subtree_root_children):]):
-                    self._map_parallel_nodes(subtree, o_child, t_child, mapping)
+                grafted_children = target_children[-len(subtree_root_children):]
+                for o_child, t_child in zip(subtree_root_children, grafted_children):
+                    mapping.update(
+                        subtree.map_parallel_nodes(
+                            self, self_root=o_child, other_root=t_child
+                        )
+                    )
 
             self._meta['pfields'].update(subtree._meta.get('pfields', set()))
             self._meta['mfields'].update(subtree._meta.get('mfields', set()))

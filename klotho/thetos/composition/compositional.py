@@ -9,13 +9,13 @@ class extends ``Chronon`` with parameter field access.
 
 from typing import Union, Optional, Any, Literal
 from fractions import Fraction
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import inspect
 import warnings
 import pandas as pd
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
-from klotho.chronos.temporal_units.temporal import Chronon, UTNodeSelector
+from klotho.chronos.temporal_units.temporal import Chronon, NodeContext, UTNodeHandle, UTNodeSelector
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.instruments import Instrument
 from klotho.thetos.instruments.base import Effect
@@ -24,35 +24,38 @@ from klotho.dynatos.envelopes import Envelope
 from klotho.topos.collections.sequences import Pattern
 
 
-@dataclass
-class DistributionContext:
-    """
-    Context object passed to callable parameter-field values during distribution.
-    
-    Attributes
-    ----------
-    index : int
-        Zero-based position of the current node in the target sequence.
-    total : int
-        Total number of target nodes being distributed to.
-    node : int
-        The node ID in the rhythm/parameter tree.
-    is_rest : bool
-        Whether this node is a rest.
-    pfields : dict
-        Effective parameter field values (PT overrides instrument).
-    mfields : dict
-        Meta field values from the PT.
-    instrument : Instrument or None
-        Resolved instrument for this node.
-    """
-    index: int
-    total: int
-    node: int
+@dataclass(frozen=True)
+class ParentDistributionView:
+    ref: UTNodeHandle
     is_rest: bool
     pfields: dict
     mfields: dict
     instrument: Any
+    _owner: Any = field(repr=False, compare=False)
+
+    @property
+    def id(self) -> int:
+        return self.ref.id
+
+    @property
+    def parent(self) -> Optional['ParentDistributionView']:
+        return self._owner._build_parent_distribution_view(self.id)
+
+    def __getattr__(self, key):
+        return getattr(self.ref, key)
+
+
+@dataclass(frozen=True)
+class DistributionContext(NodeContext):
+    is_rest: bool
+    pfields: dict
+    mfields: dict
+    instrument: Any
+    _owner: Any = field(repr=False, compare=False)
+
+    @property
+    def parent(self) -> Optional[ParentDistributionView]:
+        return self._owner._build_parent_distribution_view(self.id)
 
 
 PFieldContext = DistributionContext
@@ -66,22 +69,8 @@ def _resolve_kit_member(inst, pt, node):
 
 
 def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) -> DistributionContext:
-    pt = uc._pt
-    inst = pt.get_instrument(node)
-    effective = _resolve_kit_member(inst, pt, node) if inst is not None else inst
-    pfields = {}
-    inst_pfields = effective.pfields if (effective is not None and hasattr(effective, 'pfields')) else {}
-    for k in pt._meta['pfields']:
-        v = pt.get_pfield(node, k)
-        if v is None and effective is not None:
-            if k in inst_pfields:
-                v = inst_pfields[k]
-        pfields[k] = v
-    mfields = {k: pt.get_mfield(node, k) for k in pt._meta['mfields']}
-    return DistributionContext(
-        index=index, total=total, node=node, is_rest=is_rest,
-        pfields=pfields, mfields=mfields, instrument=inst
-    )
+    _ = is_rest
+    return uc._build_node_context(node, index, total)
 
 
 def _callable_arity(fn):
@@ -187,9 +176,8 @@ class UCNodeSelector(UTNodeSelector):
     """Selector for :class:`CompositionalUnit` owners.
 
     Extends :class:`UTNodeSelector` with UC-specific verbs that delegate to
-    the owning UC's parameter / envelope / slur / instrument mutators. Every
-    verb just passes ``list(self._ids)`` as the ``node`` argument - no new
-    dispatch logic is introduced here. Existing UC setter semantics
+    the owning UC's parameter / envelope / slur / instrument mutators. Existing
+    UC setter semantics
     (callable-per-node, Pattern-cycling, static tuple-as-poly-event,
     ``include_rests`` filtering, ensemble-family side effects, slur/envelope
     healing) are preserved verbatim.
@@ -199,25 +187,25 @@ class UCNodeSelector(UTNodeSelector):
     def set_pfields(self, include_rests: bool = False, **kwargs) -> None:
         """Set parameter field values on every selected node."""
         return self._owner.set_pfields(
-            list(self._ids), include_rests=include_rests, **kwargs
+            self, include_rests=include_rests, **kwargs
         )
 
     def set_mfields(self, include_rests: bool = False, **kwargs) -> None:
         """Set meta field values on every selected node."""
         return self._owner.set_mfields(
-            list(self._ids), include_rests=include_rests, **kwargs
+            self, include_rests=include_rests, **kwargs
         )
 
     def set_instrument(self, instrument):
         """Assign an instrument (or Pattern/callable thereof) to the selection."""
-        return self._owner.set_instrument(list(self._ids), instrument)
+        return self._owner.set_instrument(self, instrument)
 
     def apply_envelope(self, envelope, pfields, *, offset=0, take=None,
                        scope: str = 'span', control: bool = False,
                        endpoint: bool = True):
         """Apply an envelope to the selection. See :meth:`CompositionalUnit.apply_envelope`."""
         return self._owner.apply_envelope(
-            envelope, pfields, node=list(self._ids),
+            envelope, pfields, node=self,
             offset=offset, take=take, scope=scope,
             control=control, endpoint=endpoint,
         )
@@ -225,7 +213,7 @@ class UCNodeSelector(UTNodeSelector):
     def apply_slur(self, *, offset=0, take=None, mode: str = 'span'):
         """Apply a slur over the selection. See :meth:`CompositionalUnit.apply_slur`."""
         return self._owner.apply_slur(
-            node=list(self._ids), offset=offset, take=take, mode=mode,
+            node=self, offset=offset, take=take, mode=mode,
         )
 
     def clear_parameters(self) -> None:
@@ -237,7 +225,7 @@ class UCNodeSelector(UTNodeSelector):
             include_rests: bool = False):
         """Set instrument / mfields / pfields in one call across the selection."""
         return self._owner.set(
-            list(self._ids), inst=inst, mfields=mfields,
+            self, inst=inst, mfields=mfields,
             pfields=pfields, include_rests=include_rests,
         )
 
@@ -252,33 +240,70 @@ class UCNodeSelector(UTNodeSelector):
         return [self._owner.get_instrument(n) for n in self._ids]
 
 
-class UCNodeView:
-    """View of UC nodes; subscripting returns a Parametron for that node."""
+class UCNodeHandle(UTNodeHandle):
+    def set_pfields(self, include_rests: bool = False, **kwargs):
+        return self._owner.set_pfields(self.id, include_rests=include_rests, **kwargs)
 
-    def __init__(self, uc):
-        self._uc = uc
+    def set_mfields(self, include_rests: bool = False, **kwargs):
+        return self._owner.set_mfields(self.id, include_rests=include_rests, **kwargs)
 
-    def __getitem__(self, node):
-        self._uc._ensure_timing_cache()
-        return Parametron(node, self._uc, self._uc._pt)
+    def set_instrument(self, instrument):
+        return self._owner.set_instrument(self.id, instrument)
 
-    def __iter__(self):
-        return iter(self._uc._rt.nodes)
+    def apply_envelope(self, envelope, pfields, *, offset=0, take=None,
+                       scope: str = 'span', control: bool = False,
+                       endpoint: bool = True):
+        return self._owner.apply_envelope(
+            envelope, pfields, node=self.id,
+            offset=offset, take=take, scope=scope,
+            control=control, endpoint=endpoint,
+        )
 
-    def __contains__(self, node):
-        return node in self._uc._rt
+    def apply_slur(self, *, offset=0, take=None, mode: str = 'span'):
+        return self._owner.apply_slur(
+            node=self.id, offset=offset, take=take, mode=mode
+        )
 
-    def __len__(self):
-        return len(self._uc._rt)
+    def clear_parameters(self):
+        return self._owner.clear_parameters(self.id)
 
-    def __call__(self, data=False):
-        self._uc._ensure_timing_cache()
-        if data:
-            for node in self._uc._rt.nodes:
-                yield (node, Parametron(node, self._uc, self._uc._pt))
-        else:
-            for node in self._uc._rt.nodes:
-                yield node
+    def set(self, *, inst=None, mfields=None, pfields=None,
+            include_rests: bool = False):
+        return self._owner.set(
+            self.id, inst=inst, mfields=mfields,
+            pfields=pfields, include_rests=include_rests
+        )
+
+    @property
+    def is_rest(self):
+        return self._owner._rt[self.id].get('proportion', 1) < 0
+
+    @property
+    def pfields(self):
+        return {
+            key: self._owner.get_pfield(self.id, key)
+            for key in self._owner._pt._meta['pfields']
+        }
+
+    @property
+    def mfields(self):
+        return {
+            key: self._owner.get_mfield(self.id, key)
+            for key in self._owner._pt._meta['mfields']
+        }
+
+    @property
+    def instrument(self):
+        return self._owner.get_instrument(self.id)
+
+    def get_pfield(self, key: str, default=None):
+        return self._owner.get_pfield(self.id, key, default)
+
+    def get_mfield(self, key: str, default=None):
+        return self._owner.get_mfield(self.id, key, default)
+
+    def get_instrument(self):
+        return self._owner.get_instrument(self.id)
 
 
 class CompositionalUnit(TemporalUnit):
@@ -325,6 +350,7 @@ class CompositionalUnit(TemporalUnit):
     """
 
     _node_selector_class = UCNodeSelector
+    _node_handle_class = UCNodeHandle
 
     def __init__(self,
                  span     : Union[int, float, Fraction]            = 1,
@@ -353,10 +379,6 @@ class CompositionalUnit(TemporalUnit):
         self._control_envelopes: dict[int, dict] = {}
         self._next_envelope_id = 0
 
-    @property
-    def nodes(self):
-        return UCNodeView(self)
-    
     @classmethod
     def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
         """
@@ -488,22 +510,81 @@ class CompositionalUnit(TemporalUnit):
             default_values = {field: '' for field in mfields}
             pt.set_mfields(pt.root, **default_values)
 
+    def _copy_pt_node_data(self, target_cu: 'CompositionalUnit', mapping: dict[int, int]) -> None:
+        for old_node, new_node in mapping.items():
+            target_cu._pt.replace_node_data(new_node, dict(self._pt.items(old_node)))
+        target_cu._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
+        target_cu._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
+
+    def _copy_pt_instruments(self, target_cu: 'CompositionalUnit', mapping: dict[int, int]) -> None:
+        for old_node, inst in self._pt._node_instruments.items():
+            new_node = mapping.get(old_node)
+            if new_node is not None:
+                target_cu._pt.set_instrument(new_node, inst)
+
+    def _sync_pt_after_rt_subdivide(self, node: int, new_children: list[int],
+                                    pfields: dict, mfields: dict) -> None:
+        for _ in new_children:
+            self._pt.add_child(node)
+        self._pt._invalidate_caches()
+        for child in new_children:
+            if pfields:
+                self._pt.set_pfields(child, **pfields)
+            if mfields:
+                self._pt.set_mfields(child, **mfields)
+
     def _resolve_governing_instrument_node(self, node: int):
         return self._pt._resolve_governing_instrument_node(node)
+
+    def _resolve_distribution_fields(self, node_id: int):
+        inst = self._pt.get_instrument(node_id)
+        effective = _resolve_kit_member(inst, self._pt, node_id) if inst is not None else inst
+        inst_pfields = effective.pfields if (effective is not None and hasattr(effective, "pfields")) else {}
+        pfields = {}
+        for key in self._pt._meta["pfields"]:
+            value = self._pt.get_pfield(node_id, key)
+            if value is None and key in inst_pfields:
+                value = inst_pfields[key]
+            pfields[key] = value
+        mfields = {key: self._pt.get_mfield(node_id, key) for key in self._pt._meta["mfields"]}
+        is_rest = self._rt[node_id].get("proportion", 1) < 0
+        return is_rest, pfields, mfields, inst
+
+    def _build_parent_distribution_view(self, node_id: int) -> Optional[ParentDistributionView]:
+        parent_id = self._rt.parent(node_id)
+        if parent_id is None:
+            return None
+        is_rest, pfields, mfields, instrument = self._resolve_distribution_fields(parent_id)
+        return ParentDistributionView(
+            ref=self._build_node_handle(parent_id),
+            is_rest=is_rest,
+            pfields=pfields,
+            mfields=mfields,
+            instrument=instrument,
+            _owner=self,
+        )
+
+    def _build_node_context(self, node_id: int, index: int, total: int) -> DistributionContext:
+        base = super()._build_node_context(node_id, index, total)
+        is_rest, pfields, mfields, instrument = self._resolve_distribution_fields(node_id)
+        return DistributionContext(
+            ref=base.ref,
+            index=index,
+            total=total,
+            is_rest=is_rest,
+            pfields=pfields,
+            mfields=mfields,
+            instrument=instrument,
+            _owner=self,
+        )
 
     def _normalize_node_input(self, node):
         if node is None:
             raise ValueError("node selection is required")
-        if isinstance(node, int):
-            source_nodes = [node]
-        else:
-            try:
-                source_nodes = list(node)
-            except TypeError as exc:
-                raise ValueError("node must be an int or an iterable of ints") from exc
-        if not source_nodes:
-            raise ValueError("Selection cannot be empty")
-        return source_nodes
+        try:
+            return self._coerce_node_targets(node)
+        except TypeError as exc:
+            raise ValueError("node must be int, selector, or iterable thereof") from exc
 
     def _resolve_leaf_selection(self, node):
         source_nodes = self._normalize_node_input(node)
@@ -585,6 +666,10 @@ class CompositionalUnit(TemporalUnit):
     def _event_context(self):
         self._ensure_timing_cache()
         return self._build_effective_parameter_tree()
+
+    def _make_node_proxy(self, node_id: int):
+        self._ensure_timing_cache()
+        return Parametron(node_id, self, self._pt)
 
     def _make_event(self, node_id: int, event_context=None):
         eval_pt = event_context if event_context is not None else self._build_effective_parameter_tree()
@@ -738,7 +823,7 @@ class CompositionalUnit(TemporalUnit):
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
         """
-        targets = [node] if isinstance(node, int) else list(node)
+        targets = self._coerce_node_targets(node)
 
         distributable_fields = {k: v for k, v in kwargs.items()
                                if callable(v) or isinstance(v, Pattern)}
@@ -768,7 +853,7 @@ class CompositionalUnit(TemporalUnit):
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
         """
-        targets = [node] if isinstance(node, int) else list(node)
+        targets = self._coerce_node_targets(node)
 
         distributable_fields = {k: v for k, v in kwargs.items()
                                if callable(v) or isinstance(v, Pattern)}
@@ -960,10 +1045,10 @@ class CompositionalUnit(TemporalUnit):
         for leaf in leaves:
             if leaf not in self._pt:
                 continue
-            node_data = self._pt._graph[leaf]
+            node_data = self._pt.items(leaf)
             for pfield in desc["pfields"]:
                 node_data.pop(pfield, None)
-        self._pt._effective_cache = None
+            self._pt.replace_node_data(leaf, node_data)
 
     def apply_envelope(self,
                        envelope: Envelope,
@@ -1265,7 +1350,7 @@ class CompositionalUnit(TemporalUnit):
         node : int or iterable of int
             The node ID (or iterable of node IDs) to convert to rests.
         """
-        nodes = [node] if isinstance(node, int) else list(node)
+        nodes = self._coerce_node_targets(node)
         affected: set = set()
         for n in nodes:
             affected.add(n)
@@ -1299,16 +1384,7 @@ class CompositionalUnit(TemporalUnit):
         self._rt.subdivide(node, S)
         self._invalidate_timing_cache()
         new_children = list(self._rt.successors(node))
-
-        for _ in new_children:
-            self._pt.add_child(node)
-        self._pt._invalidate_caches()
-
-        for child in new_children:
-            if pfields:
-                self._pt.set_pfields(child, **pfields)
-            if mfields:
-                self._pt.set_mfields(child, **mfields)
+        self._sync_pt_after_rt_subdivide(node, new_children, pfields, mfields)
 
         new_leaves = list(self._rt.subtree_leaves(node))
         self._heal_slurs_after_subdivide(node, new_leaves)
@@ -1355,7 +1431,7 @@ class CompositionalUnit(TemporalUnit):
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
         """
-        targets = [node] if isinstance(node, int) else list(node)
+        targets = self._coerce_node_targets(node)
 
         if isinstance(instrument, (str, int)):
             for n in targets:
@@ -1435,12 +1511,10 @@ class CompositionalUnit(TemporalUnit):
         import numpy as _np
         if node is None:
             targets = list(self._rt.leaf_nodes)
-        elif isinstance(node, int):
-            targets = list(self._rt.subtree_leaves(node))
         else:
             seen = set()
             targets = []
-            for n in node:
+            for n in self._coerce_node_targets(node):
                 for leaf in self._rt.subtree_leaves(n):
                     if leaf not in seen:
                         seen.add(leaf)
@@ -1528,38 +1602,18 @@ class CompositionalUnit(TemporalUnit):
         rt_subtree = self._rt.subtree(node, renumber=True)
         new_cu = self.__class__.from_rt(rt_subtree, beat=self.beat, bpm=self.bpm, pfields=None)
         original_subtree_nodes = [node] + list(self._rt.descendants(node))
-
-        def _path_signature(tree, root_node, target_node):
-            branch = list(tree.branch(target_node))
-            root_idx = branch.index(root_node)
-            signature = []
-            for i in range(root_idx + 1, len(branch)):
-                parent = branch[i - 1]
-                current = branch[i]
-                signature.append(list(tree.successors(parent)).index(current))
-            return tuple(signature)
-
-        def _node_from_signature(tree, root_node, signature):
-            current = root_node
-            for idx in signature:
-                current = list(tree.successors(current))[idx]
-            return current
-
-        old_to_new_mapping = {}
-        for old_node in original_subtree_nodes:
-            sig = _path_signature(self._rt, node, old_node)
-            old_to_new_mapping[old_node] = _node_from_signature(new_cu._rt, new_cu._rt.root, sig)
+        old_to_new_mapping = self._rt.map_parallel_nodes(
+            new_cu._rt,
+            self_root=node,
+            other_root=new_cu._rt.root,
+        )
 
         for old_node, new_node in old_to_new_mapping.items():
             old_proportion = self._rt[old_node].get('proportion')
             if old_proportion is not None and old_proportion < 0:
                 new_cu.make_rest(new_node)
 
-        for old_node, new_node in old_to_new_mapping.items():
-            node_data = self._pt.items(old_node)
-            new_cu._pt._graph[new_node] = dict(node_data)
-        new_cu._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
-        new_cu._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
+        self._copy_pt_node_data(new_cu, old_to_new_mapping)
 
         subtree_node_set = set(original_subtree_nodes)
         governing_instrument_node = self._pt._resolve_governing_instrument_node(node)
@@ -1570,12 +1624,7 @@ class CompositionalUnit(TemporalUnit):
                 new_cu._pt.root,
                 self._pt._node_instruments[governing_instrument_node]
             )
-        for old_node in original_subtree_nodes:
-            if old_node in self._pt._node_instruments:
-                new_cu._pt.set_instrument(
-                    old_to_new_mapping[old_node],
-                    self._pt._node_instruments[old_node]
-                )
+        self._copy_pt_instruments(new_cu, old_to_new_mapping)
 
         old_leaf_set = set(self._rt.subtree_leaves(node))
         for slur_id, slur_spec in self._slur_specs.items():
@@ -1638,39 +1687,54 @@ class CompositionalUnit(TemporalUnit):
             beat     = self.beat,
             bpm      = self.bpm,
         )
+        old_to_new_mapping = self._rt.map_parallel_nodes(
+            c._rt,
+            self_root=self._rt.root,
+            other_root=c._rt.root,
+        )
 
-        for old_node in self._rt.nodes:
+        for old_node, new_node in old_to_new_mapping.items():
             old_proportion = self._rt[old_node].get('proportion')
             if old_proportion is not None and old_proportion < 0:
-                if c._rt[old_node].get('proportion', 1) >= 0:
-                    c.make_rest(old_node)
+                if c._rt[new_node].get('proportion', 1) >= 0:
+                    c.make_rest(new_node)
 
-        for node in self._pt.nodes:
-            node_data = self._pt.items(node)
-            c._pt._graph[node] = dict(node_data)
-        c._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
-        c._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
-        for inst_node, inst in self._pt._node_instruments.items():
-            c._pt.set_instrument(inst_node, inst)
+        self._copy_pt_node_data(c, old_to_new_mapping)
+        self._copy_pt_instruments(c, old_to_new_mapping)
 
         for slur_id, spec in self._slur_specs.items():
+            mapped_leaf_nodes = tuple(
+                old_to_new_mapping[n]
+                for n in spec['leaf_nodes']
+                if n in old_to_new_mapping
+            )
+            if not mapped_leaf_nodes:
+                continue
             c._slur_specs[slur_id] = {
-                'leaf_nodes': tuple(spec['leaf_nodes']),
-                'leaf_set': set(spec['leaf_set']),
-                'index_range': tuple(spec['index_range']),
+                'leaf_nodes': mapped_leaf_nodes,
+                'leaf_set': set(mapped_leaf_nodes),
+                'index_range': tuple(c._selection_index_range(mapped_leaf_nodes)),
             }
         c._next_slur_id = self._next_slur_id
 
         for env_id, desc in self._control_envelopes.items():
+            if desc["anchor_node"] not in old_to_new_mapping:
+                continue
+            mapped_leaf_subset = (
+                tuple(
+                    old_to_new_mapping[n]
+                    for n in desc["leaf_subset"]
+                    if n in old_to_new_mapping
+                )
+                if desc["leaf_subset"] is not None
+                else None
+            )
             c._control_envelopes[env_id] = {
                 "envelope": desc["envelope"],
                 "pfields": list(desc["pfields"]),
                 "endpoint": desc["endpoint"],
-                "anchor_node": desc["anchor_node"],
-                "leaf_subset": (
-                    tuple(desc["leaf_subset"])
-                    if desc["leaf_subset"] is not None else None
-                ),
+                "anchor_node": old_to_new_mapping[desc["anchor_node"]],
+                "leaf_subset": mapped_leaf_subset,
             }
         c._next_envelope_id = self._next_envelope_id
 

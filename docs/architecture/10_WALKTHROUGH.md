@@ -226,7 +226,7 @@ uc.apply_envelope(env, pfields='amp', node=uc.root)
 ```
 
 The full signature is
-`apply_envelope(envelope, pfields, node, offset=0, take=None, mode="span", endpoint=True)`.
+`apply_envelope(envelope, pfields, node, offset=0, take=None, scope="span", endpoint=True)`.
 
 ### What Happens Internally
 

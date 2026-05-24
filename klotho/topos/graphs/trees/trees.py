@@ -355,6 +355,80 @@ class Tree(Graph):
         branch_indices.reverse()
         return tuple(self._get_node_object(idx) for idx in branch_indices)
 
+    def path_signature(self, root_node, target_node):
+        """Return child-index path from ``root_node`` to ``target_node``.
+
+        The signature is a tuple of child indices describing how to navigate
+        from ``root_node`` to ``target_node`` by repeated ``successors`` lookups.
+        """
+        if root_node not in self:
+            raise ValueError(f"Root node {root_node} not found in tree")
+        if target_node not in self:
+            raise ValueError(f"Target node {target_node} not found in tree")
+
+        branch = list(self.branch(target_node))
+        if root_node not in branch:
+            raise ValueError(
+                f"Node {target_node} is not in subtree rooted at {root_node}"
+            )
+
+        root_idx = branch.index(root_node)
+        signature = []
+        for i in range(root_idx + 1, len(branch)):
+            parent = branch[i - 1]
+            current = branch[i]
+            children = list(self.successors(parent))
+            signature.append(children.index(current))
+        return tuple(signature)
+
+    def node_from_signature(self, root_node, signature):
+        """Resolve a node by child-index signature from ``root_node``."""
+        if root_node not in self:
+            raise ValueError(f"Root node {root_node} not found in tree")
+
+        current = root_node
+        for idx in signature:
+            children = list(self.successors(current))
+            if idx < 0 or idx >= len(children):
+                raise ValueError(
+                    f"Invalid child index {idx} for node {current} with {len(children)} children"
+                )
+            current = children[idx]
+        return current
+
+    def map_parallel_nodes(self, other_tree, self_root=None, other_root=None):
+        """Map nodes between topologically parallel subtrees.
+
+        Returns a dict mapping nodes in ``self`` to corresponding nodes in
+        ``other_tree`` by child-order traversal.
+        """
+        if not isinstance(other_tree, Tree):
+            raise TypeError("other_tree must be a Tree instance")
+
+        self_root = self.root if self_root is None else self_root
+        other_root = other_tree.root if other_root is None else other_root
+
+        if self_root not in self:
+            raise ValueError(f"Node {self_root} not found in source tree")
+        if other_root not in other_tree:
+            raise ValueError(f"Node {other_root} not found in target tree")
+
+        mapping = {}
+        stack = [(self_root, other_root)]
+        while stack:
+            src_node, dst_node = stack.pop()
+            mapping[src_node] = dst_node
+
+            src_children = list(self.successors(src_node))
+            dst_children = list(other_tree.successors(dst_node))
+            if len(src_children) != len(dst_children):
+                raise ValueError(
+                    "Topology mismatch while mapping parallel subtrees"
+                )
+            for src_child, dst_child in zip(reversed(src_children), reversed(dst_children)):
+                stack.append((src_child, dst_child))
+        return mapping
+
     def siblings(self, node):
         """Returns the siblings of a node (nodes with the same parent)."""
         parent = self.parent(node)

@@ -164,6 +164,66 @@ applies the shift/scale to the returned payload.
 
 ## Porting pre-Score workflows
 
+## Selector + Context migration (breaking)
+
+The selector/context surface is now node-handle-first and removes
+selector indirection from common loops.
+
+### 1) Selector iteration now yields node handles
+
+```python
+# Before
+for n in uc.at_depth(1):      # n was int
+    uc.leaves_of(n).set_pfields(freq=...)
+
+# After
+for branch in uc.at_depth(1): # branch is a NodeHandle
+    branch.leaves.set_pfields(freq=...)
+    branch.subdivide((1, 1))
+    _ = branch.real_duration
+
+# Raw IDs when needed:
+node_ids = uc.at_depth(1).ids
+```
+
+### 2) Subtree navigation lives on node handles
+
+```python
+# Now invalid (raises)
+uc.at_depth(1).leaves
+uc.at_depth(1).children
+uc.leaves_of(uc.at_depth(1))
+uc.successors(uc.at_depth(1))
+
+# Valid
+uc.at_depth(1)[0].leaves
+uc.leaves_of(uc.at_depth(1)[0])
+uc.successors(uc.at_depth(1)[0])
+```
+
+### 3) `select(...)` accepts handles and preserves duplicates
+
+```python
+uc.select(branch.first_leaf for branch in uc.at_depth(1)).set_pfields(accent=1)
+for singleton in uc.at_depth(1).singletons():
+    singleton.leaves.set_mfields(group='x')
+uc.select([3, 3, 7]).set_mfields(group='x')  # duplicate 3 is retained intentionally
+```
+
+No implicit dedupe is applied during coercion/selection.
+
+### 4) Distribution/filter context now uses `c.id`
+
+Use `c.id` as the node identifier in callables:
+
+```python
+uc.leaves.filter(lambda c: c.parent.sibling_index == 0).set_pfields(accent=1)
+uc.leaves.set_pfields(freq=lambda c: 220 + 20 * c.index)
+```
+
+`c.parent` exposes structural + PT context for the parent node; parent
+contexts do not carry selection-relative `index` / `total`.
+
 ### "I built and stretched a UTS, then played it"
 
 ```python

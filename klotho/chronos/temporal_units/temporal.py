@@ -11,7 +11,7 @@ structures.
 """
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Callable, Iterable, Iterator, Union
+from typing import Any, Callable, Iterable, Iterator, Optional, Union
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms import auto_subdiv
 from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms
@@ -48,23 +48,155 @@ class TemporalMeta(type):
     pass
 
 
+class UTNodeHandle:
+    __slots__ = ("_owner", "_node_id")
+
+    def __init__(self, owner: Any, node_id: int):
+        self._owner = owner
+        self._node_id = node_id
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(id={self._node_id})"
+
+    def __hash__(self) -> int:
+        return hash((id(self._owner), self._node_id))
+
+    def __eq__(self, other):
+        if isinstance(other, UTNodeHandle):
+            return self._owner is other._owner and self._node_id == other._node_id
+        if isinstance(other, int):
+            return self._node_id == other
+        return NotImplemented
+
+    @property
+    def id(self) -> int:
+        return self._node_id
+
+    @property
+    def node_id(self) -> int:
+        return self._node_id
+
+    def _rt_node(self):
+        return self._owner._rt[self._node_id]
+
+    @property
+    def depth(self) -> int:
+        return self._owner._rt.depth_of(self._node_id)
+
+    @property
+    def sibling_index(self) -> int:
+        parent = self._owner._rt.parent(self._node_id)
+        siblings = list(self._owner._rt.successors(parent)) if parent is not None else [self._node_id]
+        return siblings.index(self._node_id)
+
+    @property
+    def sibling_total(self) -> int:
+        parent = self._owner._rt.parent(self._node_id)
+        siblings = list(self._owner._rt.successors(parent)) if parent is not None else [self._node_id]
+        return len(siblings)
+
+    @property
+    def parent(self) -> Optional["UTNodeHandle"]:
+        parent_id = self._owner._rt.parent(self._node_id)
+        if parent_id is None:
+            return None
+        return self._owner._build_node_handle(parent_id)
+
+    @property
+    def proportion(self):
+        return self._rt_node().get("proportion")
+
+    @property
+    def metric_onset(self):
+        return self._rt_node().get("metric_onset")
+
+    @property
+    def metric_duration(self):
+        return self._rt_node().get("metric_duration")
+
+    @property
+    def real_onset(self):
+        self._owner._ensure_timing_cache()
+        return self._owner._real_times[self._node_id]["real_onset"]
+
+    @property
+    def real_duration(self):
+        self._owner._ensure_timing_cache()
+        return self._owner._real_times[self._node_id]["real_duration"]
+
+    @property
+    def leaves(self) -> "UTNodeSelector":
+        rt = self._owner._rt
+        if self._node_id in rt.leaf_nodes:
+            ids = (self._node_id,)
+        else:
+            ids = tuple(rt.subtree_leaves(self._node_id))
+        return self._owner._node_selector_class(self._owner, ids)
+
+    @property
+    def children(self) -> "UTNodeSelector":
+        return self._owner._node_selector_class(
+            self._owner, tuple(self._owner._rt.successors(self._node_id))
+        )
+
+    @property
+    def first_leaf(self):
+        return self.leaves.first
+
+    @property
+    def last_leaf(self):
+        return self.leaves.last
+
+    @property
+    def first_child(self):
+        return self.children.first
+
+    @property
+    def last_child(self):
+        return self.children.last
+
+    def make_rest(self):
+        return self._owner.make_rest(self._node_id)
+
+    def subdivide(self, S):
+        self._owner.subdivide(self._node_id, S)
+        return self._owner
+
+    def sparsify(self, probability):
+        return self._owner.sparsify(probability, node=self._node_id)
+
+    def __getitem__(self, key):
+        if key in ("real_onset", "real_duration"):
+            return getattr(self, key)
+        return self._rt_node()[key]
+
+    def get(self, key, default=None):
+        if key in ("real_onset", "real_duration"):
+            return getattr(self, key)
+        return self._rt_node().get(key, default)
+
+    def __contains__(self, key):
+        if key in ("real_onset", "real_duration"):
+            return True
+        return key in self._rt_node()
+
+
 @dataclass(frozen=True)
 class NodeContext:
-    """Context object passed to predicates in ``UTNodeSelector.filter``.
-
-    Attributes
-    ----------
-    node : int
-        The node ID being evaluated.
-    index : int
-        Zero-based position within the current selection.
-    total : int
-        Total number of nodes in the current selection.
-    """
-
-    node: int
+    ref: UTNodeHandle
     index: int
     total: int
+
+    @property
+    def id(self) -> int:
+        return self.ref.id
+
+    @property
+    def parent(self) -> Optional[UTNodeHandle]:
+        return self.ref.parent
+
+    def __getattr__(self, key):
+        return getattr(self.ref, key)
 
 
 class UTNodeSelector:
@@ -100,10 +232,15 @@ class UTNodeSelector:
     def __len__(self) -> int:
         return len(self._ids)
 
-    def __iter__(self) -> Iterator[int]:
-        return iter(self._ids)
+    def __iter__(self) -> Iterator[UTNodeHandle]:
+        owner = self._owner
+        return (owner._build_node_handle(n) for n in self._ids)
 
     def __contains__(self, node) -> bool:
+        if isinstance(node, UTNodeHandle):
+            if node._owner is not self._owner:
+                return False
+            node = node.id
         return node in self._ids
 
     def __bool__(self) -> bool:
@@ -129,13 +266,21 @@ class UTNodeSelector:
         return self._ids
 
     @property
-    def first(self) -> int:
-        """The first node ID in the selection."""
+    def first(self) -> UTNodeHandle:
+        """The first node handle in the selection."""
+        return self._owner._build_node_handle(self._ids[0])
+
+    @property
+    def last(self) -> UTNodeHandle:
+        """The last node handle in the selection."""
+        return self._owner._build_node_handle(self._ids[-1])
+
+    @property
+    def first_id(self) -> int:
         return self._ids[0]
 
     @property
-    def last(self) -> int:
-        """The last node ID in the selection."""
+    def last_id(self) -> int:
         return self._ids[-1]
 
     @property
@@ -144,9 +289,9 @@ class UTNodeSelector:
         return self._owner
 
     # --- Indexing (always returns same subclass) ---
-    def __getitem__(self, key) -> 'UTNodeSelector':
+    def __getitem__(self, key):
         if isinstance(key, int):
-            return type(self)(self._owner, (self._ids[key],))
+            return self._owner._build_node_handle(self._ids[key])
         if isinstance(key, slice):
             return type(self)(self._owner, self._ids[key])
         if isinstance(key, (list, tuple)):
@@ -157,30 +302,54 @@ class UTNodeSelector:
         )
 
     # --- Sub-selection on the underlying tree ---
+    def _require_singleton(self, name: str) -> int:
+        if len(self._ids) != 1:
+            raise ValueError(
+                f"{name} requires a single-node selector; got {len(self._ids)} nodes. "
+                f"Iterate (for branch in sel:) or use {type(self._owner).__name__.lower()}.select(...)"
+            )
+        return self._ids[0]
+
+    def selectors(self):
+        cls = type(self)
+        owner = self._owner
+        return tuple(cls(owner, (n,)) for n in self._ids)
+
+    def singletons(self):
+        return self.selectors()
+
     @property
     def leaves(self) -> 'UTNodeSelector':
-        """Expand this selection to the union of leaves under each selected node.
-
-        If a selected node is itself a leaf, it is included. Order-preserving
-        (left-to-right within each subtree, scenarios preserved in selection
-        order) and de-duplicated. Enables chaining like
-        ``uc.at_depth(1)[0].leaves.set_pfields(...)``.
-        """
+        """Leaves of the subtree rooted at this single selected node."""
+        n = self._require_singleton("leaves")
         rt = self._owner._rt
-        leaf_set = set(rt.leaf_nodes)
-        seen: set = set()
-        result: list = []
-        for n in self._ids:
-            if n in leaf_set:
-                if n not in seen:
-                    seen.add(n)
-                    result.append(n)
-            else:
-                for lf in rt.subtree_leaves(n):
-                    if lf not in seen:
-                        seen.add(lf)
-                        result.append(lf)
-        return type(self)(self._owner, tuple(result))
+        if n in rt.leaf_nodes:
+            ids = (n,)
+        else:
+            ids = tuple(rt.subtree_leaves(n))
+        return type(self)(self._owner, ids)
+
+    @property
+    def children(self) -> 'UTNodeSelector':
+        """Direct children of this single selected node."""
+        n = self._require_singleton("children")
+        return type(self)(self._owner, tuple(self._owner._rt.successors(n)))
+
+    @property
+    def first_leaf(self) -> 'UTNodeSelector':
+        return self.leaves[0]
+
+    @property
+    def last_leaf(self) -> 'UTNodeSelector':
+        return self.leaves[-1]
+
+    @property
+    def first_child(self) -> 'UTNodeSelector':
+        return self.children[0]
+
+    @property
+    def last_child(self) -> 'UTNodeSelector':
+        return self.children[-1]
 
     # --- Composition (all preserve subclass) ---
     def filter(self, predicate: Callable[['NodeContext'], bool]) -> 'UTNodeSelector':
@@ -188,7 +357,7 @@ class UTNodeSelector:
         total = len(self._ids)
         return type(self)(self._owner, tuple(
             n for i, n in enumerate(self._ids)
-            if predicate(NodeContext(node=n, index=i, total=total))
+            if predicate(self._owner._build_node_context(n, i, total))
         ))
 
     def where(self, mask: Iterable[bool]) -> 'UTNodeSelector':
@@ -226,15 +395,17 @@ class UTNodeSelector:
     # --- UT-level mutators ---
     def make_rest(self):
         """Rest every node in the selection (and its subtree)."""
-        return self._owner.make_rest(list(self._ids))
+        return self._owner.make_rest(self)
 
     def subdivide(self, S):
         """Subdivide every node in the selection with structure ``S``."""
-        return self._owner.subdivide(list(self._ids), S)
+        for n in self._ids:
+            self._owner.subdivide(n, S)
+        return self._owner
 
     def sparsify(self, probability):
         """Sparsify leaves under the selection's nodes with ``probability``."""
-        return self._owner.sparsify(probability, node=list(self._ids))
+        return self._owner.sparsify(probability, node=self)
 
 
 class UTNodeView:
@@ -244,21 +415,28 @@ class UTNodeView:
         self._ut = ut
 
     def __getitem__(self, node):
-        return Chronon(node, self._ut)
+        self._ut._ensure_timing_cache()
+        node_id = self._ut._coerce_singleton_node_target(node, "nodes")
+        return self._ut._make_node_proxy(node_id)
 
     def __iter__(self):
         return iter(self._ut._rt.nodes)
 
     def __contains__(self, node):
-        return node in self._ut._rt
+        try:
+            node_id = self._ut._coerce_singleton_node_target(node, "nodes")
+        except (TypeError, ValueError):
+            return False
+        return node_id in self._ut._rt
 
     def __len__(self):
         return len(self._ut._rt)
 
     def __call__(self, data=False):
+        self._ut._ensure_timing_cache()
         if data:
             for node in self._ut._rt.nodes:
-                yield (node, Chronon(node, self._ut))
+                yield (node, self._ut._make_node_proxy(node))
         else:
             for node in self._ut._rt.nodes:
                 yield node
@@ -288,6 +466,7 @@ class Chronon(metaclass=TemporalMeta):
         return self._ut._rt[self._node_id]
 
     def _real_data(self):
+        self._ut._ensure_timing_cache()
         return self._ut._real_times.get(self._node_id, {})
 
     def __getattr__(self, key):
@@ -449,10 +628,58 @@ class TemporalUnit(metaclass=TemporalMeta):
                    bpm      = bpm)
     
     _node_selector_class = UTNodeSelector
+    _node_handle_class = UTNodeHandle
 
     @property
     def nodes(self):
         return UTNodeView(self)
+
+    def _coerce_node_targets(self, node) -> list[int]:
+        def _append(item, out):
+            if isinstance(item, int):
+                out.append(item)
+            elif isinstance(item, UTNodeHandle):
+                if item._owner is not self:
+                    raise ValueError("node handle belongs to a different owner")
+                out.append(item.id)
+            elif isinstance(item, UTNodeSelector):
+                if item.owner is not self:
+                    raise ValueError("selector belongs to a different owner")
+                out.extend(item.ids)
+            else:
+                raise TypeError("node must be int, node handle, selector, or iterable thereof")
+
+        if isinstance(node, (int, UTNodeHandle, UTNodeSelector)):
+            ids = []
+            _append(node, ids)
+        else:
+            ids = []
+            for item in node:
+                _append(item, ids)
+        if not ids:
+            raise ValueError("Selection cannot be empty")
+        return ids
+
+    def _coerce_singleton_node_target(self, node, name: str) -> int:
+        ids = self._coerce_node_targets(node)
+        if len(ids) != 1:
+            raise ValueError(
+                f"{name} requires a single-node selector; got {len(ids)} nodes. "
+                "Iterate (for branch in sel:) and call subtree helpers on each singleton."
+            )
+        return ids[0]
+
+    def _build_node_handle(self, node_id: int) -> UTNodeHandle:
+        self._ensure_timing_cache()
+        if node_id not in self._rt.nodes:
+            raise ValueError(f"Node {node_id} not found in tree")
+        return self._node_handle_class(self, node_id)
+
+    def _build_node_ref(self, node_id: int) -> UTNodeHandle:
+        return self._build_node_handle(node_id)
+
+    def _build_node_context(self, node_id: int, index: int, total: int) -> NodeContext:
+        return NodeContext(ref=self._build_node_handle(node_id), index=index, total=total)
 
     # ------------------------------------------------------------------
     # Node-returning traversal (returns selector bound to this UT/UC)
@@ -471,23 +698,27 @@ class TemporalUnit(metaclass=TemporalMeta):
         """
         return self._node_selector_class(self, (self._rt.root,))
 
-    def leaves_of(self, node: int):
+    def leaves_of(self, node):
         """Leaves of the subtree rooted at ``node`` (selector form of RT.subtree_leaves)."""
-        return self._node_selector_class(self, self._rt.subtree_leaves(node))
+        node_id = self._coerce_singleton_node_target(node, "leaves_of")
+        return self._node_selector_class(self, self._rt.subtree_leaves(node_id))
 
     def at_depth(self, d: int, operator: str = '=='):
         """Nodes at a specific depth (selector form of RT.at_depth)."""
         return self._node_selector_class(self, self._rt.at_depth(d, operator))
 
-    def successors(self, node: int):
+    def successors(self, node):
         """Direct children of ``node`` (selector form of RT.successors)."""
-        return self._node_selector_class(self, self._rt.successors(node))
+        node_id = self._coerce_singleton_node_target(node, "successors")
+        return self._node_selector_class(self, self._rt.successors(node_id))
 
     def select(self, *ids):
-        """Build an ad-hoc selector from ints or a single iterable of ints."""
-        if len(ids) == 1 and not isinstance(ids[0], int):
-            return self._node_selector_class(self, tuple(ids[0]))
-        return self._node_selector_class(self, ids)
+        """Build an ad-hoc selector from ints/selectors or iterables thereof."""
+        if len(ids) == 1:
+            selected = self._coerce_node_targets(ids[0])
+        else:
+            selected = self._coerce_node_targets(ids)
+        return self._node_selector_class(self, tuple(selected))
 
     # ------------------------------------------------------------------
     # Non-node scalar forwards (unchanged return types)
@@ -653,7 +884,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         ValueError
             If any node is not found in the rhythm tree.
         """
-        nodes = [node] if isinstance(node, int) else list(node)
+        nodes = self._coerce_node_targets(node)
         for n in nodes:
             self._rt.make_rest(n)
         self._invalidate_timing_cache()
@@ -694,12 +925,10 @@ class TemporalUnit(metaclass=TemporalMeta):
         import numpy as _np
         if node is None:
             targets = list(self._rt.leaf_nodes)
-        elif isinstance(node, int):
-            targets = list(self._rt.subtree_leaves(node))
         else:
             seen = set()
             targets = []
-            for n in node:
+            for n in self._coerce_node_targets(node):
                 for leaf in self._rt.subtree_leaves(n):
                     if leaf not in seen:
                         seen.add(leaf)
@@ -767,6 +996,9 @@ class TemporalUnit(metaclass=TemporalMeta):
     def _ensure_timing_cache(self):
         if self._timing_dirty or len(self._real_times) != len(self._rt):
             self._compute_timing_cache()
+
+    def _make_node_proxy(self, node_id: int):
+        return Chronon(node_id, self)
 
     def _event_context(self):
         self._ensure_timing_cache()

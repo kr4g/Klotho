@@ -240,6 +240,20 @@ classDiagram
     UTNodeView ..> Chronon : creates
 ```
 
+### Node Selection and Handles
+
+`TemporalUnit` exposes two node-facing surfaces:
+
+- **NodeSelection** (`ut.leaves`, `ut.at_depth(...)`, `ut.select(...)`) for
+  bulk operations and set algebra.
+- **NodeHandle** when iterating a selection (`for node in ut.leaves:`), for
+  direct intrinsic reads (`id`, `proportion`, `depth`, `real_duration`,
+  parent/sibling metadata) and node-local verbs (`subdivide`, `make_rest`).
+
+Use selection `.ids` when you need raw integer IDs. For explicit singleton
+selector traversal (advanced chaining), call `.singletons()` / `.selectors()`
+on a selection.
+
 ### Real-Time Conversion
 
 ```mermaid

@@ -112,7 +112,7 @@ def build_rt_preview_entertain_legacy():
     S1 = ((20, ((5, (1,) * 5),) * 4), (15, ((3, (1,) * 3),) * 5))
     uc_mel = UC(tempus=tempus, prolatio=S1, beat=beat, bpm=bpm, inst=JsInst.Kalimba())
     limbs = uc_mel.at_depth(1)
-    L0, L1 = limbs[0].first, limbs[-1].first
+    L0, L1 = limbs[0].id, limbs[-1].id
     uc_mel.set_mfields(limbs[0], idx=0, direction=1, offset=0)
     uc_mel.set_mfields(limbs[1], idx=len(scale), direction=-1, offset=0)
     uc_mel.set_mfields(uc_mel.successors(L1), offset=lambda c: c.total - c.index)
@@ -137,7 +137,7 @@ def build_rt_preview_entertain_legacy():
         inst=JsInst.Bassy(freq=scale[-len(scale) * 2].freq, vel=0.2),
     )
     bs_pat = Pattern([0, 0, [1, [3, [4, -3]]]])
-    uc_bs.make_rest(limbs[-1])
+    uc_bs.make_rest(limbs[-1].id)
     seq_bs = uc_bs.repeat(n_bars)
     for unit in seq_bs:
         unit.set_pfields(unit.leaves, freq=lambda: scale[next(bs_pat) - len(scale) * 2].freq)
@@ -151,7 +151,7 @@ def build_rt_preview_entertain_fluent():
     S1 = ((20, ((5, (1,) * 5),) * 4), (15, ((3, (1,) * 3),) * 5))
     uc_mel = UC(tempus=tempus, prolatio=S1, beat=beat, bpm=bpm, inst=JsInst.Kalimba())
     limbs = uc_mel.at_depth(1)
-    L0, L1 = limbs[0].first, limbs[-1].first
+    L0, L1 = limbs[0].id, limbs[-1].id
     limbs[0].set_mfields(idx=0, direction=1, offset=0)
     limbs[1].set_mfields(idx=len(scale), direction=-1, offset=0)
     uc_mel.successors(L1).set_mfields(offset=lambda c: c.total - c.index)
@@ -174,7 +174,7 @@ def build_rt_preview_entertain_fluent():
         inst=JsInst.Bassy(freq=scale[-len(scale) * 2].freq, vel=0.2),
     )
     bs_pat = Pattern([0, 0, [1, [3, [4, -3]]]])
-    uc_bs.make_rest(limbs[-1])
+    uc_bs.make_rest(limbs[-1].id)
     seq_bs = uc_bs.repeat(n_bars)
     for unit in seq_bs:
         unit.leaves.set_pfields(freq=lambda: scale[next(bs_pat) - len(scale) * 2].freq)
@@ -298,7 +298,7 @@ def build_rt_preview_poly_fluent():
     uts2 = uc2.repeat(n_bars)
     for unit in uts2:
         for branch in unit.at_depth(2):
-            unit.select(branch).set_instrument(JsInst.HatClosed())
+            branch.set_instrument(JsInst.HatClosed())
             unit.successors(branch)[-1].set_instrument(JsInst.HatOpen())
             unit.leaves_of(branch).set_pfields(vel=lambda: np.random.uniform(0.05, 0.25))
     scale = Scale.locrian().root("Eb2")

@@ -4,7 +4,7 @@ from klotho.chronos import TemporalUnitSequence as UTS, TemporalBlock as BT
 from klotho.thetos import CompositionalUnit as UC
 from klotho.topos import Pattern
 from klotho.dynatos import Envelope
-from klotho.thetos import ToneInstrument as JsInst
+from klotho.thetos import ToneInstrument as JsInst, SynthDefInstrument as ScInst
 from klotho.utils.playback.tonejs.converters import (
     compositional_unit_to_events,
     temporal_sequence_to_events,
@@ -70,3 +70,29 @@ def test_scheduler_handles_uc_slur_and_env_overlay():
     scheduler = Scheduler()
     scheduler.add(uc)
     assert scheduler.total_events > 0
+
+
+def test_uc_copy_preserves_branch_leaf_assignments_after_subdivide():
+    uc = UC(
+        tempus="1/1",
+        prolatio=(10, 4, 3, 2, 1),
+        beat="1/8",
+        bpm=62,
+        inst=ScInst.blip(),
+    )
+    for leaf in uc.leaves:
+        leaf.subdivide(leaf.proportion * 2)
+    for branch in uc.at_depth(1):
+        branch.leaves[0].set_pfields(freq=800, amp=0.9)
+        branch.leaves[1:].set_pfields(freq=200, amp=0.2)
+
+    copied = uc.copy()
+
+    for branch in copied.at_depth(1):
+        freqs = [copied.get_pfield(node_id, "freq") for node_id in branch.leaves.ids]
+        amps = [copied.get_pfield(node_id, "amp") for node_id in branch.leaves.ids]
+        assert freqs
+        assert freqs[0] == 800
+        assert all(value == 200 for value in freqs[1:])
+        assert amps[0] == 0.9
+        assert all(value == 0.2 for value in amps[1:])

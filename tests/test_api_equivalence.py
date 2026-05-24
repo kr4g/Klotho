@@ -421,7 +421,7 @@ class TestPolyriddimBassEquivalence:
 # ---------------------------------------------------------------------------
 
 class TestUCTraversalSurface:
-    """UC traversal returns selectors bound to the UC; raw tree access remains
+    """UC traversal returns handle-backed selections; raw tree access remains
     available via ``uc._rt`` / ``uc.rt`` for dropped methods."""
 
     def test_leaves_selector_matches_rt_leaf_nodes(self):
@@ -438,7 +438,7 @@ class TestUCTraversalSurface:
 
     def test_successors_selector_matches_rt_successors(self):
         uc = UC(tempus='4/4', prolatio=((4, (1, 1, 1)), 2, 1, 1), beat='1/4', bpm=120)
-        assert list(uc.successors(0)) == list(uc.rt.successors(0))
+        assert list(uc.successors(0).ids) == list(uc.rt.successors(0))
 
     def test_descendants_via_rt_escape_hatch(self):
         # Descendants dropped from UC surface; still reachable via uc._rt

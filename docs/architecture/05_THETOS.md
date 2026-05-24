@@ -20,7 +20,7 @@ thetos/
 ├── types.py                         # Unit type wrappers (frequency, midi, amplitude…)
 ├── composition/
 │   ├── __init__.py
-│   └── compositional.py             # CompositionalUnit, Parametron, DistributionContext
+│   └── compositional.py             # CompositionalUnit, Parametron, selector/context distribution types
 ├── instruments/
 │   ├── __init__.py
 │   ├── base.py                      # Instrument (base)
@@ -355,9 +355,25 @@ classDiagram
     }
 
     class DistributionContext {
+        +id : int
+        +depth : int
+        +sibling_index : int
+        +sibling_total : int
         +index : int
         +total : int
-        +node : int
+        +parent : ParentDistributionView | None
+        +is_rest : bool
+        +pfields : dict
+        +mfields : dict
+        +instrument : Instrument | None
+    }
+
+    class ParentDistributionView {
+        +id : int
+        +depth : int
+        +sibling_index : int
+        +sibling_total : int
+        +parent : ParentDistributionView | None
         +is_rest : bool
         +pfields : dict
         +mfields : dict
@@ -367,6 +383,7 @@ classDiagram
     CompositionalUnit *-- ParameterTree
     CompositionalUnit --> Parametron : yields via .events
     CompositionalUnit --> DistributionContext : creates during distribution
+    DistributionContext --> ParentDistributionView : lazy parent context
 ```
 
 ### How RT and PT Stay Synchronized
@@ -397,8 +414,56 @@ represents a single event (leaf node) carrying:
 
 When `set_pfields` distributes a callable or `Pattern` across nodes,
 each node receives a `DistributionContext` providing its index,
-total count, existing pfield/mfield values, and resolved instrument.
-Callables can accept either `(ctx)` or `(index, total)` signatures.
+total count, structural node data (`id`, `depth`, `sibling_index`,
+`sibling_total`), existing pfield/mfield values, and resolved
+instrument.
+
+Callable distribution supports:
+
+- **1-arg callable**: receives `ctx`
+- **0-arg callable**: called with no args
+
+(`(index, total)` is not a supported direct signature; use
+`ctx.index` and `ctx.total`.)
+
+`ctx.parent` returns a `ParentDistributionView` with structural and PT
+data (`pfields`/`mfields`/`instrument`) for the parent node. Parent
+views are not in the current distribution selection, so selection
+fields (`index`, `total`) are intentionally absent there.
+
+### Selector Surface (UT/UC)
+
+Selector traversal and targeting are now node-handle-first:
+
+- `for branch in uc.at_depth(d): ...` yields `NodeHandle` objects
+- raw integer IDs are available via `handle.id` and selection-level `.ids`
+- subtree navigation (`.leaves`, `.children`) lives on `NodeHandle`
+- owner helpers `uc.leaves_of(...)` / `uc.successors(...)` stay singleton-only
+  and accept an `int`, `NodeHandle`, or singleton selector
+- `uc.select(...)` accepts ints, node handles, selectors, and
+  generators/comprehensions
+- explicit singleton selector traversal is available via
+  `.singletons()` / `.selectors()`
+
+Canonical forms:
+
+```python
+for branch in uc.at_depth(1):
+    branch.leaves.set_pfields(freq=...)
+
+uc.select(branch.first_leaf for branch in uc.at_depth(1)).set_pfields(accent=1)
+for singleton in uc.at_depth(1).singletons():
+    singleton.leaves.set_mfields(group='x')
+
+uc.select([3, 3, 7]).set_mfields(group='x')  # duplicates preserved intentionally
+```
+
+Invalid (raises):
+
+```python
+uc.at_depth(1).leaves        # multi-select is not a subtree anchor
+uc.leaves_of(uc.at_depth(1)) # owner helper also requires singleton anchor
+```
 
 ### Envelope Application
 
@@ -409,7 +474,7 @@ uc.apply_envelope(env, pfields='amp', node=uc.root)
 Full signature:
 
 ```python
-apply_envelope(envelope, pfields, node, offset=0, take=None, mode="span", endpoint=True)
+apply_envelope(envelope, pfields, node, offset=0, take=None, scope="span", endpoint=True)
 ```
 
 Resolves `node` to its subtree leaves, then samples the `Envelope`
