@@ -79,6 +79,7 @@ def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdef
         from klotho.utils.playback.supersonic.engine import (
             _load_all_synthdef_assets, _filter_synthdef_assets, _INFRA_SYNTHDEFS,
         )
+        from klotho.thetos.instruments._shared import load_ss_manifest
 
         if needed_synthdefs is None:
             needed_synthdefs = {'kl_tri', 'kl_kicktone', 'kl_sine', 'kl_saw', 'kl_sqr', 'kl_noisebpf'}
@@ -88,12 +89,14 @@ def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdef
         assets = _filter_synthdef_assets(all_assets, needed_synthdefs)
         assets_json = json.dumps(assets)
         needed_json = json.dumps(list(needed_synthdefs))
+        manifest_json = json.dumps(load_ss_manifest())
 
         bridge_js = get_animation_bridge_js()
         return f'''<script type="module">
 {ss_init_js()}
 {draw_scheduler_js()}
 {scheduler_core_js()}
+globalThis.__klothoManifest = {manifest_json};
 {synthdef_registry_merge_js(assets_json)}
 {synthdef_loader_js(needed_json)}
 {bridge_js}
