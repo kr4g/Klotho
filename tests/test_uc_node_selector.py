@@ -530,7 +530,7 @@ class TestFluentVerbDelegation:
         for leaf in uc._rt.leaf_nodes:
             # pt.get_pfield returns None when no override at this node and
             # no ancestor has one either.
-            raw = uc._pt.get_pfield(leaf, 'amp')
+            raw = uc.get_pfield(leaf, 'amp')
             assert raw is None
 
 

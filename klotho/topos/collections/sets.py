@@ -7,7 +7,8 @@ from functools import cached_property
 from typing import List, Tuple, Set, Dict, Any, Union, Literal
 import sympy as sp
 from scipy.spatial.distance import pdist, squareform
-from ..graphs import Graph
+from ..graphs import Graph, GraphCore
+from ..graphs.generators import complete_graph
 
 
 __all__ = [
@@ -851,13 +852,13 @@ class GenCol:
 # Combination Sets (CS)
 # ---------------------
 
-class CombinationSet:
+class CombinationSet(GraphCore):
     """
     A combinatorial set generating all r-combinations from a set of factors.
 
     This class generates all possible combinations of size r from a given set of factors,
     useful for combinatorial analysis and set operations. It also creates symbolic
-    aliases and an associated graph structure for analysis.
+    aliases and IS a graph (a complete graph with combinations as nodes).
 
     Parameters
     ----------
@@ -900,11 +901,12 @@ class CombinationSet:
         r : int, optional
             The size of each combination (default is 2).
         """
+        super().__init__()
         self._factors = tuple(sorted(factors))
         self._r = r
         self._combos = set(combinations(self._factors, self._r))
         self._factor_aliases = {f: sp.Symbol(chr(65 + i)) for i, f in enumerate(self._factors)}
-        self._graph = self._generate_graph()
+        self._build_graph()
 
     @property
     def factors(self):
@@ -943,18 +945,6 @@ class CombinationSet:
         return self._combos
     
     @property
-    def graph(self):
-        """
-        A complete graph with combinations as nodes.
-        
-        Returns
-        -------
-        Graph
-            A complete graph where each node represents a combination.
-        """
-        return self._graph
-    
-    @property
     def factor_to_alias(self):
         """
         Mapping from factors to symbolic aliases.
@@ -978,20 +968,17 @@ class CombinationSet:
         """
         return {v: k for k, v in self._factor_aliases.items()}
     
-    def _generate_graph(self):
+    def _build_graph(self):
         """
-        Generate a complete graph with combinations as nodes.
-        
-        Returns
-        -------
-        Graph
-            A complete graph where each node has a 'combo' attribute.
+        Build the complete graph (combinations as nodes) into this object's
+        backing rustworkx handle.
         """
         n_nodes = len(self._combos)
-        G = Graph.complete_graph(n_nodes)
+        builder = complete_graph(n_nodes)
         for i, combo in enumerate(sorted(self._combos)):
-            G.set_node_data(i, combo=combo)
-        return G
+            builder.set_node_data(i, combo=combo)
+        self._rx = builder._rx
+        self._invalidate_caches()
     
     def __str__(self):    
         """
@@ -1067,7 +1054,7 @@ class PartitionSet:
     3  (4, 2, 2)             2     2    0.8889
     4  (3, 3, 2)             2     1    0.2222
     """
-    def __init__(self, n: int, k: int, graph_type: Literal['feature_distance', 'decomposition_tree', 'substructure_embedding'] = 'feature_distance'):
+    def __init__(self, n: int, k: int):
         """
         Initialize a PartitionSet.
 
@@ -1077,14 +1064,10 @@ class PartitionSet:
             The integer to partition.
         k : int
             The number of parts in each partition.
-        graph_type : {'feature_distance', 'decomposition_tree', 'substructure_embedding'}, optional
-            The type of graph to construct (default is 'feature_distance').
         """
         self._n = n
         self._k = k
-        self._graph_type = graph_type
         self._data = self._generate_partitions()
-        self._graph = self._generate_graph()
     
     def _generate_partitions(self) -> pd.DataFrame:
         """
@@ -1113,179 +1096,6 @@ class PartitionSet:
             return results
                     
         return pd.DataFrame(backtrack(self._n, self._k, self._n, ()))
-    
-    def _generate_graph(self):
-        """
-        Generate a graph based on the specified graph type.
-        
-        Returns
-        -------
-        networkx.Graph or networkx.DiGraph
-            The generated graph representation of partition relationships.
-        
-        Raises
-        ------
-        ValueError
-            If an unknown graph type is specified.
-        """
-        if self._graph_type == 'feature_distance':
-            return self._build_feature_distance_graph()
-        elif self._graph_type == 'decomposition_tree':
-            return self._build_decomposition_tree_graph()
-        elif self._graph_type == 'substructure_embedding':
-            return self._build_substructure_embedding_graph()
-        else:
-            raise ValueError(f"Unknown graph type: {self._graph_type}")
-    
-    def _build_feature_distance_graph(self):
-        """
-        Build a graph where edge weights represent feature distances.
-        
-        Returns
-        -------
-        Graph
-            A complete graph with edge weights based on normalized feature distances.
-        """
-        features = self._data[['unique_count', 'span', 'variance']].values
-        features_normalized = (features - features.mean(axis=0)) / (features.std(axis=0) + 1e-8)
-        distances = pdist(features_normalized, metric='euclidean')
-        distance_matrix = squareform(distances)
-        
-        G = Graph()
-        n_partitions = len(self._data)
-        
-        for i in range(n_partitions):
-            G.add_node(partition=tuple(self._data.iloc[i]['partition']))
-        
-        for i in range(n_partitions):
-            for j in range(i + 1, n_partitions):
-                G.add_edge(i, j, weight=distance_matrix[i, j])
-        
-        return G
-    
-    def _build_decomposition_tree_graph(self):
-        """
-        Build a graph where edge weights represent transformation costs.
-        
-        Returns
-        -------
-        Graph
-            A complete graph with edge weights based on partition transformation costs.
-        """
-        partitions = [tuple(row['partition']) for _, row in self._data.iterrows()]
-        G = Graph()
-        
-        for i, partition in enumerate(partitions):
-            G.add_node(partition=partition)
-        
-        for i, partition_a in enumerate(partitions):
-            for j, partition_b in enumerate(partitions):
-                if i < j:
-                    cost = self._partition_transformation_cost(partition_a, partition_b)
-                    G.add_edge(i, j, weight=cost)
-        
-        return G
-    
-    def _partition_transformation_cost(self, partition_a: tuple, partition_b: tuple) -> float:
-        """
-        Calculate the cost of transforming one partition to another.
-        
-        Parameters
-        ----------
-        partition_a : tuple
-            The first partition.
-        partition_b : tuple
-            The second partition.
-        
-        Returns
-        -------
-        float
-            The transformation cost between the partitions.
-        """
-        a_parts = sorted(partition_a, reverse=True)
-        b_parts = sorted(partition_b, reverse=True)
-        
-        max_len = max(len(a_parts), len(b_parts))
-        a_padded = a_parts + [0] * (max_len - len(a_parts))
-        b_padded = b_parts + [0] * (max_len - len(b_parts))
-        
-        cost = sum(abs(a - b) for a, b in zip(a_padded, b_padded)) / 2.0
-        
-        return cost
-    
-    def _build_substructure_embedding_graph(self):
-        """
-        Build a directed graph based on substructure embedding costs.
-        
-        Returns
-        -------
-        Graph
-            A directed graph where edge weights represent embedding costs.
-        """
-        partitions = [tuple(row['partition']) for _, row in self._data.iterrows()]
-        G = Graph.digraph()
-        
-        for i, partition in enumerate(partitions):
-            G.add_node(partition=partition)
-        
-        for i, partition_a in enumerate(partitions):
-            for j, partition_b in enumerate(partitions):
-                if i != j:
-                    embedding_cost = self._substructure_embedding_cost(partition_a, partition_b)
-                    G.add_edge(i, j, weight=embedding_cost)
-        
-        return G
-    
-    def _substructure_embedding_cost(self, partition_a: tuple, partition_b: tuple) -> float:
-        """
-        Calculate the cost of embedding one partition structure into another.
-        
-        Parameters
-        ----------
-        partition_a : tuple
-            The partition to embed.
-        partition_b : tuple
-            The target partition for embedding.
-        
-        Returns
-        -------
-        float
-            The embedding cost between the partitions.
-        """
-        a_parts = sorted(partition_a, reverse=True)
-        b_parts = sorted(partition_b, reverse=True)
-        
-        b_remaining = list(b_parts)
-        total_cost = 0.0
-        
-        for a_part in a_parts:
-            best_match_cost = float('inf')
-            best_match_idx = -1
-            
-            for idx, b_part in enumerate(b_remaining):
-                if b_part >= a_part:
-                    cost = abs(b_part - a_part) / max(a_part, 1)
-                    if cost < best_match_cost:
-                        best_match_cost = cost
-                        best_match_idx = idx
-                else:
-                    cost = 2.0 + (a_part - b_part) / a_part
-                    if cost < best_match_cost:
-                        best_match_cost = cost
-                        best_match_idx = idx
-            
-            if best_match_idx != -1:
-                total_cost += best_match_cost
-                if b_remaining[best_match_idx] >= a_part:
-                    b_remaining[best_match_idx] -= a_part
-                    if b_remaining[best_match_idx] == 0:
-                        b_remaining.pop(best_match_idx)
-                else:
-                    b_remaining.pop(best_match_idx)
-            else:
-                total_cost += 5.0
-        
-        return total_cost
     
     @property
     def data(self):
@@ -1322,30 +1132,6 @@ class PartitionSet:
             The arithmetic mean n/k.
         """
         return self._n / self._k
-    
-    @property
-    def graph(self):
-        """
-        Graph representation based on the specified graph_type.
-        
-        Returns
-        -------
-        Graph
-            The graph representation of partition relationships.
-        """
-        return self._graph
-    
-    @property
-    def graph_type(self):
-        """
-        The type of graph construction used.
-        
-        Returns
-        -------
-        str
-            The graph type identifier.
-        """
-        return self._graph_type
 
     def __str__(self) -> str:
         """
@@ -1365,7 +1151,7 @@ class PartitionSet:
         
         header = (
             f"{border}\n"
-            f"PS(n={self._n}, k={self._k}) - Graph: {self._graph_type}\n"
+            f"PS(n={self._n}, k={self._k})\n"
             f"Mean: ~{round(self.mean, 4)}\n"
             f"{border}\n"
         )

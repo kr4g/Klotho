@@ -66,7 +66,7 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
     """
     import uuid as _uuid
 
-    G = cps.graph
+    G = cps
 
     dimmed_edge_color = '#333333'
     dimmed_node_color = '#555555'

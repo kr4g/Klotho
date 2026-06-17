@@ -486,7 +486,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     if master_set_name not in MASTER_SETS:
         raise ValueError(f"Invalid master set name: {master_set_name}. Must be one of {list(MASTER_SETS.keys())}")
     
-    G = cps.graph
+    G = cps
     node_positions = cps.positions if hasattr(cps, 'positions') else _cps_node_positions(G)
 
     pos_dim = max((len(p) for p in node_positions.values()), default=2)

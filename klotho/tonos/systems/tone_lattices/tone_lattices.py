@@ -221,7 +221,7 @@ class ToneLattice(Lattice):
         for coord in target_coords:
             node_id = self._get_node_for_coord(coord)
             if node_id is not None:
-                node_data = self._graph.get_node_data(node_id)
+                node_data = self._rx.get_node_data(node_id)
                 if isinstance(node_data, dict) and 'ratio' not in node_data:
                     ratio = self._coord_to_ratio(coord)
                     node_data['ratio'] = ratio
@@ -261,7 +261,7 @@ class ToneLattice(Lattice):
         node_id = self._get_node_for_coord(coord)
         ratio = None
         if node_id is not None:
-            node_data = self._graph.get_node_data(node_id)
+            node_data = self._rx.get_node_data(node_id)
             if isinstance(node_data, dict) and 'ratio' in node_data:
                 ratio = node_data['ratio']
         if ratio is None:

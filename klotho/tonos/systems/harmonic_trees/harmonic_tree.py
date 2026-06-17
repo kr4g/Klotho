@@ -1,4 +1,5 @@
 from klotho.topos.graphs import Tree
+from klotho.topos.graphs.trees import TreeLayer
 from .algorithms import *
 from klotho.tonos.utils.interval_normalization import reduce_interval
 from typing import Tuple, Union
@@ -14,6 +15,39 @@ def _odd_prime_generator():
             primes.append(n)
             yield n
         n += 2
+
+
+class HarmonicLayer(TreeLayer):
+    """Layer that owns harmonic ``factor`` data and derives harmonic values.
+
+    Owned key: ``factor`` (writable). Derived keys: ``multiple``, ``harmonic``,
+    ``ratio`` (computed by the tree's ``_evaluate``; direct writes rejected).
+    """
+
+    owned_keys = frozenset({'factor'})
+    derived_keys = frozenset({'multiple', 'harmonic', 'ratio'})
+
+    def normalize_attrs(self, tree, node, attrs, op):
+        normalized = dict(attrs) if isinstance(attrs, dict) else {}
+        if 'label' in normalized:
+            raise ValueError("HarmonicTree does not accept 'label'; use 'factor'")
+        return normalized
+
+    def validate_attrs(self, tree, node, attrs, op):
+        mutable_keys = {'factor'}
+        illegal = [k for k in attrs if k not in mutable_keys]
+        if illegal:
+            raise ValueError(f"Illegal HarmonicTree node attribute update: {illegal}")
+        if 'multiple' in attrs or 'harmonic' in attrs or 'ratio' in attrs:
+            raise ValueError("multiple, harmonic, and ratio are derived and cannot be set directly")
+
+    def data_scope(self, tree, node, changed_keys, op):
+        if 'factor' in changed_keys:
+            return node
+        return None
+
+    def on_structure_changed(self, tree, scope, op):
+        tree._evaluate(scope)
 
 
 class HarmonicTree(Tree):
@@ -54,37 +88,23 @@ class HarmonicTree(Tree):
         self._meta['span']   = span
         
         self._evaluate()
+        self._group_dirty = False
+
+    def _init_layers(self):
+        self.attach_layer(HarmonicLayer())
 
     def _post_structure_clone(self):
+        super()._post_structure_clone()
         self._meta['equave'] = None
         self._meta['span'] = 1
-        non_root = [n for n in self._graph.node_indices() if n != self._root]
+        non_root = [n for n in self._rx.node_indices() if n != self._root]
         nodes_by_depth = sorted(non_root, key=lambda n: self.depth_of(n), reverse=True)
         odd_primes = _odd_prime_generator()
         factor_map = {n: next(odd_primes) for n in nodes_by_depth}
-        self._graph[self._root] = {'factor': 1}
+        self._rx[self._root] = {'factor': 1}
         for node in non_root:
-            self._graph[node] = {'factor': factor_map[node]}
+            self._rx[node] = {'factor': factor_map[node]}
         self._evaluate()
-
-    def _normalize_node_attrs(self, node, attrs, op=None):
-        normalized = dict(attrs) if isinstance(attrs, dict) else {}
-        if 'label' in normalized:
-            raise ValueError("HarmonicTree does not accept 'label'; use 'factor'")
-        return normalized
-
-    def _validate_node_attrs(self, node, attrs, op=None):
-        mutable_keys = {'factor'}
-        illegal = [k for k in attrs if k not in mutable_keys]
-        if illegal:
-            raise ValueError(f"Illegal HarmonicTree node attribute update: {illegal}")
-        if 'multiple' in attrs or 'harmonic' in attrs or 'ratio' in attrs:
-            raise ValueError("multiple, harmonic, and ratio are derived and cannot be set directly")
-
-    def _resolve_data_update_scope(self, node, changed_keys, op=None):
-        if 'factor' in changed_keys:
-            return node
-        return super()._resolve_data_update_scope(node=node, changed_keys=changed_keys, op=op)
 
     def _evaluate(self, root_node=None):
         if root_node is None:
@@ -102,19 +122,16 @@ class HarmonicTree(Tree):
         def process_subtree(node, inherited_harmonic):
             value = self[node]['factor']
             harmonic = value * inherited_harmonic
-            self._graph[node]['multiple'] = value if value > 0 else Fraction(1, abs(value))
-            self._graph[node]['harmonic'] = harmonic
+            self._rx[node]['multiple'] = value if value > 0 else Fraction(1, abs(value))
+            self._rx[node]['harmonic'] = harmonic
             if self.equave is not None:
-                self._graph[node]['ratio'] = reduce_interval(Fraction(harmonic), self.equave, self.span)
+                self._rx[node]['ratio'] = reduce_interval(Fraction(harmonic), self.equave, self.span)
             else:
-                self._graph[node]['ratio'] = harmonic
+                self._rx[node]['ratio'] = harmonic
             for child in self.successors(node):
                 process_subtree(child, harmonic)
 
         process_subtree(root_node, parent_harmonic)
-
-    def _after_post_mutation(self, scope_node=None, op=None):
-        self._evaluate(scope_node)
 
     @property
     def harmonics(self):

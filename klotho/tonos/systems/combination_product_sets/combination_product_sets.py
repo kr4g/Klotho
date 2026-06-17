@@ -3,10 +3,10 @@ from typing import Tuple
 from math import prod
 from fractions import Fraction
 import sympy as sp
+import rustworkx as rx
 from tabulate import tabulate
 
 from klotho.topos.collections import CombinationSet as CS
-from klotho.topos.graphs import Graph
 from klotho.tonos.utils.interval_normalization import equave_reduce
 from .master_set import MasterSet, MASTER_SETS
 
@@ -82,14 +82,15 @@ class CombinationProductSet(CS):
     self._populate_graph()
     self._build_master_set_structure(self._master_set_instance.relationship_dict)
     self._compute_positions()
-    self._graph._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
 
   def _populate_graph(self):
-    directed_graph = self._graph.to_directed()
-    directed_graph._graph.clear_edges()
-    self._graph = directed_graph
-    
-    for node, attrs in self._graph.nodes(data=True):
+    directed = rx.PyDiGraph()
+    for idx in self._rx.node_indices():
+      directed.add_node(self._rx.get_node_data(idx))
+    self._rx = directed
+    self._invalidate_caches()
+
+    for node, attrs in self.nodes(data=True):
       if 'combo' in attrs:
         combo = attrs['combo']
         product = prod(combo)
@@ -102,14 +103,14 @@ class CombinationProductSet(CS):
         for factor in combo:
           symbolic_expr *= self.factor_to_alias[factor]
         
-        self._graph.set_node_data(node, product=product, ratio=ratio, alias=symbolic_expr)
+        self._write_node_data(node, {'product': product, 'ratio': ratio, 'alias': symbolic_expr})
   
   def _build_master_set_structure(self, relationship_dict):
     if not relationship_dict:
       return
       
     combo_to_node = {}
-    for node, attrs in self._graph.nodes(data=True):
+    for node, attrs in self.nodes(data=True):
       if 'combo' in attrs:
         combo_to_node[attrs['combo']] = node
     
@@ -125,7 +126,7 @@ class CombinationProductSet(CS):
           
           if sym_ratio in relationship_dict:
             rel_data = relationship_dict[sym_ratio]
-            self._graph.add_edge(node1, node2, 
+            self._add_edge_raw(node1, node2, 
                                relation=sym_ratio,
                                angle=rel_data['angle'],
                                distance=rel_data['distance'],
@@ -133,7 +134,7 @@ class CombinationProductSet(CS):
                                displacement=rel_data.get('displacement'))
 
   def _compute_positions(self):
-    G = self._graph
+    G = self
     n_dims = 2
     for u, v, data in G.edges(data=True):
       disp = data.get('displacement')
@@ -237,12 +238,12 @@ class CombinationProductSet(CS):
   @property
   def products(self):
     """tuple : Sorted tuple of raw combination products (before equave reduction)."""
-    return tuple(sorted(attrs['product'] for _, attrs in self._graph.nodes(data=True)))
+    return tuple(sorted(attrs['product'] for _, attrs in self.nodes(data=True)))
   
   @property
   def ratios(self):
     """tuple : Sorted tuple of equave-reduced ratios."""
-    return tuple(sorted(attrs['ratio'] for _, attrs in self._graph.nodes(data=True)))
+    return tuple(sorted(attrs['ratio'] for _, attrs in self.nodes(data=True)))
   
   def get_node_by(self, attr_name, value):
     """
@@ -260,7 +261,7 @@ class CombinationProductSet(CS):
     int or None
         The node ID, or None if not found.
     """
-    for node, attrs in self._graph.nodes(data=True):
+    for node, attrs in self.nodes(data=True):
       if attrs.get(attr_name) == value:
         return node
     return None
@@ -281,14 +282,14 @@ class CombinationProductSet(CS):
     dict or None
         The node attribute dictionary, or None if not found.
     """
-    for node, attrs in self._graph.nodes(data=True):
+    for node, attrs in self.nodes(data=True):
       if attrs.get(attr_name) == value:
         return attrs
     return None  
   
   def __str__(self):
     table_data = []
-    node_data = [(attrs['combo'], attrs['product'], attrs['ratio']) for _, attrs in self._graph.nodes(data=True)]
+    node_data = [(attrs['combo'], attrs['product'], attrs['ratio']) for _, attrs in self.nodes(data=True)]
     sorted_data = sorted(node_data, key=lambda x: x[2])
     for combo, product, ratio in sorted_data:
       table_data.append([combo, product, str(ratio)])
@@ -520,29 +521,34 @@ class CombinationProductSet(CS):
               expressions.append({'combo': (num_combo, den_combo), 'alias': expr, 'product': product})
 
     n_nodes = len(expressions)
-    G = Graph.complete_graph(n_nodes)
-    directed_graph = G.to_directed()
-    directed_graph._graph.clear_edges()
+    directed = rx.PyDiGraph()
+    for _ in range(n_nodes):
+      directed.add_node({})
+
+    instance = object.__new__(cls)
+    instance._meta = {}
+    instance._structure_version = 0
+    instance._rx = directed
+    instance._factors = factors_sorted
+    instance._r = None
+    instance._combos = set(e['combo'] for e in expressions)
+    instance._factor_aliases = aliases
+    instance._normalized = normalized
 
     for i, entry in enumerate(expressions):
       ratio = equave_reduce(entry['product']) if not isinstance(entry['product'], Fraction) else equave_reduce(entry['product'])
       if normalized:
         ratio = equave_reduce(ratio / max(factors_sorted))
-      directed_graph.set_node_data(
+      instance._write_node_data(
         i,
-        combo=entry['combo'],
-        alias=entry['alias'],
-        product=entry['product'],
-        ratio=ratio,
+        {
+          'combo': entry['combo'],
+          'alias': entry['alias'],
+          'product': entry['product'],
+          'ratio': ratio,
+        },
       )
 
-    instance = object.__new__(cls)
-    instance._factors = factors_sorted
-    instance._r = None
-    instance._combos = set(e['combo'] for e in expressions)
-    instance._factor_aliases = aliases
-    instance._graph = directed_graph
-    instance._normalized = normalized
     instance._master_set, instance._master_set_instance = cls._resolve_master_set(
       master_set, factors_sorted)
 
@@ -550,5 +556,4 @@ class CombinationProductSet(CS):
       instance._build_master_set_structure(instance._master_set_instance.relationship_dict)
 
     instance._compute_positions()
-    instance._graph._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
     return instance

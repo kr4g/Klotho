@@ -47,7 +47,7 @@ def match_pattern(cps, node_ids: List[int], sort_by: str = 'position',
         return [tuple(node_ids)] if include_target else []
 
     positions = cps.positions
-    all_nodes = sorted(cps.graph.nodes())
+    all_nodes = sorted(cps.nodes())
     k = len(node_ids)
     N = len(all_nodes)
     node_to_idx = {node: i for i, node in enumerate(all_nodes)}
@@ -231,7 +231,7 @@ def sub_cps(cps, k: int, s: int) -> List[dict]:
         return []
 
     combo_to_node = {}
-    for node, attrs in cps.graph.nodes(data=True):
+    for node, attrs in cps.nodes(data=True):
         if 'combo' in attrs:
             combo_to_node[attrs['combo']] = node
 
@@ -287,7 +287,7 @@ def classify(cps, node_ids: List[int]) -> dict:
         ``'shared'``, ``'excluded'``, and ``'factors_present'``.
     """
     factors = set(cps.factors)
-    G = cps.graph
+    G = cps
 
     combos = []
     for n in node_ids:
@@ -350,7 +350,7 @@ def faces(cps, size: int) -> List[Tuple[int, ...]]:
     list of tuple of int
         Each tuple contains the node IDs forming a complete subgraph.
     """
-    G = cps.graph
+    G = cps
     all_nodes = list(G.nodes())
     result = []
 

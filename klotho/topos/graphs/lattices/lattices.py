@@ -1,9 +1,10 @@
 from typing import Tuple, List, Union
 import pandas as pd
-from ..graphs import Graph
+from ..core import GraphCore
+from ..generators import grid_graph
 
 
-class Lattice(Graph):
+class Lattice(GraphCore):
     """
     A generic n-dimensional lattice structure.
     
@@ -53,15 +54,14 @@ class Lattice(Graph):
         
         self._estimate_size()
 
-        lattice_graph = Graph.grid_graph(self._dims, periodic=periodic)
+        lattice_graph = grid_graph(self._dims, periodic=periodic)
         super().__init__()
-        self._graph = lattice_graph._graph.copy()
+        self._rx = lattice_graph._rx.copy()
         self._is_lazy = False
         self._build_coordinate_mapping()
         self._materialized_coords = set(self._coord_to_node.keys())
         
         self._meta = pd.DataFrame(index=[''])
-        self._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
     
     def _estimate_size(self):
         """Estimate total lattice size."""
@@ -85,8 +85,8 @@ class Lattice(Graph):
         """Build coordinate mapping for non-lazy lattice."""
         import itertools
         
-        for node_id in self._graph.node_indices():
-            coord_data = self._graph.get_node_data(node_id)
+        for node_id in self._rx.node_indices():
+            coord_data = self._rx.get_node_data(node_id)
             if coord_data and 'coord' in coord_data:
                 coord = coord_data['coord']
                 self._coord_to_node[coord] = node_id
@@ -215,16 +215,6 @@ class Lattice(Graph):
         neighbor_nodes = super().neighbors(node_id)
         return [self._node_to_coord[n] for n in neighbor_nodes if n in self._node_to_coord]
     
-    def add_edge(self, u, v, **attr):
-        """Add edge between two coordinates."""
-        u_node = self._get_node_for_coord(u)
-        v_node = self._get_node_for_coord(v)
-        
-        if u_node is None or v_node is None:
-            raise KeyError("One or both coordinates not found in lattice")
-        
-        super().add_edge(u_node, v_node, **attr)
-    
     def has_edge(self, u, v):
         """Check if edge exists between two coordinates."""
         u_node = self._get_node_for_coord(u)
@@ -256,7 +246,7 @@ class LatticeEdgeView:
     
     def __iter__(self):
         """Iterate over edges as coordinate tuple pairs."""
-        for src_node, tgt_node in self._lattice._graph.edge_list():
+        for src_node, tgt_node in self._lattice._rx.edge_list():
             src_coord = self._lattice._node_to_coord.get(src_node)
             tgt_coord = self._lattice._node_to_coord.get(tgt_node)
             if src_coord is not None and tgt_coord is not None:
@@ -269,11 +259,11 @@ class LatticeEdgeView:
     def __call__(self, data=False):
         """Return edges with optional data."""
         if data:
-            for src_node, tgt_node in self._lattice._graph.edge_list():
+            for src_node, tgt_node in self._lattice._rx.edge_list():
                 src_coord = self._lattice._node_to_coord.get(src_node)
                 tgt_coord = self._lattice._node_to_coord.get(tgt_node)
                 if src_coord is not None and tgt_coord is not None:
-                    edge_data = self._lattice._graph.get_edge_data(src_node, tgt_node)
+                    edge_data = self._lattice._rx.get_edge_data(src_node, tgt_node)
                     yield (src_coord, tgt_coord, edge_data if isinstance(edge_data, dict) else {})
         else:
             for src_coord, tgt_coord in self:

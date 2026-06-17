@@ -285,7 +285,7 @@ def shortest_path(lattice: Lattice, start_coord: Tuple[int, ...],
     end_node = lattice._get_node_for_coord(end_coord)
 
     node_paths = rx.dijkstra_shortest_paths(
-        lattice._graph, start_node, target=end_node,
+        lattice._rx, start_node, target=end_node,
         weight_fn=lambda _: 1.0,
     )
 

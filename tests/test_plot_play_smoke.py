@@ -59,7 +59,7 @@ class TestSmokePlotPlay:
 
     def test_cps_with_path(self):
         cps = CombinationProductSet.hexany()
-        nodes_list = list(cps.graph.nodes)[:3]
+        nodes_list = list(cps.nodes)[:3]
         p = plot(cps, path=nodes_list)
         assert isinstance(p, KlothoPlot)
         _assert_renderable(p)
@@ -109,7 +109,7 @@ class TestAnimatedPath:
     def test_cps_animate_with_path(self):
         from klotho.semeios.visualization._dispatch.plot_cps import _plot_cps
         cps = CombinationProductSet.hexany()
-        nodes_list = list(cps.graph.nodes)[:3]
+        nodes_list = list(cps.nodes)[:3]
         fig = _plot_cps(cps, path=nodes_list, animate=True)
         assert hasattr(fig, 'to_html')
         assert isinstance(fig.to_html(), str)

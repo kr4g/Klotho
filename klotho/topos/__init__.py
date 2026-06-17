@@ -33,12 +33,12 @@ from .collections import autoref, autoref_rotmat, permute_list
 
 from .formal_grammars import grammars
 
-from .graphs import trees, Graph, Tree, Lattice
+from .graphs import trees, GraphCore, Graph, Tree, Lattice
 
 __all__ = [
     # Classes
     'Pattern', 'CombinationSet', 'PartitionSet',
-    'Tree', 'Graph', 'Lattice',
+    'Tree', 'GraphCore', 'Graph', 'Lattice',
     
     # Functions
     'autoref', 'autoref_rotmat', 'permute_list',

@@ -21,7 +21,7 @@ from . import thetos
 from . import semeios
 from . import utils
 
-from .topos.graphs import Graph, Tree, Lattice, Group
+from .topos.graphs import GraphCore, Graph, Tree, Lattice, Group
 
 from .semeios.visualization import plot
 
@@ -32,7 +32,7 @@ from .utils.playback._config import set_audio_engine, get_audio_engine
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
     'plot', 'play', 'play_midi', 'create_midi', 'set_audio_engine', 'get_audio_engine',
-    'Graph', 'Tree', 'Lattice', 'Group',
+    'GraphCore', 'Graph', 'Tree', 'Lattice', 'Group',
 ]
 
-__version__ = '9.0.0'
+__version__ = '10.0.0'

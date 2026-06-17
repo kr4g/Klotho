@@ -703,7 +703,7 @@ class TestCompositionalUnitArticulations:
 
 
 def _assert_rt_pt_same_structure_and_ids(uc):
-    rt, pt = uc._rt, uc._pt
+    rt, pt = uc._rt, uc.pt
     rt_nodes = set(rt.nodes)
     pt_nodes = set(pt.nodes)
     assert rt_nodes == pt_nodes, f"Node sets differ: RT {rt_nodes} vs PT {pt_nodes}"
@@ -726,7 +726,7 @@ class TestCompositionalUnitRT_PTSync:
         uc.subdivide(leaf, (1, 1, 1))
         _assert_rt_pt_same_structure_and_ids(uc)
         assert len(uc._rt.nodes) == 8
-        assert uc._rt.leaf_nodes == uc._pt.leaf_nodes
+        assert uc._rt.leaf_nodes == uc.pt.leaf_nodes
 
     def test_subdivide_cascades_pfields_to_new_nodes(self):
         uc = UC(tempus='4/4', prolatio=(4, 2, 1, 1), beat='1/4', bpm=120, pfields=['freq'])
@@ -742,9 +742,9 @@ class TestCompositionalUnitRT_PTSync:
         new_id = uc.add_child(uc._rt.root, label=1)
         _assert_rt_pt_same_structure_and_ids(uc)
         assert new_id in uc._rt.nodes
-        assert new_id in uc._pt.nodes
+        assert new_id in uc.pt.nodes
         assert new_id in uc._rt.successors(uc._rt.root)
-        assert new_id in uc._pt.successors(uc._pt.root)
+        assert new_id in uc.pt.successors(uc.pt.root)
 
     def test_add_child_accepts_label_or_proportion_and_normalizes_rt_data(self):
         uc = UC(tempus='4/4', prolatio=(1, 1), beat='1/4', bpm=120)
@@ -756,8 +756,8 @@ class TestCompositionalUnitRT_PTSync:
         assert uc._rt[by_proportion]['proportion'] == 4
         assert 'label' not in uc._rt[by_label]
         assert 'label' not in uc._rt[by_proportion]
-        assert by_label in uc._pt.nodes
-        assert by_proportion in uc._pt.nodes
+        assert by_label in uc.pt.nodes
+        assert by_proportion in uc.pt.nodes
 
     def test_prune_keeps_rt_pt_same_structure_and_ids(self):
         uc = UC(tempus='4/4', prolatio=((2, (1, 1)), (2, (1, 1))), beat='1/4', bpm=120)
@@ -777,7 +777,7 @@ class TestCompositionalUnitRT_PTSync:
         uc.subdivide(leaf, (1, 1))
         event_node_ids = [e.node_id for e in uc]
         assert set(event_node_ids) <= set(uc._rt.nodes)
-        assert set(event_node_ids) <= set(uc._pt.nodes)
+        assert set(event_node_ids) <= set(uc.pt.nodes)
         assert len(event_node_ids) == 4
 
     def test_prune_uc_matches_fresh_built_structure(self):

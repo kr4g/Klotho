@@ -102,10 +102,10 @@ class ParameterField(Lattice):
         
         for coord, value in zip(coords, values):
             node_id = self._coord_to_node[coord]
-            current_data = self._graph.get_node_data(node_id) or {}
+            current_data = self._rx.get_node_data(node_id) or {}
             field_value = float(value)
             current_data['field_value'] = field_value
-            self._graph[node_id] = current_data
+            self._rx[node_id] = current_data
     
     def _evaluate_all_coordinates(self):
         """Evaluate function at all existing coordinates."""
@@ -141,7 +141,7 @@ class ParameterField(Lattice):
             node_id = self._get_node_for_coord(coord)
             if node_id is None:
                 continue
-            node_data = self._graph.get_node_data(node_id) or {}
+            node_data = self._rx.get_node_data(node_id) or {}
             if 'field_value' not in node_data:
                 missing_coords.append(coord)
         if missing_coords:
@@ -169,11 +169,11 @@ class ParameterField(Lattice):
         node_id = self._get_node_for_coord(coord)
         if node_id is None:
             raise KeyError(f"Coordinate {coord} not found in field")
-        node_data = self._graph.get_node_data(node_id) or {}
+        node_data = self._rx.get_node_data(node_id) or {}
         if 'field_value' in node_data:
             return float(node_data['field_value'])
         self._evaluate_coordinates([coord])
-        node_data = self._graph.get_node_data(node_id) or {}
+        node_data = self._rx.get_node_data(node_id) or {}
         return float(node_data.get('field_value', 0.0))
     
     def set_field_value(self, coord: Tuple[int, ...], value: float):
@@ -191,10 +191,10 @@ class ParameterField(Lattice):
         if node_id is None:
             raise KeyError(f"Coordinate {coord} not found in field")
         
-        current_data = self._graph.get_node_data(node_id) or {}
+        current_data = self._rx.get_node_data(node_id) or {}
         field_value = float(value)
         current_data['field_value'] = field_value
-        self._graph[node_id] = current_data
+        self._rx[node_id] = current_data
     
     def apply_function(self, function: Callable[[np.ndarray], np.ndarray], compute_all: bool = False):
         """
@@ -207,8 +207,8 @@ class ParameterField(Lattice):
             (n_points, dimensionality) and return an array of shape (n_points,).
         """
         self._function = function
-        for node_id in self._graph.node_indices():
-            node_data = self._graph.get_node_data(node_id)
+        for node_id in self._rx.node_indices():
+            node_data = self._rx.get_node_data(node_id)
             if isinstance(node_data, dict) and 'field_value' in node_data:
                 del node_data['field_value']
         if compute_all:
@@ -349,7 +349,8 @@ class ParameterField(Lattice):
         field._is_lazy = lattice._is_lazy
         field._function = function
         
-        field._graph = lattice._graph.copy()
+        field._rx = lattice._rx.copy()
+        field._structure_version = 0
         field._meta = lattice._meta.copy() if hasattr(lattice, '_meta') else pd.DataFrame(index=[''])
         
         if ranges is None:

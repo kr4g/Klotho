@@ -5,7 +5,7 @@ from fractions import Fraction
 import warnings
 import pytest
 
-from klotho.topos.graphs import Graph, Lattice, Tree
+from klotho.topos.graphs import Graph, Lattice, Tree, grid_graph
 from klotho.tonos.systems.tone_lattices.tone_lattices import ToneLattice, ToneLatticeLookupWarning
 from klotho.thetos.parameters.parameter_fields.parameter_field import ParameterField
 from klotho.utils.algorithms.factors import (
@@ -100,7 +100,7 @@ def _coord_map(graph):
 
 def test_graph_grid_graph_nd_counts_and_coordinates_non_periodic():
     dims = [range(-2, 3), range(0, 4), range(10, 13)]
-    graph = Graph.grid_graph(dims, periodic=False)
+    graph = grid_graph(dims, periodic=False)
 
     expected_nodes = _prod(len(d) for d in dims)
     expected_edges = _expected_edges(dims, periodic=False)
@@ -120,7 +120,7 @@ def test_graph_grid_graph_nd_counts_and_coordinates_non_periodic():
 
 def test_graph_grid_graph_nd_periodic_wrap_edges_exist():
     dims = [range(-1, 2), range(0, 4), range(3, 6)]
-    graph = Graph.grid_graph(dims, periodic=True)
+    graph = grid_graph(dims, periodic=True)
     coord_to_node = _coord_map(graph)
 
     anchor = (dims[0][-1], dims[1][1], dims[2][1])
@@ -138,7 +138,7 @@ def test_graph_grid_graph_nd_periodic_wrap_edges_exist():
 
 def test_graph_grid_graph_nd_adjacency_matches_axis_steps():
     dims = [range(0, 4), range(0, 3), range(0, 3)]
-    graph = Graph.grid_graph(dims, periodic=False)
+    graph = grid_graph(dims, periodic=False)
     coord_to_node = _coord_map(graph)
 
     u = (1, 1, 1)
@@ -156,7 +156,7 @@ def test_tone_lattice_ratios_are_cached_on_access():
     lattice = ToneLattice(dimensionality=3, resolution=2, bipolar=True)
     coord = (1, -1, 0)
     node_id = lattice.get_node(coord)
-    node_data_before = lattice._graph.get_node_data(node_id)
+    node_data_before = lattice._rx.get_node_data(node_id)
 
     assert 'ratio' not in node_data_before
     ratio = lattice.get_ratio(coord)
@@ -326,12 +326,12 @@ def test_parametric_field_values_are_cached_on_access():
     )
     coord = (1, -1, 2)
     node_id = field.get_node(coord)
-    node_data_before = field._graph.get_node_data(node_id)
+    node_data_before = field._rx.get_node_data(node_id)
     assert 'field_value' not in node_data_before
 
     value_1 = field.get_field_value(coord)
     value_2 = field.get_field_value(coord)
-    node_data_after = field._graph.get_node_data(node_id)
+    node_data_after = field._rx.get_node_data(node_id)
 
     assert value_1 == value_2
     assert 'field_value' in node_data_after

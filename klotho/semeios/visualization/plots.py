@@ -94,34 +94,26 @@ def plot(obj, **kwargs):
         return KlothoPlot(plot_fn, target, kw)
 
     match obj:
-        case Graph():
+        case Tree():
             match obj:
-                case Tree():
-                    match obj:
-                        case RhythmTree():
-                            return _wrap(_plot_rt, obj, dict(kwargs))
-                        case ParameterTree():
-                            return _show(_plot_parameter_tree(obj, **kwargs))
-                        case _:
-                            return _show(_plot_tree(obj, **kwargs))
-                case ParameterField():
-                    return _show(_plot_field(obj, **kwargs))
-                case Lattice():
-                    return _wrap(_plot_lattice, obj, dict(kwargs))
+                case RhythmTree():
+                    return _wrap(_plot_rt, obj, dict(kwargs))
+                case ParameterTree():
+                    return _show(_plot_parameter_tree(obj, **kwargs))
                 case _:
-                    return _show(_plot_graph(obj._graph, **kwargs))
+                    return _show(_plot_tree(obj, **kwargs))
+        case ParameterField():
+            return _show(_plot_field(obj, **kwargs))
+        case Lattice():
+            return _wrap(_plot_lattice, obj, dict(kwargs))
         case MasterSet():
             return _wrap(_plot_master_set, obj, dict(kwargs))
+        case CombinationProductSet():
+            return _wrap(_plot_cps, obj, dict(kwargs))
         case CombinationSet():
-            match obj:
-                case CombinationProductSet():
-                    return _wrap(_plot_cps, obj, dict(kwargs))
-                case _:
-                    return _show(_plot_cs(obj, **kwargs))
+            return _show(_plot_cs(obj, **kwargs))
         case Scale() | Chord() | Voicing():
             return _show(_plot_scale_chord(obj, **kwargs))
-        case PartitionSet():
-            return _show(_plot_graph(obj.graph._graph, **kwargs))
         case DynamicRange():
             return _show(_plot_dynamic_range(obj, **kwargs))
         case Envelope():
@@ -136,6 +128,8 @@ def plot(obj, **kwargs):
             raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
         case TemporalBlock():
             raise NotImplementedError("Plotting for temporal blocks not yet implemented")
+        case Graph():
+            return _show(_plot_graph(obj._rx, **kwargs))
         case _ if hasattr(obj, 'nodes') and hasattr(obj, 'edges'):
             return _show(_plot_graph(obj, **kwargs))
         case _:
@@ -242,7 +236,7 @@ def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = Non
         
         return max(nodes_by_level.values()) if nodes_by_level else 1
     
-    G = tree._graph
+    G = tree._rx
     root = tree.root
     height_scale = figsize[1] / 1.5
     pos = _hierarchy_pos(G, root, height=height_scale, inverted=invert)
@@ -486,7 +480,7 @@ def _plot_tree(tree: Tree, attributes: list[str] | None = None, figsize: tuple[f
         
         return max(nodes_by_level.values()) if nodes_by_level else 1
     
-    original_G = tree._graph
+    original_G = tree._rx
     root = tree.root
     
     # Use original_G for our custom tree operations
@@ -625,9 +619,9 @@ def _get_graph_layout(G, layout='spring', k=1, dim=2):
     
     try:
         # Try RustworkX layouts first for better performance
-        if hasattr(G, '_graph') and hasattr(G._graph, 'node_indices'):
+        if hasattr(G, '_rx') and hasattr(G._rx, 'node_indices'):
             # This is our Graph class wrapping RustworkX
-            rx_graph = G._graph
+            rx_graph = G._rx
             if layout == 'spring':
                 return rx.spring_layout(rx_graph, k=k, dim=dim)
             elif layout == 'circular':
@@ -1324,7 +1318,7 @@ def _plot_cs(cs: CombinationSet, figsize: tuple[float, float] = (12, 12),
     plt.gcf().set_facecolor('black')
     
     # Convert RustworkX graph to NetworkX for visualization
-    rx_graph = cs.graph._graph
+    rx_graph = cs._rx
     G = nx.Graph()
     
     # Add nodes with data

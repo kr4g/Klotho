@@ -77,20 +77,28 @@ def test_lattice_topology_and_attr_mutation_are_blocked():
     coord = lattice.coords[0]
     node = lattice.get_node(coord)
 
-    with pytest.raises(PermissionError):
+    # Immutable graph surfaces simply do not expose mutators (no runtime policy).
+    assert not hasattr(lattice, "add_node")
+    assert not hasattr(lattice, "set_node_data")
+
+    with pytest.raises(AttributeError):
         lattice.add_node(coord=(99, 99))
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(AttributeError):
         lattice.set_node_data(node, ratio=1)
 
 
 def test_cps_graph_surface_is_immutable():
     cps = CombinationProductSet.hexany((1, 3, 5, 7))
-    node = next(iter(cps.graph.nodes))
-    edge = next(iter(cps.graph.edges))
+    node = next(iter(cps.nodes))
+    edge = next(iter(cps.edges))
 
-    with pytest.raises(PermissionError):
-        cps.graph.set_node_data(node, ratio=1)
+    # CPS is-a graph (no `.graph` indirection) and exposes no mutators.
+    assert not hasattr(cps, "graph")
+    assert not hasattr(cps, "set_node_data")
 
-    with pytest.raises(PermissionError):
-        cps.graph.remove_edge(*edge)
+    with pytest.raises(AttributeError):
+        cps.set_node_data(node, ratio=1)
+
+    with pytest.raises(AttributeError):
+        cps.remove_edge(*edge)

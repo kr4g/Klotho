@@ -101,7 +101,7 @@ def test_parameter_tree_graft_adopt_preserves_structure_and_effective_fields():
     expected = ParameterTree(10, (1, (2, (21, 22, 23)), 3))
     expected.set_pfields(_node_at_path(expected, tuple()), tempo=98)
     expected.set_pfields(_node_at_path(expected, (1,)), amp=0.35)
-    expected._meta["pfields"].add("cutoff")
+    expected.register_pfields(["cutoff"])
     expected.set_mfields(_node_at_path(expected, (1,)), role="target")
     expected.set_mfields(_node_at_path(expected, (1, 0)), region="low")
     expected.set_instrument(_node_at_path(expected, (1,)), Instrument("bass", {"channel": 4}))
@@ -132,7 +132,7 @@ def test_parameter_tree_replace_node_updates_structure_and_data():
 
     expected = ParameterTree(1, (11, 12, 13))
     expected.set_pfields(_node_at_path(expected, tuple()), tempo=100)
-    expected._graph[_node_at_path(expected, (2,))].update({"pitch": 64, "velocity": 90})
+    expected._rx[_node_at_path(expected, (2,))].update({"pitch": 64, "velocity": 90})
 
     _assert_parameter_tree_equivalent(source, expected)
 

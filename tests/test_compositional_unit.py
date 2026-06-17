@@ -26,7 +26,7 @@ class Test_uc_default:
 
     def test_rt_pt_structurally_matched(self, uc):
         _ = uc.events
-        assert_rt_pt_structurally_matched(uc._rt, uc._pt)
+        assert_rt_pt_structurally_matched(uc._rt, uc.pt)
 
     def test_num_events(self, uc):
         assert len(uc.events) == 1
@@ -92,7 +92,7 @@ class Test_uc_4_2_1_1:
 
     def test_rt_pt_structurally_matched(self, uc):
         _ = uc.events
-        assert_rt_pt_structurally_matched(uc._rt, uc._pt)
+        assert_rt_pt_structurally_matched(uc._rt, uc.pt)
 
     def test_num_events(self, uc):
         assert len(uc.events) == 4
@@ -194,7 +194,7 @@ class Test_uc_pulse:
 
     def test_rt_pt_structurally_matched(self, uc):
         _ = uc.events
-        assert_rt_pt_structurally_matched(uc._rt, uc._pt)
+        assert_rt_pt_structurally_matched(uc._rt, uc.pt)
 
     def test_num_events(self, uc):
         assert len(uc.events) == 4
@@ -296,7 +296,7 @@ class Test_uc_nested:
 
     def test_rt_pt_structurally_matched(self, uc):
         _ = uc.events
-        assert_rt_pt_structurally_matched(uc._rt, uc._pt)
+        assert_rt_pt_structurally_matched(uc._rt, uc.pt)
 
     def test_num_events(self, uc):
         assert len(uc.events) == 6

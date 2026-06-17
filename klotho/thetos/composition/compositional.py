@@ -17,11 +17,29 @@ import pandas as pd
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon, NodeContext, UTNodeHandle, UTNodeSelector
 from klotho.thetos.parameters import ParameterTree
+from klotho.thetos.parameters.parameter_tree import ParameterApiMixin, ParameterLayer
 from klotho.thetos.instruments import Instrument
 from klotho.thetos.instruments.base import Effect
 from klotho.thetos.instruments.base import Kit
 from klotho.dynatos.envelopes import Envelope
 from klotho.topos.collections.sequences import Pattern
+
+
+class CompositionalTree(ParameterApiMixin, RhythmTree):
+    """A single tree carrying both a rhythm layer and a parameter layer.
+
+    This fuses what were previously two topologically-mirrored trees (an
+    ``RhythmTree`` and a ``ParameterTree``) into one topology, so there is no
+    sync to maintain: node ids are shared by construction. Rhythm data
+    (``proportion``/``tied`` -> ``metric_duration``/``metric_onset``) is owned by
+    the inherited :class:`RhythmLayer`; parameter data (pfields/mfields,
+    instruments, inheritance) is owned by an attached :class:`ParameterLayer`
+    and exposed through :class:`ParameterApiMixin`.
+    """
+
+    def _init_layers(self):
+        super()._init_layers()
+        self._param_layer = self.attach_layer(ParameterLayer())
 
 
 @dataclass(frozen=True)
@@ -128,7 +146,7 @@ class Parametron(Chronon):
         effective = _resolve_kit_member(inst, self._pt, self._node_id) if inst is not None else inst
         if effective is not None and hasattr(effective, 'pfields'):
             result.update(dict(effective.pfields))
-        for k in self._pt._meta['pfields']:
+        for k in self._pt.pfield_names:
             v = self._pt.get_pfield(self._node_id, k)
             if v is not None:
                 result[k] = v
@@ -149,7 +167,7 @@ class Parametron(Chronon):
             Dictionary of meta field names and values
         """
         return {k: self._pt.get_mfield(self._node_id, k)
-                for k in self._pt._meta['mfields']}
+                for k in self._pt.mfield_names}
 
     def _resolve_instrument(self):
         return self._pt.get_instrument(self._node_id)
@@ -282,14 +300,14 @@ class UCNodeHandle(UTNodeHandle):
     def pfields(self):
         return {
             key: self._owner.get_pfield(self.id, key)
-            for key in self._owner._pt._meta['pfields']
+            for key in self._owner._rt.pfield_names
         }
 
     @property
     def mfields(self):
         return {
             key: self._owner.get_mfield(self.id, key)
-            for key in self._owner._pt._meta['mfields']
+            for key in self._owner._rt.mfield_names
         }
 
     @property
@@ -351,6 +369,7 @@ class CompositionalUnit(TemporalUnit):
 
     _node_selector_class = UCNodeSelector
     _node_handle_class = UCNodeHandle
+    _tree_class = CompositionalTree
 
     def __init__(self,
                  span     : Union[int, float, Fraction]            = 1,
@@ -369,10 +388,10 @@ class CompositionalUnit(TemporalUnit):
         if 'group' not in mfields:
             mfields['group'] = 'default'
         
-        self._pt = self._create_synchronized_parameter_tree(pfields, mfields)
+        self._init_parameter_fields(pfields, mfields)
         
         if inst is not None:
-            self.set_instrument(self._pt.root, inst)
+            self.set_instrument(self._rt.root, inst)
         
         self._slur_specs = {}
         self._next_slur_id = 0
@@ -448,105 +467,100 @@ class CompositionalUnit(TemporalUnit):
         new_uc._invalidate_timing_cache()
         return new_uc
     
-    def _create_synchronized_parameter_tree(self, pfields: Union[dict, list, None], mfields: Union[dict, list, None] = None) -> ParameterTree:
-        """
-        Create a ParameterTree with identical structure to the RhythmTree but blank node data.
-        
-        Parameters
-        ----------
-        pfields : Union[dict, list, None]
-            Parameter fields to initialize
-        inst : Union[Instrument, None], optional
-            Instrument to set on the root node
-        mfields : Union[dict, list, None], optional
-            Meta fields to initialize
-            
-        Returns
-        -------
-        ParameterTree
-            A parameter tree matching the rhythm tree structure with clean nodes
-        """
-        pt = ParameterTree.from_tree_structure(self._rt)
-        
+    def _init_parameter_fields(self, pfields: Union[dict, list, None], mfields: Union[dict, list, None]) -> None:
+        """Initialize root-level parameter and meta fields on the fused tree."""
         if pfields is not None:
-            self._initialize_parameter_fields(pt, pfields)
-        
+            if isinstance(pfields, dict):
+                self._rt.set_pfields(self._rt.root, **pfields)
+            elif isinstance(pfields, list):
+                self._rt.set_pfields(self._rt.root, **{field: 0.0 for field in pfields})
         if mfields is not None:
-            self._initialize_meta_fields(pt, mfields)
-        
-        return pt
-    
-    def _initialize_parameter_fields(self, pt: ParameterTree, pfields: Union[dict, list]):
-        """
-        Initialize parameter fields across all nodes in the parameter tree.
-        
-        Parameters
-        ----------
-        pt : ParameterTree
-            The parameter tree to initialize
-        pfields : Union[dict, list]
-            Parameter fields to set
-        """
-        if isinstance(pfields, dict):
-            pt.set_pfields(pt.root, **pfields)
-        elif isinstance(pfields, list):
-            default_values = {field: 0.0 for field in pfields}
-            pt.set_pfields(pt.root, **default_values)
+            if isinstance(mfields, dict):
+                self._rt.set_mfields(self._rt.root, **mfields)
+            elif isinstance(mfields, list):
+                self._rt.set_mfields(self._rt.root, **{field: '' for field in mfields})
 
-    def _initialize_meta_fields(self, pt: ParameterTree, mfields: Union[dict, list]):
+    def _extract_parameter_tree(self) -> ParameterTree:
+        """Extract a standalone ParameterTree snapshot from the fused tree.
+
+        Node ids are preserved so the snapshot lines up with ``self._rt``. Raw
+        per-node overrides (not flattened effective values) are copied, along
+        with the pfield/mfield registries and instrument bindings.
         """
-        Initialize meta fields across all nodes in the parameter tree.
-        
-        Parameters
-        ----------
-        pt : ParameterTree
-            The parameter tree to initialize
-        mfields : Union[dict, list]
-            Meta fields to set
-        """
-        if isinstance(mfields, dict):
-            pt.set_mfields(pt.root, **mfields)
-        elif isinstance(mfields, list):
-            default_values = {field: '' for field in mfields}
-            pt.set_mfields(pt.root, **default_values)
+        src = self._rt
+        pt = ParameterTree.from_tree_structure(src)
+        pt.register_pfields(src.pfield_names)
+        pt.register_mfields(src.mfield_names)
+        keys = src.pfield_names | src.mfield_names
+        for node in src.nodes:
+            raw = src._rx[node]
+            if isinstance(raw, dict):
+                own = {k: v for k, v in raw.items() if k in keys}
+                if own:
+                    pt._rx[node].update(own)
+        for node, inst in src.node_instruments.items():
+            pt.set_instrument(node, inst)
+        pt._param_layer._effective_cache = None
+        return pt
 
     def _copy_pt_node_data(self, target_cu: 'CompositionalUnit', mapping: dict[int, int]) -> None:
+        src = self._rt
+        dst = target_cu._rt
+        dst.register_pfields(src.pfield_names)
+        dst.register_mfields(src.mfield_names)
         for old_node, new_node in mapping.items():
-            target_cu._pt.replace_node_data(new_node, dict(self._pt.items(old_node)))
-        target_cu._pt._meta['pfields'] = set(self._pt._meta.get('pfields', set()))
-        target_cu._pt._meta['mfields'] = set(self._pt._meta.get('mfields', set()))
+            eff = src.items(old_node)
+            pf = {k: v for k, v in eff.items() if k in src.pfield_names}
+            mf = {k: v for k, v in eff.items() if k in src.mfield_names}
+            if pf:
+                dst.set_pfields(new_node, **pf)
+            if mf:
+                dst.set_mfields(new_node, **mf)
 
     def _copy_pt_instruments(self, target_cu: 'CompositionalUnit', mapping: dict[int, int]) -> None:
-        for old_node, inst in self._pt._node_instruments.items():
+        for old_node, inst in self._rt.node_instruments.items():
             new_node = mapping.get(old_node)
             if new_node is not None:
-                target_cu._pt.set_instrument(new_node, inst)
+                target_cu._rt.set_instrument(new_node, inst)
 
-    def _sync_pt_after_rt_subdivide(self, node: int, new_children: list[int],
-                                    pfields: dict, mfields: dict) -> None:
-        for _ in new_children:
-            self._pt.add_child(node)
-        self._pt._invalidate_caches()
-        for child in new_children:
-            if pfields:
-                self._pt.set_pfields(child, **pfields)
-            if mfields:
-                self._pt.set_mfields(child, **mfields)
+    def _mirror_param_state(self, source_uc: 'CompositionalUnit') -> None:
+        """Copy raw parameter-layer state from a same-topology source UC.
+
+        Preserves per-node override placement (inheritance structure), the
+        pfield/mfield registries, and instrument bindings. Node ids must match
+        between the two trees (guaranteed when both are built from the same
+        prolatio).
+        """
+        src = source_uc._rt
+        dst = self._rt
+        dst.register_pfields(src.pfield_names)
+        dst.register_mfields(src.mfield_names)
+        keys = src.pfield_names | src.mfield_names
+        for node in src.nodes:
+            raw = src._rx[node]
+            if isinstance(raw, dict):
+                own = {k: v for k, v in raw.items() if k in keys}
+                if node in dst and own:
+                    dst._rx[node].update(own)
+        for node, inst in src.node_instruments.items():
+            if node in dst:
+                dst.set_instrument(node, inst)
+        dst._param_layer._effective_cache = None
 
     def _resolve_governing_instrument_node(self, node: int):
-        return self._pt._resolve_governing_instrument_node(node)
+        return self._rt._resolve_governing_instrument_node(node)
 
     def _resolve_distribution_fields(self, node_id: int):
-        inst = self._pt.get_instrument(node_id)
-        effective = _resolve_kit_member(inst, self._pt, node_id) if inst is not None else inst
+        inst = self._rt.get_instrument(node_id)
+        effective = _resolve_kit_member(inst, self._rt, node_id) if inst is not None else inst
         inst_pfields = effective.pfields if (effective is not None and hasattr(effective, "pfields")) else {}
         pfields = {}
-        for key in self._pt._meta["pfields"]:
-            value = self._pt.get_pfield(node_id, key)
+        for key in self._rt.pfield_names:
+            value = self._rt.get_pfield(node_id, key)
             if value is None and key in inst_pfields:
                 value = inst_pfields[key]
             pfields[key] = value
-        mfields = {key: self._pt.get_mfield(node_id, key) for key in self._pt._meta["mfields"]}
+        mfields = {key: self._rt.get_mfield(node_id, key) for key in self._rt.mfield_names}
         is_rest = self._rt[node_id].get("proportion", 1) < 0
         return is_rest, pfields, mfields, inst
 
@@ -648,7 +662,7 @@ class CompositionalUnit(TemporalUnit):
         return min(idx), max(idx)
 
     def _build_effective_parameter_tree(self):
-        pt_snapshot = self._pt.copy()
+        pt_snapshot = self._extract_parameter_tree()
         for slur_id, slur_spec in self._slur_specs.items():
             leaves = list(slur_spec['leaf_nodes'])
             if not leaves:
@@ -669,7 +683,7 @@ class CompositionalUnit(TemporalUnit):
 
     def _make_node_proxy(self, node_id: int):
         self._ensure_timing_cache()
-        return Parametron(node_id, self, self._pt)
+        return Parametron(node_id, self, self._rt)
 
     def _make_event(self, node_id: int, event_context=None):
         eval_pt = event_context if event_context is not None else self._build_effective_parameter_tree()
@@ -698,7 +712,7 @@ class CompositionalUnit(TemporalUnit):
         list of str
             Sorted list of parameter field names
         """
-        return self._pt.pfields
+        return self._rt.pfields
     
     @property
     def mfields(self) -> list:
@@ -710,7 +724,7 @@ class CompositionalUnit(TemporalUnit):
         list of str
             Sorted list of meta field names
         """
-        return self._pt.mfields
+        return self._rt.mfields
     
     @staticmethod
     def _instrument_display(inst):
@@ -802,9 +816,9 @@ class CompositionalUnit(TemporalUnit):
                         resolved[k] = val
             if resolved:
                 if setter == 'pfields':
-                    self._pt.set_pfields(n, **resolved)
+                    self._rt.set_pfields(n, **resolved)
                 else:
-                    self._pt.set_mfields(n, **resolved)
+                    self._rt.set_mfields(n, **resolved)
 
     def set_pfields(self, node, include_rests=False, **kwargs) -> None:
         """
@@ -832,7 +846,7 @@ class CompositionalUnit(TemporalUnit):
 
         for n in targets:
             if static_fields:
-                self._pt.set_pfields(n, **static_fields)
+                self._rt.set_pfields(n, **static_fields)
 
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='pfields')
@@ -862,7 +876,7 @@ class CompositionalUnit(TemporalUnit):
 
         for n in targets:
             if static_fields:
-                self._pt.set_mfields(n, **static_fields)
+                self._rt.set_mfields(n, **static_fields)
 
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
@@ -903,7 +917,7 @@ class CompositionalUnit(TemporalUnit):
                 env_value = scaled_envelope.at_time(relative_time)
             except ValueError:
                 env_value = scaled_envelope.values[0] if relative_time <= 0 else scaled_envelope.values[-1]
-            self._pt.set_pfields(node, **{pfield: env_value for pfield in pfields_list})
+            self._rt.set_pfields(node, **{pfield: env_value for pfield in pfields_list})
 
     def _resolve_control_envelope_leaves(self, desc):
         anchor = desc["anchor_node"]
@@ -1043,12 +1057,9 @@ class CompositionalUnit(TemporalUnit):
         desc = self._control_envelopes.pop(env_id)
         leaves = self._resolve_control_envelope_leaves(desc)
         for leaf in leaves:
-            if leaf not in self._pt:
+            if leaf not in self._rt:
                 continue
-            node_data = self._pt.items(leaf)
-            for pfield in desc["pfields"]:
-                node_data.pop(pfield, None)
-            self._pt.replace_node_data(leaf, node_data)
+            self._rt.remove_fields(leaf, desc["pfields"])
 
     def apply_envelope(self,
                        envelope: Envelope,
@@ -1377,14 +1388,18 @@ class CompositionalUnit(TemporalUnit):
         ValueError
             If the node is not found or is not a leaf.
         """
-        parent_data = self._pt[node].active_items()
-        pfields = {k: v for k, v in parent_data.items() if k in self._pt._meta['pfields']}
-        mfields = {k: v for k, v in parent_data.items() if k in self._pt._meta['mfields']}
+        parent_data = self._rt.items(node)
+        pfields = {k: v for k, v in parent_data.items() if k in self._rt.pfield_names}
+        mfields = {k: v for k, v in parent_data.items() if k in self._rt.mfield_names}
 
         self._rt.subdivide(node, S)
         self._invalidate_timing_cache()
         new_children = list(self._rt.successors(node))
-        self._sync_pt_after_rt_subdivide(node, new_children, pfields, mfields)
+        for child in new_children:
+            if pfields:
+                self._rt.set_pfields(child, **pfields)
+            if mfields:
+                self._rt.set_mfields(child, **mfields)
 
         new_leaves = list(self._rt.subtree_leaves(node))
         self._heal_slurs_after_subdivide(node, new_leaves)
@@ -1395,7 +1410,6 @@ class CompositionalUnit(TemporalUnit):
             attr = dict(attr)
             attr['proportion'] = attr.pop('label')
         new_rt_node = self._rt.add_child(parent, **attr)
-        self._pt.add_child(parent)
         return new_rt_node
 
     def prune(self, node):
@@ -1403,14 +1417,12 @@ class CompositionalUnit(TemporalUnit):
         self._invalidate_slurs_for_removed_nodes(removed_set)
         self._invalidate_envelopes_for_removed_nodes(removed_set)
         self._rt.prune(node)
-        self._pt.prune(node)
 
     def remove_subtree(self, node):
         removed_set = {node} | set(self._rt.descendants(node))
         self._invalidate_slurs_for_removed_nodes(removed_set)
         self._invalidate_envelopes_for_removed_nodes(removed_set)
         self._rt.remove_subtree(node)
-        self._pt.remove_subtree(node)
 
     def set_instrument(self, node, instrument) -> None:
         """
@@ -1435,13 +1447,13 @@ class CompositionalUnit(TemporalUnit):
 
         if isinstance(instrument, (str, int)):
             for n in targets:
-                self._pt.set_instrument(n, instrument)
+                self._rt.set_instrument(n, instrument)
         elif isinstance(instrument, (Instrument, Effect)):
             family = getattr(instrument, '_ensemble_family', None)
             for n in targets:
-                self._pt.set_instrument(n, instrument)
+                self._rt.set_instrument(n, instrument)
                 if family is not None:
-                    self._pt.set_mfields(n, group=family)
+                    self._rt.set_mfields(n, group=family)
         elif callable(instrument) or isinstance(instrument, Pattern):
             total = len(targets)
             for i, n in enumerate(targets):
@@ -1455,10 +1467,10 @@ class CompositionalUnit(TemporalUnit):
                     arity = _callable_arity(instrument)
                     inst = instrument(ctx) if arity >= 1 else instrument()
                 if inst is not None:
-                    self._pt.set_instrument(n, inst)
+                    self._rt.set_instrument(n, inst)
                     family = getattr(inst, '_ensemble_family', None)
                     if family is not None:
-                        self._pt.set_mfields(n, group=family)
+                        self._rt.set_mfields(n, group=family)
 
     def set(self, node, inst=None, mfields=None, pfields=None,
             include_rests=False):
@@ -1531,16 +1543,16 @@ class CompositionalUnit(TemporalUnit):
 
     def get_instrument(self, node: int):
         """Resolved instrument for node (nearest ancestor with instrument)."""
-        return self._pt.get_instrument(node)
+        return self._rt.get_instrument(node)
 
     def get_pfield(self, node: int, key: str, default=None):
         """Parameter field value for node (PT only, no instrument fallback)."""
-        value = self._pt.get_pfield(node, key)
+        value = self._rt.get_pfield(node, key)
         return default if value is None else value
 
     def get_mfield(self, node: int, key: str, default=None):
         """Meta field value for node."""
-        value = self._pt.get_mfield(node, key)
+        value = self._rt.get_mfield(node, key)
         return default if value is None else value
 
     
@@ -1562,7 +1574,7 @@ class CompositionalUnit(TemporalUnit):
             self._split_slurs_for_rests(affected_leaves)
             self._invalidate_envelopes_for_removed_nodes(affected_nodes)
         
-        self._pt.clear(node)
+        self._rt.clear_fields(node)
     
     def get_event_parameters(self, idx: int) -> dict:
         """
@@ -1616,13 +1628,13 @@ class CompositionalUnit(TemporalUnit):
         self._copy_pt_node_data(new_cu, old_to_new_mapping)
 
         subtree_node_set = set(original_subtree_nodes)
-        governing_instrument_node = self._pt._resolve_governing_instrument_node(node)
+        governing_instrument_node = self._rt._resolve_governing_instrument_node(node)
         if (governing_instrument_node is not None
             and governing_instrument_node not in subtree_node_set
-            and governing_instrument_node in self._pt._node_instruments):
-            new_cu._pt.set_instrument(
-                new_cu._pt.root,
-                self._pt._node_instruments[governing_instrument_node]
+            and governing_instrument_node in self._rt.node_instruments):
+            new_cu._rt.set_instrument(
+                new_cu._rt.root,
+                self._rt.node_instruments[governing_instrument_node]
             )
         self._copy_pt_instruments(new_cu, old_to_new_mapping)
 

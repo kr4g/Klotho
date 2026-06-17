@@ -159,7 +159,7 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
                 
                 instrument = ut.get_instrument(ut._rt.root)
                 if instrument is not None:
-                    unit.set_instrument(unit._pt.root, instrument)
+                    unit.set_instrument(unit._rt.root, instrument)
             else:
                 # Original behavior for TemporalUnit
                 unit = TemporalUnit(
@@ -223,7 +223,7 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
             bpm=bpm,
             pfields=ut.pfields
         )
-        new_cu._pt = ut._pt.copy()
+        new_cu._mirror_param_state(ut)
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
         new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
@@ -275,7 +275,7 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
             bpm=ut.bpm * ratio,
             pfields=ut.pfields
         )
-        new_cu._pt = ut._pt.copy()
+        new_cu._mirror_param_state(ut)
         new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
         new_cu._next_slur_id = ut._next_slur_id
         new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)

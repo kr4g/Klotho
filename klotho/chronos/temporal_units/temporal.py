@@ -629,6 +629,7 @@ class TemporalUnit(metaclass=TemporalMeta):
     
     _node_selector_class = UTNodeSelector
     _node_handle_class = UTNodeHandle
+    _tree_class = RhythmTree
 
     @property
     def nodes(self):
@@ -942,17 +943,18 @@ class TemporalUnit(metaclass=TemporalMeta):
                 self.make_rest(leaf)
 
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
+        tree_cls = self._tree_class
         match prolatio:
             case tuple():
                 self._type = ProlatioTypes.SUBDIVISION
-                return RhythmTree(span = span, meas = tempus, subdivisions = prolatio)
+                return tree_cls(span = span, meas = tempus, subdivisions = prolatio)
             
             case str():
                 prolatio = prolatio.lower()
                 match prolatio:
                     case p if p.lower() in ProlatioTypes.PULSTYPES.value:
                         self._type = ProlatioTypes.PULSE
-                        return RhythmTree(
+                        return tree_cls(
                             span = span,
                             meas = tempus,
                             subdivisions = (1,) * tempus._numerator
@@ -960,7 +962,7 @@ class TemporalUnit(metaclass=TemporalMeta):
                     
                     case d if d.lower() in ProlatioTypes.DURTYPES.value:
                         self._type = ProlatioTypes.DURATION
-                        return RhythmTree(
+                        return tree_cls(
                             span = span,
                             meas = tempus,
                             subdivisions = (1,)
@@ -968,7 +970,7 @@ class TemporalUnit(metaclass=TemporalMeta):
                     
                     case r if r.lower() in ProlatioTypes.RESTYPES.value:
                         self._type = ProlatioTypes.REST
-                        return RhythmTree(
+                        return tree_cls(
                             span = span,
                             meas = tempus,
                             subdivisions = (-1,)
@@ -1294,8 +1296,8 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
             'Type': ut.type.name[0] if ut.type else '',
             'Tempo': f'{ut.beat} = {round(ut.bpm, 3)}',
             'Start': seconds_to_hmsms(ut.time[0]),
-            'End': seconds_to_hmsms(ut.time[1]),
             'Duration': seconds_to_hmsms(ut.duration),
+            'End': seconds_to_hmsms(ut.time[1]),
         } for ut in self._seq]).__str__()
 
     def __repr__(self):

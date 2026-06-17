@@ -46,7 +46,7 @@ def _score_artifacts(uc, track=None):
 def _baked_pfield_series(uc, field):
     """Baked values for `field` on sounding leaves in leaf order."""
     return [
-        uc._pt.get_pfield(n, field)
+        uc.get_pfield(n, field)
         for n in uc._rt.leaf_nodes
         if uc._rt[n].get('proportion', 1) >= 0
     ]
@@ -579,7 +579,7 @@ class TestRebakeOnPartialShrink:
         leaves = list(uc.rt.leaf_nodes)
         uc.make_rest(leaves[-1])
         post_rest = [
-            uc._pt.get_pfield(n, 'amp')
+            uc.get_pfield(n, 'amp')
             for n in uc._rt.leaf_nodes
             if uc._rt[n].get('proportion', 1) >= 0
         ]
@@ -598,7 +598,7 @@ class TestRebakeOnPartialShrink:
             envelope=env, pfields='amp', node=reference.rt.root, control=True
         )
         ref_series = [
-            reference._pt.get_pfield(n, 'amp')
+            reference.get_pfield(n, 'amp')
             for n in reference._rt.leaf_nodes
             if reference._rt[n].get('proportion', 1) >= 0
         ]
@@ -628,7 +628,7 @@ class TestDegenerateEndpointFalse:
             uc.apply_envelope(
                 envelope=env, pfields='amp', node=uc.rt.root, endpoint=False
             )
-        amp = uc._pt.get_pfield(uc.rt.leaf_nodes[0], 'amp')
+        amp = uc.get_pfield(uc.rt.leaf_nodes[0], 'amp')
         assert amp == pytest.approx(0.1, abs=1e-9), (
             "Single leaf sits at relative_time=0 of the envelope, so baked "
             f"value should equal values[0]=0.1; got {amp}"
