@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 _SS_MANIFEST_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'manifest.json'
-_SS_MANIFEST_CACHE = None
+_SS_DISK_MANIFEST_CACHE = None
 
 GM_PROGRAM_NAMES = (
     "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano",
@@ -40,21 +40,28 @@ GM_PROGRAM_NAMES = (
 )
 
 
+def _load_disk_manifest():
+    global _SS_DISK_MANIFEST_CACHE
+    if _SS_DISK_MANIFEST_CACHE is None:
+        if _SS_MANIFEST_PATH.exists():
+            _SS_DISK_MANIFEST_CACHE = json.loads(_SS_MANIFEST_PATH.read_text())
+        else:
+            _SS_DISK_MANIFEST_CACHE = {}
+    return _SS_DISK_MANIFEST_CACHE
+
+
 def load_ss_manifest():
     """Return the flat ``{synth_name: {control_name: default_value}}`` dict.
 
     The on-disk manifest is auto-regenerated from compiled ``.scsyndef``
-    files via
-    ``klotho.utils.playback.supersonic.scripts.regenerate_manifest``.  See
-    ``07_PLAYBACK.md`` for the schema.
+    files; see ``07_PLAYBACK.md`` for the schema.  Any SynthDefs
+    registered at runtime via
+    :mod:`klotho.utils.playback.supersonic.registry` are overlaid on top
+    (taking precedence) so they are immediately introspectable by the
+    instrument layer and the browser auto-release logic.
     """
-    global _SS_MANIFEST_CACHE
-    if _SS_MANIFEST_CACHE is None:
-        if _SS_MANIFEST_PATH.exists():
-            _SS_MANIFEST_CACHE = json.loads(_SS_MANIFEST_PATH.read_text())
-        else:
-            _SS_MANIFEST_CACHE = {}
-    return _SS_MANIFEST_CACHE
+    from klotho.utils.playback.supersonic.registry import runtime_controls
+    return {**_load_disk_manifest(), **runtime_controls()}
 
 
 def ss_synth_controls(def_name):

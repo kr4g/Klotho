@@ -52,6 +52,23 @@ def _has_gate(instrument):
     return bool(getattr(instrument, 'has_gate', True))
 
 
+def _wants_duration_pfield(instrument):
+    """True if a non-gated instrument declares a ``duration`` control.
+
+    Such synths (e.g. Supriya/SC one-shots that self-free via an
+    ``Env.linen(0, duration, ...)`` envelope) need the leaf's time
+    duration injected as the ``duration`` pfield so their internal
+    envelope length tracks the rhythmic value.
+    """
+    pfields = getattr(instrument, 'pfields', None)
+    if pfields is None:
+        return False
+    try:
+        return 'duration' in pfields
+    except TypeError:
+        return False
+
+
 def _attach_poly_meta(event_record, voice_event):
     event_record["_polyGroupId"] = voice_event["poly_group_id"]
     event_record["_logicalStepId"] = voice_event["logical_step_id"]
@@ -169,6 +186,7 @@ def lower_compositional_ir_to_sc_assembly(
 
         def_name = _resolve_event_synth(resolved_instrument, default_synth)
         has_gate = _has_gate(resolved_instrument)
+        inject_duration = (not has_gate) and _wants_duration_pfield(resolved_instrument)
         group = event.get_mfield('group')
         is_slur_start = event.get_mfield('_slur_start', 0)
         is_slur_end = event.get_mfield('_slur_end', 0)
@@ -229,6 +247,10 @@ def lower_compositional_ir_to_sc_assembly(
                 voice_pfields = _normalize_sc_pfields(voice_pfields)
 
             merged_pfields = _merge_pfields(voice_pfields, extra_pfields)
+
+            if inject_duration:
+                merged_pfields = dict(merged_pfields)
+                merged_pfields['duration'] = voice_dur
 
             if is_slur_start:
                 slur_uid = uuid4().hex

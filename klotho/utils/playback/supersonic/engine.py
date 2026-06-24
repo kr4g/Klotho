@@ -16,22 +16,33 @@ from klotho.thetos.instruments._shared import load_ss_manifest
 SYNTHDEFS_DIR = Path(__file__).parent / "assets" / "synthdefs"
 _WIDGET_JS_PATH = Path(__file__).parent / "_engine_widget.js"
 _WIDGET_JS_TEMPLATE = None
-_ALL_SYNTHDEF_ASSETS = None
+_DISK_SYNTHDEF_ASSETS = None
 
 _INFRA_SYNTHDEFS = frozenset({'__busRouter', '__busRouterMonitor', '__chainLimiter'})
 
 
-def _load_all_synthdef_assets():
-    global _ALL_SYNTHDEF_ASSETS
-    if _ALL_SYNTHDEF_ASSETS is None:
+def _load_disk_synthdef_assets():
+    global _DISK_SYNTHDEF_ASSETS
+    if _DISK_SYNTHDEF_ASSETS is None:
         assets = {}
         if SYNTHDEFS_DIR.exists():
             for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
                 assets[path.stem] = base64.b64encode(path.read_bytes()).decode("ascii")
         if "default" not in assets and "kl_tri" in assets:
             assets["default"] = assets["kl_tri"]
-        _ALL_SYNTHDEF_ASSETS = assets
-    return _ALL_SYNTHDEF_ASSETS
+        _DISK_SYNTHDEF_ASSETS = assets
+    return _DISK_SYNTHDEF_ASSETS
+
+
+def _load_all_synthdef_assets():
+    """Disk-baked assets overlaid with any runtime-registered SynthDefs.
+
+    Runtime registrations (see
+    :mod:`klotho.utils.playback.supersonic.registry`) take precedence and
+    become visible immediately, without reimporting the package.
+    """
+    from klotho.utils.playback.supersonic.registry import runtime_assets
+    return {**_load_disk_synthdef_assets(), **runtime_assets()}
 
 
 def _filter_synthdef_assets(all_assets, needed):
