@@ -1614,11 +1614,15 @@ class CompositionalUnit(TemporalUnit):
         rt_subtree = self._rt.subtree(node, renumber=True)
         new_cu = self.__class__.from_rt(rt_subtree, beat=self.beat, bpm=self.bpm, pfields=None)
         original_subtree_nodes = [node] + list(self._rt.descendants(node))
-        old_to_new_mapping = self._rt.map_parallel_nodes(
-            new_cu._rt,
-            self_root=node,
-            other_root=new_cu._rt.root,
-        )
+        if list(self._rt.successors(node)):
+            old_to_new_mapping = self._rt.map_parallel_nodes(
+                new_cu._rt,
+                self_root=node,
+                other_root=new_cu._rt.root,
+            )
+        else:
+            new_leaf = list(new_cu._rt.leaf_nodes)[0]
+            old_to_new_mapping = {node: new_leaf}
 
         for old_node, new_node in old_to_new_mapping.items():
             old_proportion = self._rt[old_node].get('proportion')
