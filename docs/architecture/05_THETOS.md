@@ -6,9 +6,11 @@
 `klotho.thetos` is the **composition layer** — the bridge that unifies
 time (chronos), pitch (tonos), and dynamics (dynatos) into playable
 musical structures.  Its central abstraction is `CompositionalUnit`,
-which wires a `ParameterTree` to a `RhythmTree` so that every
-temporal event carries frequency, amplitude, instrument, and
-arbitrary user-defined parameter data.
+whose internal tree is a **fused `CompositionalTree`** carrying both
+rhythm and parameter data on a single topology, so that every temporal
+event carries frequency, amplitude, instrument, and arbitrary
+user-defined parameter data.  `Score` arranges multiple units on a
+shared timeline.
 
 ---
 
@@ -20,19 +22,20 @@ thetos/
 ├── types.py                         # Unit type wrappers (frequency, midi, amplitude…)
 ├── composition/
 │   ├── __init__.py
-│   └── compositional.py             # CompositionalUnit, Parametron, selector/context distribution types
+│   ├── compositional.py             # CompositionalTree, CompositionalUnit, Parametron, selectors
+│   └── score.py                     # Score, ScoreItem — multi-unit timeline
 ├── instruments/
 │   ├── __init__.py
-│   ├── base.py                      # Instrument (base)
-│   ├── instrument.py                # instrument lookup / registration
+│   ├── base.py                      # Instrument, Kit, Effect (bases)
 │   ├── _shared.py                   # shared constants
-│   ├── synthdef.py                  # SynthDefInstrument (SuperCollider)
+│   ├── synthdef.py                  # SynthDefInstrument, SynthDefFX, SynthDefKit (SuperCollider)
 │   ├── midi.py                      # MidiInstrument (General MIDI)
 │   ├── tone.py                      # ToneInstrument (Tone.js)
+│   ├── ensemble.py                  # Ensemble — named instrument grouping
 │   └── presets.py                   # preset definitions
 └── parameters/
     ├── __init__.py
-    ├── parameter_tree.py            # ParameterTree(Tree)
+    ├── parameter_tree.py            # ParameterLayer, ParameterApiMixin, ParameterTree
     └── parameter_fields/
         ├── __init__.py
         ├── parameter_field.py       # ParameterField(Lattice)
@@ -121,34 +124,61 @@ from klotho.types import real_onset, real_duration, metric_onset, metric_duratio
 
 ---
 
-## 2. ParameterTree
+## 2. ParameterTree (and ParameterLayer)
 
 **File:** `thetos/parameters/parameter_tree.py`  
-**Inherits:** `Tree` (from `topos.graphs`)
+**Inherits:** `ParameterApiMixin, Tree` (from `topos.graphs`)
 
-A tree that mirrors the topology of a `RhythmTree` and stores per-node
-parameter values with **automatic inheritance**: setting a value on
-a parent propagates to all descendants unless overridden.
+A tree that stores per-node parameter values with **automatic
+inheritance**: setting a value on a parent propagates to all
+descendants unless overridden.
+
+The parameter behavior is split into two pieces:
+
+- **`ParameterLayer(TreeLayer)`** — owns the registered pfield/mfield
+  key sets, the per-node instrument bindings (`_node_instruments`),
+  and the effective-value cache (`_effective_cache`).
+- **`ParameterApiMixin`** — exposes the public API (`set_pfields`,
+  `set_instrument`, `clear_fields`, …) on any tree that carries a
+  `ParameterLayer`.
+
+This is what lets `CompositionalTree` carry parameters on a rhythm
+tree's topology without a mirrored tree — it attaches the same layer
+and mixes in the same API.
 
 ### Class Diagram
 
 ```mermaid
 classDiagram
     Tree <|-- ParameterTree
+    ParameterApiMixin <|-- ParameterTree
+    TreeLayer <|-- ParameterLayer
 
-    class ParameterTree {
+    class ParameterLayer {
+        -_pfields : set[str]
+        -_mfields : set[str]
         -_node_instruments : dict[int, Instrument]
         -_effective_cache : dict | None
-        +pfields : set[str]
-        +mfields : set[str]
+        +invalidate(tree)
+        +on_structure_changed(tree, scope, op)
+        -_build_effective(tree)
+    }
+
+    class ParameterApiMixin {
+        +pfields : list[str]
+        +mfields : list[str]
+        +node_instruments : dict
         +set_pfields(node, **kwargs)
         +set_mfields(node, **kwargs)
         +get_pfield(node, key) Any
         +get_mfield(node, key) Any
         +set_instrument(node, instrument)
         +get_instrument(node) Instrument | None
-        +clear(node=None)
+        +clear_fields(node=None)
+        +remove_fields(node, keys)
     }
+
+    ParameterTree o-- ParameterLayer : attached in _init_layers
 ```
 
 ### Storage Model
@@ -156,10 +186,12 @@ classDiagram
 - **Overrides** are stored only at the node where explicitly set
   (in the RustworkX node data dict).
 - **Effective values** (resolved via ancestor chain) are computed
-  on write and cached in `_effective_cache` for O(1) read.
+  **lazily on read** by `ParameterLayer._build_effective()` and cached
+  in `_effective_cache` for O(1) subsequent reads.
 - `_build_effective()` walks root → leaves, merging parent effective
   values with node overrides.
-- Any mutation invalidates the cache via `_invalidate_caches()`.
+- Any write or structural mutation sets `_effective_cache = None`
+  (via `layer.invalidate` / `layer.on_structure_changed`).
 
 ### PFields vs MFields
 
@@ -172,8 +204,8 @@ Both follow the same inheritance model.
 
 ### Instrument Resolution
 
-Instruments are stored per-node in `_node_instruments`.  Resolution
-walks up the ancestor chain:
+Instruments are stored per-node in the layer's `_node_instruments`.
+Resolution walks up the ancestor chain:
 
 ```mermaid
 flowchart TD
@@ -187,9 +219,11 @@ flowchart TD
 
 ### `from_tree_structure`
 
-Creates a `ParameterTree` with the same topology as a source tree
-(typically a `RhythmTree`) but **empty node data**.  This is how
-`CompositionalUnit` synchronizes its PT with its RT.
+Creates a `ParameterTree` with the same topology as a source tree but
+**empty node data**.  `CompositionalUnit` uses this to derive
+**snapshots** — the `uc.pt` property extracts an effective
+`ParameterTree` from the fused tree (node ids preserved).  It is not a
+live synchronization mechanism; there is nothing to keep in sync.
 
 ---
 
@@ -214,7 +248,7 @@ classDiagram
         +get_field_value(coord) float
         +set_field_value(coord, value)
         +apply_function(fn)
-        +sample_field(n) list
+        +sample_field(points) ndarray
         +gradient(coord) ndarray
         +laplacian(coord) float
         +from_lattice(lattice, fn) ParameterField$
@@ -255,13 +289,14 @@ classDiagram
     Instrument <|-- SynthDefInstrument
     Instrument <|-- MidiInstrument
     Instrument <|-- ToneInstrument
+    Instrument <|-- Kit
+    Kit <|-- SynthDefKit
+    Effect <|-- SynthDefFX
 
     class SynthDefInstrument {
         +defName : str
         +has_gate : bool
-        +from_manifest()$
-        +KlTri$
-        +KlSine$
+        +from_manifest(defName)$
     }
 
     class MidiInstrument {
@@ -278,13 +313,35 @@ classDiagram
         +Kick$
         +Snare$
     }
+
+    class Kit {
+        +members : dict
+        +selector : str
+    }
+
+    class Effect {
+        +name : str
+    }
 ```
+
+The instruments package also provides `Ensemble` (`ensemble.py`), a
+named grouping of instruments, and effect wrappers (`Effect`,
+`SynthDefFX`).
 
 ### SynthDefInstrument (SuperCollider)
 
-Wraps a SuperCollider synth definition.  Default synthdefs (`KlTri`,
-`KlSine`, etc.) are loaded from `.scsyndef` files in
-`utils/playback/supersonic/assets/`.
+Wraps a SuperCollider synth definition, looked up by name in the
+SuperSonic manifest:
+
+```python
+inst = SynthDefInstrument.from_manifest('kl_tri')
+```
+
+Default synthdefs are loaded from `.scsyndef` files in
+`utils/playback/supersonic/assets/synthdefs/`.  Additional synthdefs
+can be registered at runtime with `klotho.register_synthdef` (see the
+playback doc).  `SynthDefKit.from_manifest({...})` builds a multi-member
+kit keyed by a selector mfield.
 
 Key property: **`has_gate`** — a derived `bool` (`'gate' in self._pfields`).
 If the synthdef has a `gate` control, events emitted for it carry
@@ -312,8 +369,13 @@ presets for common sounds (`Harmonics`, `Kick`, `Snare`, etc.).
 **File:** `thetos/composition/compositional.py`  
 **Inherits:** `TemporalUnit` (from `chronos`)
 
-The central composition object.  Extends `TemporalUnit` with a
-synchronized `ParameterTree` for hierarchical parameter management.
+The central composition object.  `TemporalUnit`'s internal tree class
+is pluggable via `_tree_class`; `CompositionalUnit` sets
+`_tree_class = CompositionalTree`, where
+`CompositionalTree(ParameterApiMixin, RhythmTree)` attaches **both** a
+`RhythmLayer` and a `ParameterLayer` to one topology.  The unit's
+single fused tree (`uc._rt`) therefore carries rhythm *and*
+hierarchical parameters — there is no separate `ParameterTree` member.
 
 ### Class Diagram
 
@@ -321,10 +383,18 @@ synchronized `ParameterTree` for hierarchical parameter management.
 classDiagram
     TemporalUnit <|-- CompositionalUnit
     Chronon <|-- Parametron
+    RhythmTree <|-- CompositionalTree
+    ParameterApiMixin <|-- CompositionalTree
+
+    class CompositionalTree {
+        rhythm layer + parameter layer
+        on one topology
+    }
 
     class CompositionalUnit {
-        -_pt : ParameterTree
-        +pt : ParameterTree
+        -_rt : CompositionalTree
+        +rt : RhythmTree (copy)
+        +pt : ParameterTree (effective snapshot)
         +pfields : list[str]
         +mfields : list[str]
         +events : DataFrame
@@ -333,8 +403,10 @@ classDiagram
         +set_instrument(node, instrument)
         +apply_envelope(envelope, pfields, node, ...)
         +apply_slur(node, offset, take, mode)
+        +clear_parameters(node=None)
         +make_rest(node)
         +subdivide(node, subdivs)
+        +sparsify(probability, node=None)
         +from_rt(rt, beat, bpm)$
         +from_ut(ut)$
         +from_subtree(node)
@@ -380,25 +452,30 @@ classDiagram
         +instrument : Instrument | None
     }
 
-    CompositionalUnit *-- ParameterTree
-    CompositionalUnit --> Parametron : yields via .events
+    CompositionalUnit *-- CompositionalTree : _rt (fused)
+    CompositionalUnit --> Parametron : yields via iteration
     CompositionalUnit --> DistributionContext : creates during distribution
     DistributionContext --> ParentDistributionView : lazy parent context
 ```
 
-### How RT and PT Stay Synchronized
+### One Fused Tree (no RT/PT mirroring)
 
 ```mermaid
 flowchart LR
-    RT["RhythmTree"] -->|"from_tree_structure()"| PT["ParameterTree<br/>(same topology)"]
-    RT --> UC["CompositionalUnit"]
-    PT --> UC
+    RT["rhythm data<br/>(RhythmLayer)"] --- CT["CompositionalTree<br/>(single topology, uc._rt)"]
+    PT["parameter data<br/>(ParameterLayer)"] --- CT
+    CT --> UC["CompositionalUnit"]
     UC -->|"iter(uc)"| P["yields Parametron"]
+    UC -->|"uc.rt"| RTC["RhythmTree copy"]
+    UC -->|"uc.pt"| PTS["effective ParameterTree snapshot"]
 ```
 
-When `CompositionalUnit` is constructed, it creates a `ParameterTree`
-that clones the `RhythmTree`'s topology.  Both trees share the same
-node IDs, so a node in the RT maps 1:1 to the same node in the PT.
+All parameter operations route through `uc._rt` (e.g. `uc.set_pfields`
+calls `self._rt.set_pfields(...)`).  The accessors are derived views:
+`uc.rt` returns a **copy** of the rhythm tree; `uc.pt` returns an
+effective `ParameterTree` **snapshot** with node ids preserved,
+including UC-level overlays (slurs, control envelopes) folded in via
+`_build_effective_parameter_tree()`.
 
 ### Parametron
 
@@ -408,7 +485,10 @@ represents a single event (leaf node) carrying:
 - **Temporal data** — `start`, `duration`, `end`, `metric_onset`,
   `metric_duration` (inherited from `Chronon`).
 - **Parameter data** — `pfields` dict, `mfields` dict, resolved
-  instrument (from the PT).
+  instrument (read from the effective parameter snapshot).
+
+Iterating the unit (`for p in uc:`) yields Parametrons; the `events`
+property returns a pandas **DataFrame** summary instead.
 
 ### DistributionContext
 
@@ -474,12 +554,18 @@ uc.apply_envelope(env, pfields='amp', node=uc.root)
 Full signature:
 
 ```python
-apply_envelope(envelope, pfields, node, offset=0, take=None, scope="span", endpoint=True)
+apply_envelope(envelope, pfields, node, offset=0, take=None,
+               scope="span", control=False, endpoint=True)
 ```
 
 Resolves `node` to its subtree leaves, then samples the `Envelope`
 across their real-time span, writing the sampled values to the
-specified pfield(s).  Returns a span ID for tracking.
+specified pfield(s).  Returns an envelope ID for tracking (a list of
+IDs with `scope="per_node"`).  With `control=True`, values are still
+baked for inspection but a control-envelope descriptor is also
+recorded for runtime bus-based automation (a `__klEnvCtrl` control
+synth in SuperSonic).  `remove_envelope(env_id)` undoes an
+application.
 
 ### Slur Marking
 
@@ -493,42 +579,76 @@ tied gates (SuperSonic) or legato (Tone.js/MIDI).
 
 ---
 
-## 6. End-to-End Composition Flow
+## 6. Score and ScoreItem
+
+**File:** `thetos/composition/score.py`
+
+`Score` is an ordered collection of temporal units on a shared
+timeline; adding a unit wraps it in a **`ScoreItem`** — a named, owned
+wrapper that mediates *all* time mutation.  Outside a `Score`, a
+temporal unit's time is immutable (no public offset setter, no
+`set_duration`).
+
+Key surface:
+
+| API | Purpose |
+|---|---|
+| `score.add(unit, name=…, at=…/after=…/before=…, track=…)` | Place a unit on the timeline |
+| `score.append(...)` / `score.prepend(...)` | Place relative to current extent |
+| `score[name]` | Look up a `ScoreItem` by name |
+| `score.track(name, inserts=[…])` | Register a named track with insert effects |
+| `score.from_ensemble(ensemble)` | Create tracks from an `Ensemble` |
+| `score.start` / `score.end` / `score.duration` | Timeline extent |
+| `score.write(...)` | Export |
+| `item.set_duration(secs, ripple=False)` | Scale the owned unit's bpm to hit a duration |
+| `item.stretch(factor, ripple=False)` | Multiply duration |
+| `item.freeze()` | Disallow further time mutation |
+
+`ScoreItem` proxies attribute access to the owned unit, so
+`score['intro'].set_pfields(...)` works directly.  `play(score)` and
+score-aware SuperSonic playback consume the assembled timeline (see
+the playback doc).
+
+---
+
+## 7. End-to-End Composition Flow
 
 ```mermaid
 flowchart TD
-    subgraph "Define Structure"
+    subgraph defineStructure [Define Structure]
         RT["RhythmTree<br/>(span, meas, subdivisions)"]
     end
 
-    subgraph "Create Compositional Unit"
+    subgraph createUnit [Create Compositional Unit]
         UC["CompositionalUnit.from_rt(rt, beat, bpm)"]
-        UC -->|"clones topology"| PT["ParameterTree"]
+        UC -->|"builds fused tree"| CT["CompositionalTree (uc._rt)<br/>rhythm layer + parameter layer"]
     end
 
-    subgraph "Assign Parameters"
+    subgraph assignParams [Assign Parameters — all route through uc._rt]
         I["set_instrument(root, Instrument)"]
         PF["set_pfields(root, freq=pitches)"]
         MF["set_mfields(root, group=values)"]
         ENV["apply_envelope(env, 'amp', root)"]
     end
 
-    subgraph "Read Events"
+    subgraph readEvents [Read Events]
+        SNAP["effective PT snapshot<br/>(slur/control overlays folded in)"]
         EVT["iter(uc) → Parametron per leaf"]
+        SNAP --> EVT
         EVT --> P1["Parametron 0<br/>start=0.0, freq=440, amp=0.8"]
         EVT --> P2["Parametron 1<br/>start=0.5, freq=550, amp=0.6"]
         EVT --> P3["…"]
     end
 
     RT --> UC
-    PT --> I
-    PT --> PF
-    PT --> MF
-    PT --> ENV
-    I --> EVT
-    PF --> EVT
-    MF --> EVT
-    ENV --> EVT
+    CT --> I
+    CT --> PF
+    CT --> MF
+    CT --> ENV
+    I --> SNAP
+    PF --> SNAP
+    MF --> SNAP
+    ENV --> SNAP
 
     EVT -->|"play(uc)"| PB["Playback Engine"]
     EVT -->|"plot(uc)"| VIS["Visualization"]
@@ -536,16 +656,17 @@ flowchart TD
 
 ---
 
-## 7. Exported API
+## 8. Exported API
 
 From `klotho.thetos`:
 
 ```python
 ParameterTree, ParameterField
-Instrument, SynthDefInstrument, MidiInstrument, ToneInstrument
-CompositionalUnit, Parametron
+Instrument, Effect, SynthDefInstrument, SynthDefFX, MidiInstrument,
+ToneInstrument, Kit, SynthDefKit, Ensemble
+CompositionalUnit, Parametron, Score, ScoreItem
 frequency, cent, midicent, midi, amplitude, decibel
 real_onset, real_duration, metric_onset, metric_duration
 ```
 
-From `klotho` top level — all of the above plus the `types` module.
+The type factories are also available via the `klotho.types` module.

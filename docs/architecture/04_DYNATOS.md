@@ -15,6 +15,7 @@ parameter control—plus low-level amplitude utilities.
 ```
 dynatos/
 ├── __init__.py
+├── types.py                   # Amplitude, Decibel, Velocity unit wrappers
 ├── dynamics/
 │   ├── __init__.py
 │   ├── dynamics.py            # Dynamic, DynamicRange
@@ -47,18 +48,19 @@ classDiagram
         +marking : str
         +db : float
         +amp : float
+        +__float__() float
     }
 
     class DynamicRange {
-        +lo : Dynamic
-        +hi : Dynamic
-        +markings : tuple[str]
-        +db_range : tuple[float, float]
-        +amp_range : tuple[float, float]
+        +min_dynamic : float
+        +max_dynamic : float
+        +curve : float
+        +ranges : dict[str, Dynamic]
+        +__getitem__(marking) Dynamic
         +at(position) Dynamic
     }
 
-    DynamicRange o-- Dynamic : lo, hi
+    DynamicRange o-- Dynamic : one per marking
 ```
 
 ### Built-in Markings
@@ -70,12 +72,16 @@ ppp  pp  p  mp  mf  f  ff  fff
 ```
 
 Each is mapped to a decibel value.  `Dynamic.amp` converts via
-`dbamp()` for linear amplitude.
+`dbamp()` for linear amplitude.  A `Dynamic` is constructed from both
+a `marking` and a `db_value` — normally you get them from a
+`DynamicRange` rather than building them directly.
 
 ### DynamicRange
 
-A range between two `Dynamic` extremes.  Provides interpolation
-(`at(0.5)` → the midpoint dynamic).
+Maps a configurable tuple of markings onto a dB range
+(`min_dynamic`/`max_dynamic`, default −60 to −3 dB) with optional
+`curve` shaping.  Access by marking (`dr['mf']`) or by continuous
+interpolation (`dr.at(0.5)` → the midpoint dynamic).
 
 ---
 
@@ -93,9 +99,15 @@ classDiagram
     class Envelope {
         +values : list[float]
         +times : list[float]
-        +curves : list[float]
+        +time_scale : float
         +total_time : float
+        +breakpoint_times : list[float]
+        +normalized_times : list[float]
         +at_time(t) float
+        +perc(attackTime, releaseTime, curve)$
+        +adr(attackTime, decayTime, decayLevel, releaseTime)$
+        +adsr(attackTime, decayTime, sustainTime, sustainLevel, releaseTime)$
+        +pairs(pairs, curve)$
     }
 ```
 
@@ -105,9 +117,16 @@ classDiagram
 env = Envelope(
     values=[0, 1, 0.5, 0],     # breakpoint values
     times=[0.1, 0.8, 0.1],     # segment durations
-    curve=-3                     # curve shape (all segments)
+    curve=-3                   # curve shape (all segments)
 )
+
+env = Envelope.adsr()          # classic shapes as classmethods
+env = Envelope.perc(attackTime=0.01, releaseTime=1.0)
 ```
+
+The constructor also accepts `normalize_values`, `normalize_times`,
+`value_scale`, and `time_scale` options.  (Curve data is internal —
+there is no public `curves` property.)
 
 ### Curve Shapes
 
@@ -134,9 +153,17 @@ flowchart LR
 
 ### Usage in Composition
 
-Envelopes are applied to `CompositionalUnit` events via
-`uc.apply_envelope(env, field='amp')`, which distributes sampled
-envelope values across the leaf nodes' parameter fields.
+Envelopes are applied to `CompositionalUnit` leaves via
+
+```python
+uc.apply_envelope(env, pfields='amp', node=uc.root)
+```
+
+(full signature: `apply_envelope(envelope, pfields, node, offset=0,
+take=None, scope="span", control=False, endpoint=True)`), which
+distributes sampled envelope values across the selected leaves'
+parameter fields — or, with `control=True`, also records a runtime
+control-envelope for bus-based automation.
 
 ---
 
@@ -153,7 +180,7 @@ envelope values across the leaf nodes' parameter fields.
 
 | Function | Description |
 |---|---|
-| `freq_amp_scale(freq, ref)` | Frequency-dependent amplitude scaling (equal-loudness approximation) |
+| `freq_amp_scale(freq, db_level, min_db=-60)` | Frequency-dependent amplitude scaling (equal-loudness approximation) |
 
 ### `envelopes/utils/curves.py`
 
@@ -174,12 +201,17 @@ Dynamic, DynamicRange          # dynamics
 ampdb, dbamp, freq_amp_scale   # amplitude utilities
 Envelope                       # envelopes
 line, arch, map_curve          # curve helpers
+amplitude, decibel, velocity   # unit factory functions
 ```
 
-From `klotho` top level:
+The unit wrapper classes themselves (`Amplitude`, `Decibel`,
+`Velocity`) live in `klotho.dynatos.types`.
+
+These are **not** re-exported from the `klotho` top level — import
+them from `klotho.dynatos`:
 
 ```python
-Envelope, DynamicRange
+from klotho.dynatos import Envelope, DynamicRange
 ```
 
 ---

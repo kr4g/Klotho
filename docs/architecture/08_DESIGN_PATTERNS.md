@@ -7,54 +7,62 @@ conventions that span multiple subpackages in Klotho.
 
 ## 1. Pattern Catalogue
 
-### 1.1 Template Method — Mutation Pipeline
+### 1.1 Layered Trees — TreeLayer Delegation
 
-**Where:** `Graph._apply_node_data_mutation` → `Tree` → `RhythmTree` /
-`HarmonicTree` / `ParameterTree`
+**Where:** `Tree` + `TreeLayer` (`topos/graphs/trees/layers.py`) →
+`RhythmLayer` / `HarmonicLayer` / `ParameterLayer`
 
-The core extensibility mechanism.  `Graph` defines the mutation
-pipeline as a sequence of overridable hook methods.  Each subclass
-adds domain-specific behavior without modifying the base flow.
+The core extensibility mechanism.  Domain behavior is not implemented
+by overriding `Tree` methods — it lives in `TreeLayer` objects attached
+to the tree.  A layer owns a set of writable node-data keys
+(`owned_keys`), declares the keys it derives (`derived_keys`), and
+implements normalization, validation, scoping, and recompute hooks.
+The tree notifies **all** attached layers on every mutation.
 
 ```mermaid
 flowchart TD
-    subgraph "Graph (base)"
-        A["_apply_node_data_mutation"]
-        B["_normalize_node_attrs"]
-        C["_validate_node_attrs"]
-        D["_resolve_data_update_scope"]
-        E["_before_node_data_mutation"]
-        F["write to rx graph"]
-        G["_invalidate_caches"]
-        H["_after_node_data_mutation"]
+    subgraph treeBase [Tree]
+        A["set_node_data / update_node_data / replace_node_data"]
+        B["_apply_layer_node_write"]
+        F["_write_node_data (raw)"]
+        G["_post_mutation(scope)"]
+        H["_invalidate_caches"]
     end
 
-    A --> B --> C --> D --> E --> F --> G --> H
+    A --> B
+    B -->|"each layer"| N["layer.normalize_attrs"]
+    N -->|"each layer"| V["layer.validate_attrs"]
+    V -->|"each layer"| S["layer.data_scope → scope node"]
+    S --> F --> G
+    G --> H
+    G -->|"each layer"| R["layer.on_structure_changed"]
 
-    subgraph "Tree layer"
-        H --> I["_post_mutation"]
-        I --> J["_before_post_mutation"]
-        J --> K["_update_group_structure"]
-        K --> L["_after_post_mutation"]
+    subgraph rhythmLayer [RhythmLayer — chronos]
+        R2["owns proportion, tied<br/>recomputes metric_duration, metric_onset"]
     end
 
-    subgraph "RhythmTree layer"
-        C -.->|overrides| C2["reject non-proportion keys"]
-        L -.->|overrides| L2["_evaluate() → recompute timing"]
+    subgraph harmonicLayer [HarmonicLayer — tonos]
+        R3["owns factor<br/>recomputes multiple, harmonic, ratio"]
     end
 
-    subgraph "HarmonicTree layer"
-        C -.->|overrides| C3["reject non-factor keys"]
-        L -.->|overrides| L3["_evaluate() → recompute harmonics"]
+    subgraph paramLayer [ParameterLayer — thetos]
+        R4["owns pfields, mfields, instruments<br/>invalidates effective-value cache"]
     end
 
-    subgraph "ParameterTree layer"
-        G -.->|overrides| G2["_invalidate_caches → clear effective cache"]
-    end
+    R -.-> R2
+    R -.-> R3
+    R -.-> R4
 ```
 
-**Benefit:** New tree types can be added by overriding 2–3 hooks
-without touching `Graph` or `Tree` code.
+Facades (`RhythmTree`, `HarmonicTree`, `ParameterTree`) are thin `Tree`
+subclasses that attach their layer in the `_init_layers` hook.
+Because layers compose, a single tree can carry several synchronized
+data domains: `CompositionalTree` attaches **both** a rhythm layer and
+a parameter layer to one topology.
+
+**Benefit:** New data domains can be added by writing a layer, without
+touching `Tree` code — and multiple domains can share one topology
+instead of mirroring trees.
 
 ### 1.2 Composite — Trees from Nested Tuples
 
@@ -87,14 +95,15 @@ to build" logic.
 
 | Class | Key Factories |
 |---|---|
-| `Graph` | `from_networkx`, `from_edges`, `from_cost_matrix`, `grid_graph`, `random_graph`, … |
+| `Graph` | `from_rustworkx`, `from_networkx`, `from_nodes_edges`, `from_edges`, `empty_graph`, `directed` |
+| *(module-level)* | `path_graph`, `cycle_graph`, `star_graph`, `random_graph`, `complete_graph`, `grid_graph`, `from_cost_matrix` in `topos/graphs/generators.py` |
 | `Tree` | `from_tree_structure` (topology clone) |
 | `RhythmTree` | `from_ratios` (flat ratio list → tree) |
 | `HarmonicTree` | standard `__init__` only |
 | `ToneLattice` | `from_generators` (custom generators) |
 | `ParameterField` | `from_lattice` (wrap existing lattice) |
 | `CompositionalUnit` | `from_rt`, `from_ut`, `from_subtree` |
-| `SynthDefInstrument` | `from_manifest`, named class-method presets |
+| `SynthDefInstrument` | `from_manifest('kl_tri')` (manifest lookup) |
 | `ToneInstrument` | `from_preset`, named class-method presets |
 
 ### 1.4 View / Proxy — Read-Only Access
@@ -107,8 +116,8 @@ to internal data without exposing mutable structures.
 
 ```mermaid
 classDiagram
-    class Graph {
-        -_graph : rx.PyGraph
+    class GraphCore {
+        -_rx : rx.PyGraph
     }
 
     class GraphNodeView {
@@ -129,7 +138,7 @@ classDiagram
         +mfields : dict
     }
 
-    Graph --> GraphNodeView : .nodes
+    GraphCore --> GraphNodeView : .nodes
     TemporalUnit --> UTNodeView : .nodes
     UTNodeView --> Chronon : creates on access
     Chronon <|-- Parametron
@@ -153,21 +162,21 @@ lattice._coord_to_node[(0,1)]  # maps to node ID 42 (internal)
 
 `LatticeEdgeView` translates edge endpoints back to coordinates.
 
-### 1.6 Strategy — Mutability Policy
+### 1.6 Immutability by Absence of Mutators
 
-**Where:** `Graph._set_mutability_policy`
+**Where:** `GraphCore` and its non-`Graph` subclasses
 
-Runtime-configurable mutation control using two boolean flags:
+There are no runtime mutability flags.  `GraphCore` is read-only;
+mutation exists only where a class defines mutators.  Calling a
+mutator on an immutable class is a plain `AttributeError`:
 
-| Class | `topology_mutable` | `node_attr_mutable` |
-|---|---|---|
-| `Graph` (default) | `True` | `True` |
-| `Tree` (post-build) | via API only | `True` |
-| `Lattice` | `False` | `False` |
-| `ToneLattice` | `False` | `False` |
-| `CombinationProductSet` | `False` | `False` |
-| `MasterSet` | `False` | `False` |
-| `ParameterField` | `False` | `True` (field values writable) |
+| Class | Mutation surface |
+|---|---|
+| `Graph` | Free-form (`add_node`, `add_edge`, `set_node_data`, …) |
+| `Tree` | Structural API only (`add_child`, `prune`, …) + layer-validated node data |
+| `Lattice` / `ToneLattice` | *(none — built during construction, then frozen)* |
+| `CombinationSet` / `CombinationProductSet` | *(none)* |
+| `ParameterField` | `set_field_value` at coordinates (its own sanctioned writer) |
 
 ### 1.7 Dispatcher — Type-Based Routing
 
@@ -180,6 +189,7 @@ types to specialized handlers:
 ```mermaid
 flowchart LR
     INPUT["obj"] --> CHECK{"isinstance?"}
+    CHECK -->|Score| H0["handler_score"]
     CHECK -->|CompositionalUnit| H1["handler_uc"]
     CHECK -->|TemporalUnit| H2["handler_ut"]
     CHECK -->|RhythmTree| H3["handler_rt"]
@@ -192,13 +202,14 @@ flowchart LR
 **Where:** `Tree._build_tree`, `Lattice.__init__`,
 `CombinationProductSet.__init__`
 
-Complex graph structures are built incrementally during `__init__`:
+Complex graph structures are built incrementally during `__init__`
+using the protected raw primitives:
 
-1. Create empty graph.
-2. Add nodes/edges in a loop.
+1. Create empty graph core.
+2. Add nodes/edges via `_add_node_raw` / `_add_edge_raw`.
 3. Build coordinate/index mappings.
 4. Evaluate derived fields.
-5. Lock mutability policy.
+5. Expose no mutators (immutable classes) or only sanctioned ones.
 
 ---
 
@@ -209,22 +220,26 @@ Complex graph structures are built incrementally during `__init__`:
 > Direct `graph.nodes[n]['key'] = value` writes are **illegal**.
 
 All node-data writes must go through `set_node_data`,
-`update_node_data`, or `replace_node_data`.  These methods trigger
-the template-method pipeline, ensuring:
+`update_node_data`, or `replace_node_data`.  On trees these methods
+route through the attached layers, ensuring:
 
-1. Attributes are normalized (renamed, coerced).
-2. Attributes are validated (whitelist check).
-3. Derived fields are recomputed.
-4. Caches are invalidated.
+1. Attributes are normalized (renamed, coerced) — `layer.normalize_attrs`.
+2. Attributes are validated (owned/derived key check) — `layer.validate_attrs`.
+3. The recompute scope is resolved — `layer.data_scope`.
+4. Caches are invalidated and derived fields recomputed —
+   `layer.on_structure_changed`.
 
-### Per-Subclass Mutable Keys
+Node views are read-only `MappingProxyType` objects, so a direct write
+fails at the language level, not by convention.
 
-| Subclass | Writable keys | Derived keys (read-only) |
+### Per-Layer Mutable Keys
+
+| Class (layer) | Writable keys | Derived keys (read-only) |
 |---|---|---|
-| `Tree` | `label` | — |
-| `RhythmTree` | `proportion`, `tied` | `metric_duration`, `metric_onset` |
-| `HarmonicTree` | `factor` | `harmonic`, `multiple`, `ratio` |
-| `ParameterTree` | any pfield/mfield | effective cache |
+| `Tree` (no layer) | `label` | — |
+| `RhythmTree` (`RhythmLayer`) | `proportion`, `tied` | `metric_duration`, `metric_onset` |
+| `HarmonicTree` (`HarmonicLayer`) | `factor` | `harmonic`, `multiple`, `ratio` |
+| `ParameterTree` (`ParameterLayer`) | any pfield/mfield | effective-value cache |
 | `Lattice` | *(none — fully immutable)* | — |
 | `ToneLattice` | *(none — fully immutable)* | — |
 | `ParameterField` | field value at coord | — |
@@ -238,6 +253,7 @@ the `Tree` structural API:
 |---|---|
 | `add_child` | Add a new child to a parent |
 | `add_subtree` | Attach a subtree at a parent |
+| `subdivide` | Split a node into proportional children (`RhythmTree`) |
 | `prune` | Remove a node, promote its children |
 | `remove_subtree` | Remove a node and all descendants |
 | `graft_subtree` | Replace a leaf with a subtree |
@@ -245,8 +261,9 @@ the `Tree` structural API:
 | `prune_to_depth` | Truncate the tree |
 | `prune_leaves` | Remove *n* leaves |
 
-Each of these updates the `Group` representation, invalidates caches,
-and triggers `_post_mutation`.
+Each of these ends in `_post_mutation`, which invalidates caches
+(marking the `Group` representation dirty for lazy rebuild) and
+notifies every attached layer via `on_structure_changed`.
 
 ---
 
@@ -267,9 +284,9 @@ the next access after a mutation.
 
 | Class | Cached methods |
 |---|---|
-| `Graph` | `descendants`, `ancestors`, `successors`, `predecessors` |
-| `Tree` | `depth`, `k`, `leaf_nodes` (via `@cached_property`) |
-| `ParameterTree` | `_effective_cache` (dict, manually invalidated) |
+| `GraphCore` | `descendants`, `ancestors`, `successors`, `predecessors` |
+| `Tree` | `depth`, `k`, `leaf_nodes` (via `@cached_property`), `parent` |
+| `ParameterLayer` | `_effective_cache` (dict, cleared via `layer.invalidate`) |
 
 ### Invalidation Flow
 
@@ -278,7 +295,8 @@ flowchart LR
     MUT["mutation"] --> INV["_invalidate_caches()"]
     INV --> BUMP["_structure_version += 1"]
     BUMP --> CLEAR["clear lru_cache on<br/>descendants, ancestors,<br/>successors, predecessors"]
-    INV --> EFF["ParameterTree:<br/>_effective_cache = None"]
+    INV --> LAYERS["layer.invalidate() for each layer"]
+    LAYERS --> EFF["ParameterLayer:<br/>_effective_cache = None"]
 ```
 
 ---
@@ -290,20 +308,28 @@ flowchart LR
 The deepest inheritance chains in Klotho:
 
 ```
-CompositionalUnit → TemporalUnit → (uses RhythmTree → Tree → Graph)
+CompositionalUnit → TemporalUnit → (uses CompositionalTree → RhythmTree → Tree → GraphCore)
 Parametron → Chronon → (metaclass: TemporalMeta)
-ToneLattice → Lattice → Graph
-CombinationProductSet → Graph
+ToneLattice → Lattice → GraphCore
+CombinationProductSet → CombinationSet → GraphCore
 ```
 
-### Mixin-Free Design
+### Inheritance vs Layers vs Mixins
 
-Klotho avoids mixins and multiple inheritance.  Each class has a
-single inheritance chain.  Cross-cutting behavior is achieved through:
+Most classes have a single inheritance chain, with cross-cutting
+behavior achieved through:
 
-- **Composition** (e.g. `CompositionalUnit` *has-a* `ParameterTree`).
-- **Template methods** (e.g. `_after_post_mutation` hooks).
+- **Layers** (e.g. `RhythmLayer` / `ParameterLayer` attached to one
+  tree — the primary composition mechanism, see §1.1).
+- **One deliberate mixin**: `ParameterApiMixin` provides the parameter
+  API surface (`set_pfields`, `set_instrument`, `clear_fields`, …) to
+  both `ParameterTree` and `CompositionalTree(ParameterApiMixin,
+  RhythmTree)` — the only multiple-inheritance site in the core.
 - **Metaclasses** (`TemporalMeta` for `Chronon` / `TemporalUnit`).
+- **Composition**: `CompositionalUnit` *has-a* fused
+  `CompositionalTree` (`uc._rt`), carrying rhythm and parameters on a
+  single topology.  There is no mirrored `ParameterTree` — `uc.pt` is
+  a derived snapshot.
 
 ---
 
@@ -346,9 +372,9 @@ flowchart LR
 
 | Convention | Examples |
 |---|---|
-| **Leading underscore** for private/internal | `_graph`, `_meta`, `_building_tree` |
+| **Leading underscore** for private/internal | `_rx`, `_meta`, `_layers` |
 | **Double underscore** never used | (no name mangling) |
-| **Verb prefixes** for hooks | `_before_*`, `_after_*`, `_post_*` |
+| **Verb prefixes** for hooks | `_post_*` (`_post_mutation`), `on_*` (layer hooks) |
 | **`from_*`** for factory classmethods | `from_rt`, `from_tree_structure`, `from_generators` |
 | **Greek names** for subpackages | topos, chronos, tonos, dynatos, thetos, semeios |
 | **Domain abbreviations** in user code | RT, PT, HT, TL, CPS, UT, UC, etc. |

@@ -2,8 +2,9 @@
 
 This document maps the actual `import` and `from … import`
 relationships between Klotho's subpackages and modules.  It is based
-on a scan of all cross-subpackage imports in the codebase (intra-
-subpackage imports are omitted for clarity).
+on an AST scan of all cross-subpackage imports in the codebase at
+version 10.1.1 (intra-subpackage imports are omitted for clarity;
+deferred function-body imports are counted and marked).
 
 ---
 
@@ -11,47 +12,37 @@ subpackage imports are omitted for clarity).
 
 ```mermaid
 graph TD
-    TOPOS["<b>topos</b><br/>Graph, Tree, Lattice<br/>Collections"]
+    TOPOS["<b>topos</b><br/>GraphCore, Graph, Tree, Lattice<br/>Collections, types"]
     UTILS["<b>utils</b><br/>algorithms<br/>data_structures<br/>playback"]
     CHRONOS["<b>chronos</b><br/>RhythmTree<br/>TemporalUnit"]
     TONOS["<b>tonos</b><br/>Pitch, Scale, Chord<br/>HarmonicTree, ToneLattice, CPS"]
     DYNATOS["<b>dynatos</b><br/>Dynamic, Envelope"]
-    THETOS["<b>thetos</b><br/>ParameterTree, Instruments<br/>CompositionalUnit"]
-    SEMEIOS["<b>semeios</b><br/>visualization<br/>notelists"]
+    THETOS["<b>thetos</b><br/>ParameterTree, Instruments<br/>CompositionalUnit, Score"]
+    SEMEIOS["<b>semeios</b><br/>visualization"]
 
-    UTILS -->|"algorithms,<br/>data_structures"| TOPOS
-    TOPOS -->|"Tree, Group"| CHRONOS
-    TOPOS -->|"Tree, Lattice,<br/>Graph, CombinationSet"| TONOS
-    TOPOS -->|"Lattice,<br/>Pattern"| THETOS
-    UTILS -->|"enums,<br/>factors"| CHRONOS
+    UTILS -->|"lists (deferred)"| TOPOS
+    TOPOS -->|"Tree, Group,<br/>patterns, types"| CHRONOS
+    TOPOS -->|"Tree, Lattice,<br/>CombinationSet, types"| TONOS
+    TOPOS -->|"Tree, Lattice,<br/>Pattern, types"| THETOS
+    TOPOS -->|"types (Unit)"| DYNATOS
+    UTILS -->|"enums"| CHRONOS
     UTILS -->|"factors, enums,<br/>ratios, basis"| TONOS
-    UTILS -->|"SafeDict"| THETOS
+    UTILS -->|"SafeDict, playback"| THETOS
     CHRONOS -->|"TemporalUnit,<br/>Chronon, RhythmTree"| THETOS
     TONOS -->|"Pitch, Scale,<br/>Chord, HarmonicTree"| UTILS
     DYNATOS -->|"Envelope"| THETOS
-    DYNATOS -->|"ampdb, dbamp"| UTILS
+    DYNATOS -->|"freq_amp_scale"| UTILS
 
-    THETOS -->|"CompositionalUnit,<br/>Instruments"| SEMEIOS
+    THETOS -->|"CompositionalUnit,<br/>ParameterTree, Instruments"| SEMEIOS
     CHRONOS -->|"RhythmTree,<br/>TemporalUnit"| SEMEIOS
     TONOS -->|"CPS, Scale,<br/>Chord"| SEMEIOS
     DYNATOS -->|"DynamicRange,<br/>Envelope"| SEMEIOS
     TOPOS -->|"Graph, Tree,<br/>Lattice, CombinationSet"| SEMEIOS
+    UTILS -->|"playback (deferred)"| SEMEIOS
 
-    THETOS -->|"CompositionalUnit,<br/>Instruments"| UTILS
+    THETOS -->|"CompositionalUnit,<br/>Score, Instruments"| UTILS
     CHRONOS -->|"RhythmTree,<br/>TemporalUnit"| UTILS
-    SEMEIOS -->|"KlothoPlot"| UTILS
-
-    linkStyle 0 stroke:#999
-    linkStyle 1 stroke:#2196F3
-    linkStyle 2 stroke:#2196F3
-    linkStyle 3 stroke:#2196F3
-    linkStyle 4 stroke:#999
-    linkStyle 5 stroke:#999
-    linkStyle 6 stroke:#999
-    linkStyle 7 stroke:#4CAF50
-    linkStyle 8 stroke:#FF9800
-    linkStyle 9 stroke:#9C27B0
-    linkStyle 10 stroke:#FF9800
+    SEMEIOS -->|"KlothoPlot (deferred)"| UTILS
 ```
 
 ### Reading the Arrows
@@ -63,21 +54,23 @@ An arrow **A → B** means "B imports from A."  For example,
 
 ## 2. Dependency Counts
 
-How many files in each subpackage import from each other:
+How many files in each subpackage import from each other (AST scan at
+10.1.1; cells count importer files, includes deferred function-body
+imports):
 
 | Imported by ↓ / Imports from → | topos | chronos | tonos | dynatos | thetos | semeios | utils |
 |---|---|---|---|---|---|---|---|
-| **topos** | — | | | | | | 1 |
-| **chronos** | 2 | — | | | 1¹ | | 2 |
-| **tonos** | 3 | | — | | | | 6 |
-| **dynatos** | | | | — | | | |
-| **thetos** | 1 | 1 | | 1 | — | | 2 |
-| **semeios** | 4 | 3 | 2 | 1 | 4 | — | 5 |
-| **utils** | | 4 | 5 | 1 | 4 | 1 | — |
+| **topos** | — | | | | | | 1² |
+| **chronos** | 3 | — | | | 1¹ | | 2 |
+| **tonos** | 4 | | — | | | | 5 |
+| **dynatos** | 1³ | | | — | | | |
+| **thetos** | 3 | 2 | | 1 | — | | 4 |
+| **semeios** | 3 | 2 | 2 | 1 | 4 | — | 8² |
+| **utils** | 1 | 4 | 4 | 1 | 8 | 1¹ | — |
 
-¹ Circular: `chronos.temporal_units.algorithms` imports
-`CompositionalUnit` from thetos. This is a runtime import for
-type checking, not a structural dependency.
+¹ Deferred (function-body) imports that break would-be cycles — see §6.  
+² Mostly deferred imports of playback helpers from inside plot/animation functions.  
+³ `dynatos/types.py` imports the `Unit` base from `topos.types`.
 
 ---
 
@@ -88,17 +81,20 @@ but have few or no cross-subpackage imports themselves:
 
 | Module | Imported by | Imports from |
 |---|---|---|
-| `topos.graphs.graphs` (Graph) | chronos, tonos, thetos, semeios | *(none cross-pkg)* |
-| `topos.graphs.trees.trees` (Tree) | chronos, tonos, thetos | topos.graphs only |
-| `topos.graphs.lattices.lattices` (Lattice) | tonos, thetos, semeios | topos.graphs only |
+| `topos.graphs.core` (GraphCore) | everything graph-shaped, via `topos.graphs` | *(none cross-pkg)* |
+| `topos.graphs.graphs` (Graph) | `semeios.visualization.plots`, `utils.algorithms.graphs` (direct); most consumers use subclasses instead | *(none cross-pkg)* |
+| `topos.graphs.trees` (Tree, layers) | chronos, tonos, thetos | topos.graphs only |
+| `topos.graphs.lattices` (Lattice) | tonos, thetos, semeios | topos.graphs only |
+| `topos.graphs.generators` | topos (Lattice, CombinationSet build via `grid_graph`/`complete_graph`) | topos.graphs only |
+| `topos.types` (Unit) | chronos, tonos, dynatos, thetos (their `types.py` modules) | *(none cross-pkg)* |
 | `utils.data_structures.enums` | chronos, tonos | *(none cross-pkg)* |
 | `utils.data_structures.dictionaries` (SafeDict) | thetos | *(none cross-pkg)* |
-| `utils.algorithms.factors` | tonos (3 files) | *(none cross-pkg)* |
+| `utils.algorithms.factors` / `basis` / `ratios` | tonos | *(none cross-pkg)* |
 | `dynatos.dynamics.dynamics` | thetos, semeios, utils | *(none cross-pkg)* |
 | `dynatos.envelopes.envelopes` | thetos, semeios | *(none cross-pkg)* |
 
-**dynatos is entirely leaf** — it imports nothing from other Klotho
-subpackages.
+**dynatos is almost entirely leaf** — its only cross-package import is
+the `Unit` base class from `topos.types` (in `dynatos/types.py`).
 
 ---
 
@@ -109,24 +105,28 @@ These modules have the most cross-subpackage connections:
 ### `semeios/visualization/plots.py`
 
 **Fan-in:** 0 (entry point)  
-**Fan-out:** 12 cross-package imports
+**Fan-out:** ~17 cross-package imports across 5 subpackages
 
-Imports from: `topos.graphs`, `topos.collections.sets`,
-`topos.graphs.lattices`, `thetos.parameters.parameter_fields`,
+Imports from: `topos.graphs` (Graph, Tree), `topos.collections.sets`
+(CombinationSet, PartitionSet), `topos.collections.sequences`
+(Pattern), `topos.graphs.lattices`,
+`thetos.parameters.parameter_fields`,
 `thetos.parameters.parameter_tree`, `thetos.composition.compositional`,
 `chronos.rhythm_trees`, `chronos.temporal_units`,
-`tonos.systems.combination_product_sets`, `tonos.scales`,
-`tonos.chords`, `dynatos.dynamics`, `dynatos.envelopes`
+`tonos.systems.combination_product_sets` (CPS, MasterSet),
+`tonos.scales`, `tonos.chords`, `dynatos.dynamics`,
+`dynatos.envelopes`
 
 This is expected — the plot dispatcher must know about every
 plottable type.
 
 ### `utils/playback/_converter_base.py`
 
-**Fan-out:** 8 cross-package imports
+**Fan-out:** 9 cross-package imports
 
-Imports from: `tonos.pitch.pitch_collections`, `tonos.chords.chord`,
-`tonos.scales.scale`, `tonos.systems.harmonic_trees`,
+Imports from: `tonos` (Pitch), `tonos.pitch.pitch_collections`,
+`tonos.chords.chord`, `tonos.scales.scale`,
+`tonos.systems.harmonic_trees` (Spectrum, HarmonicTree),
 `chronos.rhythm_trees.rhythm_tree`,
 `chronos.temporal_units.temporal`,
 `thetos.composition.compositional`
@@ -135,17 +135,23 @@ Also expected — the converter must handle every playable type.
 
 ### `thetos/composition/compositional.py`
 
-**Fan-out:** 4 cross-package imports  
-**Fan-in:** 6 (semeios: 4, utils: 4, chronos: 1 — most imported
-module)
+**Fan-out:** 4 cross-package targets  
+**Fan-in:** 8 external files — the most-imported module
 
-Imports from: `chronos` (TemporalUnit, RhythmTree, Chronon),
-`dynatos.envelopes` (Envelope), `topos.collections.sequences`
-(Pattern), `thetos.parameters` (ParameterTree),
-`thetos.instruments` (Instrument)
+Imports from: `chronos` (TemporalUnit, RhythmTree, Chronon, selector
+types), `dynatos.envelopes` (Envelope), `topos.collections.sequences`
+(Pattern), plus intra-thetos `parameters` and `instruments`
 
-Imported by: semeios (plots, renderers, notelists), utils (all
-playback converters, SC assembly, MIDI player)
+Imported by: semeios (`plots.py`, `plot_rt.py`, `svg_rt.py`), utils
+playback (`_converter_base.py`, `midi_player.py`,
+`tonejs/converters.py`, `supersonic/converters.py`), and chronos
+(`temporal_units/algorithms.py`, deferred)
+
+### `thetos/composition/score.py`
+
+A newer cross-package hub: imports chronos temporal types plus
+`compositional`, and (deferred) utils playback helpers.  Consumed by
+`utils/playback/player.py` for score-aware SuperSonic playback.
 
 ---
 
@@ -174,6 +180,7 @@ flowchart LR
     subgraph chronos
         rt["rhythm_trees.rhythm_tree"]
         rt_init["rhythm_trees.__init__"]
+        c_types["types"]
         ut_alg["temporal_units.algorithms"]
         c_tempo["utils.tempo"]
         c_time["utils.time_conversion"]
@@ -182,6 +189,7 @@ flowchart LR
     subgraph topos
         tree_group["graphs (Tree, Group)"]
         patterns["collections.patterns"]
+        t_types["types (Unit)"]
     end
 
     subgraph utils
@@ -194,9 +202,10 @@ flowchart LR
 
     tree_group --> rt
     patterns --> rt_init
+    t_types --> c_types
     enums --> c_tempo
     enums --> c_time
-    comp -.->|"runtime only"| ut_alg
+    comp -.->|"deferred (runtime only)"| ut_alg
 ```
 
 ### `tonos` imports
@@ -206,7 +215,9 @@ flowchart LR
     subgraph tonos
         ht["harmonic_trees.harmonic_tree"]
         tl["tone_lattices.tone_lattices"]
-        cps["combination_product_sets.cps"]
+        tl_basis["tone_lattices.basis"]
+        cps["combination_product_sets"]
+        to_types["types"]
         t_freq["utils.frequency_conversion"]
         t_norm["utils.interval_normalization"]
         t_intv["utils.intervals"]
@@ -215,8 +226,8 @@ flowchart LR
     subgraph topos
         tree["graphs (Tree)"]
         lattice["graphs.lattices (Lattice)"]
-        combset["collections (CombinationSet)"]
-        graph["graphs (Graph)"]
+        combset["collections.sets (CombinationSet)"]
+        t_types["types (Unit)"]
     end
 
     subgraph utils
@@ -229,16 +240,19 @@ flowchart LR
     tree --> ht
     lattice --> tl
     combset --> cps
-    graph --> cps
+    t_types --> to_types
     factors --> tl
     factors --> t_norm
     factors --> t_intv
+    basis --> tl_basis
     enums --> t_freq
     enums --> t_norm
     enums --> t_intv
     ratios --> tl
-    basis --> tl
 ```
+
+(`CombinationProductSet` no longer imports `Graph` — it builds on
+`CombinationSet(GraphCore)`.)
 
 ### `thetos` imports
 
@@ -246,15 +260,16 @@ flowchart LR
 flowchart LR
     subgraph thetos
         comp["composition.compositional"]
+        score["composition.score"]
         pt["parameters.parameter_tree"]
         pf["parameters.parameter_field"]
         inst_base["instruments.base"]
         inst_tone["instruments.tone"]
-        types["types"]
+        inst_shared["instruments._shared"]
     end
 
     subgraph topos
-        tree["graphs.trees (Tree)"]
+        tree["graphs.trees (Tree, TreeLayer)"]
         lattice["graphs.lattices (Lattice)"]
         pattern["collections.sequences (Pattern)"]
     end
@@ -269,26 +284,23 @@ flowchart LR
 
     subgraph utils
         safedict["data_structures.dictionaries"]
-    end
-
-    subgraph tonos_utils ["tonos"]
-        freq_conv["utils.frequency_conversion"]
-    end
-
-    subgraph dynatos_utils ["dynatos"]
-        ampdb["dynamics (ampdb, dbamp)"]
+        playback["playback helpers"]
     end
 
     tree --> pt
     lattice --> pf
     pattern --> comp
     ut --> comp
+    ut --> score
     env --> comp
     safedict --> inst_base
     safedict --> inst_tone
-    freq_conv --> types
-    ampdb --> types
+    playback -.->|"deferred"| score
+    playback -.->|"deferred"| inst_shared
 ```
+
+(`thetos/types.py` is intentionally empty — typed units live in the
+domain packages and are aggregated by the top-level `klotho.types`.)
 
 ### `semeios` imports
 
@@ -299,17 +311,18 @@ flowchart LR
         plot_rt["_dispatch.plot_rt"]
         plot_cps["_dispatch.plot_cps"]
         plot_lat["_dispatch.plot_lattice"]
+        plot_pat["_plot_pattern"]
         klotho_plot["_dispatch._klotho_plot"]
         svg_rt["_renderers.svg_rt"]
         anim_base["_animation.base"]
         anim["_animation.animated"]
-        notelists["notelists.supercollider"]
     end
 
     subgraph topos
         t_graph["graphs (Graph, Tree)"]
         t_sets["collections.sets"]
         t_lattice["graphs.lattices"]
+        t_seq["collections.sequences (Pattern)"]
     end
 
     subgraph chronos
@@ -318,7 +331,7 @@ flowchart LR
     end
 
     subgraph tonos
-        cps_mod["systems.cps"]
+        cps_mod["systems.combination_product_sets"]
         scales["scales"]
         chords["chords"]
     end
@@ -335,12 +348,13 @@ flowchart LR
     end
 
     subgraph utils
-        playback["playback.*"]
+        playback["playback.* (deferred)"]
     end
 
     t_graph --> plots
     t_sets --> plots
     t_lattice --> plots
+    t_seq --> plot_pat
     c_rt --> plots
     c_ut --> plots
     cps_mod --> plots
@@ -353,20 +367,21 @@ flowchart LR
     param_field --> plots
 
     c_rt --> plot_rt
-    c_ut --> plot_rt
     comp --> plot_rt
     comp --> svg_rt
-    comp --> notelists
+    comp --> anim_base
     cps_mod --> plot_cps
     t_lattice --> plot_lat
-    playback --> plot_rt
-    playback --> plot_cps
-    playback --> plot_lat
-    playback --> klotho_plot
-    playback --> anim_base
-    playback --> anim
-    playback --> notelists
+    playback -.-> plot_rt
+    playback -.-> plot_cps
+    playback -.-> plot_lat
+    playback -.-> klotho_plot
+    playback -.-> anim_base
+    playback -.-> anim
 ```
+
+(The former `notelists/` subtree is gone — SuperCollider output now
+lives entirely in `utils.playback`.)
 
 ### `utils.playback` imports
 
@@ -380,6 +395,8 @@ flowchart LR
         midi["midi_player"]
         tone_conv["tonejs.converters"]
         sc_conv["supersonic.converters"]
+        sc_eng["supersonic.engine"]
+        registry["supersonic.registry"]
     end
 
     subgraph tonos
@@ -396,7 +413,8 @@ flowchart LR
 
     subgraph thetos
         comp["composition.compositional"]
-        inst["instruments.instrument"]
+        score["composition.score"]
+        inst["instruments"]
     end
 
     subgraph dynatos
@@ -423,13 +441,15 @@ flowchart LR
     comp --> midi
     inst --> midi
     pitch --> midi
-    scales --> midi
-    chords --> midi
 
     comp --> tone_conv
     comp --> sc_conv
+    score --> sc_conv
+    inst --> sc_eng
+    inst -.->|"deferred"| registry
 
-    kp --> player
+    score -.->|"deferred"| player
+    kp -.->|"deferred"| player
 ```
 
 ---
@@ -455,22 +475,29 @@ because:
 There is also a structural cycle between `utils.playback.player`
 and `semeios.visualization._dispatch` (KlothoPlot), resolved the
 same way — the import in `player.py` is inside the function body.
+The same deferred-import pattern appears throughout: semeios dispatch
+and animation modules defer their playback imports, `score.py` and
+`instruments/_shared.py` defer their utils imports, and
+`supersonic/registry.py` defers its thetos import.
 
 ---
 
 ## 7. Architectural Observations
 
-1. **topos and dynatos are true leaves** — they have no or minimal
-   outgoing cross-package imports, making them safe foundations.
+1. **topos and dynatos are (near-)leaves** — topos's single outgoing
+   import is a deferred `utils.algorithms.lists` helper, and dynatos
+   only pulls the `Unit` base from `topos.types`.  Both are safe
+   foundations.
 
 2. **semeios and utils.playback are the heaviest consumers** — they
    need to know about every domain type for dispatch, which is
    inherent to their role.
 
 3. **thetos.composition.compositional is the most-imported module** —
-   it is referenced by semeios (4 files), utils.playback (4+ files),
-   and even chronos (1 file).  This reflects its central role as the
-   composition bridge.
+   it is referenced by semeios (3 files), utils.playback (4 files),
+   and chronos (1 file, deferred).  `score.py` is emerging as a
+   second hub alongside it.  This reflects thetos's central role as
+   the composition bridge.
 
 4. **utils is split-brained** — `utils.algorithms` and
    `utils.data_structures` are low-level leaf dependencies (imported
@@ -479,6 +506,6 @@ same way — the import in `player.py` is inside the function body.
    semeios).  These two halves of utils have very different dependency
    profiles.
 
-5. **No subpackage is an island** — every subpackage (except dynatos)
-   has at least one outgoing cross-package import, reflecting the
-   integrated design of the toolkit.
+5. **No subpackage is an island** — every subpackage has at least one
+   outgoing cross-package import, reflecting the integrated design of
+   the toolkit.

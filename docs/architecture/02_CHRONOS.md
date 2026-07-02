@@ -29,13 +29,14 @@ chronos/
 │   └── algorithms.py          # decomposition, auto-subdivision, complexity
 ├── temporal_units/
 │   ├── __init__.py
-│   ├── temporal.py            # TemporalUnit, TemporalUnitSequence, TemporalBlock, Chronon
-│   └── algorithms.py          # decompose, modulate_tempo, convolve
+│   ├── temporal.py            # TemporalUnit, TemporalUnitSequence, TemporalBlock, Chronon, selectors
+│   └── algorithms.py          # decompose, modulate_tempo, modulate_tempus, convolve
+├── types.py                   # typed units (MetricOnset, Bpm, …)
 └── utils/
     ├── __init__.py
-    ├── beat.py                # beat_duration, calc_onsets
+    ├── beat.py                # beat_duration, calc_onsets, cycles_to_frequency
     ├── tempo.py               # metric_modulation, tempo_for_duration, beat_for_duration
-    └── time_conversion.py     # seconds_to_hmsms, hmsms_to_seconds, cycles_to_frequency
+    └── time_conversion.py     # seconds_to_hmsms, hmsms_to_seconds, seconds_to_hmsf
 ```
 
 ---
@@ -92,8 +93,9 @@ Internally:
 1. `meas` is parsed into a `Meas` object.
 2. `span * meas.numerator` becomes the root's `proportion`.
 3. `subdivisions` is recursively built into the tree via `Tree.__init__`.
-4. `_evaluate()` walks the tree and computes `metric_duration` and
-   `metric_onset` on every node.
+4. The attached **`RhythmLayer`** (owning `proportion`/`tied`) runs
+   `_evaluate()`, which walks the tree and computes `metric_duration`
+   and `metric_onset` on every node.
 
 ### Node Data Model
 
@@ -106,9 +108,11 @@ Each node stores:
 | `metric_onset` | `Fraction` | Onset as fraction of whole note |
 | `tied` | `bool` | Whether tied to the next event |
 
-Only `proportion` and `tied` are mutable; the metric fields are
-**derived** by `_evaluate()` and recomputed automatically after any
-proportion change.
+Only `proportion` and `tied` are mutable (they are the
+`RhythmLayer`'s owned keys); the metric fields are **derived** by
+`_evaluate()` and recomputed automatically after any proportion change
+via the layer's `on_structure_changed` hook, scoped to the changed
+subtree.
 
 ### `_evaluate()` Algorithm
 
@@ -132,15 +136,15 @@ silent.
 
 | Function | Description |
 |---|---|
-| `measure_ratios(rt)` | Extract leaf proportions as a ratio list |
-| `reduced_decomposition(ratio)` | Simplify a ratio to coprime integers |
-| `strict_decomposition(ratio)` | Decompose preserving structure |
-| `ratios_to_subdivs(ratios)` | Convert flat ratios to nested `(D, S)` |
-| `auto_subdiv(meas, depth)` | Generate canonical subdivisions for a meter |
-| `rhythm_pair(…)` | See RhythmPair below |
-| `segment(rt, points)` | Segment a tree at given metric points |
-| `sum_proportions(subdivs)` | Sum proportions at the top level |
-| `measure_complexity(rt)` | Heuristic complexity score |
+| `measure_ratios(subdivs)` | Metric ratios from a nested subdivision tuple |
+| `reduced_decomposition(lst, meas)` | Reduce ratios relative to a measure |
+| `strict_decomposition(lst, meas)` | Decompose preserving proportional structure |
+| `ratios_to_subdivs(ratios)` | Convert flat ratios to a subdivision tuple |
+| `auto_subdiv(subdivs, n=1)` | Automatic rotation-based re-subdivision |
+| `rhythm_pair(lst, MM=True)` | See RhythmPair below |
+| `segment(ratio)` | Split a ratio into an integer proportion pair |
+| `sum_proportions(S)` | Sum proportions at the top level |
+| `measure_complexity(subdivs)` | `bool` — whether the subdivision is "complex" |
 
 ---
 
@@ -177,7 +181,7 @@ the union of evenly spaced pulse streams.
 | `partitions` | Rhythmic partitions from the grid |
 | `measures` | Organized into time-signature groups |
 | `beats` | Beat-level patterns |
-| `subdivs` | Subdivision tuples suitable for RhythmTree |
+| `subdivs` (constructor flag) | `bool` — controls whether `partitions`/`measures` return subdivision-shaped output |
 
 ---
 
@@ -198,7 +202,8 @@ classDiagram
         -_beat : Fraction
         -_bpm : float
         -_offset : float
-        -_timing_cache : dict
+        -_real_times : dict
+        -_timing_dirty : bool
         +rt : RhythmTree
         +beat : Fraction
         +bpm : float
@@ -244,11 +249,15 @@ classDiagram
 
 `TemporalUnit` exposes two node-facing surfaces:
 
-- **NodeSelection** (`ut.leaves`, `ut.at_depth(...)`, `ut.select(...)`) for
-  bulk operations and set algebra.
-- **NodeHandle** when iterating a selection (`for node in ut.leaves:`), for
-  direct intrinsic reads (`id`, `proportion`, `depth`, `real_duration`,
-  parent/sibling metadata) and node-local verbs (`subdivide`, `make_rest`).
+- **`UTNodeSelector`** (`ut.leaves`, `ut.at_depth(...)`,
+  `ut.select(...)`) for bulk operations and set algebra.
+- **`UTNodeHandle`** when iterating a selection
+  (`for node in ut.leaves:`), for direct intrinsic reads (`id`,
+  `proportion`, `depth`, `real_duration`, parent/sibling metadata) and
+  node-local verbs (`subdivide`, `make_rest`).
+
+(`CompositionalUnit` swaps in `UCNodeSelector`/`UCNodeHandle`, which
+add the parameter verbs.)
 
 Use selection `.ids` when you need raw integer IDs. For explicit singleton
 selector traversal (advanced chaining), call `.singletons()` / `.selectors()`
@@ -331,13 +340,11 @@ flowchart TD
     TB --> R1["Row 0: TemporalUnit"]
     TB --> R2["Row 1: TemporalUnitSequence"]
     TB --> R3["Row 2: TemporalBlock (nested)"]
-
-    style TB fill:#f5f5f5,stroke:#333
 ```
 
 | Property | Description |
 |---|---|
-| `axis` | Alignment axis (`'start'` or `'end'`) |
+| `axis` | Alignment axis — a float in `[-1, 1]` (`-1` left/start, `0` center, `1` right/end) |
 | `rows` | List of temporal objects |
 | `duration` | Maximum row duration |
 
@@ -350,10 +357,10 @@ Supports the same `append`/`prepend`/`insert`/`remove`/`replace`/
 
 | Function | Description |
 |---|---|
-| `decompose(ut, points)` | Split a UT at metric time points |
-| `modulate_tempo(ut, factor)` | Scale tempo proportionally |
-| `modulate_tempus(ut, new_meas)` | Change time signature |
-| `convolve(ut1, ut2)` | Rhythmic convolution |
+| `decompose(ut, prolatio=None, depth=None)` | Split a UT into a `TemporalUnitSequence` — per-leaf (with optional replacement prolatio) or at a given tree depth |
+| `modulate_tempo(ut, beat, bpm)` | Set a new beat/bpm, adjusting tempus so total duration is preserved |
+| `modulate_tempus(ut, span, tempus)` | Change span/time signature |
+| `convolve(x, h, beat='1/4', bpm=60)` | Rhythmic convolution of two units/sequences |
 
 ---
 
@@ -363,24 +370,25 @@ Supports the same `append`/`prepend`/`insert`/`remove`/`replace`/
 
 | Function | Description |
 |---|---|
-| `beat_duration(bpm, beat)` | Duration of one beat in seconds |
+| `beat_duration(ratio, bpm, beat_ratio='1/4')` | Duration in seconds of a metric ratio at a tempo |
 | `calc_onsets(durations)` | Cumulative onset list from durations |
+| `cycles_to_frequency(cycles, duration)` | Cycles over a duration → Hz |
 
 ### `tempo.py`
 
 | Function | Description |
 |---|---|
-| `metric_modulation(old_bpm, old_beat, new_beat)` | New BPM after metric modulation |
-| `tempo_for_duration(target_dur, meas, beat)` | BPM that makes a measure last `target_dur` seconds |
-| `beat_for_duration(target_dur, meas, bpm)` | Beat value that makes a measure last `target_dur` |
+| `metric_modulation(current_tempo, current_beat_value, new_beat_value)` | New BPM after metric modulation |
+| `tempo_for_duration(metric_ratio, reference_beat, duration)` | BPM that makes a metric ratio last `duration` seconds |
+| `beat_for_duration(metric_ratio, bpm, duration)` | Beat value that makes a metric ratio last `duration` seconds |
 
 ### `time_conversion.py`
 
 | Function | Description |
 |---|---|
-| `seconds_to_hmsms(s)` | Convert to `(hours, minutes, seconds, ms)` |
+| `seconds_to_hmsms(seconds, as_string=True)` | Convert to `H:M:S.ms` (string or tuple) |
 | `hmsms_to_seconds(h, m, s, ms)` | Convert back to seconds |
-| `cycles_to_frequency(cycles, period)` | Cycles per period → Hz |
+| `seconds_to_hmsf(seconds, fps=30)` / `hmsf_to_seconds(...)` | Frame-based timecode conversions |
 
 ---
 
@@ -398,7 +406,4 @@ flowchart TD
     UTS --> TB
 
     RF --> Chronon["Chronon<br/>(node view)"]
-
-    style RT fill:#e8f4fd,stroke:#333
-    style UT fill:#e8f4fd,stroke:#333
 ```

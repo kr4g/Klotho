@@ -5,9 +5,10 @@
 
 `klotho.semeios` is the primary output layer for visual representation.
 It provides a universal `plot()` dispatcher that routes Klotho objects
-to type-specific renderers (SVG, Plotly, Three.js), wraps the results
-in `KlothoPlot` objects with integrated animation and audio playback,
-and exports note-list data for SuperCollider.
+to type-specific renderers (SVG, Plotly, Three.js) and wraps animatable
+results in `KlothoPlot` objects with integrated animation and audio
+playback.  (Note-list export for SuperCollider was removed; audio
+output lives in `utils.playback` — see the playback doc.)
 
 ---
 
@@ -15,13 +16,12 @@ and exports note-list data for SuperCollider.
 
 ```
 semeios/
-├── __init__.py
-├── notelists/
-│   ├── __init__.py
-│   └── supercollider.py               # Scheduler — SC event export
+├── __init__.py                         # exports plot
 └── visualization/
     ├── __init__.py
-    ├── plots.py                        # plot() dispatcher
+    ├── plots.py                        # plot() dispatcher + Plotly/matplotlib plotters
+    ├── _plot_pattern.py                # Pattern plotting
+    ├── _projections.py                 # projection helpers
     ├── _dispatch/
     │   ├── __init__.py
     │   ├── _klotho_plot.py             # KlothoPlot wrapper
@@ -72,35 +72,47 @@ flowchart TD
     P["plot(obj)"] --> T{"type(obj)?"}
 
     T -->|RhythmTree<br/>TemporalUnit<br/>CompositionalUnit| RT["_plot_rt(obj)"]
-    T -->|Lattice<br/>ToneLattice<br/>ParameterField| LAT["_plot_lattice(obj)"]
-    T -->|CombinationProductSet<br/>Hexany, Dekany…| CPS["_plot_cps(obj)"]
+    T -->|Lattice / ToneLattice| LAT["_plot_lattice(obj)"]
+    T -->|ParameterField| PF["_plot_field(obj)"]
+    T -->|CombinationProductSet<br/>hexany, dekany…| CPS["_plot_cps(obj)"]
     T -->|MasterSet| MS["_plot_master_set(obj)"]
-    T -->|Scale| SC["scale bar chart"]
-    T -->|Chord / Voicing| CH["chord visualization"]
+    T -->|ParameterTree| PT["_plot_parameter_tree(obj)"]
+    T -->|Scale / Chord / Voicing| SC["pitch-collection plot"]
     T -->|DynamicRange| DR["dynamics plot"]
     T -->|Envelope| EN["envelope curve"]
-    T -->|CombinationSet / PartitionSet| CS["graph plot"]
+    T -->|Pattern| PAT["plot_pattern(obj)"]
+    T -->|CombinationSet| CS["graph plot"]
     T -->|Tree / Graph| GR["generic graph layout"]
+    T -->|TemporalUnitSequence<br/>TemporalBlock| NIE["NotImplementedError"]
 
     RT --> KP["KlothoPlot<br/>(animatable)"]
     LAT --> KP
     CPS --> KP
     MS --> KP
 
-    SC --> DISP["IPython.display.display()"]
-    CH --> DISP
+    PF --> DISP["IPython.display.display() → None"]
+    PT --> DISP
+    SC --> DISP
     DR --> DISP
     EN --> DISP
+    PAT --> DISP
     CS --> DISP
     GR --> DISP
 ```
 
 ### Return Values
 
-- **Animatable types** (RhythmTree, Lattice, CPS, TemporalUnit,
-  CompositionalUnit) → returns a `KlothoPlot`.
-- **Non-animatable types** (Scale, Chord, Envelope, etc.) → displayed
-  immediately via `IPython.display.display()`, returns `None`.
+- **Animatable types** (`RhythmTree`, `Lattice`, `ToneLattice`, CPS,
+  `MasterSet`, `TemporalUnit`, `CompositionalUnit`) → returns a
+  `KlothoPlot`.
+- **Non-animatable types** (`Scale`, `Chord`, `Envelope`,
+  `ParameterField`, `ParameterTree`, `Pattern`, `CombinationSet`,
+  plain graphs, etc.) → displayed immediately via
+  `IPython.display.display()`, returns `None`.
+- **`TemporalUnitSequence` / `TemporalBlock`** → not yet supported;
+  `plot()` raises `NotImplementedError`.
+- **`PartitionSet`** has no plot branch (it is no longer graph-backed);
+  `plot(ps)` raises `TypeError`.
 
 ---
 
@@ -108,30 +120,36 @@ flowchart TD
 
 **File:** `semeios/visualization/_dispatch/_klotho_plot.py`
 
-A wrapper that holds a static figure (Plotly or SVG HTML) and knows
-how to trigger animated playback with audio.
+A lazy wrapper around a plotting function and its target object that
+knows how to trigger animated playback with audio.
 
 ```mermaid
 classDiagram
     class KlothoPlot {
-        -_figure_html : str
-        -_audio_events : list
-        -_animation_type : str
-        +_repr_html_() str
-        +play(**kwargs) DisplayHandle
+        -_plot_fn : callable
+        -_obj : object
+        -_kwargs : dict
+        -_play_kwargs : dict
+        -_static_fig
+        -_display_handle : DisplayHandle
+        +play(dur=0.5, loop=None, **kwargs)
     }
 ```
 
 ### Lifecycle
 
-1. `plot(obj)` builds the static figure HTML and extracts audio
-   event data.
-2. Returns `KlothoPlot` to the notebook cell.
-3. Jupyter calls `_repr_html_()` → the static SVG/Plotly figure
-   renders inline.
-4. User calls `.play()` → the widget replaces itself with an
-   animated version that synchronizes visual highlights with audio
-   events through the selected playback engine.
+1. `plot(obj)` wraps the plotting function and object in a
+   `KlothoPlot`.
+2. `__init__` **eagerly displays** the static figure via
+   `IPython.display.display(..., display_id=True)` and keeps the
+   display handle.  (`_repr_html_()` returns an empty string, so
+   Jupyter's implicit repr does not double-render.)
+3. User calls `.play(...)` → the plot function is re-run with
+   `animate=True` (booting SuperSonic first) and the animated widget
+   **updates the existing display handle in place**, synchronizing
+   visual highlights with audio events through the selected playback
+   engine.  Playback kwargs (`bpm`, `amp`, `arp`, `strum`, `loop`,
+   `ring_time`, …) can be passed to `plot()` up front or to `.play()`.
 
 ---
 
@@ -255,27 +273,7 @@ as grouped brackets.
 
 ---
 
-## 7. Notelists
-
-### Scheduler (`semeios/notelists/supercollider.py`)
-
-Exports Klotho composition data as a JSON event list compatible with
-SuperCollider's pattern system:
-
-```python
-from klotho.semeios.notelists.supercollider import Scheduler
-
-sched = Scheduler(compositional_unit)
-sched.to_json('output.json')
-```
-
-The `Scheduler` iterates over `Parametron` events and serializes
-each event's temporal and parameter data into a dictionary structure
-that can be loaded by the Klotho-SC SuperCollider extension.
-
----
-
-## 8. Supported Plot Types — Full Matrix
+## 7. Supported Plot Types — Full Matrix
 
 | Input type | Renderer | Returns | Animatable |
 |---|---|---|---|
@@ -285,13 +283,15 @@ that can be loaded by the Klotho-SC SuperCollider extension.
 | `Lattice` (2D) | SVG grid | `KlothoPlot` | Yes |
 | `Lattice` (3D+) | Three.js | `KlothoPlot` | Yes |
 | `ToneLattice` | SVG or Three.js | `KlothoPlot` | Yes |
-| `ParameterField` | SVG or Three.js | `KlothoPlot` | Yes |
 | `CombinationProductSet` | SVG polygon or Three.js | `KlothoPlot` | Yes |
 | `MasterSet` | SVG or Three.js | `KlothoPlot` | Yes |
-| `Scale` | Plotly bar chart | `None` | No |
-| `Chord` / `Voicing` | Plotly | `None` | No |
+| `ParameterField` | field plot (`_plot_field`) | `None` | No |
+| `ParameterTree` | matplotlib tree plot | `None` | No |
+| `Scale` / `Chord` / `Voicing` | Plotly | `None` | No |
 | `DynamicRange` | Plotly | `None` | No |
 | `Envelope` | Plotly curve | `None` | No |
-| `CombinationSet` | NetworkX + Matplotlib | `None` | No |
-| `PartitionSet` | NetworkX + Matplotlib | `None` | No |
-| `Tree` / `Graph` | NetworkX + Matplotlib | `None` | No |
+| `Pattern` | pattern plot (`plot_pattern`) | `None` | No |
+| `CombinationSet` | graph plot | `None` | No |
+| `Tree` / `Graph` | generic graph layout | `None` | No |
+| `TemporalUnitSequence` / `TemporalBlock` | — | raises `NotImplementedError` | — |
+| `PartitionSet` | — | raises `TypeError` (no plot branch) | — |

@@ -42,7 +42,9 @@ systems.
 
 | Function | Description |
 |---|---|
-| `basis_matrix(generators)` | Build a basis matrix from generator ratios |
+| `monzo_from_ratio(ratio, primes)` | Ratio → prime-exponent (monzo) vector |
+| `ratio_from_monzo(monzo, primes)` | Monzo vector → `Fraction` ratio |
+| `basis_matrix(primes, generators)` | Build a basis matrix from primes and generator ratios |
 | `is_unimodular(matrix)` | Check if basis matrix has determinant ±1 |
 | `change_of_basis(coords, from_basis, to_basis)` | Transform coordinates between bases |
 | `prime_to_generator_coords(prime_coords, generators)` | Prime-exponent vector → generator coordinates |
@@ -58,8 +60,10 @@ Used for pitch-distance calculations and optimal ordering.
 
 | Function | Description |
 |---|---|
-| `cost_matrix(items, cost_fn)` | Build a symmetric cost matrix from a pairwise cost function |
-| `minimum_cost_path(matrix, start)` | Greedy nearest-neighbor path through the matrix |
+| `cost_matrix(items, cost_function)` | Build a symmetric cost matrix from a pairwise cost function (returns matrix + item list) |
+
+(Path-finding over a cost structure lives in `graphs.py` —
+`minimum_cost_path` there operates on a `Graph`, not a raw matrix.)
 
 **Dependencies:** `numpy`, `scipy.spatial.distance`
 
@@ -69,14 +73,14 @@ Core numeric operations used throughout chronos and tonos.
 
 | Function | Description |
 |---|---|
-| `normalize_sum(values, target)` | Scale a list so its sum equals `target` |
-| `invert(values)` | Element-wise reciprocal |
-| `to_factors(n)` | Prime factorization of an integer |
-| `from_factors(factors)` | Reconstruct integer from prime factors |
-| `nth_prime(n)` | The *n*-th prime number |
-| `factors_to_lattice_vector(factors, primes)` | Prime factors → exponent vector |
-| `ratio_to_coordinate(ratio, primes)` | `Fraction` → prime-exponent coordinate |
-| `ratios_to_coordinates(ratios, primes)` | Batch version |
+| `to_factors(value)` | Prime factorization of an int/Fraction (dict of prime → exponent) |
+| `from_factors(factors)` | Reconstruct a `Fraction` from prime factors |
+| `nth_prime(prime)` | 1-based **index** of a given prime in the prime sequence (inverse lookup) |
+| `factors_to_lattice_vector(factors, vector_size=None)` | Prime factors → exponent vector |
+| `ratio_to_coordinate(ratio, …)` | `Fraction` → prime-exponent coordinate |
+| `ratios_to_coordinates(ratios, …)` | Batch version |
+
+(`normalize_sum` and `invert` live in `lists.py`, not here — see 1.5.)
 
 **Dependencies:** `sympy` (prime generation)
 
@@ -87,30 +91,35 @@ navigation and compositional path-finding.
 
 | Function | Description |
 |---|---|
-| `greedy_tsp(graph, start)` | Greedy traveling salesman approximation |
-| `minimum_cost_path(graph, start, end)` | Dijkstra shortest path |
-| `greedy_random_walk(graph, start, steps)` | Random walk biased toward low-cost edges |
-| `probabilistic_random_walk(graph, start, steps)` | Stochastic walk with temperature |
-| `deterministic_greedy_walk(graph, start, steps)` | Always choose cheapest unvisited neighbor |
-| `prim_order_traversal(graph, start)` | MST-ordered traversal |
-| `greedy_nearest_unvisited(graph, start)` | Visit nearest unvisited node repeatedly |
-| `dijkstra_order_traversal(graph, start)` | Nodes in Dijkstra distance order |
-| `weighted_dfs_traversal(graph, start)` | DFS preferring lower-weight edges |
+| `greedy_tsp(G, source=None)` | Greedy traveling salesman approximation |
+| `minimum_cost_path(G, traversal_func, …)` | Lowest-cost path under a traversal strategy |
+| `greedy_random_walk(G, source, steps=10, weight='weight')` | Random walk biased toward low-cost edges |
+| `probabilistic_random_walk(G, source, steps=10, …)` | Stochastic walk with temperature |
+| `deterministic_greedy_walk(G, source, steps=10, …)` | Always choose cheapest unvisited neighbor |
+| `prim_order_traversal(G, source, weight='weight')` | MST-ordered traversal |
+| `greedy_nearest_unvisited(G, source, weight='weight')` | Visit nearest unvisited node repeatedly |
+| `dijkstra_order_traversal(G, source, weight='weight')` | Nodes in Dijkstra distance order |
+| `weighted_dfs_traversal(G, source, weight='weight')` | DFS preferring lower-weight edges |
 
 **Dependencies:** `networkx` (graph algorithms)
 
 ### 1.5 `lists.py` — List Utilities
 
-General-purpose list manipulation functions used across subpackages.
-
-### 1.6 `random.py` — Quasi-Random Sampling
+General-purpose list manipulation functions used across subpackages:
 
 | Function | Description |
 |---|---|
-| `diverse_sample(population, k)` | Select *k* maximally diverse items (quasi-random) |
+| `normalize_sum(data)` | Scale a list so its values sum to 1 |
+| `invert(data)` | Structural inversion of a value list |
 
-Uses distance-based selection to ensure sampled items are well-spread
-across the input space.
+### 1.6 `random.py` — Diverse Subset Sampling
+
+| Function | Description |
+|---|---|
+| `diverse_sample(elements, num_samples, subset_size, **kwargs)` | Select `num_samples` maximally diverse **subsets** of size `subset_size` |
+
+Uses distance-based selection to ensure sampled subsets are
+well-spread across the combinatorial space.
 
 ### 1.7 `ratios.py` — Ratio Validation
 
@@ -118,7 +127,7 @@ across the input space.
 |---|---|
 | `is_superparticular(ratio)` | Check if a ratio is of the form (n+1)/n |
 | `superparticular_base(ratio)` | Extract the base *n* from a superparticular ratio |
-| `validate_primes(factors)` | Verify that all factors are prime |
+| `validate_primes(primes)` | Validate a list of primes (returns the cleaned list) |
 
 ---
 
@@ -128,9 +137,10 @@ across the input space.
 
 A dictionary subclass used by `Instrument` for parameter storage:
 
-- Case-insensitive key lookup.
-- Controlled mutability (can be frozen after construction).
-- `.copy()` returns a regular `dict`.
+- **Fixed key set** — keys are established at construction; adding or
+  deleting keys afterwards raises (values remain updatable).
+- Optional **alias resolution** — alternative names map onto canonical
+  keys (`aliases={...}` at construction).
 
 ### 2.2 `enums.py` — Shared Enumerations
 
@@ -145,16 +155,18 @@ node IDs) and external representations.
 ```mermaid
 classDiagram
     class NodeIdentityMapper {
-        +obj_to_idx : dict
-        +idx_to_obj : dict
-        +register(obj) int
-        +get_idx(obj) int
-        +get_obj(idx) object
+        +add_node(node_obj) int
+        +get_index(node_obj) int | None
+        +get_object(index) object | None
+        +remove_node(node_obj) bool
+        +has_node(node_obj) bool
+        +num_nodes() int
     }
 ```
 
-Used internally by `Graph.from_networkx()` and CPS construction to
-map arbitrary hashable node labels to RustworkX integer IDs.
+A general-purpose helper for bridging object-keyed and integer-keyed
+node addressing.  (Note: `Graph.from_networkx()` currently uses an
+inline dict rather than this class.)
 
 ### 2.4 `8th-octave.json`
 

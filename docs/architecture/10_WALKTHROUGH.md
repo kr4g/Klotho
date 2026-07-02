@@ -20,7 +20,6 @@ from klotho.thetos import CompositionalUnit, SynthDefInstrument
 from klotho.tonos import Scale
 from klotho.dynatos import Envelope
 from klotho.topos import Pattern
-from klotho.types import frequency
 from klotho import play
 ```
 
@@ -49,10 +48,10 @@ flowchart TD
     F --> G["Node 0: proportion=7 (root)"]
     F --> H["Node 1: proportion=2 (leaf)"]
     F --> I["Node 2: proportion=3 (branch)"]
-    F --> J["Node 3: proportion=2 (leaf)"]
-    I --> K["Node 4: proportion=1 (leaf)"]
-    I --> L["Node 5: proportion=1 (leaf)"]
-    I --> M["Node 6: proportion=1 (leaf)"]
+    F --> J["Node 6: proportion=2 (leaf)"]
+    I --> K["Node 3: proportion=1 (leaf)"]
+    I --> L["Node 4: proportion=1 (leaf)"]
+    I --> M["Node 5: proportion=1 (leaf)"]
 
     G --> N["_evaluate()"]
 ```
@@ -62,10 +61,14 @@ flowchart TD
 ```
         7  (root, node 0)
        /|\
-      2  3  2    (nodes 1, 2, 3)
+      2  3  2    (nodes 1, 2, 6)
         /|\
-       1  1  1   (nodes 4, 5, 6)
+       1  1  1   (nodes 3, 4, 5)
 ```
+
+Node ids are assigned as the builder walks the nested tuple, so the
+branch's children (3, 4, 5) are numbered before the final top-level
+leaf (6).
 
 #### `_evaluate()` — Single-Pass DFS
 
@@ -73,25 +76,26 @@ Starting from the root (proportion = 7, metric_duration = 7/8):
 
 | Node | Proportion | Divisor | Metric Duration | Metric Onset |
 |---|---|---|---|---|
-| 0 (root) | 7 | — | 7/8 | — |
+| 0 (root) | 7 | — | 7/8 | 0 |
 | 1 (leaf) | 2 | 2+3+2=7 | 2/7 × 7/8 = **1/4** | **0** |
-| 2 (branch) | 3 | 7 | 3/7 × 7/8 = **3/8** | — |
-| 4 (leaf) | 1 | 1+1+1=3 | 1/3 × 3/8 = **1/8** | **1/4** |
-| 5 (leaf) | 1 | 3 | **1/8** | **3/8** |
-| 6 (leaf) | 1 | 3 | **1/8** | **1/2** |
-| 3 (leaf) | 2 | 7 | 2/7 × 7/8 = **1/4** | **5/8** |
+| 2 (branch) | 3 | 7 | 3/7 × 7/8 = **3/8** | 1/4 |
+| 3 (leaf) | 1 | 1+1+1=3 | 1/3 × 3/8 = **1/8** | **1/4** |
+| 4 (leaf) | 1 | 3 | **1/8** | **3/8** |
+| 5 (leaf) | 1 | 3 | **1/8** | **1/2** |
+| 6 (leaf) | 2 | 7 | 2/7 × 7/8 = **1/4** | **5/8** |
 
 After `_evaluate()`, each node in the RustworkX graph has:
 - `proportion` (the integer weight — mutable)
+- `tied` (bool — mutable)
 - `metric_duration` (Fraction — derived)
-- `metric_onset` (Fraction — derived, leaves only)
+- `metric_onset` (Fraction — derived)
 
 #### Verify
 
 ```python
 rt.durations  # (Fraction(1,4), Fraction(1,8), Fraction(1,8), Fraction(1,8), Fraction(1,4))
 rt.onsets     # (Fraction(0,1), Fraction(1,4), Fraction(3,8), Fraction(1,2), Fraction(5,8))
-rt.leaf_nodes # [1, 4, 5, 6, 3]
+rt.leaf_nodes # (1, 3, 4, 5, 6)
 ```
 
 ---
@@ -112,11 +116,10 @@ flowchart TD
     A["CompositionalUnit.from_rt(rt, beat='1/8', bpm=160)"]
     A --> B["CompositionalUnit.__init__(<br/>span=1, tempus='7/8',<br/>prolatio=(2,(3,(1,1,1)),2),<br/>beat=1/8, bpm=160)"]
     B --> C["TemporalUnit.__init__()"]
-    C --> D["_set_rt(1, Meas(7,8), (2,(3,(1,1,1)),2))<br/>→ creates new RhythmTree internally"]
-    D --> E["_beat = Fraction(1,8)<br/>_bpm = 160"]
-    B --> F["_create_synchronized_parameter_tree()"]
-    F --> G["ParameterTree.from_tree_structure(self._rt)<br/>→ clones RT topology, empty node data"]
-    G --> H["_pt: ParameterTree with 7 nodes,<br/>same structure as RT"]
+    C --> D["builds the internal tree via _tree_class<br/>= CompositionalTree(ParameterApiMixin, RhythmTree)"]
+    D --> E["uc._rt: ONE tree with 7 nodes,<br/>rhythm layer + parameter layer attached"]
+    C --> F["_beat = Fraction(1,8)<br/>_bpm = 160"]
+    B --> G["_init_parameter_fields()<br/>→ registers any pfields/mfields on _rt"]
 ```
 
 #### Real-Time Conversion (Lazy)
@@ -137,69 +140,73 @@ real_onset = beat_duration(metric_onset, bpm=160, beat_ratio=1/8) + offset
 | Leaf | Metric Duration | Metric Onset | Real Duration (s) | Real Onset (s) |
 |---|---|---|---|---|
 | 1 | 1/4 | 0 | 0.750 | 0.000 |
-| 4 | 1/8 | 1/4 | 0.375 | 0.750 |
-| 5 | 1/8 | 3/8 | 0.375 | 1.125 |
-| 6 | 1/8 | 1/2 | 0.375 | 1.500 |
-| 3 | 1/4 | 5/8 | 0.750 | 1.875 |
+| 3 | 1/8 | 1/4 | 0.375 | 0.750 |
+| 4 | 1/8 | 3/8 | 0.375 | 1.125 |
+| 5 | 1/8 | 1/2 | 0.375 | 1.500 |
+| 6 | 1/4 | 5/8 | 0.750 | 1.875 |
 
 Total duration: **2.625 seconds**.
 
-#### The Synchronized ParameterTree
+#### The Fused Tree
 
-At this point, `uc._pt` exists with the same 7-node topology as the
-RT but contains no parameter data — it's an empty shell waiting for
-pfields, mfields, and instruments.
+At this point `uc._rt` is a `CompositionalTree` — a single 7-node
+topology carrying both rhythm data (via its `RhythmLayer`) and, so
+far, no parameter overrides (its `ParameterLayer` is empty, waiting
+for pfields, mfields, and instruments).  There is no separate
+`ParameterTree` to keep in sync; `uc.pt` is a derived snapshot when
+you ask for it.
 
 ---
 
 ## Step 3: Assign Pitches
 
 ```python
-scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2"])
+scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2"]).root("C4")
 
-pitches = Pattern([
-    frequency(261.63),              # C4
-    frequency(261.63 * 9/8),        # D4 (just)
-    frequency(261.63 * 5/4),        # E4 (just)
-    frequency(261.63 * 4/3),        # F4 (just)
-    frequency(261.63 * 3/2),        # G4 (just)
-])
+pitches = Pattern([float(p.freq) for p in scale.pitches])
+# [261.63, 294.33, 327.03, 348.83, 392.44]  — C4 D4 E4 F4 G4 (just)
 
-uc.set_pfields(uc.root, freq=pitches)
+uc.leaves.set_pfields(freq=pitches)
 ```
 
-The actual API is `set_pfields(node, **kwargs)` — the first argument
-is a target node (or list of nodes), and parameter names are passed
-as keyword arguments.  When the target is a branch node, the values
-are distributed across its subtree leaves.  `Pattern` and callable
-values are evaluated once per leaf.
+(Pfield values that reach the playback layer must be plain numbers —
+the SC event validator rejects `klotho.types` unit wrappers, so
+unwrap with `float()` when sourcing pitches from typed objects.)
+
+The API is `set_pfields(node, **kwargs)` where the target is a node or
+list of nodes; the leaves selector (`uc.leaves.set_pfields(...)`)
+targets every sounding leaf.  `Pattern` and callable values are
+evaluated **once per target node** — so targeting the leaves cycles
+the pattern across them.  (Targeting a single node like `uc.root`
+would evaluate the pattern once and let the single value inherit to
+all descendants.)
 
 ### What Happens Internally
 
 ```mermaid
 flowchart TD
-    A["uc.set_pfields(root, freq=Pattern([...]))"]
-    A --> B["register 'freq' in _pt._meta['pfields']"]
+    A["uc.leaves.set_pfields(freq=Pattern([...]))"]
+    A --> B["ParameterLayer registers 'freq'<br/>in its pfield key set"]
     B --> C["detect freq is a Pattern → distributable"]
-    C --> D["resolve targets: root → leaf_nodes [1,4,5,6,3]"]
-    D --> E["_pt.set_pfields(node_1, freq=frequency(261.63))"]
-    D --> F["_pt.set_pfields(node_4, freq=frequency(294.33))"]
-    D --> G["_pt.set_pfields(node_5, freq=frequency(327.04))"]
-    D --> H["_pt.set_pfields(node_6, freq=frequency(348.84))"]
-    D --> I["_pt.set_pfields(node_3, freq=frequency(392.44))"]
-    E --> J["_invalidate_caches() → _effective_cache = None"]
+    C --> D["targets = leaf nodes [1,3,4,5,6]"]
+    D --> E["self._rt.set_pfields(node_1, freq=261.63)"]
+    D --> F["self._rt.set_pfields(node_3, freq=294.33)"]
+    D --> G["self._rt.set_pfields(node_4, freq=327.03)"]
+    D --> H["self._rt.set_pfields(node_5, freq=348.83)"]
+    D --> I["self._rt.set_pfields(node_6, freq=392.44)"]
+    E --> J["layer invalidates: _effective_cache = None"]
 ```
 
-Each value is stored as an override on the specific leaf node.
-The `_effective_cache` is invalidated and will be rebuilt on next
-read.
+Each value is stored as an override on the specific leaf node of the
+fused tree.  The layer's `_effective_cache` is invalidated and will be
+rebuilt lazily on the next read.
 
 ---
 
 ## Step 4: Assign an Instrument
 
 ```python
-inst = SynthDefInstrument.KlTri
+inst = SynthDefInstrument.from_manifest('kl_tri')
 uc.set_instrument(uc.root, inst)
 ```
 
@@ -207,9 +214,9 @@ uc.set_instrument(uc.root, inst)
 
 ```mermaid
 flowchart TD
-    A["uc.set_instrument(root, KlTri)"]
-    A --> B["_pt.set_instrument(0, KlTri)"]
-    B --> C["_pt._node_instruments[0] = KlTri"]
+    A["uc.set_instrument(root, inst)"]
+    A --> B["self._rt.set_instrument(0, inst)"]
+    B --> C["ParameterLayer._node_instruments[0] = inst"]
 ```
 
 Because the instrument is set at the **root**, it is inherited by
@@ -226,27 +233,27 @@ uc.apply_envelope(env, pfields='amp', node=uc.root)
 ```
 
 The full signature is
-`apply_envelope(envelope, pfields, node, offset=0, take=None, scope="span", endpoint=True)`.
+`apply_envelope(envelope, pfields, node, offset=0, take=None, scope="span", control=False, endpoint=True)`.
 
 ### What Happens Internally
 
 ```mermaid
 flowchart TD
     A["uc.apply_envelope(env, 'amp', root)"]
-    A --> B["resolve root → leaf nodes [1,4,5,6,3]"]
+    A --> B["resolve root → leaf nodes [1,3,4,5,6]"]
     B --> C["compute real-time span of sounding leaves"]
     C --> D["for each leaf, compute normalized<br/>temporal position within span"]
     D --> E["env.at_time(scaled_position)<br/>→ sample envelope value"]
-    E --> F["_pt.set_pfields(node, amp=sampled_value)"]
+    E --> F["self._rt.set_pfields(node, amp=sampled_value)"]
 ```
 
 | Leaf | Normalized Position | Envelope Value |
 |---|---|---|
 | 1 | 0.000 | 0.300 |
-| 4 | 0.286 | 0.907 |
-| 5 | 0.429 | 0.986 |
-| 6 | 0.571 | 0.852 |
-| 3 | 0.714 | 0.534 |
+| 3 | 0.286 | 0.786 |
+| 4 | 0.429 | 0.692 |
+| 5 | 0.571 | 0.633 |
+| 6 | 0.714 | 0.558 |
 
 These amplitude values are written as `'amp'` pfields on each
 leaf node.
@@ -271,25 +278,25 @@ uc.events                          # returns a DataFrame summary
 
 ```mermaid
 flowchart TD
-    A["iter(uc) / uc[i]"] --> B["_materialize_events()"]
-    B --> C["_event_context() → _ensure_timing_cache()"]
-    C --> D["_compute_timing_cache()<br/>(if dirty)"]
-    D --> E["for each leaf node:<br/>create Parametron(node_id, uc, _pt)"]
+    A["iter(uc) / uc[i]"] --> B["_event_context() → _ensure_timing_cache()"]
+    B --> C["_compute_timing_cache()<br/>(if dirty)"]
+    C --> D["_build_effective_parameter_tree()<br/>→ effective PT snapshot<br/>(slur/control overlays folded in)"]
+    D --> E["for each leaf node:<br/>Parametron(node_id, uc, snapshot)"]
 
     E --> F["Parametron.pfields (property)"]
-    F --> G["1. resolve instrument → KlTri (from root)"]
-    G --> H["2. get KlTri.pfields (defaults)"]
-    H --> I["3. overlay _pt.get_pfield(node, 'freq')"]
-    I --> J["4. overlay _pt.get_pfield(node, 'amp')"]
+    F --> G["1. resolve instrument → kl_tri (from root)"]
+    G --> H["2. get instrument pfields (defaults)"]
+    H --> I["3. overlay snapshot.get_pfield(node, 'freq')"]
+    I --> J["4. overlay snapshot.get_pfield(node, 'amp')"]
     J --> K["final pfields dict:<br/>{defName: 'kl_tri', freq: 261.63, amp: 0.3, ...}"]
 ```
 
 Each `Parametron` lazily resolves its parameter values through a
 three-level lookup:
 
-1. **Instrument defaults** — base pfields from `KlTri`.
-2. **ParameterTree inherited values** — propagated from ancestors.
-3. **ParameterTree node overrides** — set directly on this node.
+1. **Instrument defaults** — base pfields from the resolved instrument.
+2. **Inherited values** — propagated from ancestors in the snapshot.
+3. **Node overrides** — set directly on this node.
 
 Node overrides win over inherited values, which win over instrument
 defaults.
@@ -315,13 +322,13 @@ flowchart TD
     B --> C["engine = get_audio_engine() → 'supersonic'"]
     C --> D["convert_to_sc_events(uc)"]
 
-    D --> E["type dispatch → CompositionalUnit handler"]
-    E --> F["lower_compositional_ir_to_sc_assembly(uc)"]
+    D --> E["type dispatch → compositional_unit_to_sc_events(uc)"]
+    E --> F["lower_compositional_ir_to_sc_assembly(...)"]
 
-    F --> G["for each Parametron in uc.events:"]
+    F --> G["for each Parametron (iterating the unit):"]
     G --> H["resolve pfields: {defName, freq, amp, ...}"]
     H --> I["resolve mfields: {group, slur, ...}"]
-    I --> J["emit: {type:'new', defName, dur, releaseAfter, args, nodeId}"]
+    I --> J["emit: {type:'new', id, defName, start, pfields, dur, releaseAfter}"]
     J --> K["scheduler at fire time:<br/>'gate' in manifest[defName]?"]
     K -->|"yes"| L["NTP-schedule /n_set node 'gate' 0<br/>at start + dur"]
     K -->|"no"| M["no follow-up<br/>(synth self-frees via Done.freeSelf)"]
@@ -338,11 +345,11 @@ flowchart TD
 
 ```json
 [
-  {"type":"new", "time":0.000, "defName":"kl_tri", "args":{"freq":261.63,"amp":0.300,"dur":0.750}, "nodeId":1000},
-  {"type":"new", "time":0.750, "defName":"kl_tri", "args":{"freq":294.33,"amp":0.907,"dur":0.375}, "nodeId":1001},
-  {"type":"new", "time":1.125, "defName":"kl_tri", "args":{"freq":327.04,"amp":0.986,"dur":0.375}, "nodeId":1002},
-  {"type":"new", "time":1.500, "defName":"kl_tri", "args":{"freq":348.84,"amp":0.852,"dur":0.375}, "nodeId":1003},
-  {"type":"new", "time":1.875, "defName":"kl_tri", "args":{"freq":392.44,"amp":0.534,"dur":0.750}, "nodeId":1004}
+  {"type":"new", "id":"a1…", "defName":"kl_tri", "start":0.000, "pfields":{"freq":261.63,"amp":0.300}, "dur":0.750, "releaseAfter":true},
+  {"type":"new", "id":"b2…", "defName":"kl_tri", "start":0.750, "pfields":{"freq":294.33,"amp":0.786}, "dur":0.375, "releaseAfter":true},
+  {"type":"new", "id":"c3…", "defName":"kl_tri", "start":1.125, "pfields":{"freq":327.03,"amp":0.692}, "dur":0.375, "releaseAfter":true},
+  {"type":"new", "id":"d4…", "defName":"kl_tri", "start":1.500, "pfields":{"freq":348.83,"amp":0.633}, "dur":0.375, "releaseAfter":true},
+  {"type":"new", "id":"e5…", "defName":"kl_tri", "start":1.875, "pfields":{"freq":392.44,"amp":0.558}, "dur":0.750, "releaseAfter":true}
 ]
 ```
 
@@ -369,7 +376,7 @@ flowchart LR
 
     subgraph "Layer 3: Composition"
         UC["CompositionalUnit"]
-        PT["ParameterTree<br/>freq, amp, instrument"]
+        CT["CompositionalTree (uc._rt)<br/>rhythm + freq, amp, instrument"]
         PARAM["5 Parametrons"]
     end
 
@@ -384,7 +391,7 @@ flowchart LR
     RT --> UC
     SCALE --> UC
     ENV --> UC
-    UC --> PT
+    UC --> CT
     UC --> PARAM
     PARAM --> CONV
     CONV --> ENGINE
@@ -402,9 +409,12 @@ flowchart LR
    until first access (`_ensure_timing_cache`).  Effective parameter
    values are not resolved until a `Parametron` is read.
 
-3. **The ParameterTree is the bridge** — it clones the RhythmTree's
-   topology and provides O(1) parameter lookup with automatic
-   inheritance.
+3. **One topology carries everything** — the fused
+   `CompositionalTree` holds rhythm and parameters on the same nodes
+   via attached layers, providing O(1) parameter lookup with automatic
+   inheritance and nothing to synchronize.  (Standalone
+   `ParameterTree`s and `uc.pt` snapshots still clone a topology via
+   `from_tree_structure`.)
 
 4. **Instruments are resolved by walking up** — setting an instrument
    at the root means every leaf inherits it; setting one on a specific

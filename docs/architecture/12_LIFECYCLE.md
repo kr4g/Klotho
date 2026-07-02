@@ -9,7 +9,10 @@ what the valid operation sequences are.
 ## 1. Graph Lifecycle
 
 `Graph` is the simplest lifecycle.  It starts mutable and stays
-mutable unless a subclass explicitly locks it.
+mutable — mutability is a property of the class, not a runtime flag.
+(The read-only base `GraphCore` never enters the mutable states at
+all: classes that inherit only `GraphCore` are frozen by construction
+because they expose no mutators.)
 
 ```mermaid
 stateDiagram-v2
@@ -20,8 +23,10 @@ stateDiagram-v2
     DataMutated --> Populated : (automatic — caches invalidated)
 
     note right of Populated
-        _topology_mutable = True
-        _node_attr_mutable = True
+        Free-form mutators defined
+        directly on Graph.
+        Node views stay read-only
+        (MappingProxyType).
     end note
 ```
 
@@ -37,42 +42,46 @@ underlying graph is built from tuple notation) and **operational**
 stateDiagram-v2
     [*] --> Constructing : __init__(root, children)
     state Constructing {
-        [*] --> Building : _building_tree = True
-        Building --> Building : add_node / add_edge\n(raw graph ops OK)
-        Building --> [*] : _building_tree = False
+        [*] --> Building : _build_tree()
+        Building --> Building : _add_node_raw / _add_edge_raw\n(protected primitives)
+        Building --> Layers : _init_layers()\n(attach domain layers)
+        Layers --> [*]
     }
     Constructing --> Built : construction complete
 
     state Built {
         [*] --> Ready
-        Ready --> GroupUpdated : add_child / add_subtree /\nprune / graft_subtree
-        GroupUpdated --> CachesInvalidated : _invalidate_caches()
-        CachesInvalidated --> PostMutation : _post_mutation()
-        PostMutation --> GroupRebuilt : _update_group_structure()
-        GroupRebuilt --> Ready
+        Ready --> Mutated : add_child / add_subtree /\nprune / graft_subtree / move_subtree
+        Mutated --> PostMutation : _post_mutation(scope)
+        PostMutation --> CachesInvalidated : _invalidate_caches()\n(group marked dirty)
+        CachesInvalidated --> LayersNotified : layer.on_structure_changed(scope)\nfor each attached layer
+        LayersNotified --> Ready
 
-        Ready --> DataMutated : set_node_data(proportion=…)
-        DataMutated --> CachesInvalidated2 : _invalidate_caches()
-        CachesInvalidated2 --> PostMutation2 : _post_mutation()
-        PostMutation2 --> Ready
+        Ready --> DataMutated : set_node_data(…)\n(normalize → validate → scope via layers)
+        DataMutated --> PostMutation
     }
 
     note right of Built
-        add_node() → NotImplementedError
-        add_edge() → NotImplementedError
+        No add_node / add_edge exist on Tree
+        (calling one → AttributeError).
         Structural changes only via
         add_child, add_subtree, prune, etc.
+        Group rebuilt lazily on next
+        .group access.
     end note
 ```
 
 ### Key Points
 
-- During `_building_tree = True`, raw `add_node`/`add_edge` are
-  allowed.
-- After construction, raw graph mutation raises `NotImplementedError`.
-- Every structural or data mutation triggers `_post_mutation()`, which
-  calls `_update_group_structure()` and then `_after_post_mutation()`
-  (the subclass hook).
+- Construction writes through the protected `GraphCore` primitives
+  (`_add_node_raw` / `_add_edge_raw`); there is never a public
+  `add_node`/`add_edge` on `Tree`.
+- Domain layers are attached at the end of construction via the
+  `_init_layers` hook.
+- Every structural or data mutation ends in `_post_mutation(scope)`,
+  which invalidates caches (marking the `Group` representation dirty
+  for lazy rebuild) and notifies every attached layer via
+  `on_structure_changed`.
 
 ---
 
@@ -98,10 +107,10 @@ stateDiagram-v2
         [*] --> Ready
 
         Ready --> ProportionChanged : set_node_data(node, proportion=N)
-        ProportionChanged --> Validated : _validate_node_attrs()\n[only proportion, tied allowed]
-        Validated --> ScopeResolved : _resolve_data_update_scope()\n→ parent or root
+        ProportionChanged --> Validated : RhythmLayer.validate_attrs()\n[only proportion, tied allowed]
+        Validated --> ScopeResolved : RhythmLayer.data_scope()\n→ parent or root
         ScopeResolved --> PostMutation : _post_mutation(scope)
-        PostMutation --> ReEvaluated : _evaluate(scope_node)\n→ recompute from scope down
+        PostMutation --> ReEvaluated : RhythmLayer.on_structure_changed\n→ _evaluate(scope) from scope down
         ReEvaluated --> Ready
 
         Ready --> Subdivided : subdivide(node, S)\n[leaf only]
@@ -121,10 +130,11 @@ stateDiagram-v2
 
 ### Scoped Recomputation
 
-When a single proportion changes, `_resolve_data_update_scope()`
-returns the **parent** of the changed node (not the root).
-`_evaluate(parent)` then only recomputes the subtree from that parent
-down, avoiding a full-tree re-evaluation.
+When a single proportion changes, `RhythmLayer.data_scope()` returns
+the **parent** of the changed node (not the root).  The layer's
+`on_structure_changed` then re-runs `_evaluate(parent)`, recomputing
+only the subtree from that parent down and avoiding a full-tree
+re-evaluation.
 
 ---
 
@@ -149,8 +159,9 @@ stateDiagram-v2
         [*] --> Ready
 
         Ready --> FactorChanged : set_node_data(node, factor=N)
-        FactorChanged --> Validated : _validate_node_attrs()\n[only factor allowed]
-        Validated --> ReEvaluated : _evaluate()\n→ recompute all harmonics
+        FactorChanged --> Validated : HarmonicLayer.validate_attrs()\n[only factor allowed]
+        Validated --> ScopeResolved : HarmonicLayer.data_scope()\n→ the changed node
+        ScopeResolved --> ReEvaluated : _evaluate(scope)\n→ recompute from that node down
         ReEvaluated --> Ready
     }
 
@@ -174,10 +185,9 @@ stateDiagram-v2
     [*] --> Constructing : __init__(dimensionality, resolution, …)
 
     state Constructing {
-        [*] --> GridBuild : Graph.grid_graph(dims)
+        [*] --> GridBuild : grid_graph(dims)\n(module-level generator)
         GridBuild --> CoordMap : _build_coordinate_mapping()
-        CoordMap --> Locked : _set_mutability_policy(\ntopology=False,\nnode_attr=False)
-        Locked --> [*]
+        CoordMap --> [*]
     }
 
     Constructing --> Immutable : fully frozen
@@ -188,11 +198,17 @@ stateDiagram-v2
     }
 
     note right of Immutable
-        add_node → PermissionError
-        set_node_data → PermissionError
-        All operations are read-only
+        Lattice inherits only GraphCore,
+        so add_node / set_node_data
+        simply do not exist
+        (calling one → AttributeError).
     end note
 ```
+
+There is no "lock" step — immutability is structural.  `Lattice`
+inherits only the read-only `GraphCore`, so once construction finishes
+(via the protected raw primitives) there is no public API left that
+could change it.
 
 ### ToneLattice
 
@@ -201,11 +217,10 @@ coordinate.  Also fully immutable.
 
 ### ParameterField
 
-Extends `Lattice` but **relaxes node-attribute mutability**:
-```python
-_set_mutability_policy(topology_mutable=False, node_attr_mutable=True)
-```
-Topology is frozen, but field values at coordinates can be written.
+Extends `Lattice` and adds its **own sanctioned writer** for field
+values (`set_field_value` at coordinates).  Topology remains frozen —
+`ParameterField` defines no structural mutators — but field data at
+coordinates can be written through that method.
 
 ---
 
@@ -213,45 +228,49 @@ Topology is frozen, but field values at coordinates can be written.
 
 `ParameterTree` has the most complex lifecycle because it manages
 both the tree structure and an effective-value cache with inheritance.
+All parameter state (registered pfield/mfield key sets, per-node
+instrument bindings, effective-value cache) lives on the attached
+`ParameterLayer`; the public API is provided by `ParameterApiMixin`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Created : from_tree_structure(source_tree)
+    [*] --> Created : __init__ or from_tree_structure(source_tree)
 
     state Created {
         [*] --> CloneTopology : copy graph, empty node data
-        CloneTopology --> InitMeta : pfields=∅, mfields=∅,\n_node_instruments={},\n_effective_cache=None
-        InitMeta --> [*]
+        CloneTopology --> InitLayer : _init_layers() attaches ParameterLayer\n(_pfields=∅, _mfields=∅,\n_node_instruments={},\n_effective_cache=None)
+        InitLayer --> [*]
     }
 
-    Created --> Operational : empty PT, same shape as RT
+    Created --> Operational : empty PT
 
     state Operational {
         [*] --> Ready
 
-        Ready --> PFieldSet : set_pfields('freq', values)
-        PFieldSet --> DistributeValues : write overrides to leaf nodes
+        Ready --> PFieldSet : set_pfields(node, freq=values)
+        PFieldSet --> DistributeValues : layer registers keys,\nwrites overrides at node
         DistributeValues --> CacheInvalidated : _effective_cache = None
         CacheInvalidated --> Ready
 
         Ready --> InstrumentSet : set_instrument(node, inst)
-        InstrumentSet --> StoredInMap : _node_instruments[node] = inst
+        InstrumentSet --> StoredInMap : layer._node_instruments[node] = inst
         StoredInMap --> Ready
 
         Ready --> PFieldRead : get_pfield(node, 'freq')
         PFieldRead --> CacheCheck : _effective_cache exists?
-        CacheCheck --> CacheMiss : No → _build_effective()
+        CacheCheck --> CacheMiss : No → _build_effective()\n(lazy, on read)
         CacheCheck --> CacheHit : Yes → read from cache
         CacheMiss --> CacheHit : cache now built
         CacheHit --> Ready : return value
 
-        Ready --> Cleared : clear()
-        Cleared --> Ready : all pfields/mfields/instruments removed
+        Ready --> Cleared : clear_fields(node=None)
+        Cleared --> Ready : pfields/mfields/instruments removed\n(whole tree or subtree)
     }
 
     note right of Operational
         Override storage: per-node dict
-        Effective values: root→leaf cache
+        Effective values: root→leaf cache,
+        built lazily on read
         Instrument lookup: ancestor walk
     end note
 ```
@@ -274,42 +293,44 @@ flowchart TD
 
 ## 7. CompositionalUnit Lifecycle
 
-The central composition object, combining `TemporalUnit` (RT + tempo)
-with `ParameterTree`.
+The central composition object.  `CompositionalUnit` sets
+`_tree_class = CompositionalTree`, so the single tree built by
+`TemporalUnit.__init__` (`uc._rt`) carries **both** a rhythm layer and
+a parameter layer on one topology.  There is no mirrored
+`ParameterTree` — `uc.pt` is a derived snapshot.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Created : from_rt(rt, beat, bpm)
 
     state Created {
-        [*] --> UTInit : TemporalUnit.__init__()\n→ creates internal RT
-        UTInit --> PTSync : _create_synchronized_parameter_tree()\n→ clones RT topology
-        PTSync --> [*]
+        [*] --> UTInit : TemporalUnit.__init__()\n→ builds CompositionalTree via _tree_class\n(rhythm + parameter layers on one tree)
+        UTInit --> ParamInit : _init_parameter_fields()\n→ registers pfields/mfields on _rt
+        ParamInit --> [*]
     }
 
-    Created --> Configuring : UC with empty PT
+    Created --> Configuring : UC with fused tree, no overrides
 
     state Configuring {
         [*] --> Ready
 
-        Ready --> SetInstrument : set_instrument(node, inst)
+        Ready --> SetInstrument : set_instrument(node, inst)\n→ _rt.set_instrument(...)
         SetInstrument --> Ready
 
-        Ready --> SetPFields : set_pfields(node, freq=values)
+        Ready --> SetPFields : set_pfields(node, freq=values)\n→ _rt.set_pfields(...)
         SetPFields --> Ready
 
-        Ready --> SetMFields : set_mfields(node, group=values)
+        Ready --> SetMFields : set_mfields(node, group=values)\n→ _rt.set_mfields(...)
         SetMFields --> Ready
 
-        Ready --> ApplyEnvelope : apply_envelope(env, 'amp', node)
+        Ready --> ApplyEnvelope : apply_envelope(env, pfields, node)\n(baked, or recorded if control=True)
         ApplyEnvelope --> Ready
 
-        Ready --> ApplySlur : apply_slur(node)
+        Ready --> ApplySlur : apply_slur(node)\n→ recorded in _slur_specs
         ApplySlur --> Ready
 
-        Ready --> Subdivide : subdivide(node, S)\n→ modifies RT and PT
-        Subdivide --> PTResync : PT topology updated\nto match new RT
-        PTResync --> Ready
+        Ready --> Subdivide : subdivide(node, S)\n→ mutates _rt in place,\ncascades pfields to new children
+        Subdivide --> Ready
 
         Ready --> MakeRest : make_rest(node)
         MakeRest --> Ready
@@ -320,8 +341,9 @@ stateDiagram-v2
     state Reading {
         [*] --> EnsureCache : _ensure_timing_cache()
         EnsureCache --> ComputeCache : _compute_timing_cache()\n(if dirty)
-        ComputeCache --> MaterializeEvents : _materialize_events()\n→ Parametron per leaf
-        MaterializeEvents --> ResolvePFields : each Parametron resolves:\n1. instrument defaults\n2. PT inherited values\n3. PT node overrides
+        ComputeCache --> Snapshot : _build_effective_parameter_tree()\n→ effective PT snapshot\n(with slur/control overlays)
+        Snapshot --> MaterializeEvents : Parametron per leaf,\nbacked by the snapshot
+        MaterializeEvents --> ResolvePFields : each Parametron resolves:\n1. instrument defaults\n2. inherited values\n3. node overrides
         ResolvePFields --> [*]
     }
 
@@ -332,17 +354,25 @@ stateDiagram-v2
         only on first access.
         Parametrons are created
         on-the-fly, not stored.
+        uc.events returns a DataFrame;
+        iterate the UC for Parametrons.
     end note
 ```
 
-### PT ↔ RT Synchronization
+### The Fused Tree (no PT ↔ RT sync)
 
-When `subdivide()` or structural mutations occur on the UC:
+There is nothing to synchronize: rhythm and parameters live on the
+same `CompositionalTree` (`uc._rt`).
 
-1. The RT is modified (new nodes added).
-2. The PT is rebuilt via `_create_synchronized_parameter_tree()` or
-   updated to match the new RT topology.
-3. Previously set pfields/mfields on surviving nodes are preserved.
+- `uc.rt` returns a **copy** of the rhythm view; `uc.pt` returns an
+  effective `ParameterTree` **snapshot** (node ids preserved, built by
+  `_extract_parameter_tree` / `_build_effective_parameter_tree`).
+- `subdivide(node, S)` mutates `_rt` in place; the parent's pfields
+  cascade to the new children automatically.
+- UC-level overlays (`_slur_specs`, control envelopes) are stored on
+  the unit and folded into the effective snapshot at read time.
+- `clear_parameters(node=None)` clears overrides, instruments, slurs,
+  and envelopes for the whole unit or a subtree.
 
 ---
 
@@ -386,25 +416,29 @@ unit's time is immutable: there is no public offset setter and no
 
 ## 9. CombinationProductSet / MasterSet Lifecycle
 
-Like `Lattice`, CPS objects are fully immutable after construction:
+Like `Lattice`, CPS objects are fully immutable after construction.
+`CombinationProductSet` extends `CombinationSet(GraphCore)` — the
+object **is** the graph, and immutability comes from exposing no
+mutators (`MasterSet` is a separate layout template, not a graph
+class).
 
 ```mermaid
 stateDiagram-v2
     [*] --> Constructing
 
     state Constructing {
-        [*] --> ComputeProducts : generate all r-combinations
-        ComputeProducts --> BuildGraph : create nodes (products),\nedges (shared factors)
-        BuildGraph --> ComputeRatios : equave_reduce each product
-        ComputeRatios --> Lock : _set_mutability_policy(\ntopology=False,\nnode_attr=False)
-        Lock --> [*]
+        [*] --> ComputeCombos : generate all r-combinations\n(CombinationSet)
+        ComputeCombos --> BuildGraph : build graph into own\nrustworkx handle (_rx)
+        BuildGraph --> ComputeRatios : products → equave_reduce\n→ ratios
+        ComputeRatios --> Layout : resolve master_set template\n→ positions, edges
+        Layout --> [*]
     }
 
     Constructing --> Immutable
 
     state Immutable {
         [*] --> ReadOnly
-        ReadOnly --> ReadOnly : .products, .ratios,\n.complement(), .factors
+        ReadOnly --> ReadOnly : .factors, .rank, .combos,\n.products, .ratios,\n.positions, .master_set
     }
 ```
 
@@ -415,13 +449,13 @@ stateDiagram-v2
 | Object | Construction | Post-construction topology | Post-construction node data | Derived field recomputation |
 |---|---|---|---|---|
 | `Graph` | `__init__` or factory | Mutable | Mutable | Manual |
-| `Tree` | Tuple notation | Via structural API only | Mutable (`_node_value_attr`) | `_post_mutation` → `_after_post_mutation` |
-| `RhythmTree` | span + meas + subdivs | Via structural API only | `proportion`, `tied` only | `_evaluate(scope_node)` |
-| `HarmonicTree` | root + children + equave | Via structural API only | `factor` only | `_evaluate()` |
-| `ParameterTree` | `from_tree_structure` | Via structural API only | Any pfield/mfield | `_build_effective()` (lazy) |
+| `Tree` | Tuple notation | Via structural API only | Via layer-validated setters | `_post_mutation` → layer `on_structure_changed` |
+| `RhythmTree` | span + meas + subdivs | Via structural API only | `proportion`, `tied` only | `RhythmLayer` → `_evaluate(scope)` |
+| `HarmonicTree` | root + children + equave | Via structural API only | `factor` only | `HarmonicLayer` → `_evaluate(scope)` |
+| `ParameterTree` | `__init__` / `from_tree_structure` | Via structural API only | Any pfield/mfield | `ParameterLayer._build_effective()` (lazy) |
 | `Lattice` | dims + resolution | **Frozen** | **Frozen** | N/A |
 | `ToneLattice` | generators + resolution | **Frozen** | **Frozen** | N/A |
 | `ParameterField` | lattice + function | **Frozen** | Mutable (field values) | On write |
-| `CPS` / `MasterSet` | factors + r | **Frozen** | **Frozen** | N/A |
+| `CombinationSet` / `CPS` | factors + r | **Frozen** | **Frozen** | N/A |
 | `TemporalUnit` | tempus + prolatio + bpm | Delegates to RT | Delegates to RT | `_compute_timing_cache()` (lazy) |
-| `CompositionalUnit` | from_rt / from_ut | Delegates to RT + PT | via set_pfields, set_instrument | Timing: lazy cache; Params: effective cache |
+| `CompositionalUnit` | from_rt / from_ut | Delegates to fused `CompositionalTree` (`_rt`) | via set_pfields, set_instrument | Timing: lazy cache; Params: effective snapshot |

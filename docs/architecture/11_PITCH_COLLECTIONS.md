@@ -35,14 +35,6 @@ flowchart TD
 
     Q6 -->|"Yes — bottom to top"| VOICING["Voicing"]
     Q6 -->|"Not necessarily"| ROOTED["Chord.root()"]
-
-    style SCALE fill:#d4edda,stroke:#333
-    style SCALE_ROOT fill:#cce5ff,stroke:#333
-    style CHORD fill:#d4edda,stroke:#333
-    style VOICING fill:#d4edda,stroke:#333
-    style ABS fill:#fff3cd,stroke:#333
-    style REL fill:#fff3cd,stroke:#333
-    style ROOTED fill:#cce5ff,stroke:#333
 ```
 
 ---
@@ -59,7 +51,7 @@ flowchart TD
 | `Chord` | Intervals | Via `.root()` | Yes | No | Abstract chord quality |
 | `Voicing` | Intervals + register | Via `.root()` | Yes | Yes | Specific pitch placement |
 | `ChordSequence` | List of chords | — | — | — | Progression container |
-| `Contour` | Direction integers | — | — | — | Pitch motion pattern |
+| `Contour` | Scale-degree indices | — | — | — | Pitch motion pattern |
 
 ---
 
@@ -74,7 +66,7 @@ classDiagram
         +degrees
         +pitches
         +intervals
-        +size : int
+        +__len__()
         +is_relative : bool
         +is_instanced : bool
         +reference_pitch : Pitch | None
@@ -102,14 +94,15 @@ classDiagram
     }
 
     class Scale {
-        +degree(n) Fraction
-        +mode(n) Scale
+        +degrees : tuple
+        +mode(mode_number) Scale
         +root(pitch) Scale
         +__getitem__(n) «equave-cyclic»
     }
 
     class Chord {
-        +inversion(n) Chord
+        +__invert__() Chord
+        +__neg__() Chord
         +root(pitch) Chord
         +__getitem__(n) «equave-cyclic»
     }
@@ -149,9 +142,9 @@ pitches until a root is applied.
 ```python
 scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
 scale.degrees   # [Fraction(1,1), Fraction(9,8), …]
-scale.pitches   # None — no root assigned
+scale.pitches   # raises ValueError — no reference pitch assigned
 
-c_scale = scale.root("C4")  # → InstancedScale at C4
+c_scale = scale.root("C4")  # → Scale instanced at C4
 c_scale.pitches  # [Pitch(C4), Pitch(D4+4¢), Pitch(E4-14¢), …]
 ```
 
@@ -180,7 +173,7 @@ equave-cyclic indexing (`EquaveCyclicMixin`), but differ in semantics:
 | Equave-reduced | Yes | Yes |
 | Cyclic indexing | `scale[7]` wraps into next equave | `chord[3]` wraps into next equave |
 | `.mode(n)` | Yes — rotates to *n*-th degree | No |
-| `.inversion(n)` | No | Yes — inverts chord voicing |
+| Inversion | No | Yes — via `~chord` / `-chord` operators |
 
 ---
 
@@ -201,10 +194,6 @@ flowchart TD
 
     CHORD -->|".root('C4')"| INST_C["Chord with pitches"]
     VOICING -->|".root('C4')"| INST_V["Voicing with pitches"]
-
-    style RPC fill:#f5f5f5,stroke:#333
-    style INST_C fill:#cce5ff,stroke:#333
-    style INST_V fill:#cce5ff,stroke:#333
 ```
 
 | Class | Inherits from | What it models | Example |
@@ -224,8 +213,11 @@ flowchart TD
 ## 7. The Instancing Pattern
 
 "Instancing" converts a relative collection to concrete pitches by
-calling `.root(pitch)`.  This returns a **new instance of the same
-class** with its `reference_pitch` set:
+calling `.root(pitch)`.  For the named types (`Scale`, `Chord`,
+`Voicing`) this returns a **new instance of the same class** with its
+`reference_pitch` set; on a plain `RelativePitchCollection` it returns
+a `RootedPitchCollection`.  (Collections can also be constructed
+already-instanced by passing `reference_pitch=` to the constructor.)
 
 ```mermaid
 flowchart LR
@@ -277,7 +269,9 @@ result = degrees[degree] × equave^octave_shift
 
 ## 9. ChordSequence
 
-A container for temporal chord progressions:
+A thin ordered container for chord progressions — it supports
+`len()`, indexing, and iteration (there are no bulk-transform methods
+like `transpose`; operate on the member chords):
 
 ```python
 seq = ChordSequence([
@@ -286,7 +280,8 @@ seq = ChordSequence([
     Chord(["1/1", "5/4", "3/2", "7/4"]),
 ])
 
-seq.transpose(Fraction(3, 2))  # transpose all chords by a fifth
+seq[0]        # first Chord
+len(seq)      # 3
 ```
 
 Used by the playback system to generate arpeggiated or block-chord
@@ -296,14 +291,21 @@ events.
 
 ## 10. Contour
 
-Not a pitch collection, but a pitch-*motion* descriptor:
+Not a pitch collection, but a pitch-*motion* descriptor: an immutable
+sequence of **scale-degree indices** (`.values`) used to index into
+pitch collections:
 
 ```python
-contour = Contour((1, 1, -1, 0, 1))  # up, up, down, same, up
+contour = Contour([6, 2, 4, 0])       # degree indices, not up/down flags
+
+scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2"]).root("C4")
+melody = [scale[i] for i in contour.values]
 ```
 
-Contours can be applied to a sequence of pitches to shape melodic
-direction independently of specific pitch content.
+Contours support element-wise arithmetic (`contour + 1`,
+`contour * 2`, contour + contour), transformations (`invert`,
+`retrograde`, `rotate`), `Contour.concat`, and `Contour.outer` —
+the Cartesian sum ("chord multiplication" in the Boulez sense).
 
 ---
 
@@ -314,12 +316,12 @@ Pitch collections and tonal systems (`HarmonicTree`, `ToneLattice`,
 
 ```mermaid
 flowchart TD
-    HT["HarmonicTree<br/>.spectrum()"] -->|"ratios"| SCALE["Scale(ratios)"]
+    HT["HarmonicTree<br/>.ratios / .harmonics"] -->|"ratios"| SCALE["Scale(ratios)"]
     CPS["CombinationProductSet<br/>.ratios"] -->|"ratios"| CHORD["Chord(ratios)"]
-    TL["ToneLattice<br/>.ratio_at(coord)"] -->|"ratios"| CHORD
+    TL["ToneLattice<br/>.get_ratio(coord)"] -->|"ratios"| CHORD
 
-    SCALE -->|".root('C4')"| INST["InstancedScale → Pitch objects"]
-    CHORD -->|".root('A3')"| INST2["InstancedChord → Pitch objects"]
+    SCALE -->|".root('C4')"| INST["instanced Scale → Pitch objects"]
+    CHORD -->|".root('A3')"| INST2["instanced Chord → Pitch objects"]
 ```
 
 A typical workflow: generate ratios from a tonal system, wrap them

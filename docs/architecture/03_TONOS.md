@@ -17,9 +17,9 @@ tonos/
 ├── __init__.py
 ├── pitch/
 │   ├── __init__.py
-│   ├── pitch.py               # Pitch, PitchCollection hierarchy
-│   ├── pitch_collections.py   # RelativePitchCollection, AbsolutePitchCollection, RootedPitchCollection
-│   └── contour.py             # Contour (pitch-direction sequence)
+│   ├── pitch.py               # Pitch
+│   ├── pitch_collections.py   # PitchCollection hierarchy + PitchCollection factory
+│   └── contour.py             # Contour (scale-degree index sequence)
 ├── scales/
 │   ├── __init__.py
 │   └── scale.py               # Scale, InstancedScale
@@ -39,9 +39,9 @@ tonos/
 │   │   └── basis.py           # basis matrix, generator coordinates
 │   └── combination_product_sets/
 │       ├── __init__.py
-│       ├── combination_product_sets.py  # CombinationProductSet(Graph)
-│       ├── master_set.py               # MasterSet(CPS)
-│       └── algorithms.py               # CPS graph construction
+│       ├── combination_product_sets.py  # CombinationProductSet(CombinationSet)
+│       ├── master_set.py               # MasterSet layout templates + MASTER_SETS registry
+│       └── algorithms.py               # match_pattern, sub_cps, classify, faces
 └── utils/
     ├── __init__.py
     ├── frequency_conversion.py   # freq ↔ midicent ↔ pitch class
@@ -63,7 +63,7 @@ classDiagram
         <<abstract>>
         +pitches
         +intervals
-        +size
+        +__len__()
         +is_relative : bool
         +is_instanced : bool
         +reference_pitch : Pitch | None
@@ -95,13 +95,14 @@ classDiagram
     RelativePitchCollection <|-- Voicing
 
     class Scale {
-        +degree(n) Fraction
-        +mode(n) Scale
+        +degrees : tuple
+        +mode(mode_number) Scale
         +root(pitch) Scale
     }
 
     class Chord {
-        +inversion(n) Chord
+        +__invert__() Chord
+        +__neg__() Chord
         +root(pitch) Chord
     }
 
@@ -111,15 +112,21 @@ classDiagram
 
     class ChordSequence {
         +chords : list
-        +append()
-        +transpose()
+        +__getitem__(i) Chord
+        +__len__()
     }
 
     class Contour {
-        +directions : tuple[int]
-        +apply_to(pitches)
+        +values : tuple[int]
+        +__getitem__(i)
     }
 ```
+
+`Chord` inversion is spelled with operators (`~chord` / `-chord`),
+not an `inversion(n)` method.  `ChordSequence` is a thin ordered
+wrapper around a list of chords.  `Contour` holds a sequence of
+**scale-degree indices** used to index into pitch collections (see the
+pitch-collections doc).
 
 ### Key Distinctions
 
@@ -134,7 +141,7 @@ given a root via `.root(pitch)` to produce concrete pitches.
 | `RelativePitchCollection` | `PitchCollectionBase` | Interval ratios/cents | `.root(pitch)` → `RootedPitchCollection`; `.is_instanced` flag |
 | `RootedPitchCollection` | `RelativePitchCollection` | Root + intervals | Has `reference_pitch`; produces `Pitch` objects |
 | `Scale` | `RelativePitchCollection` | Intervals | Enforces unison, sorts, equave-reduces, adds `.mode(n)` |
-| `Chord` | `RelativePitchCollection` | Intervals | Sorts, equave-reduces, no unison required, adds `.inversion(n)` |
+| `Chord` | `RelativePitchCollection` | Intervals | Sorts, equave-reduces, no unison required; inversion via `~chord` / `-chord` |
 | `Voicing` | `RelativePitchCollection` | Intervals | **No** equave reduction — preserves multi-octave spacing |
 | `AbsolutePitchCollection` | `PitchCollectionBase` | Absolute `Pitch` objects | Stores concrete pitches directly |
 
@@ -160,7 +167,9 @@ called, producing concrete `Pitch` objects with Hz values.
 
 A tree that models **multiplicative harmonic relationships**.  Each
 node carries a `factor`; a leaf's *harmonic* is the product of all
-factors along the path from the root.
+factors along the path from the root.  Domain behavior lives in the
+attached **`HarmonicLayer`** (owns `factor`, derives
+`multiple`/`harmonic`/`ratio`).
 
 ### Class Diagram
 
@@ -172,19 +181,28 @@ classDiagram
         +_node_value_attr = "factor"
         +equave : Fraction | None
         +span : int
-        +spectrum() Spectrum
-        +_evaluate()
+        +harmonics : tuple
+        +ratios : tuple
+    }
+
+    class HarmonicLayer {
+        owns factor
+        derives multiple, harmonic, ratio
     }
 
     class Spectrum {
-        +df : DataFrame
-        +fundamentals
-        +harmonics
-        +ratios
-        +cents
+        +fundamental : Pitch
+        +partials : list
+        +data : DataFrame
+        +ht : HarmonicTree
+        +from_target(target, partials)$
+        +pivot(source_partial, target_partial) Spectrum
+        +retarget(partial, target) Spectrum
+        +modulate(target, source_partial, target_partial) Spectrum
     }
 
-    HarmonicTree --> Spectrum : produces
+    HarmonicTree o-- HarmonicLayer : attached in _init_layers
+    Spectrum --> HarmonicTree : .ht view
 ```
 
 ### Construction
@@ -207,8 +225,11 @@ ht = HarmonicTree(
 | `multiple` | No (derived) | Absolute harmonic number |
 | `ratio` | No (derived) | Equave-reduced ratio (if equave set) |
 
-Only `factor` is writable; all other fields are recomputed by
-`_evaluate()`.
+Only `factor` is writable; writes go through the layer-validated
+setters (`set_node_data(node, factor=…)`) since node views are
+read-only `MappingProxyType` objects.  All other fields are recomputed
+by `_evaluate()`, triggered by `HarmonicLayer.on_structure_changed`
+with the changed node as scope.
 
 ### `_evaluate()` Algorithm
 
@@ -217,11 +238,17 @@ Only `factor` is writable; all other fields are recomputed by
 3. `multiple = harmonic` (absolute partial number).
 4. If `equave` is set, `ratio = reduce_interval(harmonic, equave, span)`.
 
+Leaf-level results are exposed as the `harmonics` and `ratios`
+properties.
+
 ### Spectrum
 
-The `spectrum()` method returns a `Spectrum` object—a pandas DataFrame
-view with columns for fundamental, harmonic, ratio, and cents values
-for every leaf node.
+`Spectrum` (`spectrum.py`) is a **separate class**, constructed from a
+fundamental (Hz or `Pitch`) plus a list of partials — there is no
+`HarmonicTree.spectrum()` method.  It exposes `fundamental`,
+`partials`, `data` (a pandas DataFrame), and an `ht` view
+(`HarmonicTree` of the partials), plus retuning operations
+(`from_target`, `pivot`, `retarget`, `modulate`).
 
 ---
 
@@ -242,98 +269,142 @@ classDiagram
 
     class ToneLattice {
         +generators : tuple[Fraction]
-        +equave : Fraction | None
-        +span : int
-        +ratio_at(coord) Fraction
-        +coords_of(ratio) tuple | None
-        +from_generators(gens, res) ToneLattice$
+        +equave : Fraction
+        +bipolar : bool
+        +get_ratio(coord) Fraction
+        +get_coordinates_for_ratio(ratio, lookup, warn) tuple | list | None
+        +from_generators(generators, resolution, ...)$ ToneLattice
     }
 ```
 
 ### Construction
 
 ```python
+tl = ToneLattice(dimensionality=2, resolution=3)      # default prime basis
+
 tl = ToneLattice.from_generators(
-    generators=(Fraction(3,2), Fraction(5,4)),
-    resolution=3
+    generators=(Fraction(3, 2), Fraction(5, 4)),      # custom basis
+    resolution=3,
 )
 ```
 
 Each coordinate `(a, b)` maps to the ratio
-`generator[0]^a × generator[1]^b`, optionally reduced by an equave.
+`generator[0]^a × generator[1]^b`, optionally equave-reduced
+(`equave_reduce=True` by default).  The reduction window depends on
+`bipolar`: `(1/equave, equave)` when bipolar, `[1, equave)` otherwise.
 
 ### Coordinate Semantics
 
-In the default prime-based lattice:
-- Axis 0 → powers of 3/2 (perfect fifths)
-- Axis 1 → powers of 5/4 (major thirds)
-- etc.
+The **default** basis uses raw prime generators, one per axis
+(skipping the equave prime when reduction is on):
+- Axis 0 → powers of 3
+- Axis 1 → powers of 5
+- Axis 2 → powers of 7, etc.
+
+Stacked-interval bases like `(3/2, 5/4)` are opt-in via
+`from_generators`.  Ratio → coordinate lookup supports `"first"`,
+`"unique"`, and `"all"` modes and emits a `ToneLatticeLookupWarning`
+for ambiguous matches.
 
 The lattice is **immutable** after construction (inherited from
-`Lattice`).
+`Lattice` — no mutators exist).
 
 ---
 
 ## 4. Combination Product Sets (CPS)
 
 **File:** `tonos/systems/combination_product_sets/combination_product_sets.py`  
-**Inherits:** `Graph` (from `topos.graphs`)
+**Inherits:** `CombinationSet` (from `topos.collections.sets`, itself a `GraphCore`)
 
 Erv Wilson's **Combination Product Sets**: given a set of *n*
 harmonic factors and a combination size *r*, the CPS is the set of
-all products of *r*-element subsets.
+all products of *r*-element subsets.  The object **is** the graph —
+there is no separate `.graph` property.
 
 ### Class Diagram
 
 ```mermaid
 classDiagram
-    Graph <|-- CombinationProductSet
-    CombinationProductSet <|-- MasterSet
+    GraphCore <|-- CombinationSet
+    CombinationSet <|-- CombinationProductSet
+
+    class CombinationSet {
+        +factors : tuple
+        +rank : int
+        +combos : set
+        +factor_to_alias : dict
+        +alias_to_factor : dict
+    }
 
     class CombinationProductSet {
-        +factors : tuple
-        +r : int
-        +equave : Fraction
-        +products : set[Fraction]
-        +ratios : set[Fraction]
-        +complement() CombinationProductSet
+        +products : tuple[int]
+        +ratios : tuple[Fraction]
+        +positions : dict
+        +master_set : str
+        +master_set_instance : MasterSet
+        +aliases : dict
+        +hexany(factors)$
+        +dekany(factors, r)$
+        +pentadekany(factors, r)$
+        +eikosany(factors)$
+        +hebdomekontany(factors)$
     }
 
     class MasterSet {
-        +factors : tuple
-        +subsets : dict[int, CPS]
+        <<layout template>>
+        +name : str
+        +n_factors : int
+        +positions
+        +edges
+        +relationship_dict
+        +with_factors(factors)
     }
 
-    class Hexany { r=2, n=4 }
-    class Dekany { r=2, n=5 }
-    class Eikosany { r=3, n=6 }
-
-    CombinationProductSet <|-- Hexany
-    CombinationProductSet <|-- Dekany
-    CombinationProductSet <|-- Eikosany
+    CombinationProductSet --> MasterSet : resolves via MASTER_SETS
 ```
 
-### Named CPS Types
+### Construction and Named CPS Types
 
-| Class | Factors (*n*) | Combination (*r*) | Products |
-|---|---|---|---|
-| `Hexany` | 4 | 2 | 6 |
-| `Dekany` | 5 | 2 | 10 |
-| `Pentadekany` | 6 | 2 | 15 |
-| `Eikosany` | 6 | 3 | 20 |
-| `Hebdomekontany` | 8 | 4 | 70 |
+CPS construction **requires a `master_set`** — a geometric layout
+template resolved by name from the `MASTER_SETS` registry (or passed
+as a `MasterSet` instance):
+
+```python
+cps = CombinationProductSet((1, 3, 5, 7), r=2, master_set='tetrad')
+```
+
+The familiar named types are **classmethod factories** (module-level
+names like `Hexany` are aliases to these bound classmethods, not
+subclasses):
+
+| Factory | Factors (*n*) | Combination (*r*) | Products | Default master set |
+|---|---|---|---|---|
+| `CombinationProductSet.hexany` | 4 | 2 | 6 | `'tetrad'` |
+| `CombinationProductSet.dekany` | 5 | 2 | 10 | `'arrow'` |
+| `CombinationProductSet.pentadekany` | 6 | 2 | 15 | `'asterisk'` |
+| `CombinationProductSet.eikosany` | 6 | 3 | 20 | `'asterisk'` |
+| `CombinationProductSet.hebdomekontany` | 8 | 4 | 70 | `'ogdoad'` |
 
 ### MasterSet
 
-The `MasterSet` generates **all** CPS subsets for a given set of
-factors (every *r* from 1 to *n*), organized into a single graph
-with edges connecting products that share *r-1* factors.
+`MasterSet` (`master_set.py`) is **not** a CPS subclass — it is a
+standalone geometric layout template defining node positions and edge
+relationships (angle, distance, elevation, displacement) keyed by
+symbolic factor ratios.  Presets live in the `MASTER_SETS` registry.
+A CPS resolves its template at construction and uses it to build its
+edge structure and normalized node positions (consumed by the
+visualization layer).
 
 ### Graph Structure
 
-Nodes represent products (ratios).  Edges connect products that
-differ by exactly one factor.  The graph is **immutable** after
-construction.
+Nodes represent combinations, carrying `combo`, `product`, `ratio`,
+and `alias` data.  Edges come from the master set's
+`relationship_dict`, keyed by the symbolic ratio between two
+combinations' aliases.  The graph is **immutable** after construction
+(no mutators — `CombinationSet` inherits only `GraphCore`).
+
+CPS analysis helpers live in `algorithms.py`: `match_pattern`,
+`sub_cps`, `classify`, `faces`.
 
 ---
 
@@ -355,35 +426,36 @@ Constants: `A4_Hz = 440.0`, `A4_MIDI = 69`, `PITCH_CLASSES` (dict).
 
 | Function | Description |
 |---|---|
-| `ratio_to_cents(ratio)` | Frequency ratio → cents |
+| `ratio_to_cents(ratio, round_to=4)` | Frequency ratio → cents |
 | `cents_to_ratio(cents)` | Cents → frequency ratio |
-| `cents_to_setclass(cents)` | Cents → pitch-class integer |
-| `ratio_to_setclass(ratio)` | Ratio → pitch-class integer |
-| `split_partial(ratio)` | Decompose into octave + remainder |
+| `cents_to_setclass(cent_value, n_tet=12)` | Cents → set-class value in an *n*-TET |
+| `ratio_to_setclass(ratio, n_tet=12)` | Ratio → set-class value in an *n*-TET |
+| `split_partial(interval, n=2)` | Decompose into equave power + remainder |
 | `harmonic_mean(a, b)` | Harmonic mean of two ratios |
 | `arithmetic_mean(a, b)` | Arithmetic mean of two ratios |
-| `logarithmic_distance(a, b)` | Log-distance between ratios |
-| `interval_cost(ratio)` | Tenney height / harmonic distance |
-| `n_tet(n)` | Generate *n*-tone equal temperament ratios |
-| `ratios_n_tet(ratios, n)` | Map ratios to nearest *n*-TET steps |
+| `harmonic_distance(ratio)` | Tenney harmonic distance of one ratio |
+| `logarithmic_distance(a, b)` | Log-distance between two ratios |
+| `interval_cost(a, b, diff_coeff=1.0, prime_coeff=1.0, …)` | Weighted cost between two intervals |
+| `n_tet(divisions=12, equave=2, nth_division=1)` | One step ratio of an equal temperament |
+| `ratios_n_tet(divisions=12, equave=2)` | All step ratios of an equal temperament |
 
 ### `harmonics.py`
 
 | Function | Description |
 |---|---|
-| `partial_to_fundamental(partial, n)` | Fundamental from partial number |
-| `first_equave(ratio, equave)` | Reduce ratio into first equave |
+| `partial_to_fundamental(pitchclass, octave=4, partial=1, cent_offset=0.0)` | `(pitchclass, cents)` of the fundamental implied by a partial |
+| `first_equave(harmonic, equave=2, max_equave=None)` | Equave **register number** (int) in which a harmonic first appears |
 
 ### `interval_normalization.py`
 
 | Function | Description |
 |---|---|
-| `equave_reduce(ratio, equave)` | Reduce ratio into `[1, equave)` |
-| `reduce_interval(ratio, equave, span)` | Reduce within *span* equaves |
-| `reduce_interval_relative(ratio, ref, equave)` | Reduce relative to a reference |
-| `reduce_sequence_relative(ratios, equave)` | Reduce a sequence preserving contour |
-| `fold_interval(ratio, equave)` | Fold into `[1, √equave]` |
-| `reduce_freq(freq, lo, hi)` | Reduce Hz into a frequency band |
+| `equave_reduce(interval, equave=2, n_equaves=1)` | Reduce ratio into `[1, equave)` |
+| `reduce_interval(interval, equave=2, n_equaves=1)` | Reduce within *n* equaves |
+| `reduce_interval_relative(target, source, equave=2)` | Reduce relative to a reference |
+| `reduce_sequence_relative(sequence, equave=2)` | Reduce a sequence preserving contour |
+| `fold_interval(interval, lower_thresh, upper_thresh)` | Fold into an explicit `[lower, upper]` window |
+| `reduce_freq(freq, lower=27.5, upper=4186, equave=2)` | Reduce Hz into a frequency band |
 
 ---
 
@@ -402,9 +474,11 @@ classDiagram
 
     Tree <|-- HarmonicTree
     Lattice <|-- ToneLattice
-    Graph <|-- CombinationProductSet
-    CombinationProductSet <|-- Hexany
-    CombinationProductSet <|-- Dekany
-    CombinationProductSet <|-- Eikosany
-    CombinationProductSet <|-- MasterSet
+    GraphCore <|-- CombinationSet
+    CombinationSet <|-- CombinationProductSet
 ```
+
+`MasterSet` and the named CPS types (`Hexany`, `Dekany`, …) do not
+appear in the inheritance tree: the former is a standalone layout
+template, the latter are aliases to `CombinationProductSet`
+classmethods.

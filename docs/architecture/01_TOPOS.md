@@ -16,16 +16,21 @@ formal grammars.
 ```
 topos/
 ├── __init__.py
+├── types.py               # abstract structural types
 ├── collections/
+│   ├── _pattern.py        # Pattern/Cyclic internals
 │   ├── patterns.py        # permutations, autoref, chaining
 │   ├── sequences.py       # Nørgård infinity series, Pattern iterator
 │   └── sets.py            # Operations, Sieve, GenCol, CombinationSet, PartitionSet
 ├── formal_grammars/
 │   └── grammars.py        # context-free grammar engine
 └── graphs/
-    ├── graphs.py          # Graph base class (RustworkX)
+    ├── core.py            # GraphCore — read-only base (RustworkX) + views
+    ├── graphs.py          # Graph — mutable general-purpose graph
+    ├── generators.py      # module-level topology generators
     ├── trees/
-    │   ├── trees.py       # Tree (rooted DAG)
+    │   ├── trees.py       # Tree (rooted DAG, layer-aware)
+    │   ├── layers.py      # TreeLayer protocol
     │   └── group.py       # Group — immutable (D, S) tuple
     └── lattices/
         ├── lattices.py    # Lattice (n-dimensional grid)
@@ -34,27 +39,52 @@ topos/
 
 ---
 
-## 1. Graph
+## 1. GraphCore and Graph
 
-**File:** `topos/graphs/graphs.py`  
+**Files:** `topos/graphs/core.py` (`GraphCore`), `topos/graphs/graphs.py` (`Graph`)  
 **Backend:** `rustworkx.PyGraph` (undirected) or `rustworkx.PyDiGraph` (directed)
 
-`Graph` is the root class for all graph-based structures in Klotho.
-It wraps a RustworkX graph with a consistent Python API, read-only
-node/edge views, and a disciplined mutation protocol.
+`GraphCore` is the **read-only root** of every graph-shaped structure in
+Klotho.  It wraps a RustworkX graph (stored as `self._rx`) and exposes
+views, traversal, and query operations only — no public mutators.
+`Graph(GraphCore)` adds free-form topology and node-data mutation for
+general-purpose use.  Everything else (`Tree`, `Lattice`,
+`CombinationSet`, …) inherits `GraphCore` directly and exposes either a
+disciplined subset of mutators or none at all.
+
+**Immutability is the absence of mutators**, not a runtime flag: an
+immutable class like `Lattice` simply never defines `add_node`, so
+calling it raises a plain `AttributeError`.
 
 ### Class Diagram
 
 ```mermaid
 classDiagram
-    class Graph {
-        -_graph : rx.PyGraph | rx.PyDiGraph
+    class GraphCore {
+        -_rx : rx.PyGraph | rx.PyDiGraph
         -_meta : dict
         -_structure_version : int
-        -_topology_mutable : bool
-        -_node_attr_mutable : bool
         +nodes : GraphNodeView
         +edges : GraphEdgeView
+        +neighbors(node) list
+        +predecessors(node) tuple
+        +successors(node) tuple
+        +descendants(node) tuple
+        +ancestors(node) tuple
+        +topological_sort()
+        +subgraph(node) GraphCore
+        +root_nodes : tuple
+        +has_edge(u, v) bool
+        +copy()
+        +to_networkx()
+        +to_directed() Graph
+        #_add_node_raw(**attr) int
+        #_add_edge_raw(u, v, **attr)
+        #_write_node_data(node, attrs, replace)
+        #_invalidate_caches()
+    }
+
+    class Graph {
         +add_node(**attr) int
         +add_edge(u, v, **attr)
         +remove_node(node)
@@ -62,14 +92,8 @@ classDiagram
         +set_node_data(node, **attr)
         +update_node_data(node, attrs)
         +replace_node_data(node, attrs)
-        +subgraph(node) Graph
-        +neighbors(node) list
-        +predecessors(node) list
-        +successors(node) list
-        +descendants(node) set
-        +ancestors(node) set
-        +topological_sort() list
-        +root_nodes : list
+        +update(edges, nodes)
+        +clear()
     }
 
     class GraphNodeView {
@@ -83,112 +107,123 @@ classDiagram
     class GraphEdgeView {
         +__iter__()
         +__len__()
+        +__call__(data=False)
+        +__getitem__(edge) dict
     }
 
-    Graph *-- GraphNodeView
-    Graph *-- GraphEdgeView
+    GraphCore <|-- Graph
+    GraphCore *-- GraphNodeView
+    GraphCore *-- GraphEdgeView
 ```
 
-### Factory Methods
+### Raw Write Primitives
 
-| Method | Description |
+Subclasses and internal code perform sanctioned writes through the
+protected `_*_raw` primitives on `GraphCore` (`_add_node_raw`,
+`_add_edge_raw`, `_remove_node_raw`, `_remove_edge_raw`,
+`_write_node_data`).  These write directly to `self._rx` and invalidate
+caches, but apply **no validation or recomputation policy** — policy
+lives in the public mutators of each subclass (`Graph` passes writes
+straight through; `Tree` routes them through attached layers, see §2).
+
+### Constructors on `Graph`
+
+| Classmethod | Description |
 |---|---|
 | `from_rustworkx(rx_graph)` | Wrap an existing RustworkX graph |
 | `from_networkx(nx_graph)` | Convert from NetworkX |
 | `from_nodes_edges(nodes, edges)` | Build from explicit lists |
 | `from_edges(edges)` | Infer nodes from edge list |
-| `from_cost_matrix(matrix)` | Complete weighted graph |
 | `empty_graph(n)` | *n* isolated nodes |
-| `path_graph(n)` | Linear chain |
-| `cycle_graph(n)` | Ring |
-| `star_graph(n)` | Hub-and-spoke |
-| `random_graph(n, p)` | Erdős–Rényi random |
-| `grid_graph(dims)` | *n*-dimensional grid |
-| `complete_graph(n)` | Fully connected |
 | `directed()` / `digraph()` | Empty directed graph |
 
-### Mutation Protocol
+### Topology Generators (module-level)
 
-All node-data writes go through a template-method pipeline:
+Topology builders are **module-level functions** in
+`topos/graphs/generators.py`, re-exported from `klotho.topos.graphs`.
+They were moved out of `Graph` so they are not inherited (and broken)
+by subclasses such as `Tree` or `RhythmTree`.  Each returns a mutable
+`Graph`:
 
-```mermaid
-flowchart LR
-    A["set_node_data(node, **attr)"] --> B["_apply_node_data_mutation"]
-    B --> C["_normalize_node_attrs"]
-    C --> D["_validate_node_attrs"]
-    D --> E["_resolve_data_update_scope"]
-    E --> F["_before_node_data_mutation"]
-    F --> G["write to rx graph"]
-    G --> H["_invalidate_caches"]
-    H --> I["_after_node_data_mutation"]
-```
-
-Each hook is a no-op in `Graph` and overridden by subclasses:
-
-- **`_normalize_node_attrs`** — coerce or rename attributes (e.g.
-  `RhythmTree` rejects `'label'`, requires `'proportion'`).
-- **`_validate_node_attrs`** — enforce mutable-key whitelist.
-- **`_resolve_data_update_scope`** — determine which subtree needs
-  recomputation.
-- **`_before_node_data_mutation`** / **`_after_node_data_mutation`** —
-  pre/post hooks for derived-field recomputation.
-
-### Mutability Policy
+| Function | Description |
+|---|---|
+| `path_graph(n_nodes)` | Linear chain |
+| `cycle_graph(n_nodes)` | Ring |
+| `star_graph(n_nodes, center=0)` | Hub-and-spoke |
+| `random_graph(n_nodes, p=0.3)` | Erdős–Rényi random |
+| `complete_graph(n_nodes)` | Fully connected |
+| `grid_graph(dims, periodic=False)` | *n*-dimensional grid |
+| `from_cost_matrix(matrix, items)` | Complete weighted graph |
 
 ```python
-graph._set_mutability_policy(
-    topology_mutable=True,    # can add/remove nodes and edges
-    node_attr_mutable=True    # can modify node data
-)
+from klotho.topos.graphs import complete_graph
+g = complete_graph(5)          # a mutable Graph
 ```
 
-- `Tree` allows both during construction, then restricts topology
-  mutation to its own structural API (`add_child`, `add_subtree`, etc.).
-- `Lattice` locks **both** topology and node attributes after
-  construction (fully immutable).
+### Node-Data Access Is Read-Only
+
+`graph.nodes[n]` and `graph[n]` return a `MappingProxyType` — direct
+writes like `graph.nodes[n]['key'] = value` raise `TypeError`.  All
+node-data mutation goes through the sanctioned methods
+(`set_node_data`, `update_node_data`, `replace_node_data`).
 
 ### Cache Invalidation
 
 - `_structure_version` is an integer counter bumped on every structural
   change.
 - `@lru_cache` decorates `descendants`, `ancestors`, `successors`,
-  `predecessors`; caches are keyed on `_structure_version`.
+  `predecessors`; the cached methods read `_structure_version` so stale
+  entries are never returned.
 - `_invalidate_caches()` clears these caches and is called
-  automatically by the mutation pipeline.
+  automatically by every raw write primitive.
 
 ---
 
 ## 2. Tree
 
 **File:** `topos/graphs/trees/trees.py`  
-**Inherits:** `Graph` (always directed)
+**Inherits:** `GraphCore` (always directed)
 
 A rooted directed acyclic tree built from nested `(D, S)` tuple
 notation, where `D` is a value and `S` is a tuple of children.
+
+`Tree` does **not** inherit `Graph`, so it never exposes free-form
+`add_node`/`add_edge`.  Structural changes go exclusively through its
+sanctioned mutators (`add_child`, `add_subtree`, `prune`,
+`graft_subtree`, `move_subtree`, …), and node-data writes are routed
+through attached **layers** (see below).
 
 ### Class Diagram
 
 ```mermaid
 classDiagram
-    Graph <|-- Tree
+    GraphCore <|-- Tree
 
     class Tree {
         +_node_value_attr : str = "label"
+        -_layers : list~TreeLayer~
         +root : int
         +group : Group
+        +layers : tuple
         +depth : int
         +k : int
-        +leaf_nodes : list
-        +subtree_leaves(node) list
+        +leaf_nodes : tuple
+        +subtree_leaves(node) tuple
         +depth_of(node) int
         +parent(node) int
-        +ancestors(node) list
-        +descendants(node) list
-        +branch(node) list
-        +siblings(node) list
+        +ancestors(node) tuple
+        +descendants(node) tuple
+        +branch(node) tuple
+        +siblings(node) tuple
         +lowest_common_ancestor(a, b) int
         +subtree(node) Tree
         +at_depth(n) list
+        +path_signature(root, target) tuple
+        +node_from_signature(root, signature) int
+        +attach_layer(layer)
+        +set_node_data(node, **attr)
+        +update_node_data(node, attrs)
+        +replace_node_data(node, attrs)
         +add_child(parent, index, **attr) int
         +add_subtree(parent, subtree, index)
         +prune(node)
@@ -199,11 +234,22 @@ classDiagram
         +prune_leaves(n)
     }
 
+    class TreeLayer {
+        +owned_keys : frozenset
+        +derived_keys : frozenset
+        +normalize_attrs(tree, node, attrs, op)
+        +validate_attrs(tree, node, attrs, op)
+        +data_scope(tree, node, changed_keys, op)
+        +on_structure_changed(tree, scope, op)
+        +invalidate(tree)
+    }
+
     class Group {
         +D : value
         +S : tuple
     }
 
+    Tree o-- TreeLayer : notifies
     Tree *-- Group
 ```
 
@@ -225,11 +271,54 @@ This produces:
       1   1
 ```
 
-During `__init__`, `_build_tree` recursively walks the tuple, calling
-`add_node` and `add_edge` on the underlying graph.  Once construction
-completes, `_building_tree` is set to `False` and raw `add_node` /
-`add_edge` raise `NotImplementedError` — structural changes must go
-through `add_child`, `add_subtree`, `prune`, etc.
+During `__init__`, `_build_tree` recursively walks the tuple, using the
+protected raw primitives (`_add_node_raw` / `_add_edge_raw`) inherited
+from `GraphCore`.  There is no public `add_node`/`add_edge` on `Tree`
+at any point — post-construction structural changes must go through
+`add_child`, `add_subtree`, `prune`, etc., which always end in
+`_post_mutation`.
+
+### Tree Layers
+
+Domain behavior (rhythm, harmony, parameters) lives in `TreeLayer`
+objects (`topos/graphs/trees/layers.py`) attached to a tree, not in
+subclass method overrides.  A layer owns a set of writable node-data
+keys (`owned_keys`), declares the keys it computes (`derived_keys`),
+and implements recompute rules.  Subclasses attach their layers in the
+`_init_layers` hook:
+
+- **`RhythmLayer`** (chronos) — owns `proportion`/`tied`, derives
+  `metric_duration`/`metric_onset`.
+- **`HarmonicLayer`** (tonos) — owns `factor`, derives
+  `multiple`/`harmonic`/`ratio`.
+- **`ParameterLayer`** (thetos) — owns pfield/mfield overrides,
+  instruments, and the effective-value cache.
+
+Multiple layers can be attached to a single tree:
+`CompositionalTree` carries **both** a rhythm layer and a parameter
+layer on one topology, which is how a `CompositionalUnit` avoids
+mirroring two trees.
+
+### Node-Data Write Pipeline
+
+Every node-data write (`set_node_data`, `update_node_data`,
+`replace_node_data`) is routed through the attached layers:
+
+```mermaid
+flowchart LR
+    A["set_node_data(node, **attr)"] --> B["layer.normalize_attrs (each layer)"]
+    B --> C["layer.validate_attrs (each layer)"]
+    C --> D["layer.data_scope → scope node"]
+    D --> E["_write_node_data (raw)"]
+    E --> F["_post_mutation(scope)"]
+    F --> G["_invalidate_caches"]
+    F --> H["layer.on_structure_changed (each layer)"]
+```
+
+Structural mutators (`add_child`, `prune`, …) skip the data hooks but
+also end in `_post_mutation`, so layers always get a chance to
+recompute derived fields (e.g. `RhythmLayer` re-runs the rhythm-tree
+evaluation for the affected scope).
 
 ### `_node_value_attr`
 
@@ -240,28 +329,14 @@ Subclasses override this class attribute to use a domain-specific name:
 | `Tree` | `'label'` |
 | `RhythmTree` | `'proportion'` |
 | `HarmonicTree` | `'factor'` |
-| `ParameterTree` | `'label'` (removed post-init) |
-
-### Post-Mutation Recomputation
-
-When node data changes, `Tree._after_node_data_mutation` triggers:
-
-```mermaid
-flowchart LR
-    A["_after_node_data_mutation"] --> B["_post_mutation(scope_node)"]
-    B --> C["_before_post_mutation"]
-    C --> D["_update_group_structure"]
-    D --> E["_after_post_mutation"]
-```
-
-Subclasses hook into `_after_post_mutation` to recompute derived fields
-(e.g. `RhythmTree._evaluate()` recalculates metric durations).
+| `ParameterTree` | `'label'` (popped from node data after init) |
 
 ### `from_tree_structure`
 
 A key factory: creates a new tree instance with the **same topology**
-as a source tree but **empty node data**.  Used by `ParameterTree` to
-clone a `RhythmTree`'s shape.
+as a source tree but **empty node data**, then re-runs `_init_layers`.
+Used to derive parameter-tree snapshots from a rhythm-bearing tree's
+shape.
 
 ---
 
@@ -287,15 +362,16 @@ subdivisions.  Provides `.D` and `.S` properties plus helper functions:
 ## 4. Lattice
 
 **File:** `topos/graphs/lattices/lattices.py`  
-**Inherits:** `Graph` (undirected)
+**Inherits:** `GraphCore` (undirected)
 
-An *n*-dimensional grid graph with coordinate-based access.
+An *n*-dimensional grid graph with coordinate-based access.  The grid
+itself is produced by the `grid_graph` generator during construction.
 
 ### Class Diagram
 
 ```mermaid
 classDiagram
-    Graph <|-- Lattice
+    GraphCore <|-- Lattice
 
     class Lattice {
         -_coord_to_node : dict
@@ -339,14 +415,12 @@ two addressing schemes.
 
 ### Immutability
 
-After construction, a `Lattice` sets:
-
-```python
-self._set_mutability_policy(topology_mutable=False, node_attr_mutable=False)
-```
-
-Neither topology nor node data can be changed.  Subclasses that need
-writable node data (`ParameterField`) can relax this.
+`Lattice` builds its graph during construction and then exposes **no
+mutators** — since it inherits only `GraphCore`, there is no
+`add_node`/`set_node_data` to call, and attempting one raises a plain
+`AttributeError`.  Subclasses that need writable node data
+(`ParameterField`) add their own sanctioned write methods (e.g.
+`set_field_value`) on top.
 
 ---
 
@@ -372,13 +446,23 @@ and modulus.
 
 ### 5.4 `CombinationSet`
 
-Generates all *r*-combinations from a set of factors, builds a
-`Graph` of relationships between combination products.
+**Inherits:** `GraphCore`
+
+Generates all *r*-combinations from a set of factors and **is itself a
+graph**: a complete graph with combinations as nodes, built during
+construction into the backing rustworkx handle.  There is no separate
+`.graph` property — query the object directly (`cs.nodes`,
+`cs.edges`, …).  Key properties: `factors`, `rank`, `combos`,
+`factor_to_alias`, `alias_to_factor`.  As with all `GraphCore`-only
+classes, it exposes no mutators.  `CombinationProductSet` (tonos)
+extends it.
 
 ### 5.5 `PartitionSet`
 
-Generates integer partitions; builds a `Graph` from another `Graph`
-to explore partitioning structure.
+A plain (non-graph) class.  Generates all partitions of an integer *n*
+into exactly *k* parts and computes structural features.  Key
+properties: `data` (pandas DataFrame with `partition`, `unique_count`,
+`span`, `variance` columns), `partitions`, `mean`.
 
 ### 5.6 `Pattern`
 
@@ -426,15 +510,16 @@ classDiagram
 
     class CombinationSet {
         +factors : tuple
-        +r : int
-        +graph : Graph
-        +products : set
+        +rank : int
+        +combos : set
+        +factor_to_alias : dict
+        +alias_to_factor : dict
     }
 
     class PartitionSet {
-        +source : Graph
-        +graph : Graph
-        +partitions : list
+        +data : DataFrame
+        +partitions : tuple
+        +mean : float
     }
 
     class Pattern {
@@ -443,11 +528,11 @@ classDiagram
     }
 
     class Norg {
-        +__getitem__(n) int
+        +inf(start, size, step)$
+        +inf_num(n)$
     }
 
-    CombinationSet --> Graph : builds
-    PartitionSet --> Graph : builds from
+    GraphCore <|-- CombinationSet
 ```
 
 ---
@@ -460,10 +545,10 @@ A context-free grammar engine:
 
 | Function | Purpose |
 |---|---|
-| `rand_rules(alphabet, max_rhs)` | Generate random production rules |
-| `constrain_rules(rules, constraints)` | Filter rules by constraints |
-| `apply_rules(string, rules)` | One step of rule application |
-| `gen_str(axiom, rules, n)` | Generate string after *n* derivation steps |
+| `rand_rules(symbols, word_length_min=1, word_length_max=3)` | Generate random production rules |
+| `constrain_rules(rules, constraints)` | Mutate rules to satisfy constraints |
+| `apply_rules(rules={}, axiom='')` | One step of rule application |
+| `gen_str(generations=0, axiom='', rules={}, display=False)` | Dict of strings, one per derivation step |
 
 ---
 
@@ -471,26 +556,36 @@ A context-free grammar engine:
 
 ```mermaid
 classDiagram
-    Graph <|-- Tree
-    Graph <|-- Lattice
+    GraphCore <|-- Graph
+    GraphCore <|-- Tree
+    GraphCore <|-- Lattice
+    GraphCore <|-- CombinationSet
     Tree <|-- RhythmTree
     Tree <|-- HarmonicTree
     Tree <|-- ParameterTree
+    RhythmTree <|-- CompositionalTree
     Lattice <|-- ToneLattice
     Lattice <|-- ParameterField
-    Graph <|-- CombinationProductSet
+    CombinationSet <|-- CombinationProductSet
 
+    class GraphCore { topos }
     class Graph { topos }
     class Tree { topos }
     class Lattice { topos }
+    class CombinationSet { topos }
     class RhythmTree { chronos }
     class HarmonicTree { tonos }
     class ParameterTree { thetos }
+    class CompositionalTree { thetos }
     class ToneLattice { tonos }
     class ParameterField { thetos }
     class CombinationProductSet { tonos }
 ```
 
-All domain-specific graph structures trace back to `Graph` through
-either `Tree` or `Lattice`, inheriting the mutation protocol, caching,
-and view system.
+All domain-specific graph structures trace back to **`GraphCore`**
+through `Tree`, `Lattice`, or `CombinationSet`, inheriting the views,
+traversal/query API, and cache system.  Mutation is opt-in per class:
+`Graph` for free-form graphs, `Tree` for structural mutators plus
+layer-validated node data, and nothing at all for the immutable
+classes.  (`CompositionalTree` additionally mixes in
+`ParameterApiMixin` — see the thetos doc.)

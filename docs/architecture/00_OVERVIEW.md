@@ -66,31 +66,41 @@ graph TD
 ### Layer 1 — Foundation (`topos`, `utils`)
 
 Abstract mathematical and structural primitives with no musical
-semantics. `Graph`, `Tree`, `Lattice`, collection types (`Pattern`,
-`CombinationSet`, `PartitionSet`), formal grammars, and pure-math
-algorithms (prime factorization, cost matrices, graph traversals).
+semantics.  `GraphCore` is the read-only base of every graph-shaped
+structure; `Graph` adds free-form mutation, `Tree` adds structural
+mutators plus attachable `TreeLayer` objects for domain behavior, and
+`Lattice` is an immutable *n*-dimensional grid.  Topology generators
+(`path_graph`, `complete_graph`, …) are module-level functions in
+`topos.graphs.generators`.  Also: `Group`, collection types
+(`Pattern`, `CombinationSet`, `PartitionSet`, `Sieve`), formal
+grammars, and pure-math algorithms (prime factorization, cost
+matrices, graph traversals).
 
 ### Layer 2 — Domain (`chronos`, `tonos`, `dynatos`)
 
 Musical domains built on topos structures:
 
-- **chronos** — time and rhythm.  `RhythmTree` extends `Tree`.
-- **tonos** — pitch and harmony.  `HarmonicTree` extends `Tree`;
-  `ToneLattice` extends `Lattice`; `CombinationProductSet` extends
-  `Graph`.
+- **chronos** — time and rhythm.  `RhythmTree` extends `Tree` and
+  attaches a `RhythmLayer`.
+- **tonos** — pitch and harmony.  `HarmonicTree` extends `Tree`
+  (with a `HarmonicLayer`); `ToneLattice` extends `Lattice`;
+  `CombinationProductSet` extends `CombinationSet` (a `GraphCore`).
 - **dynatos** — dynamics and envelopes (standalone; no graph
   inheritance).
 
 ### Layer 3 — Composition (`thetos`)
 
 Bridges every domain layer into a unified composition object.
-`ParameterTree` (extends `Tree`) mirrors a `RhythmTree` and stores
-per-node musical parameters.  `CompositionalUnit` (extends
-`TemporalUnit`) wires a `ParameterTree` to a rhythm, yielding
-`Parametron` events that carry both temporal and parametric data.
+`CompositionalUnit` (extends `TemporalUnit`) carries a single fused
+`CompositionalTree` — one topology with both a rhythm layer and a
+parameter layer — yielding `Parametron` events that carry temporal
+and parametric data together.  (`ParameterTree` remains available as
+a standalone parameter tree and as the type of derived snapshots.)
+`Score` / `ScoreItem` arrange multiple units on a shared timeline.
 Instrument definitions (`SynthDefInstrument`, `MidiInstrument`,
-`ToneInstrument`) live here.  Typed unit wrappers (`frequency`, `midi`,
-`amplitude`, etc.) ensure dimensional correctness.
+`ToneInstrument`, `Kit`, `Ensemble`) live here.  Typed unit wrappers
+(`frequency`, `midi`, `amplitude`, etc.) ensure dimensional
+correctness.
 
 ### Layer 4 — Output (`semeios`, `utils.playback`)
 
@@ -106,13 +116,17 @@ supports MIDI file export.
 
 | Subpackage | Greek root | Domain | Key classes |
 |---|---|---|---|
-| `topos` | τόπος — "place" | Abstract structure | `Graph`, `Tree`, `Lattice`, `Group`, `Pattern`, `CombinationSet`, `PartitionSet`, `Sieve`, `GenCol` |
+| `topos` | τόπος — "place" | Abstract structure | `GraphCore`, `Graph`, `Tree`, `Lattice`, `Group`, `Pattern`, `CombinationSet`, `PartitionSet`, `Sieve`, `GenCol` |
 | `chronos` | χρόνος — "time" | Rhythm & time | `RhythmTree`, `Meas`, `RhythmPair`, `TemporalUnit`, `TemporalUnitSequence`, `TemporalBlock`, `Chronon` |
 | `tonos` | τόνος — "tone" | Pitch & harmony | `Pitch`, `Scale`, `Chord`, `Voicing`, `ChordSequence`, `Contour`, `HarmonicTree`, `Spectrum`, `ToneLattice`, `CombinationProductSet`, `MasterSet` |
 | `dynatos` | δυνατός — "powerful" | Dynamics & expression | `Dynamic`, `DynamicRange`, `Envelope` |
-| `thetos` | θέτος — "placed" | Composition & params | `ParameterTree`, `ParameterField`, `CompositionalUnit`, `Parametron`, `Instrument`, `SynthDefInstrument`, `MidiInstrument`, `ToneInstrument`, `Unit` subclasses |
-| `semeios` | σημεῖον — "sign" | Visualization & notation | `plot()`, `KlothoPlot`, `Scheduler` |
+| `thetos` | θέτος — "placed" | Composition & params | `ParameterTree`, `ParameterField`, `CompositionalUnit`, `Parametron`, `Score`, `ScoreItem`, `Instrument`, `SynthDefInstrument`, `MidiInstrument`, `ToneInstrument`, `Kit`, `Ensemble`, `Unit` subclasses |
+| `semeios` | σημεῖον — "sign" | Visualization & notation | `plot()`, `KlothoPlot` |
 | `utils` | — | Shared utilities | algorithms, data structures, playback engines |
+
+Top-level exports from `klotho` itself: `plot`, `play`, `play_midi`,
+`create_midi`, `set_audio_engine`, `get_audio_engine`,
+`register_synthdef`, `GraphCore`, `Graph`, `Tree`, `Lattice`, `Group`.
 
 ---
 
@@ -145,19 +159,19 @@ These short aliases appear frequently in code and discussion:
 
 ## Module Count
 
-~120 Python modules across 7 main subpackages, organized in the tree
+~160 Python modules across 7 main subpackages, organized in the tree
 shown below.
 
 ```
 klotho/
 ├── __init__.py
-├── chronos/          (4 sub-packages, 11 modules)
-├── dynatos/          (2 sub-packages,  7 modules)
-├── semeios/          (2 sub-packages, 18 modules)
-├── thetos/           (3 sub-packages, 13 modules)
-├── tonos/            (5 sub-packages, 19 modules)
-├── topos/            (3 sub-packages, 10 modules)
-└── utils/            (3 sub-packages, 17 modules)
+├── chronos/          (15 modules)
+├── dynatos/          (11 modules)
+├── semeios/          (26 modules)
+├── thetos/           (19 modules)
+├── tonos/            (27 modules)
+├── topos/            (20 modules)
+└── utils/            (39 modules)
 ```
 
 ---

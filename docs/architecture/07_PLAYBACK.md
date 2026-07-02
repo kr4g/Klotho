@@ -16,8 +16,10 @@ utils/playback/
 ├── _converter_base.py         # shared conversion logic
 ├── _amplitude.py              # voice amplitude computation
 ├── _sc_assembly.py            # CompositionalUnit → SC event assembly
-├── _session_boot.py           # boot_supersonic() — lazy loader
-├── animation_events.py        # events for animated KlothoPlot playback
+├── _sc_validate.py            # SC event-list validation
+├── _helpers.py                # shared helpers
+├── _session_boot.py           # boot_supersonic()
+├── animation_events.py        # events/payloads for animated KlothoPlot playback
 ├── midi_player.py             # play_midi(), create_midi()
 ├── tonejs/
 │   ├── __init__.py
@@ -27,15 +29,22 @@ utils/playback/
 └── supersonic/
     ├── __init__.py
     ├── engine.py              # SuperSonicEngine — HTML widget
-    ├── converters.py          # convert_to_sc_events()
+    ├── converters.py          # convert_to_sc_events(), convert_score_to_sc_events()
+    ├── registry.py            # register_synthdef(), runtime synthdef registry
     ├── cdn.py                 # SuperSonic CDN URLs
+    ├── _js_fragments.py       # JS snippets shared by widgets
+    ├── _engine_widget.js      # widget shell
+    ├── scheduler_core.js      # core JS scheduler
+    ├── scheduler_score.js     # score-aware JS scheduler
+    ├── draw.js                # widget drawing
     ├── _vendor/
     │   └── synthdef_parser/   # vendored .scsyndef parser (MIT)
     ├── scripts/
     │   └── regenerate_manifest.py  # rebuilds flat manifest.json from .scsyndef
     └── assets/
         ├── manifest.json      # flat {name: {control: default}} dict
-        └── *.scsyndef         # compiled synth definition files
+        ├── *.scd              # SC source for the bundled synthdefs
+        └── synthdefs/         # ~100 compiled .scsyndef files
 ```
 
 ---
@@ -56,19 +65,28 @@ play(obj, engine='supersonic')  # force SuperSonic
 
 ```mermaid
 flowchart TD
-    P["play(obj, engine, **kwargs)"] --> KP{"isinstance<br/>KlothoPlot?"}
+    P["play(obj, engine, **kwargs)"] --> SCORE{"isinstance<br/>Score?"}
+    SCORE -->|Yes| S_CONV["convert_score_to_sc_events(score)"]
+    S_CONV --> S_ENG["SuperSonicEngine(events,<br/>meta, control_data, ring_time)"]
+    S_ENG --> DISP["engine.display()<br/>→ HTML widget"]
+
+    SCORE -->|No| KP{"isinstance<br/>KlothoPlot?"}
     KP -->|Yes| KPLAY["obj.play(**kwargs)<br/>(animated)"]
     KP -->|No| BOOT["boot_supersonic()"]
     BOOT --> ENG{"engine?"}
 
     ENG -->|supersonic| SC_CONV["convert_to_sc_events(obj)"]
-    SC_CONV --> SC_ENG["SuperSonicEngine(events)"]
-    SC_ENG --> DISP["engine.display()<br/>→ HTML widget"]
+    SC_CONV --> SC_ENG["SuperSonicEngine(events, ring_time)"]
+    SC_ENG --> DISP
 
     ENG -->|tone| T_CONV["convert_to_events(obj)"]
     T_CONV --> T_ENG["ToneEngine(events)"]
     T_ENG --> DISP
 ```
+
+`Score` playback is always SuperSonic: the converter returns a payload
+with `events`, track/FX `meta`, and control-envelope `control_data`,
+and the widget accepts a `ring_time` tail (default 5 s).
 
 ### Engine Configuration
 
@@ -103,6 +121,7 @@ objects into flat event lists.
 | `TemporalUnitSequence` | Temporal sequence |
 | `TemporalBlock` | Parallel temporal |
 | `CompositionalUnit` | Full composition |
+| `Score` | Multi-unit timeline (SuperSonic only) |
 
 ### Conversion Architecture
 
@@ -132,11 +151,11 @@ flowchart TD
 | Function | Purpose |
 |---|---|
 | `_get_addressed_collection(obj)` | Extract pitch data from any collection type |
-| `scale_pitch_sequence(pitches, n)` | Stretch/cycle a pitch list to length *n* |
+| `scale_pitch_sequence(obj, equaves=1)` | Pitch sequence spanning *n* equaves of a collection |
 | `extract_convert_kwargs(kwargs)` | Parse `dur`, `arp`, `strum`, `mode` kwargs |
-| `lower_poly_pfields_to_voices(events)` | Expand polyphonic pfields (lists of freqs) into separate voice events |
-| `lower_event_ir_to_voice_events(events)` | Flatten intermediate representation to voice events |
-| `iter_group_sequence(uc)` | Iterate CompositionalUnit events respecting groups |
+| `lower_poly_pfields_to_voices(pfields)` | Expand polyphonic pfields (lists of freqs) into separate voice pfield dicts |
+| `lower_event_ir_to_voice_events(event)` | Flatten one intermediate event to a list of voice events |
+| `iter_group_sequence(groups, dur, arp=False, strum=0, direction='u', pause=0.0)` | Iterate grouped pitch material into timed events |
 
 ### SC Assembly (`_sc_assembly.py`)
 
@@ -195,16 +214,19 @@ flowchart LR
 
 ### Event Format (Tone.js)
 
+Musical parameters are nested under `pfields`, not flattened:
+
 ```json
 {
   "start": 0.0,
   "duration": 0.5,
   "instrument": "Harmonics",
-  "freq": 440.0,
-  "amp": 0.8,
-  "pan": 0.0
+  "pfields": {"freq": 440.0, "amp": 0.8, "vel": 0.8}
 }
 ```
+
+The converter returns a payload of `{"events": [...], "instruments":
+{...}}` so the widget can instantiate the right Tone.js classes.
 
 ---
 
@@ -244,31 +266,33 @@ flowchart LR
 
 ### Event Format (SuperSonic)
 
-Three message types:
+Three message types, keyed by a string `id` (uid) with `start` times
+and nested `pfields`:
 
 ```json
-{"type": "new",     "time": 0.0,  "defName": "kl_tri", "args": {"freq": 440, "amp": 0.8}, "nodeId": 1000}
-{"type": "set",     "time": 0.25, "nodeId": 1000, "args": {"freq": 550}}
-{"type": "release", "time": 0.5,  "nodeId": 1000}
+{"type": "new",     "id": "a1…", "start": 0.0,  "defName": "kl_tri", "pfields": {"freq": 440, "amp": 0.8}, "dur": 0.5, "releaseAfter": true}
+{"type": "set",     "id": "a1…", "start": 0.25, "pfields": {"freq": 550}}
+{"type": "release", "id": "a1…", "start": 0.5}
 ```
 
 - **`new`** — allocate a synth node with initial parameters.
 - **`set`** — update parameters on a running node (used for slurs,
-  parameter changes).
-- **`release`** — free the node (triggers envelope release).
+  parameter changes, insert-FX automation).
+- **`release`** — free the node explicitly (normally superseded by the
+  `dur`/`releaseAfter` auto-release contract below).
 
-### Default SynthDefs
+### Bundled SynthDefs
 
-| Name | Description |
-|---|---|
-| `kl_tri` | Triangle wave with filter |
-| `kl_sine` | Sine wave |
-| `kl_kicktone` | Kick drum tone |
+Roughly **100 compiled synthdefs** ship with the package — the
+`kl_*` Klotho family (`kl_tri`, `kl_sine`, `kl_kicktone`, …), a large
+`fd_*` FoxDot-derived set, and internal control/routing defs
+(`__klEnvCtrl`, `__busRouter`, `__chainLimiter`, …).
 
-Definitions are compiled `.scsyndef` files in `supersonic/assets/`.
-The `manifest.json` lists registered synthdefs as a flat dict
-`{synth_name: {control_name: default_value}}`. It is auto-regenerated
-from the compiled `.scsyndef` blobs by
+Definitions are compiled `.scsyndef` files in
+`supersonic/assets/synthdefs/` (with `.scd` sources in
+`supersonic/assets/`).  The `manifest.json` lists registered synthdefs
+as a flat dict `{synth_name: {control_name: default_value}}`.  It is
+auto-regenerated from the compiled `.scsyndef` blobs by
 
 ```bash
 python -m klotho.utils.playback.supersonic.scripts.regenerate_manifest
@@ -277,6 +301,31 @@ python -m klotho.utils.playback.supersonic.scripts.regenerate_manifest
 (use `--dry-run` to preview). The script uses a vendored copy of
 `synthdef_parser` at `supersonic/_vendor/synthdef_parser/` (no external
 install).
+
+### Runtime SynthDef Registration (`registry.py`)
+
+New in 10.1.0: synthdefs can be registered at runtime without touching
+the bundled assets, exposed at the top level as
+`klotho.register_synthdef`:
+
+```python
+import klotho
+
+klotho.register_synthdef(my_supriya_synthdef)          # from a supriya SynthDef
+inst = SynthDefInstrument.from_manifest('my_synth')    # then usable like any other
+```
+
+The registry (`supersonic/registry.py`) stores compiled bytes plus
+parsed controls in a session-scoped runtime store that the engine
+merges with the bundled manifest:
+
+| Function | Purpose |
+|---|---|
+| `register_synthdef(supriya_synthdef, name=None, pfields=None)` | Compile-and-register from a supriya `SynthDef` |
+| `register_compiled(def_name, compiled_bytes, controls)` | Register pre-compiled bytes |
+| `runtime_assets()` / `runtime_controls()` | Session-registered blobs / control dicts |
+| `is_registered(def_name)` | Check the runtime registry |
+| `clear_runtime()` | Drop all runtime registrations |
 
 ### Event-list contract: `dur` + `releaseAfter` (auto-release)
 
@@ -308,10 +357,10 @@ that lands, SC scheduling falls back to consuming any explicit
 
 ### Session Boot
 
-`boot_supersonic()` is called lazily on first `play()` invocation.
-It checks whether SuperSonic is available and pre-loads the CDN
-resources.  In Jupyter/Colab environments, it injects the required
-`<script>` tags.
+`boot_supersonic()` runs at import of `player.py` and again on each
+`play()` invocation (it is idempotent).  It checks whether SuperSonic
+is available and pre-loads the CDN resources.  In Jupyter/Colab
+environments, it injects the required `<script>` tags.
 
 ---
 
@@ -376,9 +425,11 @@ Bridges the playback system with the animation system in semeios:
 
 | Function | Purpose |
 |---|---|
-| `build_path_audio_events(obj, path)` | Audio events for lattice path animation |
-| `build_shape_audio_events(obj)` | Audio events for CPS shape animation |
-| `normalize_animation_payload_for_engine(payload, engine)` | Convert animation events to engine-specific format |
+| `build_path_audio_events(freqs, dur, amp=None)` | Audio events for lattice path animation |
+| `build_shape_audio_events(freq_groups, dur, arp=False, strum=0, direction='u', amp=None)` | Audio events for CPS shape animation |
+| `build_path_engine_payload(freqs, dur, engine, …)` | Engine-specific payload for a path animation |
+| `build_shape_engine_payload(freq_groups, dur, engine, …)` | Engine-specific payload for a shape animation |
+| `normalize_animation_payload_for_engine(audio_payload, engine)` | Convert animation events to engine-specific format |
 
 These functions are called by `KlothoPlot.play()` to synchronize
 audio with visual animation.
@@ -390,13 +441,14 @@ audio with visual animation.
 ```mermaid
 flowchart TD
     subgraph "Composition"
+        SCR["Score"]
         UC["CompositionalUnit"]
         UT["TemporalUnit"]
         PC["Pitch Collection"]
     end
 
     subgraph "Conversion"
-        CONV["convert_to_events()<br/>convert_to_sc_events()<br/>create_midi()"]
+        CONV["convert_to_events()<br/>convert_to_sc_events()<br/>convert_score_to_sc_events()<br/>create_midi()"]
     end
 
     subgraph "Rendering"
@@ -411,6 +463,7 @@ flowchart TD
         AUDIO["IPython.display.Audio"]
     end
 
+    SCR --> CONV
     UC --> CONV
     UT --> CONV
     PC --> CONV
