@@ -147,3 +147,10 @@ Intervals
 .. automodule:: klotho.tonos.utils.intervals
    :members:
    :show-inheritance:
+
+Types
+-----
+
+.. automodule:: klotho.tonos.types
+   :members:
+   :show-inheritance:

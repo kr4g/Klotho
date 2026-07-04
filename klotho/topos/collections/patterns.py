@@ -21,12 +21,21 @@ __all__ = [
 # Algorithm 4: PermutList
 def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     '''
-    Algorithm 4: PermutList with optional sign preservation
-    
-    :param lst: List of elements to be permuted.
-    :param pt: Starting position for the permutation.
-    :param preserve_signs: If True, preserves signs while rotating absolute values.
-    :return: Circularly permuted list.
+    Algorithm 4: PermutList with optional sign preservation.
+
+    Parameters
+    ----------
+    lst : tuple
+        List of elements to be permuted.
+    pt : int
+        Starting position for the permutation.
+    preserve_signs : bool, optional
+        If True, preserves signs while rotating absolute values (default is False).
+
+    Returns
+    -------
+    tuple
+        Circularly permuted list.
     '''
     if not preserve_signs:
         pt = pt % len(lst)
@@ -43,11 +52,19 @@ def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
 # Algorithm 5: AutoRef
 def autoref(*args, preserve_signs:bool=False):    
     '''
-    Algorithm 5: AutoRef with optional sign preservation
-    
-    :param args: One or two lists to be doubly circularly permuted.
-    :param preserve_signs: If True, preserves signs while rotating absolute values.
-    :return: List containing the original element and its permutations.
+    Algorithm 5: AutoRef with optional sign preservation.
+
+    Parameters
+    ----------
+    *args
+        One or two lists to be doubly circularly permuted.
+    preserve_signs : bool, optional
+        If True, preserves signs while rotating absolute values (default is False).
+
+    Returns
+    -------
+    tuple
+        Tuple containing each original element paired with a permutation.
     '''
     if len(args) == 1:
         lst1 = lst2 = tuple(args[0])
@@ -65,12 +82,21 @@ def autoref(*args, preserve_signs:bool=False):
 # AutoRef Matrices
 def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     '''
-    AutoRef rotation matrices with optional sign preservation
-    
-    :param args: One or two lists to generate rotation matrices from.
-    :param mode: Rotation mode ('G', 'S', 'D', or 'C').
-    :param preserve_signs: If True, preserves signs while rotating absolute values.
-    :return: Tuple of rotation matrices based on the specified mode.
+    AutoRef rotation matrices with optional sign preservation.
+
+    Parameters
+    ----------
+    *args
+        One or two lists to generate rotation matrices from.
+    mode : str, optional
+        Rotation mode ('G', 'S', 'D', or 'C'). Default is 'G'.
+    preserve_signs : bool, optional
+        If True, preserves signs while rotating absolute values (default is False).
+
+    Returns
+    -------
+    tuple
+        Tuple of rotation matrices based on the specified mode.
     '''
     if len(args) == 1:
         lst1 = lst2 = tuple(args[0])
@@ -116,20 +142,26 @@ def iso_pairs(*lists):
     This is a form of "cyclic pairing" or "modulo-based pairing" and is 
     different from computing the Cartesian product.
 
-    Args:
-        *lists: Any number of input lists.
+    Parameters
+    ----------
+    *lists
+        Any number of input lists.
 
-    Returns:
-        tuple: A tuple of tuples where each inner tuple contains one element 
+    Returns
+    -------
+    tuple
+        A tuple of tuples where each inner tuple contains one element
         from each input list.
 
-    Raises:
-        ValueError: If no lists are provided.
+    Raises
+    ------
+    ValueError
+        If no lists are provided.
 
-    Example:
-        >> iso_pairs([1, 2], ['a', 'b', 'c'])
-        ((1, 'a'), (2, 'b'), (1, 'c'), (2, 'a'), (1, 'b'), (2, 'c'))
-
+    Examples
+    --------
+    >>> iso_pairs([1, 2], ['a', 'b', 'c'])
+    ((1, 'a'), (2, 'b'), (1, 'c'), (2, 'a'), (1, 'b'), (2, 'c'))
     '''
     if not lists:
         raise ValueError("At least one list must be provided")
@@ -144,15 +176,20 @@ def pair_adjacent(elements):
     '''
     Creates groups where elements are paired with their adjacent elements.
     
-    Args:
-        elements: A tuple of elements to be grouped.
-        
-    Returns:
+    Parameters
+    ----------
+    elements : tuple
+        A tuple of elements to be grouped.
+
+    Returns
+    -------
+    tuple
         A tuple of valid groups.
-        
-    Example:
-        >> pair_adjacent((1, 2, 3, 4, 5))
-        ((1, (2, 3)), (2, (3, 4)), (3, (4, 5)), (4, (5, 1)), (5, (1, 2)))
+
+    Examples
+    --------
+    >>> pair_adjacent((1, 2, 3, 4, 5))
+    ((1, (2, 3)), (2, (3, 4)), (3, (4, 5)), (4, (5, 1)), (5, (1, 2)))
     '''
     if not elements:
         return ()
@@ -176,15 +213,20 @@ def nested_chain(elements):
     '''
     Creates a nested chain structure with elements.
     
-    Args:
-        elements: A tuple of elements to chain.
-        
-    Returns:
+    Parameters
+    ----------
+    elements : tuple
+        A tuple of elements to chain.
+
+    Returns
+    -------
+    tuple
         A valid group with a nested chain structure.
-        
-    Example:
-        >> nested_chain((1, 2, 3, 4, 5))
-        (1, (2, 3, 4, 5))
+
+    Examples
+    --------
+    >>> nested_chain((1, 2, 3, 4, 5))
+    (1, (2, 3, 4, 5))
     '''
     if not elements:
         return None
@@ -201,15 +243,20 @@ def alternate_sequence(elements):
     '''
     Creates a sequence where elements alternate between being part of the head and tail.
     
-    Args:
-        elements: A tuple of elements to alternate.
-        
-    Returns:
+    Parameters
+    ----------
+    elements : tuple
+        A tuple of elements to alternate.
+
+    Returns
+    -------
+    tuple
         A valid group with alternating elements.
-        
-    Example:
-        >> alternate_sequence((1, 2, 3, 4, 5))
-        (1, (3, 5, 2, 4))
+
+    Examples
+    --------
+    >>> alternate_sequence((1, 2, 3, 4, 5))
+    (1, (2, 4, 3, 5))
     '''
     if not elements:
         return None

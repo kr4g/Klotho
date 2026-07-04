@@ -39,13 +39,13 @@ class CombinationProductSet(CS):
 
   References
   ----------
-  .. [1] https://en.xen.wiki/w/Combination_product_set
+  https://en.xen.wiki/w/Combination_product_set
 
   Examples
   --------
   >>> cps = CombinationProductSet.hexany((1, 3, 5, 7))
   >>> cps.ratios
-  (Fraction(1, 1), Fraction(7, 6), ...)
+  (Fraction(35, 32), Fraction(5, 4), Fraction(21, 16), Fraction(3, 2), Fraction(7, 4), Fraction(15, 8))
   """
 
   @staticmethod
@@ -322,8 +322,8 @@ class CombinationProductSet(CS):
 
     References
     ----------
-    .. [1] https://en.wikipedia.org/wiki/Hexany
-    .. [2] https://en.xen.wiki/w/Hexany
+    https://en.wikipedia.org/wiki/Hexany
+    https://en.xen.wiki/w/Hexany
     """
     if len(factors) != 4:
       raise ValueError('Hexany requires exactly 4 factors.')
@@ -351,7 +351,7 @@ class CombinationProductSet(CS):
 
     References
     ----------
-    .. [1] https://en.xen.wiki/w/Dekany
+    https://en.xen.wiki/w/Dekany
     """
     if len(factors) != 5:
       raise ValueError('Dekany requires exactly 5 factors.')
@@ -381,7 +381,7 @@ class CombinationProductSet(CS):
 
     References
     ----------
-    .. [1] https://en.xen.wiki/w/Pentadekany
+    https://en.xen.wiki/w/Pentadekany
     """
     if len(factors) != 6:
       raise ValueError('Pentadekany requires exactly 6 factors.')
@@ -409,7 +409,7 @@ class CombinationProductSet(CS):
 
     References
     ----------
-    .. [1] https://en.xen.wiki/w/Eikosany
+    https://en.xen.wiki/w/Eikosany
     """
     if len(factors) != 6:
       raise ValueError('Eikosany requires exactly 6 factors.')
@@ -435,7 +435,7 @@ class CombinationProductSet(CS):
 
     References
     ----------
-    .. [1] https://en.xen.wiki/w/Hebdomekontany
+    https://en.xen.wiki/w/Hebdomekontany
     """
     if len(factors) != 8:
       raise ValueError('Hebdomekontany requires exactly 8 factors.')

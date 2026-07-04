@@ -761,6 +761,137 @@ class AnimatedRTSvgFigure:
         return html
 
 
+class AnimatedTimelineSvgFigure:
+    """Animated SVG figure for multi-lane temporal-container playback.
+
+    Unlike :class:`AnimatedRTSvgFigure`, which dims everything outside
+    the active leaf's ancestor path, this figure uses additive "pulse"
+    highlighting: each step brightens its segment (and shows its halo),
+    then reverts after the event's real duration.  This is required for
+    :class:`TemporalBlock`, where multiple rows sound simultaneously.
+
+    Parameters
+    ----------
+    svg_data : SvgTimelineData
+        Pre-built SVG data for the temporal container.
+    audio_payload : dict or list or None, optional
+        Engine-specific event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps (no-audio fallback only).
+    glow : bool, optional
+        Enable halo glow on active segments.
+    """
+
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False,
+                 engine=None, ring_time=5, loop=False):
+        self.svg_data = svg_data
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.glow = glow
+        self.ring_time = ring_time
+        self.loop = loop
+        self.engine = engine or get_audio_engine()
+        self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        """Return a self-contained HTML string for Jupyter display."""
+        sd = self.svg_data
+        wid = self.widget_id
+        eng = self.engine
+
+        cdn_html, instruments_js, player_js = build_session_preamble(
+            include_tone=(bool(self.audio_payload) and eng == "tone"),
+            engine=eng)
+        controls_html = build_control_bar_html(wid)
+        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
+                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+
+        step_ids_json = json.dumps(sd.step_element_ids)
+        step_halo_ids_json = json.dumps(sd.step_halo_ids)
+        step_durs_json = json.dumps(sd.step_durations)
+        bright_json = json.dumps(sd.step_bright_colors)
+        base_json = json.dumps(sd.step_base_colors)
+
+        converted = _maybe_convert_payload(self.audio_payload, eng)
+        payload_json = json.dumps(converted) if converted else "null"
+
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False,
+                                        engine=eng, ring_time=self.ring_time, loop=self.loop)
+
+        html = f'''
+{cdn_html}
+{sd.svg_str}
+{controls_html}
+{scripts_html}
+<script type="module">
+(function() {{
+    var elCache = {{}};
+    function getEl(id) {{ if (!elCache[id]) elCache[id] = document.getElementById(id); return elCache[id]; }}
+
+    var stepIds = {step_ids_json};
+    var stepHaloIds = {step_halo_ids_json};
+    var stepDurs = {step_durs_json};
+    var brightColors = {bright_json};
+    var baseColors = {base_json};
+    var audioPayload = {payload_json};
+    var glowEnabled = {'true' if self.glow else 'false'};
+    var totalSteps = stepIds.length;
+
+    var stepTimers = {{}};
+
+    function revertStep(idx) {{
+        var ids = stepIds[idx] || [];
+        for (var i = 0; i < ids.length; i++) {{
+            var el = getEl(ids[i]);
+            if (el) el.setAttribute("fill", baseColors[ids[i]]);
+        }}
+        var halos = stepHaloIds[idx] || [];
+        for (var i = 0; i < halos.length; i++) {{
+            var el = getEl(halos[i]);
+            if (el) el.style.display = "none";
+        }}
+    }}
+
+    function pulseStep(idx) {{
+        if (idx < 0 || idx >= totalSteps) return;
+        var ids = stepIds[idx] || [];
+        for (var i = 0; i < ids.length; i++) {{
+            var eid = ids[i], bright = brightColors[eid];
+            var el = getEl(eid);
+            if (el && bright) el.setAttribute("fill", bright);
+        }}
+        var halos = stepHaloIds[idx] || [];
+        for (var i = 0; i < halos.length; i++) {{
+            var el = getEl(halos[i]);
+            if (el) el.style.display = "";
+        }}
+        var ms = Math.max(90, Math.min((stepDurs[idx] || 0.25) * 1000, 1500));
+        if (stepTimers[idx]) clearTimeout(stepTimers[idx]);
+        stepTimers[idx] = setTimeout(function() {{
+            revertStep(idx);
+            delete stepTimers[idx];
+        }}, ms);
+    }}
+
+    function resetAll() {{
+        for (var key in stepTimers) {{
+            clearTimeout(stepTimers[key]);
+        }}
+        stepTimers = {{}};
+        for (var i = 0; i < totalSteps; i++) revertStep(i);
+    }}
+
+    function onReset() {{ resetAll(); }}
+    function onBeforePlay() {{ resetAll(); }}
+    function onStep(stepIdx) {{ pulseStep(stepIdx); }}
+
+    {playback_js}
+}})();
+</script>
+'''
+        return html
+
+
 class AnimatedLatticeSvgFigure:
     """Animated SVG figure for step-by-step lattice path traversal.
 

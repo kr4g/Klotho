@@ -3,6 +3,25 @@ from ._shared import GM_PROGRAM_NAMES
 
 
 class MidiInstrument(Instrument):
+    """A General MIDI instrument identified by program number.
+
+    Every GM program is also available as a named classmethod constructor
+    (e.g. ``MidiInstrument.Violin()``, ``MidiInstrument.Marimba()``), plus
+    ``MidiInstrument.DrumKit()`` for the standard drum kit.
+
+    Parameters
+    ----------
+    name : str or None, optional
+        Display name. Defaults to the GM program name (or
+        ``'Standard Drum Kit'`` when ``is_Drum`` is True).
+    prgm : int, optional
+        General MIDI program number, 0-127 (default is 0).
+    is_Drum : bool, optional
+        If True, the instrument plays on a percussion channel (default is False).
+    default_values : dict, optional
+        Overrides for the ``note``, ``velocity``, and ``expression`` pfields.
+    """
+
     FIXED_PFIELDS_MELODIC = {'note': 60, 'velocity': 100, 'expression': 127}
     FIXED_PFIELDS_DRUM = {'note': 35, 'velocity': 100, 'expression': 127}
 
@@ -20,10 +39,12 @@ class MidiInstrument(Instrument):
 
     @property
     def prgm(self):
+        """int : The General MIDI program number (0-127)."""
         return self._prgm
 
     @property
     def is_Drum(self):
+        """bool : Whether this instrument plays on a percussion channel."""
         return self._is_Drum
 
     @classmethod
@@ -38,11 +59,13 @@ class MidiInstrument(Instrument):
 
     @classmethod
     def AcousticGrandPiano(cls, **kwargs):
+        """Create a MidiInstrument for GM program 0 (Acoustic Grand Piano)."""
         cls._validate_default_values(kwargs)
         return cls(name=GM_PROGRAM_NAMES[0], prgm=0, is_Drum=False, default_values=kwargs)
 
     @classmethod
     def DrumKit(cls, **kwargs):
+        """Create a MidiInstrument for the standard GM drum kit (percussion channel)."""
         cls._validate_default_values(kwargs)
         return cls(name='Standard Drum Kit', prgm=1, is_Drum=True, default_values=kwargs)
 
@@ -79,6 +102,10 @@ def _make_gm_classmethod(program_num: int):
             default_values=kwargs,
         )
     _ctor.__name__ = f"GM{program_num}"
+    _ctor.__doc__ = (
+        f"Create a MidiInstrument for GM program {program_num} "
+        f"({GM_PROGRAM_NAMES[program_num]})."
+    )
     return classmethod(_ctor)
 
 

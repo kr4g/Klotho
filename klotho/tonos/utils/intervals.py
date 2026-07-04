@@ -47,7 +47,7 @@ def ratio_to_cents(ratio: Union[int, float, Fraction, str], round_to: int = 4) -
 
   Examples
   --------
-  >>> ratio_to_cents('3/2')
+  >>> float(ratio_to_cents('3/2'))
   701.955
   """
   # bad...
@@ -424,6 +424,6 @@ def ratios_n_tet(divisions: int = 12, equave: Union[int, float, Fraction, str] =
 
   References
   ----------
-  .. [1] https://en.wikipedia.org/wiki/Equal_temperament
+  https://en.wikipedia.org/wiki/Equal_temperament
   """
   return [n_tet(divisions, equave, nth_division, symbolic) for nth_division in range(divisions)]

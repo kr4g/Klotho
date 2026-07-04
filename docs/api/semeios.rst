@@ -7,16 +7,16 @@ plotting, animation, and multimedia output.
 Visualization
 -------------
 
-.. automodule:: klotho.semeios.visualization
-   :members:
-   :show-inheritance:
+Plotting
+~~~~~~~~
 
-Notelists
----------
+The primary entry point for visualizing Klotho objects.
 
-SuperCollider
-~~~~~~~~~~~~~
+.. autofunction:: klotho.semeios.visualization.plots.plot
 
-.. automodule:: klotho.semeios.notelists.supercollider
+Plot Handles
+~~~~~~~~~~~~
+
+.. autoclass:: klotho.semeios.visualization._dispatch._klotho_plot.KlothoPlot
    :members:
    :show-inheritance:

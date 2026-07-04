@@ -89,12 +89,45 @@ Player
    :members:
    :show-inheritance:
 
+Engine Configuration
+~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.utils.playback._config
+   :members:
+   :show-inheritance:
+
+SuperSonic Engine
+~~~~~~~~~~~~~~~~~
+
+The default audio engine: SuperCollider synthesis in the browser via WebAssembly.
+
+.. automodule:: klotho.utils.playback.supersonic.engine
+   :members:
+   :show-inheritance:
+
+SuperSonic Registry
+~~~~~~~~~~~~~~~~~~~
+
+Register custom SynthDefs for use with the SuperSonic engine.
+
+.. automodule:: klotho.utils.playback.supersonic.registry
+   :members:
+   :show-inheritance:
+
+SuperSonic Converters
+~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.utils.playback.supersonic.converters
+   :members:
+   :show-inheritance:
+
 MIDI Player
 ~~~~~~~~~~~
 
 .. automodule:: klotho.utils.playback.midi_player
    :members:
    :show-inheritance:
+   :exclude-members: deque
 
 Tone.js Engine
 ~~~~~~~~~~~~~~

@@ -89,6 +89,7 @@ def lower_compositional_ir_to_sc_assembly(
     obj,
     extra_pfields=None,
     animation=False,
+    use_absolute_time=False,
     default_synth='kl_tri',
     normalize_sc_pfields=True,
     sort_output=True,
@@ -134,7 +135,7 @@ def lower_compositional_ir_to_sc_assembly(
             slur_end_events[slur_id] = event
 
     time_offset = 0.0
-    if animation:
+    if animation and not use_absolute_time:
         sounding = [ev for ev in events_iterable if not ev.is_rest]
         time_offset = min(ev.start for ev in sounding) if sounding else 0.0
 

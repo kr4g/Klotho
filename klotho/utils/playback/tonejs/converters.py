@@ -101,7 +101,8 @@ def _build_chord_events(pitches, start, dur, strum, instrument, amp=None,
     return events
 
 
-def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
+def compositional_unit_to_events(obj, extra_pfields=None, animation=False,
+                                 use_absolute_time=False):
     events = []
     instruments = {}
     inst_id_map = {}
@@ -111,7 +112,7 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False):
                     if animation else None)
 
     time_offset = 0
-    if animation:
+    if animation and not use_absolute_time:
         time_offset = min(ev.start for ev in obj if not ev.is_rest) if any(not ev.is_rest for ev in obj) else 0
 
     for event in obj:
@@ -455,6 +456,67 @@ def temporal_block_to_events(obj, extra_pfields=None, rebase_to_zero=True):
     if rebase_to_zero:
         _shift_payload_events_to_zero(payload)
     return payload
+
+
+def _shift_payload_step_indices(payload, step_offset):
+    if step_offset == 0:
+        return payload
+    for ev in payload["events"]:
+        if ev.get("_stepIndex") is not None:
+            ev["_stepIndex"] = ev["_stepIndex"] + step_offset
+    return payload
+
+
+def _temporal_container_animation_payload(obj, amp=None, extra_pfields=None):
+    """Build an animation payload for a UTS/BT with global step indices.
+
+    Traverses members in structural (DFS) order — the same enumeration
+    used by the timeline SVG renderer — assigning each leaf-unit's local
+    step indices a running global offset.
+
+    Returns
+    -------
+    tuple of (dict, int)
+        ``(payload, total_steps)``.
+    """
+    events = []
+    instruments = {}
+    step_offset = 0
+
+    for member in obj:
+        if isinstance(member, CompositionalUnit):
+            sub = compositional_unit_to_events(member, extra_pfields=None,
+                                               animation=True, use_absolute_time=True)
+            n_steps = len(member._rt.leaf_nodes)
+        elif isinstance(member, TemporalUnit):
+            sub = temporal_unit_to_events(member, use_absolute_time=True, amp=amp,
+                                          extra_pfields=extra_pfields, animation=True)
+            n_steps = len(member._rt.leaf_nodes)
+        elif isinstance(member, (TemporalUnitSequence, TemporalBlock)):
+            sub, n_steps = _temporal_container_animation_payload(
+                member, amp=amp, extra_pfields=extra_pfields)
+        else:
+            raise TypeError(
+                f"Unsupported member type in temporal container: {type(member).__name__}"
+            )
+        _shift_payload_step_indices(sub, step_offset)
+        _merge_sub_payload(events, instruments, sub)
+        step_offset += n_steps
+
+    return _payload(events, instruments), step_offset
+
+
+def temporal_container_to_animation_events(obj, amp=None, extra_pfields=None):
+    """Animation events for a TemporalUnitSequence or TemporalBlock.
+
+    Events carry absolute times (rebased so the payload starts at zero)
+    and a global ``_stepIndex`` matching the timeline renderer's step
+    enumeration.
+    """
+    payload, _ = _temporal_container_animation_payload(obj, amp=amp,
+                                                       extra_pfields=extra_pfields)
+    payload["events"].sort(key=lambda ev: ev["start"])
+    return _shift_payload_events_to_zero(payload)
 
 
 def convert_to_events(obj, **kwargs):

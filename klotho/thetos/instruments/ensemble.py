@@ -93,18 +93,22 @@ class Ensemble:
 
     @property
     def name(self):
+        """str or None : The ensemble name."""
         return self._name
 
     @property
     def families(self):
+        """list of str : Names of all families in the ensemble."""
         return list(self._families.keys())
 
     @property
     def members(self):
+        """OrderedDict : Copy of the mapping from member names to Instruments."""
         return OrderedDict(self._members)
 
     @property
     def ungrouped(self):
+        """list of str : Names of members not assigned to any family."""
         return list(self._ungrouped)
 
     def add(self, name_or_inst, instrument=None, family=None):

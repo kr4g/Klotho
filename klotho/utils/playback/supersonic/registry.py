@@ -60,6 +60,7 @@ def runtime_controls() -> dict:
 
 
 def is_registered(def_name: str) -> bool:
+    """Return True if ``def_name`` has been registered at runtime."""
     return def_name in _RUNTIME
 
 

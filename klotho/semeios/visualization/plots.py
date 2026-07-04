@@ -30,7 +30,7 @@ import plotly.graph_objects as go
 import math
 from sklearn.manifold import MDS, SpectralEmbedding
 
-from ._dispatch import _plot_rt, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
+from ._dispatch import _plot_rt, _plot_timeline, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
 from ._dispatch import KlothoPlot
 from ._plot_pattern import plot_pattern
 
@@ -124,10 +124,8 @@ def plot(obj, **kwargs):
             return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
         case TemporalUnit():
             return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
-        case TemporalUnitSequence():
-            raise NotImplementedError("Plotting for temporal unit sequences not yet implemented")
-        case TemporalBlock():
-            raise NotImplementedError("Plotting for temporal blocks not yet implemented")
+        case TemporalUnitSequence() | TemporalBlock():
+            return _wrap(_plot_timeline, obj, dict(kwargs))
         case Graph():
             return _show(_plot_graph(obj._rx, **kwargs))
         case _ if hasattr(obj, 'nodes') and hasattr(obj, 'edges'):

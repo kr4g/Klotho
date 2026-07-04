@@ -326,13 +326,14 @@ class UCNodeHandle(UTNodeHandle):
 
 class CompositionalUnit(TemporalUnit):
     """
-    A TemporalUnit enhanced with synchronized parameter management capabilities.
-    
-    Extends TemporalUnit to include a shadow ParameterTree that maintains 
-    identical structural form to the internal RhythmTree. This allows for 
-    hierarchical parameter organization where parameter values can be set at 
-    any level and automatically propagate to descendant events.
-    
+    A TemporalUnit enhanced with hierarchical parameter management.
+
+    Extends TemporalUnit by using a single fused :class:`CompositionalTree`
+    as its internal tree, carrying both rhythmic data (via a rhythm layer)
+    and parameter data (via a parameter layer) on one topology. Parameter
+    values can be set at any node and automatically propagate to descendant
+    events through hierarchical inheritance.
+
     Parameters
     ----------
     span : Union[int, float, Fraction], default=1
@@ -345,6 +346,10 @@ class CompositionalUnit(TemporalUnit):
         Beat unit for tempo (e.g., Fraction(1,4) for quarter note)
     bpm : Union[None, int, float], optional
         Beats per minute
+    inst : Instrument or None, optional
+        Instrument to assign to the root node.
+    mfields : Union[dict, list, None], optional
+        Meta fields to initialize (a ``'group'`` field is always present).
     pfields : Union[dict, list, None], optional
         Parameter fields to initialize. Can be:
         - dict: {field_name: default_value, ...}
@@ -359,10 +364,15 @@ class CompositionalUnit(TemporalUnit):
     by :class:`~klotho.thetos.composition.score.ScoreItem` once the UC
     has been added to a Score.
 
+    There is no shadow ParameterTree: rhythm and parameters live on the
+    same fused tree. The :attr:`pt` property builds an effective
+    ParameterTree snapshot (node ids preserved) on demand.
+
     Attributes
     ----------
     pt : ParameterTree
-        The synchronized parameter tree matching RhythmTree structure (returns copy)
+        Effective parameter tree snapshot derived from the fused tree
+        (a new object on each access; mutating it does not affect the unit)
     pfields : list
         List of all available parameter field names
     """

@@ -49,6 +49,15 @@ class TemporalMeta(type):
 
 
 class UTNodeHandle:
+    """Owner-bound handle to a single node in a :class:`TemporalUnit`.
+
+    Handles are the canonical node-selection currency (handle-first API):
+    they pair a node id with the owning unit, so structural and data
+    operations can validate ownership. Obtained via ``ut.root``,
+    ``ut.leaves``, or selector subscripting; a handle compares equal only
+    to a handle for the same node of the same owner.
+    """
+
     __slots__ = ("_owner", "_node_id")
 
     def __init__(self, owner: Any, node_id: int):

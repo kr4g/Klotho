@@ -1,9 +1,13 @@
-"""Smoke tests: plot(obj).play() pipeline runs end-to-end for RT / Lattice / CPS / MasterSet."""
+"""Smoke tests: plot(obj).play() pipeline runs end-to-end for RT / Lattice / CPS / MasterSet / UTS / BT."""
 from unittest.mock import patch
 
 import pytest
 
 from klotho.chronos.rhythm_trees import RhythmTree
+from klotho.chronos.temporal_units.temporal import (
+    TemporalUnit, TemporalUnitSequence, TemporalBlock,
+)
+from klotho.thetos.composition.compositional import CompositionalUnit
 from klotho.tonos.systems.tone_lattices.tone_lattices import ToneLattice
 from klotho.tonos.systems.combination_product_sets import (
     CombinationProductSet, MasterSet,
@@ -87,6 +91,106 @@ class TestSmokePlotPlay:
         p = plot(ms)
         assert isinstance(p, KlothoPlot)
         _assert_renderable(p)
+
+
+def _u1():
+    return TemporalUnit(tempus='4/4', prolatio=(1, 2, 1), bpm=120)
+
+
+def _u2():
+    return TemporalUnit(tempus='3/4', prolatio='p', bpm=90)
+
+
+def _u3():
+    return TemporalUnit(tempus='5/8', prolatio=(2, -1, 3), bpm=100)
+
+
+def _uc():
+    return CompositionalUnit(tempus='4/4', prolatio=(1, 1, 2), bpm=100)
+
+
+def _timeline_cases():
+    return {
+        'flat_uts': TemporalUnitSequence([_u1(), _u2(), _u3()]),
+        'flat_bt': TemporalBlock([_u1(), _u2(), _u3()], sort_rows=False),
+        'uts_with_bt': TemporalUnitSequence([_u1(), TemporalBlock([_u2(), _u3()]), _u2()]),
+        'bt_with_uts': TemporalBlock([TemporalUnitSequence([_u1(), _u2()]), _u3()], sort_rows=False),
+        'nested_bt': TemporalBlock(
+            [TemporalBlock([_u1(), _u2()]), TemporalUnitSequence([_u3(), _u1()])],
+            sort_rows=False),
+        'uts_with_uc': TemporalUnitSequence([_u1(), _uc()]),
+        'bt_with_uc': TemporalBlock([_uc(), _u2()], sort_rows=False),
+    }
+
+
+class TestSmokeTimelinePlotPlay:
+    """plot() returns a KlothoPlot for UTS/BT and the static SVG renders."""
+
+    @pytest.mark.parametrize('case', sorted(_timeline_cases()))
+    def test_static(self, case):
+        obj = _timeline_cases()[case]
+        p = plot(obj)
+        assert isinstance(p, KlothoPlot)
+        _assert_renderable(p)
+
+    def test_non_ratios_layout_rejected(self):
+        from klotho.semeios.visualization._dispatch import _plot_timeline
+        with pytest.raises(ValueError, match='ratios'):
+            _plot_timeline(_timeline_cases()['flat_uts'], layout='containers')
+
+    def test_empty_container_rejected(self):
+        from klotho.semeios.visualization._dispatch import _plot_timeline
+        with pytest.raises(ValueError):
+            _plot_timeline(TemporalUnitSequence())
+
+
+class TestTimelineAnimated:
+    """Exercise the animate=True code path for UTS/BT."""
+
+    @pytest.mark.parametrize('case', sorted(_timeline_cases()))
+    def test_animate(self, case):
+        from klotho.semeios.visualization._dispatch import _plot_timeline
+        obj = _timeline_cases()[case]
+        fig = _plot_timeline(obj, animate=True)
+        html = fig.to_html()
+        assert isinstance(html, str) and len(html) > 0
+
+
+class TestTimelineStepConsistency:
+    """Renderer step count == global _stepIndex range in both engines' payloads."""
+
+    @pytest.mark.parametrize('case', sorted(_timeline_cases()))
+    def test_step_indices_match(self, case):
+        from klotho.semeios.visualization._renderers.svg_timeline import (
+            _resolve_lanes, _svg_timeline_ratios,
+        )
+        from klotho.utils.playback.tonejs.converters import (
+            temporal_container_to_animation_events,
+        )
+        from klotho.utils.playback.supersonic.converters import (
+            temporal_container_to_sc_animation_events,
+        )
+
+        obj = _timeline_cases()[case]
+        placements, _, _ = _resolve_lanes(obj)
+        total_steps = sum(len(p.unit._rt.leaf_nodes) for p in placements)
+
+        sd = _svg_timeline_ratios(obj)
+        assert len(sd.step_element_ids) == total_steps
+        assert len(sd.step_halo_ids) == total_steps
+        assert len(sd.step_durations) == total_steps
+
+        tone = temporal_container_to_animation_events(obj)
+        tone_steps = {ev['_stepIndex'] for ev in tone['events']
+                      if ev.get('_stepIndex') is not None}
+        assert tone_steps == set(range(total_steps))
+        assert min(ev['start'] for ev in tone['events']) == 0.0
+
+        sc = temporal_container_to_sc_animation_events(obj)
+        sc_steps = {ev['_stepIndex'] for ev in sc
+                    if ev.get('_stepIndex') is not None}
+        assert sc_steps == set(range(total_steps))
+        assert min(ev['start'] for ev in sc) >= 0.0
 
 
 class TestAnimatedPath:

@@ -7,10 +7,40 @@ dimensions—temporal, tonal, dynamic, instrumental, and parametric.
 Instruments
 -----------
 
-Instrument Implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Instrument Base Classes
+~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: klotho.thetos.instruments.instrument
+.. automodule:: klotho.thetos.instruments.base
+   :members:
+   :show-inheritance:
+
+SynthDef Instruments
+~~~~~~~~~~~~~~~~~~~~
+
+SuperCollider SynthDef-backed instruments, effects, and kits.
+
+.. automodule:: klotho.thetos.instruments.synthdef
+   :members:
+   :show-inheritance:
+
+MIDI Instruments
+~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.thetos.instruments.midi
+   :members:
+   :show-inheritance:
+
+Tone.js Instruments
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: klotho.thetos.instruments.tone
+   :members:
+   :show-inheritance:
+
+Ensembles
+~~~~~~~~~
+
+.. automodule:: klotho.thetos.instruments.ensemble
    :members:
    :show-inheritance:
 
@@ -65,9 +95,9 @@ Compositional Units
    :members:
    :show-inheritance:
 
-Types
------
+Scores
+~~~~~~
 
-.. automodule:: klotho.types
+.. automodule:: klotho.thetos.composition.score
    :members:
    :show-inheritance:

@@ -70,8 +70,8 @@ class Operations:
     Musical transformations:
     
     >>> chord = {0, 4, 7}  # C major triad
-    >>> Operations.transpose(chord, 5, 12)  # Transpose up a fourth
-    {5, 9, 0}
+    >>> sorted(Operations.transpose(chord, 5, 12))  # Transpose up a fourth
+    [0, 5, 9]
     """
     @staticmethod
     def union(set1: set, set2: set) -> set:        
@@ -236,8 +236,8 @@ class Operations:
         Examples
         --------
         >>> chord = {0, 4, 7}  # C major triad
-        >>> Operations.transpose(chord, 7, 12)  # Transpose up a fifth
-        {7, 11, 2}
+        >>> sorted(Operations.transpose(chord, 7, 12))  # Transpose up a fifth
+        [2, 7, 11]
         """
         return {(pitch + transposition_interval) % modulus for pitch in set1}
 
@@ -311,8 +311,8 @@ class Operations:
         Examples
         --------
         >>> scale = {0, 2, 4, 5, 7, 9, 11}  # Major scale
-        >>> Operations.intervals(scale)
-        {1, 2}
+        >>> sorted(int(i) for i in Operations.intervals(scale))
+        [1, 2]
         """
         S = sorted(S)
         return set(np.diff(S))
@@ -401,7 +401,7 @@ class Sieve:
     Create a basic sieve (3,1) - multiples of 3 starting from 1:
     
     >>> sieve = Sieve(modulus=3, residue=1, N=10)
-    >>> print(sorted(sieve.S))
+    >>> print(sorted(int(x) for x in sieve.S))
     [1, 4, 7, 10]
     
     See Also
@@ -568,7 +568,7 @@ class Sieve:
         >>> sieve1 = Sieve(3, 1, 10)  # (3,1)
         >>> sieve2 = Sieve(5, 2, 10)  # (5,2)
         >>> combined = sieve1 | sieve2
-        >>> print(sorted(combined))
+        >>> print(sorted(int(x) for x in combined))
         [1, 2, 4, 7, 10]
         """
         return Operations.union(self.S, other.S)
@@ -592,7 +592,7 @@ class Sieve:
         >>> sieve1 = Sieve(2, 0, 20)  # Even numbers
         >>> sieve2 = Sieve(3, 0, 20)  # Multiples of 3
         >>> intersection = sieve1 & sieve2
-        >>> print(sorted(intersection))
+        >>> print(sorted(int(x) for x in intersection))
         [0, 6, 12, 18]
         """
         return Operations.intersect(self.S, other.S)
@@ -616,7 +616,7 @@ class Sieve:
         >>> sieve1 = Sieve(2, 0, 10)  # Even numbers
         >>> sieve2 = Sieve(4, 0, 10)  # Multiples of 4
         >>> difference = sieve1 - sieve2
-        >>> print(sorted(difference))
+        >>> print(sorted(int(x) for x in difference))
         [2, 6, 10]
         """
         return Operations.diff(self.S, other.S)
@@ -640,7 +640,7 @@ class Sieve:
         >>> sieve1 = Sieve(2, 0, 10)  # Even numbers
         >>> sieve2 = Sieve(3, 0, 10)  # Multiples of 3
         >>> sym_diff = sieve1 ^ sieve2
-        >>> print(sorted(sym_diff))
+        >>> print(sorted(int(x) for x in sym_diff))
         [2, 3, 4, 8, 9, 10]
         """
         return Operations.symm_diff(self.S, other.S)
@@ -875,20 +875,25 @@ class CombinationSet(GraphCore):
         The size of each combination.
     combos : set
         The set of all r-combinations from the factors.
-    graph : networkx.Graph
-        A complete graph with combinations as nodes.
     factor_to_alias : dict
         Mapping from factors to symbolic aliases.
     alias_to_factor : dict
         Mapping from symbolic aliases to factors.
+
+    Notes
+    -----
+    A CombinationSet *is* a graph: it subclasses
+    :class:`~klotho.topos.graphs.core.GraphCore` and builds a complete
+    graph with combinations as nodes during construction. Use the object
+    directly for graph queries; it exposes no mutators.
 
     Examples
     --------
     Create combinations with default parameters:
     
     >>> cs = CombinationSet()  # Uses ('A', 'B', 'C', 'D') with r=2
-    >>> print(cs.combos)
-    {('A', 'B'), ('A', 'C'), ('A', 'D'), ('B', 'C'), ('B', 'D'), ('C', 'D')}
+    >>> sorted(cs.combos)
+    [('A', 'B'), ('A', 'C'), ('A', 'D'), ('B', 'C'), ('B', 'D'), ('C', 'D')]
     """
     def __init__(self, factors:tuple = ('A', 'B', 'C', 'D'), r:int = 2):
         """
@@ -1013,11 +1018,10 @@ class CombinationSet(GraphCore):
 
 class PartitionSet:
     """
-    A set of integer partitions with associated graph structures for analysis.
+    A set of integer partitions with computed structural features.
 
-    This class generates all partitions of an integer n into exactly k parts,
-    analyzes their structural properties, and creates various graph representations
-    for studying relationships between partitions.
+    This class generates all partitions of an integer n into exactly k parts
+    and analyzes their structural properties (unique counts, span, variance).
 
     Parameters
     ----------
@@ -1025,8 +1029,6 @@ class PartitionSet:
         The integer to partition.
     k : int
         The number of parts in each partition.
-    graph_type : {'feature_distance', 'decomposition_tree', 'substructure_embedding'}, optional
-        The type of graph to construct (default is 'feature_distance').
 
     Attributes
     ----------
@@ -1036,10 +1038,6 @@ class PartitionSet:
         Tuple of all generated partitions.
     mean : float
         The mean value of partition parts (n/k).
-    graph : networkx.Graph or networkx.DiGraph
-        Graph representation based on the specified graph_type.
-    graph_type : str
-        The type of graph construction used.
 
     Examples
     --------
@@ -1048,11 +1046,11 @@ class PartitionSet:
     >>> ps = PartitionSet(8, 3)
     >>> ps.data
        partition  unique_count  span  variance
-    0  (6, 1, 1)             2     5    5.5556
-    1  (5, 2, 1)             3     4    2.8889
-    2  (4, 3, 1)             3     3    1.5556
-    3  (4, 2, 2)             2     2    0.8889
-    4  (3, 3, 2)             2     1    0.2222
+    0  (6, 1, 1)             2     5  5.555556
+    1  (5, 2, 1)             3     4  2.888889
+    2  (4, 3, 1)             3     3  1.555556
+    3  (4, 2, 2)             2     2  0.888889
+    4  (3, 3, 2)             2     1  0.222222
     """
     def __init__(self, n: int, k: int):
         """

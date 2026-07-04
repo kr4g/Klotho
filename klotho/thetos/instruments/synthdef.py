@@ -13,6 +13,21 @@ class SynthDefInstrument(Instrument):
     omit ``gate`` from the pfields.  The normal way to suppress per-event
     auto-release is to set ``releaseAfter=False`` on that event, not to
     mutate the instrument.
+
+    Every SynthDef in the bundled SuperSonic manifest is also available as
+    a named classmethod constructor (e.g. ``SynthDefInstrument.tri()``,
+    ``SynthDefInstrument.klank()``), equivalent to calling
+    :meth:`from_manifest` with the corresponding defName.
+
+    Parameters
+    ----------
+    name : str, optional
+        Display name (default is ``'default'``).
+    defName : str or None, optional
+        SuperCollider SynthDef name. Defaults to ``'default'``.
+    pfields : dict, optional
+        Default parameter-field values. If omitted, a standard
+        amp/freq/pan/gate/out set is used.
     """
 
     def __init__(self, name='default', defName=None, pfields=None):
@@ -24,14 +39,34 @@ class SynthDefInstrument(Instrument):
 
     @property
     def defName(self):
+        """str : The SuperCollider SynthDef name."""
         return self._defName
 
     @property
     def has_gate(self) -> bool:
+        """bool : Whether the instrument is gated (its pfields contain ``'gate'``)."""
         return 'gate' in self._pfields
 
     @classmethod
     def from_manifest(cls, defName: str, name: str = None, **overrides):
+        """Create an instrument from the bundled SuperSonic SynthDef manifest.
+
+        Looks up the SynthDef's control names and defaults from the manifest
+        and uses them as pfields.
+
+        Parameters
+        ----------
+        defName : str
+            SynthDef name as registered in the manifest (e.g. ``'kl_tri'``).
+        name : str or None, optional
+            Display name. Defaults to ``defName``.
+        **overrides
+            Pfield values overriding the manifest defaults.
+
+        Returns
+        -------
+        SynthDefInstrument
+        """
         controls = ss_synth_controls(defName)
         pfields = copy.deepcopy(controls)
         pfields.update(overrides)
@@ -68,10 +103,12 @@ class SynthDefFX(Effect):
 
     @property
     def defName(self):
+        """str : The SuperCollider SynthDef name."""
         return self._defName
 
     @property
     def args(self):
+        """dict : Copy of the effect's parameter values."""
         return dict(self._pfields)
 
     def __str__(self):
@@ -99,10 +136,12 @@ class SynthDefKit(Kit):
 
     @property
     def defName(self):
+        """str or None : SynthDef name of the default member."""
         return getattr(self._members[self._default], 'defName', None)
 
     @property
     def has_gate(self) -> bool:
+        """bool : Whether the default member is gated (display/fallback hint)."""
         return getattr(self._members[self._default], 'has_gate', False)
 
     @classmethod
@@ -151,6 +190,10 @@ def _make_synth_classmethod(def_name: str, method_name: str):
     def _ctor(cls, name: str = None, **kwargs):
         return cls.from_manifest(def_name, name=name or method_name, **kwargs)
     _ctor.__name__ = method_name
+    _ctor.__doc__ = (
+        f"Create a SynthDefInstrument for the ``{def_name}`` SynthDef "
+        f"(equivalent to ``from_manifest({def_name!r})``)."
+    )
     return classmethod(_ctor)
 
 

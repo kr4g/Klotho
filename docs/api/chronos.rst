@@ -51,6 +51,21 @@ Core Classes
    :members:
    :show-inheritance:
 
+.. autoclass:: klotho.chronos.temporal_units.temporal.Chronon
+   :members:
+   :show-inheritance:
+
+Node Selection
+~~~~~~~~~~~~~~
+
+.. autoclass:: klotho.chronos.temporal_units.temporal.UTNodeSelector
+   :members:
+   :show-inheritance:
+
+.. autoclass:: klotho.chronos.temporal_units.temporal.UTNodeHandle
+   :members:
+   :show-inheritance:
+
 Temporal Algorithms
 ~~~~~~~~~~~~~~~~~~~
 
@@ -79,5 +94,12 @@ Time Conversion
 ~~~~~~~~~~~~~~~
 
 .. automodule:: klotho.chronos.utils.time_conversion
+   :members:
+   :show-inheritance:
+
+Types
+-----
+
+.. automodule:: klotho.chronos.types
    :members:
    :show-inheritance:

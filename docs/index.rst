@@ -48,7 +48,8 @@ Klotho is organized into six primary modules plus utilities:
   into human-readable and performable representations.
 
 * **utils** — General utilities and helper functions including algorithms for cost matrices,
-  graph traversal, ratio analysis, and playback via Tone.js and MIDI.
+  graph traversal, ratio analysis, and notebook playback via SuperSonic (in-browser
+  SuperCollider, the default engine), Tone.js, and MIDI.
 
 Installation
 ------------

@@ -41,12 +41,12 @@ def to_factors(value: Union[int, Fraction, str]) -> Dict[int, int]:
     Factor a fraction:
     
     >>> to_factors(Fraction(3, 2))
-    {2: -1, 3: 1}
+    {3: 1, 2: -1}
     
     Factor from string representation:
     
     >>> to_factors('5/4')
-    {2: -2, 5: 1}
+    {5: 1, 2: -2}
     """
     match value:
         case int() as i:
@@ -177,7 +177,7 @@ def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int
     -------
     numpy.ndarray
         Immutable vector of prime exponents with optional zero-padding.
-        Position ``i`` corresponds to the ``(i+1)``th prime.
+        Position ``i`` corresponds to the (i+1)-th prime.
 
     Raises
     ------

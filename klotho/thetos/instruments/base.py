@@ -4,6 +4,21 @@ from klotho.utils.data_structures.dictionaries import SafeDict
 
 
 class Instrument:
+    """Engine-agnostic per-note voice with a name and default pfields.
+
+    An Instrument carries the pfield defaults applied to every event it
+    plays. Engine-specific subclasses (``SynthDefInstrument``,
+    ``MidiInstrument``, ``ToneInstrument``) add backend details; this base
+    class is what node assignment APIs such as ``UC.set_instrument`` accept.
+
+    Parameters
+    ----------
+    name : str, optional
+        Instrument name (default is ``'default'``).
+    pfields : dict, optional
+        Default parameter-field values for events played by this instrument.
+    """
+
     def __init__(self, name='default', pfields=None):
         self._name = name
         if pfields is None:
@@ -12,10 +27,12 @@ class Instrument:
 
     @property
     def name(self):
+        """str : The instrument name."""
         return self._name
 
     @property
     def pfields(self):
+        """dict : Copy of the instrument's default parameter fields."""
         return self._pfields.copy()
 
     def __eq__(self, other):
@@ -77,14 +94,17 @@ class Kit(Instrument):
 
     @property
     def default(self) -> str:
+        """str : Key of the default member."""
         return self._default
 
     @property
     def selector(self) -> str:
+        """str : Pfield name used to choose the active member."""
         return self._selector
 
     @property
     def members(self) -> dict:
+        """dict : Copy of the mapping from selector keys to member Instruments."""
         return dict(self._members)
 
     def _resolve(self, key=None):
@@ -131,14 +151,17 @@ class Effect:
 
     @property
     def name(self):
+        """str : The effect name."""
         return self._name
 
     @property
     def uid(self):
+        """str : Unique identifier for this effect instance."""
         return self._uid
 
     @property
     def pfields(self):
+        """dict : Copy of the effect's default parameter fields."""
         return self._pfields.copy()
 
     def __eq__(self, other):

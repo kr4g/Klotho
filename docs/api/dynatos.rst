@@ -44,3 +44,10 @@ Curve Utilities
 .. automodule:: klotho.dynatos.envelopes.utils.curves
    :members:
    :show-inheritance:
+
+Types
+-----
+
+.. automodule:: klotho.dynatos.types
+   :members:
+   :show-inheritance:

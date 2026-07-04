@@ -1,6 +1,7 @@
 from .animated import (
     AnimatedLattice3dFigure,
     AnimatedRTSvgFigure,
+    AnimatedTimelineSvgFigure,
     AnimatedLatticeSvgFigure,
     AnimatedCPSSvgFigure,
     AnimatedCPSShapeFigure,
@@ -10,6 +11,7 @@ from .animated import (
 __all__ = [
     "AnimatedLattice3dFigure",
     "AnimatedRTSvgFigure",
+    "AnimatedTimelineSvgFigure",
     "AnimatedLatticeSvgFigure",
     "AnimatedCPSSvgFigure",
     "AnimatedCPSShapeFigure",

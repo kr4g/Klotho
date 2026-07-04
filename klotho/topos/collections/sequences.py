@@ -31,7 +31,7 @@ class Norg:
 
     References
     ----------
-    .. [1] https://web.archive.org/web/20071010091253/http://www.pernoergaard.dk/eng/strukturer/uendelig/uindhold.html
+    https://web.archive.org/web/20071010091253/http://www.pernoergaard.dk/eng/strukturer/uendelig/uindhold.html
 
     Examples
     --------
@@ -63,7 +63,7 @@ class Norg:
 
         References
         ----------
-        .. [1] https://web.archive.org/web/20071010092334/http://www.pernoergaard.dk/eng/strukturer/uendelig/ukonstruktion05.html
+        https://web.archive.org/web/20071010092334/http://www.pernoergaard.dk/eng/strukturer/uendelig/ukonstruktion05.html
 
         Examples
         --------
@@ -71,7 +71,7 @@ class Norg:
         array([ 0,  1, -1,  2,  1,  0, -2,  3])
 
         >>> Norg.inf(start=4, size=4)
-        array([1, 0, -2, 3])
+        array([ 1,  0, -2,  3])
         """
         if start == 0 and step == 1:
             p = np.empty(size, dtype=int)
@@ -105,7 +105,7 @@ class Norg:
 
         References
         ----------
-        .. [1] https://arxiv.org/pdf/1402.3091.pdf
+        https://arxiv.org/pdf/1402.3091.pdf
 
         Examples
         --------
@@ -144,12 +144,12 @@ class Norg:
 
         References
         ----------
-        .. [1] https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
+        https://web.archive.org/web/20071010091606/http://www.pernoergaard.dk/eng/strukturer/uendelig/u3.html
 
         Examples
         --------
         >>> Norg.n_partite(size=9)
-        array([ 0, -2, -1,  2,  0, -1, -2,  0,  1])
+        array([ 0, -2, -1,  2, -4, -3,  1, -3, -2])
         """
         seed_len = len(seed)
         p = np.empty(size, dtype=int)
@@ -174,7 +174,7 @@ class Norg:
 
         References
         ----------
-        .. [1] https://web.archive.org/web/20071010093955/http://www.pernoergaard.dk/eng/strukturer/toneso/tkonstruktion.html
+        https://web.archive.org/web/20071010093955/http://www.pernoergaard.dk/eng/strukturer/toneso/tkonstruktion.html
         """
         pass
 

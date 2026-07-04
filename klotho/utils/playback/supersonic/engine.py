@@ -63,6 +63,27 @@ def _load_widget_template():
 
 
 class SuperSonicEngine:
+    """Browser playback widget running SuperCollider synthesis via WebAssembly.
+
+    Renders an HTML/JS widget that boots scsynth in the browser, loads the
+    required SynthDefs (bundled assets plus any runtime registrations), and
+    schedules the given events. This is the default audio engine used by
+    :func:`~klotho.utils.playback.player.play`.
+
+    Parameters
+    ----------
+    events : list of dict
+        SuperCollider-style playback events (as produced by the converters
+        in :mod:`klotho.utils.playback.supersonic.converters`).
+    meta : dict, optional
+        Score-level metadata (track groups, insert FX chains, slurs).
+    control_data : dict, optional
+        Control-envelope buffer and descriptors for continuous automation.
+    ring_time : float, optional
+        Seconds of reverb/release tail to keep the audio context alive
+        after the last event (default is 5).
+    """
+
     def __init__(self, events, meta=None, control_data=None, ring_time=5):
         self.events = convert_numpy_types(events)
         self.meta = convert_numpy_types(meta or {})
@@ -146,6 +167,7 @@ globalThis.__klothoManifest = {manifest_json};
         return html
 
     def display(self):
+        """Render the playback widget in the current notebook output."""
         html = self._generate_html()
         return display(HTML(html))
 

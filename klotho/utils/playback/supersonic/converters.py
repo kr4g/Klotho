@@ -236,11 +236,13 @@ def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None, amp=None, extra
                                                 extra_pfields=extra_pfields)
 
 
-def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False):
+def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False,
+                                    use_absolute_time=False):
     events = lower_compositional_ir_to_sc_assembly(
         obj,
         extra_pfields=extra_pfields,
         animation=animation,
+        use_absolute_time=use_absolute_time,
         default_synth=DEFAULT_COMPOSITION_SYNTH,
         normalize_sc_pfields=True,
         sort_output=True,
@@ -351,6 +353,69 @@ def temporal_block_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True):
     events = sort_sc_assembly_events(events)
     if rebase_to_zero:
         _shift_events_to_zero(events)
+    return events
+
+
+def _shift_sc_step_indices(events, step_offset):
+    if step_offset == 0:
+        return events
+    for ev in events:
+        if ev.get("_stepIndex") is not None:
+            ev["_stepIndex"] = ev["_stepIndex"] + step_offset
+    return events
+
+
+def _temporal_container_sc_animation_events(obj, amp=None, extra_pfields=None):
+    """Build SC animation events for a UTS/BT with global step indices.
+
+    Traverses members in structural (DFS) order — the same enumeration
+    used by the timeline SVG renderer — assigning each leaf-unit's local
+    step indices a running global offset.
+
+    Returns
+    -------
+    tuple of (list, int)
+        ``(events, total_steps)``.
+    """
+    events = []
+    step_offset = 0
+
+    for member in obj:
+        if isinstance(member, CompositionalUnit):
+            sub = compositional_unit_to_sc_events(member, extra_pfields=None,
+                                                  animation=True, use_absolute_time=True)
+            n_steps = len(member._rt.leaf_nodes)
+        elif isinstance(member, TemporalUnit):
+            sub = temporal_unit_to_sc_events(member, use_absolute_time=True, amp=amp,
+                                             extra_pfields=extra_pfields, animation=True)
+            n_steps = len(member._rt.leaf_nodes)
+        elif isinstance(member, (TemporalUnitSequence, TemporalBlock)):
+            sub, n_steps = _temporal_container_sc_animation_events(
+                member, amp=amp, extra_pfields=extra_pfields)
+        else:
+            raise TypeError(
+                f"Unsupported member type in temporal container: {type(member).__name__}"
+            )
+        _shift_sc_step_indices(sub, step_offset)
+        _merge_sub_sc(events, sub)
+        step_offset += n_steps
+
+    return events, step_offset
+
+
+def temporal_container_to_sc_animation_events(obj, amp=None, extra_pfields=None):
+    """SC animation events for a TemporalUnitSequence or TemporalBlock.
+
+    Events carry absolute times (rebased so the payload starts at zero)
+    and a global ``_stepIndex`` matching the timeline renderer's step
+    enumeration.
+    """
+    events, _ = _temporal_container_sc_animation_events(obj, amp=amp,
+                                                        extra_pfields=extra_pfields)
+    events = sort_sc_assembly_events(events)
+    _shift_events_to_zero(events)
+    from klotho.utils.playback._sc_validate import validate_sc_events
+    validate_sc_events(events, animation=True)
     return events
 
 

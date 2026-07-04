@@ -39,7 +39,7 @@ class Dynamic:
     >>> dyn.db
     -12
     >>> dyn.amp
-    0.25118864315095825
+    0.251188643150958
     """
     def __init__(self, marking, db_value):
         self._marking = marking
@@ -111,13 +111,14 @@ class DynamicRange:
     --------
     >>> dr = DynamicRange()
     >>> dr['f'].db
-    -12.857142857142858
+    -19.285714285714285
     >>> dr.at(0.5).marking
     'mp'
         
-    See Also
-    --------
-    https://en.wikipedia.org/wiki/Dynamics_(music)
+    References
+    ----------
+    .. [1] Wikipedia: Dynamics (music).
+       https://en.wikipedia.org/wiki/Dynamics_(music)
     """
     def __init__(self, min_dynamic=-60, max_dynamic=-3, curve=0, dynamics=DYNAMIC_MARKINGS):
         self._min_db = min_dynamic
