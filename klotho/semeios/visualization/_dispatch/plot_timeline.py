@@ -1,3 +1,8 @@
+_PASSTHROUGH_KWARGS = frozenset({
+    'beat', 'bpm', 'arp', 'strum', 'direction', 'pause', 'loop', 'ring_time',
+})
+
+
 def _plot_timeline(obj, layout: str = 'ratios',
                    figsize: tuple[float, float] | None = None,
                    outlines: bool = True,
@@ -40,6 +45,13 @@ def _plot_timeline(obj, layout: str = 'ratios',
         raise ValueError(
             f"Unknown layout: {layout}. Only 'ratios' is currently supported "
             f"for TemporalUnitSequence and TemporalBlock."
+        )
+
+    unknown = set(kwargs) - _PASSTHROUGH_KWARGS
+    if unknown:
+        raise TypeError(
+            f"Unexpected keyword argument(s) for timeline plot: "
+            f"{', '.join(sorted(unknown))}"
         )
 
     from .._renderers.svg_timeline import _svg_timeline_ratios

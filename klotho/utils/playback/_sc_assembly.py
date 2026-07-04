@@ -136,8 +136,7 @@ def lower_compositional_ir_to_sc_assembly(
 
     time_offset = 0.0
     if animation and not use_absolute_time:
-        sounding = [ev for ev in events_iterable if not ev.is_rest]
-        time_offset = min(ev.start for ev in sounding) if sounding else 0.0
+        time_offset = min((ev.start for ev in events_iterable), default=0.0)
 
     slur_voice_uids: dict = {}
 

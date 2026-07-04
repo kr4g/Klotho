@@ -852,6 +852,17 @@ class AnimatedTimelineSvgFigure:
         }}
     }}
 
+    function scrollToStep(el) {{
+        if (!el || !el.ownerSVGElement) return;
+        var scroller = el.ownerSVGElement.parentElement;
+        if (!scroller || scroller.scrollWidth <= scroller.clientWidth) return;
+        var r = el.getBoundingClientRect();
+        var sr = scroller.getBoundingClientRect();
+        if (r.left < sr.left || r.right > sr.right) {{
+            scroller.scrollLeft += (r.left + r.width / 2) - (sr.left + sr.width / 2);
+        }}
+    }}
+
     function pulseStep(idx) {{
         if (idx < 0 || idx >= totalSteps) return;
         var ids = stepIds[idx] || [];
@@ -860,6 +871,7 @@ class AnimatedTimelineSvgFigure:
             var el = getEl(eid);
             if (el && bright) el.setAttribute("fill", bright);
         }}
+        if (ids.length > 0) scrollToStep(getEl(ids[0]));
         var halos = stepHaloIds[idx] || [];
         for (var i = 0; i < halos.length; i++) {{
             var el = getEl(halos[i]);
@@ -881,8 +893,17 @@ class AnimatedTimelineSvgFigure:
         for (var i = 0; i < totalSteps; i++) revertStep(i);
     }}
 
+    function scrollToStart() {{
+        if (totalSteps === 0) return;
+        var ids = stepIds[0] || [];
+        var el = ids.length > 0 ? getEl(ids[0]) : null;
+        if (el && el.ownerSVGElement && el.ownerSVGElement.parentElement) {{
+            el.ownerSVGElement.parentElement.scrollLeft = 0;
+        }}
+    }}
+
     function onReset() {{ resetAll(); }}
-    function onBeforePlay() {{ resetAll(); }}
+    function onBeforePlay() {{ resetAll(); scrollToStart(); }}
     function onStep(stepIdx) {{ pulseStep(stepIdx); }}
 
     {playback_js}
