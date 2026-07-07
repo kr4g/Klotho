@@ -1,7 +1,9 @@
 // Shape playback controller for animated Klotho shape figures.
 // Python replaces: __WID__, __DUR_MS__, __ENGINE_TYPE__, __RING_TIME__, __TOTAL_GROUPS__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
-// Caller must define: groupNodeIndices, groupEdgeIds, shapeColors,
-//                     allShapeEdgeIds, allNodeIds, dimmedColor, audioPayload
+// Caller must define: audioPayload, shapeColors, and the visual hooks
+//   dimAllNodes(), hideAllShapeEdges(), revealGroupVisual(gi, color)
+// (SVG figures implement the hooks on DOM elements; 3D figures on
+// THREE.js meshes/tubes.)
 
 var toggleBtn = document.getElementById("__WID___toggle");
 var iconEl    = document.getElementById("__WID___icon");
@@ -43,36 +45,11 @@ function updateCounter() {
     if (counterEl) counterEl.textContent = (currentView + 1) + " / " + totalGroups;
 }
 
-function dimAllNodes() {
-    for (var i = 0; i < allNodeIds.length; i++) {
-        var el = document.getElementById(allNodeIds[i]);
-        if (el) el.setAttribute("fill", dimmedColor);
-    }
-}
-function hideAllShapeEdges() {
-    for (var i = 0; i < allShapeEdgeIds.length; i++) {
-        var el = document.getElementById(allShapeEdgeIds[i]);
-        if (el) el.style.display = "none";
-    }
-}
 function revealGroup(gi) {
     dimAllNodes();
     hideAllShapeEdges();
     if (gi < 0 || gi >= totalGroups) return;
-    var col = shapeColors[gi] || "white";
-    var nodeIdxs = groupNodeIndices[gi] || [];
-    for (var i = 0; i < nodeIdxs.length; i++) {
-        var idx = nodeIdxs[i];
-        if (idx >= 0 && idx < allNodeIds.length) {
-            var el = document.getElementById(allNodeIds[idx]);
-            if (el) el.setAttribute("fill", col);
-        }
-    }
-    var edgeIds = groupEdgeIds[gi] || [];
-    for (var i = 0; i < edgeIds.length; i++) {
-        var el = document.getElementById(edgeIds[i]);
-        if (el) el.style.display = "";
-    }
+    revealGroupVisual(gi, shapeColors[gi] || "white");
 }
 function revealAndTrack(gi) {
     currentView = gi;

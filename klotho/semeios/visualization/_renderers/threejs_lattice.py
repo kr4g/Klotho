@@ -10,6 +10,139 @@ from .._shared.svg_utils import SvgFigureData
 _ANIMATION_BRIDGE_JS_PATH = Path(__file__).parents[3] / 'utils' / 'playback' / '_animation_bridge.js'
 _ANIMATION_BRIDGE_JS = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
 
+# Shared click-to-play preview handler for 3D scenes.
+# Requires in scope: sceneData, nodeMeshes, canvas, mouse, raycaster,
+# camera, _klDimmables (array of THREE objects to dim in preview mode).
+# Clicking a node previews its frequency and highlights it for the
+# preview duration while dimming every other node and edge; concurrent
+# clicks keep all still-sounding nodes highlighted.
+THREEJS_CLICK_PREVIEW_JS = """
+(function() {
+    var freqs = sceneData.nodeFreqs || null;
+    if (!freqs) return;
+    var previewCfg = sceneData.previewConfig || {};
+    var previewDur = Number(previewCfg.dur);
+    if (!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
+    var dimmedColor = sceneData.dimmedNodeColor || "#080808";
+
+    var activeTimers = new Map();
+    var savedNodeColors = null;
+    var savedOpacities = null;
+
+    function snapshot() {
+        if (savedNodeColors !== null) return;
+        savedNodeColors = [];
+        for (var i = 0; i < nodeMeshes.length; i++)
+            savedNodeColors[i] = "#" + nodeMeshes[i].material.color.getHexString();
+        savedOpacities = [];
+        for (var j = 0; j < _klDimmables.length; j++) {
+            var m = _klDimmables[j].material;
+            savedOpacities[j] = { transparent: m.transparent, opacity: m.opacity };
+        }
+    }
+    function applyState() {
+        if (activeTimers.size === 0) {
+            if (savedNodeColors !== null) {
+                for (var i = 0; i < nodeMeshes.length; i++)
+                    nodeMeshes[i].material.color.set(savedNodeColors[i]);
+                for (var j = 0; j < _klDimmables.length; j++) {
+                    var m = _klDimmables[j].material;
+                    m.opacity = savedOpacities[j].opacity;
+                    m.transparent = savedOpacities[j].transparent;
+                }
+                savedNodeColors = null;
+                savedOpacities = null;
+            }
+            return;
+        }
+        snapshot();
+        for (var j = 0; j < _klDimmables.length; j++) {
+            var m = _klDimmables[j].material;
+            m.transparent = true;
+            m.opacity = Math.min(m.opacity, savedOpacities[j].opacity * 0.15);
+        }
+        for (var i = 0; i < nodeMeshes.length; i++)
+            nodeMeshes[i].material.color.set(activeTimers.has(i) ? "#ffffff" : dimmedColor);
+    }
+    function activate(idx) {
+        snapshot();
+        if (activeTimers.has(idx)) clearTimeout(activeTimers.get(idx));
+        activeTimers.set(idx, setTimeout(function() {
+            activeTimers.delete(idx);
+            applyState();
+        }, Math.max(1, Math.round(previewDur * 1000))));
+        applyState();
+    }
+    async function playFreq(freq) {
+        if (!freq || freq <= 0) return;
+        try {
+            if (typeof globalThis.KlothoPlaybackBridge !== "function") return;
+            var previewAmp = Number(previewCfg.amp);
+            if (!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
+            var bridge = globalThis.KlothoPlaybackBridge({
+                engine: previewCfg.engine || sceneData.previewEngine || "supersonic",
+                audioPayload: null,
+                ringTime: 5
+            });
+            await bridge.ensureReady();
+            await bridge.resumeAudio();
+            await bridge.preview({
+                freq: freq,
+                dur: previewDur,
+                amp: previewAmp,
+                defName: previewCfg.defName || "kl_tri",
+                pfields: previewCfg.pfields || null
+            });
+        } catch(e) {}
+    }
+    var downX = 0, downY = 0;
+    canvas.addEventListener("pointerdown", function(ev) {
+        downX = ev.clientX; downY = ev.clientY;
+    });
+    canvas.addEventListener("pointerup", function(ev) {
+        var dx = ev.clientX - downX, dy = ev.clientY - downY;
+        if (dx * dx + dy * dy > 9) return;
+        var rect = canvas.getBoundingClientRect();
+        mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        var hits = raycaster.intersectObjects(nodeMeshes, false);
+        if (hits.length > 0) {
+            var idx = hits[0].object.userData.nodeIdx;
+            if (idx >= 0 && idx < freqs.length) {
+                activate(idx);
+                playFreq(freqs[idx]);
+            }
+        }
+    });
+})();
+"""
+
+# Renders sceneData.shapeGroupEdges as per-group colored tubes.
+# Requires in scope: sceneData, scene, makeTube, _klDimmables.
+# Defines shapeEdgeObjs (list of per-group tube arrays) for callers that
+# toggle group visibility (animated shape playback).
+THREEJS_SHAPE_EDGES_JS = """
+    var shapeEdgeObjs = [];
+    (function() {
+        var groups = sceneData.shapeGroupEdges || [];
+        var shapeCols = sceneData.shapeColors || [];
+        for (var gi = 0; gi < groups.length; gi++) {
+            var segs = groups[gi] || [];
+            var objs = [];
+            for (var k = 0; k < segs.length; k++) {
+                var e = segs[k];
+                var tube = makeTube([[e[0], e[1], e[2]], [e[3], e[4], e[5]]],
+                                    0.014, shapeCols[gi] || "#90EE90", 0.85);
+                scene.add(tube);
+                objs.push(tube);
+                _klDimmables.push(tube);
+            }
+            shapeEdgeObjs.push(objs);
+        }
+    })();
+"""
+
 
 class ThreejsLatticeData(SvgFigureData):
     """Container for Three.js 3D lattice scene data and path metadata."""
@@ -138,6 +271,7 @@ def _static_threejs_html(sd):
     var W = {w}, H = {h};
     var scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
+    var _klDimmables = [];
     var camera = new THREE.PerspectiveCamera(50, W / H, 0.01, 1000);
 
     var axCfg = sceneData.axisConfig;
@@ -254,8 +388,10 @@ def _static_threejs_html(sd):
         }}
         var gGeom = new THREE.BufferGeometry();
         gGeom.setAttribute("position", new THREE.BufferAttribute(gVerts, 3));
-        scene.add(new THREE.LineSegments(gGeom,
-            new THREE.LineBasicMaterial({{ color: sceneData.gridEdgeColor }})));
+        var gridLines = new THREE.LineSegments(gGeom,
+            new THREE.LineBasicMaterial({{ color: sceneData.gridEdgeColor }}));
+        scene.add(gridLines);
+        _klDimmables.push(gridLines);
     }}
     if (sceneData.highlightEdges.length > 0) {{
         var hVerts = new Float32Array(sceneData.highlightEdges.length * 6);
@@ -266,8 +402,10 @@ def _static_threejs_html(sd):
         }}
         var hGeom = new THREE.BufferGeometry();
         hGeom.setAttribute("position", new THREE.BufferAttribute(hVerts, 3));
-        scene.add(new THREE.LineSegments(hGeom,
-            new THREE.LineBasicMaterial({{ color: 0xffffff, linewidth: 2 }})));
+        var hlLines = new THREE.LineSegments(hGeom,
+            new THREE.LineBasicMaterial({{ color: 0xffffff, linewidth: 2 }}));
+        scene.add(hlLines);
+        _klDimmables.push(hlLines);
     }}
 
     var sphereR = sceneData.nodeSize * 0.015;
@@ -351,8 +489,12 @@ def _static_threejs_html(sd):
     for (var si = 0; si < pathSteps.length; si++) {{
         var step = pathSteps[si];
         if (!step) continue;
-        scene.add(makeTube(step.polyline, 0.018, 0xffffff, 0.25));
-        scene.add(makeTube(step.polyline, 0.012, step.color, 1.0));
+        var glowTube = makeTube(step.polyline, 0.018, 0xffffff, 0.25);
+        scene.add(glowTube);
+        _klDimmables.push(glowTube);
+        var colTube = makeTube(step.polyline, 0.012, step.color, 1.0);
+        scene.add(colTube);
+        _klDimmables.push(colTube);
         var coneH = 0.12, coneR = 0.04;
         var coneGeo = new THREE.ConeGeometry(coneR, coneH, 8);
         coneGeo.translate(0, coneH/2, 0);
@@ -364,7 +506,10 @@ def _static_threejs_html(sd):
         cone.setRotationFromQuaternion(
             new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), dir));
         scene.add(cone);
+        _klDimmables.push(cone);
     }}
+
+{THREEJS_SHAPE_EDGES_JS}
 
     function makeHaloSprite(hex, size) {{
         var c2 = document.createElement("canvas");
@@ -386,9 +531,11 @@ def _static_threejs_html(sd):
         var sh = makeHaloSprite(haloData.start.color, 0.55);
         sh.position.set(haloData.start.pos[0], haloData.start.pos[1], haloData.start.pos[2]);
         scene.add(sh);
+        _klDimmables.push(sh);
         var eh = makeHaloSprite(haloData.end.color, 0.55);
         eh.position.set(haloData.end.pos[0], haloData.end.pos[1], haloData.end.pos[2]);
         scene.add(eh);
+        _klDimmables.push(eh);
     }}
 
     for (var i = 0; i < pathNodeIndices.length; i++) {{
@@ -434,53 +581,7 @@ def _static_threejs_html(sd):
         canvas.style.cursor = "default";
     }});
 
-    async function _playFreq(freq) {{
-        if (!freq || freq <= 0) return;
-        try {{
-            if (typeof globalThis.KlothoPlaybackBridge !== "function") {{
-                return;
-            }}
-            var previewCfg = sceneData.previewConfig || {{}};
-            var previewDur = Number(previewCfg.dur);
-            if (!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
-            var previewAmp = Number(previewCfg.amp);
-            if (!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
-            var previewSynth = previewCfg.defName || "kl_tri";
-            var previewEngine = previewCfg.engine || sceneData.previewEngine || "supersonic";
-            var bridge = globalThis.KlothoPlaybackBridge({{
-                engine: previewEngine,
-                audioPayload: null,
-                ringTime: 5
-            }});
-            await bridge.ensureReady();
-            await bridge.resumeAudio();
-            await bridge.preview({{
-                freq: freq,
-                dur: previewDur,
-                amp: previewAmp,
-                defName: previewSynth
-            }});
-        }} catch(e) {{}}
-    }}
-    if (_nodeFreqs) {{
-        var _downX = 0, _downY = 0;
-        canvas.addEventListener("pointerdown", function(ev) {{
-            _downX = ev.clientX; _downY = ev.clientY;
-        }});
-        canvas.addEventListener("pointerup", function(ev) {{
-            var dx = ev.clientX - _downX, dy = ev.clientY - _downY;
-            if (dx * dx + dy * dy > 9) return;
-            var rect = canvas.getBoundingClientRect();
-            mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            var hits = raycaster.intersectObjects(nodeMeshes, false);
-            if (hits.length > 0) {{
-                var idx = hits[0].object.userData.nodeIdx;
-                if (idx >= 0 && idx < _nodeFreqs.length) _playFreq(_nodeFreqs[idx]);
-            }}
-        }});
-    }}
+{THREEJS_CLICK_PREVIEW_JS}
 }})();
 </script>
 '''
@@ -492,7 +593,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
                         path_mode, figsize, node_size, title,
                         is_tone_lattice, coord_label, gen_labels,
                         path_cmap='viridis', preview_engine='supersonic',
-                        preview_config=None):
+                        preview_config=None, shape=None):
     """
     Build a Three.js 3D scene for a lattice.
 
@@ -720,8 +821,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
 
         if lattice.dimensionality > 3 and orig_coord is not None:
             orig_str = str(orig_coord).replace(',)', ')')
-            reduced_str = f"({x:.2f}, {y:.2f}, {z:.2f})"
-            hover_text = f"Original: {orig_str}\nReduced: {reduced_str}"
+            hover_text = f"{coord_label}: {orig_str}"
         else:
             hover_text = f"{coord_label}: ({x}, {y}, {z})"
 
@@ -752,6 +852,51 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     for i, p in enumerate(node_positions):
         key = (round(p[0], 6), round(p[1], 6), round(p[2], 6))
         pos_to_node_idx[key] = i
+
+    shape_groups = [list(g) for g in shape] if shape else []
+    shape_group_node_indices = []
+    shape_group_edges = []
+    used_shape_colors = []
+    if shape_groups:
+        from .._shared.colors import SHAPE_COLORS
+        edge_set = set()
+        for u, v in G.edges():
+            edge_set.add((u, v))
+            edge_set.add((v, u))
+
+        def _plot_coord(c):
+            ct = tuple(c) if not isinstance(c, tuple) else c
+            return coord_mapping.get(ct, ct) if lattice.dimensionality > 3 else ct
+
+        shape_node_final = {}
+        for gi, group in enumerate(shape_groups):
+            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
+            used_shape_colors.append(color)
+            group_tuples = [tuple(c) if not isinstance(c, tuple) else c for c in group]
+
+            indices = []
+            for c in group_tuples:
+                px, py, pz = _unpack3(_plot_coord(c))
+                idx = pos_to_node_idx.get((round(px, 6), round(py, 6), round(pz, 6)), -1)
+                indices.append(idx)
+                if idx >= 0:
+                    shape_node_final[idx] = color
+            shape_group_node_indices.append(indices)
+
+            group_edges = []
+            for i, c1 in enumerate(group_tuples):
+                for c2 in group_tuples[i + 1:]:
+                    pc1 = _plot_coord(c1)
+                    pc2 = _plot_coord(c2)
+                    if (pc1, pc2) in edge_set or (pc2, pc1) in edge_set:
+                        x1, y1, z1 = _unpack3(pc1)
+                        x2, y2, z2 = _unpack3(pc2)
+                        group_edges.append([x1, y1, z1, x2, y2, z2])
+            shape_group_edges.append(group_edges)
+
+        for idx, color in shape_node_final.items():
+            if 0 <= idx < len(node_colors):
+                node_colors[idx] = color
 
     path_node_indices = []
     path_node_colors = []
@@ -813,6 +958,9 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         'dimmedNodeColor': dimmed_node_color,
         'pathNodeIndices': path_node_indices,
         'pathNodeColors': path_node_colors,
+        'shapeGroupNodeIndices': shape_group_node_indices,
+        'shapeGroupEdges': shape_group_edges,
+        'shapeColors': used_shape_colors,
         'axisConfig': {
             'xRange': [x_min - pad, x_max + pad],
             'yRange': [y_min - pad, y_max + pad],

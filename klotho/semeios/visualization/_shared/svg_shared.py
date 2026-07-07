@@ -214,11 +214,13 @@ def compute_svg_layout(
     }
 
 
-def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None, preview_config=None):
+def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None, preview_config=None,
+                          dimmed_node_color='#111111'):
     data_json = json.dumps(hover_texts)
     active_json = json.dumps(is_active) if is_active is not None else "null"
     freqs_json = json.dumps(node_freqs) if node_freqs is not None else "null"
     preview_json = json.dumps(preview_config or {})
+    dimmed_json = json.dumps(dimmed_node_color)
 
     return f"""<script type="module">{get_animation_bridge_js()}</script>
 <div id="{svg_uid}_tip" style="
@@ -234,6 +236,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
     var active={active_json};
     var freqs={freqs_json};
     var previewCfg={preview_json};
+    var dimmedColor={dimmed_json};
     var tip=document.getElementById("{svg_uid}_tip");
     if(!tip){{ setTimeout(_klothoTip_{svg_uid},50); return; }}
     var wrap=tip.parentElement;
@@ -241,10 +244,62 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
     var circles=document.querySelectorAll("[data-tip-uid='{svg_uid}']");
     if(!circles.length){{ setTimeout(_klothoTip_{svg_uid},50); return; }}
 
+    var previewDur = Number(previewCfg.dur);
+    if(!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
+
+    // Click-highlight state: while any previewed note is sounding, every
+    // node and edge except the active node(s) is dimmed. Concurrent clicks
+    // keep all still-sounding nodes highlighted; when the last timer
+    // expires the original fills/opacities are restored.
+    var activeTimers = new Map();
+    var savedFills = null;
+    var savedEls = null;
+
+    function _snapshotPreviewState(){{
+        if(savedFills !== null) return;
+        savedFills = [];
+        circles.forEach(function(c,i){{ savedFills[i] = c.getAttribute("fill"); }});
+        savedEls = [];
+        var svg = circles[0].ownerSVGElement;
+        if(svg){{
+            svg.querySelectorAll("line, path, polygon, circle:not([data-tip-uid])").forEach(function(el){{
+                savedEls.push({{ el: el, op: el.getAttribute("opacity") }});
+            }});
+        }}
+    }}
+
+    function _applyPreviewState(){{
+        if(activeTimers.size === 0){{
+            if(savedFills !== null){{
+                circles.forEach(function(c,i){{ c.setAttribute("fill", savedFills[i]); }});
+                savedEls.forEach(function(s){{
+                    if(s.op === null) s.el.removeAttribute("opacity");
+                    else s.el.setAttribute("opacity", s.op);
+                }});
+                savedFills = null;
+                savedEls = null;
+            }}
+            return;
+        }}
+        _snapshotPreviewState();
+        savedEls.forEach(function(s){{ s.el.setAttribute("opacity", "0.15"); }});
+        circles.forEach(function(c,i){{
+            c.setAttribute("fill", activeTimers.has(i) ? "white" : dimmedColor);
+        }});
+    }}
+
+    function _activateNode(idx){{
+        _snapshotPreviewState();
+        if(activeTimers.has(idx)) clearTimeout(activeTimers.get(idx));
+        activeTimers.set(idx, setTimeout(function(){{
+            activeTimers.delete(idx);
+            _applyPreviewState();
+        }}, Math.max(1, Math.round(previewDur * 1000))));
+        _applyPreviewState();
+    }}
+
     async function _playFreq(freq){{
         if(!freq||freq<=0) return;
-        var previewDur = Number(previewCfg.dur);
-        if(!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
         var previewAmp = Number(previewCfg.amp);
         if(!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
         var previewSynth = previewCfg.defName || "kl_tri";
@@ -264,7 +319,8 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
                 freq: freq,
                 dur: previewDur,
                 amp: previewAmp,
-                defName: previewSynth
+                defName: previewSynth,
+                pfields: previewCfg.pfields || null
             }});
         }}catch(e){{}}
     }}
@@ -301,6 +357,7 @@ def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None,
             c.addEventListener("click",function(){{
                 var idx=parseInt(c.getAttribute("data-idx"),10);
                 if(isNaN(idx)||idx<0||idx>=freqs.length) return;
+                _activateNode(idx);
                 _playFreq(freqs[idx]);
             }});
         }}

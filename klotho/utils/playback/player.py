@@ -43,6 +43,17 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
         ``strum``, ``mode``).  For :class:`Score`, ``ring_time`` is
         supported.
 
+        ``inst`` selects the instrument for pitch-like objects
+        (``Pitch``, ``PitchCollection``, ``Scale``, ``Chord``,
+        ``Spectrum``): pass a SynthDef name string (exact match,
+        including Supriya defs registered via
+        :func:`~klotho.utils.playback.supersonic.registry.register_synthdef`)
+        or a ``SynthDefInstrument`` instance. Ignored (like ``dur``)
+        for time-structured objects (``RhythmTree``, ``TemporalUnit``,
+        ``TemporalUnitSequence``, ``TemporalBlock``,
+        ``CompositionalUnit``, ``Score``), whose instruments come from
+        their own structure. SuperSonic engine only.
+
     Returns
     -------
     IPython.display.DisplayHandle or KlothoPlot

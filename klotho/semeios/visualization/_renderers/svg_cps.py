@@ -337,7 +337,8 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
     tooltip_html = render_tooltip_system(uid, hover_texts,
                                          is_active=is_active_list if has_selection else None,
                                          node_freqs=node_freqs if preview_config else None,
-                                         preview_config=preview_config)
+                                         preview_config=preview_config,
+                                         dimmed_node_color=dimmed_node_color)
     svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
     return SvgCPSData(

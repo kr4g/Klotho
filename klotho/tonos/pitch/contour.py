@@ -15,12 +15,19 @@ class Contour:
 
     Parameters
     ----------
-    values : list of int, Sequence, numpy.ndarray, or Contour
-        Sequence of integers representing the contour.
+    values : list of int, Sequence, numpy.ndarray, Contour, or Pattern
+        Sequence of integers representing the contour. A
+        :class:`~klotho.topos.collections.sequences.Pattern` is
+        materialized over one full period (without advancing or
+        disturbing the pattern's iteration state).
 
     Examples
     --------
     >>> contour = Contour([6, 2, 4, 0])
+
+    >>> from klotho.topos import Pattern
+    >>> Contour(Pattern([0, [1, 2]]))
+    Contour([0, 1, 0, 2])
 
     >>> contour + 1
     Contour([7, 3, 5, 1])
@@ -39,6 +46,9 @@ class Contour:
         if isinstance(values, Contour):
             self._values = values._values.copy()
         else:
+            from klotho.topos.collections.sequences import Pattern
+            if isinstance(values, Pattern):
+                values = values.materialize_period()
             self._values = np.asarray(values, dtype=int).flatten()
     
     @classmethod

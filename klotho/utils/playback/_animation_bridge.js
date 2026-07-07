@@ -251,6 +251,7 @@
       var dur = Number(params.dur);
       if (!Number.isFinite(dur) || dur <= 0) dur = 1.0;
       var defName = (params.defName || "kl_tri") + "";
+      var pfields = (params.pfields && typeof params.pfields === "object") ? params.pfields : null;
 
       if (engine === "supersonic") {
         var ready = await _ensureSSReady();
@@ -263,8 +264,18 @@
         // release tail. This keeps click-to-play independent of whether
         // a SuperSonic ``play()`` widget has injected ``__klothoManifest``.
         var nodeId = _ssSonic.nextNodeId();
-        _ssSonic.send("/s_new", defName, nodeId, 0, 0,
-                      "freq", freq, "amp", amp, "gate", 1);
+        var args = ["/s_new", defName, nodeId, 0, 0,
+                    "freq", freq, "amp", amp, "gate", 1];
+        if (pfields) {
+          for (var k in pfields) {
+            if (!Object.prototype.hasOwnProperty.call(pfields, k)) continue;
+            if (k === "freq" || k === "amp" || k === "gate") continue;
+            var v = Number(pfields[k]);
+            if (!Number.isFinite(v)) continue;
+            args.push(k, v);
+          }
+        }
+        _ssSonic.send.apply(_ssSonic, args);
         setTimeout(function() {
           try { _ssSonic.send("/n_set", nodeId, "gate", 0); } catch(_) {}
         }, Math.max(1, Math.round(dur * 1000)));

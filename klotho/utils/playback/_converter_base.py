@@ -19,7 +19,62 @@ DEFAULT_DRUM_FREQ = 110.0
 KNOWN_KWARGS = frozenset({
     'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
     'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time', 'pause',
+    'inst',
 })
+
+
+def resolve_instrument(inst):
+    """Resolve an ``inst`` playback argument to ``(defName, default_pfields, has_gate)``.
+
+    Accepts either a SynthDef name string (exact match against the
+    SuperSonic manifest, which includes any runtime-registered Supriya
+    defs) or an ``Instrument`` instance carrying a ``defName`` (in
+    practice a ``SynthDefInstrument``).
+
+    Parameters
+    ----------
+    inst : None, str, or Instrument
+        ``None`` leaves synth selection to the caller's defaults.
+
+    Returns
+    -------
+    tuple[str | None, dict, bool]
+        ``(defName, default_pfields, has_gate)``.
+
+    Raises
+    ------
+    ValueError
+        If a string name is not registered (exact match only; no
+        ``kl_``/``fd_`` prefix fallback, so user-registered names can
+        never be shadowed by builtins).
+    TypeError
+        If given an object without a usable ``defName``.
+    """
+    if inst is None:
+        return None, {}, True
+
+    from klotho.thetos.instruments._shared import load_ss_manifest
+
+    if isinstance(inst, str):
+        manifest = load_ss_manifest()
+        if inst not in manifest:
+            available = ', '.join(sorted(manifest.keys()))
+            raise ValueError(
+                f"Unknown SynthDef name {inst!r}. Names must match exactly "
+                f"(no prefix fallback). Available: {available}"
+            )
+        controls = dict(manifest[inst])
+        return inst, controls, 'gate' in controls
+
+    def_name = getattr(inst, 'defName', None)
+    if def_name is None:
+        raise TypeError(
+            f"inst must be a SynthDef name string or an Instrument with a "
+            f"defName (e.g. SynthDefInstrument); got {type(inst).__name__}"
+        )
+    pfields = dict(getattr(inst, 'pfields', {}) or {})
+    has_gate = bool(getattr(inst, 'has_gate', 'gate' in pfields))
+    return def_name, pfields, has_gate
 
 
 def freq_to_midi(freq):
@@ -81,6 +136,7 @@ def extract_convert_kwargs(kwargs):
         'bpm': kwargs.get('bpm', None),
         'amp': kwargs.get('amp', None),
         'pause': kwargs.get('pause', None),
+        'inst': kwargs.get('inst', None),
         'extra_pfields': extra if extra else None,
     }
 

@@ -14,6 +14,9 @@ from .base import (
     build_nav_controls_html, build_scripts_html, build_playback_js,
     build_shape_playback_js,
 )
+from .._renderers.threejs_lattice import (
+    THREEJS_CLICK_PREVIEW_JS, THREEJS_SHAPE_EDGES_JS,
+)
 
 
 def _maybe_convert_payload(audio_payload, engine):
@@ -59,6 +62,59 @@ class AnimatedLattice3dFigure:
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
 
+    def _nav_html(self, wid):
+        return ""
+
+    def _controller_js(self, wid, eng):
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng,
+                                        ring_time=self.ring_time, loop=self.loop)
+        return '''
+    var totalSteps = pathSteps.length;
+
+    function hideAllPath() {
+        for (var i = 0; i < stepGroups.length; i++) {
+            var g = stepGroups[i];
+            if (g) { for (var j = 0; j < g.length; j++) g[j].visible = false; }
+        }
+        if (startHalo) startHalo.visible = false;
+        if (endHalo) endHalo.visible = false;
+        dimAllNodes();
+    }
+
+    function showAllPath() {
+        for (var i = 0; i < stepGroups.length; i++) {
+            var g = stepGroups[i];
+            if (g) { for (var j = 0; j < g.length; j++) g[j].visible = true; }
+        }
+        if (startHalo) startHalo.visible = true;
+        if (endHalo) endHalo.visible = true;
+        highlightAllPathNodes();
+    }
+
+    function revealStep(stepIdx) {
+        if (stepIdx === 0) {
+            hideAllPath();
+            if (startHalo) startHalo.visible = true;
+            highlightNodeAt(0);
+            return;
+        }
+        var edgeIdx = stepIdx - 1;
+        if (edgeIdx >= 0 && edgeIdx < stepGroups.length) {
+            var g = stepGroups[edgeIdx];
+            if (g) { for (var j = 0; j < g.length; j++) g[j].visible = true; }
+        }
+        highlightNodeAt(stepIdx);
+        if (stepIdx >= totalSteps && endHalo) {
+            endHalo.visible = true;
+        }
+    }
+
+    function onReset() { showAllPath(); }
+    function onBeforePlay() { hideAllPath(); }
+    function onStep(stepIdx) { revealStep(stepIdx); }
+
+''' + playback_js
+
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.scene_data
@@ -70,6 +126,7 @@ class AnimatedLattice3dFigure:
             include_threejs=True,
             engine=eng)
         controls_html = build_control_bar_html(wid)
+        nav_html = self._nav_html(wid)
         scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
                                           needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
@@ -87,7 +144,7 @@ class AnimatedLattice3dFigure:
         orbit_cdn = THREEJS_ORBIT_CDN
         trackball_cdn = THREEJS_TRACKBALL_CDN
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time, loop=self.loop)
+        controller_js = self._controller_js(wid, eng)
 
         html = f'''
 {cdn_html}
@@ -130,6 +187,7 @@ class AnimatedLattice3dFigure:
     </div>
 </div>
 {controls_html}
+{nav_html}
 {scripts_html}
 <script type="module">
 (function _klotho3dInit() {{
@@ -180,6 +238,7 @@ class AnimatedLattice3dFigure:
 
     var scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
+    var _klDimmables = [];
 
     var camera = new THREE.PerspectiveCamera(50, W / H, 0.01, 1000);
 
@@ -299,7 +358,9 @@ class AnimatedLattice3dFigure:
         var gGeom = new THREE.BufferGeometry();
         gGeom.setAttribute("position", new THREE.BufferAttribute(gVerts, 3));
         var gMat = new THREE.LineBasicMaterial({{ color: sceneData.gridEdgeColor }});
-        scene.add(new THREE.LineSegments(gGeom, gMat));
+        var gridLines = new THREE.LineSegments(gGeom, gMat);
+        scene.add(gridLines);
+        _klDimmables.push(gridLines);
     }}
 
     if (sceneData.highlightEdges.length > 0) {{
@@ -312,7 +373,9 @@ class AnimatedLattice3dFigure:
         var hGeom = new THREE.BufferGeometry();
         hGeom.setAttribute("position", new THREE.BufferAttribute(hVerts, 3));
         var hMat = new THREE.LineBasicMaterial({{ color: 0xffffff, linewidth: 2 }});
-        scene.add(new THREE.LineSegments(hGeom, hMat));
+        var hlLines = new THREE.LineSegments(hGeom, hMat);
+        scene.add(hlLines);
+        _klDimmables.push(hlLines);
     }}
 
     var nodeCount = sceneData.nodes.length;
@@ -427,11 +490,13 @@ class AnimatedLattice3dFigure:
         glowTube.visible = true;
         scene.add(glowTube);
         group.push(glowTube);
+        _klDimmables.push(glowTube);
 
         var colTube = makeTube(pts, 0.012, step.color, 1.0);
         colTube.visible = true;
         scene.add(colTube);
         group.push(colTube);
+        _klDimmables.push(colTube);
 
         var coneH = 0.12, coneR = 0.04;
         var coneGeo = new THREE.ConeGeometry(coneR, coneH, 8);
@@ -445,9 +510,12 @@ class AnimatedLattice3dFigure:
         cone.visible = true;
         scene.add(cone);
         group.push(cone);
+        _klDimmables.push(cone);
 
         stepGroups.push(group);
     }}
+
+{THREEJS_SHAPE_EDGES_JS}
 
     function makeHaloSprite(hex, size) {{
         var c2 = document.createElement("canvas");
@@ -473,11 +541,13 @@ class AnimatedLattice3dFigure:
         startHalo.position.set(haloData.start.pos[0], haloData.start.pos[1], haloData.start.pos[2]);
         startHalo.visible = true;
         scene.add(startHalo);
+        _klDimmables.push(startHalo);
 
         endHalo = makeHaloSprite(haloData.end.color, 0.55);
         endHalo.position.set(haloData.end.pos[0], haloData.end.pos[1], haloData.end.pos[2]);
         endHalo.visible = true;
         scene.add(endHalo);
+        _klDimmables.push(endHalo);
     }}
 
     if (pathNodeIndices.length > 0) highlightAllPathNodes();
@@ -525,99 +595,9 @@ class AnimatedLattice3dFigure:
         canvas.style.cursor = "default";
     }});
 
-    async function _playFreq3d(freq) {{
-        if (!freq || freq <= 0) return;
-        try {{
-            if (typeof globalThis.KlothoPlaybackBridge !== "function") {{
-                return;
-            }}
-            var previewCfg = sceneData.previewConfig || {{}};
-            var previewDur = Number(previewCfg.dur);
-            if (!Number.isFinite(previewDur) || previewDur <= 0) previewDur = 1.0;
-            var previewAmp = Number(previewCfg.amp);
-            if (!Number.isFinite(previewAmp) || previewAmp <= 0) previewAmp = 0.3;
-            var previewSynth = previewCfg.defName || "kl_tri";
-            var previewEngine = previewCfg.engine || sceneData.previewEngine || "{eng}";
-            var bridge = globalThis.KlothoPlaybackBridge({{
-                engine: previewEngine,
-                audioPayload: null,
-                ringTime: 5
-            }});
-            await bridge.ensureReady();
-            await bridge.resumeAudio();
-            await bridge.preview({{
-                freq: freq,
-                dur: previewDur,
-                amp: previewAmp,
-                defName: previewSynth
-            }});
-        }} catch(e) {{}}
-    }}
-    if (_nodeFreqs3d) {{
-        var _dX3d = 0, _dY3d = 0;
-        canvas.addEventListener("pointerdown", function(ev) {{
-            _dX3d = ev.clientX; _dY3d = ev.clientY;
-        }});
-        canvas.addEventListener("pointerup", function(ev) {{
-            var dx = ev.clientX - _dX3d, dy = ev.clientY - _dY3d;
-            if (dx * dx + dy * dy > 9) return;
-            var rect = canvas.getBoundingClientRect();
-            mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            var hits = raycaster.intersectObjects(nodeMeshes, false);
-            if (hits.length > 0) {{
-                var idx = hits[0].object.userData.nodeIdx;
-                if (idx >= 0 && idx < _nodeFreqs3d.length) _playFreq3d(_nodeFreqs3d[idx]);
-            }}
-        }});
-    }}
+{THREEJS_CLICK_PREVIEW_JS}
 
-    var totalSteps = pathSteps.length;
-
-    function hideAllPath() {{
-        for (var i = 0; i < stepGroups.length; i++) {{
-            var g = stepGroups[i];
-            if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = false; }}
-        }}
-        if (startHalo) startHalo.visible = false;
-        if (endHalo) endHalo.visible = false;
-        dimAllNodes();
-    }}
-
-    function showAllPath() {{
-        for (var i = 0; i < stepGroups.length; i++) {{
-            var g = stepGroups[i];
-            if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = true; }}
-        }}
-        if (startHalo) startHalo.visible = true;
-        if (endHalo) endHalo.visible = true;
-        highlightAllPathNodes();
-    }}
-
-    function revealStep(stepIdx) {{
-        if (stepIdx === 0) {{
-            hideAllPath();
-            if (startHalo) startHalo.visible = true;
-            highlightNodeAt(0);
-            return;
-        }}
-        var edgeIdx = stepIdx - 1;
-        if (edgeIdx >= 0 && edgeIdx < stepGroups.length) {{
-            var g = stepGroups[edgeIdx];
-            if (g) {{ for (var j = 0; j < g.length; j++) g[j].visible = true; }}
-        }}
-        highlightNodeAt(stepIdx);
-        if (stepIdx >= totalSteps && endHalo) {{
-            endHalo.visible = true;
-        }}
-    }}
-
-    function onReset() {{ showAllPath(); }}
-    function onBeforePlay() {{ hideAllPath(); }}
-    function onStep(stepIdx) {{ revealStep(stepIdx); }}
-
-    {playback_js}
+{controller_js}
 }})();
 </script>
 '''
@@ -1137,6 +1117,34 @@ class _AnimatedShapeFigureBase:
     var dimmedColor = "{dimmed_color}";
     var audioPayload = {payload_json};
 
+    function dimAllNodes() {{
+        for (var i = 0; i < allNodeIds.length; i++) {{
+            var el = document.getElementById(allNodeIds[i]);
+            if (el) el.setAttribute("fill", dimmedColor);
+        }}
+    }}
+    function hideAllShapeEdges() {{
+        for (var i = 0; i < allShapeEdgeIds.length; i++) {{
+            var el = document.getElementById(allShapeEdgeIds[i]);
+            if (el) el.style.display = "none";
+        }}
+    }}
+    function revealGroupVisual(gi, col) {{
+        var nodeIdxs = groupNodeIndices[gi] || [];
+        for (var i = 0; i < nodeIdxs.length; i++) {{
+            var idx = nodeIdxs[i];
+            if (idx >= 0 && idx < allNodeIds.length) {{
+                var el = document.getElementById(allNodeIds[idx]);
+                if (el) el.setAttribute("fill", col);
+            }}
+        }}
+        var edgeIds = groupEdgeIds[gi] || [];
+        for (var i = 0; i < edgeIds.length; i++) {{
+            var el = document.getElementById(edgeIds[i]);
+            if (el) el.style.display = "";
+        }}
+    }}
+
     {shape_js}
 }})();
 </script>
@@ -1144,8 +1152,119 @@ class _AnimatedShapeFigureBase:
         return html
 
 
+class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
+    """Animated Three.js 3D figure for chord / chord-sequence shape playback.
+
+    Reuses the 3D lattice scene scaffolding (grid, nodes, tooltips,
+    click-preview) and drives shape-group playback: each group's nodes
+    and edges highlight in the group's color while all others dim,
+    with prev/next navigation and solo mode matching the 2D shape
+    figure.
+
+    Parameters
+    ----------
+    scene_data : ThreejsLatticeData
+        Scene descriptor carrying ``shapeGroupNodeIndices``,
+        ``shapeGroupEdges``, and ``shapeColors``.
+    audio_payload : dict or None, optional
+        Engine event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps.
+    """
+
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None,
+                 ring_time=5, loop=False):
+        super().__init__(scene_data, audio_payload=audio_payload, dur=dur,
+                         engine=engine, ring_time=ring_time, loop=loop)
+        self.widget_id = f"klotho_3dshp_{uuid.uuid4().hex[:8]}"
+        groups = scene_data.scene_data.get('shapeGroupNodeIndices') or []
+        self.total_groups = max(1, len(groups))
+
+    def _nav_html(self, wid):
+        display = "inline-flex" if self.total_groups > 1 else "none"
+        return build_nav_controls_html(wid, self.total_groups, display=display)
+
+    def _controller_js(self, wid, eng):
+        shape_js = build_shape_playback_js(
+            wid, self.dur * 1000, self.total_groups,
+            engine=eng, ring_time=self.ring_time, loop=self.loop)
+        return '''
+    var groupNodeIndices = sceneData.shapeGroupNodeIndices || [];
+    var shapeColors = sceneData.shapeColors || [];
+    var _shapeDimColor = new THREE.Color(sceneData.dimmedNodeColor || "#080808");
+
+    function dimAllNodes() {
+        for (var i = 0; i < nodeMeshes.length; i++)
+            nodeMeshes[i].material.color.copy(_shapeDimColor);
+    }
+    function hideAllShapeEdges() {
+        for (var g = 0; g < shapeEdgeObjs.length; g++) {
+            var objs = shapeEdgeObjs[g];
+            for (var j = 0; j < objs.length; j++) objs[j].visible = false;
+        }
+    }
+    function revealGroupVisual(gi, col) {
+        var idxs = groupNodeIndices[gi] || [];
+        for (var i = 0; i < idxs.length; i++) {
+            var ix = idxs[i];
+            if (ix >= 0 && ix < nodeMeshes.length) nodeMeshes[ix].material.color.set(col);
+        }
+        var objs = shapeEdgeObjs[gi] || [];
+        for (var j = 0; j < objs.length; j++) objs[j].visible = true;
+    }
+
+''' + shape_js
+
+
 AnimatedCPSShapeFigure = _AnimatedShapeFigureBase
 """Alias for ``_AnimatedShapeFigureBase`` used for CPS shape animations."""
 
 AnimatedLatticeShapeFigure = _AnimatedShapeFigureBase
 """Alias for ``_AnimatedShapeFigureBase`` used for lattice shape animations."""
+
+
+class ClickPreviewFigure:
+    """Static figure wrapper that makes click-to-play actually audible.
+
+    Bare / nodes-only plots have no animated playback controls, but when
+    ``.play()`` is called they still expose click-to-play previews.  The
+    preview sends ``/s_new <defName>`` to the SuperSonic engine, which
+    silently fails unless the SynthDef bytes have been loaded on the
+    page — something only the animated figures' script preamble used to
+    do.  This wrapper prepends the same session preamble and synthdef
+    loader scripts (scoped to the preview's defName) to the static
+    figure's HTML.
+
+    Parameters
+    ----------
+    inner : SvgFigureData or ThreejsLatticeData
+        The static figure to display.
+    def_name : str, optional
+        SynthDef used by the click preview (default ``'kl_tri'``).
+    engine : str or None, optional
+        Audio engine; defaults to the session engine.
+    """
+
+    def __init__(self, inner, def_name='kl_tri', engine=None):
+        self.inner = inner
+        self.def_name = def_name or 'kl_tri'
+        self.engine = engine or get_audio_engine()
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def to_html(self, **kwargs):
+        eng = self.engine
+        include_threejs = hasattr(self.inner, 'scene_data')
+        cdn_html, instruments_js, player_js = build_session_preamble(
+            include_tone=(eng == "tone"),
+            include_threejs=include_threejs,
+            engine=eng)
+        scripts_html = build_scripts_html(
+            instruments_js, player_js, engine=eng,
+            needed_synthdefs={self.def_name})
+        return f'''
+{cdn_html}
+{scripts_html}
+{self.inner.to_html()}
+'''

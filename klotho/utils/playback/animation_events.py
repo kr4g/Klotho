@@ -70,14 +70,14 @@ def _tone_payload_from_plan(plan, extra_pfields=None, pause=0.0):
     return {"events": events, "instruments": {}, "_engine": "tone", "pause": max(0.0, float(pause or 0.0))}
 
 
-def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0):
+def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0, def_name=None):
     events = []
     counter = 0
 
     for ev in plan:
         uid = f"a{counter}"
         counter += 1
-        synth = "kl_kicktone" if ev["instrument"] == "membrane" else "kl_tri"
+        synth = "kl_kicktone" if ev["instrument"] == "membrane" else (def_name or "kl_tri")
 
         if ev["instrument"] == "membrane":
             pfields = _merged_pfields(
@@ -120,15 +120,15 @@ def build_shape_audio_events(freq_groups, dur, arp=False, strum=0, direction='u'
     return _tone_payload_from_plan(plan, extra_pfields=None, pause=0.25)
 
 
-def build_path_engine_payload(freqs, dur, engine, amp=None, extra_pfields=None, pause=0.0):
+def build_path_engine_payload(freqs, dur, engine, amp=None, extra_pfields=None, pause=0.0, def_name=None):
     plan = _plan_from_path(freqs, dur, amp=amp, pause=pause)
     if engine == "supersonic":
-        return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause)
+        return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause, def_name=def_name)
     return _tone_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause)
 
 
-def build_shape_engine_payload(freq_groups, dur, engine, arp=False, strum=0, direction='u', amp=None, extra_pfields=None, pause=0.25):
+def build_shape_engine_payload(freq_groups, dur, engine, arp=False, strum=0, direction='u', amp=None, extra_pfields=None, pause=0.25, def_name=None):
     plan = _plan_from_shape(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp, pause=pause)
     if engine == "supersonic":
-        return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause)
+        return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause, def_name=def_name)
     return _tone_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause)

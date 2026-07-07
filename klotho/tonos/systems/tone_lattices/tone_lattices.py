@@ -194,6 +194,18 @@ class ToneLattice(Lattice):
             ]
         )
         self._generator_symbols = sp.symbols(f"y0:{len(self._generators)}", integer=True)
+
+        equave_factors = to_factors(equave)
+        self._augmented_basis_primes = sorted(basis_primes | set(equave_factors.keys()))
+        self._augmented_matrix = sp.Matrix(
+            [
+                [factors.get(p, 0) for factors in self._generator_factors]
+                + [equave_factors.get(p, 0)]
+                for p in self._augmented_basis_primes
+            ]
+        )
+        self._augmented_symbols = sp.symbols(f"z0:{len(self._generators) + 1}", integer=True)
+
         self._is_monzo_basis = (
             len(self._generators) > 0
             and all(g.denominator == 1 and isprime(int(g)) for g in self._generators)
@@ -213,6 +225,23 @@ class ToneLattice(Lattice):
                 interval *= equave
             while interval >= equave:
                 interval /= equave
+        return interval
+
+    def _canonical_class(self, interval: Union[int, float, Fraction, str]) -> Fraction:
+        """Canonical equave-class representative in ``[1, equave)``.
+
+        Unlike ``_custom_equave_reduce`` with ``bipolar=True`` (whose
+        window ``(1/equave, equave)`` spans two equaves and therefore has
+        two fixed points per class, e.g. ``16/15`` and ``8/15``), this
+        reduction is canonical: two ratios reduce to the same value iff
+        they differ by a power of the equave.
+        """
+        interval = Fraction(interval)
+        equave = self._equave
+        while interval < 1:
+            interval *= equave
+        while interval >= equave:
+            interval /= equave
         return interval
         
     def _populate_missing_ratio_data(self, coords: Optional[List[Tuple[int, ...]]] = None):
@@ -268,16 +297,28 @@ class ToneLattice(Lattice):
             ratio = self._coord_to_ratio(coord)
         return ratio
     
+    def _match_key(self, ratio: Fraction) -> Fraction:
+        """Index/lookup key for ratio matching.
+
+        With ``equave_reduce`` enabled, ratios match by equave class
+        (canonical ``[1, equave)`` representative) so e.g. ``16/15``
+        finds the coordinate whose represented ratio is ``8/15``.
+        Without equave reduction, ratios must match exactly.
+        """
+        if self._equave_reduce:
+            return self._canonical_class(ratio)
+        return ratio
+
     def _sorted_matches_for_ratio(self, ratio: Fraction) -> List[Tuple[int, ...]]:
         if self._ratio_match_index is None:
             ratio_index: dict[Fraction, List[Tuple[int, ...]]] = {}
             for coord in self.coords:
                 coord_ratio = self._coord_to_ratio(coord)
-                ratio_index.setdefault(coord_ratio, []).append(coord)
+                ratio_index.setdefault(self._match_key(coord_ratio), []).append(coord)
             for coords in ratio_index.values():
                 coords.sort(key=lambda c: (sum(abs(v) for v in c), c))
             self._ratio_match_index = ratio_index
-        return self._ratio_match_index.get(ratio, [])
+        return self._ratio_match_index.get(self._match_key(ratio), [])
 
     def _warn_lookup(self, message: str, warn_once: bool) -> None:
         if warn_once and message in self._warned_lookup_messages:
@@ -288,13 +329,27 @@ class ToneLattice(Lattice):
 
     def _direct_coordinate_for_ratio(self, ratio: Fraction) -> Tuple[int, ...]:
         ratio_factors = to_factors(ratio)
-        missing_primes = [p for p, e in ratio_factors.items() if e != 0 and p not in self._basis_primes]
+
+        if self._equave_reduce:
+            # Solve modulo the equave: augment the generator basis with an
+            # extra equave column, so ratios containing equave primes
+            # (e.g. 2 in 16/15 with a (3,5) basis) still resolve. The
+            # equave exponent is solved for and then discarded.
+            basis_primes = self._augmented_basis_primes
+            matrix = self._augmented_matrix
+            symbols = self._augmented_symbols
+        else:
+            basis_primes = self._basis_primes
+            matrix = self._generator_matrix
+            symbols = self._generator_symbols
+
+        missing_primes = [p for p, e in ratio_factors.items() if e != 0 and p not in basis_primes]
         if missing_primes:
             raise ValueError(
                 f"ratio contains primes not present in prime_basis: {sorted(missing_primes)}"
             )
-        x = sp.Matrix([ratio_factors.get(p, 0) for p in self._basis_primes])
-        solutions = sp.linsolve((self._generator_matrix, x), self._generator_symbols)
+        x = sp.Matrix([ratio_factors.get(p, 0) for p in basis_primes])
+        solutions = sp.linsolve((matrix, x), symbols)
         if not solutions:
             raise ValueError("ratio is not representable with provided generators")
         solution = next(iter(solutions))
@@ -334,6 +389,16 @@ class ToneLattice(Lattice):
         tuple[int, ...] | list[tuple[int, ...]] | None
             Coordinate result according to ``lookup`` mode, or ``None`` when
             unresolved.
+
+        Notes
+        -----
+        When ``equave_reduce`` is enabled, matching is performed by
+        equave-equivalence class: ratios that differ only by powers of
+        the equave resolve to the same coordinate(s). The returned
+        coordinate's ``get_ratio()`` may therefore print a different
+        equave representative of the query (e.g. querying ``16/15`` in a
+        bipolar 3x5 lattice returns the coordinate whose represented
+        ratio is ``8/15``).
         """
         if lookup not in ("first", "unique", "all"):
             raise ValueError("lookup must be one of: 'first', 'unique', 'all'")
@@ -346,7 +411,8 @@ class ToneLattice(Lattice):
         direct_coord: Optional[Tuple[int, ...]] = None
         try:
             candidate_coord = self._direct_coordinate_for_ratio(ratio)
-            if candidate_coord in self and self._coord_to_ratio(candidate_coord) == ratio:
+            if (candidate_coord in self
+                    and self._match_key(self._coord_to_ratio(candidate_coord)) == self._match_key(ratio)):
                 direct_coord = candidate_coord
             else:
                 reason = (
@@ -415,6 +481,11 @@ class ToneLattice(Lattice):
         """Plot label for coordinates: ``Monzo`` for pure prime bases, else ``Coordinate``."""
         return "Monzo" if self._is_monzo_basis else "Coordinate"
     
+    @property
+    def equave(self) -> Fraction:
+        """The equivalence interval used for equave reduction."""
+        return self._equave
+
     @property
     def equave_reduce(self) -> bool:
         """Whether this lattice applies equave reduction to represented ratios."""

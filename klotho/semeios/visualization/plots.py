@@ -9,6 +9,7 @@ from klotho.chronos.temporal_units import TemporalUnit, TemporalUnitSequence, Te
 from klotho.tonos.systems.combination_product_sets import CombinationProductSet, MasterSet
 from klotho.tonos.scales import Scale
 from klotho.tonos.chords import Chord, Voicing
+from klotho.tonos.pitch import Contour
 
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
@@ -118,6 +119,8 @@ def plot(obj, **kwargs):
             return _show(_plot_dynamic_range(obj, **kwargs))
         case Envelope():
             return _show(_plot_envelope(obj, **kwargs))
+        case Contour():
+            return _show(_plot_contour(obj, **kwargs))
         case Pattern():
             return _show(plot_pattern(obj, **kwargs))
         case CompositionalUnit():
@@ -1898,6 +1901,76 @@ def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True
     
     plt.tight_layout()
     
+    if output_file:
+        plt.savefig(output_file, bbox_inches='tight', facecolor='black')
+        plt.close()
+    else:
+        plt.show()
+
+
+def _plot_contour(contour: Contour, figsize=(12, 4), title: str = None,
+                  output_file: str = None):
+    """
+    Render a Contour as a pianoroll-style step diagram.
+
+    Each contour step is drawn as a horizontal bar of equal width along
+    the x-axis at its integer value on the y-axis, resembling a MIDI
+    pianoroll.
+
+    Parameters
+    ----------
+    contour : Contour
+        Contour instance to visualize.
+    figsize : tuple of float, optional
+        Width and height of the figure in inches.
+    title : str or None, optional
+        Plot title.  Defaults to ``"Contour"``.
+    output_file : str or None, optional
+        Path to save the figure.  Displays the plot when ``None``.
+    """
+    values = contour.values
+    n = len(values)
+
+    fig = plt.figure(figsize=figsize)
+    ax = plt.gca()
+
+    ax.set_facecolor('black')
+    fig.set_facecolor('black')
+
+    bar_height = 0.6
+    for i, v in enumerate(values):
+        ax.add_patch(plt.Rectangle((i, v - bar_height / 2), 1, bar_height,
+                                   facecolor='#e6e6e6', edgecolor='white',
+                                   linewidth=0.5))
+
+    if n > 0:
+        v_min, v_max = min(values), max(values)
+    else:
+        v_min, v_max = 0, 0
+
+    ax.set_xlim(0, max(n, 1))
+    ax.set_ylim(v_min - 1, v_max + 1)
+    ax.set_yticks(range(int(v_min), int(v_max) + 1))
+    ax.set_xticks(range(0, max(n, 1) + 1))
+
+    if title is None:
+        title = "Contour"
+
+    ax.set_title(title, color='white', fontsize=14)
+    ax.set_xlabel('Step', color='white', fontsize=12)
+    ax.set_ylabel('Value', color='white', fontsize=12)
+
+    for spine in ax.spines.values():
+        spine.set_color('white')
+
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+
+    ax.grid(color='#555555', linestyle='-', linewidth=0.5, alpha=0.5)
+    ax.set_axisbelow(True)
+
+    plt.tight_layout()
+
     if output_file:
         plt.savefig(output_file, bbox_inches='tight', facecolor='black')
         plt.close()

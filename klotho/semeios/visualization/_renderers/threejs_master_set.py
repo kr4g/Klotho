@@ -1,12 +1,12 @@
 from .threejs_lattice import ThreejsLatticeData
-from .._shared.colors import _path_color_array, _rgba_to_hex
+from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 
 
 def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
                            show_labels=True, title=None, override_positions=None,
                            preview_engine='supersonic', preview_config=None,
                            nodes=None, path=None, path_cmap='viridis',
-                           mute_background=False):
+                           mute_background=False, shape=None):
     """
     Build a Three.js 3D scene for a MasterSet.
 
@@ -59,7 +59,9 @@ def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
     has_path = path and len(path) >= 2
     highlight_set = set(nodes) if nodes else set()
     path_set = set(path) if path else set()
-    has_selection = bool(highlight_set) or has_path
+    shape_groups = [list(g) for g in shape] if shape else []
+    has_shape = len(shape_groups) > 0
+    has_selection = bool(highlight_set) or has_path or has_shape
     use_dimmed = mute_background and has_selection
 
     def _as_xyz(p):
@@ -127,6 +129,41 @@ def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
         hover_data = ['(empty)']
         node_freqs = [ref_freq]
         is_active_list = [True]
+
+    shape_group_node_indices = []
+    shape_group_edges = []
+    used_shape_colors = []
+    if has_shape:
+        edge_lookup = set()
+        for fr, to in edge_pairs:
+            edge_lookup.add((fr, to))
+            edge_lookup.add((to, fr))
+
+        shape_node_final = {}
+        for gi, group in enumerate(shape_groups):
+            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
+            used_shape_colors.append(color)
+            indices = []
+            for label in group:
+                idx = label_to_idx.get(label, -1)
+                indices.append(idx)
+                if idx >= 0:
+                    shape_node_final[idx] = color
+            shape_group_node_indices.append(indices)
+
+            group_edges = []
+            for i, l1 in enumerate(group):
+                for l2 in group[i + 1:]:
+                    if (l1, l2) in edge_lookup and l1 in positions and l2 in positions:
+                        x1, y1, z1 = _as_xyz(positions[l1])
+                        x2, y2, z2 = _as_xyz(positions[l2])
+                        group_edges.append([x1, y1, z1, x2, y2, z2])
+            shape_group_edges.append(group_edges)
+
+        for idx, color in shape_node_final.items():
+            if 0 <= idx < len(node_colors):
+                node_colors[idx] = color
+                is_active_list[idx] = True
 
     path_steps = []
     halo_data = None
@@ -197,6 +234,9 @@ def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
         'dimmedNodeColor': dimmed_color_hex,
         'pathNodeIndices': path_node_indices,
         'pathNodeColors': path_node_colors,
+        'shapeGroupNodeIndices': shape_group_node_indices,
+        'shapeGroupEdges': shape_group_edges,
+        'shapeColors': used_shape_colors,
         'hoverData': hover_data,
         'nodeFreqs': node_freqs if preview_config else None,
         'isActive': is_active_list if has_selection else None,

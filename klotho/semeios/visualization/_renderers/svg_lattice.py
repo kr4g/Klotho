@@ -1,14 +1,11 @@
-import math
 import numpy as np
-from collections import defaultdict
 from html import escape as html_escape
 
-from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
-from .._shared.svg_utils import (
-    SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
-    svg_glow_edge, svg_path_edge, compute_quadratic_bezier_midpoint,
+from .._shared.colors import _rgba_to_hex
+from .._shared.svg_utils import SvgFigureData, svg_wrap
+from .._shared.svg_shared import (
+    render_tooltip_system, render_path_edges, render_shape_groups,
 )
-from .._shared.svg_shared import render_tooltip_system
 
 
 class SvgLatticeData(SvgFigureData):
@@ -293,123 +290,44 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                     except Exception:
                         continue
 
+    def _plot_key(coord):
+        """Map a lattice coordinate to its plot-space key, or None."""
+        if lattice.dimensionality > 3:
+            if coord not in coord_mapping:
+                return None
+            return coord_mapping[coord]
+        return coord
+
     path_els = []
     step_group_ids = []
     halo_ids = []
     all_path_el_ids = []
-    base_arc_offset = 0.15
-    n_bezier_points = 20
+    colors = None
 
     if path and len(path) >= 2:
-        colors = _path_color_array(path_cmap, len(path) - 1)
-        edge_counts = defaultdict(int)
+        plot_path = []
+        for coord in path:
+            pc = _plot_key(coord)
+            plot_path.append(pc)
+        for i in range(len(plot_path) - 1):
+            if plot_path[i] is not None and plot_path[i + 1] is not None:
+                drawn_nodes_set.add(plot_path[i])
+                drawn_nodes_set.add(plot_path[i + 1])
 
-        for i in range(len(path) - 1):
-            coord1, coord2 = path[i], path[i + 1]
-
-            if lattice.dimensionality > 3:
-                if coord1 in coord_mapping and coord2 in coord_mapping:
-                    pc1, pc2 = coord_mapping[coord1], coord_mapping[coord2]
-                else:
-                    step_group_ids.append([])
-                    continue
-            else:
-                pc1, pc2 = coord1, coord2
-
+        def _plot_key_positions(pc):
+            if pc is None:
+                return None
             if effective_dimensionality == 1:
-                x1, y1 = pc1[0], 0
-                x2, y2 = pc2[0], 0
+                x, y = pc[0], 0
             else:
-                x1, y1 = pc1[0], pc1[1]
-                x2, y2 = pc2[0], pc2[1]
+                x, y = pc[0], pc[1]
+            return x, y, tx(x), ty(y)
 
-            drawn_nodes_set.add(pc1)
-            drawn_nodes_set.add(pc2)
+        _plot_key_positions._tx = tx
+        _plot_key_positions._ty = ty
 
-            edge_key = tuple(sorted([pc1, pc2]))
-            traversal_idx = edge_counts[edge_key]
-            edge_counts[edge_key] += 1
-            is_forward = pc1 <= pc2
-
-            path_color_hex = _rgba_to_hex(colors[i])
-
-            px1, py1 = tx(x1), ty(y1)
-            px2, py2 = tx(x2), ty(y2)
-
-            if traversal_idx == 0:
-                svg_d = f"M{px1:.2f},{py1:.2f} L{px2:.2f},{py2:.2f}"
-                mid_px = (px1 + px2) / 2
-                mid_py = (py1 + py2) / 2
-                arrow_angle = math.degrees(math.atan2(py2 - py1, px2 - px1))
-            else:
-                dx, dy = x2 - x1, y2 - y1
-                length = math.sqrt(dx*dx + dy*dy)
-                if length < 1e-9:
-                    step_group_ids.append([])
-                    continue
-                perp_x, perp_y = -dy / length, dx / length
-
-                side = 1 if is_forward else -1
-                if traversal_idx == 1:
-                    offset_mag = base_arc_offset
-                else:
-                    offset_mag = base_arc_offset * ((traversal_idx + 1) // 2)
-                if traversal_idx % 2 == 0:
-                    side = -side
-
-                ctrl_x = (x1 + x2) / 2 + side * perp_x * offset_mag
-                ctrl_y = (y1 + y2) / 2 + side * perp_y * offset_mag
-
-                cpx, cpy = tx(ctrl_x), ty(ctrl_y)
-                svg_d = f"M{px1:.2f},{py1:.2f} Q{cpx:.2f},{cpy:.2f} {px2:.2f},{py2:.2f}"
-
-                mid_px, mid_py, arrow_angle = compute_quadratic_bezier_midpoint(
-                    px1, py1, cpx, cpy, px2, py2)
-
-            glow_id = next_eid("pg")
-            edge_id = next_eid("pe")
-            arrow_id = next_eid("pa")
-
-            path_els.append(svg_glow_edge(glow_id, svg_d))
-            path_els.append(svg_path_edge(edge_id, svg_d, path_color_hex))
-            path_els.append(svg_arrow_polygon(arrow_id, mid_px, mid_py, arrow_angle, path_color_hex))
-
-            group = [glow_id, edge_id, arrow_id]
-            step_group_ids.append(group)
-            all_path_el_ids.extend(group)
-
-        start_coord = path[0]
-        end_coord = path[-1]
-        if lattice.dimensionality > 3:
-            start_plot = coord_mapping.get(start_coord, start_coord)
-            end_plot = coord_mapping.get(end_coord, end_coord)
-        else:
-            start_plot = start_coord
-            end_plot = end_coord
-
-        start_hex = _rgba_to_hex(colors[0])
-        end_hex = _rgba_to_hex(colors[-1])
-
-        if effective_dimensionality == 1:
-            sx, sy = tx(start_plot[0]), ty(0)
-            ex, ey = tx(end_plot[0]), ty(0)
-        else:
-            sx, sy = tx(start_plot[0]), ty(start_plot[1])
-            ex, ey = tx(end_plot[0]), ty(end_plot[1])
-
-        start_halo_id = next_eid("hs")
-        end_halo_id = next_eid("he")
-        sg_id = next_eid("rg")
-        eg_id = next_eid("rg")
-
-        s_defs, s_circle = svg_radial_halo(sg_id, start_halo_id, sx, sy, 20, start_hex)
-        e_defs, e_circle = svg_radial_halo(eg_id, end_halo_id, ex, ey, 20, end_hex)
-        path_els.append(s_defs)
-        path_els.append(s_circle)
-        path_els.append(e_defs)
-        path_els.append(e_circle)
-        halo_ids = [start_halo_id, end_halo_id]
-        all_path_el_ids.extend(halo_ids)
+        path_els, step_group_ids, halo_ids, all_path_el_ids, colors = render_path_edges(
+            plot_path, _plot_key_positions, next_eid, path_cmap=path_cmap)
 
     has_path = path and len(path) >= 2
 
@@ -450,36 +368,27 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             edge_set.add((u, v))
             edge_set.add((v, u))
 
-        for gi, group in enumerate(shape_groups):
-            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
-            used_shape_colors.append(color)
-            group_edge_ids = []
-            group_tuples = [tuple(c) if not isinstance(c, tuple) else c for c in group]
-            group_set = set(group_tuples)
-            for c in group_tuples:
-                shape_coord_colors[c] = color
+        shape_groups_t = [
+            [tuple(c) if not isinstance(c, tuple) else c for c in group]
+            for group in shape_groups
+        ]
 
-            for i, c1 in enumerate(group_tuples):
-                for c2 in group_tuples[i + 1:]:
-                    pc1 = coord_mapping.get(c1, c1) if lattice.dimensionality > 3 else c1
-                    pc2 = coord_mapping.get(c2, c2) if lattice.dimensionality > 3 else c2
-                    if (pc1, pc2) in edge_set or (pc2, pc1) in edge_set:
-                        if effective_dimensionality == 1:
-                            px1, py1 = tx(pc1[0]), ty(0)
-                            px2, py2 = tx(pc2[0]), ty(0)
-                        else:
-                            px1, py1 = tx(pc1[0]), ty(pc1[1])
-                            px2, py2 = tx(pc2[0]), ty(pc2[1])
-                        eid = next_eid("se")
-                        shape_els.append(
-                            f'<line id="{eid}" x1="{px1:.2f}" y1="{py1:.2f}" '
-                            f'x2="{px2:.2f}" y2="{py2:.2f}" '
-                            f'stroke="{color}" stroke-width="3" opacity="0.8" '
-                            f'pointer-events="none"/>'
-                        )
-                        group_edge_ids.append(eid)
-                        all_shape_el_ids.append(eid)
-            svg_shape_group_edge_ids.append(group_edge_ids)
+        def _shape_plot(c):
+            return coord_mapping.get(c, c) if lattice.dimensionality > 3 else c
+
+        def _shape_edge_exists(c1, c2):
+            pc1, pc2 = _shape_plot(c1), _shape_plot(c2)
+            return (pc1, pc2) in edge_set or (pc2, pc1) in edge_set
+
+        def _shape_positions(c):
+            pc = _shape_plot(c)
+            if effective_dimensionality == 1:
+                return tx(pc[0]), ty(0)
+            return tx(pc[0]), ty(pc[1])
+
+        shape_els, svg_shape_group_edge_ids, all_shape_el_ids, used_shape_colors, shape_coord_colors = (
+            render_shape_groups(shape_groups_t, _shape_edge_exists, _shape_positions, next_eid)
+        )
 
     node_els = []
     all_node_ids = []
@@ -503,11 +412,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
 
         if lattice.dimensionality > 3 and orig_coord is not None:
             orig_str = str(orig_coord).replace(',)', ')')
-            if effective_dimensionality == 1:
-                red_str = f"({coord[0]:.2f})"
-            else:
-                red_str = f"({coord[0]:.2f}, {coord[1]:.2f})"
-            hover_text = f"Original: {orig_str}\nReduced: {red_str}"
+            hover_text = f"{coord_label}: {orig_str}"
         else:
             if effective_dimensionality == 1:
                 hover_text = f"{coord_label}: ({coord[0]})"
@@ -593,7 +498,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     tooltip_html = render_tooltip_system(uid, hover_texts,
                                          is_active=is_active_list if use_dimmed else None,
                                          node_freqs=node_freqs if preview_config else None,
-                                         preview_config=preview_config)
+                                         preview_config=preview_config,
+                                         dimmed_node_color=dimmed_node_color)
     svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
     return SvgLatticeData(

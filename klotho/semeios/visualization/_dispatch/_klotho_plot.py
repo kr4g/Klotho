@@ -11,6 +11,8 @@ _PLAYBACK_KWARGS = frozenset(
         "pause",
         "loop",
         "ring_time",
+        "inst",
+        "defName",
     }
 )
 

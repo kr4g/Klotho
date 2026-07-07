@@ -8,6 +8,60 @@ from .._shared.colors import SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
 from .._projections import apply_projection
 
 
+_PREVIEW_CONTROL_KEYS = frozenset({
+    "pause", "loop", "ring_time", "defName", "dur", "amp",
+    "arp", "strum", "direction", "beat", "bpm", "glow", "inst",
+})
+
+
+def _resolve_plot_inst(kwargs):
+    """Pop and resolve the ``inst`` kwarg for plot playback.
+
+    Returns ``(def_name, inst_pfields)`` where ``def_name`` is the
+    SynthDef to use for previews and audio payloads (``defName=`` kwarg
+    wins as a lower-level escape hatch, then the instrument, then
+    ``'kl_tri'``) and ``inst_pfields`` are the instrument's default
+    pfields (merged below explicit user kwargs).
+    """
+    from klotho.utils.playback._converter_base import resolve_instrument
+    inst = kwargs.pop('inst', None) if kwargs else None
+    inst_def_name, inst_pfields, _ = resolve_instrument(inst)
+    explicit = kwargs.get('defName') if kwargs else None
+    def_name = explicit or inst_def_name or 'kl_tri'
+    cleaned = {k: v for k, v in (inst_pfields or {}).items()
+               if k not in ('gate', 'out', 'freq', 'amp')}
+    return def_name, cleaned
+
+
+def _build_preview_config(dur, amp, kwargs, engine, def_name='kl_tri', inst_pfields=None):
+    """Build the click-to-play preview configuration dict.
+
+    Carries ``pfields`` (instrument defaults overlaid with any extra
+    synth kwargs from ``.play()``, e.g. ``attackTime``) so previews
+    respect the same parameters as full playback.
+    """
+    pfields = dict(inst_pfields or {})
+    if kwargs:
+        pfields.update({k: v for k, v in kwargs.items() if k not in _PREVIEW_CONTROL_KEYS})
+    return {
+        "dur": kwargs.get("dur", dur) if kwargs else dur,
+        "amp": kwargs.get("amp", amp) if kwargs else amp,
+        "defName": def_name,
+        "engine": engine,
+        "pfields": pfields or None,
+    }
+
+
+def _payload_extra_pfields(kwargs, inst_pfields=None):
+    """Extra pfields for path/shape audio payloads: instrument defaults
+    below explicit user kwargs (control keys excluded)."""
+    merged = dict(inst_pfields or {})
+    if kwargs:
+        merged.update({k: v for k, v in kwargs.items()
+                       if k not in {"pause", "loop", "ring_time", "inst", "defName"}})
+    return merged or None
+
+
 def _coerce_to_tuples(items):
     if items is None:
         return None
@@ -259,7 +313,8 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                               gen_labels, is_tone_lattice, coord_label,
                               path, path_mode, shape,
                               figsize, node_size, title, path_cmap,
-                              dur, arp, strum, direction, amp, kwargs):
+                              dur, arp, strum, direction, amp, kwargs,
+                              preview_def_name='kl_tri', inst_pfields=None):
     has_shape = len(lattice_shape_groups) > 0
     from klotho.utils.playback._config import get_audio_engine
     engine_name = get_audio_engine()
@@ -276,13 +331,12 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
         path_cmap=path_cmap,
     )
 
+    preview_config = _build_preview_config(dur, amp, kwargs, engine_name,
+                                           def_name=preview_def_name,
+                                           inst_pfields=inst_pfields)
+    extra_synth_kwargs = _payload_extra_pfields(kwargs, inst_pfields)
+
     if path and len(path) > 1:
-        preview_config = {
-            "dur": kwargs.get("dur", dur) if kwargs else dur,
-            "amp": kwargs.get("amp", amp) if kwargs else amp,
-            "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
-            "engine": engine_name,
-        }
         from klotho.utils.playback.animation_events import build_path_engine_payload
 
         ref_freq = 261.63
@@ -293,7 +347,6 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                 freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
             except Exception:
                 freqs.append(ref_freq)
-        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
         audio_payload = build_path_engine_payload(
             freqs,
             dur,
@@ -301,6 +354,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             amp=amp,
             extra_pfields=extra_synth_kwargs,
             pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
+            def_name=preview_def_name,
         )
 
         if effective_dimensionality <= 2:
@@ -327,12 +381,6 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             )
 
     if has_shape:
-        preview_config = {
-            "dur": kwargs.get("dur", dur) if kwargs else dur,
-            "amp": kwargs.get("amp", amp) if kwargs else amp,
-            "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
-            "engine": engine_name,
-        }
         from klotho.utils.playback.animation_events import build_shape_engine_payload
 
         ref_freq = 261.63
@@ -347,7 +395,6 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                     group_freqs.append(ref_freq)
             freq_groups.append(group_freqs)
 
-        extra_synth_kwargs = ({k: v for k, v in kwargs.items() if k not in {"pause", "loop", "ring_time"}} if kwargs else None)
         audio_payload = build_shape_engine_payload(
             freq_groups,
             dur,
@@ -358,6 +405,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             amp=amp,
             extra_pfields=extra_synth_kwargs,
             pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
+            def_name=preview_def_name,
         )
 
         if effective_dimensionality <= 2:
@@ -366,6 +414,20 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             svg_data = _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups, preview_config=preview_config)
             return AnimatedLatticeShapeFigure(
                 svg_data=svg_data, audio_payload=audio_payload, dur=dur,
+                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
+                loop=kwargs.get("loop", False) if kwargs else False,
+            )
+        else:
+            from .._animation import AnimatedLattice3dShapeFigure
+            from .._renderers.threejs_lattice import _threejs_lattice_3d
+            threejs_data = _threejs_lattice_3d(
+                **svg_threejs_kwargs,
+                preview_engine=engine_name,
+                preview_config=preview_config,
+                shape=lattice_shape_groups,
+            )
+            return AnimatedLattice3dShapeFigure(
+                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
                 ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
                 loop=kwargs.get("loop", False) if kwargs else False,
             )
@@ -464,6 +526,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     if is_tone_lattice:
         coord_label = getattr(lattice, "coord_label", "Monzo")
 
+    preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
+
     nodes = _coerce_to_tuples(nodes)
     path = _coerce_to_tuples(path)
 
@@ -509,12 +573,22 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     )
 
     if title is None:
-        resolution_str = 'x'.join(str(r) for r in lattice.resolution)
-        bipolar_str = "bipolar" if lattice.bipolar else "unipolar"
-        if lattice.dimensionality > 3:
-            title = f"{lattice.dimensionality}D→{target_dims}D Lattice ({resolution_str}, {bipolar_str}, {dim_reduction})"
+        if is_tone_lattice:
+            title = ' x '.join(str(g) for g in lattice.generators)
+            if getattr(lattice, 'equave_reduce', False):
+                from fractions import Fraction
+                equave = getattr(lattice, 'equave', Fraction(2))
+                if equave == 2:
+                    title += " (Octave Reduced)"
+                else:
+                    title += " (Equave Reduced)"
         else:
-            title = f"{lattice.dimensionality}D Lattice ({resolution_str}, {bipolar_str})"
+            resolution_str = 'x'.join(str(r) for r in lattice.resolution)
+            bipolar_str = "bipolar" if lattice.bipolar else "unipolar"
+            if lattice.dimensionality > 3:
+                title = f"{lattice.dimensionality}D→{target_dims}D Lattice ({resolution_str}, {bipolar_str}, {dim_reduction})"
+            else:
+                title = f"{lattice.dimensionality}D Lattice ({resolution_str}, {bipolar_str})"
 
     highlighted_coords, lattice_shape_groups, use_dimmed, gen_labels = (
         _build_lattice_graph_data(
@@ -540,12 +614,10 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         path_cmap=path_cmap,
     )
     preview_engine = get_audio_engine()
-    animate_preview_config = {
-        "dur": kwargs.get("dur", dur) if kwargs else dur,
-        "amp": kwargs.get("amp", amp) if kwargs else amp,
-        "defName": (kwargs.get("defName") if kwargs else None) or "kl_tri",
-        "engine": preview_engine,
-    } if (animate and is_tone_lattice) else None
+    animate_preview_config = _build_preview_config(
+        dur, amp, kwargs, preview_engine,
+        def_name=preview_def_name, inst_pfields=inst_pfields,
+    ) if (animate and is_tone_lattice) else None
 
     if not animate:
         if effective_dimensionality <= 2:
@@ -559,6 +631,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                 **svg_threejs_kwargs,
                 preview_engine=preview_engine,
                 preview_config=None,
+                shape=lattice_shape_groups if lattice_shape_groups else None,
             )
 
     animated_fig = _setup_lattice_animation(
@@ -569,19 +642,28 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         path, path_mode, shape,
         figsize, node_size, title, path_cmap,
         dur, arp, strum, direction, amp, kwargs,
+        preview_def_name=preview_def_name, inst_pfields=inst_pfields,
     )
 
     if animated_fig is not None:
         return animated_fig
 
     if effective_dimensionality <= 2:
-        return _svg_lattice_2d(
+        static_fig = _svg_lattice_2d(
             **svg_threejs_kwargs,
             shape=lattice_shape_groups if lattice_shape_groups else None,
             preview_config=animate_preview_config,
         )
-    return _threejs_lattice_3d(
-        **svg_threejs_kwargs,
-        preview_engine=preview_engine,
-        preview_config=animate_preview_config,
-    )
+    else:
+        static_fig = _threejs_lattice_3d(
+            **svg_threejs_kwargs,
+            preview_engine=preview_engine,
+            preview_config=animate_preview_config,
+            shape=lattice_shape_groups if lattice_shape_groups else None,
+        )
+
+    if is_tone_lattice:
+        from .._animation import ClickPreviewFigure
+        return ClickPreviewFigure(static_fig, def_name=preview_def_name,
+                                  engine=preview_engine)
+    return static_fig

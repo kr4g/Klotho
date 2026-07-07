@@ -375,6 +375,7 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
         is_active=is_active_list if has_selection else None,
         node_freqs=node_freqs if preview_config else None,
         preview_config=preview_config,
+        dimmed_node_color=dimmed_node_color,
     )
     svg_str = svg_wrap(all_svg, width_px, height_px) + tooltip_html
 
