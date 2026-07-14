@@ -8,16 +8,21 @@ from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.thetos.composition.events import Event
 from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voice_amplitudes
 from klotho.utils.playback._converter_base import (
     DEFAULT_NOTE_DURATION, DEFAULT_CHORD_DURATION,
     DEFAULT_SPECTRUM_DURATION, DEFAULT_DRUM_FREQ,
     KNOWN_KWARGS, perc_env_pfields,
-    _get_addressed_collection, _merge_pfields,
+    _merge_pfields,
+    coerce_sc_pfield_values,
+    lower_event_ir_to_voice_events,
     scale_pitch_sequence, extract_convert_kwargs, iter_group_sequence,
     resolve_instrument,
 )
 from klotho.utils.playback._sc_assembly import (
+    _attach_poly_meta,
+    _warn_unknown_pfields,
     lower_compositional_ir_to_sc_assembly,
     sort_sc_assembly_events,
 )
@@ -133,8 +138,7 @@ def pitch_to_sc_events(pitch, duration=None, amp=None, extra_pfields=None, inst=
 
 def pitch_collection_to_sc_events(obj, duration=None, mode="seq", arp=False, strum=0, direction='u',
                                   amp=None, pause=0.0, extra_pfields=None, inst=None):
-    addressed = _get_addressed_collection(obj)
-    pitches = [addressed[i] for i in range(len(addressed))]
+    pitches = [obj[i] for i in range(len(obj))]
     synth, inst_ctx = _resolve_synth(inst, DEFAULT_COLLECTION_SYNTH)
 
     if mode == "chord":
@@ -169,8 +173,7 @@ def scale_to_sc_events(obj, duration=None, equaves=1, amp=None, pause=0.0, extra
 
 def chord_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
                        amp=None, extra_pfields=None, inst=None):
-    addressed = _get_addressed_collection(obj)
-    pitches = [addressed[i] for i in range(len(addressed))]
+    pitches = [obj[i] for i in range(len(obj))]
     synth, inst_ctx = _resolve_synth(inst, DEFAULT_COLLECTION_SYNTH)
 
     if direction.lower() == 'd':
@@ -195,8 +198,7 @@ def chord_sequence_to_sc_events(obj, duration=None, arp=False, strum=0, directio
     synth, inst_ctx = _resolve_synth(inst, DEFAULT_COLLECTION_SYNTH)
     groups = []
     for chord in obj:
-        addressed = _get_addressed_collection(chord)
-        groups.append([addressed[i] for i in range(len(addressed))])
+        groups.append([chord[i] for i in range(len(chord))])
     group_voice_amps = [
         compute_voice_amplitudes([p.freq for p in group], amp)
         for group in groups
@@ -608,7 +610,6 @@ def _build_score_control_data(control_descriptors, block_size):
 
     import numpy as np
 
-    t = np.linspace(0.0, 1.0, block_size, dtype=np.float64)
     blocks = []
     serializable: list[dict] = []
 
@@ -616,18 +617,13 @@ def _build_score_control_data(control_descriptors, block_size):
         env = desc["envelope"]
         total = env.total_time
         if total <= 0:
-            bp_times = [0.0] * len(env.values)
+            samples = np.full(block_size, float(env.values[0]), dtype=np.float32)
         else:
-            cumulative = [0.0]
-            for seg_t in env.times:
-                cumulative.append(cumulative[-1] + seg_t * env.time_scale)
-            bp_times = [c / total for c in cumulative]
-
-        samples = np.interp(
-            t,
-            np.array(bp_times, dtype=np.float64),
-            np.array(env.values, dtype=np.float64),
-        ).astype(np.float32)
+            sample_times = np.linspace(0.0, total, block_size, dtype=np.float64)
+            samples = np.array(
+                [env.at_time(float(x)) for x in sample_times],
+                dtype=np.float32,
+            )
         blocks.append(samples)
 
         serializable.append({
@@ -644,6 +640,46 @@ def _build_score_control_data(control_descriptors, block_size):
         "blockSize": block_size,
         "descriptors": serializable,
     }
+
+
+def _collect_control_descriptors(uc, node_to_event_ids, id_map=None):
+    """Build control-envelope descriptors for one lowered UC.
+
+    Maps each envelope's ``target_nodes`` through the node→event-id map
+    (optionally remapped via *id_map*, as the Score path regenerates
+    uids), computing per-target ``startTime = max(synth_start,
+    env_start)`` and deduping by uid (keeping the earliest start).
+    Descriptor times are absolute (same timeline as the events).
+    """
+    from collections import OrderedDict
+
+    control_descriptors: list[dict] = []
+    for desc in uc.resolved_control_envelopes():
+        env_start, env_end = desc["time_span"]
+        target_map: "OrderedDict[str, float]" = OrderedDict()
+        for nid in desc["target_nodes"]:
+            for entry in node_to_event_ids.get(nid, []):
+                eid, synth_start = entry
+                uid = id_map.get(eid, eid) if id_map else eid
+                mapping_start = max(float(synth_start), float(env_start))
+                if uid in target_map:
+                    if mapping_start < target_map[uid]:
+                        target_map[uid] = mapping_start
+                else:
+                    target_map[uid] = mapping_start
+        if not target_map:
+            continue
+        targets = [
+            {"id": uid, "startTime": start} for uid, start in target_map.items()
+        ]
+        control_descriptors.append({
+            "envelope": desc["envelope"],
+            "pfields": desc["pfields"],
+            "start": env_start,
+            "duration": env_end - env_start,
+            "targets": targets,
+        })
+    return control_descriptors
 
 
 def _lower_score_uc(uc, track_override):
@@ -702,38 +738,188 @@ def _lower_score_uc(uc, track_override):
             event["id"] = mapped_uid
             events.append(event)
 
-    from collections import OrderedDict
-    control_descriptors: list[dict] = []
-    for desc in uc.resolved_control_envelopes():
-        env_start, env_end = desc["time_span"]
-        target_map: "OrderedDict[str, float]" = OrderedDict()
-        for nid in desc["target_nodes"]:
-            for entry in node_to_event_ids.get(nid, []):
-                eid, synth_start = entry
-                score_uid = id_map.get(eid, eid)
-                mapping_start = max(float(synth_start), float(env_start))
-                if score_uid in target_map:
-                    if mapping_start < target_map[score_uid]:
-                        target_map[score_uid] = mapping_start
-                else:
-                    target_map[score_uid] = mapping_start
-        if not target_map:
-            continue
-        targets = [
-            {"id": uid, "startTime": start} for uid, start in target_map.items()
-        ]
-        control_descriptors.append({
-            "envelope": desc["envelope"],
-            "pfields": desc["pfields"],
-            "start": env_start,
-            "duration": env_end - env_start,
-            "targets": targets,
-        })
+    control_descriptors = _collect_control_descriptors(
+        uc, node_to_event_ids, id_map=id_map
+    )
 
     return events, control_descriptors
 
 
-def convert_score_to_sc_events(score, **kwargs) -> dict:
+# Once-per-process dedupe for standalone-event FYI notes (mirrors the
+# unknown-pfield FYIs in _sc_assembly). Playback always continues.
+_WARNED_EVENT_FYIS: set = set()
+
+
+def _event_fyi(tag, message):
+    if tag in _WARNED_EVENT_FYIS:
+        return
+    _WARNED_EVENT_FYIS.add(tag)
+    print(f"Klotho FYI: {message}")
+
+
+def _lower_score_event(item):
+    """Lower one standalone Event item to SC events.
+
+    Emits one ``new`` per voice (a tuple pfield expands to simultaneous
+    voices via the standard poly expansion), then the event's scheduled
+    ``set`` / ``release`` messages, each targeting the per-voice ids
+    minted here.  Ids are regenerated per lowering call, matching
+    :func:`_lower_score_uc`.
+    """
+    from types import SimpleNamespace
+
+    from klotho.thetos.instruments._shared import load_ss_manifest
+    from klotho.thetos.instruments.base import Kit
+
+    event = item.unit
+    kit = event.inst if isinstance(event.inst, Kit) else None
+    if kit is not None:
+        def_name, inst_pfields, has_gate = resolve_instrument(kit._resolve(None))
+    else:
+        def_name, inst_pfields, has_gate = resolve_instrument(event.inst)
+    if def_name is None:
+        def_name = DEFAULT_COMPOSITION_SYNTH
+
+    if item.track is not None:
+        group = item.track
+    else:
+        group = event.mfields.get('group') or 'default'
+
+    is_hold = event._dur is None
+    if is_hold and event.mfields.get('strum'):
+        _event_fyi(
+            ('strum-hold', item.name),
+            f"strum has no effect on a held event (dur=None) "
+            f"['{item.name}']; voices start together.",
+        )
+
+    shim = SimpleNamespace(
+        start=item.start,
+        duration=0.0 if is_hold else event._dur,
+        pfields=dict(event.pfields),
+        mfields=dict(event.mfields),
+        node_id=None,
+    )
+    voices = lower_event_ir_to_voice_events(shim)
+
+    release_time = None
+    if event._release is not None:
+        release_time = item.start + event._release.offset
+        if not is_hold and abs(event._release.offset - event._dur) > 1e-9:
+            _event_fyi(
+                ('release-vs-dur', item.name),
+                f"event '{item.name}' has dur={event._dur} and an explicit "
+                f"release at offset {event._release.offset}; the release "
+                f"wins.",
+            )
+
+    manifest = load_ss_manifest()
+    events = []
+    voice_ids = []
+
+    for voice in voices:
+        uid = uuid4().hex
+        voice_ids.append(uid)
+
+        user_pf = coerce_sc_pfield_values(voice["pfields"])
+        v_def_name, v_inst_pfields, v_has_gate = def_name, inst_pfields, has_gate
+        if kit is not None:
+            # Kit member is chosen per voice from the selector pfield
+            # (tuple selectors were already expanded per voice above);
+            # the selector itself never reaches the synth.
+            voice_sel = user_pf.pop(kit.selector, None)
+            member = kit._resolve(voice_sel)
+            v_def_name, v_inst_pfields, v_has_gate = resolve_instrument(member)
+        pf = coerce_sc_pfield_values(_combine_extras(v_inst_pfields, user_pf))
+        if not v_has_gate and not is_hold:
+            if 'duration' in v_inst_pfields and 'duration' not in user_pf:
+                pf['duration'] = voice["duration"]
+            elif 'dur' in v_inst_pfields and 'dur' not in user_pf:
+                pf['dur'] = voice["duration"]
+        _warn_unknown_pfields(v_def_name, pf, manifest)
+
+        if release_time is not None:
+            dur_val = max(0.0, release_time - voice["start"])
+            release_after = False
+        elif is_hold:
+            dur_val = None
+            release_after = False
+        else:
+            dur_val = voice["duration"]
+            release_after = True
+
+        new_event = {
+            "type": "new",
+            "id": uid,
+            "defName": v_def_name,
+            "start": voice["start"],
+            "dur": dur_val,
+            "releaseAfter": release_after,
+            "pfields": pf,
+            "group": group,
+        }
+        _attach_poly_meta(new_event, voice)
+        events.append(new_event)
+
+    voice_count = len(voice_ids)
+    sounding_end = release_time
+    if sounding_end is None and not is_hold:
+        sounding_end = item.start + event._dur
+
+    for spec in event._sets:
+        set_start = item.start + spec.offset
+        if sounding_end is not None and set_start > sounding_end + 1e-9:
+            _event_fyi(
+                ('set-past-end', item.name, spec.offset),
+                f"set at {set_start}s on event '{item.name}' fires after "
+                f"its node(s) end at {sounding_end}s; it will have no "
+                f"effect.",
+            )
+        for key, value in spec.pfields.items():
+            if isinstance(value, tuple) and len(value) > voice_count:
+                _event_fyi(
+                    ('set-extra-voices', item.name, key),
+                    f"set on event '{item.name}' gives {len(value)} values "
+                    f"for '{key}' but the event has {voice_count} "
+                    f"voice(s); extra values are unused.",
+                )
+        for voice_index, uid in enumerate(voice_ids):
+            pf = {}
+            for key, value in spec.pfields.items():
+                if isinstance(value, tuple):
+                    pf[key] = value[voice_index % len(value)]
+                else:
+                    pf[key] = value
+            pf = coerce_sc_pfield_values(pf)
+            _warn_unknown_pfields(def_name, pf, manifest)
+            events.append({
+                "type": "set",
+                "id": uid,
+                "start": set_start,
+                "pfields": pf,
+                "group": group,
+            })
+
+    if release_time is not None:
+        if not has_gate:
+            _event_fyi(
+                ('release-ungated', item.name),
+                f"event '{item.name}' uses ungated synth '{def_name}'; "
+                f"the scheduled release is a no-op and was dropped.",
+            )
+        else:
+            for uid in voice_ids:
+                events.append({
+                    "type": "release",
+                    "id": uid,
+                    "start": release_time,
+                    "group": group,
+                })
+
+    return events
+
+
+def convert_score_to_sc_events(score, start_time=None, **kwargs) -> dict:
     """Lower every item in a Score to a SuperCollider event payload.
 
     The converter iterates items in insertion order, walks each item's
@@ -743,10 +929,23 @@ def convert_score_to_sc_events(score, **kwargs) -> dict:
     Event IDs are regenerated per lowering so the same external UC
     reused across multiple items does not collide.
 
+    The timeline is normalized: items may sit at negative score times
+    (e.g. a riser placed before the "downbeat" at 0), and the whole
+    score is shifted uniformly so the earliest item lands at 0 before
+    lowering.  The pre-lowering shift matters: leaf extraction encodes
+    rests as negative onsets (recovered via ``abs``), so genuinely
+    negative timelines must never reach it.  *start_time* then shifts
+    the lowered payload — events and control-envelope descriptors
+    alike — so the earliest event lands exactly there.
+
     Parameters
     ----------
     score : Score
         The score to lower.
+    start_time : float or None
+        Shift the earliest event to this time.  When None, only
+        timelines that begin at a negative time are shifted (so the
+        earliest item starts at 0).
     **kwargs
         Reserved for future engine options; unused today.
 
@@ -757,18 +956,49 @@ def convert_score_to_sc_events(score, **kwargs) -> dict:
         ``control_data`` is a SuperSonic-ready payload with ``buffer``,
         ``blockSize``, and ``descriptors``.
     """
+    from klotho.chronos.temporal_units.temporal import _reoffset
+
     all_events: list[dict] = []
     control_descriptors: list[dict] = []
 
-    for item in score.items():
-        for uc in _iter_ucs(item.unit):
-            uc_events, uc_ctrl = _lower_score_uc(uc, item.track)
-            all_events.extend(uc_events)
-            control_descriptors.extend(uc_ctrl)
+    items = list(score.items())
+    pre_shift = 0.0
+    if items:
+        score_start = min(item.start for item in items)
+        if score_start < 0:
+            pre_shift = -score_start
+
+    try:
+        if pre_shift:
+            for item in items:
+                _reoffset(item.unit, item.unit._offset + pre_shift)
+
+        for item in items:
+            if isinstance(item.unit, Event):
+                all_events.extend(_lower_score_event(item))
+                continue
+            for uc in _iter_ucs(item.unit):
+                uc_events, uc_ctrl = _lower_score_uc(uc, item.track)
+                all_events.extend(uc_events)
+                control_descriptors.extend(uc_ctrl)
+    finally:
+        if pre_shift:
+            for item in items:
+                _reoffset(item.unit, item.unit._offset - pre_shift)
 
     all_events.sort(
         key=lambda e: (e["start"], _SC_EVENT_PRIORITY.get(e["type"], 3))
     )
+
+    if start_time is not None and all_events:
+        shift = float(start_time) - all_events[0]["start"]
+        if shift:
+            for ev in all_events:
+                ev["start"] += shift
+            for desc in control_descriptors:
+                desc["start"] += shift
+                for target in desc["targets"]:
+                    target["startTime"] += shift
 
     block_size = getattr(score, "_block_size", _DEFAULT_SCORE_BLOCK_SIZE)
     meta = _build_score_meta(score)
@@ -779,6 +1009,100 @@ def convert_score_to_sc_events(score, **kwargs) -> dict:
         "meta": meta,
         "control_data": control_data,
     }
+
+
+def _compositional_unit_payload_parts(obj):
+    """Lower a bare UC to ``(events, control_descriptors)``.
+
+    Events keep their assembly uids (no Score-style regeneration) and
+    absolute times; descriptors are keyed against those uids via the
+    node→event-id map.
+    """
+    events, node_to_event_ids = lower_compositional_ir_to_sc_assembly(
+        obj,
+        extra_pfields=None,
+        animation=False,
+        default_synth=DEFAULT_COMPOSITION_SYNTH,
+        normalize_sc_pfields=True,
+        sort_output=True,
+        return_node_map=True,
+    )
+    descriptors = _collect_control_descriptors(obj, node_to_event_ids)
+    return events, descriptors
+
+
+def _container_payload_parts(obj, extra_pfields=None):
+    """Recursively lower a UTS/BT to ``(events, control_descriptors)``
+    with absolute (un-rebased) times.
+
+    Mirrors :func:`temporal_sequence_to_sc_events` /
+    :func:`temporal_block_to_sc_events` member handling (UC members get
+    no extra_pfields; bare TemporalUnits keep their absolute times).
+    """
+    events: list[dict] = []
+    descriptors: list[dict] = []
+    for unit in obj:
+        if isinstance(unit, CompositionalUnit):
+            ev, desc = _compositional_unit_payload_parts(unit)
+            events.extend(ev)
+            descriptors.extend(desc)
+        elif isinstance(unit, TemporalUnit):
+            events.extend(temporal_unit_to_sc_events(
+                unit, use_absolute_time=True, extra_pfields=extra_pfields
+            ))
+        elif isinstance(unit, (TemporalUnitSequence, TemporalBlock)):
+            ev, desc = _container_payload_parts(unit, extra_pfields=extra_pfields)
+            events.extend(ev)
+            descriptors.extend(desc)
+    return events, descriptors
+
+
+def _shift_payload_to_zero(events, descriptors):
+    """Apply one shared rebase delta to events AND descriptor times so
+    control envelopes stay in sync with the audio timeline."""
+    if not events:
+        return events, descriptors
+    min_start = min(ev.get("start", 0.0) for ev in events)
+    if min_start == 0.0:
+        return events, descriptors
+    for ev in events:
+        ev["start"] = ev.get("start", 0.0) - min_start
+    for desc in descriptors:
+        desc["start"] = desc["start"] - min_start
+        for tgt in desc["targets"]:
+            tgt["startTime"] = tgt["startTime"] - min_start
+    return events, descriptors
+
+
+def convert_to_sc_payload(obj, block_size=_DEFAULT_SCORE_BLOCK_SIZE, **kwargs):
+    """Convert a bare UC/UTS/BT (or any playable object) to a payload
+    ``{"events": [...], "control_data": {...}}``.
+
+    Unlike :func:`convert_to_sc_events` (which returns a plain event
+    list), this harvests control-envelope descriptors from every
+    :class:`CompositionalUnit` so ``apply_envelope(..., control=True)``
+    produces continuous bus automation outside a Score. Other object
+    types fall through to :func:`convert_to_sc_events` with an empty
+    ``control_data``.
+    """
+    from klotho.utils.playback._sc_validate import validate_sc_events
+
+    if isinstance(obj, CompositionalUnit):
+        events, descriptors = _compositional_unit_payload_parts(obj)
+    elif isinstance(obj, (TemporalUnitSequence, TemporalBlock)):
+        kw = extract_convert_kwargs(kwargs)
+        events, descriptors = _container_payload_parts(
+            obj, extra_pfields=kw['extra_pfields']
+        )
+        events = sort_sc_assembly_events(events)
+        events, descriptors = _shift_payload_to_zero(events, descriptors)
+    else:
+        events = convert_to_sc_events(obj, **kwargs)
+        descriptors = []
+
+    validate_sc_events(events)
+    control_data = _build_score_control_data(descriptors, block_size)
+    return {"events": events, "control_data": control_data}
 
 
 def tonejs_events_to_sc(tone_events):

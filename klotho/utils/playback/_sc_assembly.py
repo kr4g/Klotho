@@ -8,9 +8,51 @@ from klotho.utils.playback._converter_base import (
     _merge_pfields,
     lower_event_ir_to_voice_events,
     freq_to_midi,
+    coerce_sc_pfield_values,
 )
 
 SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
+
+# Once-per-process dedupe for the "unknown pfield / unknown SynthDef" FYI
+# notes printed during lowering. The engine still plays; these are purely
+# informational.
+_WARNED_UNKNOWN_PFIELDS: set = set()
+_WARNED_UNKNOWN_DEFNAMES: set = set()
+
+# Keys legitimately present in event pfields that are not SynthDef controls
+# (synthetic/engine-level), so the unknown-pfield FYI must skip them.
+_PFIELD_WARN_EXEMPT = frozenset({'note', 'out', 'gate', 'dur', 'duration'})
+
+
+def _warn_unknown_pfields(def_name, pfields, manifest):
+    """Print a one-line FYI for pfields the target SynthDef does not declare.
+
+    Deduped per ``(defName, key)`` for the life of the process. Infra defs
+    (``__``-prefixed) and empty names are skipped. An unknown defName gets
+    its own one-time FYI instead of per-key checks.
+    """
+    if not def_name or def_name.startswith('__'):
+        return
+    controls = manifest.get(def_name)
+    if controls is None:
+        if def_name not in _WARNED_UNKNOWN_DEFNAMES:
+            _WARNED_UNKNOWN_DEFNAMES.add(def_name)
+            print(
+                f"Klotho FYI: SynthDef '{def_name}' is not in the manifest; "
+                f"its pfields cannot be checked (playback continues)."
+            )
+        return
+    for key in pfields:
+        if key in _PFIELD_WARN_EXEMPT or key in controls:
+            continue
+        tag = (def_name, key)
+        if tag in _WARNED_UNKNOWN_PFIELDS:
+            continue
+        _WARNED_UNKNOWN_PFIELDS.add(tag)
+        print(
+            f"Klotho FYI: SynthDef '{def_name}' has no control '{key}'; "
+            f"the value will be ignored during playback."
+        )
 
 
 def sort_sc_assembly_events(events):
@@ -106,6 +148,12 @@ def lower_compositional_ir_to_sc_assembly(
     slur_end_events = {}
     sustain_param_cache = {}
 
+    if extra_pfields:
+        extra_pfields = coerce_sc_pfield_values(extra_pfields)
+
+    from klotho.thetos.instruments._shared import load_ss_manifest
+    manifest = load_ss_manifest()
+
     def _record(node_id, uid, synth_start):
         if uid not in uid_first_start:
             uid_first_start[uid] = synth_start
@@ -166,6 +214,10 @@ def lower_compositional_ir_to_sc_assembly(
                     k: v for k, v in voice_event["pfields"].items()
                     if k != 'group'
                 }
+                voice_pfields = coerce_sc_pfield_values(voice_pfields)
+                _warn_unknown_pfields(
+                    getattr(instrument, 'defName', None), voice_pfields, manifest
+                )
                 if normalize_sc_pfields:
                     voice_pfields = _normalize_sc_pfields(voice_pfields)
                 merged_pfields = _merge_pfields(voice_pfields, extra_pfields)
@@ -180,8 +232,10 @@ def lower_compositional_ir_to_sc_assembly(
             continue
 
         resolved_instrument = instrument
+        kit_tuple_selector = False
         if isinstance(instrument, Kit):
             selector_val = event.get_pfield(instrument.selector)
+            kit_tuple_selector = isinstance(selector_val, tuple)
             resolved_instrument = instrument._resolve(selector_val)
 
         def_name = _resolve_event_synth(resolved_instrument, default_synth)
@@ -222,17 +276,46 @@ def lower_compositional_ir_to_sc_assembly(
             voice_end = voice_event["end"] - time_offset if animation else voice_event["end"]
             voice_dur = max(0.0, voice_end - voice_start)
             voice_index = voice_event["poly_voice_index"]
+
+            # A tuple selector expands per voice, so Kit members (and hence
+            # defName/gating) must be re-resolved from the voice's own
+            # selector value, not once per event.
+            voice_resolved = resolved_instrument
+            voice_def_name = def_name
+            voice_has_gate = has_gate
+            voice_inject_duration = inject_duration
+            if _kit_selector is not None:
+                voice_sel = voice_event["pfields"].get(_kit_selector)
+                if not isinstance(voice_sel, tuple):
+                    voice_resolved = instrument._resolve(voice_sel)
+                    voice_def_name = _resolve_event_synth(voice_resolved, default_synth)
+                    voice_has_gate = _has_gate(voice_resolved)
+                    voice_inject_duration = (
+                        (not voice_has_gate) and _wants_duration_pfield(voice_resolved)
+                    )
+
             voice_pfields = {
                 k: v for k, v in voice_event["pfields"].items()
                 if k != 'group' and k != _kit_selector
             }
 
-            if not has_gate:
-                instrument_id = id(resolved_instrument) if resolved_instrument is not None else None
+            # A tuple selector merges defaults across members whose key
+            # sets may differ; keep only what THIS voice's member (or the
+            # engine) understands so e.g. a gated member's `gate` never
+            # leaks onto a one-shot sampler voice.
+            if kit_tuple_selector and voice_resolved is not None:
+                member_keys = set(voice_resolved.pfields.keys())
+                voice_pfields = {
+                    k: v for k, v in voice_pfields.items()
+                    if k in member_keys or k in ('note', 'out')
+                }
+
+            if not voice_has_gate:
+                instrument_id = id(voice_resolved) if voice_resolved is not None else None
                 sustain_param = sustain_param_cache.get(instrument_id)
                 if instrument_id is not None and instrument_id not in sustain_param_cache:
                     sustain_param = None
-                    lower_to_key = {k.lower(): k for k in resolved_instrument.pfields.keys()}
+                    lower_to_key = {k.lower(): k for k in voice_resolved.pfields.keys()}
                     for param in ('sustaintime', 'releasetime'):
                         if param in lower_to_key:
                             sustain_param = lower_to_key[param]
@@ -243,12 +326,15 @@ def lower_compositional_ir_to_sc_assembly(
                     if end_event is not None:
                         voice_pfields[sustain_param] = end_event.end - voice_event["start"]
 
+            voice_pfields = coerce_sc_pfield_values(voice_pfields)
+            _warn_unknown_pfields(voice_def_name, voice_pfields, manifest)
+
             if normalize_sc_pfields:
                 voice_pfields = _normalize_sc_pfields(voice_pfields)
 
             merged_pfields = _merge_pfields(voice_pfields, extra_pfields)
 
-            if inject_duration:
+            if voice_inject_duration:
                 merged_pfields = dict(merged_pfields)
                 merged_pfields['duration'] = voice_dur
 
@@ -257,7 +343,7 @@ def lower_compositional_ir_to_sc_assembly(
                 new_event = {
                     "type": "new",
                     "id": slur_uid,
-                    "defName": def_name,
+                    "defName": voice_def_name,
                     "start": voice_start,
                     "dur": voice_dur,
                     "releaseAfter": False,
@@ -292,7 +378,7 @@ def lower_compositional_ir_to_sc_assembly(
                     new_event = {
                         "type": "new",
                         "id": slur_uid,
-                        "defName": def_name,
+                        "defName": voice_def_name,
                         "start": voice_start,
                         "dur": voice_dur,
                         "releaseAfter": False,
@@ -313,7 +399,7 @@ def lower_compositional_ir_to_sc_assembly(
             new_event = {
                 "type": "new",
                 "id": uid,
-                "defName": def_name,
+                "defName": voice_def_name,
                 "start": voice_start,
                 "dur": voice_dur,
                 "releaseAfter": True,

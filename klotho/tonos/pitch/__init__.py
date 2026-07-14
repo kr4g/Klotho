@@ -5,7 +5,6 @@ from .pitch_collections import (
     PitchCollection,
     PitchCollectionBase,
     RelativePitchCollection,
-    RootedPitchCollection,
 )
 from .contour import Contour
 
@@ -15,7 +14,6 @@ __all__ = [
     'PitchCollectionBase',
     'RelativePitchCollection',
     'AbsolutePitchCollection',
-    'RootedPitchCollection',
     'IntervalType',
     'Contour',
-] 
+]

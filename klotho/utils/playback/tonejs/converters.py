@@ -14,8 +14,9 @@ from klotho.utils.playback._converter_base import (
     DEFAULT_NOTE_DURATION, DEFAULT_CHORD_DURATION,
     DEFAULT_SPECTRUM_DURATION, DEFAULT_DRUM_FREQ,
     KNOWN_KWARGS,
-    _get_addressed_collection, _merge_pfields,
+    _merge_pfields,
     scale_pitch_sequence, extract_convert_kwargs, lower_event_ir_to_voice_events, iter_group_sequence,
+    coerce_sc_pfield_values,
 )
 
 
@@ -168,6 +169,7 @@ def compositional_unit_to_events(obj, extra_pfields=None, animation=False,
         for expanded_voice in expanded_voices:
             pfields = {k: v for k, v in expanded_voice["pfields"].items()
                        if k != 'group'}
+            pfields = coerce_sc_pfield_values(pfields)
             pfields = _normalize_event_pfields(pfields)
             default_pfields = instruments[routing_key].get('preset', {})
             effective_pfields = _deep_merge(default_pfields, pfields)
@@ -215,8 +217,7 @@ def pitch_to_events(pitch, duration=None, amp=None, extra_pfields=None):
 
 def pitch_collection_to_events(obj, duration=None, mode="seq", arp=False, strum=0, direction='u',
                                amp=None, pause=0.0, extra_pfields=None):
-    addressed = _get_addressed_collection(obj)
-    pitches = [addressed[i] for i in range(len(addressed))]
+    pitches = [obj[i] for i in range(len(obj))]
 
     if mode == "chord":
         pitches = sorted(pitches, key=lambda p: p.freq)
@@ -246,8 +247,7 @@ def scale_to_events(obj, duration=None, equaves=1, amp=None, pause=0.0, extra_pf
 
 def chord_to_events(obj, duration=None, arp=False, strum=0, direction='u',
                     amp=None, extra_pfields=None):
-    addressed = _get_addressed_collection(obj)
-    pitches = [addressed[i] for i in range(len(addressed))]
+    pitches = [obj[i] for i in range(len(obj))]
 
     if direction.lower() == 'd':
         pitches = list(reversed(pitches))
@@ -268,8 +268,7 @@ def chord_sequence_to_events(obj, duration=None, arp=False, strum=0, direction='
     dur = duration if duration is not None else DEFAULT_CHORD_DURATION
     groups = []
     for chord in obj:
-        addressed = _get_addressed_collection(chord)
-        groups.append([addressed[i] for i in range(len(addressed))])
+        groups.append([chord[i] for i in range(len(chord))])
     group_voice_amps = [
         compute_voice_amplitudes([p.freq for p in group], amp)
         for group in groups

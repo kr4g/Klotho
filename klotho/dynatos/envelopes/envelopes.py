@@ -29,9 +29,17 @@ class Envelope:
         the same duration. If a list, must have one fewer element than values.
         Default is 1.0.
     curve : float or list, optional
-        Curve shape for each segment. 0 = linear, negative = exponential, 
-        positive = logarithmic. If a single value, all segments use the same 
+        Curve shape for each segment. 0 = linear, negative = exponential,
+        positive = logarithmic. If a single value, all segments use the same
         curve. Default is 0.0.
+    warp : str, optional
+        Interpolation domain for all segments: ``'lin'`` (default)
+        interpolates values linearly; ``'exp'`` interpolates in the
+        exponential (log) domain, i.e. a linexp mapping suited to
+        perceptual parameters such as frequency. ``warp`` composes with
+        ``curve``: the curve shapes the segment progress first, then the
+        (possibly exponential) interpolation is applied. ``'exp'``
+        requires every value to be strictly positive.
     normalize_values : bool, optional
         Whether to normalize values to 0-1 range at construction. Default is False.
     normalize_times : bool, optional
@@ -53,8 +61,8 @@ class Envelope:
     >>> decay.at_time(2.0)
     0.0
     """
-    def __init__(self, values, times=1.0, curve=0.0, 
-                 normalize_values=False, normalize_times=False, 
+    def __init__(self, values, times=1.0, curve=0.0, warp='lin',
+                 normalize_values=False, normalize_times=False,
                  value_scale=1.0, time_scale=1.0):
         values = list(values)
         times = times if isinstance(times, (list, tuple)) else [times] * (len(values) - 1)
@@ -76,14 +84,23 @@ class Envelope:
             if time_sum != 0:
                 times = [t / time_sum for t in times]
         
+        if warp not in ('lin', 'exp'):
+            raise ValueError(f"warp must be 'lin' or 'exp', got {warp!r}")
+        if warp == 'exp' and any(v <= 0 for v in values):
+            raise ValueError(
+                "warp='exp' requires all envelope values to be strictly "
+                f"positive; got {values}"
+            )
+
         self._values = values
         self._times = times
         self._curve = curve
+        self._warp = warp
         self._time_scale = time_scale
         self._at_time_cache: dict = {}
     
     @classmethod
-    def perc(cls, attackTime=0.01, releaseTime=1.0, curve=-4.0, time_scale=1.0):
+    def perc(cls, attackTime=0.01, releaseTime=1.0, curve=-4.0, warp='lin', time_scale=1.0):
         """
         Create a percussive envelope: 0 -> 1 -> 0
         
@@ -103,10 +120,10 @@ class Envelope:
         Envelope
             A percussive envelope instance.
         """
-        return cls(values=[0, 1, 0], times=[attackTime, releaseTime], curve=curve, time_scale=time_scale)
+        return cls(values=[0, 1, 0], times=[attackTime, releaseTime], curve=curve, warp=warp, time_scale=time_scale)
     
     @classmethod
-    def adr(cls, attackTime=0.01, decayTime=0.3, decayLevel=0.5, releaseTime=1.0, curve=-4.0, time_scale=1.0):
+    def adr(cls, attackTime=0.01, decayTime=0.3, decayLevel=0.5, releaseTime=1.0, curve=-4.0, warp='lin', time_scale=1.0):
         """
         Create an ADR envelope (3 segments): 0 -> 1 -> decayLevel -> 0
         
@@ -130,10 +147,10 @@ class Envelope:
         Envelope
             An ADR envelope instance.
         """
-        return cls(values=[0, 1, decayLevel, 0], times=[attackTime, decayTime, releaseTime], curve=curve, time_scale=time_scale)
+        return cls(values=[0, 1, decayLevel, 0], times=[attackTime, decayTime, releaseTime], curve=curve, warp=warp, time_scale=time_scale)
     
     @classmethod
-    def adsr(cls, attackTime=0.01, decayTime=0.3, sustainTime=0.5, sustainLevel=0.5, releaseTime=1.0, curve=-4.0, time_scale=1.0):
+    def adsr(cls, attackTime=0.01, decayTime=0.3, sustainTime=0.5, sustainLevel=0.5, releaseTime=1.0, curve=-4.0, warp='lin', time_scale=1.0):
         """
         Create an ADSR envelope (4 segments): 0 -> 1 -> sustainLevel (hold) -> 0
         
@@ -159,10 +176,10 @@ class Envelope:
         Envelope
             An ADSR envelope instance.
         """
-        return cls(values=[0, 1, sustainLevel, sustainLevel, 0], times=[attackTime, decayTime, sustainTime, releaseTime], curve=curve, time_scale=time_scale)
+        return cls(values=[0, 1, sustainLevel, sustainLevel, 0], times=[attackTime, decayTime, sustainTime, releaseTime], curve=curve, warp=warp, time_scale=time_scale)
     
     @classmethod
-    def pairs(cls, pairs, curve=0.0, time_scale=1.0):
+    def pairs(cls, pairs, curve=0.0, warp='lin', time_scale=1.0):
         """
         Create an envelope from (time, value) pairs.
         
@@ -189,7 +206,7 @@ class Envelope:
         times_abs = [p[0] for p in sorted_pairs]
         values = [p[1] for p in sorted_pairs]
         durations = [times_abs[i+1] - times_abs[i] for i in range(len(times_abs)-1)]
-        return cls(values=values, times=durations, curve=curve, time_scale=time_scale)
+        return cls(values=values, times=durations, curve=curve, warp=warp, time_scale=time_scale)
     
     @property
     def values(self):
@@ -201,6 +218,11 @@ class Envelope:
         """List of segment durations."""
         return self._times
     
+    @property
+    def warp(self):
+        """Interpolation domain: ``'lin'`` or ``'exp'``."""
+        return self._warp
+
     @property
     def time_scale(self):
         """Time scale factor applied to segment durations."""
@@ -284,10 +306,14 @@ class Envelope:
                 curve_val = self._curve[i]
 
                 if curve_val == 0:
-                    result = start_val + (end_val - start_val) * segment_progress
+                    progress = segment_progress
                 else:
-                    curved_progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
-                    result = start_val + (end_val - start_val) * curved_progress
+                    progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
+
+                if self._warp == 'exp':
+                    result = start_val * (end_val / start_val) ** progress
+                else:
+                    result = start_val + (end_val - start_val) * progress
                 self._at_time_cache[time] = result
                 return result
 
@@ -304,8 +330,9 @@ class Envelope:
             return lst
         
         effective_times = [t * self._time_scale for t in self._times]
-        
-        return f"Envelope(values={format_list(self._values)}, times={format_list(effective_times)}, curve={format_list(self._curve)})"
+
+        warp_str = f", warp='{self._warp}'" if self._warp != 'lin' else ""
+        return f"Envelope(values={format_list(self._values)}, times={format_list(effective_times)}, curve={format_list(self._curve)}{warp_str})"
 
     def __repr__(self):
         return self.__str__()

@@ -15,6 +15,13 @@ _VALID_EVENT_TYPES = frozenset({'new', 'set', 'release'})
 _FORBIDDEN_PFIELD_KEYS = frozenset({'group', '_slur_id', '_slur_start', '_slur_end'})
 
 
+def _is_buf_key(key):
+    """``buf`` / ``buf2`` / ``bufnum`` etc. -- pfields that may carry a
+    symbolic sample name (resolved to a numeric bufnum in the browser
+    scheduler)."""
+    return key.startswith('buf')
+
+
 def _err(idx, msg):
     raise AssemblyValidationError(f"SC event [{idx}]: {msg}")
 
@@ -27,8 +34,19 @@ def _check_pfields(idx, pfields, label="pfields"):
             _err(idx, f"{label} key must be str, got {type(k).__name__}")
         if k in _FORBIDDEN_PFIELD_KEYS:
             _err(idx, f"forbidden key '{k}' leaked into {label}")
+        if isinstance(v, str) and _is_buf_key(k):
+            if not v:
+                _err(idx, f"{label}['{k}'] sample name must be non-empty")
+            continue
         if not isinstance(v, (int, float)):
-            _err(idx, f"{label}['{k}'] must be numeric, got {type(v).__name__}={v!r}")
+            hint = ""
+            if isinstance(v, list):
+                hint = (
+                    " (a list is not a valid pfield value: use a tuple for a "
+                    "chord/poly value, or Pattern([...]) to cycle values "
+                    "across nodes)"
+                )
+            _err(idx, f"{label}['{k}'] must be numeric, got {type(v).__name__}={v!r}{hint}")
 
 
 def _check_optional_dur_release_after(idx, ev):

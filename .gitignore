@@ -167,3 +167,7 @@ klotho/utils/playback/supersonic/assets/tidal_synthdefs_add.scd
 # Graphify knowledge graph
 graphify-out/
 
+# Local analysis / tooling artifacts
+.understand-anything/
+*_UX_AUDIT.md
+

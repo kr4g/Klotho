@@ -1,6 +1,12 @@
 (
 var outputDir = thisProcess.nowExecutingPath.dirname +/+ "synthdefs";
+var instDir = outputDir +/+ "instruments";
+var fxDir = outputDir +/+ "effects";
+var infraDir = outputDir +/+ "infra";
 outputDir.mkdir;
+instDir.mkdir;
+fxDir.mkdir;
+infraDir.mkdir;
 
 SynthDef(\kl_tri, { |out=0, freq=440, amp=0.5, gate=1, pan=0, portamento=0.1,
     vibRate=5, vibDepth=0, toneLPFRatio=2, filterEnvAmt=0.2, softDrive=1.1, softMix=0.08,
@@ -22,7 +28,7 @@ SynthDef(\kl_tri, { |out=0, freq=440, amp=0.5, gate=1, pan=0, portamento=0.1,
     sig = sig * env * amp;
     sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\kl_sine, { |out=0, freq=440, amp=0.3, gate=1, pan=0, portamento=0.1,
     vibRate=5, vibDepth=0,
@@ -41,7 +47,7 @@ SynthDef(\kl_sine, { |out=0, freq=440, amp=0.3, gate=1, pan=0, portamento=0.1,
     sig = sig * env * amp;
     sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\kl_sqr, { |out=0, freq=440, amp=0.4, gate=1, pan=0, width=0.5, portamento=0.1,
     vibRate=5, vibDepth=0, toneLPFRatio=2, filterEnvAmt=0.2, softDrive=1.1, softMix=0.08,
@@ -64,7 +70,7 @@ SynthDef(\kl_sqr, { |out=0, freq=440, amp=0.4, gate=1, pan=0, width=0.5, portame
     sig = LeakDC.ar(sig);
     sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\kl_saw, { |out=0, freq=440, amp=0.35, gate=1, pan=0, portamento=0.1,
     vibRate=5, vibDepth=0, toneLPFRatio=2, filterEnvAmt=0.2, softDrive=1.1, softMix=0.08,
@@ -86,7 +92,7 @@ SynthDef(\kl_saw, { |out=0, freq=440, amp=0.35, gate=1, pan=0, portamento=0.1,
     sig = sig * env * amp;
     sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\kl_noisebpf, { |out=0, freq=440, amp=0.2, gate=1, pan=0, portamento=0.1,
     rq=0.001,
@@ -105,7 +111,7 @@ SynthDef(\kl_noisebpf, { |out=0, freq=440, amp=0.2, gate=1, pan=0, portamento=0.
     sig = sig * env * amp;
     sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\kl_kicktone, { |out=0, amp=0.85, pan=0,
     dur=0.6, baseFreq=110, pitchDrop=2.0, pitchDropTime=0.04, pitchCurve=(-6),
@@ -128,14 +134,14 @@ SynthDef(\kl_kicktone, { |out=0, amp=0.85, pan=0,
     sig = tanh(sig * drive.max(0.1));
     sig = Pan2.ar(sig, pan);
     Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\__busRouter, { |inBus=0, outBus=0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = sig * gain;
     ReplaceOut.ar(inBus, sig);
     Out.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(infraDir);
 
 SynthDef(\__busRouterMonitor, { |inBus=0, outBus=0, gain=1.0, id=0|
     var amp, peak;
@@ -146,7 +152,7 @@ SynthDef(\__busRouterMonitor, { |inBus=0, outBus=0, gain=1.0, id=0|
     SendReply.kr(Impulse.kr(20), '/trackLevel', [peak, id]);
     ReplaceOut.ar(inBus, sig);
     Out.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(infraDir);
 
 SynthDef(\__chainLimiter, { |inBus=0, outBus=0, gain=1.0, preGain=1.0, limitLevel=0.95, lookAhead=0.01|
     var sig = In.ar(inBus, 2);
@@ -156,26 +162,26 @@ SynthDef(\__chainLimiter, { |inBus=0, outBus=0, gain=1.0, preGain=1.0, limitLeve
     sig = LeakDC.ar(sig);
     ReplaceOut.ar(inBus, sig);
     Out.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(infraDir);
 
 SynthDef(\__klEnvCtrl, { |bufnum=0, bus=0, dur=1, startFrame=0, numFrames=512|
     var phase = Line.kr(startFrame, startFrame + numFrames - 1, dur, doneAction: 2);
     Out.kr(bus, BufRd.kr(1, bufnum, phase, interpolation: 2));
-}).writeDefFile(outputDir);
+}).writeDefFile(infraDir);
 
 SynthDef(\kl_reverb, { |inBus=0, outBus=0, mix=0.3, room=0.7, damp=0.5, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = FreeVerb.ar(sig, mix.clip(0, 1), room.clip(0, 1), damp.clip(0, 1));
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_delay, { |inBus=0, outBus=0, delayTime=0.25, decayTime=1.0, maxDelay=2.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = sig + CombL.ar(sig, maxDelay.max(delayTime), delayTime.max(0.001), decayTime);
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, gain=1.0|
     var sig, dry;
@@ -188,28 +194,28 @@ SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, gain=1.0|
     sig = SelectX.ar(dist.clip(0, 1), [dry, sig]);
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_bitcrush, { |inBus=0, outBus=0, bits=8, crush=4, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = Decimator.ar(sig, rate: (44100 / crush.max(1)).max(100), bits: bits.clip(1, 24));
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_lpf, { |inBus=0, outBus=0, freq=1200, rq=1.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = RLPF.ar(sig, freq.clip(20, 20000), rq.clip(0.01, 2));
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_hpf, { |inBus=0, outBus=0, freq=200, rq=1.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = RHPF.ar(sig, freq.clip(20, 20000), rq.clip(0.01, 2));
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_tremolo, { |inBus=0, outBus=0, rate=4.0, depth=0.5, gain=1.0|
     var sig, mod;
@@ -218,14 +224,56 @@ SynthDef(\kl_tremolo, { |inBus=0, outBus=0, rate=4.0, depth=0.5, gain=1.0|
     sig = sig * mod;
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\kl_chop, { |inBus=0, outBus=0, rate=4.0, gain=1.0|
     var sig = In.ar(inBus, 2);
     sig = sig * LFPulse.kr(rate.max(0.01), add: 0.01);
     sig = sig * gain;
     ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
+
+// One-shot sample players (mono / stereo buffers). Non-gated, kicktone-style
+// lifecycle: a fixed AR-around-hold envelope self-frees at `duration`.
+// duration <= 0 means "play the remaining sample once in full".
+// rate follows PlayBuf semantics (1 normal, -1 backward, |r|<1 slower);
+// pos is the 0-1 relative start position within the buffer.
+SynthDef(\kl_sampler1, { |out=0, buf=0, amp=0.5, pan=0, rate=1, pos=0, loop=0,
+    duration=0, attackTime=0.001, releaseTime=0.05,
+    attackCurve=(-4), releaseCurve=(-4)|
+    var sig, env, effDur, hold, remaining, player;
+    remaining = (BufDur.kr(buf) * (1 - pos.clip(0, 1))) / rate.abs.max(0.001);
+    effDur = Select.kr(duration <= 0, [duration, remaining + releaseTime]);
+    hold = (effDur - attackTime - releaseTime).max(0.01);
+    env = EnvGen.kr(
+        Env([0, 1, 1, 0], [attackTime, hold, releaseTime], [attackCurve, 0, releaseCurve]),
+        doneAction: 2
+    );
+    player = PlayBuf.ar(1, buf, rate * BufRateScale.kr(buf),
+        startPos: pos.clip(0, 1) * BufFrames.kr(buf), loop: loop);
+    FreeSelf.kr(Done.kr(player) * (loop <= 0));
+    sig = player * env * amp;
+    sig = Pan2.ar(sig, pan);
+    Out.ar(out, sig);
+}).writeDefFile(instDir);
+
+SynthDef(\kl_sampler2, { |out=0, buf=0, amp=0.5, pan=0, rate=1, pos=0, loop=0,
+    duration=0, attackTime=0.001, releaseTime=0.05,
+    attackCurve=(-4), releaseCurve=(-4)|
+    var sig, env, effDur, hold, remaining, player;
+    remaining = (BufDur.kr(buf) * (1 - pos.clip(0, 1))) / rate.abs.max(0.001);
+    effDur = Select.kr(duration <= 0, [duration, remaining + releaseTime]);
+    hold = (effDur - attackTime - releaseTime).max(0.01);
+    env = EnvGen.kr(
+        Env([0, 1, 1, 0], [attackTime, hold, releaseTime], [attackCurve, 0, releaseCurve]),
+        doneAction: 2
+    );
+    player = PlayBuf.ar(2, buf, rate * BufRateScale.kr(buf),
+        startPos: pos.clip(0, 1) * BufFrames.kr(buf), loop: loop);
+    FreeSelf.kr(Done.kr(player) * (loop <= 0));
+    sig = Balance2.ar(player[0], player[1], pan) * env * amp;
+    Out.ar(out, sig);
+}).writeDefFile(instDir);
 
 "All synthdefs compiled to: %".format(outputDir).postln;
 )

@@ -1,6 +1,5 @@
-from .scale import Scale, InstancedScale
+from .scale import Scale
 
 __all__ = [
     'Scale',
-    'InstancedScale',
 ]

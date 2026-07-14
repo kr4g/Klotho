@@ -30,14 +30,18 @@ from klotho.chronos.temporal_units import (
     TemporalUnitSequence,
 )
 from klotho.chronos.temporal_units.temporal import _reoffset
-from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.thetos.composition.compositional import (
+    ENGINE_MFIELDS,
+    CompositionalUnit,
+)
+from klotho.thetos.composition.events import Event
 from klotho.thetos.instruments.base import Effect
 
 
 _DEFAULT_BLOCK_SIZE = 512
 
 TemporalLike = Union[
-    TemporalUnit, TemporalUnitSequence, TemporalBlock, CompositionalUnit
+    TemporalUnit, TemporalUnitSequence, TemporalBlock, CompositionalUnit, Event
 ]
 
 
@@ -57,6 +61,8 @@ def _promote_to_uc(unit: TemporalLike) -> TemporalLike:
     cascades (``_set_offsets`` / ``_align_rows``) re-align correctly after
     reconstruction.
     """
+    if isinstance(unit, Event):
+        return unit
     if isinstance(unit, CompositionalUnit):
         return unit
     if isinstance(unit, TemporalUnit):
@@ -200,6 +206,58 @@ class ScoreItem:
             f"ScoreItem(name={self.name!r}, track={self.track!r}, "
             f"start={self.start:.3f}, end={self.end:.3f}, "
             f"unit={type(self.unit).__name__})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# EventItem: handle for standalone events (Score.new)
+# ---------------------------------------------------------------------------
+
+
+class EventItem(ScoreItem):
+    """The handle returned by :meth:`Score.new` — also the score entry.
+
+    Wraps a standalone :class:`~klotho.thetos.composition.events.Event`
+    and schedules ``set`` / ``release`` messages on its live synth
+    node(s), analogous to scsynth ``/n_set``. Times are given in
+    absolute score seconds (consistent with ``Score.add(at=...)``) but
+    stored relative to the event's start, so scheduled messages travel
+    with the event when it is repositioned or time-scaled.
+    """
+
+    def set(self, *, at: float, **pfields) -> "EventItem":
+        """Schedule a pfield change at absolute score time *at*.
+
+        Tuple values map element-wise onto the event's voices
+        (modulo-cycling); scalars broadcast to every voice.
+        """
+        rel = float(at) - self.start
+        if rel < 0:
+            raise ValueError(
+                f"set at={at} precedes event '{self.name}' start "
+                f"({self.start}); the node does not exist yet"
+            )
+        self.unit.add_set(rel, pfields)
+        return self
+
+    def release(self, *, at: float) -> "EventItem":
+        """Schedule a gate-off at absolute score time *at*."""
+        rel = float(at) - self.start
+        if rel < 0:
+            raise ValueError(
+                f"release at={at} precedes event '{self.name}' start "
+                f"({self.start})"
+            )
+        self.unit.add_release(rel)
+        return self
+
+    def __repr__(self) -> str:
+        ev = self.unit
+        dur = "hold" if ev._dur is None else f"{ev._dur:.3f}"
+        return (
+            f"EventItem(name={self.name!r}, inst={ev.inst!r}, "
+            f"start={self.start:.3f}, dur={dur}, sets={len(ev._sets)}, "
+            f"released={ev._release is not None})"
         )
 
 
@@ -375,7 +433,8 @@ class Score:
         _reoffset(owned, t)
 
         if name is None:
-            name = f"item_{len(self._items)}"
+            prefix = "event" if isinstance(owned, Event) else "item"
+            name = f"{prefix}_{len(self._items)}"
         if name in self._items:
             raise ValueError(f"Item {name!r} already exists")
 
@@ -384,7 +443,8 @@ class Score:
                 f"Track {track!r} not registered; call score.track() first"
             )
 
-        item = ScoreItem(unit=owned, name=name, track=track, _score=self)
+        item_cls = EventItem if isinstance(owned, Event) else ScoreItem
+        item = item_cls(unit=owned, name=name, track=track, _score=self)
         self._items[name] = item
         return item
 
@@ -420,7 +480,8 @@ class Score:
         _reoffset(owned, 0.0)
 
         if name is None:
-            name = f"item_{len(self._items)}"
+            prefix = "event" if isinstance(owned, Event) else "item"
+            name = f"{prefix}_{len(self._items)}"
         if name in self._items:
             raise ValueError(f"Item {name!r} already exists")
         if track is not None and track != 'main' and track not in self._tracks:
@@ -428,13 +489,110 @@ class Score:
                 f"Track {track!r} not registered; call score.track() first"
             )
 
-        item = ScoreItem(unit=owned, name=name, track=track, _score=self)
+        item_cls = EventItem if isinstance(owned, Event) else ScoreItem
+        item = item_cls(unit=owned, name=name, track=track, _score=self)
         new_items: "OrderedDict[str, ScoreItem]" = OrderedDict()
         new_items[name] = item
         for k, v in self._items.items():
             new_items[k] = v
         self._items = new_items
         return item
+
+    # ------------------------------------------------------------------
+    # Standalone events (scsynth node analogy: /s_new, /n_set, gate-off)
+    # ------------------------------------------------------------------
+
+    def new(
+        self,
+        start: float = 0.0,
+        dur: Optional[float] = None,
+        inst=None,
+        *,
+        name: Optional[str] = None,
+        track: Optional[str] = None,
+        **pfields,
+    ) -> EventItem:
+        """Schedule a single standalone event (→ ``/s_new``).
+
+        Parameters
+        ----------
+        start : float
+            Absolute start time in seconds.
+        dur : float or None
+            Duration in seconds.  None holds the synth until an explicit
+            :meth:`release` (requires a gated synth).
+        inst : None, str, or Instrument
+            SynthDef name or instrument object; None uses the default
+            synth.
+        name : str, optional
+            Item name; auto-generated (``"event_N"``) if omitted.
+        track : str, optional
+            Track name (registered via :meth:`track`).
+        **pfields
+            Pfield values, with the same semantics as
+            ``UC.set_pfields`` — a tuple value means a simultaneity (one
+            synth voice per element).  ``strum`` and ``group`` are
+            routed to engine meta-fields.
+
+        Returns
+        -------
+        EventItem
+            The handle (also the score entry), usable as the target of
+            :meth:`set` / :meth:`release` — even when tuple pfields
+            expand to multiple voices, the event is one logical handle.
+        """
+        mfields = {
+            k: pfields.pop(k) for k in list(pfields) if k in ENGINE_MFIELDS
+        }
+        ev = Event(inst=inst, dur=dur, pfields=pfields, mfields=mfields)
+        return self.add(ev, name=name, track=track, at=float(start))
+
+    def set(self, target, *, at: float, **pfields) -> EventItem:
+        """Schedule pfield changes on a standalone event's live node(s)
+        at absolute score time *at* (→ ``/n_set``).
+
+        Tuple values map element-wise onto the event's voices
+        (modulo-cycling); scalars broadcast.  Note that
+        ``score['uc_item'].set(...)`` on a unit item is different: it
+        falls through to ``CompositionalUnit.set``, a static
+        (pre-playback) parameter assignment.
+
+        Parameters
+        ----------
+        target : EventItem or str
+            The handle returned by :meth:`new`, or its item name.
+        at : float
+            Absolute score time in seconds; must not precede the
+            event's start.
+        """
+        return self._resolve_event_target(target, 'set').set(at=at, **pfields)
+
+    def release(self, target, *, at: float) -> EventItem:
+        """Schedule a gate-off on a standalone event's live node(s) at
+        absolute score time *at* (→ ``/n_set gate 0``).
+
+        See :meth:`set` for target/time semantics.
+        """
+        return self._resolve_event_target(target, 'release').release(at=at)
+
+    def _resolve_event_target(self, target, op: str) -> EventItem:
+        if isinstance(target, str):
+            if target not in self._items:
+                raise KeyError(
+                    f"No item named {target!r}; existing: {list(self._items)}"
+                )
+            target = self._items[target]
+        if not isinstance(target, EventItem):
+            raise TypeError(
+                f"Score.{op}() targets standalone events (from Score.new); "
+                f"got {type(target).__name__}. For unit items use "
+                f"set_pfields(...) instead."
+            )
+        if target._score is not self:
+            raise ValueError(
+                f"Event '{target.name}' belongs to a different Score"
+            )
+        return target
 
     # ------------------------------------------------------------------
     # Access
@@ -559,7 +717,9 @@ class Score:
             Output path for the JSON data.
         start_time : float or None
             Shift the earliest event to this time.  When None, events
-            retain their absolute times as recorded in the score.
+            retain their absolute times as recorded in the score,
+            except that a timeline beginning at a negative time is
+            always pulled up to start at 0 during lowering.
         time_scale : float
             Multiplicative factor for all event / envelope times.
         """
@@ -571,28 +731,23 @@ class Score:
             convert_score_to_sc_events,
         )
 
-        payload = convert_score_to_sc_events(self)
+        payload = convert_score_to_sc_events(self, start_time=start_time)
         events = payload["events"]
         meta = payload.get("meta") or {}
         ctrl = payload.get("control_data") or {
             "buffer": None, "blockSize": self._block_size, "descriptors": []
         }
 
-        time_shift = 0.0
-        if start_time is not None and events:
-            min_start = min(ev["start"] for ev in events)
-            time_shift = start_time - min_start
-
         shifted_events = []
         for ev in events:
             ev_copy = dict(ev)
-            ev_copy["start"] = (ev["start"] + time_shift) * time_scale
+            ev_copy["start"] = ev["start"] * time_scale
             shifted_events.append(ev_copy)
 
         shifted_descriptors = []
         for d in ctrl.get("descriptors", []):
             d_copy = dict(d)
-            d_copy["start"] = (d["start"] + time_shift) * time_scale
+            d_copy["start"] = d["start"] * time_scale
             d_copy["dur"] = d["dur"] * time_scale
             shifted_descriptors.append(d_copy)
 

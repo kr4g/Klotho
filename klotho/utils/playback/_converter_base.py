@@ -1,4 +1,5 @@
 import math
+import numbers
 from uuid import uuid4
 
 from klotho.tonos import Pitch
@@ -53,7 +54,17 @@ def resolve_instrument(inst):
     if inst is None:
         return None, {}, True
 
-    from klotho.thetos.instruments._shared import load_ss_manifest
+    from klotho.thetos.instruments._shared import load_ss_manifest, ss_synth_kind
+
+    def _reject_non_inst(def_name):
+        kind = ss_synth_kind(def_name)
+        if kind in ('fx', 'infra'):
+            what = 'an effect' if kind == 'fx' else 'an internal engine'
+            raise TypeError(
+                f"'{def_name}' is {what} SynthDef, not an instrument. "
+                f"Effects belong in a track's insert chain "
+                f"(SynthDefFX + Score.track(inserts=[...]))."
+            )
 
     if isinstance(inst, str):
         manifest = load_ss_manifest()
@@ -63,6 +74,7 @@ def resolve_instrument(inst):
                 f"Unknown SynthDef name {inst!r}. Names must match exactly "
                 f"(no prefix fallback). Available: {available}"
             )
+        _reject_non_inst(inst)
         controls = dict(manifest[inst])
         return inst, controls, 'gate' in controls
 
@@ -72,6 +84,7 @@ def resolve_instrument(inst):
             f"inst must be a SynthDef name string or an Instrument with a "
             f"defName (e.g. SynthDefInstrument); got {type(inst).__name__}"
         )
+    _reject_non_inst(def_name)
     pfields = dict(getattr(inst, 'pfields', {}) or {})
     has_gate = bool(getattr(inst, 'has_gate', 'gate' in pfields))
     return def_name, pfields, has_gate
@@ -83,14 +96,28 @@ def freq_to_midi(freq):
     return 69.0 + 12.0 * math.log2(freq / 440.0)
 
 
-def _get_addressed_collection(obj):
-    if hasattr(obj, 'freq'):
-        return obj
-    if hasattr(obj, 'is_instanced') and obj.is_instanced:
-        return obj
-    if hasattr(obj, 'is_relative') and not obj.is_relative:
-        return obj
-    return obj.root("C4")
+def coerce_sc_pfield_value(value):
+    """Coerce a single pfield value to an SC/JSON-safe numeric type.
+
+    ``Pitch`` lowers to its frequency; any other non-int/float
+    ``numbers.Real`` (``Fraction``, NumPy scalars, ``Decimal``) lowers to
+    ``float``. Tuples (poly/chord values) are coerced element-wise.
+    Values that cannot be coerced pass through for validation to reject.
+    """
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, Pitch):
+        return float(value.freq)
+    if isinstance(value, numbers.Real):
+        return float(value)
+    if isinstance(value, tuple):
+        return tuple(coerce_sc_pfield_value(v) for v in value)
+    return value
+
+
+def coerce_sc_pfield_values(pfields):
+    """Coerce every value in a pfields dict via :func:`coerce_sc_pfield_value`."""
+    return {k: coerce_sc_pfield_value(v) for k, v in pfields.items()}
 
 
 def _merge_pfields(base, extra):
@@ -102,22 +129,21 @@ def _merge_pfields(base, extra):
 
 
 def scale_pitch_sequence(obj, equaves=1):
-    addressed = _get_addressed_collection(obj)
     if equaves == 0:
         equaves = 1
-    scale_len = len(addressed)
+    scale_len = len(obj)
     abs_equaves = abs(equaves)
     going_up = equaves > 0
 
     all_pitches = []
     if going_up:
         for idx in range(abs_equaves * scale_len + 1):
-            all_pitches.append(addressed[idx])
+            all_pitches.append(obj[idx])
         pitches_down = list(reversed(all_pitches[:-1]))
         all_pitches = all_pitches + pitches_down
     else:
         for i in range(abs_equaves * scale_len + 1):
-            all_pitches.append(addressed[-i])
+            all_pitches.append(obj[-i])
         pitches_up = list(reversed(all_pitches[:-1]))
         all_pitches = all_pitches + pitches_up
     return all_pitches

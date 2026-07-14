@@ -1,7 +1,7 @@
 // SuperSonic standalone playback widget.
 // Python replaces: __WID__, __EVENTS_JSON__, __NEEDED_JSON__,
 //                  __SS_CONFIG_JSON__, __META_JSON__,
-//                  __CONTROL_DATA_JSON__, __RING_TIME__
+//                  __CONTROL_DATA_JSON__, __SAMPLES_JSON__, __RING_TIME__
 
 (function __klothoSSInit___WID__() {
     var wid = "__WID__";
@@ -18,6 +18,7 @@
     var ssConfig = __SS_CONFIG_JSON__;
     var meta = __META_JSON__;
     var controlData = __CONTROL_DATA_JSON__;
+    var sampleAssets = __SAMPLES_JSON__;
 
     var looping = false;
     var scheduler = null;
@@ -86,6 +87,27 @@
         }
     }
 
+    // Load referenced samples into scsynth buffers once per session.
+    // The name->bufnum map is shared across widgets and never freed;
+    // bufnums come from the same shared allocator the control-envelope
+    // path uses, so the two can never collide.
+    async function loadSamples(sonic) {
+        var state = globalThis.__klothoSonic;
+        if (!state.sampleMap) state.sampleMap = {};
+        if (state._nextBufnum == null) state._nextBufnum = 0;
+        for (var name in sampleAssets) {
+            if (!sampleAssets.hasOwnProperty(name)) continue;
+            if (state.sampleMap[name] != null) continue;
+            var b64 = sampleAssets[name].b64;
+            var bytes = Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
+            var bufnum = state._nextBufnum++;
+            try {
+                await sonic.loadSample(bufnum, bytes.buffer);
+                state.sampleMap[name] = bufnum;
+            } catch(e) {}
+        }
+    }
+
     function ensureReady() {
         if (ready) return Promise.resolve(true);
         if (_loadPromise) return _loadPromise;
@@ -96,6 +118,7 @@
                 return false;
             }
             await loadDefs(sonic);
+            await loadSamples(sonic);
             scheduler = new BrowserScheduler({
                 sonic: sonic,
                 manifest: __MANIFEST_JSON__,

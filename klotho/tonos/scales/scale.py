@@ -6,10 +6,10 @@ from ..pitch.pitch_collections import (
     IntervalType,
     DegreeList,
     RelativePitchCollection,
-    RootedPitchCollection,
     PitchCollectionBase,
     _parse_equave,
     _convert_degree,
+    _resolve_reference,
 )
 from ..utils.interval_normalization import equave_reduce
 import numpy as np
@@ -33,7 +33,7 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     equave : float, Fraction, int, or str, optional
         Interval of equivalence. Default is ``"2/1"`` (octave).
     reference_pitch : Pitch, str, or None, optional
-        If provided, the scale is instanced at this pitch.
+        The root pitch. ``None`` (default) resolves to C4.
 
     Examples
     --------
@@ -41,12 +41,12 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     >>> scale.degrees
     [Fraction(1, 1), Fraction(9, 8), Fraction(5, 4), Fraction(4, 3), Fraction(3, 2), Fraction(5, 3), Fraction(15, 8)]
 
-    >>> scale[7]
-    Fraction(2, 1)
-
-    >>> c_major = scale.root("C4")
-    >>> c_major[0]
+    >>> scale[0]
     Pitch(C4, 261.63 Hz)
+
+    >>> a_major = scale.root("A4")
+    >>> a_major[0]
+    Pitch(A4, 440.00 Hz)
     """
     
     def __init__(self, degrees: DegreeList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"],
@@ -70,14 +70,8 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         self._equave_cyclic = True
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
-        self._pitches = None
         self._mode_cache = {}
-        
-        if reference_pitch is not None:
-            self._reference_pitch = Pitch(reference_pitch) if isinstance(reference_pitch, str) else reference_pitch
-        else:
-            self._reference_pitch = None
-        
+        self._reference_pitch = _resolve_reference(reference_pitch)
         self._intervals = self._compute_scale_intervals()
     
     def _process_scale_degrees(self, degrees: DegreeList, interval_type: str, 
@@ -163,30 +157,6 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         """list : Successive step intervals including the closing interval to the equave."""
         return self._intervals
 
-    @property
-    def degrees(self) -> List[Union[Pitch, IntervalType]]:
-        """list : Cumulative degrees. Returns Pitch objects when instanced."""
-        if self.is_instanced:
-            return [self._calculate_pitch(i) for i in range(len(self._degrees))]
-        return list(self._degrees)
-    
-    def relative(self) -> 'Scale':
-        """
-        Return a rootless copy retaining only the interval structure.
-
-        Returns
-        -------
-        Scale
-        """
-        if not self.is_instanced:
-            return self
-        return Scale(
-            list(self._degrees),
-            self._interval_type_mode,
-            self._equave,
-            None
-        )
-    
     def root(self, pitch: Union[Pitch, str]) -> 'Scale':
         """
         Return a copy of this scale rooted at the given pitch.
@@ -224,11 +194,8 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             specified degree of the original.
         """
         if mode_number in self._mode_cache:
-            cached = self._mode_cache[mode_number]
-            if self._reference_pitch:
-                return cached.root(self._reference_pitch)
-            return cached
-        
+            return self._mode_cache[mode_number].root(self._reference_pitch)
+
         if mode_number == 0:
             return self
         
@@ -268,10 +235,7 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         
         result = Scale(modal_degrees, self._interval_type_mode, self._equave, None)
         self._mode_cache[mode_number] = result
-        
-        if self._reference_pitch:
-            return result.root(self._reference_pitch)
-        return result
+        return result.root(self._reference_pitch)
     
     def __invert__(self) -> 'Scale':
         if self._interval_type_mode == "cents":
@@ -297,13 +261,8 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         
         return self._getitem_single_scale(index)
     
-    def _getitem_single_scale(self, index: int) -> Union[Pitch, IntervalType]:
-        equave_shift, wrapped_index = self._get_cyclic_index(index)
-        degree = self._calculate_degree_with_shift(equave_shift, wrapped_index)
-        
-        if self.is_instanced:
-            return self._calculate_pitch(index)
-        return degree
+    def _getitem_single_scale(self, index: int) -> Pitch:
+        return self._calculate_pitch(index)
     
     def _getitem_slice_scale(self, index: slice) -> PitchCollectionBase:
         size = len(self._degrees)
@@ -327,15 +286,10 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             for i in (indices if use_cyclic else range(start, stop, step))
         ]
 
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
 
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-        relative._equave_cyclic = False
-        return relative
-    
     def _getitem_sequence_scale(self, indices: Sequence[int]) -> PitchCollectionBase:
         selected_degrees = []
         for i in indices:
@@ -343,13 +297,9 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             equave_shift, wrapped_index = self._get_cyclic_index(idx)
             degree = self._calculate_degree_with_shift(equave_shift, wrapped_index)
             selected_degrees.append(degree)
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, None)
-        relative._equave_cyclic = False
-        return relative
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
     
     @classmethod
     def n_edo(cls, n: int = 12, equave: float = 1200.0, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
@@ -402,6 +352,40 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         return cls.ionian().mode(6).root(reference_pitch) if reference_pitch else cls.ionian().mode(6)
 
     @classmethod
+    def octatonic(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Half–whole octatonic scale in 12-EDO cents. ``.mode(1)`` gives whole–half."""
+        return cls([0, 100, 300, 400, 600, 700, 900, 1000],
+                   interval_type='cents', reference_pitch=reference_pitch)
+
+    @classmethod
+    def hexatonic(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """The hexatonic (augmented) scale in 12-EDO cents."""
+        return cls([0, 100, 400, 500, 800, 900],
+                   interval_type='cents', reference_pitch=reference_pitch)
+
+    @classmethod
+    def wholetone(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """The whole-tone scale (6-EDO)."""
+        return cls.n_edo(6, reference_pitch=reference_pitch)
+
+    @classmethod
+    def pentatonic(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Just-intonation major pentatonic scale."""
+        return cls(["1/1", "9/8", "5/4", "3/2", "5/3"], reference_pitch=reference_pitch)
+
+    @classmethod
+    def harmonic_minor(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Just-intonation harmonic minor scale."""
+        return cls(["1/1", "9/8", "6/5", "4/3", "3/2", "8/5", "15/8"],
+                   reference_pitch=reference_pitch)
+
+    @classmethod
+    def melodic_minor(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Just-intonation melodic minor scale (ascending)."""
+        return cls(["1/1", "9/8", "6/5", "4/3", "3/2", "5/3", "15/8"],
+                   reference_pitch=reference_pitch)
+
+    @classmethod
     def bagpipes(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
         return cls(
             ['1/1', '9/8', '5/4', '4/3', '27/20', '3/2', '5/3', '7/4', '16/9', '9/5'],
@@ -414,6 +398,3 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             ['1/1', '33/32', '9/8', '7/6', '5/4', '21/16', '11/8', '3/2', '99/64', '5/3', '7/4', '15/8'],
             reference_pitch=reference_pitch
         )
-
-
-InstancedScale = Scale

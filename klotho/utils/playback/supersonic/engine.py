@@ -26,7 +26,7 @@ def _load_disk_synthdef_assets():
     if _DISK_SYNTHDEF_ASSETS is None:
         assets = {}
         if SYNTHDEFS_DIR.exists():
-            for path in SYNTHDEFS_DIR.glob("*.scsyndef"):
+            for path in sorted(SYNTHDEFS_DIR.rglob("*.scsyndef")):
                 assets[path.stem] = base64.b64encode(path.read_bytes()).decode("ascii")
         if "default" not in assets and "kl_tri" in assets:
             assets["default"] = assets["kl_tri"]
@@ -100,6 +100,7 @@ class SuperSonicEngine:
             validate_sc_meta(self.meta)
         self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
         self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), self._needed)
+        self.sample_assets = self._load_needed_samples()
         self._is_score = bool(self.meta.get("groups") or self.meta.get("inserts"))
 
     def _needed_synthdefs(self):
@@ -117,6 +118,31 @@ class SuperSonicEngine:
         if self.control_data.get("descriptors"):
             names.add("__klEnvCtrl")
         return names
+
+    def _needed_samples(self):
+        """Sample names referenced symbolically by ``buf*`` pfields."""
+        names = set()
+        for ev in self.events:
+            pfields = ev.get("pfields")
+            if not isinstance(pfields, dict):
+                continue
+            for key, val in pfields.items():
+                if isinstance(val, str) and key.startswith('buf'):
+                    names.add(val)
+        return names
+
+    def _load_needed_samples(self):
+        from klotho.utils.playback.supersonic.samples import (
+            sample_info, sample_bytes_b64,
+        )
+        assets = {}
+        for name in sorted(self._needed_samples()):
+            info = sample_info(name)
+            assets[name] = {
+                "b64": sample_bytes_b64(name),
+                "channels": info["channels"],
+            }
+        return assets
 
     def _serialize_control_data(self):
         cd = self.control_data
@@ -137,6 +163,8 @@ class SuperSonicEngine:
         control_data_json = json.dumps(self._serialize_control_data())
         manifest_json = json.dumps(load_ss_manifest())
 
+        samples_json = json.dumps(self.sample_assets)
+
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
@@ -144,10 +172,12 @@ class SuperSonicEngine:
                      .replace('__SS_CONFIG_JSON__', config_json)
                      .replace('__META_JSON__', meta_json)
                      .replace('__CONTROL_DATA_JSON__', control_data_json)
+                     .replace('__SAMPLES_JSON__', samples_json)
                      .replace('__MANIFEST_JSON__', manifest_json)
                      .replace('__RING_TIME__', str(self.ring_time)))
 
-        score_js = scheduler_score_js() if self._is_score else ""
+        needs_score_js = self._is_score or bool(self.control_data.get("descriptors"))
+        score_js = scheduler_score_js() if needs_score_js else ""
 
         bar_html = control_bar_html(wid, show_status=True)
 

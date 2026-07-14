@@ -38,12 +38,9 @@ from .pitch import (
     PitchCollectionBase,
     RelativePitchCollection,
     AbsolutePitchCollection,
-    RootedPitchCollection,
 )
 from .scales import Scale
-from .scales.scale import InstancedScale
-from .chords import Chord, Voicing, ChordSequence
-from .chords.chord import InstancedChord, InstancedVoicing
+from .chords import Chord, Voicing, ChordSequence, fold, voice_lead
 from .pitch import Contour
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany, MasterSet
 from .systems.harmonic_trees import HarmonicTree
@@ -79,19 +76,17 @@ __all__ = [
     'PitchCollectionBase',
     'RelativePitchCollection',
     'AbsolutePitchCollection',
-    'RootedPitchCollection',
     'Scale',
     'Chord',
     'Voicing',
-    
+
     # Sequences
     'ChordSequence',
-    
-    # Instanced Pitch Collection Classes
-    'InstancedScale',
-    'InstancedChord',
-    'InstancedVoicing',
-    
+
+    # Voice leading
+    'fold',
+    'voice_lead',
+
     # Other Classes
     'Contour',
     'CombinationProductSet',

@@ -31,8 +31,6 @@ from .types import *
 from .collections import patterns, sequences, sets, Pattern, CombinationSet, PartitionSet
 from .collections import autoref, autoref_rotmat, permute_list
 
-from .formal_grammars import grammars
-
 from .graphs import trees, GraphCore, Graph, Tree, Lattice
 
 __all__ = [
@@ -43,6 +41,6 @@ __all__ = [
     # Functions
     'autoref', 'autoref_rotmat', 'permute_list',
     'patterns', 'sequences', 'sets',
-    'grammars',
+    'formal_grammars',
     'trees',
 ] + getattr(_types, '__all__', [])

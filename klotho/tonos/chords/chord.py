@@ -7,10 +7,10 @@ from ..pitch.pitch_collections import (
     IntervalType,
     DegreeList,
     RelativePitchCollection,
-    RootedPitchCollection,
     PitchCollectionBase,
     _parse_equave,
     _convert_degree,
+    _resolve_reference,
 )
 from ..utils.interval_normalization import equave_reduce
 import numpy as np
@@ -34,7 +34,7 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
     equave : float, Fraction, int, or str, optional
         Interval of equivalence. Default is ``"2/1"`` (octave).
     reference_pitch : Pitch, str, or None, optional
-        If provided, the chord is instanced at this pitch.
+        The root pitch. ``None`` (default) resolves to C4.
 
     Examples
     --------
@@ -42,12 +42,12 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
     >>> chord.degrees
     [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
 
-    >>> chord[3]
-    Fraction(2, 1)
-
-    >>> c_major = chord.root("C4")
-    >>> c_major[0]
+    >>> chord[0]
     Pitch(C4, 261.63 Hz)
+
+    >>> a_major = chord.root("A4")
+    >>> a_major[0]
+    Pitch(A4, 440.00 Hz)
     """
     
     def __init__(self, degrees: DegreeList = ["1/1", "5/4", "3/2"],
@@ -71,13 +71,7 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         self._equave_cyclic = True
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
-        self._pitches = None
-        
-        if reference_pitch is not None:
-            self._reference_pitch = Pitch(reference_pitch) if isinstance(reference_pitch, str) else reference_pitch
-        else:
-            self._reference_pitch = None
-        
+        self._reference_pitch = _resolve_reference(reference_pitch)
         self._intervals = self._compute_chord_intervals()
     
     def _process_chord_degrees(self, degrees: DegreeList, interval_type: str,
@@ -153,29 +147,15 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         return self._intervals
 
     @property
-    def degrees(self) -> List[Union[Pitch, IntervalType]]:
-        """list : Cumulative degrees. Returns Pitch objects when instanced."""
-        if self.is_instanced:
-            return [self._calculate_pitch(i) for i in range(len(self._degrees))]
-        return list(self._degrees)
-    
-    def relative(self) -> 'Chord':
-        """
-        Return a rootless copy retaining only the interval structure.
+    def freq(self) -> tuple:
+        """tuple of float : Frequencies of the chord's pitches.
 
-        Returns
-        -------
-        Chord
+        A tuple, so ``freq=chord.freq`` assigns the whole chord as one
+        simultaneity when used as the ``freq`` pfield (alias of
+        :attr:`freqs`).
         """
-        if not self.is_instanced:
-            return self
-        return Chord(
-            list(self._degrees),
-            self._interval_type_mode,
-            self._equave,
-            None
-        )
-    
+        return self.freqs
+
     def root(self, pitch: Union[Pitch, str]) -> 'Chord':
         """
         Return a copy of this chord rooted at the given pitch.
@@ -296,13 +276,8 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         
         return self._getitem_single_chord(index)
     
-    def _getitem_single_chord(self, index: int) -> Union[Pitch, IntervalType]:
-        equave_shift, wrapped_index = self._get_cyclic_index(index)
-        degree = self._calculate_degree_with_shift(equave_shift, wrapped_index)
-        
-        if self.is_instanced:
-            return self._calculate_pitch(index)
-        return degree
+    def _getitem_single_chord(self, index: int) -> Pitch:
+        return self._calculate_pitch(index)
     
     def _getitem_slice_chord(self, index: slice) -> PitchCollectionBase:
         size = len(self._degrees)
@@ -319,25 +294,16 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
             selected_degrees = [self._get_degree_cyclic(i) for i in indices]
         else:
             selected_degrees = [self._degrees[i] for i in range(start, stop, step)]
-        
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
 
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-        relative._equave_cyclic = False
-        return relative
-    
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
+
     def _getitem_sequence_chord(self, indices: Sequence[int]) -> PitchCollectionBase:
         selected_degrees = [self._get_degree_cyclic(int(i) if not isinstance(i, int) else i) for i in indices]
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, None)
-        relative._equave_cyclic = False
-        return relative
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
     
     @classmethod
     def from_collection(cls, collection: PitchCollectionBase, equave: Union[float, Fraction, int, str, None] = None) -> 'Chord':
@@ -390,7 +356,7 @@ class Voicing(RelativePitchCollection):
     equave : float, Fraction, int, or str, optional
         Interval of equivalence. Default is ``"2/1"``.
     reference_pitch : Pitch, str, or None, optional
-        If provided, the voicing is instanced at this pitch.
+        The root pitch. ``None`` (default) resolves to C4.
 
     Examples
     --------
@@ -424,13 +390,7 @@ class Voicing(RelativePitchCollection):
         self._equave_cyclic = False
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
-        self._pitches = None
-        
-        if reference_pitch is not None:
-            self._reference_pitch = Pitch(reference_pitch) if isinstance(reference_pitch, str) else reference_pitch
-        else:
-            self._reference_pitch = None
-        
+        self._reference_pitch = _resolve_reference(reference_pitch)
         self._intervals = self._compute_sonority_intervals()
     
     def _process_sonority_degrees(self, degrees: DegreeList, interval_type: str,
@@ -487,29 +447,15 @@ class Voicing(RelativePitchCollection):
         return self._intervals
 
     @property
-    def degrees(self) -> List[Union[Pitch, IntervalType]]:
-        """list : The voicing degrees. Returns Pitch objects when instanced."""
-        if self.is_instanced:
-            return [self._getitem_single_sonority(i) for i in range(len(self._degrees))]
-        return list(self._degrees)
-    
-    def relative(self) -> 'Voicing':
-        """
-        Return a rootless copy retaining only the interval structure.
+    def freq(self) -> tuple:
+        """tuple of float : Frequencies of the voicing's pitches.
 
-        Returns
-        -------
-        Voicing
+        A tuple, so ``freq=voicing.freq`` assigns the whole voicing as one
+        simultaneity when used as the ``freq`` pfield (alias of
+        :attr:`freqs`).
         """
-        if not self.is_instanced:
-            return self
-        return Voicing(
-            list(self._degrees),
-            self._interval_type_mode,
-            self._equave,
-            None
-        )
-    
+        return self.freqs
+
     def root(self, pitch: Union[Pitch, str]) -> 'Voicing':
         """
         Return a copy rooted at the given pitch.
@@ -543,40 +489,20 @@ class Voicing(RelativePitchCollection):
         
         return self._getitem_single_sonority(index)
     
-    def _getitem_single_sonority(self, index: int) -> Union[Pitch, IntervalType]:
-        degree = self._degrees[index]
-        
-        if self.is_instanced:
-            if self._interval_type_mode == "cents":
-                freq = self._reference_pitch.freq * (2 ** (float(degree) / 1200))
-                partial = 2 ** (float(degree) / 1200)
-            else:
-                freq = self._reference_pitch.freq * float(degree)
-                partial = degree
-            return Pitch.from_freq(freq, partial)
-        return degree
-    
+    def _getitem_single_sonority(self, index: int) -> Pitch:
+        return self._calculate_pitch(index)
+
     def _getitem_slice_sonority(self, index: slice) -> PitchCollectionBase:
         selected_degrees = self._degrees[index]
-        
-        if self.is_instanced:
-            rooted = RootedPitchCollection(list(selected_degrees), self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
+        subset = RelativePitchCollection(list(selected_degrees), self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
 
-        relative = RelativePitchCollection(list(selected_degrees), self._interval_type_mode, self._equave, None)
-        relative._equave_cyclic = False
-        return relative
-    
     def _getitem_sequence_sonority(self, indices: Sequence[int]) -> PitchCollectionBase:
         selected_degrees = [self._degrees[int(i) if not isinstance(i, int) else i] for i in indices]
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, None)
-        relative._equave_cyclic = False
-        return relative
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
     
     @classmethod
     def from_collection(cls, collection: PitchCollectionBase, equave: Union[float, Fraction, int, str, None] = None) -> 'Voicing':
@@ -648,13 +574,41 @@ class ChordSequence:
     
     def __iter__(self):
         return iter(self._chords)
-    
+
+    def folded(self, lo=None, hi=None) -> 'ChordSequence':
+        """
+        Return a new sequence with each chord folded into ``[lo, hi]``.
+
+        Parameters
+        ----------
+        lo, hi : optional
+            Register bounds, as in :func:`~klotho.tonos.chords.voice_leading.fold`.
+
+        Returns
+        -------
+        ChordSequence
+        """
+        from .voice_leading import fold
+        return ChordSequence([fold(chord, lo, hi) for chord in self._chords])
+
+    def voice_led(self, lo=None, hi=None) -> 'ChordSequence':
+        """
+        Return a new sequence voice-led with minimal per-voice movement.
+
+        Parameters
+        ----------
+        lo, hi : optional
+            Register bounds, as in :func:`~klotho.tonos.chords.voice_leading.voice_lead`.
+
+        Returns
+        -------
+        ChordSequence
+        """
+        from .voice_leading import voice_lead
+        return ChordSequence(voice_lead(self._chords, lo, hi))
+
     def __repr__(self) -> str:
         return f"ChordSequence({len(self._chords)} chords)"
     
     def __str__(self) -> str:
         return f"ChordSequence({len(self._chords)} chords)"
-
-
-InstancedChord = Chord
-InstancedVoicing = Voicing

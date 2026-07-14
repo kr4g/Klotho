@@ -7,6 +7,7 @@ recursive-include klotho *.js
 recursive-include klotho *.json
 recursive-include klotho *.scsyndef
 recursive-include klotho *.scd
+recursive-include klotho *.wav
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .DS_Store

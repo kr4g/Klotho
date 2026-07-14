@@ -9,9 +9,9 @@ from . import instruments
 from . import parameters
 from . import composition
 
-from .parameters import ParameterTree, ParameterField
+from .parameters import ParameterTree, ParameterField, Bind
 from .instruments import Instrument, Effect, SynthDefInstrument, SynthDefFX, MidiInstrument, ToneInstrument, Kit, SynthDefKit, Ensemble
-from .composition import CompositionalUnit, Parametron, Score, ScoreItem
+from .composition import CompositionalUnit, Parametron, Score, ScoreItem, Event, EventItem
 from klotho.types import frequency, cent, midicent, midi, amplitude, decibel, real_onset, real_duration, metric_onset, metric_duration
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     'composition',
     'ParameterTree',
     'ParameterField',
+    'Bind',
     'Instrument',
     'Effect',
     'SynthDefFX',
@@ -30,6 +31,8 @@ __all__ = [
     'Parametron',
     'Score',
     'ScoreItem',
+    'Event',
+    'EventItem',
     'frequency', 
     'cent', 
     'midicent', 

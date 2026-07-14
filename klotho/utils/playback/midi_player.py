@@ -1898,13 +1898,7 @@ def _create_midi_from_pitch_collection(collection, dur=0.5, prgm=0, max_channels
     if debug:
         print(f"[DEBUG] PitchCollection: {max_concurrent} voices, {writer.num_ports} ports")
     
-    if hasattr(collection, 'is_instanced') and collection.is_instanced:
-        instanced = collection
-    elif hasattr(collection, 'is_relative') and not collection.is_relative:
-        instanced = collection
-    else:
-        from klotho.tonos.pitch.pitch import Pitch
-        instanced = collection.root(Pitch("C4"))
+    instanced = collection
     
     note_events = []
     current_time = 0.0
@@ -1965,13 +1959,7 @@ def _create_midi_from_scale(scale, dur=0.5, prgm=0, max_channels=128, bend_sensi
     if debug:
         print(f"[DEBUG] Scale: {max_concurrent} voices, {writer.num_ports} ports")
     
-    if hasattr(scale, 'is_instanced') and scale.is_instanced:
-        instanced = scale
-    elif hasattr(scale, 'is_relative') and not scale.is_relative:
-        instanced = scale
-    else:
-        from klotho.tonos.pitch.pitch import Pitch
-        instanced = scale.root(Pitch("C4"))
+    instanced = scale
     
     # For scales: allocate channels per note for ascending (microtones), reuse for descending
     note_events = []
@@ -2073,13 +2061,7 @@ def _create_midi_from_chord(chord, dur=3.0, arp=False, prgm=0, max_channels=128,
     if debug:
         print(f"[DEBUG] Chord: {max_concurrent} voices, {writer.num_ports} ports")
     
-    if hasattr(chord, 'is_instanced') and chord.is_instanced:
-        instanced = chord
-    elif hasattr(chord, 'is_relative') and not chord.is_relative:
-        instanced = chord
-    else:
-        from klotho.tonos.pitch.pitch import Pitch
-        instanced = chord.root(Pitch("C4"))
+    instanced = chord
     
     note_events = []
     voice_counter = 0
@@ -2177,14 +2159,8 @@ def _create_midi_from_chord_sequence(chord_sequence, dur=3.0, arp=False, prgm=0,
     voice_counter = 0
     
     for chord_idx, chord in enumerate(chord_sequence.chords):
-        if hasattr(chord, 'is_instanced') and chord.is_instanced:
-            pitches = chord
-        elif hasattr(chord, 'is_relative') and not chord.is_relative:
-            pitches = chord
-        else:
-            from klotho.tonos.pitch.pitch import Pitch
-            pitches = chord.root(Pitch("C4"))
-        
+        pitches = chord
+
         if arp:
             chord_start_time = current_time
             for i in range(len(pitches)):

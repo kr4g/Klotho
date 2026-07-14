@@ -18,6 +18,7 @@ from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon, NodeContext, UTNodeHandle, UTNodeSelector
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.parameters.parameter_tree import ParameterApiMixin, ParameterLayer
+from klotho.thetos.parameters.bind import Bind
 from klotho.thetos.instruments import Instrument
 from klotho.thetos.instruments.base import Effect
 from klotho.thetos.instruments.base import Kit
@@ -78,10 +79,50 @@ class DistributionContext(NodeContext):
 
 PFieldContext = DistributionContext
 
+# Meta-field names the playback engine consumes (poly-voice strum spread and
+# track/group routing). The unified ``set()`` routes bare kwargs with these
+# names to mfields; everything else goes to pfields.
+ENGINE_MFIELDS = frozenset({'strum', 'group'})
+
+
+def _merge_kit_member_defaults(kit, selector_tuple):
+    """Element-wise merge of member default pfields for a tuple selector.
+
+    Each element of *selector_tuple* resolves to a Kit member; for every
+    default pfield key across those members, the merged dict carries a
+    scalar when all members agree and a tuple aligned with the selector
+    tuple otherwise (so each expanded voice gets its own member's
+    defaults, e.g. per-voice ``buf`` for sampler kits).
+    """
+    members = [kit._resolve(k) for k in selector_tuple]
+    dicts = [dict(m.pfields) if hasattr(m, 'pfields') else {} for m in members]
+    keys = []
+    for d in dicts:
+        for k in d:
+            if k not in keys:
+                keys.append(k)
+    merged = {}
+    for k in keys:
+        values = [d.get(k) for d in dicts]
+        present = [v for v in values if v is not None]
+        if not present:
+            continue
+        first = present[0]
+        if all(v == first for v in present):
+            merged[k] = first
+        else:
+            merged[k] = tuple(v if v is not None else first for v in values)
+    return merged
+
 
 def _resolve_kit_member(inst, pt, node):
     if isinstance(inst, Kit):
         selector_val = pt.get_pfield(node, inst.selector)
+        if isinstance(selector_val, tuple) and selector_val:
+            from types import SimpleNamespace
+            return SimpleNamespace(
+                pfields=_merge_kit_member_defaults(inst, selector_val)
+            )
         return inst._resolve(selector_val)
     return inst
 
@@ -98,6 +139,83 @@ def _callable_arity(fn):
                     if p.default is inspect.Parameter.empty])
     except (ValueError, TypeError):
         return 0
+
+
+def _reject_fx_as_instrument(def_name):
+    """Raise if *def_name* names a known effect or infra SynthDef.
+
+    Voice assignment (``set_instrument``) is for instrument defs only;
+    effects belong in a track's insert chain. No-ops for non-strings and
+    names of unknown kind (treated as instruments).
+    """
+    if not isinstance(def_name, str) or not def_name:
+        return
+    from klotho.thetos.instruments._shared import ss_synth_kind
+    kind = ss_synth_kind(def_name)
+    if kind == 'fx':
+        raise TypeError(
+            f"'{def_name}' is an effect SynthDef, not an instrument. Use "
+            f"SynthDefFX('{def_name}', ...) in Score.track(inserts=[...]) "
+            f"or Ensemble.set_inserts(...) instead of set_instrument."
+        )
+    if kind == 'infra':
+        raise TypeError(
+            f"'{def_name}' is an internal engine SynthDef and cannot be "
+            f"used as an instrument."
+        )
+
+
+def _is_pitch_collection_value(value):
+    """Pitch collections define ``__call__`` (index delegation), so they must
+    be excluded from the callable/distributable classification in setters and
+    treated as static values instead."""
+    from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
+    return isinstance(value, PitchCollectionBase)
+
+
+def _coerce_set_pfield_value(key, value):
+    """Set-time normalization of a pfield value.
+
+    - NumPy scalars become Python scalars; NumPy arrays are rejected
+      (ambiguous: a tuple means a chord/poly value, a Pattern cycles).
+    - For the ``freq`` key: a pitch-name string becomes a :class:`Pitch`
+      (parsed eagerly so typos fail at set time); a ``Chord``/``Voicing``
+      becomes a tuple of its member Pitches (a chord); any other pitch
+      collection is rejected as ambiguous (sequence vs simultaneity).
+    - Tuples are normalized element-wise.
+
+    Rich values (``Pitch``, ``Fraction``) are stored as-is in the tree and
+    lowered to floats at playback assembly.
+    """
+    import numpy as _np
+    from klotho.tonos import Pitch
+    from klotho.tonos.chords.chord import Chord, Voicing
+    from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
+
+    if isinstance(value, Bind):
+        return value
+    if isinstance(value, _np.generic):
+        return value.item()
+    if isinstance(value, _np.ndarray):
+        raise TypeError(
+            f"set_pfields got a numpy array for '{key}'; use a tuple for a "
+            f"chord/poly value, or Pattern([...]) to cycle values across nodes"
+        )
+    if key == 'freq':
+        if isinstance(value, str) and value:
+            return Pitch(value)
+        if isinstance(value, (Chord, Voicing)):
+            return tuple(value.pitches)
+        if isinstance(value, PitchCollectionBase):
+            raise TypeError(
+                f"A {type(value).__name__} is ambiguous for 'freq' (it can "
+                f"model a sequence or a simultaneity). Use freq=coll.freqs "
+                f"for a chord, Pattern(coll.freqs) to cycle across nodes, "
+                f"or coll.as_voicing() for an explicit simultaneity."
+            )
+    if isinstance(value, tuple):
+        return tuple(_coerce_set_pfield_value(key, v) for v in value)
+    return value
 
 
 class Parametron(Chronon):
@@ -126,7 +244,13 @@ class Parametron(Chronon):
         """
         super().__init__(node_id, ut)
         self._pt = pt
-    
+
+    def _resolve_bind(self, key, value):
+        resolver = getattr(self._ut, '_resolve_bound_value', None)
+        if resolver is not None:
+            return resolver(self._node_id, key, value)
+        return value
+
     @property
     def pfields(self):
         """
@@ -147,7 +271,7 @@ class Parametron(Chronon):
         if effective is not None and hasattr(effective, 'pfields'):
             result.update(dict(effective.pfields))
         for k in self._pt.pfield_names:
-            v = self._pt.get_pfield(self._node_id, k)
+            v = self._resolve_bind(k, self._pt.get_pfield(self._node_id, k))
             if v is not None:
                 result[k] = v
             elif effective is not None and hasattr(effective, 'pfields'):
@@ -166,18 +290,18 @@ class Parametron(Chronon):
         dict
             Dictionary of meta field names and values
         """
-        return {k: self._pt.get_mfield(self._node_id, k)
+        return {k: self._resolve_bind(k, self._pt.get_mfield(self._node_id, k))
                 for k in self._pt.mfield_names}
 
     def _resolve_instrument(self):
         return self._pt.get_instrument(self._node_id)
 
     def get_pfield(self, key: str, default=None):
-        value = self._pt.get_pfield(self._node_id, key)
+        value = self._resolve_bind(key, self._pt.get_pfield(self._node_id, key))
         return default if value is None else value
 
     def get_mfield(self, key: str, default=None):
-        value = self._pt.get_mfield(self._node_id, key)
+        value = self._resolve_bind(key, self._pt.get_mfield(self._node_id, key))
         return default if value is None else value
 
     def __getitem__(self, key: str):
@@ -239,12 +363,13 @@ class UCNodeSelector(UTNodeSelector):
         for n in self._ids:
             self._owner.clear_parameters(n)
 
-    def set(self, *, inst=None, mfields=None, pfields=None,
-            include_rests: bool = False):
-        """Set instrument / mfields / pfields in one call across the selection."""
+    def set(self, *, inst=None, include_rests: bool = False,
+            pfields=None, mfields=None, **fields):
+        """Set instrument and auto-routed fields in one call across the
+        selection. See :meth:`CompositionalUnit.set`."""
         return self._owner.set(
-            self, inst=inst, mfields=mfields,
-            pfields=pfields, include_rests=include_rests,
+            self, inst=inst, include_rests=include_rests,
+            pfields=pfields, mfields=mfields, **fields,
         )
 
     # --- Per-node getters (return list aligned with self._ids) ---
@@ -285,11 +410,11 @@ class UCNodeHandle(UTNodeHandle):
     def clear_parameters(self):
         return self._owner.clear_parameters(self.id)
 
-    def set(self, *, inst=None, mfields=None, pfields=None,
-            include_rests: bool = False):
+    def set(self, *, inst=None, include_rests: bool = False,
+            pfields=None, mfields=None, **fields):
         return self._owner.set(
-            self.id, inst=inst, mfields=mfields,
-            pfields=pfields, include_rests=include_rests
+            self.id, inst=inst, include_rests=include_rests,
+            pfields=pfields, mfields=mfields, **fields,
         )
 
     @property
@@ -391,6 +516,9 @@ class CompositionalUnit(TemporalUnit):
                  mfields  : Union[dict, list, None]                = None,
                  pfields  : Union[dict, list, None]                = None):
         
+        self._bind_memo = {}
+        self._bind_active = set()
+
         super().__init__(span, tempus, prolatio, beat, bpm)
         
         if mfields is None:
@@ -442,6 +570,126 @@ class CompositionalUnit(TemporalUnit):
                    mfields  = mfields,
                    inst     = inst)
         
+    @classmethod
+    def from_tree(cls, tree, denom: int = 8,
+                  beat: Union[None, Fraction, int, float, str] = None,
+                  bpm: Union[None, int, float] = None,
+                  inst: Union[Instrument, None] = None,
+                  tempus: Union[Meas, Fraction, int, float, str, None] = None,
+                  head_weight: int = 1,
+                  pfields: Union[dict, list, None] = None,
+                  mfields: Union[dict, list, None] = None):
+        """
+        Create a CompositionalUnit whose rhythm is an arbitrary tree.
+
+        Accepts a plain :class:`~klotho.topos.graphs.trees.Tree` or a
+        :class:`~klotho.topos.formal_grammars.derivation.DerivationTree`
+        (converted via ``to_tree()``, copying every ``data`` payload).
+
+        Rhythm comes from each node's ``proportion`` attribute (default 1
+        when absent); the nested prolatio is rebuilt from the topology.
+        Negative proportions (rests) pass through unchanged.
+
+        The meter is resolved in precedence order:
+
+        1. an explicit ``tempus`` argument wins;
+        2. else, if the root node has a ``proportion`` attribute,
+           ``tempus = Meas(root_proportion, denom)``;
+        3. else — the normal case for derivation trees, whose conversion
+           writes no root proportion — ``tempus`` is the sum of the root's
+           child proportions over ``denom``.
+
+        ``span`` is always 1.
+
+        Every other node attribute that is not rhythm-owned
+        (``proportion``, ``tied``, ``metric_duration``, ``metric_onset``)
+        or tree bookkeeping (``label``, ``meta``) is copied into the
+        corresponding node's **mfields**, so a derivation tree with
+        ``chord`` payloads yields a UC where ``leaf.mfields['chord']`` is
+        the chord.
+
+        Parameters
+        ----------
+        tree : Tree or DerivationTree
+            The source tree.
+        denom : int, optional
+            Meter denominator for the derived tempus. Default is 8.
+        beat, bpm : optional
+            Tempo, as in the constructor.
+        inst : Instrument or None, optional
+            Instrument for the root node.
+        tempus : optional
+            Explicit time signature (overrides derivation from the tree).
+        head_weight : int, optional
+            Only used for DerivationTree input: the rightmost child of
+            every expansion gets this proportion (all others get 1),
+            exactly as in :meth:`DerivationTree.prolatio`. Default is 1.
+        pfields, mfields : dict, list, or None, optional
+            Fields to initialize, as in the constructor.
+
+        Returns
+        -------
+        CompositionalUnit
+        """
+        from klotho.topos.formal_grammars.derivation import DerivationTree
+
+        if isinstance(tree, DerivationTree):
+            data_keys = sorted({k for node in tree.walk() for k in node.data})
+            derivation = tree
+            tree = derivation.to_tree(**{k: k for k in data_keys})
+            if head_weight != 1 and derivation.children:
+                stack = [(derivation, tree.root)]
+                while stack:
+                    dnode, tnode = stack.pop()
+                    children = list(tree.successors(tnode))
+                    for i, (dchild, tchild) in enumerate(zip(dnode.children, children)):
+                        weight = head_weight if i == len(dnode.children) - 1 else 1
+                        tree.set_node_data(tchild, proportion=weight)
+                        stack.append((dchild, tchild))
+
+        def proportion_of(node):
+            return tree[node].get('proportion', 1)
+
+        def build_s(node):
+            parts = []
+            for child in tree.successors(node):
+                if tree.successors(child):
+                    parts.append((proportion_of(child), build_s(child)))
+                else:
+                    parts.append(proportion_of(child))
+            return tuple(parts)
+
+        subdivisions = build_s(tree.root) or (1,)
+
+        if tempus is None:
+            root_proportion = tree[tree.root].get('proportion')
+            if root_proportion is not None:
+                tempus = Meas(int(abs(root_proportion)), denom)
+            else:
+                child_sum = sum(abs(proportion_of(c)) for c in tree.successors(tree.root))
+                tempus = Meas(int(child_sum) if child_sum else 1, denom)
+
+        new_uc = cls(span=1, tempus=tempus, prolatio=subdivisions,
+                     beat=beat, bpm=bpm, inst=inst,
+                     pfields=pfields, mfields=mfields)
+
+        rhythm_keys = {'proportion', 'tied', 'metric_duration', 'metric_onset'}
+        bookkeeping = {'label', 'meta'}
+        skip = rhythm_keys | bookkeeping
+
+        if list(tree.successors(tree.root)):
+            mapping = tree.map_parallel_nodes(new_uc._rt)
+        else:
+            mapping = {tree.root: new_uc._rt.root}
+
+        for old_node, new_node in mapping.items():
+            fields = {k: v for k, v in dict(tree[old_node]).items()
+                      if k not in skip and v is not None}
+            if fields:
+                new_uc._rt.set_mfields(new_node, **fields)
+
+        return new_uc
+
     @classmethod
     def from_ut(cls, ut: TemporalUnit, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
         """
@@ -560,6 +808,93 @@ class CompositionalUnit(TemporalUnit):
     def _resolve_governing_instrument_node(self, node: int):
         return self._rt._resolve_governing_instrument_node(node)
 
+    # ------------------------------------------------------------------
+    # Late-bound (Bind) value resolution
+    # ------------------------------------------------------------------
+    def _bind_origin(self, node: int, key: str) -> int:
+        """Nearest ancestor-or-self holding a raw Bind override for *key*."""
+        for ancestor in reversed(self._rt.branch(node)):
+            raw = self._rt._rx[ancestor]
+            if isinstance(raw, dict) and isinstance(raw.get(key), Bind):
+                return ancestor
+        return node
+
+    def _resolve_bound_value(self, node: int, key: str, value):
+        """Resolve *value* if it is a :class:`Bind`; pass anything else through.
+
+        The Bind's callable is evaluated for the reading node with a
+        ``DistributionContext`` whose index/total reflect the node's
+        position among the leaf descendants of the origin node (the nearest
+        ancestor-or-self holding the raw Bind override). Results are
+        memoized per ``(node, key)`` so stochastic functions are stable
+        across repeated reads and structural edits.
+        """
+        if not isinstance(value, Bind):
+            return value
+        memo_key = (node, key)
+        if memo_key in self._bind_memo:
+            return self._bind_memo[memo_key]
+        if memo_key in self._bind_active:
+            raise ValueError(
+                f"Bind cycle detected: field '{key}' at node {node} is being "
+                f"evaluated while already under evaluation"
+            )
+        origin = self._bind_origin(node, key)
+        leaves = self._rt.subtree_leaves(origin)
+        try:
+            index = leaves.index(node)
+        except ValueError:
+            index = 0
+        total = len(leaves)
+        self._bind_active.add(memo_key)
+        try:
+            ctx = self._build_node_context(node, index, total)
+            arity = _callable_arity(value.fn)
+            result = value.fn(ctx) if arity >= 1 else value.fn()
+        finally:
+            self._bind_active.discard(memo_key)
+        if isinstance(result, Bind):
+            raise ValueError(
+                f"Bind cycle detected: field '{key}' at node {node} resolved "
+                f"to another Bind (self-referential pfield read?)"
+            )
+        if key in self._rt.pfield_names:
+            result = _coerce_set_pfield_value(key, result)
+        self._bind_memo[memo_key] = result
+        return result
+
+    def _invalidate_bind_memo(self, nodes=None, keys=None):
+        """Drop memoized Bind evaluations for the given nodes/keys.
+
+        ``None`` for either argument means "all". Called when a field is
+        re-assigned or removed at a node (invalidating its subtree) and
+        when nodes are destroyed.
+        """
+        if not self._bind_memo:
+            return
+        if nodes is None and keys is None:
+            self._bind_memo.clear()
+            return
+        node_set = set(nodes) if nodes is not None else None
+        key_set = set(keys) if keys is not None else None
+        for memo_key in list(self._bind_memo):
+            n, k = memo_key
+            if ((node_set is None or n in node_set)
+                    and (key_set is None or k in key_set)):
+                del self._bind_memo[memo_key]
+
+    def _invalidate_bind_memo_subtree(self, targets, keys):
+        if not self._bind_memo:
+            return
+        affected = set()
+        for n in targets:
+            if n in self._rt:
+                affected.add(n)
+                affected.update(self._rt.descendants(n))
+            else:
+                affected.add(n)
+        self._invalidate_bind_memo(affected, keys)
+
     def _resolve_distribution_fields(self, node_id: int):
         inst = self._rt.get_instrument(node_id)
         effective = _resolve_kit_member(inst, self._rt, node_id) if inst is not None else inst
@@ -569,8 +904,15 @@ class CompositionalUnit(TemporalUnit):
             value = self._rt.get_pfield(node_id, key)
             if value is None and key in inst_pfields:
                 value = inst_pfields[key]
+            if isinstance(value, Bind) and (node_id, key) not in self._bind_active:
+                value = self._resolve_bound_value(node_id, key, value)
             pfields[key] = value
-        mfields = {key: self._rt.get_mfield(node_id, key) for key in self._rt.mfield_names}
+        mfields = {}
+        for key in self._rt.mfield_names:
+            value = self._rt.get_mfield(node_id, key)
+            if isinstance(value, Bind) and (node_id, key) not in self._bind_active:
+                value = self._resolve_bound_value(node_id, key, value)
+            mfields[key] = value
         is_rest = self._rt[node_id].get("proportion", 1) < 0
         return is_rest, pfields, mfields, inst
 
@@ -671,8 +1013,44 @@ class CompositionalUnit(TemporalUnit):
         idx = [leaf_index[leaf] for leaf in leaves]
         return min(idx), max(idx)
 
+    def _bind_field_keys(self):
+        """Field keys that carry a Bind override anywhere in the tree."""
+        keys = self._rt.pfield_names | self._rt.mfield_names
+        found = set()
+        for node in self._rt.nodes:
+            raw = self._rt._rx[node]
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if k in keys and isinstance(v, Bind):
+                        found.add(k)
+        return found
+
+    def _materialize_bound_values(self, pt_snapshot):
+        """Replace Bind values in a PT snapshot with per-node resolved values.
+
+        Converters/engines must never see a Bind, so snapshots carry only
+        concrete values.
+        """
+        bind_keys = self._bind_field_keys()
+        if not bind_keys:
+            return
+        pfield_keys = bind_keys & self._rt.pfield_names
+        mfield_keys = bind_keys & self._rt.mfield_names
+        for node in self._rt.nodes:
+            for key in pfield_keys:
+                value = self._rt.get_pfield(node, key)
+                if isinstance(value, Bind):
+                    resolved = self._resolve_bound_value(node, key, value)
+                    pt_snapshot.set_pfields(node, **{key: resolved})
+            for key in mfield_keys:
+                value = self._rt.get_mfield(node, key)
+                if isinstance(value, Bind):
+                    resolved = self._resolve_bound_value(node, key, value)
+                    pt_snapshot.set_mfields(node, **{key: resolved})
+
     def _build_effective_parameter_tree(self):
         pt_snapshot = self._extract_parameter_tree()
+        self._materialize_bound_values(pt_snapshot)
         for slur_id, slur_spec in self._slur_specs.items():
             leaves = list(slur_spec['leaf_nodes'])
             if not leaves:
@@ -826,6 +1204,8 @@ class CompositionalUnit(TemporalUnit):
                         resolved[k] = val
             if resolved:
                 if setter == 'pfields':
+                    resolved = {k: _coerce_set_pfield_value(k, v)
+                                for k, v in resolved.items()}
                     self._rt.set_pfields(n, **resolved)
                 else:
                     self._rt.set_mfields(n, **resolved)
@@ -846,12 +1226,18 @@ class CompositionalUnit(TemporalUnit):
             - Scalar: set directly on target node(s) (includes tuples, lists, or any non-callable/non-Pattern value)
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
+            - Bind: stored as-is; the wrapped callable re-evaluates per
+              reading node (descendants created later included)
         """
         targets = self._coerce_node_targets(node)
+        self._invalidate_bind_memo_subtree(targets, kwargs.keys())
 
         distributable_fields = {k: v for k, v in kwargs.items()
-                               if callable(v) or isinstance(v, Pattern)}
-        static_fields = {k: v for k, v in kwargs.items()
+                               if not isinstance(v, Bind)
+                               and (isinstance(v, Pattern)
+                                    or (callable(v) and not _is_pitch_collection_value(v)))}
+        static_fields = {k: _coerce_set_pfield_value(k, v)
+                        for k, v in kwargs.items()
                         if k not in distributable_fields}
 
         for n in targets:
@@ -876,11 +1262,14 @@ class CompositionalUnit(TemporalUnit):
             - Scalar: set directly on target node(s)
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
+            - Bind: stored as-is; re-evaluates per reading node
         """
         targets = self._coerce_node_targets(node)
+        self._invalidate_bind_memo_subtree(targets, kwargs.keys())
 
         distributable_fields = {k: v for k, v in kwargs.items()
-                               if callable(v) or isinstance(v, Pattern)}
+                               if not isinstance(v, Bind)
+                               and (callable(v) or isinstance(v, Pattern))}
         static_fields = {k: v for k, v in kwargs.items()
                         if k not in distributable_fields}
 
@@ -918,8 +1307,10 @@ class CompositionalUnit(TemporalUnit):
             values=envelope.values,
             times=envelope.times,
             curve=envelope._curve,
+            warp=envelope.warp,
             time_scale=duration / raw_total if raw_total > 0 else 1.0
         )
+        self._invalidate_bind_memo_subtree(sounding, pfields_list)
         for node in sounding:
             event_time = self.nodes[node]['real_onset']
             relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
@@ -1066,6 +1457,7 @@ class CompositionalUnit(TemporalUnit):
             raise KeyError(f"No control envelope with id {env_id}")
         desc = self._control_envelopes.pop(env_id)
         leaves = self._resolve_control_envelope_leaves(desc)
+        self._invalidate_bind_memo_subtree(leaves, desc["pfields"])
         for leaf in leaves:
             if leaf not in self._rt:
                 continue
@@ -1426,12 +1818,14 @@ class CompositionalUnit(TemporalUnit):
         removed_set = {node}
         self._invalidate_slurs_for_removed_nodes(removed_set)
         self._invalidate_envelopes_for_removed_nodes(removed_set)
+        self._invalidate_bind_memo(removed_set)
         self._rt.prune(node)
 
     def remove_subtree(self, node):
         removed_set = {node} | set(self._rt.descendants(node))
         self._invalidate_slurs_for_removed_nodes(removed_set)
         self._invalidate_envelopes_for_removed_nodes(removed_set)
+        self._invalidate_bind_memo(removed_set)
         self._rt.remove_subtree(node)
 
     def set_instrument(self, node, instrument) -> None:
@@ -1452,13 +1846,24 @@ class CompositionalUnit(TemporalUnit):
             - int: raw program number (MIDI)
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
+
+        Raises
+        ------
+        TypeError
+            If a SynthDef name (or SynthDefInstrument-wrapped defName)
+            refers to a known effect or infra def. Effect *instances*
+            remain accepted: assigning an Effect to nodes automates the
+            insert's parameters via ``set`` events.
         """
         targets = self._coerce_node_targets(node)
 
         if isinstance(instrument, (str, int)):
+            _reject_fx_as_instrument(instrument)
             for n in targets:
                 self._rt.set_instrument(n, instrument)
         elif isinstance(instrument, (Instrument, Effect)):
+            if not isinstance(instrument, Effect):
+                _reject_fx_as_instrument(getattr(instrument, 'defName', None))
             family = getattr(instrument, '_ensemble_family', None)
             for n in targets:
                 self._rt.set_instrument(n, instrument)
@@ -1477,36 +1882,65 @@ class CompositionalUnit(TemporalUnit):
                     arity = _callable_arity(instrument)
                     inst = instrument(ctx) if arity >= 1 else instrument()
                 if inst is not None:
+                    if isinstance(inst, str):
+                        _reject_fx_as_instrument(inst)
+                    elif isinstance(inst, Instrument) and not isinstance(inst, Effect):
+                        _reject_fx_as_instrument(getattr(inst, 'defName', None))
                     self._rt.set_instrument(n, inst)
                     family = getattr(inst, '_ensemble_family', None)
                     if family is not None:
                         self._rt.set_mfields(n, group=family)
 
-    def set(self, node, inst=None, mfields=None, pfields=None,
-            include_rests=False):
+    def set(self, node, *, inst=None, include_rests=False,
+            pfields=None, mfields=None, **fields):
         """
-        Convenience method to set instrument, meta fields, and parameter fields in one call.
-        
+        Set instrument, parameter fields, and meta fields in one call.
+
+        Bare keyword fields are routed automatically: names in
+        :data:`ENGINE_MFIELDS` (currently ``strum`` and ``group``) go to
+        meta fields, everything else goes to parameter fields. So::
+
+            uc.set(node, inst='fd_saw', freq='F#3', amp=0.15, strum=0.2)
+
+        is equivalent to ``set_instrument`` + ``set_pfields(freq=...,
+        amp=...)`` + ``set_mfields(strum=...)``.
+
         Parameters
         ----------
         node : int or list/tuple of int
             Target node(s).
-        inst : Instrument, Pattern, callable, or None, optional
-            Instrument to assign.
-        mfields : dict or None, optional
-            Meta field names and values to set.
-        pfields : dict or None, optional
-            Parameter field names and values to set.
+        inst : Instrument, str, Pattern, callable, or None, optional
+            Instrument to assign (same semantics as :meth:`set_instrument`,
+            including the effect-SynthDef guard).
         include_rests : bool, optional
             When True, rest nodes are included during callable/Pattern
             distribution (default is False).
+        pfields : dict or None, optional
+            Explicit parameter fields. Escape hatch: values here always go
+            to pfields, even if a name collides with an engine mfield.
+        mfields : dict or None, optional
+            Explicit meta fields. Escape hatch: values here always go to
+            mfields, even if a name collides with a SynthDef control.
+        **fields
+            Auto-routed fields (see above). Values may be scalars,
+            Patterns, or callables, exactly as in ``set_pfields`` /
+            ``set_mfields``.
         """
         if inst is not None:
             self.set_instrument(node, inst)
-        if mfields is not None:
-            self.set_mfields(node, include_rests=include_rests, **mfields)
-        if pfields is not None:
-            self.set_pfields(node, include_rests=include_rests, **pfields)
+
+        routed_mfields = {k: v for k, v in fields.items() if k in ENGINE_MFIELDS}
+        routed_pfields = {k: v for k, v in fields.items() if k not in ENGINE_MFIELDS}
+
+        if mfields:
+            routed_mfields.update(mfields)
+        if pfields:
+            routed_pfields.update(pfields)
+
+        if routed_mfields:
+            self.set_mfields(node, include_rests=include_rests, **routed_mfields)
+        if routed_pfields:
+            self.set_pfields(node, include_rests=include_rests, **routed_pfields)
 
     def sparsify(self, probability, node=None):
         """
@@ -1557,12 +1991,12 @@ class CompositionalUnit(TemporalUnit):
 
     def get_pfield(self, node: int, key: str, default=None):
         """Parameter field value for node (PT only, no instrument fallback)."""
-        value = self._rt.get_pfield(node, key)
+        value = self._resolve_bound_value(node, key, self._rt.get_pfield(node, key))
         return default if value is None else value
 
     def get_mfield(self, node: int, key: str, default=None):
         """Meta field value for node."""
-        value = self._rt.get_mfield(node, key)
+        value = self._resolve_bound_value(node, key, self._rt.get_mfield(node, key))
         return default if value is None else value
 
     
@@ -1578,11 +2012,13 @@ class CompositionalUnit(TemporalUnit):
         if node is None:
             self._slur_specs.clear()
             self._control_envelopes.clear()
+            self._invalidate_bind_memo()
         else:
             affected_nodes = {node} | set(self._rt.descendants(node))
             affected_leaves = {n for n in affected_nodes if n in self._rt.leaf_nodes}
             self._split_slurs_for_rests(affected_leaves)
             self._invalidate_envelopes_for_removed_nodes(affected_nodes)
+            self._invalidate_bind_memo(affected_nodes)
         
         self._rt.clear_fields(node)
     

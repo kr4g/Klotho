@@ -1,6 +1,10 @@
 (
 var outputDir = thisProcess.nowExecutingPath.dirname +/+ "synthdefs";
+var instDir = outputDir +/+ "instruments";
+var fxDir = outputDir +/+ "effects";
 outputDir.mkdir;
+instDir.mkdir;
+fxDir.mkdir;
 
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Instruments
@@ -27,7 +31,7 @@ SynthDef(\fd_ambi, { |out=0, freq=440, amp=1, gate=1, brightness=1, pan=0, porta
 	osc = osc * -20.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_dub, { |out=0, freq=110, amp=1, gate=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, decayTime=0.1, sustainLevel=0.7, releaseTime=0.2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -45,7 +49,7 @@ SynthDef(\fd_dub, { |out=0, freq=110, amp=1, gate=1, pan=0, portamento=0.08, vib
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_glass, { |out=0, freq=440, amp=1, gate=1, pan=0, spread=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=2, decayTime=0.3, sustainLevel=0.7, releaseTime=4, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -65,7 +69,7 @@ SynthDef(\fd_glass, { |out=0, freq=440, amp=1, gate=1, pan=0, spread=0, portamen
 	osc = LPF.ar(osc, freq * 8);
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_longsaw, { |out=0, freq=440, amp=1, gate=1, brightness=0.5, pan=0, portamento=0.08, vibRate=1.5, vibDepth=0.007, attackTime=1.25, decayTime=1.25, sustainLevel=0.5, releaseTime=1, attackCurve=(2), decayCurve=(2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -83,7 +87,7 @@ SynthDef(\fd_longsaw, { |out=0, freq=440, amp=1, gate=1, brightness=0.5, pan=0, 
 	osc = LPF.ar(osc, ampEnv.linexp(0, 1, freq * 2, freq * 4), 0.5) + Splay.ar(BPF.ar(osc, LFNoise1.kr([0.9,1.1,1.2]).exprange(freq * 2, freq * brightness.linexp(0.0, 1, 8, 16)), 0.15, 0.4));
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_pads, { |out=0, freq=440, amp=1, gate=1, pan=0, rq=0.5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=2, decayTime=0.5, sustainLevel=0.5, releaseTime=2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv, dur = attackTime + decayTime + releaseTime;
@@ -105,7 +109,7 @@ SynthDef(\fd_pads, { |out=0, freq=440, amp=1, gate=1, pan=0, rq=0.5, portamento=
 	osc = Mix(osc) * -16.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_ripple, { |out=0, freq=440, amp=1, gate=1, brightness=0.5, pan=0, rq=0.5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=2.5, decayTime=0.25, sustainLevel=0.7, releaseTime=0.2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv, dur = attackTime + decayTime + releaseTime;
@@ -126,7 +130,7 @@ SynthDef(\fd_ripple, { |out=0, freq=440, amp=1, gate=1, brightness=0.5, pan=0, r
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_sinepad, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=2, decayTime=1.5, sustainLevel=0.6, releaseTime=2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -146,7 +150,7 @@ SynthDef(\fd_sinepad, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08,
 	osc = Mix(osc) * -16.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_swell, { |out=0, freq=440, amp=1, gate=1, brightness = 0.5, pan=0, lfoRate=0.1, rq=0.5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=2, decayTime=1, sustainLevel=0.7, releaseTime=4, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -168,7 +172,7 @@ SynthDef(\fd_swell, { |out=0, freq=440, amp=1, gate=1, brightness = 0.5, pan=0, 
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Keys & piano
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -192,7 +196,7 @@ SynthDef(\fd_keys, { |out=0, freq=440, amp=1, gate=1, pan=0, brightness=0, rq=0.
 	osc = Mix(osc);
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_piano, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=1, attackCurve=(-4), releaseCurve=(-4)|
 	var osc;
@@ -205,7 +209,7 @@ SynthDef(\fd_piano, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Synth leads & classic voices
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -229,7 +233,7 @@ SynthDef(\fd_pasha, { |out=0, freq=440, amp=1, gate=1, pan=0, rq=0.5, portamento
 	osc = Mix(osc) * 0.25;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_prophet, { |out=0, freq=440, amp=1, gate=1, pan=0, rq=0.5, portamento=0.08, vibRate=5, vibDepth=0, lforate=6, lfowidth=0.5, cutoff=1200, attackTime=0.01, decayTime=0.1, sustainLevel=0.7, releaseTime=0.2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var lfo, pulse, filter, ampEnv;
@@ -251,7 +255,7 @@ SynthDef(\fd_prophet, { |out=0, freq=440, amp=1, gate=1, pan=0, rq=0.5, portamen
 	filter = RLPF.ar(pulse, cutoff, rq);
 	filter = BHiPass.ar(filter, 200);
 	Out.ar(out, Pan2.ar(Mix(filter) * 0.5, pan) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_razz, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.125, decayTime=0.1, sustainLevel=0.7, releaseTime=0.2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, env, ampEnv, freqAR;
@@ -272,7 +276,7 @@ SynthDef(\fd_razz, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, vi
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_scatter, { |out=0, freq=440, amp=1, gate=1, pan=0, rate=0, width=0.5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.05, decayTime=0.1, sustainLevel=0.7, releaseTime=0.8, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -289,7 +293,7 @@ SynthDef(\fd_scatter, { |out=0, freq=440, amp=1, gate=1, pan=0, rate=0, width=0.
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_soprano, { |out=0, freq=440, amp=1, gate=1, pan=0, fmBias=0, portamento=0.08, vibRate=5, vibDepth=0.167, attackTime=0.25, decayTime=0.1, sustainLevel=0.7, releaseTime=0.2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -308,7 +312,7 @@ SynthDef(\fd_soprano, { |out=0, freq=440, amp=1, gate=1, pan=0, fmBias=0, portam
 	osc = Mix(osc) * -21.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_varsaw, { |out=0, freq=440, detune=0.083, amp=1, gate=1, pan=0, width=0.5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.5, decayTime=0.25, sustainLevel=0.7, releaseTime=1, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -326,7 +330,7 @@ SynthDef(\fd_varsaw, { |out=0, freq=440, detune=0.083, amp=1, gate=1, pan=0, wid
 	osc = Mix(osc) * -12.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Brass & ensemble
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -348,7 +352,7 @@ SynthDef(\fd_brass, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, v
 	osc = Mix(osc);
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Strings (bowed / lyrical)
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -371,7 +375,7 @@ SynthDef(\fd_charm, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_viola, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0.03, attackTime=0.25, decayTime=0.15, sustainLevel=0.7, releaseTime=0.2, attackCurve=(-4), decayCurve=(-2), releaseCurve=(-4)|
 	var osc, ampEnv;
@@ -389,7 +393,7 @@ SynthDef(\fd_viola, { |out=0, freq=440, amp=1, gate=1, pan=0, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * ampEnv * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Bass — sustained
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -412,7 +416,7 @@ SynthDef(\fd_sawbass, { |out=0, freq=110, amp=1, gate=1, pan=0, rq=0.5, portamen
 	filter2 = BPeakEQ.ar(filter2, 1600, 1.0, -6);
 	env = EnvGen.kr(Env.adsr(attackTime, decayTime, sustainLevel, releaseTime, curve: [attackCurve, decayCurve, releaseCurve]), gate, doneAction: 2);
 	Out.ar(out, Pan2.ar((filter + filter2) * env, pan) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Bass — punchy & distorted
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -429,7 +433,7 @@ SynthDef(\fd_bass, { |out=0, freq=110, amp=1, pan=0, width=0.5, portamento=0.08,
 	osc = Mix(osc) * -26.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_dab, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.05, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -442,7 +446,7 @@ SynthDef(\fd_dab, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5, 
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_dbass, { |out=0, freq=110, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.02, decayTime=0.01, releaseTime=0.2|
 	var osc, env;
@@ -456,7 +460,7 @@ SynthDef(\fd_dbass, { |out=0, freq=110, amp=1, pan=0, rate=0, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_dirt, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -470,7 +474,7 @@ SynthDef(\fd_dirt, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5,
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_fuzz, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc, env;
@@ -484,7 +488,7 @@ SynthDef(\fd_fuzz, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5,
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_growl, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc, env;
@@ -497,7 +501,7 @@ SynthDef(\fd_growl, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.95;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_jbass, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.02, releaseTime=0.35, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -511,7 +515,7 @@ SynthDef(\fd_jbass, { |out=0, freq=110, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Plucked strings & resonators
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -528,7 +532,7 @@ SynthDef(\fd_karp, { |out=0, freq=440, amp=1, pan=0, coef=0.5, portamento=0.08, 
 	sig = sig * 0.15 * Env.perc(attackTime, releaseTime, 1, [attackCurve, releaseCurve]).kr(Done.freeSelf);
 	sig = Pan2.ar(sig * amp, pan);
 	Out.ar(out, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_nylon, { |out=0, freq=440, amp=1, pan=0, rate=1, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.000125, releaseTime=3, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -541,7 +545,7 @@ SynthDef(\fd_nylon, { |out=0, freq=440, amp=1, pan=0, rate=1, portamento=0.08, v
 	osc = Mix(osc) * -12.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_pluck, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc;
@@ -555,7 +559,7 @@ SynthDef(\fd_pluck, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_sitar, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc, env;
@@ -572,7 +576,7 @@ SynthDef(\fd_sitar, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_twang, { |out=0, freq=440, amp=1, pan=0, stretch=1, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc;
@@ -585,7 +589,7 @@ SynthDef(\fd_twang, { |out=0, freq=440, amp=1, pan=0, stretch=1, portamento=0.08
 	osc = Mix(osc) * -20.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Bells, mallets & metallic resonators
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -605,7 +609,7 @@ SynthDef(\fd_angel, { |out=0, freq=440, amp=1, pan=0, rq=0.5, portamento=0.08, v
 	osc = osc * env;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_bell, { |out=0, freq=880, amp=1, pan=0, decayScale=4, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=5, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env = EnvGen.ar(Env.perc(attackTime, releaseTime, 1, [attackCurve, releaseCurve]), doneAction: Done.freeSelf);
@@ -622,7 +626,7 @@ SynthDef(\fd_bell, { |out=0, freq=880, amp=1, pan=0, decayScale=4, portamento=0.
 	osc = osc * env * -8.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_feel, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -637,7 +641,7 @@ SynthDef(\fd_feel, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vi
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_gong, { |out=0, freq=440, amp=1, pan=0, rate=0, decayScale=5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=10, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -653,7 +657,7 @@ SynthDef(\fd_gong, { |out=0, freq=440, amp=1, pan=0, rate=0, decayScale=5, porta
 	osc = osc * env;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_klank, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -666,7 +670,7 @@ SynthDef(\fd_klank, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_marimba, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -679,7 +683,7 @@ SynthDef(\fd_marimba, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_quin, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -694,7 +698,7 @@ SynthDef(\fd_quin, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vi
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_soft, { |out=0, freq=440, amp=1, pan=0, exciterHz=4, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -708,7 +712,7 @@ SynthDef(\fd_soft, { |out=0, freq=440, amp=1, pan=0, exciterHz=4, portamento=0.0
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Drums & kicks
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -726,7 +730,7 @@ SynthDef(\fd_donk, { |out=0, freq=110, amp=1, pan=0, rate=0, portamento=0.08, vi
 	osc = Mix(osc) * -18.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_donk1, { |out=0, freq=110, amp=1, pan=0, vibRate=5, vibDepth=0, attackTime=0.001, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -738,7 +742,7 @@ SynthDef(\fd_donk1, { |out=0, freq=110, amp=1, pan=0, vibRate=5, vibDepth=0, att
 	osc = osc * env;
 	osc = osc * [min(1, (1-pan)/2), min(1, (pan+1)/2)];
 	Out.ar(out, (osc) * amp * -18.dbamp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_donk2, { |out=0, freq=110, amp=1, pan=0, vibRate=5, vibDepth=0, attackTime=0.001, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -749,7 +753,7 @@ SynthDef(\fd_donk2, { |out=0, freq=110, amp=1, pan=0, vibRate=5, vibDepth=0, att
 	osc = osc * env;
 	osc = osc * [min(1, (1-pan)/2), min(1, (pan+1)/2)];
 	Out.ar(out, (osc) * amp * -23.dbamp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_squish, { |out=0, freq=110, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc;
@@ -763,7 +767,7 @@ SynthDef(\fd_squish, { |out=0, freq=110, amp=1, pan=0, rate=0, portamento=0.08, 
 	osc = Mix(osc) * -38.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Noise & glitch
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -780,7 +784,7 @@ SynthDef(\fd_crunch, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_noise, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -794,7 +798,7 @@ SynthDef(\fd_noise, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_rave, { |out=0, freq=440, amp=1, pan=0, chaos=(-1), portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -807,7 +811,7 @@ SynthDef(\fd_rave, { |out=0, freq=440, amp=1, pan=0, chaos=(-1), portamento=0.08
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_scrap, { |out=0, freq=440, amp=1, pan=0, rq=0.5, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.001, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env, body;
@@ -821,7 +825,7 @@ SynthDef(\fd_scrap, { |out=0, freq=440, amp=1, pan=0, rq=0.5, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_scratch, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc, env;
@@ -836,7 +840,7 @@ SynthDef(\fd_scratch, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08,
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // Synth hooks & percussive voices
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -854,7 +858,7 @@ SynthDef(\fd_arpy, { |out=0, freq=220, amp=1, pan=0, portamento=0.08, vibRate=5,
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_blip, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=1, attackCurve=(-4), releaseCurve=(-4)|
 	var osc;
@@ -868,7 +872,7 @@ SynthDef(\fd_blip, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vi
 	osc = Mix(osc) * 0.5 * EnvGen.ar(Env.perc(attackTime, releaseTime, 1, [attackCurve, releaseCurve]), doneAction: Done.freeSelf);
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_bug, { |out=0, freq=440, amp=1, pan=0, tremHz=8, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=1, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -883,7 +887,7 @@ SynthDef(\fd_bug, { |out=0, freq=440, amp=1, pan=0, tremHz=8, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_creep, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc, env;
@@ -897,7 +901,7 @@ SynthDef(\fd_creep, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_lazer, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.1, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -912,7 +916,7 @@ SynthDef(\fd_lazer, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_orient, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=2, attackCurve=(-4), releaseCurve=(-8)|
 	var osc, env;
@@ -925,7 +929,7 @@ SynthDef(\fd_orient, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_pulse, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2|
 	var osc, env;
@@ -939,7 +943,7 @@ SynthDef(\fd_pulse, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_saw, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2|
 	var osc, env;
@@ -953,7 +957,7 @@ SynthDef(\fd_saw, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, 
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_siren, { |out=0, freq=440, amp=1, pan=0, rate=0, vibRate=5, vibDepth=0, attackTime=0.1, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -965,7 +969,7 @@ SynthDef(\fd_siren, { |out=0, freq=440, amp=1, pan=0, rate=0, vibRate=5, vibDept
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_snick, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=1, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -978,7 +982,7 @@ SynthDef(\fd_snick, { |out=0, freq=440, amp=1, pan=0, rate=0, portamento=0.08, v
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_space, { |out=0, freq=440, amp=1, pan=0, rate=0, rq=0.5, sus=1|
 	var osc, env;
@@ -993,7 +997,7 @@ SynthDef(\fd_space, { |out=0, freq=440, amp=1, pan=0, rate=0, rq=0.5, sus=1|
 	osc = Mix(osc) * env;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, osc * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_spark, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.01, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc;
@@ -1007,7 +1011,7 @@ SynthDef(\fd_spark, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5
 	osc = Mix(osc) * -16.dbamp;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_spick, { |out=0, freq=440, amp=1, pan=0, vibRate=5, vibDepth=0, attackTime=0.1, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -1019,7 +1023,7 @@ SynthDef(\fd_spick, { |out=0, freq=440, amp=1, pan=0, vibRate=5, vibDepth=0, att
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_star, { |out=0, freq=220, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, releaseTime=0.2|
 	var osc;
@@ -1032,7 +1036,7 @@ SynthDef(\fd_star, { |out=0, freq=220, amp=1, pan=0, portamento=0.08, vibRate=5,
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 
 SynthDef(\fd_zap, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, vibDepth=0, attackTime=0.025, releaseTime=0.2, attackCurve=(-4), releaseCurve=(-4)|
 	var osc, env;
@@ -1046,7 +1050,7 @@ SynthDef(\fd_zap, { |out=0, freq=440, amp=1, pan=0, portamento=0.08, vibRate=5, 
 	osc = Mix(osc) * 0.5;
 	osc = Pan2.ar(osc, pan);
 	Out.ar(out, (osc) * amp);
-}).writeDefFile(outputDir);
+}).writeDefFile(instDir);
 // -------------------------------------------------------------------------------------------------------------------------------------
 // FX
 // -------------------------------------------------------------------------------------------------------------------------------------
@@ -1057,7 +1061,7 @@ SynthDef(\fd_reverb, { |inBus=0, outBus=0, room=0.5, mix=0.3, damp=0.5, gain=1.0
 	sig = FreeVerb.ar(sig, mix.clip(0, 1), room.clip(0, 1), damp.clip(0, 1));
 	sig = sig * gain.max(0.0);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_combDelay, { |inBus=0, outBus=0, echo=0.5, beatDur=1.0, echoTime=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1068,7 +1072,7 @@ SynthDef(\fd_combDelay, { |inBus=0, outBus=0, echo=0.5, beatDur=1.0, echoTime=1.
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_distortion, { |inBus=0, outBus=0, dist=0.5, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1081,7 +1085,7 @@ SynthDef(\fd_distortion, { |inBus=0, outBus=0, dist=0.5, mix=1.0, gain=1.0|
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_overdriveDistortion, { |inBus=0, outBus=0, drive=0.4, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1090,7 +1094,7 @@ SynthDef(\fd_overdriveDistortion, { |inBus=0, outBus=0, drive=0.4, mix=1.0, gain
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_bitcrush, { |inBus=0, outBus=0, bits=8, crush=4, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1099,7 +1103,7 @@ SynthDef(\fd_bitcrush, { |inBus=0, outBus=0, bits=8, crush=4, mix=1.0, gain=1.0|
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_chop, { |inBus=0, outBus=0, chop=4.0, segmentDur=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1109,7 +1113,7 @@ SynthDef(\fd_chop, { |inBus=0, outBus=0, chop=4.0, segmentDur=1.0, mix=1.0, gain
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_tremolo, { |inBus=0, outBus=0, tremolo=4.0, beatDur=1.0, depth=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1120,7 +1124,7 @@ SynthDef(\fd_tremolo, { |inBus=0, outBus=0, tremolo=4.0, beatDur=1.0, depth=1.0,
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_highPassFilter, { |inBus=0, outBus=0, hpf=200, hpr=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1129,7 +1133,7 @@ SynthDef(\fd_highPassFilter, { |inBus=0, outBus=0, hpf=200, hpr=1.0, mix=1.0, ga
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_lowPassFilter, { |inBus=0, outBus=0, lpf=1200, lpr=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1138,7 +1142,7 @@ SynthDef(\fd_lowPassFilter, { |inBus=0, outBus=0, lpf=1200, lpr=1.0, mix=1.0, ga
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_bandPassFilter, { |inBus=0, outBus=0, bpf=1200, bpr=0.6, bpnoise=2.0, segmentDur=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1150,7 +1154,7 @@ SynthDef(\fd_bandPassFilter, { |inBus=0, outBus=0, bpf=1200, bpr=0.6, bpnoise=2.
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_filterSwell, { |inBus=0, outBus=0, swell=1.0, segmentDur=1.0, hpr=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1160,7 +1164,7 @@ SynthDef(\fd_filterSwell, { |inBus=0, outBus=0, swell=1.0, segmentDur=1.0, hpr=1
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_formantFilter, { |inBus=0, outBus=0, formant=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1170,7 +1174,7 @@ SynthDef(\fd_formantFilter, { |inBus=0, outBus=0, formant=1.0, mix=1.0, gain=1.0
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_spinPan, { |inBus=0, outBus=0, spin=1.0, segmentDur=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1183,7 +1187,7 @@ SynthDef(\fd_spinPan, { |inBus=0, outBus=0, spin=1.0, segmentDur=1.0, mix=1.0, g
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 SynthDef(\fd_wavesShapeDistortion, { |inBus=0, outBus=0, shape=1.0, mix=1.0, gain=1.0|
 	var dry = In.ar(inBus, 2);
@@ -1192,7 +1196,7 @@ SynthDef(\fd_wavesShapeDistortion, { |inBus=0, outBus=0, shape=1.0, mix=1.0, gai
 	sig = sig * gain.max(0.0);
 	sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
 	ReplaceOut.ar(outBus, sig);
-}).writeDefFile(outputDir);
+}).writeDefFile(fxDir);
 
 "All FoxDot-adapted synthdefs compiled to: %".format(outputDir).postln;
 )

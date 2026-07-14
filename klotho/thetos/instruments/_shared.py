@@ -2,7 +2,9 @@ from pathlib import Path
 import json
 
 _SS_MANIFEST_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'manifest.json'
+_SS_KINDS_PATH = Path(__file__).parents[2] / 'utils' / 'playback' / 'supersonic' / 'assets' / 'kinds.json'
 _SS_DISK_MANIFEST_CACHE = None
+_SS_DISK_KINDS_CACHE = None
 
 GM_PROGRAM_NAMES = (
     "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano",
@@ -62,6 +64,38 @@ def load_ss_manifest():
     """
     from klotho.utils.playback.supersonic.registry import runtime_controls
     return {**_load_disk_manifest(), **runtime_controls()}
+
+
+def _load_disk_kinds():
+    global _SS_DISK_KINDS_CACHE
+    if _SS_DISK_KINDS_CACHE is None:
+        if _SS_KINDS_PATH.exists():
+            _SS_DISK_KINDS_CACHE = json.loads(_SS_KINDS_PATH.read_text())
+        else:
+            _SS_DISK_KINDS_CACHE = {}
+    return _SS_DISK_KINDS_CACHE
+
+
+def load_ss_kinds():
+    """Return the ``{synth_name: 'inst' | 'fx' | 'infra'}`` kind map.
+
+    Derived from the asset subfolder layout by the manifest regeneration
+    script; runtime registrations are overlaid on top. Names absent from
+    the map should be treated as ``'inst'`` (see :func:`ss_synth_kind`).
+    """
+    from klotho.utils.playback.supersonic.registry import runtime_kinds
+    return {**_load_disk_kinds(), **runtime_kinds()}
+
+
+def ss_synth_kind(def_name):
+    """Return ``'inst'``, ``'fx'``, or ``'infra'`` for ``def_name``.
+
+    Unknown names default to ``'inst'`` (permissive: user-supplied or
+    external defs are assumed playable).
+    """
+    if isinstance(def_name, str) and def_name.startswith('__'):
+        return 'infra'
+    return load_ss_kinds().get(def_name, 'inst')
 
 
 def ss_synth_controls(def_name):

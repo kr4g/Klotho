@@ -159,11 +159,21 @@
 
     _resolveDefPfields(defName, pfields) {
       var out = {};
+      var sampleMap = (globalThis.__klothoSonic && globalThis.__klothoSonic.sampleMap) || {};
       for (var key in pfields) {
         if (!pfields.hasOwnProperty(key)) continue;
         var val = pfields[key];
         if (val === null || val === undefined) continue;
         if (typeof val === 'object') continue;
+        if (typeof val === 'string') {
+          // Symbolic sample name on a buf* pfield: substitute the bufnum
+          // allocated by the widget's loadSamples. Drop unresolvable
+          // strings so they never reach the OSC encoder.
+          if (key.indexOf('buf') === 0 && sampleMap[val] != null) {
+            out[key] = sampleMap[val];
+          }
+          continue;
+        }
         out[key] = val;
       }
       return out;
@@ -427,11 +437,15 @@
       if (scoreMeta && (scoreMeta.groups || scoreMeta.inserts) && typeof this.setupTracks === 'function') {
         this._createScoreGroup();
         await this.setupTracks(scoreMeta, this._scoreGroupId);
-        if (scoreControlData && scoreControlData.bufferB64 && typeof this.setupControlEnvelopes === 'function') {
-          await this.setupControlEnvelopes(scoreControlData, this._scoreGroupId);
-        }
       } else {
         this._createGroup();
+      }
+
+      // Control envelopes are independent of track/insert setup: they fire
+      // for any payload carrying descriptors (bare UC/UTS/BT play included).
+      if (scoreControlData && scoreControlData.bufferB64 && typeof this.setupControlEnvelopes === 'function') {
+        var ctrlParent = (this._scoreGroupId != null) ? this._scoreGroupId : this._groupId;
+        await this.setupControlEnvelopes(scoreControlData, ctrlParent);
       }
 
       // Compute start time AFTER any async setup so the cushion isn't

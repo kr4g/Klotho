@@ -24,7 +24,8 @@ import base64
 _RUNTIME: dict[str, dict] = {}
 
 
-def register_compiled(def_name: str, compiled_bytes: bytes, controls: dict) -> str:
+def register_compiled(def_name: str, compiled_bytes: bytes, controls: dict,
+                      kind: str = "inst") -> str:
     """Register a compiled SynthDef's bytes + controls under ``def_name``.
 
     Parameters
@@ -36,15 +37,21 @@ def register_compiled(def_name: str, compiled_bytes: bytes, controls: dict) -> s
         The compiled ``.scsyndef`` blob.
     controls : dict
         ``{control_name: default_value}`` for the synth.
+    kind : str, optional
+        ``'inst'`` (default) or ``'fx'`` — how the def participates in
+        the instrument/effect taxonomy.
 
     Returns
     -------
     str
         ``def_name`` (for convenience / chaining).
     """
+    if kind not in ("inst", "fx"):
+        raise ValueError(f"kind must be 'inst' or 'fx', got {kind!r}")
     _RUNTIME[def_name] = {
         "b64": base64.b64encode(bytes(compiled_bytes)).decode("ascii"),
         "controls": dict(controls),
+        "kind": kind,
     }
     return def_name
 
@@ -57,6 +64,11 @@ def runtime_assets() -> dict:
 def runtime_controls() -> dict:
     """Return ``{def_name: {control: default}}`` for all runtime synths."""
     return {name: dict(entry["controls"]) for name, entry in _RUNTIME.items()}
+
+
+def runtime_kinds() -> dict:
+    """Return ``{def_name: kind}`` for all runtime-registered synths."""
+    return {name: entry.get("kind", "inst") for name, entry in _RUNTIME.items()}
 
 
 def is_registered(def_name: str) -> bool:
@@ -89,7 +101,8 @@ def _controls_from_compiled(compiled_bytes: bytes, def_name: str) -> dict:
     return dict(synth.get("named_parameters", {}))
 
 
-def register_synthdef(supriya_synthdef, name: str = None, pfields: dict = None):
+def register_synthdef(supriya_synthdef, name: str = None, pfields: dict = None,
+                      kind: str = "inst"):
     """Compile + register a Supriya ``SynthDef`` and return an instrument.
 
     Supriya is imported lazily here so it is never a runtime dependency
@@ -109,17 +122,25 @@ def register_synthdef(supriya_synthdef, name: str = None, pfields: dict = None):
     pfields : dict, optional
         Extra pfield overrides applied on top of the synth's controls
         when building the :class:`SynthDefInstrument`.
+    kind : str, optional
+        ``'inst'`` (default) registers an instrument; ``'fx'`` registers
+        an insert effect (usable with ``SynthDefFX`` / ``Score.track``
+        but rejected by ``set_instrument``).
 
     Returns
     -------
     SynthDefInstrument
         An instrument whose ``defName`` is the registered name and whose
         pfields are the synth's controls (with ``pfields`` overrides).
+        For ``kind='fx'``, returns ``None`` (build a ``SynthDefFX`` with
+        the registered name instead).
     """
     from klotho.thetos.instruments.synthdef import SynthDefInstrument
 
     compiled = supriya_synthdef.compile()
     def_name = name or supriya_synthdef.name
     controls = _controls_from_compiled(compiled, supriya_synthdef.name)
-    register_compiled(def_name, compiled, controls)
+    register_compiled(def_name, compiled, controls, kind=kind)
+    if kind == "fx":
+        return None
     return SynthDefInstrument.from_manifest(def_name, **(pfields or {}))

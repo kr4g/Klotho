@@ -111,6 +111,61 @@ class TestControlEnvelopeCollection:
         assert desc['start'] >= 7.5 - 1e-9
 
 
+class TestTimelineNormalization:
+    def test_negative_placement_pulled_to_zero(self):
+        """A riser placed before time 0 shifts the whole timeline up
+        uniformly so the earliest event lands at 0."""
+        s = Score()
+        s.add(_uc(), name='riser', at=-2.0)
+        s.add(_uc(), name='main', at=0.0)
+        payload = convert_score_to_sc_events(s)
+        starts = sorted(e['start'] for e in payload['events'])
+        assert starts[0] == pytest.approx(0.0)
+        # relative gap preserved: main's first event now sits at +2
+        assert starts == pytest.approx([0.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 5.0])
+
+    def test_positive_timeline_unchanged(self):
+        s = Score()
+        s.add(_uc(), name='a', at=3.0)
+        payload = convert_score_to_sc_events(s)
+        starts = [e['start'] for e in payload['events']]
+        assert min(starts) == pytest.approx(3.0)
+
+    def test_start_time_shifts_earliest_event(self):
+        s = Score()
+        s.add(_uc(), name='a', at=-2.0)
+        payload = convert_score_to_sc_events(s, start_time=1.0)
+        starts = [e['start'] for e in payload['events']]
+        assert min(starts) == pytest.approx(1.0)
+
+    def test_start_time_removes_leading_silence(self):
+        s = Score()
+        s.add(_uc(), name='a', at=3.0)
+        payload = convert_score_to_sc_events(s, start_time=0.0)
+        starts = [e['start'] for e in payload['events']]
+        assert min(starts) == pytest.approx(0.0)
+
+    def test_control_envelope_shifted_with_events(self):
+        uc = _uc()
+        env = Envelope([0.0, 1.0], times=[1.0])
+        uc.apply_envelope(
+            envelope=env, pfields='amp', node=uc.rt.root, control=True
+        )
+        s = Score()
+        s.add(uc, name='a', at=-2.0)
+        payload = convert_score_to_sc_events(s)
+        desc = payload['control_data']['descriptors'][0]
+        assert desc['start'] == pytest.approx(0.0)
+        assert all(t['startTime'] >= -1e-9 for t in desc['targets'])
+
+    def test_play_score_with_negative_placement_does_not_raise(self):
+        from klotho import play
+        s = Score()
+        s.add(_uc(), name='riser', at=-2.0)
+        s.add(_uc(), name='main', at=0.0)
+        play(s)
+
+
 class TestMetaTracksAndInserts:
     def test_registered_tracks_appear_in_meta_groups(self):
         s = Score().track('melody').track('bass')

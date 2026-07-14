@@ -48,6 +48,20 @@ class Spectrum():
     def data(self):
         """pandas.DataFrame : Tabular data with partial, frequency, pitch, and offset columns."""
         return self._data
+
+    @property
+    def freq(self) -> tuple:
+        """tuple of float : Frequencies of the spectrum's partials.
+
+        A tuple, so ``freq=spectrum.freq`` assigns the whole spectrum as
+        one simultaneity when used as the ``freq`` pfield.
+        """
+        return tuple(float(p.freq) for p in self._data['pitch'])
+
+    @property
+    def freqs(self) -> tuple:
+        """tuple of float : Alias of :attr:`freq`."""
+        return self.freq
     
     @property
     def ht(self):

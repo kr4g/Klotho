@@ -1,15 +1,14 @@
 from .chord import (
     Chord,
-    InstancedChord,
     Voicing,
-    InstancedVoicing,
     ChordSequence,
 )
+from .voice_leading import fold, voice_lead
 
 __all__ = [
     'Chord',
-    'InstancedChord',
     'Voicing',
-    'InstancedVoicing',
     'ChordSequence',
+    'fold',
+    'voice_lead',
 ]

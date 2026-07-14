@@ -80,6 +80,20 @@ def _convert_degree(value: Union[float, Fraction, int, str]) -> Union[float, Fra
         raise ValueError(f"Cannot convert {value} to either a float or Fraction")
 
 
+_DEFAULT_REFERENCE = 'C4'
+
+
+def _resolve_reference(reference_pitch: Union[Pitch, str, None]) -> Pitch:
+    """Resolve a reference-pitch argument, defaulting ``None`` to C4.
+
+    Relative collections always carry a reference pitch; ``None`` in a
+    constructor signature means "use the default root," not "rootless."
+    """
+    if reference_pitch is None:
+        return Pitch(_DEFAULT_REFERENCE)
+    return Pitch(reference_pitch) if isinstance(reference_pitch, str) else reference_pitch
+
+
 class PitchCollectionBase(ABC):
     """
     Abstract base class for all pitch collections.
@@ -92,11 +106,6 @@ class PitchCollectionBase(ABC):
     @property
     @abstractmethod
     def is_relative(self) -> bool:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def is_instanced(self) -> bool:
         raise NotImplementedError
 
     @property
@@ -144,6 +153,16 @@ class PitchCollectionBase(ABC):
     def __call__(self, index: Union[int, Sequence[int]]):
         return self[index]
 
+    @property
+    def freqs(self) -> tuple:
+        """tuple of float : Concrete frequencies of the collection's pitches.
+
+        A tuple, so ``freq=coll.freqs`` produces a simultaneity (chord)
+        when assigned to the ``freq`` pfield; wrap in ``Pattern(...)`` to
+        cycle the frequencies across events instead.
+        """
+        return tuple(float(p.freq) for p in self.pitches)
+
     def _flatten_indices(self, index: Iterable) -> List[int]:
         result: List[int] = []
         for item in index:
@@ -177,24 +196,30 @@ class PitchCollectionBase(ABC):
         ValueError
             If the value is not found in the collection.
         """
-        if self.is_relative and not self.is_instanced:
-            target = _convert_degree(value)
-            if isinstance(target, Fraction) and isinstance(self.degrees[0], float):
-                target = float(target)
-            elif isinstance(target, float) and isinstance(self.degrees[0], Fraction):
-                target = Fraction.from_float(target)
-            for i, degree in enumerate(self.degrees):
-                if i < start:
-                    continue
-                if stop is not None and i >= stop:
-                    break
-                if isinstance(degree, float):
-                    if abs(degree - target) < 1e-6:
-                        return i
-                else:
-                    if degree == target:
-                        return i
-            raise ValueError(f"Value {value} not found in collection")
+        if self.is_relative and not isinstance(value, Pitch):
+            try:
+                target = _convert_degree(value)
+            except ValueError:
+                target = None
+            if target is not None:
+                degrees = self.degrees
+                if degrees:
+                    if isinstance(target, Fraction) and isinstance(degrees[0], float):
+                        target = float(target)
+                    elif isinstance(target, float) and isinstance(degrees[0], Fraction):
+                        target = Fraction.from_float(target)
+                for i, degree in enumerate(degrees):
+                    if i < start:
+                        continue
+                    if stop is not None and i >= stop:
+                        break
+                    if isinstance(degree, float):
+                        if abs(degree - target) < 1e-6:
+                            return i
+                    else:
+                        if degree == target:
+                            return i
+                raise ValueError(f"Value {value} not found in collection")
         target_pitch = value if isinstance(value, Pitch) else Pitch(value)
         for i, pitch in enumerate(self.pitches):
             if i < start:
@@ -216,9 +241,11 @@ class RelativePitchCollection(PitchCollectionBase):
     """
     A collection of pitches defined by interval degrees relative to a root.
 
-    Degrees are stored as ratios (``Fraction``) or cents (``float``) and can
-    optionally be anchored to a reference pitch to resolve concrete ``Pitch``
-    objects. Supports equave-cyclic indexing when enabled.
+    Degrees are stored as ratios (``Fraction``) or cents (``float``) and are
+    always anchored to a reference pitch (default C4) that resolves concrete
+    ``Pitch`` objects. ``.degrees`` is the interval structure; ``.pitches``
+    / ``.freqs`` are the realization. Supports equave-cyclic indexing when
+    enabled.
 
     Parameters
     ----------
@@ -230,14 +257,15 @@ class RelativePitchCollection(PitchCollectionBase):
         Interval of equivalence. When provided, equave-cyclic indexing
         is enabled.
     reference_pitch : Pitch, str, or None, optional
-        If given, the collection is *instanced* at this pitch and indexing
-        returns ``Pitch`` objects.
+        The root pitch. ``None`` (default) resolves to C4.
 
     Examples
     --------
     >>> coll = RelativePitchCollection(["1/1", "5/4", "3/2"])
     >>> coll.degrees
     [Fraction(1, 1), Fraction(5, 4), Fraction(3, 2)]
+    >>> coll[0]
+    Pitch(C4, 261.63 Hz)
     """
     _equave_cyclic_enabled: Optional[bool] = None
 
@@ -280,7 +308,7 @@ class RelativePitchCollection(PitchCollectionBase):
         self._equave_cyclic = equave_cyclic
         self._degrees = converted
         self._interval_type_mode = interval_type
-        self._reference_pitch = Pitch(reference_pitch) if isinstance(reference_pitch, str) else reference_pitch
+        self._reference_pitch = _resolve_reference(reference_pitch)
         self._intervals = self._compute_intervals_relative()
 
     @classmethod
@@ -412,13 +440,8 @@ class RelativePitchCollection(PitchCollectionBase):
         return True
 
     @property
-    def is_instanced(self) -> bool:
-        """bool : True if a reference pitch has been assigned."""
-        return self._reference_pitch is not None
-
-    @property
-    def reference_pitch(self) -> Optional[Pitch]:
-        """Pitch or None : The reference pitch anchoring the collection."""
+    def reference_pitch(self) -> Pitch:
+        """Pitch : The reference pitch anchoring the collection."""
         return self._reference_pitch
 
     @property
@@ -438,16 +461,8 @@ class RelativePitchCollection(PitchCollectionBase):
 
     @property
     def pitches(self) -> List[Pitch]:
-        """
-        list of Pitch : Concrete pitches resolved from degrees and reference pitch.
-
-        Raises
-        ------
-        ValueError
-            If no reference pitch has been set.
-        """
-        if not self.is_instanced:
-            raise ValueError("Cannot resolve pitches without a reference pitch")
+        """list of Pitch : Concrete pitches resolved from degrees and the
+        reference pitch."""
         return [self._calculate_pitch(i) for i in range(len(self._degrees))]
 
     @property
@@ -456,13 +471,13 @@ class RelativePitchCollection(PitchCollectionBase):
         return self._intervals
 
     @property
-    def interval_type(self) -> Optional[type]:
+    def degree_dtype(self) -> Optional[type]:
         """type or None : The Python type of the stored degrees (float or Fraction)."""
         if self._degrees:
             return type(self._degrees[0])
         return None
 
-    def root(self, pitch: Union[Pitch, str]) -> "RootedPitchCollection":
+    def root(self, pitch: Union[Pitch, str]) -> "RelativePitchCollection":
         """
         Return a copy of this collection rooted at the given pitch.
 
@@ -473,33 +488,35 @@ class RelativePitchCollection(PitchCollectionBase):
 
         Returns
         -------
-        RootedPitchCollection
+        RelativePitchCollection
         """
-        return RootedPitchCollection(
+        rooted = RelativePitchCollection(
             list(self._degrees),
             self._interval_type_mode,
             self._equave,
             pitch,
         )
+        rooted._equave_cyclic = self._equave_cyclic
+        return rooted
 
-    def relative(self) -> "RelativePitchCollection":
+    def as_voicing(self):
         """
-        Return a rootless copy retaining only the interval structure.
+        Convert to a :class:`~klotho.tonos.chords.chord.Voicing`.
+
+        Dedupes and sorts the degrees but does NOT equave-reduce, so
+        multi-octave spreads survive. The reference pitch carries over.
 
         Returns
         -------
-        RelativePitchCollection
+        Voicing
         """
-        if not self.is_instanced:
-            return self
-        relative = RelativePitchCollection(
+        from klotho.tonos.chords.chord import Voicing
+        return Voicing(
             list(self._degrees),
             self._interval_type_mode,
             self._equave,
-            None,
+            self._reference_pitch,
         )
-        relative._equave_cyclic = self._equave_cyclic
-        return relative
 
     def _get_cyclic_index(self, index: int) -> tuple:
         if not self._equave_cyclic:
@@ -544,18 +561,15 @@ class RelativePitchCollection(PitchCollectionBase):
             raise TypeError("Index must be an integer, slice, or sequence of integers")
         return self._getitem_single(index)
 
-    def _getitem_single(self, index: int) -> Union[Pitch, IntervalType]:
-        if self.is_instanced:
-            return self._calculate_pitch(index)
-        if self._equave_cyclic:
-            equave_shift, wrapped_index = self._get_cyclic_index(index)
-            return self._calculate_degree_with_shift(equave_shift, wrapped_index)
-        return self._degrees[index]
+    def _getitem_single(self, index: int) -> Pitch:
+        return self._calculate_pitch(index)
 
     def _getitem_slice(self, index: slice):
         size = len(self)
         if size == 0:
-            return RelativePitchCollection([], self._interval_type_mode, self._equave, False, self._reference_pitch)
+            empty = RelativePitchCollection([], self._interval_type_mode, self._equave, self._reference_pitch)
+            empty._equave_cyclic = False
+            return empty
         start, stop, step = index.indices(size)
         use_cyclic = self._equave_cyclic and index.stop is not None and abs(index.stop) > size
         if use_cyclic:
@@ -566,13 +580,9 @@ class RelativePitchCollection(PitchCollectionBase):
             ]
         else:
             selected_degrees = [self._degrees[i] for i in range(start, stop, step)]
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-        relative._equave_cyclic = False
-        return relative
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
 
     def _getitem_sequence(self, indices: Sequence[int]):
         selected_degrees = []
@@ -582,72 +592,21 @@ class RelativePitchCollection(PitchCollectionBase):
                 selected_degrees.append(self._calculate_degree_with_shift(*self._get_cyclic_index(idx)))
             else:
                 selected_degrees.append(self._degrees[idx])
-        if self.is_instanced:
-            rooted = RootedPitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
-            rooted._equave_cyclic = False
-            return rooted
-        relative = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, None)
-        relative._equave_cyclic = False
-        return relative
+        subset = RelativePitchCollection(selected_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        subset._equave_cyclic = False
+        return subset
 
     def __repr__(self) -> str:
         size = len(self._degrees)
-        if self.is_instanced:
-            pitches = []
-            for i in range(min(size, 8)):
-                pitch = self._calculate_pitch(i)
-                if abs(pitch.cents_offset) > 0.01:
-                    pitches.append(f"{pitch.pitchclass}{pitch.octave} ({pitch.cents_offset:+.1f}¢)")
-                else:
-                    pitches.append(f"{pitch.pitchclass}{pitch.octave}")
-            if size > 8:
-                pitches.append("...")
-            pitches_str = ", ".join(pitches)
-            return f"{self.__class__.__name__}([{pitches_str}], root={self._reference_pitch.pitchclass}{self._reference_pitch.octave})"
         degrees_str = ", ".join(str(d) for d in self._degrees[:8])
         if size > 8:
             degrees_str += ", ..."
-        return f"{self.__class__.__name__}([{degrees_str}], equave={self._equave})"
-
-
-class RootedPitchCollection(RelativePitchCollection):
-    """
-    A ``RelativePitchCollection`` that always carries a reference pitch.
-
-    Slicing or sequence-indexing a ``RelativePitchCollection`` with a
-    reference pitch produces a ``RootedPitchCollection`` so that the
-    root information is preserved through subsetting.
-    """
-
-    def root(self, pitch: Union[Pitch, str]) -> "RootedPitchCollection":
-        """
-        Return a copy rooted at a different pitch.
-
-        Parameters
-        ----------
-        pitch : Pitch or str
-            The new reference pitch.
-
-        Returns
-        -------
-        RootedPitchCollection
-        """
-        return RootedPitchCollection(
-            list(self._degrees),
-            self._interval_type_mode,
-            self._equave,
-            pitch,
-        )
-
-    def relative(self) -> "RelativePitchCollection":
-        relative = RelativePitchCollection(
-            list(self._degrees),
-            self._interval_type_mode,
-            self._equave,
-            None,
-        )
-        relative._equave_cyclic = self._equave_cyclic
-        return relative
+        ref = self._reference_pitch
+        if abs(ref.cents_offset) > 0.01:
+            root_str = f"{ref.pitchclass}{ref.octave} ({ref.cents_offset:+.1f}¢)"
+        else:
+            root_str = f"{ref.pitchclass}{ref.octave}"
+        return f"{self.__class__.__name__}([{degrees_str}], equave={self._equave}, root={root_str})"
 
 
 class AbsolutePitchCollection(PitchCollectionBase):
@@ -703,11 +662,6 @@ class AbsolutePitchCollection(PitchCollectionBase):
         return False
 
     @property
-    def is_instanced(self) -> bool:
-        """bool : True if a reference pitch has been assigned."""
-        return self._reference_pitch is not None
-
-    @property
     def reference_pitch(self) -> Optional[Pitch]:
         """Pitch or None : The reference pitch."""
         return self._reference_pitch
@@ -723,9 +677,22 @@ class AbsolutePitchCollection(PitchCollectionBase):
         return self._equave_cyclic
 
     @property
-    def degrees(self) -> List[Pitch]:
-        """list of Pitch : The pitches (same as ``pitches`` for absolute collections)."""
-        return list(self._pitches)
+    def degrees(self) -> List[float]:
+        """list of float : Cents of each pitch relative to the reference
+        pitch (or the first pitch when no reference is set).
+
+        Degrees are always raw interval values; use ``pitches`` / ``freqs``
+        for the concrete realization.
+        """
+        if not self._pitches:
+            return []
+        ref = self._reference_pitch if self._reference_pitch is not None else self._pitches[0]
+        return [p.cents_difference(ref) for p in self._pitches]
+
+    @property
+    def degree_dtype(self) -> Optional[type]:
+        """type or None : Absolute collections express degrees in cents (float)."""
+        return float if self._pitches else None
 
     @property
     def pitches(self) -> List[Pitch]:
@@ -736,6 +703,22 @@ class AbsolutePitchCollection(PitchCollectionBase):
     def intervals(self) -> List[float]:
         """list of float : Successive intervals in cents between adjacent pitches."""
         return self._intervals
+
+    def as_voicing(self):
+        """
+        Convert to a :class:`~klotho.tonos.chords.chord.Voicing` (cents
+        degrees relative to the reference or first pitch; dedupe + sort,
+        no equave reduction).
+
+        Returns
+        -------
+        Voicing
+        """
+        from klotho.tonos.chords.chord import Voicing
+        if not self._pitches:
+            return Voicing([], 'cents', self._equave, self._reference_pitch)
+        ref = self._reference_pitch if self._reference_pitch is not None else self._pitches[0]
+        return Voicing(self.degrees, 'cents', self._equave, ref)
 
     def root(self, pitch: Union[Pitch, str]) -> "AbsolutePitchCollection":
         """

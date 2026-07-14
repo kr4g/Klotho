@@ -263,6 +263,62 @@ class Pitch:
             raise TypeError("Can only calculate cents difference with another Pitch")
         return 1200 * np.log2(self.freq / other.freq)
     
+    def transpose(self, interval) -> 'Pitch':
+        """
+        Return this pitch transposed by an interval.
+
+        Parameters
+        ----------
+        interval : Fraction, int, str, Ratio, or Cent
+            A frequency ratio (``Fraction``, ``int``, or str like ``'3/2'``)
+            or a cents amount via the typed unit
+            :func:`~klotho.tonos.types.cent`.
+
+        Returns
+        -------
+        Pitch
+            A new Pitch at ``freq * factor``, preserving the partial.
+
+        Examples
+        --------
+        >>> Pitch('C4').transpose('3/2')
+        Pitch(G4 (+1.96¢), 392.44 Hz)
+
+        >>> from klotho.tonos import cent
+        >>> Pitch('C4').transpose(cent(-500))
+        Pitch(G3, 196.00 Hz)
+        """
+        from ..types import Cent, Ratio
+        if isinstance(interval, Cent):
+            factor = 2.0 ** (float(interval.magnitude) / 1200.0)
+        elif isinstance(interval, Ratio):
+            factor = float(interval.magnitude)
+        else:
+            factor = float(Fraction(interval))
+        return Pitch.from_freq(self.freq * factor, partial=self.partial)
+
+    def at_octave(self, octave: int) -> 'Pitch':
+        """
+        Return this pitch placed at an absolute octave.
+
+        The pitch class and cents offset are kept; only the octave changes.
+
+        Parameters
+        ----------
+        octave : int
+            The target octave number.
+
+        Returns
+        -------
+        Pitch
+
+        Examples
+        --------
+        >>> Pitch('G5').at_octave(3)
+        Pitch(G3, 196.00 Hz)
+        """
+        return Pitch(self.pitchclass, octave, self.cents_offset, self.partial)
+
     def with_partial(self, partial: Union[int, float, Fraction]) -> 'Pitch':
         """
         Return a copy of this pitch with a different partial number.

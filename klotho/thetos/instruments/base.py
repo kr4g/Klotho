@@ -1,3 +1,4 @@
+import numbers
 from uuid import uuid4
 
 from klotho.utils.data_structures.dictionaries import SafeDict
@@ -107,14 +108,24 @@ class Kit(Instrument):
         """dict : Copy of the mapping from selector keys to member Instruments."""
         return dict(self._members)
 
+    def _member_by_index(self, index):
+        keys = list(self._members)
+        return self._members[keys[int(index) % len(keys)]]
+
     def _resolve(self, key=None):
-        if key is None or key not in self._members:
+        if key is None:
             return self._members[self._default]
-        return self._members[key]
+        if key in self._members:
+            return self._members[key]
+        if isinstance(key, numbers.Integral) and not isinstance(key, bool):
+            return self._member_by_index(key)
+        return self._members[self._default]
 
     def __getitem__(self, key):
         if key in self._members:
             return self._members[key]
+        if isinstance(key, numbers.Integral) and not isinstance(key, bool):
+            return self._member_by_index(key)
         return super().__getitem__(key)
 
     def __contains__(self, key):

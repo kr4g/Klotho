@@ -1437,10 +1437,11 @@ def _plot_scale_chord(obj, figsize: tuple = (12, 12),
         return _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                                             text_size, show_labels, title, output_file, layout)
 
-def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize, 
+def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                            node_size, text_size, show_labels, title, output_file, nodes):
     """Render cents-based scales/chords as circular node diagrams."""
     n_degrees = len(degrees)
+    pitch_objs = obj.pitches if obj.is_relative else list(obj.pitches)
     node_x, node_y = [], []
     node_text, hover_data, node_colors = [], [], []
     
@@ -1461,29 +1462,23 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
         node_x.append(x)
         node_y.append(y)
         
-        if obj.is_instanced:
-            calc_degree = calc_degrees[i]
-            if obj._interval_type_mode == "cents":
-                display_text = f"{calc_degree:.1f}¢"
-                base_hover = f"{calc_degree:.1f} cents"
-            else:
-                display_text = f"{calc_degree}"
-                base_hover = f"{calc_degree}"
-            
-            note_name = degree.pitchclass
-            cents_offset = degree.cents_offset
-            
-            cent_info = ""
-            if abs(cents_offset) > 0.01:
-                cent_info = f" ({cents_offset:+.2f}¢)"
-            
-            hover_info = f"Node {i}<br>{base_hover}<br>{note_name}{cent_info}"
-        elif obj._interval_type_mode == "cents":
-            display_text = f"{degree:.1f}¢"
-            hover_info = f"Node {i}<br>{degree:.1f} cents"
+        calc_degree = calc_degrees[i]
+        if obj._interval_type_mode == "cents":
+            display_text = f"{calc_degree:.1f}¢"
+            base_hover = f"{calc_degree:.1f} cents"
         else:
-            display_text = f"{degree}"
-            hover_info = f"Node {i}<br>{degree}"
+            display_text = f"{calc_degree}"
+            base_hover = f"{calc_degree}"
+
+        pitch = pitch_objs[i]
+        note_name = pitch.pitchclass
+        cents_offset = pitch.cents_offset
+
+        cent_info = ""
+        if abs(cents_offset) > 0.01:
+            cent_info = f" ({cents_offset:+.2f}¢)"
+
+        hover_info = f"Node {i}<br>{base_hover}<br>{note_name}{cent_info}"
         
         node_text.append(display_text if show_labels else "")
         hover_data.append(hover_info)
@@ -1676,22 +1671,15 @@ def _plot_cents_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
     )
     
     if title is None:
-        if obj.is_instanced:
-            obj_type = type(obj).__name__
-            interval_type = "cents" if obj._interval_type_mode == "cents" else "ratios"
-            
-            root_pitch = obj.reference_pitch
-            root_note = root_pitch.pitchclass
-            if abs(root_pitch.cents_offset) > 0.01:
-                root_note += f" ({root_pitch.cents_offset:+.2f}¢)"
-            
-            title = f"{obj_type} ({interval_type}) - Root: {root_note}"
-        else:
-            obj_type = type(obj).__name__
-            if calc_obj._interval_type_mode == "cents":
-                title = f"{obj_type} (cents)"
-            else:
-                title = f"{obj_type} (ratios)"
+        obj_type = type(obj).__name__
+        interval_type = "cents" if obj._interval_type_mode == "cents" else "ratios"
+
+        root_pitch = obj.reference_pitch
+        root_note = root_pitch.pitchclass
+        if abs(root_pitch.cents_offset) > 0.01:
+            root_note += f" ({root_pitch.cents_offset:+.2f}¢)"
+
+        title = f"{obj_type} ({interval_type}) - Root: {root_note}"
     
     width_px, height_px = int(figsize[0] * 100), int(figsize[1] * 100)
     
@@ -3019,6 +3007,7 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                                text_size, show_labels, title, output_file, layout):
     """Render ratio-based scales/chords as proportional segments."""
     n_degrees = len(degrees)
+    pitch_objs = obj.pitches
     
     if n_degrees < 2:
         raise ValueError("Need at least 2 degrees to plot intervals")
@@ -3082,15 +3071,12 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                 degree = degrees[i]
                 calc_degree = calc_degrees[i]
                 
-                if obj.is_instanced:
-                    note_name = degree.pitchclass
-                    cents_offset = degree.cents_offset
-                    cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
-                    hover_text = f"Degree {i}<br>{calc_degree}<br>{note_name}{cent_info}"
-                    label_text = f"{calc_degree}" if show_labels else ""
-                else:
-                    hover_text = f"Degree {i}<br>{calc_degree}"
-                    label_text = f"{calc_degree}" if show_labels else ""
+                pitch = pitch_objs[i]
+                note_name = pitch.pitchclass
+                cents_offset = pitch.cents_offset
+                cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
+                hover_text = f"Degree {i}<br>{calc_degree}<br>{note_name}{cent_info}"
+                label_text = f"{calc_degree}" if show_labels else ""
             else:
                 hover_text = f"To Equave<br>{calc_obj._equave}"
                 label_text = f"{calc_obj._equave}" if show_labels else ""
@@ -3175,15 +3161,12 @@ def _plot_ratio_scale_chord_new(obj, calc_obj, degrees, calc_degrees, fig, figsi
                 degree = degrees[i]
                 calc_degree = calc_degrees[i]
                 
-                if obj.is_instanced:
-                    note_name = degree.pitchclass
-                    cents_offset = degree.cents_offset
-                    cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
-                    hover_text = f"Degree {i}<br>{calc_degree}<br>{note_name}{cent_info}"
-                    label_text = f"{calc_degree}" if show_labels else ""
-                else:
-                    hover_text = f"Degree {i}<br>{calc_degree}"
-                    label_text = f"{calc_degree}" if show_labels else ""
+                pitch = pitch_objs[i]
+                note_name = pitch.pitchclass
+                cents_offset = pitch.cents_offset
+                cent_info = f" ({cents_offset:+.2f}¢)" if abs(cents_offset) > 0.01 else ""
+                hover_text = f"Degree {i}<br>{calc_degree}<br>{note_name}{cent_info}"
+                label_text = f"{calc_degree}" if show_labels else ""
             else:
                 hover_text = f"To Equave<br>{calc_obj._equave}"
                 label_text = f"{calc_obj._equave}" if show_labels else ""
@@ -3313,7 +3296,7 @@ def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, fig
                  text=["1/1"],
                  textfont=dict(color='white', size=text_size+2, family='Arial'),
                  showlegend=False,
-                 hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                 hovertemplate=f'Node 0<br>Degree: 1/1<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
                  hoverlabel=dict(bgcolor='lightgrey', font_color='black')
              ))
         
@@ -3422,7 +3405,7 @@ def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, fig
                     text=[f"{calc_degree}"],
                     textfont=dict(color='white', size=text_size+2, family='Arial'),
                     showlegend=False,
-                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<br>{_pitch_hover(pitch_objs, i)}<extra></extra>',
                     hoverlabel=dict(bgcolor='lightgrey', font_color='black')
                 ))
             
@@ -3433,7 +3416,7 @@ def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, fig
                 text=["1/1"],
                 textfont=dict(color='white', size=text_size+2, family='Arial'),
                 showlegend=False,
-                hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                hovertemplate=f'Node 0<br>Degree: 1/1<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
                 hoverlabel=dict(bgcolor='lightgrey', font_color='black')
             ))
         
@@ -3519,10 +3502,20 @@ def _plot_ratio_scale_chord_fixed(obj, calc_obj, degrees, calc_degrees, fig, fig
             fig.write_image(output_file)
     
     return fig
+def _pitch_hover(pitch_objs, i):
+    """Pitch-name hover fragment for degree i, or '' when unavailable."""
+    if not pitch_objs or i >= len(pitch_objs):
+        return ""
+    pitch = pitch_objs[i]
+    cent_info = f" ({pitch.cents_offset:+.2f}¢)" if abs(pitch.cents_offset) > 0.01 else ""
+    return f"{pitch.pitchclass}{pitch.octave}{cent_info}"
+
+
 def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                                  text_size, show_labels, title, output_file, layout):
     """Render ratio-based scales/chords as proportional segments (clean style)."""
     n_degrees = len(degrees)
+    pitch_objs = obj.pitches
     
     if n_degrees < 2:
         raise ValueError("Need at least 2 degrees to plot intervals")
@@ -3558,7 +3551,7 @@ def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, fig
                     text=[f"{calc_degree}"],
                     textfont=dict(color='white', size=text_size+2, family='Arial'),
                     showlegend=False,
-                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<br>{_pitch_hover(pitch_objs, i)}<extra></extra>',
                     hoverlabel=dict(bgcolor='lightgrey', font_color='black')
                 ))
             
@@ -3571,7 +3564,7 @@ def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, fig
                 text=["1/1"],
                 textfont=dict(color='white', size=text_size+2, family='Arial'),
                 showlegend=False,
-                hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                hovertemplate=f'Node 0<br>Degree: 1/1<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
                 hoverlabel=dict(bgcolor='lightgrey', font_color='black')
             ))
         
@@ -3666,7 +3659,7 @@ def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, fig
                 text=["1/1"],
                 textfont=dict(color='white', size=text_size+2, family='Arial'),
                 showlegend=False,
-                hovertemplate=f'Node 0<br>Degree: 1/1<extra></extra>',
+                hovertemplate=f'Node 0<br>Degree: 1/1<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
                 hoverlabel=dict(bgcolor='lightgrey', font_color='black')
             ))
             
@@ -3682,7 +3675,7 @@ def _plot_ratio_scale_chord_clean(obj, calc_obj, degrees, calc_degrees, fig, fig
                     text=[f"{calc_degree}"],
                     textfont=dict(color='white', size=text_size+2, family='Arial'),
                     showlegend=False,
-                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<extra></extra>',
+                    hovertemplate=f'Node {i}<br>Degree: {calc_degree}<br>{_pitch_hover(pitch_objs, i)}<extra></extra>',
                     hoverlabel=dict(bgcolor='lightgrey', font_color='black')
                 ))
             

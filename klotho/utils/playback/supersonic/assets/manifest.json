@@ -116,6 +116,34 @@
     "damp": 0.5,
     "gain": 1.0
   },
+  "kl_sampler1": {
+    "out": 0.0,
+    "buf": 0.0,
+    "amp": 0.5,
+    "pan": 0.0,
+    "rate": 1.0,
+    "pos": 0.0,
+    "loop": 0.0,
+    "duration": 0.0,
+    "attackTime": 0.001,
+    "releaseTime": 0.05,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
+  "kl_sampler2": {
+    "out": 0.0,
+    "buf": 0.0,
+    "amp": 0.5,
+    "pan": 0.0,
+    "rate": 1.0,
+    "pos": 0.0,
+    "loop": 0.0,
+    "duration": 0.0,
+    "attackTime": 0.001,
+    "releaseTime": 0.05,
+    "attackCurve": -4.0,
+    "releaseCurve": -4.0
+  },
   "kl_saw": {
     "out": 0.0,
     "freq": 440.0,

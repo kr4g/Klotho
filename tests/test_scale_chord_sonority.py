@@ -6,24 +6,29 @@ from klotho.tonos.scales.scale import Scale
 from klotho.tonos.chords.chord import Chord, Voicing
 from klotho.tonos.pitch.pitch import Pitch
 
+C4 = Pitch("C4").freq
+
 
 def test_scale_cyclic_indexing_ratios():
     scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
-    assert scale[0] == Fraction(1, 1)
-    assert scale[7] == Fraction(2, 1)
-    assert scale[-1] == Fraction(15, 16)
+    assert scale.degrees[0] == Fraction(1, 1)
+    assert scale[0].freq == pytest.approx(C4)
+    assert scale[7].freq == pytest.approx(C4 * 2)
+    assert scale[-1].freq == pytest.approx(C4 * 15 / 16)
 
 
 def test_chord_cyclic_indexing_ratios():
     chord = Chord(["1/1", "5/4", "3/2"])
-    assert chord[0] == Fraction(1, 1)
-    assert chord[3] == Fraction(2, 1)
-    assert chord[-1] == Fraction(3, 4)
+    assert chord.degrees[0] == Fraction(1, 1)
+    assert chord[0].freq == pytest.approx(C4)
+    assert chord[3].freq == pytest.approx(C4 * 2)
+    assert chord[-1].freq == pytest.approx(C4 * 3 / 4)
 
 
 def test_sonority_non_cyclic_indexing():
     voicing = Voicing(["1/2", "1/1", "3/2"])
-    assert voicing[0] == Fraction(1, 2)
+    assert voicing.degrees[0] == Fraction(1, 2)
+    assert voicing[0].freq == pytest.approx(C4 / 2)
     with pytest.raises(IndexError):
         _ = voicing[3]
 
@@ -47,11 +52,14 @@ def test_scale_root_instancing_returns_pitches():
     scale = Scale(["1/1", "9/8", "5/4"])
     instanced = scale.root("C4")
     assert isinstance(instanced[0], Pitch)
-    assert isinstance(instanced.degrees[0], Pitch)
+    # degrees stay raw; pitches carry the realization
+    assert instanced.degrees[0] == Fraction(1, 1)
+    assert isinstance(instanced.pitches[0], Pitch)
 
 
 def test_chord_root_instancing_returns_pitches():
     chord = Chord(["1/1", "5/4", "3/2"])
     instanced = chord.root("C4")
     assert isinstance(instanced[0], Pitch)
-    assert isinstance(instanced.degrees[0], Pitch)
+    assert instanced.degrees[0] == Fraction(1, 1)
+    assert isinstance(instanced.pitches[0], Pitch)
