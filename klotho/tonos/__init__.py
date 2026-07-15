@@ -41,6 +41,7 @@ from .pitch import (
 )
 from .scales import Scale
 from .chords import Chord, Voicing, ChordSequence, fold, voice_lead
+from .tonality import Tonality, Key, tonicize, approach
 from .pitch import Contour
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany, MasterSet
 from .systems.harmonic_trees import HarmonicTree
@@ -82,6 +83,12 @@ __all__ = [
 
     # Sequences
     'ChordSequence',
+
+    # Tonalities
+    'Tonality',
+    'Key',
+    'tonicize',
+    'approach',
 
     # Voice leading
     'fold',

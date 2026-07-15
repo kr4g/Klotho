@@ -91,6 +91,43 @@ class TestRuleSet:
                 inner = word[word.index('[') + 1:word.index(']')]
                 assert 'p' in inner
 
+    def test_random_branch_length_range(self):
+        a = Alphabet(['x', '.', '+', '-', 'v'], brackets=True)
+        for seed in (3, 17, 88):
+            rules = RuleSet.random(a, word_length=(2, 4), branch_probability=1.0,
+                                   branch_length=(2, 3), branch_requires='x', rng=seed)
+            for symbol in a.variables:
+                word = rules[symbol]
+                assert word.count('[') == 1 and word.count(']') == 1
+                inner = word[word.index('[') + 1:word.index(']')]
+                assert 2 <= len(inner) <= 3
+                assert 'x' in inner
+                stem = word.replace('[' + inner + ']', '')
+                assert 2 <= len(stem) <= 4   # word_length governs the stem alone
+
+    def test_random_branch_length_int(self):
+        a = Alphabet(['x', '.'], brackets=True)
+        rules = RuleSet.random(a, word_length=2, branch_probability=1.0,
+                               branch_length=3, rng=5)
+        for symbol in a.variables:
+            word = rules[symbol]
+            inner = word[word.index('[') + 1:word.index(']')]
+            assert len(inner) == 3
+
+    def test_random_branch_length_none_keeps_legacy_seed_behavior(self):
+        a = Alphabet(['x', '.', '+'], brackets=True)
+        for seed in (1, 9, 41):
+            default = RuleSet.random(a, word_length=(3, 6), branch_probability=0.7,
+                                     branch_requires='x', rng=seed)
+            explicit = RuleSet.random(a, word_length=(3, 6), branch_probability=0.7,
+                                      branch_requires='x', branch_length=None, rng=seed)
+            assert {s: default[s] for s in default} == {s: explicit[s] for s in explicit}
+
+    def test_random_branch_length_min_below_one_raises(self):
+        a = Alphabet(['x'], brackets=True)
+        with pytest.raises(ValueError):
+            RuleSet.random(a, branch_probability=1.0, branch_length=(0, 2), rng=1)
+
     def test_random_constrain_kwarg_matches_two_step(self):
         a = Alphabet(['x', '.', '+', '-', 'v'], brackets=True)
         constraints = {'x': 'x', '.': 'x'}

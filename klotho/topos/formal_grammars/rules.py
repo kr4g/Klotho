@@ -199,7 +199,7 @@ class RuleSet(Mapping):
     # ------------------------------------------------------------------
     @classmethod
     def random(cls, alphabet, word_length=(1, 3), branch_probability=0.0,
-               branch_requires=None, constrain=None, rng=None):
+               branch_requires=None, branch_length=None, constrain=None, rng=None):
         """
         Generate a random deterministic rule set over *alphabet*.
 
@@ -220,6 +220,12 @@ class RuleSet(Mapping):
         branch_requires : str, optional
             When set, every bracketed sub-word is guaranteed to contain at
             least one occurrence of this symbol.
+        branch_length : int or (min, max) tuple, optional
+            Length range for bracketed sub-words (minimum 1). By default a
+            branch wraps a random slice of the word; when this is set, the
+            branch contents are generated fresh at a length drawn from this
+            range and inserted at a random position, so ``word_length``
+            governs the stem alone.
         constrain : dict, optional
             ``{symbol: required}`` constraints applied to the generated
             rules. Exactly equivalent to calling
@@ -239,6 +245,14 @@ class RuleSet(Mapping):
             lo, hi = word_length, word_length
         else:
             lo, hi = word_length
+        if branch_length is None:
+            blo = bhi = None
+        elif isinstance(branch_length, int):
+            blo = bhi = branch_length
+        else:
+            blo, bhi = branch_length
+        if blo is not None and blo < 1:
+            raise ValueError("branch_length minimum must be at least 1")
         pool = list(alphabet.symbols)
         if not pool:
             raise ValueError("alphabet has no symbols")
@@ -247,16 +261,24 @@ class RuleSet(Mapping):
         for symbol in alphabet.variables:
             length = rng.randint(lo, hi)
             word = [rng.choice(pool) for _ in range(length)]
-            if (alphabet.brackets is not None and branch_probability > 0
-                    and len(word) >= 2 and rng.random() < branch_probability):
+            if alphabet.brackets is not None and branch_probability > 0:
                 open_, close_ = alphabet.brackets
-                i = rng.randint(0, len(word) - 2)
-                j = rng.randint(i + 1, len(word) - 1)
-                inner = word[i:j]
-                if branch_requires is not None and branch_requires not in inner:
-                    k = rng.randrange(len(inner))
-                    inner[k] = branch_requires
-                word = word[:i] + [open_] + inner + [close_] + word[j:]
+                if blo is not None:
+                    if rng.random() < branch_probability:
+                        inner = [rng.choice(pool) for _ in range(rng.randint(blo, bhi))]
+                        if branch_requires is not None and branch_requires not in inner:
+                            k = rng.randrange(len(inner))
+                            inner[k] = branch_requires
+                        i = rng.randint(0, len(word))
+                        word = word[:i] + [open_] + inner + [close_] + word[i:]
+                elif len(word) >= 2 and rng.random() < branch_probability:
+                    i = rng.randint(0, len(word) - 2)
+                    j = rng.randint(i + 1, len(word) - 1)
+                    inner = word[i:j]
+                    if branch_requires is not None and branch_requires not in inner:
+                        k = rng.randrange(len(inner))
+                        inner[k] = branch_requires
+                    word = word[:i] + [open_] + inner + [close_] + word[j:]
             rules[symbol] = word
         for symbol in alphabet.constants:
             rules[symbol] = [symbol]

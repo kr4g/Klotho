@@ -39,6 +39,42 @@ class Bind:
             raise TypeError(f"Bind expects a callable, got {type(fn).__name__}")
         self.fn = fn
 
+    @classmethod
+    def mfield(cls, name, default=None, map=None):
+        """
+        A Bind that reads the node's mfield *name*.
+
+        Parameters
+        ----------
+        name : str
+            The mfield to read.
+        default : optional
+            Value when the node has no such mfield.
+        map : callable, optional
+            Applied to the mfield value — store a rich object once, lower
+            it per pfield: ``Bind.mfield('chord', map=lambda v: v.freq)``.
+
+        Examples
+        --------
+        >>> uc.root.set_pfields(freq=Bind.mfield('chord'))
+        """
+        if map is None:
+            return cls(lambda c: c.mfields.get(name, default))
+        return cls(lambda c: map(c.mfields.get(name, default)))
+
+    @classmethod
+    def index(cls, map=None):
+        """
+        A Bind that reads the node's position among the read set.
+
+        Without *map*, resolves to the bare index. With *map*, resolves
+        to ``map(index, total)`` — fades, pan spreads, per-node ramps:
+        ``Bind.index(map=lambda i, n: i / max(n - 1, 1))``.
+        """
+        if map is None:
+            return cls(lambda c: c.index)
+        return cls(lambda c: map(c.index, c.total))
+
     def __repr__(self):
         name = getattr(self.fn, '__name__', None)
         return f"Bind({name})" if name and name != '<lambda>' else "Bind(<fn>)"

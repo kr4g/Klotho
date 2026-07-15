@@ -66,6 +66,35 @@ class TestFromDerivationTree:
         freqs = [uc.get_pfield(n, 'freq') for n in uc._rt.leaf_nodes]
         assert freqs == [(100.0, 200.0), (150.0, 250.0), (200.0, 300.0)]
 
+    def test_bind_mfield_accessor(self):
+        from klotho.thetos import Bind
+        uc = UC.from_tree(_chordy_derivation(), bpm=60, beat='1/4')
+        uc.root.set_pfields(freq=Bind.mfield('chord'),
+                            amp=Bind.mfield('gain', default=0.5))
+        leaves = uc._rt.leaf_nodes
+        assert uc.get_pfield(leaves[0], 'freq') == (100.0, 200.0)
+        assert uc.get_pfield(leaves[0], 'amp') == 0.5
+
+    def test_bind_mfield_map_lowers_rich_values(self):
+        from klotho.thetos import Bind
+        uc = UC.from_tree(_chordy_derivation(), bpm=60, beat='1/4')
+        uc.root.set_pfields(freq=Bind.mfield('chord', map=lambda v: v[0]))
+        assert uc.get_pfield(uc._rt.leaf_nodes[0], 'freq') == 100.0
+
+    def test_bind_index_accessor(self):
+        from klotho.thetos import Bind
+        uc = UC.from_tree(_chordy_derivation(), bpm=60, beat='1/4')
+        uc.root.set_pfields(pan=Bind.index(map=lambda i, n: i / max(n - 1, 1)))
+        pans = [uc.get_pfield(n, 'pan') for n in uc._rt.leaf_nodes]
+        assert pans[0] == 0.0 and pans[-1] == 1.0
+
+    def test_bind_as_from_tree_pfield_default(self):
+        from klotho.thetos import Bind
+        uc = UC.from_tree(_chordy_derivation(), bpm=60, beat='1/4',
+                          pfields={'freq': Bind.mfield('chord')})
+        freqs = [uc.get_pfield(n, 'freq') for n in uc._rt.leaf_nodes]
+        assert freqs == [(100.0, 200.0), (150.0, 250.0), (200.0, 300.0)]
+
 
 class TestFromPlainTree:
     def test_proportions_from_node_attrs(self):
@@ -91,9 +120,18 @@ class TestFromPlainTree:
         uc = UC.from_tree(tree, denom=8)
         assert str(uc.tempus) == '3/8'
 
-    def test_span_always_one(self):
+    def test_span_defaults_to_one(self):
         uc = UC.from_tree(_chordy_derivation())
         assert uc.span == 1
+
+    def test_span_forwarded(self):
+        one = UC.from_tree(_chordy_derivation(), bpm=60, beat='1/4')
+        two = UC.from_tree(_chordy_derivation(), bpm=60, beat='1/4', span=2)
+        assert two.span == 2
+        assert two.tempus == one.tempus
+        assert two.duration == 2 * one.duration
+        # payloads still land in mfields under a stretched span
+        assert two.get_mfield(two._rt.leaf_nodes[0], 'chord') == (100.0, 200.0)
 
     def test_extra_attrs_copied_to_mfields(self):
         tree = Tree('root', ('x', 'y'))

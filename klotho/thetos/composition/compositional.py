@@ -576,6 +576,7 @@ class CompositionalUnit(TemporalUnit):
                   bpm: Union[None, int, float] = None,
                   inst: Union[Instrument, None] = None,
                   tempus: Union[Meas, Fraction, int, float, str, None] = None,
+                  span: Union[int, float, Fraction] = 1,
                   head_weight: int = 1,
                   pfields: Union[dict, list, None] = None,
                   mfields: Union[dict, list, None] = None):
@@ -599,7 +600,7 @@ class CompositionalUnit(TemporalUnit):
            writes no root proportion — ``tempus`` is the sum of the root's
            child proportions over ``denom``.
 
-        ``span`` is always 1.
+        ``span`` defaults to 1 measure of the resolved tempus.
 
         Every other node attribute that is not rhythm-owned
         (``proportion``, ``tied``, ``metric_duration``, ``metric_onset``)
@@ -620,6 +621,9 @@ class CompositionalUnit(TemporalUnit):
             Instrument for the root node.
         tempus : optional
             Explicit time signature (overrides derivation from the tree).
+        span : int, float, or Fraction, optional
+            Number of measures the unit spans, as in the constructor.
+            Default is 1.
         head_weight : int, optional
             Only used for DerivationTree input: the rightmost child of
             every expansion gets this proportion (all others get 1),
@@ -669,7 +673,7 @@ class CompositionalUnit(TemporalUnit):
                 child_sum = sum(abs(proportion_of(c)) for c in tree.successors(tree.root))
                 tempus = Meas(int(child_sum) if child_sum else 1, denom)
 
-        new_uc = cls(span=1, tempus=tempus, prolatio=subdivisions,
+        new_uc = cls(span=span, tempus=tempus, prolatio=subdivisions,
                      beat=beat, bpm=bpm, inst=inst,
                      pfields=pfields, mfields=mfields)
 

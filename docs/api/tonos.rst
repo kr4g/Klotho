@@ -49,6 +49,13 @@ Chord Implementation
    :members:
    :show-inheritance:
 
+Tonalities
+----------
+
+.. automodule:: klotho.tonos.tonality
+   :members:
+   :show-inheritance:
+
 Systems
 -------
 
