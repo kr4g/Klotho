@@ -4,6 +4,9 @@
 //   dimAllNodes(), hideAllShapeEdges(), revealGroupVisual(gi, color)
 // (SVG figures implement the hooks on DOM elements; 3D figures on
 // THREE.js meshes/tubes.)
+// Optional hook: renderTrail(history) — when defined, the controller keeps
+// an onion-skin history of already-shown groups and calls this hook after
+// dimming so past shapes can be painted as translucent shadows.
 
 var toggleBtn = document.getElementById("__WID___toggle");
 var iconEl    = document.getElementById("__WID___icon");
@@ -36,6 +39,15 @@ var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
     })
     : null;
 
+var trailOn = (typeof renderTrail === "function");
+var trailHistory = [];
+
+function _browseTrail(gi) {
+    var h = [];
+    for (var k = 0; k < gi; k++) h.push(k);
+    return h;
+}
+
 function updateCounter() {
     if (counterEl) counterEl.textContent = (currentView + 1) + " / " + totalGroups;
 }
@@ -43,16 +55,30 @@ function updateCounter() {
 function revealGroup(gi) {
     dimAllNodes();
     hideAllShapeEdges();
+    if (trailOn) renderTrail(trailHistory);
     if (gi < 0 || gi >= totalGroups) return;
     revealGroupVisual(gi, shapeColors[gi] || "white");
 }
 function revealAndTrack(gi) {
     currentView = gi;
+    if (trailOn) {
+        // onEvent can fire once per voice of a chord: repeats of the current
+        // group must not reset the history — only a wrap to an earlier group.
+        var lastShown = trailHistory[trailHistory.length - 1];
+        if (gi !== lastShown && trailHistory.indexOf(gi) !== -1) trailHistory = [];
+    }
     revealGroup(gi);
+    if (trailOn && trailHistory[trailHistory.length - 1] !== gi) trailHistory.push(gi);
     updateCounter();
 }
 function restoreView() { revealGroup(currentView); updateCounter(); }
-function finishPlayback() { playing = false; currentView = playbackOrigin; restoreView(); setPlayIcon(); }
+function finishPlayback() {
+    playing = false;
+    currentView = playbackOrigin;
+    if (trailOn) trailHistory = _browseTrail(currentView);
+    restoreView();
+    setPlayIcon();
+}
 
 function setPlayIcon() {
     iconEl.style.cssText =
@@ -87,6 +113,7 @@ if (prevBtn) {
     prevBtn.addEventListener("click", function() {
         if (playing) return;
         currentView = (currentView - 1 + totalGroups) % totalGroups;
+        if (trailOn) trailHistory = _browseTrail(currentView);
         revealGroup(currentView);
         updateCounter();
     });
@@ -95,6 +122,7 @@ if (nextBtn) {
     nextBtn.addEventListener("click", function() {
         if (playing) return;
         currentView = (currentView + 1) % totalGroups;
+        if (trailOn) trailHistory = _browseTrail(currentView);
         revealGroup(currentView);
         updateCounter();
     });
@@ -113,6 +141,7 @@ function _runAnimation(step) {
     if (step >= totalGroups) {
         if (loopCtl.enabled && (loopCtl.infinite || loopCtl.cyclesRemaining > 1)) {
             if (!loopCtl.infinite) loopCtl.cyclesRemaining -= 1;
+            if (trailOn) trailHistory = [];
             dimAllNodes(); hideAllShapeEdges();
             _timerId = setTimeout(function() { _runAnimation(0); }, stepMs);
         } else {
@@ -144,6 +173,7 @@ toggleBtn.addEventListener("click", async function() {
         playbackOrigin = currentView;
         playing = true;
         setStopIcon();
+        if (trailOn) trailHistory = [];
 
         if (solo) {
             var soloEvts = filterEventsForGroup(allEvts, currentView);
@@ -169,6 +199,7 @@ toggleBtn.addEventListener("click", async function() {
         playbackOrigin = currentView;
         playing = true;
         setStopIcon();
+        if (trailOn) trailHistory = [];
         dimAllNodes();
         hideAllShapeEdges();
         loopCtl.rearm();

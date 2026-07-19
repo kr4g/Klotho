@@ -15,7 +15,7 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      path_cmap='viridis', mute_background=False,
                      animate=False, dur=0.5, shape=None,
                      arp=False, strum=0, direction='u', amp=None,
-                     **kwargs):
+                     trail=False, **kwargs):
     """
     Render a MasterSet as a 2D SVG or 3D Three.js network diagram.
 
@@ -137,7 +137,7 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
             lambda: _render_2d(shape=shape),
             lambda: _render_3d(shape=shape_groups),
             dur, arp, strum, direction, amp, extra_synth_kwargs,
-            preview_def_name, engine_name, kwargs)
+            preview_def_name, engine_name, kwargs, trail=trail)
 
     if is_3d:
         static_fig = _render_3d(path=path, shape=shape_groups if has_shape else None)
@@ -392,7 +392,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              shape: list = None,
              arp: bool = False, strum: float = 0, direction: str = 'u',
              amp: float = None, dim_reduction: str = 'mds',
-             equaves: int = 1, **kwargs):
+             equaves: int = 1, trail=False, **kwargs):
     """
     Render a Combination Product Set as an interactive network diagram.
 
@@ -525,7 +525,7 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
             lambda: _render_2d(shape=shape),
             lambda: _render_3d(shape=shape_groups),
             dur, arp, strum, direction, amp, extra_synth_kwargs,
-            preview_def_name, engine_name, kwargs)
+            preview_def_name, engine_name, kwargs, trail=trail)
 
     # Default play (no path/shape): the CPS "scale" — sorted ratios up
     # `equaves` equaves and back down — selecting each sounding node the

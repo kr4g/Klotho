@@ -40,7 +40,7 @@ from .pitch import (
     AbsolutePitchCollection,
 )
 from .scales import Scale
-from .chords import Chord, Voicing, ChordSequence, fold, voice_lead
+from .chords import Chord, Voicing, ChordSequence, fold, voice_lead, root_index, chord_root
 from .tonality import Tonality, Key, tonicize, approach
 from .pitch import Contour
 from .systems.combination_product_sets import CombinationProductSet, Hexany, Dekany, Pentadekany, Eikosany, Hebdomekontany, MasterSet
@@ -93,6 +93,8 @@ __all__ = [
     # Voice leading
     'fold',
     'voice_lead',
+    'root_index',
+    'chord_root',
 
     # Other Classes
     'Contour',

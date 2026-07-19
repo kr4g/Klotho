@@ -90,6 +90,19 @@ def _normalize_shape_groups(shape):
     return []
 
 
+def _shape_group_colors(shape):
+    """Per-group colors for groups carrying a ``color`` attribute (e.g.
+    :class:`klotho.topos.shapes.Shape`), or None to use the cycling palette."""
+    if shape is None or len(shape) == 0:
+        return None
+    if not isinstance(shape[0], (list, tuple)):
+        return None
+    colors = [getattr(g, 'color', None) for g in shape]
+    if any(c is not None for c in colors):
+        return colors
+    return None
+
+
 def _resolve_chord_shape(obj, shape):
     """Resolve a Chord/Voicing/ChordSequence ``shape`` argument against a
     lattice-family object.
@@ -196,7 +209,7 @@ def _animated_path_figure(freqs, use_3d, render_2d, render_3d, dur, amp,
 
 def _animated_shape_figure(freq_groups, use_3d, render_2d, render_3d, dur, arp,
                            strum, direction, amp, extra_synth_kwargs,
-                           preview_def_name, engine_name, kwargs):
+                           preview_def_name, engine_name, kwargs, trail=False):
     """Shape (chord/chord-sequence) audio payload wrapped in the matching
     animated figure, mirroring :func:`_animated_path_figure`."""
     from klotho.utils.playback.animation_events import build_shape_engine_payload
@@ -217,11 +230,11 @@ def _animated_shape_figure(freq_groups, use_3d, render_2d, render_3d, dur, arp,
     if use_3d:
         return AnimatedLattice3dShapeFigure(
             scene_data=render_3d(), audio_payload=audio_payload, dur=dur,
-            **transport_kwargs(kwargs),
+            trail=trail, **transport_kwargs(kwargs),
         )
     return AnimatedLatticeShapeFigure(
         svg_data=render_2d(), audio_payload=audio_payload, dur=dur,
-        **transport_kwargs(kwargs),
+        trail=trail, **transport_kwargs(kwargs),
     )
 
 
@@ -450,7 +463,12 @@ def _build_lattice_graph_data(lattice, coords, original_coords, coord_mapping,
         highlighted_coords.update(coord for coord in path if coord in valid_coords)
 
     if shape is not None and len(shape) > 0:
-        if isinstance(shape[0], list):
+        first = shape[0]
+        is_group = isinstance(first, list) or (
+            isinstance(first, tuple) and len(first) > 0
+            and isinstance(first[0], (list, tuple))
+        )
+        if is_group:
             lattice_shape_groups = [list(g) for g in shape]
         else:
             lattice_shape_groups = [list(shape)]
@@ -478,7 +496,8 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                               figsize, node_size, title, path_cmap,
                               dur, arp, strum, direction, amp, kwargs,
                               preview_def_name='kl_tri', inst_pfields=None,
-                              chord_freq_groups=None):
+                              chord_freq_groups=None, layout='lattice',
+                              shape_colors=None, trail=False):
     has_shape = len(lattice_shape_groups) > 0
     from klotho.utils.playback._config import get_audio_engine
     engine_name = get_audio_engine()
@@ -492,7 +511,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
         path_mode=path_mode, figsize=figsize, node_size=node_size,
         title=title, is_tone_lattice=is_tone_lattice,
         coord_label=coord_label, gen_labels=gen_labels,
-        path_cmap=path_cmap,
+        path_cmap=path_cmap, layout=layout, shape_colors=shape_colors,
     )
 
     preview_config = _build_preview_config(dur, amp, kwargs, engine_name,
@@ -535,7 +554,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             lambda: _render_2d(shape=lattice_shape_groups),
             lambda: _render_3d(shape=lattice_shape_groups),
             dur, arp, strum, direction, amp, extra_synth_kwargs,
-            preview_def_name, engine_name, kwargs)
+            preview_def_name, engine_name, kwargs, trail=trail)
 
     return None
 
@@ -548,7 +567,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                  mute_background: bool = False, fit=False, pad: int = 1,
-                 path_cmap: str = 'viridis',
+                 path_cmap: str = 'viridis', layout: str = 'lattice',
+                 trail=False,
                  animate: bool = False, dur: float = 0.5,
                  shape: list = None,
                  arp: bool = False, strum: float = 0, direction: str = 'u',
@@ -602,6 +622,17 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         active.
     path_cmap : str, optional
         Matplotlib colormap for path edge colouring.
+    layout : str, optional
+        ``'lattice'`` (default) draws nodes connected by grid edges.
+        ``'cells'`` draws one filled square (2D) or translucent cube (3D)
+        per coordinate, with no edges: highlights, shapes, and node
+        selections colour the cells (``nodes=`` connector edges are not
+        drawn), and paths draw arrows from cell center to cell center.
+        Requires ``lattice.dimensionality <= 3``.
+    trail : bool or float, optional
+        During animated shape playback, leave a translucent onion-skin of
+        already-played shapes (most recent stacking on top). ``True`` uses
+        the default shadow opacity; a float in (0, 1] sets it explicitly.
     animate : bool, optional
         Return an animated figure when ``True``.
     dur : float, optional
@@ -626,6 +657,15 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         If lattice dimensionality exceeds 3 and *dim_reduction* is
         ``None``.
     """
+    if layout not in ('lattice', 'cells'):
+        raise ValueError(f"layout must be 'lattice' or 'cells', got {layout!r}")
+    if layout == 'cells' and lattice.dimensionality > 3:
+        raise ValueError(
+            "layout='cells' requires an axis-aligned lattice with "
+            "dimensionality <= 3; use layout='lattice' (with dim_reduction) "
+            "for higher dimensions"
+        )
+
     is_tone_lattice = hasattr(lattice, '_coord_to_ratio')
     coord_label = "Coordinate"
     if is_tone_lattice:
@@ -634,6 +674,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
 
     chord_freq_groups = None
+    shape_colors = _shape_group_colors(shape)
     resolved = _resolve_chord_shape(lattice, shape)
     if resolved is not None:
         shape_groups, chord_freq_groups = resolved
@@ -724,7 +765,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         path_mode=path_mode, figsize=figsize, node_size=node_size,
         title=title, is_tone_lattice=is_tone_lattice,
         coord_label=coord_label, gen_labels=gen_labels,
-        path_cmap=path_cmap,
+        path_cmap=path_cmap, layout=layout, shape_colors=shape_colors,
     )
     preview_engine = get_audio_engine()
     animate_preview_config = _build_preview_config(
@@ -756,7 +797,8 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         figsize, node_size, title, path_cmap,
         dur, arp, strum, direction, amp, kwargs,
         preview_def_name=preview_def_name, inst_pfields=inst_pfields,
-        chord_freq_groups=chord_freq_groups,
+        chord_freq_groups=chord_freq_groups, layout=layout,
+        shape_colors=shape_colors, trail=trail,
     )
 
     if animated_fig is not None:

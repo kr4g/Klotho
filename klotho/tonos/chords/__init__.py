@@ -4,6 +4,7 @@ from .chord import (
     ChordSequence,
 )
 from .voice_leading import fold, voice_lead
+from .analysis import root_index, chord_root
 
 __all__ = [
     'Chord',
@@ -11,4 +12,6 @@ __all__ = [
     'ChordSequence',
     'fold',
     'voice_lead',
+    'root_index',
+    'chord_root',
 ]

@@ -15,7 +15,7 @@ from .base import (
     build_shape_playback_js,
 )
 from .._renderers.threejs_lattice import (
-    THREEJS_CLICK_PREVIEW_JS, THREEJS_SHAPE_EDGES_JS,
+    THREEJS_CLICK_PREVIEW_JS, THREEJS_SHAPE_EDGES_JS, THREEJS_NODE_MESHES_JS,
 )
 
 
@@ -379,24 +379,10 @@ class AnimatedLattice3dFigure:
     }}
 
     var nodeCount = sceneData.nodes.length;
-    var sphereR = sceneData.nodeSize * 0.015;
-    var sphereGeo = new THREE.SphereGeometry(sphereR, 16, 12);
-    var nodeMeshes = [];
-    var nodeGroup = new THREE.Group();
     var dimColor = new THREE.Color(sceneData.dimmedNodeColor);
     var pathNodeIndices = sceneData.pathNodeIndices || [];
     var pathNodeColors = sceneData.pathNodeColors || [];
-
-    for (var i = 0; i < nodeCount; i++) {{
-        var n = sceneData.nodes[i];
-        var mat = new THREE.MeshBasicMaterial({{ color: sceneData.nodeColors[i] }});
-        var mesh = new THREE.Mesh(sphereGeo, mat);
-        mesh.position.set(n[0], n[1], n[2]);
-        mesh.userData.nodeIdx = i;
-        nodeGroup.add(mesh);
-        nodeMeshes.push(mesh);
-    }}
-    scene.add(nodeGroup);
+{THREEJS_NODE_MESHES_JS}
 
     function dimAllNodes() {{
         for (var i = 0; i < nodeMeshes.length; i++) nodeMeshes[i].material.color.copy(dimColor);
@@ -1237,12 +1223,14 @@ class _AnimatedShapeFigureBase:
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False,
+                 trail=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
         self.loop = loop
+        self.trail = trail
         self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
 
@@ -1276,6 +1264,30 @@ class _AnimatedShapeFigureBase:
             wid, self.dur * 1000, total_groups,
             engine=eng, ring_time=self.ring_time, loop=self.loop)
 
+        trail_js = ''
+        if self.trail:
+            trail_opacity = 0.3 if self.trail is True else float(self.trail)
+            trail_js = '''
+    function renderTrail(history) {
+        var seen = {};
+        for (var h = history.length - 1; h >= 0; h--) {
+            var gi = history[h];
+            var col = shapeColors[gi] || "white";
+            var idxs = groupNodeIndices[gi] || [];
+            for (var i = 0; i < idxs.length; i++) {
+                var idx = idxs[i];
+                if (idx < 0 || idx >= allNodeIds.length || seen[idx]) continue;
+                seen[idx] = true;
+                var el = document.getElementById(allNodeIds[idx]);
+                if (el) {
+                    el.setAttribute("fill", col);
+                    el.setAttribute("fill-opacity", "__TRAIL_OPACITY__");
+                }
+            }
+        }
+    }
+'''.replace('__TRAIL_OPACITY__', str(trail_opacity))
+
         html = f'''
 {cdn_html}
 {sd.svg_str}
@@ -1295,7 +1307,10 @@ class _AnimatedShapeFigureBase:
     function dimAllNodes() {{
         for (var i = 0; i < allNodeIds.length; i++) {{
             var el = document.getElementById(allNodeIds[i]);
-            if (el) el.setAttribute("fill", dimmedColor);
+            if (el) {{
+                el.setAttribute("fill", dimmedColor);
+                el.removeAttribute("fill-opacity");
+            }}
         }}
     }}
     function hideAllShapeEdges() {{
@@ -1310,7 +1325,10 @@ class _AnimatedShapeFigureBase:
             var idx = nodeIdxs[i];
             if (idx >= 0 && idx < allNodeIds.length) {{
                 var el = document.getElementById(allNodeIds[idx]);
-                if (el) el.setAttribute("fill", col);
+                if (el) {{
+                    el.setAttribute("fill", col);
+                    el.removeAttribute("fill-opacity");
+                }}
             }}
         }}
         var edgeIds = groupEdgeIds[gi] || [];
@@ -1319,7 +1337,7 @@ class _AnimatedShapeFigureBase:
             if (el) el.style.display = "";
         }}
     }}
-
+    {trail_js}
     {shape_js}
 }})();
 </script>
@@ -1348,10 +1366,11 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
     """
 
     def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None,
-                 ring_time=5, loop=False):
+                 ring_time=5, loop=False, trail=False):
         super().__init__(scene_data, audio_payload=audio_payload, dur=dur,
                          engine=engine, ring_time=ring_time, loop=loop)
         self.widget_id = f"klotho_3dshp_{uuid.uuid4().hex[:8]}"
+        self.trail = trail
         groups = scene_data.scene_data.get('shapeGroupNodeIndices') or []
         self.total_groups = max(1, len(groups))
 
@@ -1363,14 +1382,46 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
         shape_js = build_shape_playback_js(
             wid, self.dur * 1000, self.total_groups,
             engine=eng, ring_time=self.ring_time, loop=self.loop)
+        trail_js = ''
+        if self.trail:
+            trail_opacity = 0.35 if self.trail is True else float(self.trail)
+            trail_js = '''
+    function renderTrail(history) {
+        var seen = {};
+        for (var h = history.length - 1; h >= 0; h--) {
+            var gi = history[h];
+            var col = shapeColors[gi] || "#ffffff";
+            var idxs = groupNodeIndices[gi] || [];
+            for (var i = 0; i < idxs.length; i++) {
+                var ix = idxs[i];
+                if (ix < 0 || ix >= nodeMeshes.length || seen[ix]) continue;
+                seen[ix] = true;
+                var m = nodeMeshes[ix].material;
+                m.color.set(col);
+                m.transparent = true;
+                m.depthWrite = false;
+                m.opacity = __TRAIL_OPACITY__;
+            }
+        }
+    }
+'''.replace('__TRAIL_OPACITY__', str(trail_opacity))
         return '''
     var groupNodeIndices = sceneData.shapeGroupNodeIndices || [];
     var shapeColors = sceneData.shapeColors || [];
     var _shapeDimColor = new THREE.Color(sceneData.dimmedNodeColor || "#080808");
+    var _shapeCellsMode = (sceneData.layout === "cells");
 
     function dimAllNodes() {
-        for (var i = 0; i < nodeMeshes.length; i++)
-            nodeMeshes[i].material.color.copy(_shapeDimColor);
+        for (var i = 0; i < nodeMeshes.length; i++) {
+            var m = nodeMeshes[i].material;
+            if (_shapeCellsMode) {
+                m.color.set("#ffffff");
+                m.opacity = 0.15;
+            } else {
+                m.color.copy(_shapeDimColor);
+                if (m.transparent) { m.opacity = 1; m.transparent = false; }
+            }
+        }
     }
     function hideAllShapeEdges() {
         for (var g = 0; g < shapeEdgeObjs.length; g++) {
@@ -1382,13 +1433,17 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
         var idxs = groupNodeIndices[gi] || [];
         for (var i = 0; i < idxs.length; i++) {
             var ix = idxs[i];
-            if (ix >= 0 && ix < nodeMeshes.length) nodeMeshes[ix].material.color.set(col);
+            if (ix >= 0 && ix < nodeMeshes.length) {
+                var m = nodeMeshes[ix].material;
+                m.color.set(col);
+                if (_shapeCellsMode) m.opacity = 0.9;
+                else if (m.transparent) { m.opacity = 1; m.transparent = false; }
+            }
         }
         var objs = shapeEdgeObjs[gi] || [];
         for (var j = 0; j < objs.length; j++) objs[j].visible = true;
     }
-
-''' + shape_js
+''' + trail_js + shape_js
 
 
 AnimatedCPSShapeFigure = _AnimatedShapeFigureBase

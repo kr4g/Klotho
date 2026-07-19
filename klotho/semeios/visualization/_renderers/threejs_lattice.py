@@ -145,6 +145,43 @@ THREEJS_SHAPE_EDGES_JS = """
 """
 
 
+# Builds the node meshes for a 3D lattice scene: spheres for the default
+# 'lattice' layout, translucent unit cubes for layout='cells'.
+# Requires in scope: sceneData, scene. Defines nodeMeshes and nodeGroup
+# (with per-mesh userData.nodeIdx) for the slider, raycaster, click
+# preview, and animated figures.
+THREEJS_NODE_MESHES_JS = """
+    var nodeMeshes = [];
+    var nodeGroup = new THREE.Group();
+    (function() {
+        var isCells = sceneData.layout === "cells";
+        var geo;
+        if (isCells) {
+            var cs = sceneData.cellSize || 0.82;
+            geo = new THREE.BoxGeometry(cs, cs, cs);
+        } else {
+            geo = new THREE.SphereGeometry(sceneData.nodeSize * 0.015, 16, 12);
+        }
+        var opac = sceneData.nodeOpacities || null;
+        for (var i = 0; i < sceneData.nodes.length; i++) {
+            var n = sceneData.nodes[i];
+            var matOpts = { color: sceneData.nodeColors[i] };
+            if (isCells) {
+                matOpts.transparent = true;
+                matOpts.opacity = (opac && opac[i] != null) ? opac[i] : 0.9;
+                matOpts.depthWrite = false;
+            }
+            var mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial(matOpts));
+            mesh.position.set(n[0], n[1], n[2]);
+            mesh.userData.nodeIdx = i;
+            nodeGroup.add(mesh);
+            nodeMeshes.push(mesh);
+        }
+        scene.add(nodeGroup);
+    })();
+"""
+
+
 class ThreejsLatticeData(SvgFigureData):
     """Container for Three.js 3D lattice scene data and path metadata."""
 
@@ -409,23 +446,9 @@ def _static_threejs_html(sd):
         _klDimmables.push(hlLines);
     }}
 
-    var sphereR = sceneData.nodeSize * 0.015;
-    var sphereGeo = new THREE.SphereGeometry(sphereR, 16, 12);
-    var nodeMeshes = [];
-    var nodeGroup = new THREE.Group();
+{THREEJS_NODE_MESHES_JS}
     var pathNodeIndices = sceneData.pathNodeIndices || [];
     var pathNodeColors = sceneData.pathNodeColors || [];
-
-    for (var i = 0; i < sceneData.nodes.length; i++) {{
-        var n = sceneData.nodes[i];
-        var mat = new THREE.MeshBasicMaterial({{ color: sceneData.nodeColors[i] }});
-        var mesh = new THREE.Mesh(sphereGeo, mat);
-        mesh.position.set(n[0], n[1], n[2]);
-        mesh.userData.nodeIdx = i;
-        nodeGroup.add(mesh);
-        nodeMeshes.push(mesh);
-    }}
-    scene.add(nodeGroup);
 
     function makeTextSprite(text, color) {{
         var c2 = document.createElement("canvas");
@@ -594,7 +617,8 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
                         path_mode, figsize, node_size, title,
                         is_tone_lattice, coord_label, gen_labels,
                         path_cmap='viridis', preview_engine='supersonic',
-                        preview_config=None, shape=None):
+                        preview_config=None, shape=None, layout='lattice',
+                        shape_colors=None):
     """
     Build a Three.js 3D scene for a lattice.
 
@@ -642,6 +666,11 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         Axis labels from lattice generators.
     path_cmap : str, optional
         Matplotlib colormap for path colouring.
+    layout : str, optional
+        ``'lattice'`` (default) draws sphere nodes with grid edges;
+        ``'cells'`` draws one translucent cube per coordinate with no
+        edges (lit cells at high opacity, background cells as a faint
+        translucent board).
 
     Returns
     -------
@@ -659,20 +688,27 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     dimmed_node_color = '#080808'
     drawn_nodes = set()
 
+    cells = (layout == 'cells')
+
     grid_edges = []
     if not ((nodes or path) and mute_background):
         edge_color = dimmed_edge_color if use_dimmed else '#808080'
         edge_width = 1 if use_dimmed else 3
-        for u, v in G.edges():
-            x1, y1, z1 = _unpack3(u)
-            x2, y2, z2 = _unpack3(v)
-            grid_edges.append([x1, y1, z1, x2, y2, z2])
+        if not cells:
+            for u, v in G.edges():
+                x1, y1, z1 = _unpack3(u)
+                x2, y2, z2 = _unpack3(v)
+                grid_edges.append([x1, y1, z1, x2, y2, z2])
     else:
         edge_color = '#808080'
         edge_width = 3
 
     highlight_edges = []
-    if nodes and len(highlighted_coords) >= 1:
+    if cells and nodes and len(highlighted_coords) >= 1:
+        for coord in highlighted_coords:
+            pc = coord_mapping.get(coord, coord) if lattice.dimensionality > 3 else coord
+            drawn_nodes.add(tuple(_unpack3(pc)))
+    elif nodes and len(highlighted_coords) >= 1:
         highlighted_list = list(highlighted_coords)
         if path_mode == 'adjacent' and len(highlighted_coords) > 1:
             for i in range(len(highlighted_list)):
@@ -858,6 +894,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     shape_group_node_indices = []
     shape_group_edges = []
     used_shape_colors = []
+    shape_node_final = {}
     if shape_groups:
         from .._shared.colors import SHAPE_COLORS
         edge_set = set()
@@ -869,9 +906,12 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
             ct = tuple(c) if not isinstance(c, tuple) else c
             return coord_mapping.get(ct, ct) if lattice.dimensionality > 3 else ct
 
-        shape_node_final = {}
         for gi, group in enumerate(shape_groups):
-            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
+            color = None
+            if shape_colors is not None and gi < len(shape_colors):
+                color = shape_colors[gi]
+            if color is None:
+                color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
             used_shape_colors.append(color)
             group_tuples = [tuple(c) if not isinstance(c, tuple) else c for c in group]
 
@@ -885,14 +925,15 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
             shape_group_node_indices.append(indices)
 
             group_edges = []
-            for i, c1 in enumerate(group_tuples):
-                for c2 in group_tuples[i + 1:]:
-                    pc1 = _plot_coord(c1)
-                    pc2 = _plot_coord(c2)
-                    if (pc1, pc2) in edge_set or (pc2, pc1) in edge_set:
-                        x1, y1, z1 = _unpack3(pc1)
-                        x2, y2, z2 = _unpack3(pc2)
-                        group_edges.append([x1, y1, z1, x2, y2, z2])
+            if not cells:
+                for i, c1 in enumerate(group_tuples):
+                    for c2 in group_tuples[i + 1:]:
+                        pc1 = _plot_coord(c1)
+                        pc2 = _plot_coord(c2)
+                        if (pc1, pc2) in edge_set or (pc2, pc1) in edge_set:
+                            x1, y1, z1 = _unpack3(pc1)
+                            x2, y2, z2 = _unpack3(pc2)
+                            group_edges.append([x1, y1, z1, x2, y2, z2])
             shape_group_edges.append(group_edges)
 
         for idx, color in shape_node_final.items():
@@ -920,6 +961,20 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
 
         for i in range(len(node_colors)):
             node_colors[i] = path_node_final.get(i, dimmed_node_color)
+
+    node_opacities = None
+    if cells:
+        node_opacities = []
+        for i in range(len(node_colors)):
+            if has_path:
+                lit = i in path_node_final
+            elif shape_node_final:
+                lit = i in shape_node_final
+            elif use_dimmed:
+                lit = bool(is_active_list[i])
+            else:
+                lit = False
+            node_opacities.append(0.9 if lit else 0.15)
 
     x_all = [p[0] for p in node_positions] if node_positions else [c[0] for c in coords]
     y_all = [p[1] for p in node_positions] if node_positions else [c[1] if len(c) > 1 else 0 for c in coords]
@@ -962,6 +1017,9 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
         'shapeGroupNodeIndices': shape_group_node_indices,
         'shapeGroupEdges': shape_group_edges,
         'shapeColors': used_shape_colors,
+        'layout': layout,
+        'cellSize': 0.82,
+        'nodeOpacities': node_opacities,
         'axisConfig': {
             'xRange': [x_min - pad, x_max + pad],
             'yRange': [y_min - pad, y_max + pad],

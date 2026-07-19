@@ -111,7 +111,8 @@ def render_path_edges(path, positions_fn, next_eid, path_cmap="viridis"):
     return path_els, step_group_ids, halo_ids, all_path_el_ids, colors
 
 
-def render_shape_groups(shape_groups, edge_set_fn, positions_fn, next_eid):
+def render_shape_groups(shape_groups, edge_set_fn, positions_fn, next_eid,
+                        group_colors=None):
     shape_els = []
     group_edge_ids_list = []
     all_shape_el_ids = []
@@ -119,7 +120,11 @@ def render_shape_groups(shape_groups, edge_set_fn, positions_fn, next_eid):
     used_colors = []
 
     for gi, group in enumerate(shape_groups):
-        color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
+        color = None
+        if group_colors is not None and gi < len(group_colors):
+            color = group_colors[gi]
+        if color is None:
+            color = SHAPE_COLORS[gi % len(SHAPE_COLORS)]
         used_colors.append(color)
         gids = []
         for n in group:

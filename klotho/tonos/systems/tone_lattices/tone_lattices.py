@@ -124,6 +124,44 @@ class ToneLattice(ReferencePitchAware, Lattice):
         )
         return self
 
+    def with_generators(
+        self,
+        generators: Iterable[Union[int, Fraction, str]],
+    ) -> "ToneLattice":
+        """
+        Return a new ToneLattice with the same board but a new generator basis.
+
+        Resolution, polarity, equave, and reference pitch are carried over, so
+        every coordinate (and coordinate group) valid on this lattice remains
+        valid on the result — only the represented ratios change.
+
+        Parameters
+        ----------
+        generators : Iterable[int | Fraction | str]
+            Ordered generator ratios for the new coordinate axes. Must yield
+            the same dimensionality as this lattice (note that a generator
+            equal to the equave is dropped when ``equave_reduce`` is True).
+
+        Returns
+        -------
+        ToneLattice
+        """
+        new = ToneLattice.from_generators(
+            generators,
+            resolution=self.resolution,
+            bipolar=self.bipolar,
+            equave_reduce=self.equave_reduce,
+            equave=self.equave,
+        )
+        if new.dimensionality != self.dimensionality:
+            raise ValueError(
+                f"New generator basis yields dimensionality {new.dimensionality}, "
+                f"but this lattice is {self.dimensionality}D; coordinate groups "
+                f"would not carry over"
+            )
+        new._reference_pitch = self._reference_pitch
+        return new
+
     @staticmethod
     def _parse_generator(value: Union[int, Fraction, str]) -> Fraction:
         if isinstance(value, float):

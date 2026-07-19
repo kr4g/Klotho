@@ -25,6 +25,7 @@ to unite philosphical insight with mathematical explicitness.
 from . import collections
 from . import formal_grammars
 from . import graphs
+from . import shapes
 from . import types as _types
 from .types import *
 
@@ -32,6 +33,7 @@ from .collections import patterns, sequences, sets, Pattern, CombinationSet, Par
 from .collections import autoref, autoref_rotmat, permute_list
 
 from .graphs import trees, GraphCore, Graph, Tree, Lattice
+from .shapes import polyominoes
 
 __all__ = [
     # Classes
@@ -43,4 +45,5 @@ __all__ = [
     'patterns', 'sequences', 'sets',
     'formal_grammars',
     'trees',
+    'shapes', 'polyominoes',
 ] + getattr(_types, '__all__', [])

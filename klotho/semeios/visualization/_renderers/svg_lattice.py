@@ -25,7 +25,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                     effective_dimensionality, use_dimmed, mute_background,
                     path_mode, figsize, node_size, title,
                     is_tone_lattice, coord_label, gen_labels,
-                    path_cmap='viridis', shape=None, preview_config=None):
+                    path_cmap='viridis', shape=None, preview_config=None,
+                    layout='lattice', shape_colors=None):
     """
     Build a 2D SVG representation of a lattice.
 
@@ -75,6 +76,9 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         Matplotlib colormap for path edge colouring.
     shape : list of list of tuple or None, optional
         Chord groups to highlight.
+    layout : str, optional
+        ``'lattice'`` (default) draws circle nodes with grid edges;
+        ``'cells'`` draws one filled square per coordinate with no edges.
 
     Returns
     -------
@@ -94,6 +98,10 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     else:
         dimmed_edge_color = '#555555'
         dimmed_node_color = '#111111'
+
+    cells = (layout == 'cells')
+    cell_bg_fill = '#161616'
+    cell_stroke = '#3a3a3a'
 
     valid_coords = set(coords) if lattice.dimensionality <= 3 else set(original_coords)
 
@@ -158,6 +166,11 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     def ty(val):
         return oy + actual_h - (val - data_y_min) / data_h * actual_h
 
+    cell_px = cell_rx = 0.0
+    if cells:
+        cell_px = (actual_w / data_w) * 0.92
+        cell_rx = cell_px * 0.10
+
     import uuid as _uuid
     uid = f"svglat_{_uuid.uuid4().hex[:8]}"
     els = []
@@ -213,7 +226,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                 f'{html_escape(y_title)}</text>'
             )
 
-    if not ((nodes or path) and mute_background):
+    if not cells and not ((nodes or path) and mute_background):
         edge_color = dimmed_edge_color if use_dimmed else '#808080'
         edge_width = 1 if use_dimmed else 2
 
@@ -234,7 +247,12 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                     f'stroke="{edge_color}" stroke-width="{edge_width}"/>'
                 )
 
-    if nodes and len(highlighted_coords) >= 1:
+    if cells and nodes and len(highlighted_coords) >= 1:
+        for coord in highlighted_coords:
+            pc = coord_mapping.get(coord, coord) if lattice.dimensionality > 3 else coord
+            drawn_nodes_set.add(pc)
+
+    elif nodes and len(highlighted_coords) >= 1:
         highlighted_list = list(highlighted_coords)
 
         if path_mode == 'adjacent' and len(highlighted_coords) > 1:
@@ -378,6 +396,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             return coord_mapping.get(c, c) if lattice.dimensionality > 3 else c
 
         def _shape_edge_exists(c1, c2):
+            if cells:
+                return False
             pc1, pc2 = _shape_plot(c1), _shape_plot(c2)
             return (pc1, pc2) in edge_set or (pc2, pc1) in edge_set
 
@@ -388,7 +408,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             return tx(pc[0]), ty(pc[1])
 
         shape_els, svg_shape_group_edge_ids, all_shape_el_ids, used_shape_colors, shape_coord_colors = (
-            render_shape_groups(shape_groups_t, _shape_edge_exists, _shape_positions, next_eid)
+            render_shape_groups(shape_groups_t, _shape_edge_exists, _shape_positions, next_eid,
+                                group_colors=shape_colors)
         )
 
     node_els = []
@@ -451,7 +472,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             nc = dimmed_node_color
             active = False
         else:
-            nc = 'white'
+            nc = cell_bg_fill if cells else 'white'
             active = True
 
         nid = next_eid("nd")
@@ -460,11 +481,20 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         hover_texts.append(hover_text)
         is_active_list.append(active)
 
-        node_els.append(
-            f'<circle id="{nid}" cx="{cx_px:.2f}" cy="{cy_px:.2f}" r="{ns / 2:.1f}" '
-            f'fill="{nc}" stroke="white" stroke-width="2" '
-            f'data-idx="{node_idx_counter}" data-tip-uid="{uid}"/>'
-        )
+        if cells:
+            half = cell_px / 2
+            node_els.append(
+                f'<rect id="{nid}" x="{cx_px - half:.2f}" y="{cy_px - half:.2f}" '
+                f'width="{cell_px:.2f}" height="{cell_px:.2f}" rx="{cell_rx:.2f}" '
+                f'fill="{nc}" stroke="{cell_stroke}" stroke-width="1" '
+                f'data-idx="{node_idx_counter}" data-tip-uid="{uid}"/>'
+            )
+        else:
+            node_els.append(
+                f'<circle id="{nid}" cx="{cx_px:.2f}" cy="{cy_px:.2f}" r="{ns / 2:.1f}" '
+                f'fill="{nc}" stroke="white" stroke-width="2" '
+                f'data-idx="{node_idx_counter}" data-tip-uid="{uid}"/>'
+            )
         node_idx_counter += 1
 
     path_node_indices = []
@@ -495,7 +525,10 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
                 indices.append(idx)
             svg_shape_group_node_indices.append(indices)
 
-    all_svg = '\n'.join(els + path_els + shape_els + node_els)
+    if cells:
+        all_svg = '\n'.join(els + node_els + shape_els + path_els)
+    else:
+        all_svg = '\n'.join(els + path_els + shape_els + node_els)
     tooltip_html = render_tooltip_system(uid, hover_texts,
                                          is_active=is_active_list if use_dimmed else None,
                                          node_freqs=node_freqs if preview_config else None,
