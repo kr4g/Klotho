@@ -204,20 +204,29 @@
     }
   };
 
-  proto._scheduleControlSynths = function(token) {
-    if (!this._controlBusMap || this._controlBusMap.length === 0) return;
-    var sonic = this.sonic;
+  // Control-envelope synths join the core's unified send plan as 'ctrl'
+  // items (due at each envelope's start) instead of being sent all at once
+  // at play start — front-loading them would occupy engine scheduler-queue
+  // slots for the whole piece. The batch planner calls _sendControlItem
+  // when a ctrl item's stretch of the timeline comes up.
+  proto._controlStreamItems = function() {
+    if (!this._controlBusMap || this._controlBusMap.length === 0) return [];
+    var items = [];
     for (var i = 0; i < this._controlBusMap.length; i++) {
       var cm = this._controlBusMap[i];
-      var ntp = this._playStartNTP + cm.start;
-      var ctrlNodeId = sonic.nextNodeId();
-      var args = ['__klEnvCtrl', ctrlNodeId, 0, cm.controlGroupId,
-        'bufnum', cm.bufnum, 'bus', cm.bus, 'dur', cm.dur,
-        'startFrame', cm.startFrame, 'numFrames', cm.numFrames];
-      var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/s_new', args);
-      sonic.sendOSC(bundle);
-      cm.nodeId = ctrlNodeId;
+      items.push({ kind: 'ctrl', start: cm.start, cm: cm });
     }
+    return items;
+  };
+
+  proto._sendControlItem = function(cm, ntp) {
+    var ctrlNodeId = this.sonic.nextNodeId();
+    var args = ['__klEnvCtrl', ctrlNodeId, 0, cm.controlGroupId,
+      'bufnum', cm.bufnum, 'bus', cm.bus, 'dur', cm.dur,
+      'startFrame', cm.startFrame, 'numFrames', cm.numFrames];
+    var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/s_new', args);
+    this._sendScheduled(ntp, bundle);
+    cm.nodeId = ctrlNodeId;
   };
 
   proto._getControlMappingsForEvent = function(evId, evStart) {

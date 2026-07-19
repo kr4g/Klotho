@@ -312,14 +312,17 @@ class Score:
             Unique track name.  ``"main"`` is implicit and always
             exists; calling ``track("main", inserts=[...])`` sets master
             inserts.
-        inserts : list of Effect or None
-            Insert FX instances to place in this track's chain.
+        inserts : list of Effect, Effect, or None
+            Insert FX instances to place in this track's chain.  A bare
+            ``Effect`` is accepted as a one-element chain.
 
         Returns
         -------
         Score
             ``self``, for chaining.
         """
+        if isinstance(inserts, Effect):
+            inserts = [inserts]
         if name != "main" and name in self._tracks:
             raise ValueError(f"Track '{name}' already exists")
         for ins in (inserts or []):
@@ -778,11 +781,21 @@ class Score:
     # Utilities
     # ------------------------------------------------------------------
 
-    def clear(self) -> "Score":
-        """Remove all items, tracks, and insert registrations."""
+    def clear(self, keep_tracks: bool = False) -> "Score":
+        """Remove all items; optionally keep the track structure.
+
+        Parameters
+        ----------
+        keep_tracks : bool, default=False
+            When False, tracks and insert registrations are removed too,
+            leaving a blank score.  When True, registered tracks (and
+            their insert FX chains) are preserved so the score can be
+            refilled and played with the same mixer layout.
+        """
         self._items.clear()
-        self._tracks.clear()
-        self._insert_registry.clear()
+        if not keep_tracks:
+            self._tracks.clear()
+            self._insert_registry.clear()
         return self
 
     @property

@@ -136,3 +136,51 @@ class TestAppendPrepend:
         s.add(_uc(), name='a')
         s.prepend(_uc(), name='pre')
         assert s.names() == ['pre', 'a']
+
+
+class TestClear:
+    def _tracked_score(self):
+        from klotho.thetos import SynthDefFX
+        s = Score()
+        s.track('main', inserts=[SynthDefFX('kl_reverb', mix=0.2)])
+        s.track('pads', inserts=[SynthDefFX('kl_lpf', freq=900)])
+        s.add(_uc(), name='a', track='pads')
+        return s
+
+    def test_clear_default_removes_everything(self):
+        s = self._tracked_score()
+        s.clear()
+        assert len(s) == 0
+        assert s.tracks == {}
+        assert s._insert_registry == {}
+
+    def test_clear_keep_tracks_removes_items_only(self):
+        s = self._tracked_score()
+        inserts_before = {t: d['inserts'] for t, d in s.tracks.items()}
+        s.clear(keep_tracks=True)
+        assert len(s) == 0
+        assert {t: d['inserts'] for t, d in s.tracks.items()} == inserts_before
+        assert s._insert_registry  # uid registrations survive
+
+    def test_clear_keep_tracks_score_is_refillable(self):
+        s = self._tracked_score()
+        s.clear(keep_tracks=True)
+        item = s.add(_uc(), name='b', track='pads')
+        assert item.track == 'pads'
+        assert s.names() == ['b']
+
+    def test_clear_returns_self(self):
+        s = self._tracked_score()
+        assert s.clear(keep_tracks=True) is s
+
+
+class TestTrackInsertCoercion:
+    def test_bare_effect_accepted_as_inserts(self):
+        from klotho.thetos import SynthDefFX
+        fx = SynthDefFX('kl_reverb', mix=0.2)
+        s = Score().track('pads', inserts=fx)
+        assert s.tracks['pads']['inserts'] == [fx]
+
+    def test_non_effect_insert_still_raises(self):
+        with pytest.raises(TypeError, match="SynthDefFX"):
+            Score().track('pads', inserts=['kl_reverb'])

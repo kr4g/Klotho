@@ -176,14 +176,16 @@ SynthDef(\kl_reverb, { |inBus=0, outBus=0, mix=0.3, room=0.7, damp=0.5, gain=1.0
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_delay, { |inBus=0, outBus=0, delayTime=0.25, decayTime=1.0, maxDelay=2.0, gain=1.0|
-    var sig = In.ar(inBus, 2);
+SynthDef(\kl_delay, { |inBus=0, outBus=0, delayTime=0.25, decayTime=1.0, maxDelay=2.0, mix=1.0, gain=1.0|
+    var dry = In.ar(inBus, 2);
+    var sig = dry;
     sig = sig + CombL.ar(sig, maxDelay.max(delayTime), delayTime.max(0.001), decayTime);
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, gain=1.0|
+SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, mix=1.0, gain=1.0|
     var sig, dry;
     sig = In.ar(inBus, 2);
     dry = sig;
@@ -193,43 +195,53 @@ SynthDef(\kl_distortion, { |inBus=0, outBus=0, dist=0.5, gain=1.0|
     sig = (sig.cubed * 8).softclip * 0.5;
     sig = SelectX.ar(dist.clip(0, 1), [dry, sig]);
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_bitcrush, { |inBus=0, outBus=0, bits=8, crush=4, gain=1.0|
-    var sig = In.ar(inBus, 2);
+SynthDef(\kl_bitcrush, { |inBus=0, outBus=0, bits=8, crush=4, mix=1.0, gain=1.0|
+    var dry = In.ar(inBus, 2);
+    var sig = dry;
     sig = Decimator.ar(sig, rate: (44100 / crush.max(1)).max(100), bits: bits.clip(1, 24));
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_lpf, { |inBus=0, outBus=0, freq=1200, rq=1.0, gain=1.0|
-    var sig = In.ar(inBus, 2);
+SynthDef(\kl_lpf, { |inBus=0, outBus=0, freq=1200, rq=1.0, mix=1.0, gain=1.0|
+    var dry = In.ar(inBus, 2);
+    var sig = dry;
     sig = RLPF.ar(sig, freq.clip(20, 20000), rq.clip(0.01, 2));
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_hpf, { |inBus=0, outBus=0, freq=200, rq=1.0, gain=1.0|
-    var sig = In.ar(inBus, 2);
+SynthDef(\kl_hpf, { |inBus=0, outBus=0, freq=200, rq=1.0, mix=1.0, gain=1.0|
+    var dry = In.ar(inBus, 2);
+    var sig = dry;
     sig = RHPF.ar(sig, freq.clip(20, 20000), rq.clip(0.01, 2));
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_tremolo, { |inBus=0, outBus=0, rate=4.0, depth=0.5, gain=1.0|
-    var sig, mod;
-    sig = In.ar(inBus, 2);
-    mod = SinOsc.kr(rate.max(0.01), mul: depth.clip(0, 1) * 0.5, add: 1 - (depth.clip(0, 1) * 0.5));
+SynthDef(\kl_tremolo, { |inBus=0, outBus=0, rate=4.0, depth=0.5, mix=1.0, gain=1.0|
+    var dry = In.ar(inBus, 2);
+    var sig = dry;
+    var mod = SinOsc.kr(rate.max(0.01), mul: depth.clip(0, 1) * 0.5, add: 1 - (depth.clip(0, 1) * 0.5));
     sig = sig * mod;
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
-SynthDef(\kl_chop, { |inBus=0, outBus=0, rate=4.0, gain=1.0|
-    var sig = In.ar(inBus, 2);
+SynthDef(\kl_chop, { |inBus=0, outBus=0, rate=4.0, mix=1.0, gain=1.0|
+    var dry = In.ar(inBus, 2);
+    var sig = dry;
     sig = sig * LFPulse.kr(rate.max(0.01), add: 0.01);
     sig = sig * gain;
+    sig = SelectX.ar(mix.clip(0, 1), [dry, sig]);
     ReplaceOut.ar(outBus, sig);
 }).writeDefFile(fxDir);
 
