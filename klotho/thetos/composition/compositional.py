@@ -1946,14 +1946,14 @@ class CompositionalUnit(TemporalUnit):
         if routed_pfields:
             self.set_pfields(node, include_rests=include_rests, **routed_pfields)
 
-    def sparsify(self, probability, node=None):
+    def sparsify(self, probability, node=None, seed=None):
         """
         Randomly convert sounding leaves to rests.
-        
+
         Extends the base ``TemporalUnit.sparsify`` to accept a callable
         probability that receives a ``DistributionContext`` for each candidate
         leaf, enabling parameter-aware rest decisions.
-        
+
         Parameters
         ----------
         probability : float or callable
@@ -1963,9 +1963,13 @@ class CompositionalUnit(TemporalUnit):
         node : int or iterable of int, optional
             Restrict sparsification to this node's subtree leaves.
             If None, all leaves are candidates.
+        seed : int, numpy.random.Generator, or None, optional
+            Seed for reproducible sparsification when *probability* is a
+            float. Ignored for callable probabilities (the callable makes
+            the decision itself).
         """
         if not callable(probability):
-            super().sparsify(probability, node)
+            super().sparsify(probability, node, seed=seed)
             return
 
         import numpy as _np

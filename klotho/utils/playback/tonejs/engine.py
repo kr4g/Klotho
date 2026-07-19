@@ -24,12 +24,17 @@ class ToneEngine:
         Path to a custom JavaScript file loaded before the player.
     custom_js : str, optional
         Inline JavaScript source embedded before the player.
+    loop : bool or int, optional
+        Initial loop policy, matching ``plot(...).play(loop=...)``:
+        ``False`` (default) leaves the loop button off, ``True`` starts
+        with infinite looping, and an int > 1 loops that many cycles.
     """
 
-    def __init__(self, events, custom_js_path=None, custom_js=None):
+    def __init__(self, events, custom_js_path=None, custom_js=None, loop=False):
         self.events = convert_numpy_types(events)
         self.custom_js_path = Path(custom_js_path) if custom_js_path else None
         self.custom_js = custom_js
+        self.loop = loop
         self.widget_id = f"klotho_{uuid.uuid4().hex[:8]}"
 
     def _load_instruments_js(self):
@@ -69,7 +74,11 @@ class ToneEngine:
         user_custom_js = self._load_user_custom_js()
         instruments_js = self._load_instruments_js()
         player_js = self._load_player_js()
-        scripts = "\n".join([s for s in (user_custom_js, instruments_js, player_js) if s])
+
+        from klotho.utils.playback._helpers import get_loop_control_js, normalize_loop_policy
+        scripts = "\n".join([s for s in (get_loop_control_js(), user_custom_js,
+                                         instruments_js, player_js) if s])
+        loop_mode, loop_count, loop_enabled = normalize_loop_policy(self.loop)
 
         tone_script = cdn_scripts(include_tone=True)
 
@@ -142,7 +151,8 @@ class ToneEngine:
     const instruments = globalThis.KLOTHO_BUILD_INSTRUMENTS(payload.instruments || {{}});
     const player = KlothoPlayer.create();
 
-    let looping = false;
+    const loopCtl = KlothoLoopControl(loopBtn, loopSvg, "{loop_mode}", "{loop_count}",
+                                      {"true" if loop_enabled else "false"});
 
     function setPlayIcon() {{
         iconEl.style.width = "0";
@@ -164,12 +174,6 @@ class ToneEngine:
         iconEl.style.background = "#ef4444";
     }}
 
-    loopBtn.onclick = () => {{
-        looping = !looping;
-        loopBtn.style.opacity = looping ? "1" : "0.5";
-        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
-    }};
-
     toggleBtn.onclick = async () => {{
         if (player.isPlaying()) {{
             player.stop();
@@ -177,7 +181,7 @@ class ToneEngine:
         }} else {{
             setStopIcon();
             await player.play(events, instruments, {{
-                loop: looping,
+                loop: loopCtl.schedulerValue(),
                 onFinish: () => setPlayIcon()
             }});
         }}

@@ -1,3 +1,4 @@
+from .audio_ref import DEFAULT_REF_FREQ, reference_freq
 from .colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 from .geometry import bezier_2d, bezier_3d, rodrigues_rotate, get_perp, unpack3
 from .svg_utils import (
@@ -20,6 +21,8 @@ from .svg_shared import (
 )
 
 __all__ = [
+    "DEFAULT_REF_FREQ",
+    "reference_freq",
     "SHAPE_COLORS",
     "_path_color_array",
     "_rgba_to_hex",

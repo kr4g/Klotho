@@ -176,7 +176,26 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             self._equave,
             pitch
         )
-    
+
+    def transpose(self, interval) -> 'Scale':
+        """
+        Return a copy transposed by *interval*, carried in the reference pitch.
+
+        Scale degrees are equave-reduced by construction, so the
+        reference pitch carries the shift; note that a later
+        :meth:`root` replaces the reference and therefore discards it.
+
+        Parameters
+        ----------
+        interval : Fraction, int, float, str, Ratio, or Cent
+            The transposition interval, as in :meth:`Pitch.transpose`.
+
+        Returns
+        -------
+        Scale
+        """
+        return self.root(self._reference_pitch.transpose(interval))
+
     def mode(self, mode_number: int) -> 'Scale':
         """
         Return a modal rotation of this scale.

@@ -1045,6 +1045,181 @@ AnimatedCPSSvgFigure = AnimatedLatticeSvgFigure
 """Alias for ``AnimatedLatticeSvgFigure`` used for CPS path animations."""
 
 
+class AnimatedNodeSelectSvgFigure:
+    """Per-step node "select" animation for lattice-like 2D SVG figures.
+
+    Unlike :class:`AnimatedLatticeSvgFigure`, no path edges are drawn:
+    each step reproduces the click-to-hear visual — the active node lights
+    up white while every other node and edge dims — then the original
+    fills are restored when playback stops. Used for the default
+    ``plot(cps).play()`` scale run, where octave-equivalent steps select
+    the same node.
+
+    Parameters
+    ----------
+    svg_data : SvgCPSData
+        Pre-built SVG data (no path/shape).
+    select_node_indices : list of int
+        For each animation step, the index into ``svg_data.all_node_ids``
+        of the node to select (-1 for no highlight).
+    audio_payload : dict or None, optional
+        Engine-specific event payload for audio playback.
+    dur : float, optional
+        Seconds between animation steps (no-audio fallback only).
+    """
+
+    def __init__(self, svg_data, select_node_indices, audio_payload=None,
+                 dur=0.5, engine=None, ring_time=5, loop=False):
+        self.svg_data = svg_data
+        self.select_node_indices = list(select_node_indices)
+        self.audio_payload = audio_payload
+        self.dur = dur
+        self.ring_time = ring_time
+        self.loop = loop
+        self.engine = engine or get_audio_engine()
+        self.widget_id = f"klotho_ssel_{uuid.uuid4().hex[:8]}"
+
+    def to_html(self, **kwargs):
+        """Return a self-contained HTML string for Jupyter display."""
+        sd = self.svg_data
+        wid = self.widget_id
+        eng = self.engine
+
+        cdn_html, instruments_js, player_js = build_session_preamble(
+            include_tone=(bool(self.audio_payload) and eng == "tone"),
+            engine=eng)
+        controls_html = build_control_bar_html(wid)
+        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
+                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+
+        node_ids_json = json.dumps(sd.all_node_ids)
+        select_json = json.dumps(self.select_node_indices)
+        dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
+        converted = _maybe_convert_payload(self.audio_payload, eng)
+        payload_json = json.dumps(converted) if converted else "null"
+
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng,
+                                        ring_time=self.ring_time, loop=self.loop)
+
+        html = f'''
+{cdn_html}
+{sd.svg_str}
+{controls_html}
+{scripts_html}
+<script type="module">
+(function() {{
+    var allNodeIds = {node_ids_json};
+    var selectIdx = {select_json};
+    var dimmedColor = "{dimmed_color}";
+    var audioPayload = {payload_json};
+
+    var savedFills = null;
+    var savedEls = null;
+
+    function _snapshot() {{
+        if (savedFills !== null) return;
+        savedFills = [];
+        for (var i = 0; i < allNodeIds.length; i++) {{
+            var el = document.getElementById(allNodeIds[i]);
+            savedFills[i] = el ? el.getAttribute("fill") : null;
+        }}
+        savedEls = [];
+        var first = document.getElementById(allNodeIds[0]);
+        var svg = first && first.ownerSVGElement;
+        if (svg) {{
+            svg.querySelectorAll("line, path, polygon").forEach(function(el) {{
+                savedEls.push({{ el: el, op: el.getAttribute("opacity") }});
+            }});
+        }}
+    }}
+
+    function dimAll() {{
+        _snapshot();
+        savedEls.forEach(function(s) {{ s.el.setAttribute("opacity", "0.15"); }});
+        for (var i = 0; i < allNodeIds.length; i++) {{
+            var el = document.getElementById(allNodeIds[i]);
+            if (el) el.setAttribute("fill", dimmedColor);
+        }}
+    }}
+
+    function restoreAll() {{
+        if (savedFills === null) return;
+        for (var i = 0; i < allNodeIds.length; i++) {{
+            var el = document.getElementById(allNodeIds[i]);
+            if (el && savedFills[i] !== null) el.setAttribute("fill", savedFills[i]);
+        }}
+        savedEls.forEach(function(s) {{
+            if (s.op === null) s.el.removeAttribute("opacity");
+            else s.el.setAttribute("opacity", s.op);
+        }});
+        savedFills = null;
+        savedEls = null;
+    }}
+
+    function onBeforePlay() {{ dimAll(); }}
+    function onReset() {{ restoreAll(); }}
+    function onStep(stepIdx) {{
+        dimAll();
+        if (stepIdx >= 0 && stepIdx < selectIdx.length) {{
+            var idx = selectIdx[stepIdx];
+            if (idx >= 0 && idx < allNodeIds.length) {{
+                var el = document.getElementById(allNodeIds[idx]);
+                if (el) el.setAttribute("fill", "white");
+            }}
+        }}
+    }}
+
+    {playback_js}
+}})();
+</script>
+'''
+        return html
+
+
+class AnimatedLattice3dSelectFigure(AnimatedLattice3dFigure):
+    """3D variant of :class:`AnimatedNodeSelectSvgFigure`.
+
+    Reuses the 3D lattice scene scaffolding (grid, nodes, tooltips,
+    click-preview) but draws no path tubes: each step dims every node and
+    lights the selected one white, restoring the original colours when
+    playback stops. ``scene_data['selectNodeIndices']`` carries the
+    per-step node indices.
+    """
+
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None,
+                 ring_time=5, loop=False):
+        super().__init__(scene_data, audio_payload=audio_payload, dur=dur,
+                         engine=engine, ring_time=ring_time, loop=loop)
+        self.widget_id = f"klotho_3dsel_{uuid.uuid4().hex[:8]}"
+
+    def _controller_js(self, wid, eng):
+        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng,
+                                        ring_time=self.ring_time, loop=self.loop)
+        return '''
+    var selectNodeIndices = sceneData.selectNodeIndices || [];
+    var _selOrigColors = (sceneData.nodeColors || []).slice();
+
+    function restoreAllNodes() {
+        for (var i = 0; i < nodeMeshes.length; i++) {
+            nodeMeshes[i].material.color.set(_selOrigColors[i] || "#ffffff");
+        }
+    }
+
+    function onReset() { restoreAllNodes(); }
+    function onBeforePlay() { dimAllNodes(); }
+    function onStep(stepIdx) {
+        dimAllNodes();
+        if (stepIdx >= 0 && stepIdx < selectNodeIndices.length) {
+            var idx = selectNodeIndices[stepIdx];
+            if (idx >= 0 && idx < nodeMeshes.length) {
+                nodeMeshes[idx].material.color.set("#ffffff");
+            }
+        }
+    }
+
+''' + playback_js
+
+
 class _AnimatedShapeFigureBase:
     """Animated SVG figure for chord / chord-sequence shape playback.
 

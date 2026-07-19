@@ -16,7 +16,7 @@ from klotho.utils.playback._converter_base import (
     KNOWN_KWARGS,
     _merge_pfields,
     scale_pitch_sequence, extract_convert_kwargs, lower_event_ir_to_voice_events, iter_group_sequence,
-    coerce_sc_pfield_values,
+    coerce_sc_pfield_values, dispatch_convert,
 )
 
 
@@ -518,68 +518,20 @@ def temporal_container_to_animation_events(obj, amp=None, extra_pfields=None):
     return _shift_payload_events_to_zero(payload)
 
 
+_TONE_CONVERT_HANDLERS = {
+    'pitch': pitch_to_events,
+    'spectrum': spectrum_to_events,
+    'rhythm_tree': rhythm_tree_to_events,
+    'temporal_sequence': temporal_sequence_to_events,
+    'temporal_block': temporal_block_to_events,
+    'compositional_unit': compositional_unit_to_events,
+    'temporal_unit': temporal_unit_to_events,
+    'chord_sequence': chord_sequence_to_events,
+    'scale': scale_to_events,
+    'chord': chord_to_events,
+    'pitch_collection': pitch_collection_to_events,
+}
+
+
 def convert_to_events(obj, **kwargs):
-    kw = extract_convert_kwargs(kwargs)
-    duration = kw['duration']
-    arp = kw['arp']
-    mode = kw['mode']
-    strum = kw['strum']
-    direction = kw['direction']
-    equaves = kw['equaves']
-    beat = kw['beat']
-    bpm = kw['bpm']
-    amp = kw['amp']
-    pause = kw['pause']
-    extra_pfields = kw['extra_pfields']
-
-    if isinstance(obj, Pitch):
-        return pitch_to_events(obj, duration=duration, amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, Spectrum):
-        return spectrum_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                  amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, HarmonicTree):
-        spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
-        return spectrum_to_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction,
-                                  amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, RhythmTree):
-        return rhythm_tree_to_events(obj, beat=beat, bpm=bpm, amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, TemporalUnitSequence):
-        return temporal_sequence_to_events(obj, extra_pfields=extra_pfields)
-
-    if isinstance(obj, TemporalBlock):
-        return temporal_block_to_events(obj, extra_pfields=extra_pfields)
-
-    if isinstance(obj, CompositionalUnit):
-        return compositional_unit_to_events(obj, extra_pfields=None)
-
-    if isinstance(obj, TemporalUnit):
-        return temporal_unit_to_events(obj, amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, ChordSequence):
-        return chord_sequence_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                        amp=amp, pause=(0.25 if pause is None else pause), extra_pfields=extra_pfields)
-
-    if isinstance(obj, Scale):
-        return scale_to_events(obj, duration=duration, equaves=equaves, amp=amp,
-                               pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields)
-
-    if isinstance(obj, (Chord, Voicing)):
-        return chord_to_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                               amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, PitchCollectionBase):
-        effective_mode = mode if mode else "sequential"
-        if effective_mode == "chord":
-            return pitch_collection_to_events(obj, duration=duration, mode="chord", arp=arp, strum=strum,
-                                              direction=direction, amp=amp,
-                                              pause=0.0,
-                                              extra_pfields=extra_pfields)
-        return pitch_collection_to_events(obj, duration=duration, mode="sequential",
-                                          amp=amp, pause=(0.0 if pause is None else pause),
-                                          extra_pfields=extra_pfields)
-
-    raise TypeError(f"Unsupported object type: {type(obj)}")
+    return dispatch_convert(obj, kwargs, _TONE_CONVERT_HANDLERS, include_inst=False)

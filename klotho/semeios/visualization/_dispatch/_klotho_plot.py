@@ -8,6 +8,7 @@ _PLAYBACK_KWARGS = frozenset(
         "strum",
         "direction",
         "dur",
+        "equaves",
         "pause",
         "loop",
         "ring_time",
@@ -15,6 +16,12 @@ _PLAYBACK_KWARGS = frozenset(
         "defName",
     }
 )
+
+
+def transport_kwargs(kwargs):
+    """``ring_time``/``loop`` animated-figure options from plot/play kwargs."""
+    kw = kwargs or {}
+    return {"ring_time": kw.get("ring_time", 5), "loop": kw.get("loop", False)}
 
 
 class KlothoPlot:

@@ -1,4 +1,5 @@
 from .threejs_lattice import ThreejsLatticeData
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 
 
@@ -88,7 +89,7 @@ def _threejs_master_set_3d(ms, figsize=(12, 12), node_size=30, text_size=12,
     hover_data = []
     node_freqs = []
     is_active_list = []
-    ref_freq = 261.63
+    ref_freq = reference_freq(ms)
     dimmed_color_hex = '#555555'
 
     label_to_idx = {}

@@ -82,9 +82,14 @@ class SuperSonicEngine:
     ring_time : float, optional
         Seconds of reverb/release tail to keep the audio context alive
         after the last event (default is 5).
+    loop : bool or int, optional
+        Initial loop policy, matching ``plot(...).play(loop=...)``:
+        ``False`` (default) leaves the loop button off, ``True`` starts
+        with infinite looping, and an int > 1 loops that many cycles.
+        The widget's loop button toggles the configured policy.
     """
 
-    def __init__(self, events, meta=None, control_data=None, ring_time=5):
+    def __init__(self, events, meta=None, control_data=None, ring_time=5, loop=False):
         self.events = convert_numpy_types(events)
         self.meta = convert_numpy_types(meta or {})
         raw_control = control_data or {"buffer": None, "blockSize": 512, "descriptors": []}
@@ -93,6 +98,7 @@ class SuperSonicEngine:
         self.control_data = convert_numpy_types(control_without_buffer)
         self.control_data["buffer"] = raw_buffer
         self.ring_time = ring_time
+        self.loop = loop
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta
         validate_sc_events(self.events)
@@ -165,6 +171,8 @@ class SuperSonicEngine:
 
         samples_json = json.dumps(self.sample_assets)
 
+        from klotho.utils.playback._helpers import get_loop_control_js, substitute_loop_tokens
+
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
                      .replace('__EVENTS_JSON__', events_json)
@@ -175,6 +183,7 @@ class SuperSonicEngine:
                      .replace('__SAMPLES_JSON__', samples_json)
                      .replace('__MANIFEST_JSON__', manifest_json)
                      .replace('__RING_TIME__', str(self.ring_time)))
+        widget_js = get_loop_control_js() + substitute_loop_tokens(widget_js, self.loop)
 
         needs_score_js = self._is_score or bool(self.control_data.get("descriptors"))
         score_js = scheduler_score_js() if needs_score_js else ""

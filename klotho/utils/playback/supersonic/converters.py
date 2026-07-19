@@ -18,7 +18,7 @@ from klotho.utils.playback._converter_base import (
     coerce_sc_pfield_values,
     lower_event_ir_to_voice_events,
     scale_pitch_sequence, extract_convert_kwargs, iter_group_sequence,
-    resolve_instrument,
+    resolve_instrument, dispatch_convert,
 )
 from klotho.utils.playback._sc_assembly import (
     _attach_poly_meta,
@@ -69,7 +69,8 @@ def _inst_note(uid, synth, start, dur, pfields, step_index=None,
 
     ``inst_ctx`` is ``(inst_pfields, has_gate, controls)`` from
     ``_resolve_synth``; ``None`` preserves the plain gated-note shape.
-    Non-gated synths get a ``dur`` pfield only when they declare one.
+    A declared ``duration`` control always receives the note's duration;
+    a ``dur`` control receives it only on non-gated synths.
     """
     if inst_ctx is None:
         return _gated_note(uid, synth, start, dur, pfields,
@@ -77,7 +78,9 @@ def _inst_note(uid, synth, start, dur, pfields, step_index=None,
     inst_pfields, has_gate, controls = inst_ctx
     combined = _combine_extras(inst_pfields, extra_pfields)
     pf = _merge_pfields(pfields, combined)
-    if not has_gate and 'dur' in controls and not (extra_pfields and 'dur' in extra_pfields):
+    if 'duration' in controls and not (extra_pfields and 'duration' in extra_pfields):
+        pf['duration'] = dur
+    elif not has_gate and 'dur' in controls and not (extra_pfields and 'dur' in extra_pfields):
         pf['dur'] = dur
     new_ev = {
         "type": "new",
@@ -491,74 +494,23 @@ def temporal_container_to_sc_animation_events(obj, amp=None, extra_pfields=None)
     return events
 
 
+_SC_CONVERT_HANDLERS = {
+    'pitch': pitch_to_sc_events,
+    'spectrum': spectrum_to_sc_events,
+    'rhythm_tree': rhythm_tree_to_sc_events,
+    'temporal_sequence': temporal_sequence_to_sc_events,
+    'temporal_block': temporal_block_to_sc_events,
+    'compositional_unit': compositional_unit_to_sc_events,
+    'temporal_unit': temporal_unit_to_sc_events,
+    'chord_sequence': chord_sequence_to_sc_events,
+    'scale': scale_to_sc_events,
+    'chord': chord_to_sc_events,
+    'pitch_collection': pitch_collection_to_sc_events,
+}
+
+
 def convert_to_sc_events(obj, **kwargs):
-    kw = extract_convert_kwargs(kwargs)
-    duration = kw['duration']
-    arp = kw['arp']
-    mode = kw['mode']
-    strum = kw['strum']
-    direction = kw['direction']
-    equaves = kw['equaves']
-    beat = kw['beat']
-    bpm = kw['bpm']
-    amp = kw['amp']
-    pause = kw['pause']
-    inst = kw['inst']
-    extra_pfields = kw['extra_pfields']
-
-    if isinstance(obj, Pitch):
-        return pitch_to_sc_events(obj, duration=duration, amp=amp, extra_pfields=extra_pfields, inst=inst)
-
-    if isinstance(obj, Spectrum):
-        return spectrum_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                    amp=amp, extra_pfields=extra_pfields, inst=inst)
-
-    if isinstance(obj, HarmonicTree):
-        spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
-        return spectrum_to_sc_events(spectrum, duration=duration, arp=arp, strum=strum, direction=direction,
-                                    amp=amp, extra_pfields=extra_pfields, inst=inst)
-
-    if isinstance(obj, RhythmTree):
-        return rhythm_tree_to_sc_events(obj, beat=beat, bpm=bpm, amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, TemporalUnitSequence):
-        return temporal_sequence_to_sc_events(obj, extra_pfields=extra_pfields)
-
-    if isinstance(obj, TemporalBlock):
-        return temporal_block_to_sc_events(obj, extra_pfields=extra_pfields)
-
-    if isinstance(obj, CompositionalUnit):
-        return compositional_unit_to_sc_events(obj, extra_pfields=None)
-
-    if isinstance(obj, TemporalUnit):
-        return temporal_unit_to_sc_events(obj, amp=amp, extra_pfields=extra_pfields)
-
-    if isinstance(obj, ChordSequence):
-        return chord_sequence_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                           amp=amp, pause=(0.25 if pause is None else pause), extra_pfields=extra_pfields,
-                                           inst=inst)
-
-    if isinstance(obj, Scale):
-        return scale_to_sc_events(obj, duration=duration, equaves=equaves, amp=amp,
-                                  pause=(0.0 if pause is None else pause), extra_pfields=extra_pfields,
-                                  inst=inst)
-
-    if isinstance(obj, (Chord, Voicing)):
-        return chord_to_sc_events(obj, duration=duration, arp=arp, strum=strum, direction=direction,
-                                  amp=amp, extra_pfields=extra_pfields, inst=inst)
-
-    if isinstance(obj, PitchCollectionBase):
-        effective_mode = mode if mode else "sequential"
-        if effective_mode == "chord":
-            return pitch_collection_to_sc_events(obj, duration=duration, mode="chord", arp=arp, strum=strum,
-                                                 direction=direction, amp=amp,
-                                                 pause=0.0,
-                                                 extra_pfields=extra_pfields, inst=inst)
-        return pitch_collection_to_sc_events(obj, duration=duration, mode="sequential",
-                                             amp=amp, pause=(0.0 if pause is None else pause),
-                                             extra_pfields=extra_pfields, inst=inst)
-
-    raise TypeError(f"Unsupported object type: {type(obj)}")
+    return dispatch_convert(obj, kwargs, _SC_CONVERT_HANDLERS, include_inst=True)
 
 
 _SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
@@ -831,10 +783,10 @@ def _lower_score_event(item):
             member = kit._resolve(voice_sel)
             v_def_name, v_inst_pfields, v_has_gate = resolve_instrument(member)
         pf = coerce_sc_pfield_values(_combine_extras(v_inst_pfields, user_pf))
-        if not v_has_gate and not is_hold:
+        if not is_hold:
             if 'duration' in v_inst_pfields and 'duration' not in user_pf:
                 pf['duration'] = voice["duration"]
-            elif 'dur' in v_inst_pfields and 'dur' not in user_pf:
+            elif not v_has_gate and 'dur' in v_inst_pfields and 'dur' not in user_pf:
                 pf['dur'] = voice["duration"]
         _warn_unknown_pfields(v_def_name, pf, manifest)
 

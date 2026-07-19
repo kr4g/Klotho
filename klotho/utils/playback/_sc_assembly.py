@@ -88,27 +88,48 @@ def _resolve_event_synth(instrument, default_synth):
     return default_synth
 
 
-def _has_gate(instrument):
-    if instrument is None:
-        return True
-    return bool(getattr(instrument, 'has_gate', True))
+def _resolve_instrument_controls(instrument, def_name, manifest):
+    """Resolve the control set and gating for an event's instrument.
 
+    Instrument objects carry their own pfields, which may deliberately
+    drop controls (e.g. a sampler built with ``duration=None``). String
+    and ``None`` instruments have no pfields, so their controls come from
+    the manifest entry for the resolved defName (which includes
+    runtime-registered Supriya defs).
 
-def _wants_duration_pfield(instrument):
-    """True if a non-gated instrument declares a ``duration`` control.
-
-    Such synths (e.g. Supriya/SC one-shots that self-free via an
-    ``Env.linen(0, duration, ...)`` envelope) need the leaf's time
-    duration injected as the ``duration`` pfield so their internal
-    envelope length tracks the rhythmic value.
+    Returns ``(controls, has_gate, from_manifest)``. ``from_manifest``
+    marks instruments that contribute no default pfields to the event, so
+    any ``duration``/``dur`` already on the event is user-set and must
+    win over injection. An unknown defName yields ``({}, True, False)``,
+    preserving the legacy no-injection behavior.
     """
     pfields = getattr(instrument, 'pfields', None)
-    if pfields is None:
-        return False
-    try:
-        return 'duration' in pfields
-    except TypeError:
-        return False
+    if pfields is not None:
+        return pfields, bool(getattr(instrument, 'has_gate', 'gate' in pfields)), False
+    controls = manifest.get(def_name) if def_name else None
+    if controls is None:
+        return {}, True, False
+    return controls, 'gate' in controls, True
+
+
+def _duration_inject_key(controls, has_gate, from_manifest, event_pfields):
+    """Pfield to fill with the event's real duration, or ``None``.
+
+    A synth declaring a control named exactly ``duration`` always gets
+    the event duration (e.g. one-shots that self-free via an
+    ``Env.linen(0, duration, ...)`` envelope, so their internal envelope
+    tracks the rhythmic value). A ``dur`` control gets it only on
+    non-gated synths.
+    """
+    if 'duration' in controls:
+        key = 'duration'
+    elif (not has_gate) and 'dur' in controls:
+        key = 'dur'
+    else:
+        return None
+    if from_manifest and key in event_pfields:
+        return None
+    return key
 
 
 def _attach_poly_meta(event_record, voice_event):
@@ -239,8 +260,9 @@ def lower_compositional_ir_to_sc_assembly(
             resolved_instrument = instrument._resolve(selector_val)
 
         def_name = _resolve_event_synth(resolved_instrument, default_synth)
-        has_gate = _has_gate(resolved_instrument)
-        inject_duration = (not has_gate) and _wants_duration_pfield(resolved_instrument)
+        controls, has_gate, controls_from_manifest = _resolve_instrument_controls(
+            resolved_instrument, def_name, manifest
+        )
         group = event.get_mfield('group')
         is_slur_start = event.get_mfield('_slur_start', 0)
         is_slur_end = event.get_mfield('_slur_end', 0)
@@ -282,16 +304,16 @@ def lower_compositional_ir_to_sc_assembly(
             # selector value, not once per event.
             voice_resolved = resolved_instrument
             voice_def_name = def_name
+            voice_controls = controls
             voice_has_gate = has_gate
-            voice_inject_duration = inject_duration
+            voice_from_manifest = controls_from_manifest
             if _kit_selector is not None:
                 voice_sel = voice_event["pfields"].get(_kit_selector)
                 if not isinstance(voice_sel, tuple):
                     voice_resolved = instrument._resolve(voice_sel)
                     voice_def_name = _resolve_event_synth(voice_resolved, default_synth)
-                    voice_has_gate = _has_gate(voice_resolved)
-                    voice_inject_duration = (
-                        (not voice_has_gate) and _wants_duration_pfield(voice_resolved)
+                    voice_controls, voice_has_gate, voice_from_manifest = (
+                        _resolve_instrument_controls(voice_resolved, voice_def_name, manifest)
                     )
 
             voice_pfields = {
@@ -304,7 +326,7 @@ def lower_compositional_ir_to_sc_assembly(
             # engine) understands so e.g. a gated member's `gate` never
             # leaks onto a one-shot sampler voice.
             if kit_tuple_selector and voice_resolved is not None:
-                member_keys = set(voice_resolved.pfields.keys())
+                member_keys = set(voice_controls.keys())
                 voice_pfields = {
                     k: v for k, v in voice_pfields.items()
                     if k in member_keys or k in ('note', 'out')
@@ -315,7 +337,7 @@ def lower_compositional_ir_to_sc_assembly(
                 sustain_param = sustain_param_cache.get(instrument_id)
                 if instrument_id is not None and instrument_id not in sustain_param_cache:
                     sustain_param = None
-                    lower_to_key = {k.lower(): k for k in voice_resolved.pfields.keys()}
+                    lower_to_key = {k.lower(): k for k in voice_controls.keys()}
                     for param in ('sustaintime', 'releasetime'):
                         if param in lower_to_key:
                             sustain_param = lower_to_key[param]
@@ -334,9 +356,12 @@ def lower_compositional_ir_to_sc_assembly(
 
             merged_pfields = _merge_pfields(voice_pfields, extra_pfields)
 
-            if voice_inject_duration:
+            inject_key = _duration_inject_key(
+                voice_controls, voice_has_gate, voice_from_manifest, voice_pfields
+            )
+            if inject_key is not None:
                 merged_pfields = dict(merged_pfields)
-                merged_pfields['duration'] = voice_dur
+                merged_pfields[inject_key] = voice_dur
 
             if is_slur_start:
                 slur_uid = uuid4().hex

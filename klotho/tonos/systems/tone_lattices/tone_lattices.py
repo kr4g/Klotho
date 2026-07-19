@@ -1,3 +1,4 @@
+import numbers
 from typing import List, Union, Tuple, Optional, Iterable, Literal
 from fractions import Fraction
 import warnings
@@ -5,6 +6,7 @@ import sympy as sp
 from sympy import prime as sympy_prime, isprime
 
 from klotho.topos.graphs.lattices import Lattice
+from klotho.tonos.pitch.reference import ReferencePitchAware
 from klotho.utils.algorithms.factors import to_factors
 
 
@@ -13,7 +15,7 @@ class ToneLatticeLookupWarning(RuntimeWarning):
     pass
 
 
-class ToneLattice(Lattice):
+class ToneLattice(ReferencePitchAware, Lattice):
     """
     Lattice of ratios represented by integer coordinates in generator space.
 
@@ -211,6 +213,17 @@ class ToneLattice(Lattice):
             and all(g.denominator == 1 and isprime(int(g)) for g in self._generators)
         )
     
+    def _node_ratio(self, node):
+        return self[tuple(node)]['ratio']
+
+    def _is_node_ref(self, item) -> bool:
+        """A ToneLattice node reference is a coordinate tuple of integers."""
+        return (isinstance(item, (tuple, list)) and len(item) > 0
+                and all(isinstance(c, numbers.Integral) for c in item))
+
+    def _node_for_ratio(self, ratio):
+        return self.get_coordinates_for_ratio(ratio, lookup='first')
+
     def _custom_equave_reduce(self, interval: Union[int, float, Fraction, str]) -> Fraction:
         interval = Fraction(interval)
         equave = self._equave

@@ -5,6 +5,8 @@ from klotho.tonos.systems.combination_product_sets import CombinationProductSet,
 from klotho.tonos.systems.combination_product_sets.master_set import MASTER_SETS
 
 from .._projections import apply_projection
+from ._klotho_plot import transport_kwargs
+from .._shared.audio_ref import reference_freq
 
 
 def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
@@ -71,9 +73,9 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
     SvgMasterSetData, ThreejsLatticeData, or animated figure
         Renderable figure data.
     """
-    from klotho.utils.playback._config import get_audio_engine
     from .plot_lattice import (
-        _resolve_plot_inst, _build_preview_config, _payload_extra_pfields,
+        _prepare_plot_audio, _normalize_shape_groups, _resolve_chord_shape,
+        _ratio_freqs, _animated_path_figure, _animated_shape_figure,
     )
 
     dim = ms.dimensionality
@@ -84,163 +86,63 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
         dim = 3
     is_3d = dim == 3
 
-    preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
-    engine_name = get_audio_engine()
-    animate_preview_config = _build_preview_config(
-        dur, amp, kwargs, engine_name,
-        def_name=preview_def_name, inst_pfields=inst_pfields,
-    ) if animate else None
-    extra_synth_kwargs = _payload_extra_pfields(kwargs, inst_pfields)
+    engine_name, preview_def_name, animate_preview_config, extra_synth_kwargs = (
+        _prepare_plot_audio(kwargs, dur, amp, animate))
 
-    if shape is not None and len(shape) > 0 and isinstance(shape[0], (list, tuple)):
-        shape_groups = [list(g) for g in shape]
-    elif shape is not None and len(shape) > 0:
-        shape_groups = [list(shape)]
+    chord_freq_groups = None
+    resolved = _resolve_chord_shape(ms, shape)
+    if resolved is not None:
+        shape_groups, chord_freq_groups = resolved
+        shape = shape_groups
     else:
-        shape_groups = []
+        shape_groups = _normalize_shape_groups(shape)
     has_shape = len(shape_groups) > 0
 
-    if animate and path and len(path) > 1:
+    def _render_2d(**extra):
         from .._renderers.svg_master_set import _svg_master_set_2d
-        from .._renderers.threejs_master_set import _threejs_master_set_3d
-        from .._animation import AnimatedCPSSvgFigure, AnimatedLattice3dFigure
-        from klotho.utils.playback.animation_events import build_path_engine_payload
-
-        ref_freq = 261.63
-        nd = ms.node_data()
-        freqs = []
-        for label in path:
-            info = nd.get(label, {})
-            try:
-                if 'ratio' in info:
-                    freqs.append(ref_freq * float(info['ratio']))
-                else:
-                    freqs.append(ref_freq)
-            except (TypeError, ValueError):
-                freqs.append(ref_freq)
-
-        audio_payload = build_path_engine_payload(
-            freqs,
-            dur,
-            engine=engine_name,
-            amp=amp,
-            extra_pfields=extra_synth_kwargs,
-            pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
-            def_name=preview_def_name,
-        )
-
-        if is_3d:
-            threejs_data = _threejs_master_set_3d(
-                ms, figsize=figsize, node_size=node_size, text_size=text_size,
-                show_labels=show_labels, title=title,
-                override_positions=override_positions,
-                preview_engine=engine_name, preview_config=animate_preview_config,
-                nodes=nodes, path=path, path_cmap=path_cmap,
-                mute_background=mute_background,
-            )
-            return AnimatedLattice3dFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
-
-        svg_data = _svg_master_set_2d(
+        return _svg_master_set_2d(
             ms, figsize=figsize, node_size=node_size, text_size=text_size,
             show_labels=show_labels, title=title,
             nodes=nodes, path=path, path_cmap=path_cmap,
             mute_background=mute_background,
-            preview_config=animate_preview_config,
-        )
-        return AnimatedCPSSvgFigure(
-            svg_data, audio_payload=audio_payload, dur=dur,
-            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-            loop=kwargs.get("loop", False) if kwargs else False,
-        )
+            preview_config=animate_preview_config, **extra)
 
-    if animate and has_shape:
-        from .._renderers.svg_master_set import _svg_master_set_2d
+    def _render_3d(**extra):
         from .._renderers.threejs_master_set import _threejs_master_set_3d
-        from .._animation import AnimatedCPSShapeFigure, AnimatedLattice3dShapeFigure
-        from klotho.utils.playback.animation_events import build_shape_engine_payload
-
-        ref_freq = 261.63
-        nd = ms.node_data()
-        freq_groups = []
-        for group in shape_groups:
-            group_freqs = []
-            for label in group:
-                info = nd.get(label, {})
-                try:
-                    if 'ratio' in info:
-                        group_freqs.append(ref_freq * float(info['ratio']))
-                    else:
-                        group_freqs.append(ref_freq)
-                except (TypeError, ValueError):
-                    group_freqs.append(ref_freq)
-            freq_groups.append(group_freqs)
-
-        audio_payload = build_shape_engine_payload(
-            freq_groups,
-            dur,
-            engine=engine_name,
-            arp=arp,
-            strum=strum,
-            direction=direction,
-            amp=amp,
-            extra_pfields=extra_synth_kwargs,
-            pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
-            def_name=preview_def_name,
-        )
-
-        if is_3d:
-            threejs_data = _threejs_master_set_3d(
-                ms, figsize=figsize, node_size=node_size, text_size=text_size,
-                show_labels=show_labels, title=title,
-                override_positions=override_positions,
-                preview_engine=engine_name, preview_config=animate_preview_config,
-                nodes=nodes, path_cmap=path_cmap,
-                mute_background=mute_background,
-                shape=shape_groups,
-            )
-            return AnimatedLattice3dShapeFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
-
-        svg_data = _svg_master_set_2d(
-            ms, figsize=figsize, node_size=node_size, text_size=text_size,
-            show_labels=show_labels, title=title,
-            nodes=nodes, path=path, path_cmap=path_cmap,
-            mute_background=mute_background, shape=shape,
-            preview_config=animate_preview_config,
-        )
-        return AnimatedCPSShapeFigure(
-            svg_data, audio_payload=audio_payload, dur=dur,
-            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-            loop=kwargs.get("loop", False) if kwargs else False,
-        )
-
-    if is_3d:
-        from .._renderers.threejs_master_set import _threejs_master_set_3d
-        static_fig = _threejs_master_set_3d(
+        return _threejs_master_set_3d(
             ms, figsize=figsize, node_size=node_size, text_size=text_size,
             show_labels=show_labels, title=title,
             override_positions=override_positions,
             preview_engine=engine_name, preview_config=animate_preview_config,
-            nodes=nodes, path=path, path_cmap=path_cmap,
-            mute_background=mute_background,
-            shape=shape_groups if has_shape else None,
-        )
+            nodes=nodes, path_cmap=path_cmap,
+            mute_background=mute_background, **extra)
+
+    nd = ms.node_data()
+
+    def _label_ratio(label):
+        return nd.get(label, {}).get('ratio')
+
+    if animate and path and len(path) > 1:
+        freqs = _ratio_freqs(path, _label_ratio, reference_freq(ms))
+        return _animated_path_figure(
+            freqs, is_3d, _render_2d, lambda: _render_3d(path=path),
+            dur, amp, extra_synth_kwargs, preview_def_name, engine_name, kwargs)
+
+    if animate and has_shape:
+        freq_groups = (chord_freq_groups if chord_freq_groups is not None
+                       else [_ratio_freqs(group, _label_ratio, reference_freq(ms))
+                             for group in shape_groups])
+        return _animated_shape_figure(
+            freq_groups, is_3d,
+            lambda: _render_2d(shape=shape),
+            lambda: _render_3d(shape=shape_groups),
+            dur, arp, strum, direction, amp, extra_synth_kwargs,
+            preview_def_name, engine_name, kwargs)
+
+    if is_3d:
+        static_fig = _render_3d(path=path, shape=shape_groups if has_shape else None)
     else:
-        from .._renderers.svg_master_set import _svg_master_set_2d
-        static_fig = _svg_master_set_2d(
-            ms, figsize=figsize, node_size=node_size, text_size=text_size,
-            show_labels=show_labels, title=title,
-            nodes=nodes, path=path, path_cmap=path_cmap,
-            mute_background=mute_background, shape=shape,
-            preview_config=animate_preview_config,
-        )
+        static_fig = _render_2d(shape=shape)
 
     if animate:
         from .._animation import ClickPreviewFigure
@@ -439,7 +341,49 @@ def _cps_node_positions(G):
 
 
 
-def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12), 
+def _cps_scale_run(cps, equaves=1):
+    """Build the default ``plot(cps).play()`` scale run.
+
+    Returns ``(freqs, node_ids)``: the frequencies of the CPS collection
+    played up ``equaves`` equaves and back down (mirroring
+    ``scale_pitch_sequence``), and for each step the graph node whose
+    equave-reduced ratio sounds — so octave-equivalent steps select the
+    same node. Returns None for an empty CPS.
+    """
+    collection = cps.collection
+    n = len(collection)
+    if n == 0:
+        return None
+    eq = int(equaves) if equaves else 1
+    abs_eq = abs(eq) or 1
+    idxs = list(range(abs_eq * n + 1))
+    if eq < 0:
+        idxs = [-i for i in idxs]
+    idxs = idxs + idxs[-2::-1]
+    freqs = [float(collection[i].freq) for i in idxs]
+
+    ratios = list(cps.ratios)
+    ratio_to_node = {}
+    for node, attrs in cps.nodes(data=True):
+        r = attrs.get('ratio')
+        if r is not None and r not in ratio_to_node:
+            ratio_to_node[r] = node
+    node_ids = [ratio_to_node.get(ratios[i % n]) for i in idxs]
+    return freqs, node_ids
+
+
+def _cps_render_node_order(G, node_positions):
+    """Graph node ids in renderer order.
+
+    Both ``_svg_cps`` and ``_threejs_cps_3d`` iterate ``G.nodes(data=True)``
+    and skip nodes without a position or ``combo``; this must mirror that
+    filter so select-step indices line up with rendered node indices.
+    """
+    return [node for node, attrs in G.nodes(data=True)
+            if node in node_positions and 'combo' in attrs]
+
+
+def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              node_size: int = 30, text_size: int = 12, show_labels: bool = True,
              title: str = None, output_file: str = None, nodes: list = None,
              path: list = None, path_cmap: str = 'viridis',
@@ -447,7 +391,8 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              animate: bool = False, dur: float = 0.5,
              shape: list = None,
              arp: bool = False, strum: float = 0, direction: str = 'u',
-             amp: float = None, dim_reduction: str = 'mds', **kwargs):
+             amp: float = None, dim_reduction: str = 'mds',
+             equaves: int = 1, **kwargs):
     """
     Render a Combination Product Set as an interactive network diagram.
 
@@ -496,6 +441,9 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         Projection method used when the CPS's master-set positions live
         in more than 3 dimensions. One of ``'mds'`` (default), ``'pca'``,
         ``'ortho_best'``, or ``'ortho_first'``.
+    equaves : int, optional
+        For the default ``.play()`` (no ``path``/``shape``): how many
+        equaves the scale run ascends before descending. Default is 1.
 
     Returns
     -------
@@ -523,161 +471,99 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
         pos_dim = 3
     is_3d = pos_dim >= 3 and any(abs(p[2]) > 1e-12 for p in node_positions.values())
 
-    from klotho.utils.playback._config import get_audio_engine
     from .plot_lattice import (
-        _resolve_plot_inst, _build_preview_config, _payload_extra_pfields,
+        _prepare_plot_audio, _normalize_shape_groups, _resolve_chord_shape,
+        _ratio_freqs, _animated_path_figure, _animated_shape_figure,
+        _path_audio_payload,
     )
 
-    preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
-    engine_name = get_audio_engine()
-    animate_preview_config = _build_preview_config(
-        dur, amp, kwargs, engine_name,
-        def_name=preview_def_name, inst_pfields=inst_pfields,
-    ) if animate else None
-    extra_synth_kwargs = _payload_extra_pfields(kwargs, inst_pfields)
+    engine_name, preview_def_name, animate_preview_config, extra_synth_kwargs = (
+        _prepare_plot_audio(kwargs, dur, amp, animate))
 
-    if shape is not None and len(shape) > 0:
-        if isinstance(shape[0], (list, tuple)):
-            shape_groups = [list(g) for g in shape]
-        else:
-            shape_groups = [list(shape)]
+    chord_freq_groups = None
+    resolved = _resolve_chord_shape(cps, shape)
+    if resolved is not None:
+        shape_groups, chord_freq_groups = resolved
+        shape = shape_groups
     else:
-        shape_groups = []
+        shape_groups = _normalize_shape_groups(shape)
     has_shape = len(shape_groups) > 0
 
-    if animate and path:
-        from klotho.utils.playback.animation_events import build_path_engine_payload
-        ref_freq = 261.63
-        freqs = []
-        for node_id in path:
-            try:
-                ratio = float(G.nodes[node_id]['ratio'])
-                freqs.append(ref_freq * ratio)
-            except Exception:
-                freqs.append(ref_freq)
-        audio_payload = build_path_engine_payload(
-            freqs,
-            dur,
-            engine=engine_name,
-            amp=amp,
-            extra_pfields=extra_synth_kwargs,
-            pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
-            def_name=preview_def_name,
-        )
-
-        if is_3d:
-            from .._renderers.threejs_cps import _threejs_cps_3d
-            from .._animation import AnimatedLattice3dFigure
-            threejs_data = _threejs_cps_3d(
-                cps, node_positions, G, figsize=figsize,
-                node_size=node_size, text_size=text_size,
-                show_labels=show_labels, title=title, nodes=nodes,
-                path=path, path_cmap=path_cmap,
-                mute_background=mute_background,
-                preview_engine=engine_name,
-                preview_config=animate_preview_config,
-            )
-            return AnimatedLattice3dFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
-
+    def _render_2d(**extra):
         from .._renderers.svg_cps import _svg_cps
-        from .._animation import AnimatedCPSSvgFigure
-        svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
-                            mute_background=mute_background, figsize=figsize,
-                            node_size=node_size, text_size=text_size,
-                            show_labels=show_labels, title=title,
-                            preview_config=animate_preview_config)
-        return AnimatedCPSSvgFigure(
-            svg_data,
-            audio_payload=audio_payload,
-            dur=dur,
-            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-            loop=kwargs.get("loop", False) if kwargs else False,
-        )
+        return _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
+                        mute_background=mute_background, figsize=figsize,
+                        node_size=node_size, text_size=text_size,
+                        show_labels=show_labels, title=title,
+                        preview_config=animate_preview_config, **extra)
 
-    if animate and has_shape:
-        from klotho.utils.playback.animation_events import build_shape_engine_payload
-        ref_freq = 261.63
-        freq_groups = []
-        for group in shape_groups:
-            group_freqs = []
-            for node_id in group:
-                try:
-                    ratio = float(G.nodes[node_id]['ratio'])
-                    group_freqs.append(ref_freq * ratio)
-                except Exception:
-                    group_freqs.append(ref_freq)
-            freq_groups.append(group_freqs)
-
-        audio_payload = build_shape_engine_payload(
-            freq_groups,
-            dur,
-            engine=engine_name,
-            arp=arp,
-            strum=strum,
-            direction=direction,
-            amp=amp,
-            extra_pfields=extra_synth_kwargs,
-            pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
-            def_name=preview_def_name,
-        )
-
-        if is_3d:
-            from .._renderers.threejs_cps import _threejs_cps_3d
-            from .._animation import AnimatedLattice3dShapeFigure
-            threejs_data = _threejs_cps_3d(
-                cps, node_positions, G, figsize=figsize,
-                node_size=node_size, text_size=text_size,
-                show_labels=show_labels, title=title, nodes=nodes,
-                mute_background=mute_background,
-                shape=shape_groups,
-                preview_engine=engine_name,
-                preview_config=animate_preview_config,
-            )
-            return AnimatedLattice3dShapeFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
-
-        from .._renderers.svg_cps import _svg_cps
-        from .._animation import AnimatedCPSShapeFigure
-        svg_data = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
-                            mute_background=mute_background, figsize=figsize,
-                            node_size=node_size, text_size=text_size,
-                            show_labels=show_labels, title=title,
-                            shape=shape,
-                            preview_config=animate_preview_config)
-        return AnimatedCPSShapeFigure(
-            svg_data,
-            audio_payload=audio_payload,
-            dur=dur,
-            ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-            loop=kwargs.get("loop", False) if kwargs else False,
-        )
-
-    if is_3d:
+    def _render_3d(**extra):
         from .._renderers.threejs_cps import _threejs_cps_3d
-        static_fig = _threejs_cps_3d(
+        return _threejs_cps_3d(
             cps, node_positions, G, figsize=figsize,
             node_size=node_size, text_size=text_size,
             show_labels=show_labels, title=title, nodes=nodes,
-            path=path, path_cmap=path_cmap,
             mute_background=mute_background,
-            shape=shape_groups if has_shape else None,
             preview_engine=engine_name,
-            preview_config=animate_preview_config,
-        )
+            preview_config=animate_preview_config, **extra)
+
+    def _node_ratio(node_id):
+        return G.nodes[node_id]['ratio']
+
+    if animate and path:
+        freqs = _ratio_freqs(path, _node_ratio, reference_freq(cps))
+        return _animated_path_figure(
+            freqs, is_3d, _render_2d, lambda: _render_3d(path=path, path_cmap=path_cmap),
+            dur, amp, extra_synth_kwargs, preview_def_name, engine_name, kwargs)
+
+    if animate and has_shape:
+        freq_groups = (chord_freq_groups if chord_freq_groups is not None
+                       else [_ratio_freqs(group, _node_ratio, reference_freq(cps))
+                             for group in shape_groups])
+        return _animated_shape_figure(
+            freq_groups, is_3d,
+            lambda: _render_2d(shape=shape),
+            lambda: _render_3d(shape=shape_groups),
+            dur, arp, strum, direction, amp, extra_synth_kwargs,
+            preview_def_name, engine_name, kwargs)
+
+    # Default play (no path/shape): the CPS "scale" — sorted ratios up
+    # `equaves` equaves and back down — selecting each sounding node the
+    # way a mouse click does.
+    if animate:
+        run = _cps_scale_run(cps, equaves)
+        if run is not None:
+            freqs, run_node_ids = run
+            audio_payload = _path_audio_payload(
+                freqs, dur, amp, extra_synth_kwargs, preview_def_name,
+                engine_name, kwargs)
+            node_order = _cps_render_node_order(G, node_positions)
+            select_indices = [
+                node_order.index(nid) if nid in node_order else -1
+                for nid in run_node_ids
+            ]
+
+            if is_3d:
+                from .._animation import AnimatedLattice3dSelectFigure
+                threejs_data = _render_3d()
+                threejs_data.scene_data['selectNodeIndices'] = select_indices
+                return AnimatedLattice3dSelectFigure(
+                    threejs_data, audio_payload=audio_payload, dur=dur,
+                    **transport_kwargs(kwargs),
+                )
+
+            from .._animation import AnimatedNodeSelectSvgFigure
+            return AnimatedNodeSelectSvgFigure(
+                _render_2d(), select_indices,
+                audio_payload=audio_payload, dur=dur,
+                **transport_kwargs(kwargs),
+            )
+
+    if is_3d:
+        static_fig = _render_3d(path=path, path_cmap=path_cmap,
+                                shape=shape_groups if has_shape else None)
     else:
-        from .._renderers.svg_cps import _svg_cps
-        static_fig = _svg_cps(cps, node_positions, path=path, path_cmap=path_cmap,
-                              mute_background=mute_background, figsize=figsize,
-                              node_size=node_size, text_size=text_size,
-                              show_labels=show_labels, title=title, shape=shape,
-                              preview_config=animate_preview_config)
+        static_fig = _render_2d(shape=shape)
 
     if animate:
         from .._animation import ClickPreviewFigure

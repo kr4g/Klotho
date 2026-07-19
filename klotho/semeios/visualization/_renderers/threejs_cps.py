@@ -1,4 +1,5 @@
 from .threejs_lattice import ThreejsLatticeData
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 
 
@@ -78,7 +79,7 @@ def _threejs_cps_3d(cps, node_positions, G, figsize=(12, 12),
     node_freqs = []
     is_active_list = []
     node_id_to_idx = {}
-    ref_freq = 261.63
+    ref_freq = reference_freq(cps)
     path_set = set(path) if path else set()
     for node, attrs in G.nodes(data=True):
         if node not in node_positions or 'combo' not in attrs:

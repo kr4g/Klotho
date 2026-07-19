@@ -1,4 +1,5 @@
 from klotho.chronos.rhythm_trees import RhythmTree
+from ._klotho_plot import transport_kwargs
 
 
 def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] | None = None, 
@@ -126,7 +127,6 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         dur=dur,
         glow=glow,
         engine=engine,
-        ring_time=kwargs.get("ring_time", 5),
-        loop=kwargs.get("loop", False),
+        **transport_kwargs(kwargs),
     )
 

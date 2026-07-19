@@ -4,8 +4,10 @@ import networkx as nx
 
 from klotho.topos.graphs.lattices import Lattice
 
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
 from .._projections import apply_projection
+from ._klotho_plot import transport_kwargs
 
 
 _PREVIEW_CONTROL_KEYS = frozenset({
@@ -58,8 +60,169 @@ def _payload_extra_pfields(kwargs, inst_pfields=None):
     merged = dict(inst_pfields or {})
     if kwargs:
         merged.update({k: v for k, v in kwargs.items()
-                       if k not in {"pause", "loop", "ring_time", "inst", "defName"}})
+                       if k not in {"pause", "loop", "ring_time", "inst", "defName", "equaves"}})
     return merged or None
+
+
+def _prepare_plot_audio(kwargs, dur, amp, animate):
+    """Resolve engine, preview synth, click-preview config, and payload
+    extras for a lattice-family plot in one step.
+
+    Returns ``(engine_name, preview_def_name, preview_config,
+    extra_synth_kwargs)``; ``preview_config`` is None unless *animate*.
+    """
+    from klotho.utils.playback._config import get_audio_engine
+    preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
+    engine_name = get_audio_engine()
+    preview_config = _build_preview_config(
+        dur, amp, kwargs, engine_name,
+        def_name=preview_def_name, inst_pfields=inst_pfields,
+    ) if animate else None
+    return engine_name, preview_def_name, preview_config, _payload_extra_pfields(kwargs, inst_pfields)
+
+
+def _normalize_shape_groups(shape):
+    """Normalize a ``shape`` argument to a list of groups (possibly empty)."""
+    if shape is not None and len(shape) > 0:
+        if isinstance(shape[0], (list, tuple)):
+            return [list(g) for g in shape]
+        return [list(shape)]
+    return []
+
+
+def _resolve_chord_shape(obj, shape):
+    """Resolve a Chord/Voicing/ChordSequence ``shape`` argument against a
+    lattice-family object.
+
+    Returns ``(shape_groups, freq_groups)`` — highlight node groups from
+    resolving each chord's degrees back to the object's nodes (each
+    class's ``_node_for_ratio`` hook normalizes by its own equave
+    convention, so voiced/shifted degrees find their node), and playback
+    frequencies from the chords' own realization (root, equave shifts,
+    and voicing all respected) — or ``None`` when *shape* is not
+    chord-like, falling through to the node-group path.
+
+    Raises
+    ------
+    ValueError
+        If a degree does not correspond to any node of *obj*.
+    TypeError
+        If *obj* has no ratio-to-node lookup (not a lattice-family class).
+    """
+    from klotho.tonos.chords.chord import Chord, Voicing, ChordSequence
+
+    if isinstance(shape, ChordSequence):
+        chords = list(shape)
+    elif isinstance(shape, (Chord, Voicing)):
+        chords = [shape]
+    else:
+        return None
+
+    if not hasattr(obj, '_node_for_ratio'):
+        raise TypeError(
+            f"shape={type(shape).__name__} requires a lattice-family object "
+            f"with ratio-to-node lookup; {type(obj).__name__} has none."
+        )
+
+    shape_groups, freq_groups = [], []
+    for ch in chords:
+        group = []
+        for degree in ch.degrees:
+            node = obj._node_for_ratio(degree)
+            if node is None:
+                raise ValueError(
+                    f"Shape chord degree {degree} does not correspond to a "
+                    f"node of this {type(obj).__name__}."
+                )
+            group.append(node)
+        shape_groups.append(group)
+        freq_groups.append([float(f) for f in ch.freqs])
+    return shape_groups, freq_groups
+
+
+def _ratio_freqs(items, get_ratio, ref_freq):
+    """``ref_freq``-scaled frequencies for path/shape items.
+
+    Items whose ratio is missing or malformed fall back to the
+    reference frequency itself.
+    """
+    freqs = []
+    for item in items:
+        try:
+            ratio = get_ratio(item)
+            freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
+        except Exception:
+            freqs.append(ref_freq)
+    return freqs
+
+
+def _path_audio_payload(freqs, dur, amp, extra_synth_kwargs, preview_def_name,
+                        engine_name, kwargs):
+    """Engine audio payload for a step-per-frequency (path-style) animation."""
+    from klotho.utils.playback.animation_events import build_path_engine_payload
+    return build_path_engine_payload(
+        freqs,
+        dur,
+        engine=engine_name,
+        amp=amp,
+        extra_pfields=extra_synth_kwargs,
+        pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
+        def_name=preview_def_name,
+    )
+
+
+def _animated_path_figure(freqs, use_3d, render_2d, render_3d, dur, amp,
+                          extra_synth_kwargs, preview_def_name, engine_name, kwargs):
+    """Path-traversal audio payload wrapped in the matching animated figure.
+
+    Shared by the lattice, CPS, and MasterSet dispatchers; ``render_2d``
+    / ``render_3d`` are zero-arg closures over the family-specific
+    renderer call.
+    """
+    from .._animation import AnimatedLatticeSvgFigure, AnimatedLattice3dFigure
+
+    audio_payload = _path_audio_payload(
+        freqs, dur, amp, extra_synth_kwargs, preview_def_name, engine_name, kwargs)
+    if use_3d:
+        return AnimatedLattice3dFigure(
+            scene_data=render_3d(), audio_payload=audio_payload, dur=dur,
+            **transport_kwargs(kwargs),
+        )
+    return AnimatedLatticeSvgFigure(
+        svg_data=render_2d(), audio_payload=audio_payload, dur=dur,
+        **transport_kwargs(kwargs),
+    )
+
+
+def _animated_shape_figure(freq_groups, use_3d, render_2d, render_3d, dur, arp,
+                           strum, direction, amp, extra_synth_kwargs,
+                           preview_def_name, engine_name, kwargs):
+    """Shape (chord/chord-sequence) audio payload wrapped in the matching
+    animated figure, mirroring :func:`_animated_path_figure`."""
+    from klotho.utils.playback.animation_events import build_shape_engine_payload
+    from .._animation import AnimatedLatticeShapeFigure, AnimatedLattice3dShapeFigure
+
+    audio_payload = build_shape_engine_payload(
+        freq_groups,
+        dur,
+        engine=engine_name,
+        arp=arp,
+        strum=strum,
+        direction=direction,
+        amp=amp,
+        extra_pfields=extra_synth_kwargs,
+        pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
+        def_name=preview_def_name,
+    )
+    if use_3d:
+        return AnimatedLattice3dShapeFigure(
+            scene_data=render_3d(), audio_payload=audio_payload, dur=dur,
+            **transport_kwargs(kwargs),
+        )
+    return AnimatedLatticeShapeFigure(
+        svg_data=render_2d(), audio_payload=audio_payload, dur=dur,
+        **transport_kwargs(kwargs),
+    )
 
 
 def _coerce_to_tuples(items):
@@ -314,7 +477,8 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                               path, path_mode, shape,
                               figsize, node_size, title, path_cmap,
                               dur, arp, strum, direction, amp, kwargs,
-                              preview_def_name='kl_tri', inst_pfields=None):
+                              preview_def_name='kl_tri', inst_pfields=None,
+                              chord_freq_groups=None):
     has_shape = len(lattice_shape_groups) > 0
     from klotho.utils.playback._config import get_audio_engine
     engine_name = get_audio_engine()
@@ -336,101 +500,42 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                                            inst_pfields=inst_pfields)
     extra_synth_kwargs = _payload_extra_pfields(kwargs, inst_pfields)
 
-    if path and len(path) > 1:
-        from klotho.utils.playback.animation_events import build_path_engine_payload
+    def _coord_ratio(coord):
+        return lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
 
-        ref_freq = 261.63
-        freqs = []
-        for coord in path:
-            try:
-                ratio = lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
-                freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
-            except Exception:
-                freqs.append(ref_freq)
-        audio_payload = build_path_engine_payload(
-            freqs,
-            dur,
-            engine=engine_name,
-            amp=amp,
-            extra_pfields=extra_synth_kwargs,
-            pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
-            def_name=preview_def_name,
+    use_3d = effective_dimensionality > 2
+
+    def _render_2d(shape=None):
+        from .._renderers.svg_lattice import _svg_lattice_2d
+        extra = {'shape': shape} if shape is not None else {}
+        return _svg_lattice_2d(**svg_threejs_kwargs, preview_config=preview_config, **extra)
+
+    def _render_3d(shape=None):
+        from .._renderers.threejs_lattice import _threejs_lattice_3d
+        extra = {'shape': shape} if shape is not None else {}
+        return _threejs_lattice_3d(
+            **svg_threejs_kwargs,
+            preview_engine=engine_name,
+            preview_config=preview_config,
+            **extra,
         )
 
-        if effective_dimensionality <= 2:
-            from .._animation import AnimatedLatticeSvgFigure
-            from .._renderers.svg_lattice import _svg_lattice_2d
-            svg_data = _svg_lattice_2d(**svg_threejs_kwargs, preview_config=preview_config)
-            return AnimatedLatticeSvgFigure(
-                svg_data=svg_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
-        else:
-            from .._animation import AnimatedLattice3dFigure
-            from .._renderers.threejs_lattice import _threejs_lattice_3d
-            threejs_data = _threejs_lattice_3d(
-                **svg_threejs_kwargs,
-                preview_engine=engine_name,
-                preview_config=preview_config,
-            )
-            return AnimatedLattice3dFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
+    if path and len(path) > 1:
+        freqs = _ratio_freqs(path, _coord_ratio, reference_freq(lattice))
+        return _animated_path_figure(
+            freqs, use_3d, _render_2d, _render_3d,
+            dur, amp, extra_synth_kwargs, preview_def_name, engine_name, kwargs)
 
     if has_shape:
-        from klotho.utils.playback.animation_events import build_shape_engine_payload
-
-        ref_freq = 261.63
-        freq_groups = []
-        for group in lattice_shape_groups:
-            group_freqs = []
-            for coord in group:
-                try:
-                    ratio = lattice._coord_to_ratio(coord) if hasattr(lattice, '_coord_to_ratio') else None
-                    group_freqs.append(ref_freq * float(ratio) if ratio is not None else ref_freq)
-                except Exception:
-                    group_freqs.append(ref_freq)
-            freq_groups.append(group_freqs)
-
-        audio_payload = build_shape_engine_payload(
-            freq_groups,
-            dur,
-            engine=engine_name,
-            arp=arp,
-            strum=strum,
-            direction=direction,
-            amp=amp,
-            extra_pfields=extra_synth_kwargs,
-            pause=kwargs.get("pause", 0.25) if kwargs else 0.25,
-            def_name=preview_def_name,
-        )
-
-        if effective_dimensionality <= 2:
-            from .._animation import AnimatedLatticeShapeFigure
-            from .._renderers.svg_lattice import _svg_lattice_2d
-            svg_data = _svg_lattice_2d(**svg_threejs_kwargs, shape=lattice_shape_groups, preview_config=preview_config)
-            return AnimatedLatticeShapeFigure(
-                svg_data=svg_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
-        else:
-            from .._animation import AnimatedLattice3dShapeFigure
-            from .._renderers.threejs_lattice import _threejs_lattice_3d
-            threejs_data = _threejs_lattice_3d(
-                **svg_threejs_kwargs,
-                preview_engine=engine_name,
-                preview_config=preview_config,
-                shape=lattice_shape_groups,
-            )
-            return AnimatedLattice3dShapeFigure(
-                scene_data=threejs_data, audio_payload=audio_payload, dur=dur,
-                ring_time=kwargs.get("ring_time", 5) if kwargs else 5,
-                loop=kwargs.get("loop", False) if kwargs else False,
-            )
+        freq_groups = (chord_freq_groups if chord_freq_groups is not None
+                       else [_ratio_freqs(group, _coord_ratio, reference_freq(lattice))
+                             for group in lattice_shape_groups])
+        return _animated_shape_figure(
+            freq_groups, use_3d,
+            lambda: _render_2d(shape=lattice_shape_groups),
+            lambda: _render_3d(shape=lattice_shape_groups),
+            dur, arp, strum, direction, amp, extra_synth_kwargs,
+            preview_def_name, engine_name, kwargs)
 
     return None
 
@@ -527,6 +632,14 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         coord_label = getattr(lattice, "coord_label", "Monzo")
 
     preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
+
+    chord_freq_groups = None
+    resolved = _resolve_chord_shape(lattice, shape)
+    if resolved is not None:
+        shape_groups, chord_freq_groups = resolved
+        # Lattice shape groups are lists of coord tuples (group detection
+        # downstream keys on list-ness of the outer elements).
+        shape = [list(g) for g in shape_groups]
 
     nodes = _coerce_to_tuples(nodes)
     path = _coerce_to_tuples(path)
@@ -643,6 +756,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         figsize, node_size, title, path_cmap,
         dur, arp, strum, direction, amp, kwargs,
         preview_def_name=preview_def_name, inst_pfields=inst_pfields,
+        chord_freq_groups=chord_freq_groups,
     )
 
     if animated_fig is not None:

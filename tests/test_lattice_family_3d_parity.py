@@ -116,9 +116,14 @@ class TestCPS3dParity:
         sd = fig.scene_data
         assert len(sd['shapeGroupNodeIndices']) == 1
 
-    def test_bare_animate_is_click_preview(self, cps_3d):
+    def test_bare_animate_is_select_run(self, cps_3d):
+        from klotho.semeios.visualization._animation import AnimatedLattice3dSelectFigure
         fig = _plot_cps(cps_3d, animate=True)
-        assert isinstance(fig, ClickPreviewFigure)
+        assert isinstance(fig, AnimatedLattice3dSelectFigure)
+        sel = fig.scene_data.scene_data['selectNodeIndices']
+        assert len(sel) == 2 * len(cps_3d.ratios) + 1
+        assert len(fig.audio_payload['events']) == len(sel)
+        assert all(0 <= i < len(fig.scene_data.scene_data['nodes']) for i in sel)
 
     def test_bare_static_unchanged(self, cps_3d):
         fig = _plot_cps(cps_3d)

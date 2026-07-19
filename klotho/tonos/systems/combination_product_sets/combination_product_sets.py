@@ -8,13 +8,14 @@ from tabulate import tabulate
 
 from klotho.topos.collections import CombinationSet as CS
 from klotho.tonos.utils.interval_normalization import equave_reduce
+from klotho.tonos.pitch.reference import ReferencePitchAware
 from .master_set import MasterSet, MASTER_SETS
 
 __all__ = [
     'CombinationProductSet',
 ]
 
-class CombinationProductSet(CS):
+class CombinationProductSet(ReferencePitchAware, CS):
   """
   A Combination Product Set (CPS) scale.
 
@@ -244,7 +245,19 @@ class CombinationProductSet(CS):
   def ratios(self):
     """tuple : Sorted tuple of equave-reduced ratios."""
     return tuple(sorted(attrs['ratio'] for _, attrs in self.nodes(data=True)))
-  
+
+  @property
+  def collection(self):
+    """RelativePitchCollection : The CPS ratios as an equave-cyclic collection.
+
+    Rooted at :attr:`reference_pitch` (default C4). A ``PitchCollection``
+    rather than a ``Scale`` because a CPS has no 1/1 degree, but it is
+    still equave-cyclic like a scale.
+    """
+    from klotho.tonos.pitch.pitch_collections import PitchCollection
+    return PitchCollection.from_degrees(
+      list(self.ratios), equave='2/1', reference_pitch=self.reference_pitch)
+
   def get_node_by(self, attr_name, value):
     """
     Find the first node whose attribute matches the given value.

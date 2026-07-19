@@ -3,6 +3,7 @@ import numpy as np
 from collections import defaultdict
 from html import escape as html_escape
 
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 from .._shared.svg_utils import (
     SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
@@ -256,7 +257,7 @@ def _svg_cps(cps, node_positions, path=None, path_cmap='viridis',
     hover_texts = []
     is_active_list = []
     node_freqs = []
-    ref_freq = 261.63
+    ref_freq = reference_freq(cps)
     ns = node_size
     node_idx_counter = 0
 

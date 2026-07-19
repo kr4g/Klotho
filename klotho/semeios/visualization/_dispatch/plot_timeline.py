@@ -1,3 +1,5 @@
+from ._klotho_plot import transport_kwargs
+
 _PASSTHROUGH_KWARGS = frozenset({
     'beat', 'bpm', 'arp', 'strum', 'direction', 'pause', 'loop', 'ring_time',
 })
@@ -83,6 +85,5 @@ def _plot_timeline(obj, layout: str = 'ratios',
         dur=dur,
         glow=glow,
         engine=engine,
-        ring_time=kwargs.get("ring_time", 5),
-        loop=kwargs.get("loop", False),
+        **transport_kwargs(kwargs),
     )

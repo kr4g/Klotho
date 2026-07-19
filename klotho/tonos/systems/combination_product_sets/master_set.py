@@ -2,6 +2,8 @@ import math
 import sympy as sp
 import numpy as np
 
+from klotho.tonos.pitch.reference import ReferencePitchAware
+
 __all__ = [
     'MasterSet',
     'MASTER_SETS',
@@ -10,7 +12,7 @@ __all__ = [
 _ALPHA = {chr(65 + i): sp.Symbol(chr(65 + i)) for i in range(26)}
 
 
-class MasterSet:
+class MasterSet(ReferencePitchAware):
     """
     A geometric layout template for Combination Product Sets.
 
@@ -138,6 +140,26 @@ class MasterSet:
             return None
         from klotho.tonos.utils.interval_normalization import equave_reduce
         return tuple(sorted(equave_reduce(f) for f in self._factors))
+
+    def _node_ratio(self, node):
+        data = self.node_data()
+        if node not in data:
+            raise KeyError(
+                f"Unknown MasterSet node alias {node!r}. Available: {sorted(data)}")
+        info = data[node]
+        if 'ratio' not in info:
+            raise ValueError(
+                "MasterSet has no factors assigned; use with_factors(...) "
+                "before ratio lookups.")
+        return info['ratio']
+
+    def _node_for_ratio(self, ratio):
+        from klotho.tonos.utils.interval_normalization import equave_reduce
+        reduced = equave_reduce(ratio)
+        for alias, info in self.node_data().items():
+            if info.get('ratio') == reduced:
+                return alias
+        return None
 
     def node_data(self):
         """

@@ -97,7 +97,9 @@
       playing = true;
 
       if (options.loop) {
-        myPart.loop = true;
+        // Tone.Part.loop natively accepts true (endless) or a number of
+        // repetitions, matching the loop policy passed from Python.
+        myPart.loop = (typeof options.loop === "number") ? options.loop : true;
         myPart.loopStart = 0;
         myPart.loopEnd = end;
       } else {

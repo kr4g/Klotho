@@ -43,6 +43,11 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
         ``strum``, ``mode``).  For :class:`Score`, ``ring_time`` is
         supported.
 
+        ``loop`` sets the widget's initial loop policy, exactly as in
+        ``plot(obj).play(loop=...)``: ``False`` (default) leaves the
+        loop button off, ``True`` starts with infinite looping, and an
+        int > 1 loops that many cycles.
+
         ``inst`` selects the instrument for pitch-like objects
         (``Pitch``, ``PitchCollection``, ``Scale``, ``Chord``,
         ``Spectrum``): pass a SynthDef name string (exact match,
@@ -68,12 +73,14 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
         )
         boot_supersonic()
         ring_time = kwargs.pop('ring_time', 5)
+        loop = kwargs.pop('loop', False)
         payload = convert_score_to_sc_events(obj, **kwargs)
         engine_obj = SuperSonicEngine(
             payload["events"],
             meta=payload.get("meta"),
             control_data=payload.get("control_data"),
             ring_time=ring_time,
+            loop=loop,
         )
         return engine_obj.display()
 
@@ -89,6 +96,7 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
     if engine == "supersonic":
         from .supersonic import SuperSonicEngine, convert_to_sc_events
         ring_time = kwargs.pop('ring_time', 5)
+        loop = kwargs.pop('loop', False)
 
         from klotho.chronos.temporal_units.temporal import (
             TemporalBlock, TemporalUnitSequence,
@@ -101,10 +109,13 @@ def play(obj, engine=None, custom_js_path=None, custom_js=None, **kwargs):
                 payload["events"],
                 control_data=payload["control_data"],
                 ring_time=ring_time,
+                loop=loop,
             ).display()
 
         events = convert_to_sc_events(obj, **kwargs)
-        return SuperSonicEngine(events, ring_time=ring_time).display()
+        return SuperSonicEngine(events, ring_time=ring_time, loop=loop).display()
     else:
+        loop = kwargs.pop('loop', False)
         events = convert_to_events(obj, **kwargs)
-        return ToneEngine(events, custom_js_path=custom_js_path, custom_js=custom_js).display()
+        return ToneEngine(events, custom_js_path=custom_js_path, custom_js=custom_js,
+                          loop=loop).display()

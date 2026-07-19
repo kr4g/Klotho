@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from fractions import Fraction
 from typing import Iterable, List, Optional, Sequence, Union
@@ -7,6 +8,23 @@ from typing import Iterable, List, Optional, Sequence, Union
 import numpy as np
 
 from .pitch import Pitch
+
+
+def _interval_to_shift(interval):
+    """Normalize a transposition interval to ``('ratio', Fraction)`` or
+    ``('cents', float)``.
+
+    Accepts the same domain as :meth:`Pitch.transpose` (Fraction, int,
+    str, float, ``Ratio``, ``Cent``). Ratio-like inputs stay exact
+    Fractions so ratio-mode degrees keep exact arithmetic.
+    """
+    from ..types import Cent, Ratio
+    if isinstance(interval, Cent):
+        return 'cents', float(interval.magnitude)
+    if isinstance(interval, Ratio):
+        mag = interval.magnitude
+        return 'ratio', mag if isinstance(mag, Fraction) else Fraction(mag)
+    return 'ratio', Fraction(interval)
 
 IntervalType = Union[float, Fraction]
 DegreeList = Union[List[float], List[Fraction], List[int], List[str]]
@@ -162,6 +180,31 @@ class PitchCollectionBase(ABC):
         cycle the frequencies across events instead.
         """
         return tuple(float(p.freq) for p in self.pitches)
+
+    def equave_shift(self, n: int):
+        """
+        Return a copy of this collection shifted by *n* equaves.
+
+        Delegates to :meth:`transpose` with the collection's own equave,
+        so the shift carrier follows the type: the degrees for
+        ``Voicing`` and plain relative collections, the reference pitch
+        for ``Chord`` and ``Scale`` (whose degrees stay equave-reduced),
+        and the pitches themselves for absolute collections.
+
+        Parameters
+        ----------
+        n : int
+            Number of equaves to shift (negative shifts down).
+
+        Returns
+        -------
+        Same type as ``self``
+        """
+        equave = self.equave
+        if isinstance(equave, float):
+            from ..types import cent
+            return self.transpose(cent(n * equave))
+        return self.transpose(Fraction(equave) ** n)
 
     def _flatten_indices(self, index: Iterable) -> List[int]:
         result: List[int] = []
@@ -499,6 +542,37 @@ class RelativePitchCollection(PitchCollectionBase):
         rooted._equave_cyclic = self._equave_cyclic
         return rooted
 
+    def transpose(self, interval) -> "RelativePitchCollection":
+        """
+        Return a copy transposed by *interval*, carried in the degrees.
+
+        The reference pitch is unchanged: every degree is multiplied by
+        the interval (ratios mode) or offset by it (cents mode), so the
+        register survives a later :meth:`root`. ``Chord`` and ``Scale``
+        override this with reference-pitch transposition, since their
+        degrees stay equave-reduced. A cents interval on a ratios-mode
+        collection converts the degrees to floats.
+
+        Parameters
+        ----------
+        interval : Fraction, int, float, str, Ratio, or Cent
+            The transposition interval, as in :meth:`Pitch.transpose`.
+
+        Returns
+        -------
+        Same type as ``self``
+        """
+        kind, value = _interval_to_shift(interval)
+        if self._interval_type_mode == "cents":
+            delta = value if kind == 'cents' else 1200.0 * math.log2(float(value))
+            new_degrees = [d + delta for d in self._degrees]
+        else:
+            factor = value if kind == 'ratio' else 2.0 ** (value / 1200.0)
+            new_degrees = [d * factor for d in self._degrees]
+        out = type(self)(new_degrees, self._interval_type_mode, self._equave, self._reference_pitch)
+        out._equave_cyclic = self._equave_cyclic
+        return out
+
     def as_voicing(self):
         """
         Convert to a :class:`~klotho.tonos.chords.chord.Voicing`.
@@ -736,6 +810,29 @@ class AbsolutePitchCollection(PitchCollectionBase):
         rooted = AbsolutePitchCollection(list(self._pitches), self._equave, pitch)
         rooted._equave_cyclic = self._equave_cyclic
         return rooted
+
+    def transpose(self, interval) -> "AbsolutePitchCollection":
+        """
+        Return a copy with every pitch transposed by *interval*.
+
+        The reference pitch, when set, is transposed too, so partial
+        relationships are preserved.
+
+        Parameters
+        ----------
+        interval : Fraction, int, float, str, Ratio, or Cent
+            The transposition interval, as in :meth:`Pitch.transpose`.
+
+        Returns
+        -------
+        AbsolutePitchCollection
+        """
+        new_pitches = [p.transpose(interval) for p in self._pitches]
+        new_ref = (self._reference_pitch.transpose(interval)
+                   if self._reference_pitch is not None else None)
+        out = AbsolutePitchCollection(new_pitches, self._equave, new_ref)
+        out._equave_cyclic = self._equave_cyclic
+        return out
 
     def __len__(self) -> int:
         return len(self._pitches)

@@ -175,7 +175,26 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
             self._equave,
             pitch
         )
-    
+
+    def transpose(self, interval) -> 'Chord':
+        """
+        Return a copy transposed by *interval*, carried in the reference pitch.
+
+        Chord degrees are equave-reduced by construction, so the
+        reference pitch carries the shift; note that a later
+        :meth:`root` replaces the reference and therefore discards it.
+
+        Parameters
+        ----------
+        interval : Fraction, int, float, str, Ratio, or Cent
+            The transposition interval, as in :meth:`Pitch.transpose`.
+
+        Returns
+        -------
+        Chord
+        """
+        return self.root(self._reference_pitch.transpose(interval))
+
     def normalized(self) -> 'Chord':
         """
         Transpose the chord so the lowest degree is the unison (1/1 or 0 cents).
@@ -567,13 +586,98 @@ class ChordSequence:
     def __len__(self) -> int:
         return len(self._chords)
     
-    def __getitem__(self, index: Union[int, slice]) -> Union[Chord, Voicing, 'ChordSequence']:
+    def __getitem__(self, index: Union[int, slice, Sequence[int], np.ndarray]) -> Union[Chord, Voicing, 'ChordSequence']:
         if isinstance(index, slice):
             return ChordSequence(self._chords[index])
+        if hasattr(index, '__iter__') and not isinstance(index, str):
+            flat = self._flatten_indices(index)
+            return ChordSequence([self._chords[i] for i in flat])
         return self._chords[index]
+
+    @staticmethod
+    def _flatten_indices(index) -> List[int]:
+        result: List[int] = []
+        for item in index:
+            if hasattr(item, '__iter__') and not isinstance(item, (str, int)):
+                result.extend(ChordSequence._flatten_indices(item))
+            else:
+                result.append(int(item))
+        return result
     
     def __iter__(self):
         return iter(self._chords)
+
+    def voicing(self, index: Union[int, slice, Sequence[int], np.ndarray]) -> 'ChordSequence':
+        """
+        Return a new sequence with the same voicing applied to every chord.
+
+        Elements that are already :class:`Voicing` are first reduced to
+        their underlying :class:`Chord` form, so the passed voicing
+        *replaces* any existing one.
+
+        Parameters
+        ----------
+        index : int, slice, or sequence of int
+            Voicing indices, as in :meth:`Chord.voicing` (cyclic indices
+            reach other equaves).
+
+        Returns
+        -------
+        ChordSequence
+        """
+        voiced = []
+        for ch in self._chords:
+            base = ch if isinstance(ch, Chord) else Chord.from_collection(ch)
+            voiced.append(base.voicing(index))
+        return ChordSequence(voiced)
+
+    def root(self, pitch: Union[Pitch, str]) -> 'ChordSequence':
+        """
+        Return a new sequence with every chord rooted at the given pitch.
+
+        Parameters
+        ----------
+        pitch : Pitch or str
+            The reference pitch.
+
+        Returns
+        -------
+        ChordSequence
+        """
+        return ChordSequence([ch.root(pitch) for ch in self._chords])
+
+    def transpose(self, interval) -> 'ChordSequence':
+        """
+        Return a new sequence with every chord transposed by *interval*.
+
+        Each element keeps its own carrier semantics: Chords move their
+        reference pitch, Voicings shift their degrees.
+
+        Parameters
+        ----------
+        interval : Fraction, int, float, str, Ratio, or Cent
+            The transposition interval, as in :meth:`Pitch.transpose`.
+
+        Returns
+        -------
+        ChordSequence
+        """
+        return ChordSequence([ch.transpose(interval) for ch in self._chords])
+
+    def equave_shift(self, n: int) -> 'ChordSequence':
+        """
+        Return a new sequence with every chord shifted by *n* equaves.
+
+        Parameters
+        ----------
+        n : int
+            Number of equaves to shift (negative shifts down).
+
+        Returns
+        -------
+        ChordSequence
+        """
+        return ChordSequence([ch.equave_shift(n) for ch in self._chords])
 
     def folded(self, lo=None, hi=None) -> 'ChordSequence':
         """

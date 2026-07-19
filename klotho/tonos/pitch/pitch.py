@@ -297,6 +297,28 @@ class Pitch:
             factor = float(Fraction(interval))
         return Pitch.from_freq(self.freq * factor, partial=self.partial)
 
+    def equave_shift(self, n: int, equave: Union[int, Fraction, str] = '2/1') -> 'Pitch':
+        """
+        Return this pitch shifted by *n* equaves (octaves by default).
+
+        Parameters
+        ----------
+        n : int
+            Number of equaves to shift (negative shifts down).
+        equave : int, Fraction, or str, optional
+            The interval of equivalence. Default is ``'2/1'``.
+
+        Returns
+        -------
+        Pitch
+
+        Examples
+        --------
+        >>> Pitch('C4').equave_shift(1)
+        Pitch(C5, 523.25 Hz)
+        """
+        return self.transpose(Fraction(equave) ** n)
+
     def at_octave(self, octave: int) -> 'Pitch':
         """
         Return this pitch placed at an absolute octave.

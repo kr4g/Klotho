@@ -1,6 +1,7 @@
 import numpy as np
 from html import escape as html_escape
 
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import _rgba_to_hex
 from .._shared.svg_utils import SvgFigureData, svg_wrap
 from .._shared.svg_shared import (
@@ -396,7 +397,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     hover_texts = []
     is_active_list = []
     node_freqs = [] if is_tone_lattice else None
-    ref_freq = 261.63
+    ref_freq = reference_freq(lattice)
     ns = node_size * 2
     node_idx_counter = 0
     for i, coord in enumerate(coords_iter):

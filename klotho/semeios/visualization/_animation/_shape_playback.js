@@ -15,13 +15,8 @@ var counterEl = document.getElementById("__WID___counter");
 var soloBox   = document.getElementById("__WID___solo");
 
 var playing = false;
-var loopMode = "__LOOP_MODE__";
-var loopCount = Number("__LOOP_COUNT__");
-if (!Number.isFinite(loopCount)) loopCount = 0;
-var loopEnabled = "__LOOP_ENABLED__" === "true";
-var loopInfinite = loopMode === "infinite";
-var loopFiniteCount = loopMode === "finite" ? Math.max(2, Math.floor(loopCount)) : 0;
-var loopCyclesRemaining = loopFiniteCount;
+var loopCtl = KlothoLoopControl(loopBtn, loopSvg, "__LOOP_MODE__", "__LOOP_COUNT__",
+                                "__LOOP_ENABLED__" === "true");
 var currentView = 0;
 var playbackOrigin = 0;
 var engineType = "__ENGINE_TYPE__";
@@ -105,25 +100,6 @@ if (nextBtn) {
     });
 }
 
-function _setLoopUi() {
-    if (loopMode === "off") {
-        loopBtn.style.opacity = "0.3";
-        loopBtn.style.cursor = "not-allowed";
-        loopSvg.setAttribute("stroke", "#666");
-        return;
-    }
-    loopBtn.style.opacity = loopEnabled ? "1" : "0.5";
-    loopBtn.style.cursor = "pointer";
-    loopSvg.setAttribute("stroke", loopEnabled ? "#4ade80" : "#a0a0a0");
-}
-_setLoopUi();
-
-loopBtn.addEventListener("click", function() {
-    if (loopMode === "off") return;
-    loopEnabled = !loopEnabled;
-    if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
-    _setLoopUi();
-});
 
 var _timerId = null;
 
@@ -135,8 +111,8 @@ function _stopAll() {
 function _runAnimation(step) {
     if (!playing) return;
     if (step >= totalGroups) {
-        if (loopEnabled && (loopInfinite || loopCyclesRemaining > 1)) {
-            if (!loopInfinite) loopCyclesRemaining -= 1;
+        if (loopCtl.enabled && (loopCtl.infinite || loopCtl.cyclesRemaining > 1)) {
+            if (!loopCtl.infinite) loopCtl.cyclesRemaining -= 1;
             dimAllNodes(); hideAllShapeEdges();
             _timerId = setTimeout(function() { _runAnimation(0); }, stepMs);
         } else {
@@ -173,7 +149,7 @@ toggleBtn.addEventListener("click", async function() {
             var soloEvts = filterEventsForGroup(allEvts, currentView);
             revealAndTrack(currentView);
             await bridge.play(soloEvts, {
-                loop: loopEnabled ? (loopInfinite ? true : loopFiniteCount) : false,
+                loop: loopCtl.schedulerValue(),
                 onEvent: function() {},
                 onFinish: function() { finishPlayback(); },
             });
@@ -182,7 +158,7 @@ toggleBtn.addEventListener("click", async function() {
             dimAllNodes();
             hideAllShapeEdges();
             await bridge.play(reordered.events, {
-                loop: loopEnabled ? (loopInfinite ? true : loopFiniteCount) : false,
+                loop: loopCtl.schedulerValue(),
                 onEvent: function(stepIdx) {
                     if (playing) revealAndTrack(reordered.seqMap[stepIdx]);
                 },
@@ -195,7 +171,7 @@ toggleBtn.addEventListener("click", async function() {
         setStopIcon();
         dimAllNodes();
         hideAllShapeEdges();
-        if (loopEnabled && !loopInfinite) loopCyclesRemaining = loopFiniteCount;
+        loopCtl.rearm();
         _runAnimation(0);
     }
 });

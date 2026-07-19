@@ -1,7 +1,8 @@
 // SuperSonic standalone playback widget.
 // Python replaces: __WID__, __EVENTS_JSON__, __NEEDED_JSON__,
 //                  __SS_CONFIG_JSON__, __META_JSON__,
-//                  __CONTROL_DATA_JSON__, __SAMPLES_JSON__, __RING_TIME__
+//                  __CONTROL_DATA_JSON__, __SAMPLES_JSON__, __RING_TIME__,
+//                  __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
 
 (function __klothoSSInit___WID__() {
     var wid = "__WID__";
@@ -20,7 +21,8 @@
     var controlData = __CONTROL_DATA_JSON__;
     var sampleAssets = __SAMPLES_JSON__;
 
-    var looping = false;
+    var loopCtl = KlothoLoopControl(loopBtn, loopSvg, "__LOOP_MODE__", "__LOOP_COUNT__",
+                                    "__LOOP_ENABLED__" === "true");
     var scheduler = null;
     var ready = false;
     var _loadPromise = null;
@@ -38,14 +40,11 @@
             + "margin-left:0;background:#ef4444";
     }
 
-    loopBtn.addEventListener("click", async function() {
-        looping = !looping;
-        loopBtn.style.opacity = looping ? "1" : "0.5";
-        loopSvg.setAttribute("stroke", looping ? "#4ade80" : "#a0a0a0");
+    loopCtl.onToggle = function() {
         if (scheduler && scheduler.isPlaying) {
             doPlay();
         }
-    });
+    };
 
     function ensureSharedSonic() {
         if (typeof globalThis.__ensureSuperSonic === "function") {
@@ -140,7 +139,7 @@
         scheduler.play(evts, {
             meta: meta,
             controlData: controlData,
-            loop: looping,
+            loop: loopCtl.schedulerValue(),
             onFinish: function() {
                 setPlayIcon();
             }

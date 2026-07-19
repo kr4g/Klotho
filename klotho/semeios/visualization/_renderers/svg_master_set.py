@@ -2,6 +2,7 @@ import math
 from collections import defaultdict
 from html import escape as html_escape
 
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 from .._shared.svg_utils import (
     SvgFigureData, svg_wrap, svg_radial_halo, svg_arrow_polygon,
@@ -290,7 +291,7 @@ def _svg_master_set_2d(ms, figsize=(12, 12), node_size=30, text_size=12,
     hover_texts = []
     is_active_list = []
     node_freqs = []
-    ref_freq = 261.63
+    ref_freq = reference_freq(ms)
 
     r_px = node_size * 0.5
     node_idx_counter = 0

@@ -7,6 +7,7 @@ from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
 from klotho.tonos.chords.chord import Chord, Voicing, ChordSequence
 from klotho.tonos.scales.scale import Scale
 from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
+from klotho.tonos.systems.combination_product_sets import CombinationProductSet
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
@@ -20,7 +21,7 @@ DEFAULT_DRUM_FREQ = 110.0
 KNOWN_KWARGS = frozenset({
     'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
     'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time', 'pause',
-    'inst',
+    'inst', 'loop',
 })
 
 
@@ -147,6 +148,98 @@ def scale_pitch_sequence(obj, equaves=1):
         pitches_up = list(reversed(all_pitches[:-1]))
         all_pitches = all_pitches + pitches_up
     return all_pitches
+
+
+def dispatch_convert(obj, kwargs, handlers, include_inst=False):
+    """Shared type-dispatch for the supersonic and tonejs converters.
+
+    The isinstance ladder, per-type argument wiring, and pause defaults
+    live here once; each engine supplies its converter callables in
+    ``handlers`` (keys: ``pitch``, ``spectrum``, ``rhythm_tree``,
+    ``temporal_sequence``, ``temporal_block``, ``compositional_unit``,
+    ``temporal_unit``, ``chord_sequence``, ``scale``, ``chord``,
+    ``pitch_collection``). A new playable type is added in one place.
+    ``include_inst`` forwards the ``inst`` kwarg for engines whose
+    handlers support instrument selection (SuperSonic).
+    """
+    kw = extract_convert_kwargs(kwargs)
+    duration = kw['duration']
+    arp = kw['arp']
+    mode = kw['mode']
+    strum = kw['strum']
+    direction = kw['direction']
+    equaves = kw['equaves']
+    beat = kw['beat']
+    bpm = kw['bpm']
+    amp = kw['amp']
+    pause = kw['pause']
+    extra_pfields = kw['extra_pfields']
+    inst_kw = {'inst': kw['inst']} if include_inst else {}
+
+    if isinstance(obj, Pitch):
+        return handlers['pitch'](obj, duration=duration, amp=amp,
+                                 extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, Spectrum):
+        return handlers['spectrum'](obj, duration=duration, arp=arp, strum=strum,
+                                    direction=direction, amp=amp,
+                                    extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, HarmonicTree):
+        spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
+        return handlers['spectrum'](spectrum, duration=duration, arp=arp, strum=strum,
+                                    direction=direction, amp=amp,
+                                    extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, RhythmTree):
+        return handlers['rhythm_tree'](obj, beat=beat, bpm=bpm, amp=amp,
+                                       extra_pfields=extra_pfields)
+
+    if isinstance(obj, TemporalUnitSequence):
+        return handlers['temporal_sequence'](obj, extra_pfields=extra_pfields)
+
+    if isinstance(obj, TemporalBlock):
+        return handlers['temporal_block'](obj, extra_pfields=extra_pfields)
+
+    if isinstance(obj, CompositionalUnit):
+        return handlers['compositional_unit'](obj, extra_pfields=None)
+
+    if isinstance(obj, TemporalUnit):
+        return handlers['temporal_unit'](obj, amp=amp, extra_pfields=extra_pfields)
+
+    if isinstance(obj, ChordSequence):
+        return handlers['chord_sequence'](obj, duration=duration, arp=arp, strum=strum,
+                                          direction=direction, amp=amp,
+                                          pause=(0.25 if pause is None else pause),
+                                          extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, Scale):
+        return handlers['scale'](obj, duration=duration, equaves=equaves, amp=amp,
+                                 pause=(0.0 if pause is None else pause),
+                                 extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, CombinationProductSet):
+        return handlers['scale'](obj.collection, duration=duration, equaves=equaves, amp=amp,
+                                 pause=(0.0 if pause is None else pause),
+                                 extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, (Chord, Voicing)):
+        return handlers['chord'](obj, duration=duration, arp=arp, strum=strum,
+                                 direction=direction, amp=amp,
+                                 extra_pfields=extra_pfields, **inst_kw)
+
+    if isinstance(obj, PitchCollectionBase):
+        effective_mode = mode if mode else "sequential"
+        if effective_mode == "chord":
+            return handlers['pitch_collection'](obj, duration=duration, mode="chord", arp=arp,
+                                                strum=strum, direction=direction, amp=amp,
+                                                pause=0.0,
+                                                extra_pfields=extra_pfields, **inst_kw)
+        return handlers['pitch_collection'](obj, duration=duration, mode="sequential",
+                                            amp=amp, pause=(0.0 if pause is None else pause),
+                                            extra_pfields=extra_pfields, **inst_kw)
+
+    raise TypeError(f"Unsupported object type: {type(obj)}")
 
 
 def extract_convert_kwargs(kwargs):

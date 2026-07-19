@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 from collections import defaultdict
 
+from .._shared.audio_ref import reference_freq
 from .._shared.colors import _path_color_array, _rgba_to_hex
 from .._shared.geometry import bezier_3d as _bezier_3d, rodrigues_rotate as _rodrigues_rotate, get_perp as _get_perp, unpack3 as _unpack3
 from .._shared.svg_utils import SvgFigureData
@@ -802,7 +803,7 @@ def _threejs_lattice_3d(lattice, coords, G, path, nodes,
     hover_texts = []
     node_freqs = [] if is_tone_lattice else None
     is_active_list = []
-    ref_freq = 261.63
+    ref_freq = reference_freq(lattice)
     has_path = path and len(path) >= 2
     has_selection = has_path or (nodes and len(nodes) > 0)
 

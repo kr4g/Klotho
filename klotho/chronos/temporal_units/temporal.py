@@ -48,6 +48,34 @@ class TemporalMeta(type):
     pass
 
 
+class _RepeatableTemporal:
+    """Provides :meth:`repeat` for temporal objects that can be sequenced.
+
+    Any object a :class:`TemporalUnitSequence` accepts as a member
+    (``TemporalUnit``/``CompositionalUnit``, ``TemporalUnitSequence``,
+    ``TemporalBlock``) can be repeated; the sequence's ``extend`` makes
+    the independent copies.
+    """
+
+    def repeat(self, n):
+        """
+        Create a :class:`TemporalUnitSequence` of *n* copies of this object.
+
+        Parameters
+        ----------
+        n : int
+            Number of repetitions.
+
+        Returns
+        -------
+        TemporalUnitSequence
+            A new sequence containing *n* independent copies.
+        """
+        uts = TemporalUnitSequence()
+        uts.extend([self] * n)
+        return uts
+
+
 class UTNodeHandle:
     """Owner-bound handle to a single node in a :class:`TemporalUnit`.
 
@@ -171,8 +199,8 @@ class UTNodeHandle:
         self._owner.subdivide(self._node_id, S)
         return self._owner
 
-    def sparsify(self, probability):
-        return self._owner.sparsify(probability, node=self._node_id)
+    def sparsify(self, probability, seed=None):
+        return self._owner.sparsify(probability, node=self._node_id, seed=seed)
 
     def __getitem__(self, key):
         if key in ("real_onset", "real_duration"):
@@ -412,9 +440,13 @@ class UTNodeSelector:
             self._owner.subdivide(n, S)
         return self._owner
 
-    def sparsify(self, probability):
-        """Sparsify leaves under the selection's nodes with ``probability``."""
-        return self._owner.sparsify(probability, node=self)
+    def sparsify(self, probability, seed=None):
+        """Sparsify leaves under the selection's nodes with ``probability``.
+
+        An optional ``seed`` (int or ``numpy.random.Generator``) makes the
+        result reproducible: ``unit.leaves.sparsify(0.5, my_seed)``.
+        """
+        return self._owner.sparsify(probability, node=self, seed=seed)
 
 
 class UTNodeView:
@@ -557,7 +589,7 @@ class Chronon(metaclass=TemporalMeta):
         return self.__str__()
 
 
-class TemporalUnit(metaclass=TemporalMeta):
+class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     """
     A rhythmic structure bound to a tempo, producing real-time events.
 
@@ -920,7 +952,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         self._rt.subdivide(node, S)
         self._invalidate_timing_cache()
 
-    def sparsify(self, probability, node=None):
+    def sparsify(self, probability, node=None, seed=None):
         """
         Randomly convert leaf events to rests with a given probability.
 
@@ -931,8 +963,13 @@ class TemporalUnit(metaclass=TemporalMeta):
         node : int, list of int, or None, optional
             Restrict to leaves under this node (or nodes). When None,
             all leaves are candidates. Default is None.
+        seed : int, numpy.random.Generator, or None, optional
+            Seed for reproducible sparsification (anything accepted by
+            ``numpy.random.default_rng``). When None (default), draws
+            from the global numpy random stream.
         """
         import numpy as _np
+        rng = _np.random if seed is None else _np.random.default_rng(seed)
         if node is None:
             targets = list(self._rt.leaf_nodes)
         else:
@@ -948,7 +985,7 @@ class TemporalUnit(metaclass=TemporalMeta):
                    if self._rt[n].get('proportion', 1) >= 0]
 
         for leaf in targets:
-            if _np.random.uniform() < probability:
+            if rng.uniform() < probability:
                 self.make_rest(leaf)
 
     def _set_rt(self, span:int, tempus:Union[Meas,Fraction,str], prolatio:Union[tuple,str]) -> RhythmTree:
@@ -1057,23 +1094,6 @@ class TemporalUnit(metaclass=TemporalMeta):
     def __repr__(self):
         return self.__str__()
 
-    def repeat(self, n):
-        """
-        Create a :class:`TemporalUnitSequence` of *n* copies of this unit.
-
-        Parameters
-        ----------
-        n : int
-            Number of repetitions.
-
-        Returns
-        -------
-        TemporalUnitSequence
-        """
-        uts = TemporalUnitSequence()
-        uts.extend([self] * n)
-        return uts
-
     def copy(self):
         """Create a deep copy of this TemporalUnit.
 
@@ -1092,7 +1112,7 @@ class TemporalUnit(metaclass=TemporalMeta):
         return c
 
 
-class TemporalUnitSequence(metaclass=TemporalMeta):
+class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
     """
     An ordered sequence of :class:`TemporalUnit` objects representing
     consecutive temporal events.
@@ -1300,14 +1320,28 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         return len(self._seq)
 
     def __str__(self):
-        return pd.DataFrame([{
-            'Tempus': ut.tempus,
-            'Type': ut.type.name[0] if ut.type else '',
-            'Tempo': f'{ut.beat} = {round(ut.bpm, 3)}',
-            'Start': seconds_to_hmsms(ut.time[0]),
-            'Duration': seconds_to_hmsms(ut.duration),
-            'End': seconds_to_hmsms(ut.time[1]),
-        } for ut in self._seq]).__str__()
+        rows = []
+        for ut in self._seq:
+            if hasattr(ut, 'tempus'):
+                rows.append({
+                    'Tempus': ut.tempus,
+                    'Type': ut.type.name[0] if ut.type else '',
+                    'Tempo': f'{ut.beat} = {round(ut.bpm, 3)}',
+                    'Start': seconds_to_hmsms(ut.time[0]),
+                    'Duration': seconds_to_hmsms(ut.duration),
+                    'End': seconds_to_hmsms(ut.time[1]),
+                })
+            else:
+                # Container member (TemporalUnitSequence / TemporalBlock)
+                rows.append({
+                    'Tempus': type(ut).__name__,
+                    'Type': '',
+                    'Tempo': '',
+                    'Start': seconds_to_hmsms(ut.start),
+                    'Duration': seconds_to_hmsms(ut.duration),
+                    'End': seconds_to_hmsms(ut.end),
+                })
+        return pd.DataFrame(rows).__str__()
 
     def __repr__(self):
         return self.__str__()
@@ -1325,7 +1359,7 @@ class TemporalUnitSequence(metaclass=TemporalMeta):
         return c
 
 
-class TemporalBlock(metaclass=TemporalMeta):
+class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     """
     A collection of parallel temporal structures representing simultaneous events.
 
