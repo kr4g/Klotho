@@ -23,6 +23,7 @@ from .svg_rt import _rt_node_tooltip, _svg_halo_ellipses
 
 _BT_OUTLINE_COLOR = 'rgba(150,120,220,0.55)'
 _UTS_OUTLINE_COLOR = 'rgba(210,170,110,0.55)'
+_UT_OUTLINE_COLOR = 'rgba(150,150,150,0.45)'
 
 
 class SvgTimelineData(SvgFigureData):
@@ -84,6 +85,12 @@ def _resolve_lanes(container, lane_start=0, depth=0):
             p, e, h = _resolve_lanes(element, lane_start, depth + 1)
             placements.extend(p)
             extents.extend(e)
+            if isinstance(element, TemporalUnit):
+                # bare UT/UC elements produce no extent of their own, but the
+                # members of a sequence should each read as one bordered box
+                extents.append(_ContainerExtent('UT', lane_start, h,
+                                                element.start, element.end,
+                                                depth + 1))
             max_height = max(max_height, h)
         height = max(max_height, 1)
         extents.append(_ContainerExtent('UTS', lane_start, height,
@@ -168,7 +175,12 @@ def _svg_timeline_ratios(container, figsize=None, outlines=True):
 
     if outlines:
         for ext in sorted(extents, key=lambda e: e.depth):
-            color = _BT_OUTLINE_COLOR if ext.kind == 'BT' else _UTS_OUTLINE_COLOR
+            if ext.kind == 'BT':
+                color = _BT_OUTLINE_COLOR
+            elif ext.kind == 'UTS':
+                color = _UTS_OUTLINE_COLOR
+            else:
+                color = _UT_OUTLINE_COLOR
             inset = 1.5 + 2.5 * ext.depth
             inset_y = min(inset, lane_h * 0.18)
             x0 = tx_px(ext.time_start) - 3.0 + inset
