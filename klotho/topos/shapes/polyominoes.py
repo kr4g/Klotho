@@ -62,6 +62,24 @@ def _apply(op, cells):
     return tuple(tuple(s * c[p] for p, s in zip(perm, signs)) for c in cells)
 
 
+def _op_matrix(op):
+    """Integer matrix form of a signed axis permutation (rows act on coords)."""
+    perm, signs = op
+    dims = len(perm)
+    return tuple(
+        tuple(signs[i] if perm[i] == j else 0 for j in range(dims))
+        for i in range(dims)
+    )
+
+
+def _apply_matrix(matrix, cells):
+    rows = [tuple(int(x) for x in row) for row in matrix]
+    return tuple(
+        tuple(sum(m * ci for m, ci in zip(row, c)) for row in rows)
+        for c in cells
+    )
+
+
 class Shape(tuple):
     """
     A polyomino/polycube: an immutable, sorted tuple of integer cells.
@@ -197,7 +215,7 @@ def center(cells):
     return translate(s, offset)
 
 
-def rotations(cells, reflections=False):
+def rotations(cells, reflections=False, group=None):
     """
     All distinct orientations of a shape, each normalized.
 
@@ -207,7 +225,12 @@ def rotations(cells, reflections=False):
         The shape to orient.
     reflections : bool, optional
         Include mirror images (default False: rotations only —
-        4 in 2D, 24 in 3D).
+        4 in 2D, 24 in 3D). Ignored when *group* is given.
+    group : iterable of matrix, optional
+        Transform group to orbit under, as d×d integer matrices (rows act
+        on coordinates). Defaults to the square/hyperoctahedral group of
+        the shape's dimensionality; a lattice with different geometry
+        supplies its own point group (see ``Lattice.symmetries``).
 
     Returns
     -------
@@ -215,9 +238,11 @@ def rotations(cells, reflections=False):
         Unique normalized orientations, sorted.
     """
     cells = normalize(cells)
-    dims = len(cells[0])
-    group = _orientation_group(dims, reflections)
-    return sorted({normalize(_apply(op, cells)) for op in group})
+    if group is None:
+        dims = len(cells[0])
+        ops = _orientation_group(dims, reflections)
+        return sorted({normalize(_apply(op, cells)) for op in ops})
+    return sorted({normalize(_apply_matrix(m, cells)) for m in group})
 
 
 def _canonical(cells, group):

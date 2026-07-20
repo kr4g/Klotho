@@ -1284,6 +1284,14 @@ class _AnimatedShapeFigureBase:
                     el.setAttribute("fill-opacity", "__TRAIL_OPACITY__");
                 }
             }
+            var edgeIds = groupEdgeIds[gi] || [];
+            for (var j = 0; j < edgeIds.length; j++) {
+                var eel = document.getElementById(edgeIds[j]);
+                if (eel) {
+                    eel.style.display = "";
+                    eel.style.opacity = "__TRAIL_OPACITY__";
+                }
+            }
         }
     }
 '''.replace('__TRAIL_OPACITY__', str(trail_opacity))
@@ -1334,7 +1342,10 @@ class _AnimatedShapeFigureBase:
         var edgeIds = groupEdgeIds[gi] || [];
         for (var i = 0; i < edgeIds.length; i++) {{
             var el = document.getElementById(edgeIds[i]);
-            if (el) el.style.display = "";
+            if (el) {{
+                el.style.display = "";
+                el.style.opacity = "";
+            }}
         }}
     }}
     {trail_js}
@@ -1402,6 +1413,16 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
                 m.depthWrite = false;
                 m.opacity = __TRAIL_OPACITY__;
             }
+            var objs = shapeEdgeObjs[gi] || [];
+            for (var j = 0; j < objs.length; j++) {
+                var o = objs[j];
+                if (o.userData.klBaseOpacity === undefined)
+                    o.userData.klBaseOpacity = o.material.opacity;
+                o.visible = true;
+                o.material.transparent = true;
+                o.material.depthWrite = false;
+                o.material.opacity = __TRAIL_OPACITY__;
+            }
         }
     }
 '''.replace('__TRAIL_OPACITY__', str(trail_opacity))
@@ -1441,7 +1462,14 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
             }
         }
         var objs = shapeEdgeObjs[gi] || [];
-        for (var j = 0; j < objs.length; j++) objs[j].visible = true;
+        for (var j = 0; j < objs.length; j++) {
+            var o = objs[j];
+            o.visible = true;
+            if (o.userData.klBaseOpacity !== undefined) {
+                o.material.opacity = o.userData.klBaseOpacity;
+                o.material.depthWrite = true;
+            }
+        }
     }
 ''' + trail_js + shape_js
 

@@ -1,8 +1,40 @@
 Changelog
 =========
 
-Version 10.2.0 (Current)
+Version 10.9.0 (Current)
 ------------------------
+
+* New ``Tonnetz`` tone-lattice system (``klotho.tonos.systems.tonnetz``):
+  a two-generator triangular lattice (default 3/2 x 5/4, derived third
+  direction 6/5) with exact-JI labeling, D6 point-group ``symmetries()``,
+  and general shape operations ``reflect(cells, edge=/axis=, through=)``
+  and ``rotate(cells, n, about=)``
+* Tonnetz triangle moves: ``flip(cells, move)`` (the neo-Riemannian
+  letters ``'P'``/``'R'``/``'L'`` as reflections across a shape's own
+  edges, ``'S'`` as the third-holding half-turn, or any axis) and
+  ``perform(cells, moves)`` (fold a flip/slide instruction list into a
+  shape history)
+* ``rotations(cells, reflections=False, group=None)`` generalized: pass any
+  matrix group to orbit shapes in non-square coordinate systems;
+  ``Lattice.symmetries(reflections=False)`` exposes each lattice's point
+  group (signed axis permutations for grids, D6 for a Tonnetz)
+* ``plot(..., layout='tonnetz')``: isometric triangular rendering with all
+  three edge families, auto-selected for ``Tonnetz`` objects; node
+  identity, tooltips, paths, and shape playback stay in axial coordinates
+* ``plot(..., shape_color=...)``: group coloring policies for shape
+  playback — ``'one-sided'`` (rotations and translations share a color,
+  the Tetris convention) and ``'fixed'`` (every distinct orientation gets
+  its own color; translations share). Tonnetz plots default to
+  ``'fixed'`` so major and minor shapes read apart
+* Animated shape playback with ``trail=`` now onion-skins past chords'
+  *edges* as well as their nodes (2D SVG and 3D figures)
+* New example notebook ``MAT_111MC___Radiohead_Chord_Generator.ipynb``:
+  chord generation as flips and slides of shapes on the Tonnetz —
+  chord-silhouette gallery, scripted progressions by hand, and two
+  probabilistic generators (basic flips; expanded researched move table)
+
+Version 10.2.0
+--------------
 
 * ``plot()`` and ``plot(...).play()`` for ``TemporalUnitSequence`` and
   ``TemporalBlock``: multi-lane ratios timeline with playback-synced pulse

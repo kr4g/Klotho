@@ -47,6 +47,7 @@ from .systems.combination_product_sets import CombinationProductSet, Hexany, Dek
 from .systems.harmonic_trees import HarmonicTree
 from .systems.harmonic_trees.spectrum import Spectrum
 from .systems.tone_lattices import ToneLattice
+from .systems.tonnetz import Tonnetz
 
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
 from .utils.intervals import split_partial, harmonic_mean, arithmetic_mean, logarithmic_distance
@@ -107,6 +108,7 @@ __all__ = [
     'HarmonicTree',
     'Spectrum',
     'ToneLattice',
+    'Tonnetz',
     
     # Interval utilities
     'ratio_to_cents',

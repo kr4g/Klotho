@@ -219,11 +219,36 @@ class Lattice(GraphCore):
         """Check if edge exists between two coordinates."""
         u_node = self._get_node_for_coord(u)
         v_node = self._get_node_for_coord(v)
-        
+
         if u_node is None or v_node is None:
             return False
-        
+
         return super().has_edge(u_node, v_node)
+
+    def symmetries(self, reflections=False):
+        """
+        The point group of this lattice's geometry, as integer matrices.
+
+        For a rectangular grid this is the signed-axis-permutation group
+        (the same group :func:`~klotho.topos.shapes.polyominoes.rotations`
+        uses by default). Subclasses with different geometry override this
+        (e.g. a triangular lattice returns its D6 matrices).
+
+        Parameters
+        ----------
+        reflections : bool, optional
+            Include orientation-reversing transforms (default False:
+            rotations only).
+
+        Returns
+        -------
+        list of tuple of tuple of int
+            Transform matrices whose rows act on coordinate tuples,
+            suitable for ``rotations(cells, group=...)``.
+        """
+        from ...shapes.polyominoes import _orientation_group, _op_matrix
+        ops = _orientation_group(self._dimensionality, reflections)
+        return [_op_matrix(op) for op in ops]
     
     def __str__(self) -> str:
         """String representation of the lattice."""

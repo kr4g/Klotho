@@ -92,6 +92,12 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
 
     reverse_coord_mapping = {v: k for k, v in coord_mapping.items()} if len(coord_mapping) > 0 else {}
 
+    # A non-empty coord_mapping means node identity (original_coords) and
+    # drawn position (coords) differ: dimensionality reduction for >3D
+    # lattices, or a display embedding such as the isometric tonnetz layout.
+    mapped = len(coord_mapping) > 0
+    tonnetz = (layout == 'tonnetz')
+
     if effective_dimensionality == 2:
         dimmed_edge_color = '#555555'
         dimmed_node_color = '#111111'
@@ -103,7 +109,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     cell_bg_fill = '#161616'
     cell_stroke = '#3a3a3a'
 
-    valid_coords = set(coords) if lattice.dimensionality <= 3 else set(original_coords)
+    valid_coords = set(original_coords) if mapped else set(coords)
 
     bounds_coords = coords
     drawn_nodes_set = set()
@@ -125,6 +131,10 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     else:
         x_ticks = list(range(int(x_min), int(x_max) + 1))
         y_ticks = list(range(int(y_min), int(y_max) + 1)) if effective_dimensionality == 2 else [0]
+
+    if tonnetz:
+        x_ticks = []
+        y_ticks = []
 
     data_x_min = x_min - x_pad
     data_x_max = x_max + x_pad
@@ -190,7 +200,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             f'{html_escape(title)}</text>'
         )
 
-    if not (lattice.dimensionality > 2 or lattice.dimensionality > 3):
+    if not (lattice.dimensionality > 2 or lattice.dimensionality > 3) and not tonnetz:
         x_title = gen_labels[0] if len(gen_labels) > 0 else 'X'
         y_title = (gen_labels[1] if len(gen_labels) > 1 else 'Y') if effective_dimensionality == 2 else ''
 
@@ -249,7 +259,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
 
     if cells and nodes and len(highlighted_coords) >= 1:
         for coord in highlighted_coords:
-            pc = coord_mapping.get(coord, coord) if lattice.dimensionality > 3 else coord
+            pc = coord_mapping.get(coord, coord) if mapped else coord
             drawn_nodes_set.add(pc)
 
     elif nodes and len(highlighted_coords) >= 1:
@@ -259,10 +269,8 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             for i in range(len(highlighted_list)):
                 for j in range(i + 1, len(highlighted_list)):
                     coord1, coord2 = highlighted_list[i], highlighted_list[j]
-                    diff_count = sum(1 for a, b in zip(coord1, coord2) if abs(a - b) == 1)
-                    same_count = sum(1 for a, b in zip(coord1, coord2) if a == b)
-                    if diff_count == 1 and same_count == len(coord1) - 1:
-                        if lattice.dimensionality > 3:
+                    if lattice.has_edge(coord1, coord2):
+                        if mapped:
                             if coord1 in coord_mapping and coord2 in coord_mapping:
                                 pc1, pc2 = coord_mapping[coord1], coord_mapping[coord2]
                             else:
@@ -284,11 +292,11 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
 
         elif path_mode == 'origin':
             origin = tuple(0 for _ in range(lattice.dimensionality))
-            origin_plot = coord_mapping.get(origin, origin) if lattice.dimensionality > 3 else origin
+            origin_plot = coord_mapping.get(origin, origin) if mapped else origin
             for target_coord in highlighted_list:
                 if target_coord != origin:
                     try:
-                        target_plot = coord_mapping.get(target_coord, target_coord) if lattice.dimensionality > 3 else target_coord
+                        target_plot = coord_mapping.get(target_coord, target_coord) if mapped else target_coord
                         if hasattr(G, 'has_node') and G.has_node(origin_plot) and G.has_node(target_plot):
                             path_coords = nx.shortest_path(G, origin_plot, target_plot)
                             for k in range(len(path_coords) - 1):
@@ -311,7 +319,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
 
     def _plot_key(coord):
         """Map a lattice coordinate to its plot-space key, or None."""
-        if lattice.dimensionality > 3:
+        if mapped:
             if coord not in coord_mapping:
                 return None
             return coord_mapping[coord]
@@ -368,7 +376,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     if has_path:
         for k in range(len(path)):
             coord = path[k]
-            if lattice.dimensionality > 3:
+            if mapped:
                 coord = coord_mapping.get(coord, coord)
             if k == 0:
                 path_coord_colors[coord] = _rgba_to_hex(colors[0])
@@ -393,7 +401,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         ]
 
         def _shape_plot(c):
-            return coord_mapping.get(c, c) if lattice.dimensionality > 3 else c
+            return coord_mapping.get(c, c) if mapped else c
 
         def _shape_edge_exists(c1, c2):
             if cells:
@@ -427,12 +435,12 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         else:
             cx_px, cy_px = tx(coord[0]), ty(coord[1])
 
-        if lattice.dimensionality <= 3 or len(reverse_coord_mapping) == 0:
+        if not mapped:
             orig_coord = coord
         else:
             orig_coord = reverse_coord_mapping.get(coord, None)
 
-        if lattice.dimensionality > 3 and orig_coord is not None:
+        if mapped and orig_coord is not None:
             orig_str = str(orig_coord).replace(',)', ')')
             hover_text = f"{coord_label}: {orig_str}"
         else:
@@ -501,7 +509,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
     path_node_colors = []
     if has_path:
         for k, coord in enumerate(path):
-            if lattice.dimensionality > 3:
+            if mapped:
                 plot_coord = coord_mapping.get(coord, coord)
             else:
                 plot_coord = coord
@@ -519,7 +527,7 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
             indices = []
             for c in group:
                 ct = tuple(c) if not isinstance(c, tuple) else c
-                plot_c = coord_mapping.get(ct, ct) if lattice.dimensionality > 3 else ct
+                plot_c = coord_mapping.get(ct, ct) if mapped else ct
                 nid = coord_to_node_id.get(plot_c, '')
                 idx = all_node_ids.index(nid) if nid in all_node_ids else -1
                 indices.append(idx)

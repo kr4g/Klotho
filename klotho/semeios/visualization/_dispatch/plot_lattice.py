@@ -90,17 +90,61 @@ def _normalize_shape_groups(shape):
     return []
 
 
-def _shape_group_colors(shape):
-    """Per-group colors for groups carrying a ``color`` attribute (e.g.
-    :class:`klotho.topos.shapes.Shape`), or None to use the cycling palette."""
+def _shape_group_colors(shape, mode=None):
+    """Per-group colors for shape groups.
+
+    ``mode=None`` (default): groups carrying a ``color`` attribute (e.g.
+    :class:`klotho.topos.shapes.Shape`) use it; otherwise None so the
+    cycling palette applies.
+
+    ``mode='one-sided'``: every group is colored by its one-sided shape
+    identity — rotations and translations of the same shape share a color
+    (the Tetris convention, :attr:`Shape.color`).
+
+    ``mode='fixed'``: every distinct *orientation* gets its own color —
+    translations of a shape share a color, rotations and reflections do
+    not. Hues are evenly spaced in order of first appearance.
+    """
     if shape is None or len(shape) == 0:
         return None
     if not isinstance(shape[0], (list, tuple)):
         return None
-    colors = [getattr(g, 'color', None) for g in shape]
-    if any(c is not None for c in colors):
-        return colors
-    return None
+
+    first = shape[0]
+    is_group = isinstance(first, list) or (
+        isinstance(first, tuple) and len(first) > 0
+        and isinstance(first[0], (list, tuple))
+    )
+    groups = list(shape) if is_group else [shape]
+
+    if mode is None:
+        colors = [getattr(g, 'color', None) for g in groups]
+        if any(c is not None for c in colors):
+            return colors
+        return None
+
+    from klotho.topos.shapes.polyominoes import Shape as _Shape, normalize as _normalize
+
+    if mode == 'one-sided':
+        return [_Shape(g).color for g in groups]
+
+    if mode == 'fixed':
+        import colorsys
+        form_colors = {}
+        order = []
+        for g in groups:
+            form = tuple(_normalize(g))
+            if form not in form_colors:
+                form_colors[form] = None
+                order.append(form)
+        for i, form in enumerate(order):
+            r, gg, b = colorsys.hsv_to_rgb(i / max(len(order), 1), 0.62, 0.95)
+            form_colors[form] = f'#{int(r * 255):02x}{int(gg * 255):02x}{int(b * 255):02x}'
+        return [form_colors[tuple(_normalize(g))] for g in groups]
+
+    raise ValueError(
+        f"shape_color must be None, 'one-sided', or 'fixed', got {mode!r}"
+    )
 
 
 def _resolve_chord_shape(obj, shape):
@@ -258,7 +302,7 @@ def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
                                  dim_reduction, target_dims,
                                  mds_metric, mds_max_iter,
                                  spectral_affinity, spectral_gamma,
-                                 shape=None):
+                                 shape=None, layout='lattice'):
     if dim_reduction is None:
         dim_reduction = 'mds'
     if target_dims not in [2, 3]:
@@ -448,13 +492,37 @@ def _prepare_lattice_coordinates(lattice, nodes, path, path_mode, fit, pad,
         effective_dimensionality = lattice.dimensionality
         coord_mapping = {}
 
+    if layout == 'tonnetz':
+        # Isometric embedding of a triangular 2D lattice: node identity
+        # stays the axial coordinate (original_coords); drawn positions
+        # are x = q + r/2, y = (sqrt(3)/2) r. Edges come from the
+        # lattice's own neighbor offsets (three directions for a Tonnetz).
+        import math
+        root3_2 = math.sqrt(3) / 2.0
+        original_coords = coords
+        coord_mapping = {
+            c: (c[0] + c[1] / 2.0, root3_2 * c[1]) for c in coords
+        }
+        coords = [coord_mapping[c] for c in original_coords]
+        offsets = getattr(lattice, '_edge_offsets', ((1, 0), (0, 1)))
+        G_tri = nx.Graph()
+        G_tri.add_nodes_from(coords)
+        axial_set = set(original_coords)
+        for c in original_coords:
+            for dq, dr in offsets:
+                neighbor = (c[0] + dq, c[1] + dr)
+                if neighbor in axial_set:
+                    G_tri.add_edge(coord_mapping[c], coord_mapping[neighbor])
+        G = G_tri
+        effective_dimensionality = 2
+
     return coords, G, original_coords, coord_mapping, effective_dimensionality
 
 
 def _build_lattice_graph_data(lattice, coords, original_coords, coord_mapping,
                               effective_dimensionality, nodes, path, shape,
                               path_mode, mute_background, is_tone_lattice):
-    valid_coords = set(coords) if lattice.dimensionality <= 3 else set(original_coords)
+    valid_coords = set(original_coords) if coord_mapping else set(coords)
     highlighted_coords = set()
 
     if nodes:
@@ -567,10 +635,10 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  spectral_affinity: str = 'rbf', spectral_gamma: float = None,
                  nodes: list = None, path: list = None, path_mode: str = 'adjacent',
                  mute_background: bool = False, fit=False, pad: int = 1,
-                 path_cmap: str = 'viridis', layout: str = 'lattice',
+                 path_cmap: str = 'viridis', layout: str = None,
                  trail=False,
                  animate: bool = False, dur: float = 0.5,
-                 shape: list = None,
+                 shape: list = None, shape_color: str = None,
                  arp: bool = False, strum: float = 0, direction: str = 'u',
                  amp: float = None, **kwargs):
     """
@@ -623,12 +691,17 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     path_cmap : str, optional
         Matplotlib colormap for path edge colouring.
     layout : str, optional
-        ``'lattice'`` (default) draws nodes connected by grid edges.
+        ``'lattice'`` draws nodes connected by grid edges.
         ``'cells'`` draws one filled square (2D) or translucent cube (3D)
         per coordinate, with no edges: highlights, shapes, and node
         selections colour the cells (``nodes=`` connector edges are not
         drawn), and paths draw arrows from cell center to cell center.
         Requires ``lattice.dimensionality <= 3``.
+        ``'tonnetz'`` draws a 2D lattice isometrically (equilateral
+        triangles), including the lattice's third-direction edges.
+        Requires ``lattice.dimensionality == 2``.
+        Defaults to the lattice's own preferred layout (``'tonnetz'``
+        for a Tonnetz, ``'lattice'`` otherwise).
     trail : bool or float, optional
         During animated shape playback, leave a translucent onion-skin of
         already-played shapes (most recent stacking on top). ``True`` uses
@@ -639,6 +712,14 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         Seconds between animation steps.
     shape : list or None, optional
         Coordinate tuples (chord) or list of lists (chord sequence).
+    shape_color : str or None, optional
+        Group coloring policy. ``'one-sided'``: rotations and
+        translations of the same shape share a color (the Tetris
+        convention). ``'fixed'``: only translations share a color —
+        every distinct orientation gets its own. ``None`` (default):
+        the lattice's preferred policy (``'fixed'`` for a Tonnetz);
+        otherwise groups carrying a ``color`` attribute (``Shape``) use
+        it and others cycle the palette.
     arp : bool, optional
         Arpeggiate chord notes sequentially.
     strum : float, optional
@@ -657,13 +738,22 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         If lattice dimensionality exceeds 3 and *dim_reduction* is
         ``None``.
     """
-    if layout not in ('lattice', 'cells'):
-        raise ValueError(f"layout must be 'lattice' or 'cells', got {layout!r}")
+    if layout is None:
+        layout = getattr(lattice, '_plot_layout', 'lattice')
+    if shape_color is None:
+        shape_color = getattr(lattice, '_plot_shape_color', None)
+    if layout not in ('lattice', 'cells', 'tonnetz'):
+        raise ValueError(f"layout must be 'lattice', 'cells', or 'tonnetz', got {layout!r}")
     if layout == 'cells' and lattice.dimensionality > 3:
         raise ValueError(
             "layout='cells' requires an axis-aligned lattice with "
             "dimensionality <= 3; use layout='lattice' (with dim_reduction) "
             "for higher dimensions"
+        )
+    if layout == 'tonnetz' and lattice.dimensionality != 2:
+        raise ValueError(
+            "layout='tonnetz' requires a 2-dimensional lattice, "
+            f"got dimensionality {lattice.dimensionality}"
         )
 
     is_tone_lattice = hasattr(lattice, '_coord_to_ratio')
@@ -674,13 +764,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
 
     chord_freq_groups = None
-    shape_colors = _shape_group_colors(shape)
     resolved = _resolve_chord_shape(lattice, shape)
     if resolved is not None:
         shape_groups, chord_freq_groups = resolved
         # Lattice shape groups are lists of coord tuples (group detection
         # downstream keys on list-ness of the outer elements).
         shape = [list(g) for g in shape_groups]
+    shape_colors = _shape_group_colors(shape, shape_color)
 
     nodes = _coerce_to_tuples(nodes)
     path = _coerce_to_tuples(path)
@@ -722,7 +812,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
             dim_reduction, target_dims,
             mds_metric, mds_max_iter,
             spectral_affinity, spectral_gamma,
-            shape=shape,
+            shape=shape, layout=layout,
         )
     )
 

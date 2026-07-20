@@ -2,6 +2,7 @@ from .combination_product_sets import CombinationProductSet, Hexany, Dekany, Pen
 from .harmonic_trees import HarmonicTree
 from .harmonic_trees.spectrum import Spectrum
 from .tone_lattices import ToneLattice
+from .tonnetz import Tonnetz
 
 __all__ = [
     # Combination product sets
@@ -19,4 +20,5 @@ __all__ = [
     
     # Tone lattices
     'ToneLattice',
+    'Tonnetz',
 ] 
