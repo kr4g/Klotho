@@ -338,9 +338,9 @@ class UCNodeSelector(UTNodeSelector):
             self, include_rests=include_rests, **kwargs
         )
 
-    def set_instrument(self, instrument):
+    def set_instrument(self, instrument, include_rests: bool = False):
         """Assign an instrument (or Pattern/callable thereof) to the selection."""
-        return self._owner.set_instrument(self, instrument)
+        return self._owner.set_instrument(self, instrument, include_rests=include_rests)
 
     def apply_envelope(self, envelope, pfields, *, offset=0, take=None,
                        scope: str = 'span', control: bool = False,
@@ -390,8 +390,8 @@ class UCNodeHandle(UTNodeHandle):
     def set_mfields(self, include_rests: bool = False, **kwargs):
         return self._owner.set_mfields(self.id, include_rests=include_rests, **kwargs)
 
-    def set_instrument(self, instrument):
-        return self._owner.set_instrument(self.id, instrument)
+    def set_instrument(self, instrument, include_rests: bool = False):
+        return self._owner.set_instrument(self.id, instrument, include_rests=include_rests)
 
     def apply_envelope(self, envelope, pfields, *, offset=0, take=None,
                        scope: str = 'span', control: bool = False,
@@ -1832,10 +1832,10 @@ class CompositionalUnit(TemporalUnit):
         self._invalidate_bind_memo(removed_set)
         self._rt.remove_subtree(node)
 
-    def set_instrument(self, node, instrument) -> None:
+    def set_instrument(self, node, instrument, include_rests: bool = False) -> None:
         """
         Set an instrument for target node(s).
-        
+
         Parameters
         ----------
         node : int or list/tuple of int
@@ -1850,6 +1850,12 @@ class CompositionalUnit(TemporalUnit):
             - int: raw program number (MIDI)
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
+        include_rests : bool, default=False
+            When True, rest nodes are included during callable/Pattern
+            distribution. By default rests are skipped, so a Pattern unrolls
+            across sounding nodes only (matching ``set_pfields``). Static
+            instruments (str, int, Instrument) always apply to every target
+            regardless of this flag.
 
         Raises
         ------
@@ -1874,6 +1880,9 @@ class CompositionalUnit(TemporalUnit):
                 if family is not None:
                     self._rt.set_mfields(n, group=family)
         elif callable(instrument) or isinstance(instrument, Pattern):
+            if not include_rests:
+                targets = [n for n in targets
+                           if self._rt[n].get('proportion', 1) >= 0]
             total = len(targets)
             for i, n in enumerate(targets):
                 if isinstance(instrument, Pattern):
@@ -1918,7 +1927,9 @@ class CompositionalUnit(TemporalUnit):
             including the effect-SynthDef guard).
         include_rests : bool, optional
             When True, rest nodes are included during callable/Pattern
-            distribution (default is False).
+            distribution (default is False). Applies to ``inst``
+            distribution as well as pfields/mfields, so Patterns passed
+            together stay aligned on the same sounding nodes.
         pfields : dict or None, optional
             Explicit parameter fields. Escape hatch: values here always go
             to pfields, even if a name collides with an engine mfield.
@@ -1931,7 +1942,7 @@ class CompositionalUnit(TemporalUnit):
             ``set_mfields``.
         """
         if inst is not None:
-            self.set_instrument(node, inst)
+            self.set_instrument(node, inst, include_rests=include_rests)
 
         routed_mfields = {k: v for k, v in fields.items() if k in ENGINE_MFIELDS}
         routed_pfields = {k: v for k, v in fields.items() if k not in ENGINE_MFIELDS}
