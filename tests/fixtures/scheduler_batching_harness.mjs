@@ -7,7 +7,7 @@
 // behavior, see supersonic-scsynth memory_profile.h SCHEDULER_SLOT_COUNT).
 //
 // Usage: node scheduler_batching_harness.mjs <case>
-//   case: real-shape | all-gated | wall | control-envelopes
+//   case: real-shape | all-gated | wall | control-envelopes | fx-automation
 // Prints a JSON result on stdout:
 //   { sent, dropped, peak, lateSends, finished, ctrlSendTimesMs, logs }
 
@@ -47,6 +47,7 @@ function nowNTP() {
 
 const engine = { dues: [], dropped: 0, peak: 0, lateSends: 0, sent: 0 };
 const ctrlSendTimesMs = [];
+const nMapTimesMs = [];
 const logs = [];
 
 const sonic = {
@@ -69,6 +70,9 @@ const sonic = {
     if (engine.dues.length > engine.peak) engine.peak = engine.dues.length;
     if (bundle.args && bundle.args[0] === '__klEnvCtrl') {
       ctrlSendTimesMs.push(virtualMs);
+    }
+    if (bundle.addr === '/n_map') {
+      nMapTimesMs.push(virtualMs);
     }
   },
   getMetrics() { return {}; },
@@ -120,6 +124,7 @@ function ev(i, start, dur, gated) {
 function buildCase(name) {
   const events = [];
   let controlData = null;
+  let meta = null;
 
   if (name === 'real-shape') {
     // The Aphex notebook shape: sparse 56 s intro, dense 34 s tail;
@@ -164,18 +169,43 @@ function buildCase(name) {
       blockSize,
       descriptors,
     };
+  } else if (name === 'fx-automation') {
+    // Insert-FX automation: per-section 'set' events all sharing the FX's
+    // uid, one control envelope per section targeting that uid. The
+    // scheduler must wire exactly one /n_map per envelope (exact
+    // start-time match in _bundleSet), never one per (event, envelope).
+    const S = 12;
+    const blockSize = 4;
+    const descriptors = [];
+    for (let k = 0; k < S; k++) {
+      const t = k * 5;
+      events.push({ type: 'set', id: 'fx1', defName: null, start: t,
+                    pfields: { mix: 0.1 + k * 0.05 } });
+      descriptors.push({ blockIndex: k, start: t, dur: 5, pfields: ['mix'],
+                         targets: [{ id: 'fx1', startTime: t }] });
+    }
+    for (let i = 0; i < 50; i++) {
+      events.push(ev(i, i * 1.2, 0.2, false));
+    }
+    controlData = {
+      bufferB64: Buffer.alloc(S * blockSize * 4).toString('base64'),
+      numFrames: S * blockSize,
+      blockSize,
+      descriptors,
+    };
+    meta = { groups: ['t'], inserts: { t: [{ defName: 'fxDef', uid: 'fx1', args: {} }] } };
   } else {
     throw new Error('unknown case: ' + name);
   }
 
   events.sort((a, b) => a.start - b.start);
-  return { events, controlData };
+  return { events, controlData, meta };
 }
 
 // ---- run -------------------------------------------------------------------
 
 const caseName = process.argv[2];
-const { events, controlData } = buildCase(caseName);
+const { events, controlData, meta } = buildCase(caseName);
 
 const scheduler = new sandbox.BrowserScheduler({
   sonic,
@@ -186,6 +216,7 @@ const scheduler = new sandbox.BrowserScheduler({
 let finished = false;
 await scheduler.play(events, {
   controlData,
+  meta,
   onFinish: () => { finished = true; },
 });
 
@@ -206,5 +237,6 @@ process.stdout.write(JSON.stringify({
   lateSends: engine.lateSends,
   finished,
   ctrlSendTimesMs,
+  nMapTimesMs,
   logs,
 }));

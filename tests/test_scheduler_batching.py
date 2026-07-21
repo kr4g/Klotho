@@ -83,6 +83,7 @@ CASES = {
     "all-gated": False,
     "wall": True,  # 600 simultaneous gated events: late > dropped, by design
     "control-envelopes": False,
+    "fx-automation": False,
 }
 
 
@@ -112,6 +113,16 @@ class TestEngineQueueSimulation:
             assert result["lateSends"] == 0, (
                 f"{result['lateSends']} bundles sent after their due time"
             )
+
+    def test_fx_automation_maps_once_per_envelope(self):
+        # Insert-FX control envelopes target 'set' events (the FX synth is
+        # created in setupTracks); _bundleSet must wire exactly one /n_map
+        # per envelope via the exact start-time match -- not one per
+        # (event, envelope) pair, and not zero.
+        result = _run_case("fx-automation")
+        assert result["finished"]
+        assert result["dropped"] == 0
+        assert len(result["nMapTimesMs"]) == 12
 
     def test_control_synths_not_front_loaded(self):
         result = _run_case("control-envelopes")

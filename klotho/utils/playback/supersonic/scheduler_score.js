@@ -140,13 +140,23 @@
       trackMap["default"] = trackMap["main"];
     }
 
-    await sonic.sync();
+    // No sync round-trip here: OSC messages are processed in order, so
+    // the group/insert /s_new burst above always lands before the
+    // timestamped note bundles sent afterwards, and the scheduler's
+    // startup cushion covers engine-side processing. In postMessage mode
+    // (Colab/Jupyter) a sync costs ~300ms of press-to-sound latency.
     this._trackMap = trackMap;
   };
 
-  proto.setupControlEnvelopes = async function(controlData, scoreGroupId) {
+  // Upload the control-envelope buffer once per widget. Called from the
+  // widget's ensureReady so the /b_alloc + /b_setn cost is paid at init,
+  // not on press-to-play, and replays reuse the same buffer. No sync
+  // round-trips: OSC messages are processed in order, so the /b_setn
+  // fills always land after the /b_alloc and before any /s_new that
+  // reads the buffer.
+  proto.preloadControlBuffer = function(controlData) {
+    if (this._ctrlPreload) return;
     if (!controlData || !controlData.bufferB64 || !controlData.descriptors || controlData.descriptors.length === 0) {
-      this._controlBusMap = [];
       return;
     }
 
@@ -168,20 +178,44 @@
     }
 
     sonic.send('/b_alloc', bufnum, controlData.numFrames, 1);
-    await sonic.sync();
-
     for (var off = 0; off < floats.length; off += CTRL_ENVELOPE_CHUNK) {
       var end = Math.min(off + CTRL_ENVELOPE_CHUNK, floats.length);
       var chunk = [];
       for (var ci = off; ci < end; ci++) chunk.push(floats[ci]);
       sonic.send.apply(sonic, ['/b_setn', bufnum, off, chunk.length].concat(chunk));
     }
-    await sonic.sync();
+
+    // The buffer lives for the widget's lifetime (NOT in _activeBuffers,
+    // which is freed on ring-out); the widget's orphan cleanup calls
+    // releaseControlPreload.
+    this._ctrlPreload = { bufnum: bufnum, floats: floats };
+  };
+
+  proto.releaseControlPreload = function() {
+    if (!this._ctrlPreload) return;
+    try { this.sonic.send('/b_free', this._ctrlPreload.bufnum); } catch (e) {}
+    this._ctrlPreload = null;
+  };
+
+  proto.setupControlEnvelopes = async function(controlData, scoreGroupId) {
+    if (!controlData || !controlData.descriptors || controlData.descriptors.length === 0) {
+      this._controlBusMap = [];
+      return;
+    }
+
+    this.preloadControlBuffer(controlData);
+    if (!this._ctrlPreload) {
+      this._controlBusMap = [];
+      return;
+    }
+
+    var sonic = this.sonic;
+    var bufnum = this._ctrlPreload.bufnum;
+    var floats = this._ctrlPreload.floats;
 
     var ctrlGid = sonic.nextNodeId();
     sonic.send('/g_new', ctrlGid, 0, scoreGroupId);
     this._controlGroupId = ctrlGid;
-    this._activeBuffers.push(bufnum);
 
     var descs = controlData.descriptors;
     var blockSize = controlData.blockSize || 512;
@@ -190,6 +224,12 @@
     for (var di = 0; di < descs.length; di++) {
       var desc = descs[di];
       var ctrlBus = this._allocControlBus();
+      var startFrame = desc.blockIndex * blockSize;
+      // Preset the (possibly recycled) bus to the envelope's first value
+      // so a mapped param can never read a stale level in the gap before
+      // its __klEnvCtrl synth starts writing.
+      var firstValue = (startFrame < floats.length) ? floats[startFrame] : 0;
+      sonic.send('/c_set', ctrlBus, firstValue);
       this._controlBusMap.push({
         bus: ctrlBus,
         param: (desc.pfields && desc.pfields.length > 0) ? desc.pfields[0] : 'amp',
@@ -197,7 +237,7 @@
         start: desc.start,
         dur: desc.dur,
         bufnum: bufnum,
-        startFrame: desc.blockIndex * blockSize,
+        startFrame: startFrame,
         numFrames: blockSize,
         controlGroupId: ctrlGid
       });

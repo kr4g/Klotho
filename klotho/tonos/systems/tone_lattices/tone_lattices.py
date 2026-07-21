@@ -351,14 +351,15 @@ class ToneLattice(ReferencePitchAware, Lattice):
     def _match_key(self, ratio: Fraction) -> Fraction:
         """Index/lookup key for ratio matching.
 
-        With ``equave_reduce`` enabled, ratios match by equave class
-        (canonical ``[1, equave)`` representative) so e.g. ``16/15``
-        finds the coordinate whose represented ratio is ``8/15``.
-        Without equave reduction, ratios must match exactly.
+        Ratios always match by equave class (canonical ``[1, equave)``
+        representative), so an equave-shifted query finds the coordinate
+        holding any representative of its class: ``16/15`` finds ``8/15``,
+        and on a non-reduced lattice ``8/5`` finds the cell holding
+        ``4/5``. Canonical (not bipolar) reduction is used because the
+        bipolar window ``(1/equave, equave)`` spans two equaves and has
+        two fixed points per class.
         """
-        if self._equave_reduce:
-            return self._canonical_class(ratio)
-        return ratio
+        return self._canonical_class(ratio)
 
     def _sorted_matches_for_ratio(self, ratio: Fraction) -> List[Tuple[int, ...]]:
         if self._ratio_match_index is None:
@@ -366,10 +367,14 @@ class ToneLattice(ReferencePitchAware, Lattice):
             for coord in self.coords:
                 coord_ratio = self._coord_to_ratio(coord)
                 ratio_index.setdefault(self._match_key(coord_ratio), []).append(coord)
-            for coords in ratio_index.values():
-                coords.sort(key=lambda c: (sum(abs(v) for v in c), c))
             self._ratio_match_index = ratio_index
-        return self._ratio_match_index.get(self._match_key(ratio), [])
+        matches = list(self._ratio_match_index.get(self._match_key(ratio), []))
+        # A coordinate whose represented ratio equals the query exactly wins
+        # over a nearer equave-shifted class-mate; ties break toward the
+        # origin (L1 norm), then lexicographically.
+        matches.sort(key=lambda c: (self._coord_to_ratio(c) != ratio,
+                                    sum(abs(v) for v in c), c))
+        return matches
 
     def _warn_lookup(self, message: str, warn_once: bool) -> None:
         if warn_once and message in self._warned_lookup_messages:
@@ -443,11 +448,15 @@ class ToneLattice(ReferencePitchAware, Lattice):
 
         Notes
         -----
-        When ``equave_reduce`` is enabled, matching is performed by
-        equave-equivalence class: ratios that differ only by powers of
-        the equave resolve to the same coordinate(s). The returned
-        coordinate's ``get_ratio()`` may therefore print a different
-        equave representative of the query (e.g. querying ``16/15`` in a
+        Matching is performed by equave-equivalence class in both
+        reduction modes: ratios that differ only by powers of the equave
+        resolve to the same coordinate(s), so an equave-shifted query
+        (e.g. ``8/5`` on a lattice whose cell holds ``4/5``) still finds
+        its cell. When ``equave_reduce`` is disabled, a coordinate whose
+        represented ratio equals the query *exactly* takes priority over
+        equave-shifted class-mates. The returned coordinate's
+        ``get_ratio()`` may therefore print a different equave
+        representative of the query (e.g. querying ``16/15`` in a
         bipolar 3x5 lattice returns the coordinate whose represented
         ratio is ``8/15``).
         """

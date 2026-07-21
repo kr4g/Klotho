@@ -227,7 +227,7 @@ def test_tone_lattice_get_coordinates_warns_for_unrepresentable_ratio():
         equave=2,
     )
     with pytest.warns(ToneLatticeLookupWarning, match="not representable"):
-        coord = lattice.get_coordinates_for_ratio("3/2")
+        coord = lattice.get_coordinates_for_ratio("9/8")
     assert coord is None
 
 
@@ -247,13 +247,13 @@ def test_tone_lattice_lookup_warn_once_controls_warning_spam():
         equave=2,
     )
     with pytest.warns(ToneLatticeLookupWarning, match="not representable"):
-        assert lattice.get_coordinates_for_ratio("3/2", warn=True, warn_once=True) is None
+        assert lattice.get_coordinates_for_ratio("9/8", warn=True, warn_once=True) is None
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always", ToneLatticeLookupWarning)
-        assert lattice.get_coordinates_for_ratio("3/2", warn=True, warn_once=True) is None
+        assert lattice.get_coordinates_for_ratio("9/8", warn=True, warn_once=True) is None
     assert len(captured) == 0
     with pytest.warns(ToneLatticeLookupWarning, match="not representable"):
-        assert lattice.get_coordinates_for_ratio("3/2", warn=True, warn_once=False) is None
+        assert lattice.get_coordinates_for_ratio("9/8", warn=True, warn_once=False) is None
 
 
 def test_tone_lattice_lookup_can_suppress_warnings():
@@ -266,7 +266,7 @@ def test_tone_lattice_lookup_can_suppress_warnings():
     )
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always", ToneLatticeLookupWarning)
-        assert lattice.get_coordinates_for_ratio("3/2", warn=False) is None
+        assert lattice.get_coordinates_for_ratio("9/8", warn=False) is None
     assert len(captured) == 0
 
 

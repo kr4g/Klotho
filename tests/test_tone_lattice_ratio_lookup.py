@@ -69,20 +69,78 @@ class TestEquaveClassLookup:
         assert q == 1
 
 
-class TestNoEquaveReduceUnchanged:
-    """Without equave reduction, matching stays exact."""
+class TestNoEquaveReduceClassFallback:
+    """Without equave reduction, exact representations win and
+    equave-shifted queries fall back to class matching.
 
-    def test_16_15_unresolved(self):
-        tl = ToneLattice.from_generators((3, 5), resolution=2, equave_reduce=False)
-        with pytest.warns(ToneLatticeLookupWarning):
-            assert tl.get_coordinates_for_ratio("16/15") is None
+    Regression: chords built from lattice cells carry equave-displaced
+    degrees (``Chord`` normalizes ``4/5`` to ``8/5``; voice-leading
+    displaces further), and those degrees must still resolve to their
+    cells on a non-reduced lattice.
+    """
 
-    def test_exact_ratio_resolves(self):
-        tl = ToneLattice.from_generators((3, 5), resolution=2, equave_reduce=False)
+    @pytest.fixture
+    def tl_plain(self):
+        return ToneLattice.from_generators((3, 5), resolution=2, equave_reduce=False)
+
+    def test_16_15_resolves_by_class(self, tl_plain):
         with warnings.catch_warnings():
             warnings.simplefilter("error", ToneLatticeLookupWarning)
-            assert tl.get_coordinates_for_ratio("15/1") == (1, 1)
-            assert tl.get_coordinates_for_ratio("3/5") == (1, -1)
+            coord = tl_plain.get_coordinates_for_ratio("16/15")
+        assert coord == (-1, -1)
+        # the cell keeps its own representative: 1/15 == 16/15 / 2**4
+        assert tl_plain.get_ratio(coord) == Fraction(1, 15)
+
+    def test_exact_ratio_resolves(self, tl_plain):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ToneLatticeLookupWarning)
+            assert tl_plain.get_coordinates_for_ratio("15/1") == (1, 1)
+            assert tl_plain.get_coordinates_for_ratio("3/5") == (1, -1)
+
+    def test_exact_match_beats_class_mate(self, tl_plain):
+        # 3/1 is literally a cell; 3/2 is not, and resolves to 3/1's cell.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ToneLatticeLookupWarning)
+            assert tl_plain.get_coordinates_for_ratio("3/1") == (1, 0)
+            assert tl_plain.get_coordinates_for_ratio("3/2") == (1, 0)
+
+    def test_foreign_primes_still_unresolved(self, tl_plain):
+        with pytest.warns(ToneLatticeLookupWarning):
+            assert tl_plain.get_coordinates_for_ratio("7/4") is None
+
+
+class TestUnreducedChordShapeResolution:
+    """Notebook regression: unreduced (6/5, 5/4) lattice; raw and
+    voice-led ChordSequence degrees resolve through the plot shape path."""
+
+    @pytest.fixture
+    def tl_65_54(self):
+        return ToneLattice.from_generators(('6/5', '5/4'), resolution=3,
+                                           equave_reduce=False)
+
+    def test_octave_shift_of_cell(self, tl_65_54):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ToneLatticeLookupWarning)
+            assert tl_65_54.get_coordinates_for_ratio("8/5") == (0, -1)
+            assert tl_65_54.get_coordinates_for_ratio("4/5") == (0, -1)
+            assert tl_65_54.get_coordinates_for_ratio("3/2") == (1, 1)
+
+    def test_chord_shape_resolution_raw_and_voiced(self, tl_65_54):
+        from klotho.semeios.visualization._dispatch.plot_lattice import (
+            _resolve_chord_shape,
+        )
+        placements = [[(0, 0), (0, 1), (1, 0), (1, 1)],
+                      [(0, -1), (1, -1), (1, 0), (2, 0)]]
+        seq = tl_65_54.chord(placements)
+        for s in (seq, seq.voice_led('C3', 'C5')):
+            groups, freqs = _resolve_chord_shape(tl_65_54, s)
+            assert len(groups) == len(placements)
+            assert len(freqs) == len(placements)
+            for ch, grp in zip(list(s), groups):
+                for degree, node in zip(ch.degrees, grp):
+                    represented = tl_65_54._coord_to_ratio(tuple(node))
+                    assert (tl_65_54._canonical_class(represented)
+                            == tl_65_54._canonical_class(Fraction(degree)))
 
 
 class TestUnipolar:

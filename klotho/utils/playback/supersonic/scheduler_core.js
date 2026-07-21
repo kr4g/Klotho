@@ -123,6 +123,23 @@
       this.onFinish = null;
     }
 
+    // "Now" on the clock scsynth actually fires bundles against: the
+    // engine's drift-corrected NTP (superClock) when available, the page
+    // wall clock otherwise. Stamping from the page clock desyncs whenever
+    // the engine's drift correction moves — worst right after
+    // audioContext.resume(), whose correction jump can instantly make a
+    // queued first batch late (fired mid-block = clipped attacks).
+    _engineNow() {
+      try {
+        var sc = this.sonic && this.sonic.superClock;
+        if (sc && typeof sc.now === 'function') {
+          var t = sc.now();
+          if (typeof t === 'number' && isFinite(t) && t > 0) return t;
+        }
+      } catch (e) {}
+      return getNTP();
+    }
+
     _createGroup() {
       var gid = this.sonic.nextNodeId();
       this.sonic.send('/g_new', gid, 0, 0);
@@ -438,6 +455,27 @@
       var bundle = globalThis.SuperSonic.osc.encodeSingleBundle(ntp, '/n_set', args);
       this._sendScheduled(ntp, bundle);
       this._maybeScheduleAutoRelease(ev, intId, defName, ntp);
+
+      // Control mappings for set-event targets (insert-FX automation: the
+      // FX synth is created in setupTracks, so its envelope wiring can't
+      // ride an /s_new). Only attach mappings whose envelope starts exactly
+      // at this event: every automation event on the same FX shares one
+      // uid across all of that knob's descriptors, and the exact-time match
+      // is what keeps each envelope wired once, in its own batch, instead
+      // of re-mapping every earlier bus per section. Sent after the /n_set
+      // above, so at equal timestamps the mapping wins.
+      if (typeof this._getControlMappingsForEvent === 'function') {
+        var mappings = this._getControlMappingsForEvent(ev.id, ev.start);
+        if (mappings) {
+          for (var mi = 0; mi < mappings.length; mi++) {
+            var mp = mappings[mi];
+            if (Math.abs(mp.startTime - ev.start) > 1e-6) continue;
+            var mapBundle = globalThis.SuperSonic.osc.encodeSingleBundle(
+              ntp, '/n_map', [intId, mp.param, mp.bus]);
+            this._sendScheduled(ntp, mapBundle);
+          }
+        }
+      }
     }
 
     _bundleRelease(ev, ntp) {
@@ -468,7 +506,7 @@
     _scheduleBatch(plan, startIdx, pieceDur, token, relOffset, loopState) {
       if (token !== this.stopToken) return;
 
-      var now = getNTP();
+      var now = this._engineNow();
       var self = this;
 
       relOffset = relOffset || 0;
@@ -655,11 +693,20 @@
       this._registerPlayer();
       this._metricsAtPlay = this._snapshotMetrics();
 
-      // Compute start time AFTER any async setup so the cushion isn't
-      // eaten by /g_new + /s_new + /sync round-trips during setupTracks.
-      // Otherwise the first batch of events lands with a past NTP and
-      // scsynth processes them mid-block, clipping the first note's attack.
-      var now = getNTP();
+      // Compute the start time AFTER any async setup, ON THE ENGINE'S
+      // CLOCK. First settle the drift correction: the widget resumes the
+      // AudioContext right before play(), and the resume-sized correction
+      // jump must land before the start stamp is derived, not after —
+      // otherwise the first batch of events is instantly late on the
+      // engine clock and scsynth processes it mid-block, clipping the
+      // first notes' attacks (audible as soft pops at play start).
+      try {
+        var sclk = this.sonic && this.sonic.superClock;
+        if (sclk && typeof sclk.updateDriftOffset === 'function') {
+          sclk.updateDriftOffset();
+        }
+      } catch (e) {}
+      var now = this._engineNow();
       var nowPerf = performance.now();
       this._playStartNTP = now + STARTUP_DELAY;
       this._playStartPerfMs = nowPerf + STARTUP_DELAY * 1000;

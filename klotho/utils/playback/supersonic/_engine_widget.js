@@ -123,6 +123,12 @@
                 manifest: __MANIFEST_JSON__,
                 ringTime: __RING_TIME__,
             });
+            // Pay the control-envelope buffer upload at init, not on
+            // press-to-play; replays reuse the same buffer.
+            if (controlData && controlData.bufferB64
+                    && typeof scheduler.preloadControlBuffer === "function") {
+                try { scheduler.preloadControlBuffer(controlData); } catch(e) {}
+            }
             ready = true;
             return true;
         })();
@@ -170,7 +176,12 @@
 
     var _orphanCheckId = setInterval(function() {
         if (toggleBtn && !toggleBtn.isConnected) {
-            if (scheduler) scheduler.stop();
+            if (scheduler) {
+                scheduler.stop();
+                if (typeof scheduler.releaseControlPreload === "function") {
+                    scheduler.releaseControlPreload();
+                }
+            }
             clearInterval(_orphanCheckId);
         }
     }, 1000);
