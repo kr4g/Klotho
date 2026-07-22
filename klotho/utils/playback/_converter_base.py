@@ -31,7 +31,10 @@ def resolve_instrument(inst):
     Accepts either a SynthDef name string (exact match against the
     SuperSonic manifest, which includes any runtime-registered Supriya
     defs) or an ``Instrument`` instance carrying a ``defName`` (in
-    practice a ``SynthDefInstrument``).
+    practice a ``SynthDefInstrument``).  Path-style names are sugar for
+    the underscore form (``'edm/kick'`` -> ``'edm_kick'``,
+    ``'kl/saw'`` -> ``'kl_saw'``); after that transform the match is
+    still exact.
 
     Parameters
     ----------
@@ -55,7 +58,9 @@ def resolve_instrument(inst):
     if inst is None:
         return None, {}, True
 
-    from klotho.thetos.instruments._shared import load_ss_manifest, ss_synth_kind
+    from klotho.thetos.instruments._shared import (
+        canonical_def_name, load_ss_manifest, ss_synth_kind,
+    )
 
     def _reject_non_inst(def_name):
         kind = ss_synth_kind(def_name)
@@ -68,6 +73,7 @@ def resolve_instrument(inst):
             )
 
     if isinstance(inst, str):
+        inst = canonical_def_name(inst)
         manifest = load_ss_manifest()
         if inst not in manifest:
             available = ', '.join(sorted(manifest.keys()))

@@ -77,10 +77,10 @@ class TestEnsembleConstruction:
         with pytest.raises(ValueError, match="already a member name"):
             ens.add('cello', _inst('cello'), family='vln')
 
-    def test_add_reserved_family_name_raises(self):
+    def test_add_attr_colliding_family_name_raises(self):
         for name in ('add', 'remove', 'name', 'families', 'members'):
             ens = Ensemble()
-            with pytest.raises(ValueError, match="reserved"):
+            with pytest.raises(ValueError, match="collides with an Ensemble attribute"):
                 ens.add('x', _inst('x'), family=name)
 
     def test_add_non_instrument_raises(self):
@@ -172,22 +172,24 @@ class TestEnsembleFamilyAccess:
         assert isinstance(ens.strings, _FamilyView)
         assert 'vln' in ens.strings
 
-    def test_subscript_family_access(self):
+    def test_subscript_family_name_raises_with_hint(self):
         ens = Ensemble()
         ens.add('vln', _inst('vln'), family='strings')
-        assert isinstance(ens['strings'], _FamilyView)
+        with pytest.raises(KeyError, match="is a family"):
+            ens['strings']
 
-    def test_explicit_family_method(self):
+    def test_family_accessor_subscript(self):
         ens = Ensemble()
         ens.add('vln', _inst('vln'), family='strings')
-        assert isinstance(ens.family('strings'), _FamilyView)
+        assert isinstance(ens.family['strings'], _FamilyView)
+        assert 'strings' in ens.family and list(ens.family) == ['strings']
 
     def test_all_three_access_paths_return_same_tagged_instrument(self):
         ens = Ensemble()
         ens.add('vln', _inst('vln'), family='strings')
         t1 = ens.strings['vln']
-        t2 = ens['strings']['vln']
-        t3 = ens.family('strings')['vln']
+        t2 = ens['vln']
+        t3 = ens.family['strings']['vln']
         assert t1._ensemble_family == t2._ensemble_family == t3._ensemble_family == 'strings'
         assert t1.name == t2.name == t3.name == 'vln'
 
@@ -199,11 +201,12 @@ class TestEnsembleFamilyAccess:
         assert tagged._ensemble_member == 'vln'
         assert isinstance(tagged, SynthDefInstrument)
 
-    def test_direct_getitem_returns_untagged(self):
+    def test_member_subscript_returns_tagged(self):
         ens = Ensemble()
         ens.add('vln', _inst('vln'), family='strings')
-        direct = ens['vln']
-        assert not hasattr(direct, '_ensemble_family')
+        tagged = ens['vln']
+        assert tagged._ensemble_family == 'strings'
+        assert not hasattr(ens.members['vln'], '_ensemble_family')
 
     def test_family_view_iter(self):
         ens = Ensemble()
@@ -240,10 +243,10 @@ class TestEnsembleFamilyAccess:
         with pytest.raises(KeyError):
             ens['nonexistent']
 
-    def test_nonexistent_family_method_raises(self):
+    def test_nonexistent_family_subscript_raises(self):
         ens = Ensemble()
         with pytest.raises(KeyError):
-            ens.family('nonexistent')
+            ens.family['nonexistent']
 
     def test_each_family_access_returns_fresh_copy(self):
         ens = Ensemble()
@@ -263,11 +266,10 @@ class TestEnsembleAutoRouting:
         tagged = ens.strings['vln']
         assert tagged._ensemble_family == 'strings'
 
-    def test_direct_access_no_tag(self):
+    def test_members_dict_access_no_tag(self):
         ens = Ensemble()
         ens.add('vln', _inst('vln'), family='strings')
-        direct = ens['vln']
-        assert not hasattr(direct, '_ensemble_family')
+        assert not hasattr(ens.members['vln'], '_ensemble_family')
 
     def test_set_instrument_autosets_group_from_family_view(self):
         ens = Ensemble()
@@ -280,7 +282,7 @@ class TestEnsembleAutoRouting:
         ens = Ensemble()
         ens.add('vln', _inst('vln'), family='strings')
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), bpm=120)
-        uc.set_instrument(uc.rt.root, ens['vln'])
+        uc.set_instrument(uc.rt.root, ens.members['vln'])
         assert uc.get_mfield(uc.rt.root, 'group') == 'default'
 
     def test_autoroute_override_with_set_mfields(self):
@@ -493,9 +495,9 @@ class TestEnsembleDunderProtocol:
         ens = Ensemble()
         ens.add('a', _inst('a'), family='f')
         ens.add('b', _inst('b'))
-        items = list(ens)
-        names = [name for name, _ in items]
-        assert 'a' in names and 'b' in names
+        names = list(ens)
+        assert names == ['a', 'b']
+        assert dict(ens.items())['a'].name == 'a'
 
     def test_len(self):
         ens = Ensemble()
@@ -623,3 +625,270 @@ class TestScoreFromEnsemble:
         assert len(payload["events"]) > 0
         assert 'melody' in s.tracks
         assert 'low' in s.tracks
+
+
+# ---- Spec constructor (families= / ungrouped= kwargs) ----
+
+class TestEnsembleSpecConstruction:
+    def test_list_spec_names_members_from_path_basename(self):
+        ens = Ensemble('beats', families={'drums': ['edm/kick', 'edm/snare']})
+        assert list(ens.family['drums']) == ['kick', 'snare']
+        assert ens['kick'].defName == 'edm_kick'
+
+    def test_dict_spec_maps_generic_to_concrete(self):
+        ens = Ensemble('lofi', families={'pads': {'softPad': 'fd_sinepad',
+                                                  'hazePad': 'lofi/hazePad'}})
+        assert ens['softPad'].defName == 'fd_sinepad'
+        assert ens['hazePad'].defName == 'lofi_hazePad'
+        assert ens['softPad'].name == 'softPad'
+
+    def test_instrument_specs_pass_through(self):
+        kick = _inst('kick')
+        ens = Ensemble(families={'drums': [kick]})
+        assert ens.members['kick'] is kick
+        assert ens['kick'].name == 'kick'
+
+    def test_ungrouped_specs(self):
+        ens = Ensemble('lofi', ungrouped=['lofi/wash', 'lofi/cresc'])
+        assert ens.ungrouped == ['wash', 'cresc']
+        assert ens['wash'].defName == 'lofi_wash'
+
+    def test_unknown_def_name_raises(self):
+        with pytest.raises(ValueError, match="Unknown SynthDef name"):
+            Ensemble(families={'drums': ['edm/nope']})
+
+    def test_bad_spec_type_raises(self):
+        with pytest.raises(TypeError, match="Member spec"):
+            Ensemble(families={'drums': [42]})
+
+    def test_underscore_names_accepted(self):
+        ens = Ensemble(families={'keys': ['kl_tri']})
+        assert ens['kl_tri'].defName == 'kl_tri'
+
+
+# ---- voice() resolver ----
+
+class TestEnsembleVoice:
+    def _ens(self):
+        return Ensemble('beats',
+                        families={'drums': ['edm/kick'], 'hats': ['edm/hat']},
+                        ungrouped=['edm/sweep'])
+
+    def test_voice_returns_tagged_family_member(self):
+        ens = self._ens()
+        v = ens.voice('kick')
+        assert v.defName == 'edm_kick'
+        assert v._ensemble_family == 'drums'
+
+    def test_voice_ungrouped_untagged(self):
+        ens = self._ens()
+        v = ens.voice('sweep')
+        assert v.defName == 'edm_sweep'
+        assert getattr(v, '_ensemble_family', None) is None
+
+    def test_voice_passthrough_non_string(self):
+        ens = self._ens()
+        kick = _inst('kick')
+        assert ens.voice(kick) is kick
+        assert ens.voice(None) is None
+
+    def test_voice_unknown_raises(self):
+        with pytest.raises(KeyError, match="not a member"):
+            self._ens().voice('nope')
+
+    def test_voice_sets_group_mfield(self):
+        ens = self._ens()
+        uc = CompositionalUnit(tempus='1/4', prolatio=(1,), bpm=60)
+        uc.leaves.set_instrument(ens.voice('kick'))
+        assert uc.leaves.get_mfield('group') == ['drums']
+
+    def test_voice_is_reserved_family_name(self):
+        with pytest.raises(ValueError, match="collides with an Ensemble attribute"):
+            Ensemble().add('x', _inst('x'), family='voice')
+
+
+# ---- Bundled bank factories ----
+
+class TestEnsembleFactories:
+    def test_edm(self):
+        ens = Ensemble.edm()
+        assert ens.name == 'edm'
+        assert set(ens.families) == {'drums', 'hats', 'perc', 'wubs', 'bass', 'sweeps'}
+        assert len(ens.members) == 27
+        assert ens.voice('kick').defName == 'edm_kick'
+        assert ens.ungrouped == []
+
+    def test_lofi_accents_grouped(self):
+        ens = Ensemble.lofi()
+        assert 'accents' in ens.families
+        assert ens.ungrouped == []
+        assert len(ens.members) == 25
+        assert ens.voice('wash')._ensemble_family == 'accents'
+        assert ens.voice('loSnare').defName == 'lofi_snare'
+
+    def test_chip(self):
+        ens = Ensemble.chip(name='console')
+        assert ens.name == 'console'
+        assert len(ens.members) == 14
+        assert ens.voice('chipBass').defName == 'chip_bass'
+
+    def test_only(self):
+        ens = Ensemble.edm(only=['drums', 'hats'])
+        assert set(ens.families) == {'drums', 'hats'}
+        with pytest.raises(KeyError, match="Unknown edm families"):
+            Ensemble.edm(only=['nope'])
+
+    def test_extras_graft(self):
+        ens = Ensemble.lofi(extras={'pads': {'softPad': 'fd_sinepad'},
+                                    'keys': ['kl_tri']})
+        assert ens.voice('softPad').defName == 'fd_sinepad'
+        assert ens.voice('softPad')._ensemble_family == 'pads'
+        assert 'keys' in ens.families and 'kl_tri' in ens.family['keys']
+
+    def test_tr808(self):
+        ens = Ensemble.tr808()
+        assert ens.name == 'tr808'
+        assert set(ens.families) == {'drums', 'toms', 'congas', 'perc', 'cymbals'}
+        assert len(ens.members) == 16
+        assert ens.voice('kick').defName == 'tr808_kick'
+        assert ens.voice('midConga').defName == 'tr808_tom'
+        assert ens.voice('midConga').pfields['freq'] == 250
+        assert ens.ungrouped == []
+
+    def test_tuple_member_spec_overrides(self):
+        ens = Ensemble(families={'toms': {'punchyTom': ('tr808/tom', {'freq': 99})},
+                                 'extra': [('tr808/tom', {'freq': 111})]})
+        assert ens.voice('punchyTom').defName == 'tr808_tom'
+        assert ens.voice('punchyTom').pfields['freq'] == 99
+        assert ens.voice('tom').pfields['freq'] == 111
+
+    def test_factory_names_reserved_as_families(self):
+        with pytest.raises(ValueError, match="collides with an Ensemble attribute"):
+            Ensemble().add('x', _inst('x'), family='edm')
+        with pytest.raises(ValueError, match="collides with an Ensemble attribute"):
+            Ensemble().add('x', _inst('x'), family='tr808')
+
+
+# ---- pick / cycle conveniences ----
+
+class TestEnsemblePickCycle:
+    def _ens(self):
+        ens = Ensemble('band')
+        ens.add('kick', _inst('kick'), family='drums')
+        ens.add('snare', _inst('snare'), family='drums')
+        ens.add('pad', _inst('pad'), family='pads')
+        ens.add('solo', _inst('solo'))
+        return ens
+
+    def test_pick_family_returns_tagged(self):
+        import random
+        ens = self._ens()
+        picks = {ens.pick('drums', rng=random.Random(i)).name for i in range(20)}
+        assert picks == {'kick', 'snare'}
+        assert ens.pick('drums')._ensemble_family == 'drums'
+
+    def test_pick_all_members(self):
+        ens = self._ens()
+        assert ens.pick().name in {'kick', 'snare', 'pad', 'solo'}
+
+    def test_pick_unknown_family_raises(self):
+        with pytest.raises(KeyError, match="not found"):
+            self._ens().pick('nope')
+
+    def test_view_pick_tagged(self):
+        ens = self._ens()
+        picked = ens.drums.pick()
+        assert picked.name in {'kick', 'snare'}
+        assert picked._ensemble_family == 'drums'
+
+    def test_cycle_family_pattern_of_tagged(self):
+        ens = self._ens()
+        p = ens.cycle('drums')
+        first, second, third = next(p), next(p), next(p)
+        assert [first.name, second.name, third.name] == ['kick', 'snare', 'kick']
+        assert first._ensemble_family == 'drums'
+
+    def test_view_cycle(self):
+        ens = self._ens()
+        p = ens.pads.cycle()
+        assert next(p).name == 'pad'
+
+    def test_cycle_all_members(self):
+        ens = self._ens()
+        p = ens.cycle()
+        assert [next(p).name for _ in range(4)] == ['kick', 'snare', 'pad', 'solo']
+
+
+# ---- include() semantics ----
+
+class TestEnsembleIncludeFixes:
+    def test_empty_prefix_merges_unrenamed(self):
+        outer = Ensemble('mix')
+        outer.add('lead', _inst('lead'), family='keys')
+        inner = Ensemble('x')
+        inner.add('pad', _inst('pad'), family='pads')
+        outer.include(inner, prefix='')
+        assert 'pad' in outer and 'pads' in outer.families
+
+    def test_empty_prefix_collision_is_atomic(self):
+        outer = Ensemble('mix')
+        outer.add('pad', _inst('pad'), family='pads')
+        inner = Ensemble('x')
+        inner.add('pad2', _inst('pad2'), family='pads')
+        inner.add('bass', _inst('bass'), family='bass')
+        with pytest.raises(ValueError, match="name collisions"):
+            outer.include(inner, prefix='')
+        assert 'pad2' not in outer and 'bass' not in outer.families
+
+    def test_include_copies_member_instruments(self):
+        inner = Ensemble('x')
+        inner.add('pad', _inst('pad'), family='pads')
+        outer = Ensemble('mix').include(inner)
+        outer.members['x_pad']._pfields['amp'] = 99
+        assert inner.members['pad'].pfields['amp'] != 99
+
+
+# ---- Score.new auto-routing from ensemble tags ----
+
+class TestScoreNewAutoRoute:
+    def _ens(self):
+        ens = Ensemble('band')
+        ens.add('kick', _inst('kick'), family='drums')
+        return ens
+
+    def test_group_defaults_from_tag(self):
+        ens = self._ens()
+        s = Score()
+        ev = s.new(start=0, dur=0.5, inst=ens['kick'])
+        assert ev.mfields['group'] == 'drums'
+        from klotho.utils.playback.supersonic.converters import convert_score_to_sc_events
+        payload = convert_score_to_sc_events(s)
+        news = [e for e in payload['events'] if e['type'] == 'new']
+        assert news and all(e['group'] == 'drums' for e in news)
+
+    def test_explicit_group_wins(self):
+        ens = self._ens()
+        s = Score()
+        ev = s.new(start=0, dur=0.5, inst=ens['kick'], group='master')
+        assert ev.mfields['group'] == 'master'
+
+    def test_untagged_instrument_unchanged(self):
+        s = Score()
+        ev = s.new(start=0, dur=0.5, inst=_inst('kick'))
+        assert 'group' not in ev.mfields
+
+    def test_uc_constructor_autoroutes(self):
+        ens = self._ens()
+        uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), bpm=120, inst=ens['kick'])
+        assert uc.get_mfield(uc.rt.root, 'group') == 'drums'
+
+
+class TestEnsembleReprHtml:
+    def test_smoke(self):
+        ens = Ensemble('band')
+        ens.add('kick', _inst('kick'), family='drums')
+        ens.add('solo', _inst('solo'))
+        ens.set_inserts('drums', [SynthDefFX('kl_reverb')])
+        html = ens._repr_html_()
+        assert 'drums' in html and 'kick' in html and 'ungrouped' in html
+        assert 'kl_reverb' in html

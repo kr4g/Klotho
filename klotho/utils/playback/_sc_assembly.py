@@ -3,6 +3,7 @@ from uuid import uuid4
 from klotho.thetos.instruments.synthdef import SynthDefInstrument
 from klotho.thetos.instruments.base import Effect
 from klotho.thetos.instruments.base import Kit
+from klotho.thetos.instruments._shared import canonical_def_name
 from klotho.utils.playback._amplitude import single_voice_amplitude
 from klotho.utils.playback._converter_base import (
     _merge_pfields,
@@ -80,11 +81,11 @@ def _normalize_sc_pfields(pfields):
 
 def _resolve_event_synth(instrument, default_synth):
     if isinstance(instrument, str):
-        return instrument
+        return canonical_def_name(instrument)
     if isinstance(instrument, SynthDefInstrument):
-        return instrument.defName or default_synth
+        return canonical_def_name(instrument.defName) or default_synth
     if instrument is not None and hasattr(instrument, 'defName'):
-        return instrument.defName or default_synth
+        return canonical_def_name(instrument.defName) or default_synth
     return default_synth
 
 

@@ -15,6 +15,8 @@ FX_NAMES = [
     'fd_reverb', 'fd_spinPan', 'fd_tremolo', 'fd_wavesShapeDistortion',
     'kl_bitcrush', 'kl_chop', 'kl_delay', 'kl_distortion', 'kl_hpf',
     'kl_lpf', 'kl_reverb', 'kl_tremolo',
+    'lofi_tape', 'lofi_wowFlutter', 'lofi_tapeSat', 'lofi_hissDust',
+    'chip_echo', 'chip_downSampler', 'chip_chorusLite', 'chip_pulseDuck',
 ]
 INFRA_NAMES = ['__busRouter', '__busRouterMonitor', '__chainLimiter', '__klEnvCtrl']
 
@@ -24,7 +26,7 @@ class TestKindsMap:
         kinds = load_ss_kinds()
         from collections import Counter
         counts = Counter(kinds.values())
-        assert counts['fx'] == 22
+        assert counts['fx'] == 30
         assert counts['infra'] == 4
         assert counts['inst'] >= 70
 
@@ -38,7 +40,7 @@ class TestKindsMap:
 class TestClassmethodSplit:
     def test_instrument_shortcuts_survive(self):
         for m in ['tri', 'sqr', 'saw', 'kicktone', 'sine', 'jbass',
-                  'noisebpf', 'ambi']:
+                  'noisebpf', 'ambi', 'tr808_kick', 'tr808_tom']:
             inst = getattr(SynthDefInstrument, m)()
             assert isinstance(inst, SynthDefInstrument)
 

@@ -142,9 +142,10 @@ class TestKitIndexAccess:
         assert kit['bb_voice'] is kit.members['bb_voice']
         assert kit._resolve('bb_voice') is kit.members['bb_voice']
 
-    def test_unknown_key_falls_back_to_default(self):
+    def test_unknown_key_raises(self):
         kit = _beatbox()
-        assert kit._resolve('not_a_member') is kit.members['bb_kick']
+        with pytest.raises(KeyError, match="Unknown voice 'not_a_member'"):
+            kit._resolve('not_a_member')
 
     def test_bool_is_not_an_index(self):
         members = {'a': Instrument('a', {'x': 1}), 'b': Instrument('b', {'x': 2})}

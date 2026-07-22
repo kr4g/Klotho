@@ -317,6 +317,10 @@ classDiagram
     class Kit {
         +members : dict
         +selector : str
+        +families : list
+        +family : FamilyAccessor
+        +pick(family)
+        +cycle(family)
     }
 
     class Effect {
@@ -327,6 +331,35 @@ classDiagram
 The instruments package also provides `Ensemble` (`ensemble.py`), a
 named grouping of instruments, and effect wrappers (`Effect`,
 `SynthDefFX`).
+
+### Kit and Ensemble access grammar
+
+Both classes share one grammar — **dots navigate, brackets look up,
+methods act**:
+
+```python
+kit['snare']            # member Instrument (str key or wrapping int index)
+kit.family['tas']       # KitFamilyView; dot shorthand: kit.tas
+kit.pick('tas')         # random selector KEY (pass as voice=)
+kit.cycle('tas')        # Pattern of keys, round-robin
+kit.tas.pick            # bound method = 0-arg callable: a fresh draw
+                        # per sounding leaf in set_pfields(voice=...)
+
+ens['kick']             # member, tagged with its family (auto-routes)
+ens.family['drums']     # _FamilyView; dot shorthand: ens.drums
+ens.pick('drums')       # random tagged Instrument (pass as inst=)
+ens.cycle('drums')      # Pattern of tagged Instruments
+```
+
+Kits are driven by the ``voice=`` selector pfield (member key, or an
+integer wrapping mod the member count); ``pick``/``cycle`` therefore
+speak *keys*.  Ensembles are rosters whose members are full
+instruments; their ``pick``/``cycle`` speak *tagged Instruments*.
+Kit ``families=`` groupings may overlap; family names are validated
+against member keys and class attributes (no reserved-name list).
+An unknown string selector raises a ``KeyError`` listing the members
+(with a hint when the string names a family) rather than silently
+playing the default member.
 
 ### SynthDefInstrument (SuperCollider)
 

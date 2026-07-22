@@ -1271,5 +1271,756 @@
     "releaseTime": 0.2,
     "attackCurve": -4.0,
     "releaseCurve": -4.0
+  },
+  "chip_bass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "steps": 16.0,
+    "drive": 1.3,
+    "portamento": 0.02,
+    "attackTime": 0.005,
+    "decayTime": 0.05,
+    "sustainLevel": 0.9,
+    "releaseTime": 0.15,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "chip_bitSnare": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "tone": 1800.0,
+    "crackle": 0.6
+  },
+  "chip_blipLead": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "chirpTime": 0.02,
+    "width": 0.4,
+    "hold": 0.05,
+    "release": 0.12
+  },
+  "chip_chorusLite": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "rate": 0.6,
+    "depth": 3.5,
+    "mix": 0.4,
+    "gain": 1.0
+  },
+  "chip_coinBlip": {
+    "out": 0.0,
+    "freq": 880.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "octaves": 1.0,
+    "jumpTime": 0.06,
+    "width": 0.5,
+    "tone": 8.0,
+    "sparkle": 0.0,
+    "hold": 0.25,
+    "release": 0.3
+  },
+  "chip_downSampler": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "rate": 5500.0,
+    "grit": 0.3,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "chip_echo": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "delayTime": 0.25,
+    "decayTime": 1.2,
+    "tone": 3500.0,
+    "mix": 0.25,
+    "gain": 1.0
+  },
+  "chip_fmBell": {
+    "out": 0.0,
+    "freq": 880.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "ratio": 3.5,
+    "brightness": 1.4,
+    "hold": 0.35,
+    "release": 1.2
+  },
+  "chip_glassPad": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "ratio": 3.0,
+    "brightness": 0.8,
+    "detune": 0.05,
+    "shimmerRate": 0.35,
+    "attackTime": 0.5,
+    "decayTime": 0.4,
+    "sustainLevel": 0.75,
+    "releaseTime": 1.4,
+    "peakLevel": 1.0,
+    "attackCurve": 3.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "chip_gridKick": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "baseFreq": 52.0,
+    "punch": 1.0
+  },
+  "chip_lead": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "width": 0.35,
+    "portamento": 0.03,
+    "vibRate": 5.5,
+    "vibDepth": 0.12,
+    "vibDelay": 0.15,
+    "attackTime": 0.005,
+    "decayTime": 0.06,
+    "sustainLevel": 0.8,
+    "releaseTime": 0.12,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "chip_powerArp": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "stepTime": 0.05,
+    "width": 0.5,
+    "hold": 0.16,
+    "release": 0.35
+  },
+  "chip_powerDown": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "duration": 2.5,
+    "octaves": 2.0,
+    "stepRate": 12.0,
+    "flicker": 0.3,
+    "width": 0.5,
+    "release": 0.9
+  },
+  "chip_pulseChord": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "width": 0.5,
+    "pwmRate": 0.7,
+    "pwmDepth": 0.15,
+    "octaveMix": 0.25,
+    "attackTime": 0.01,
+    "decayTime": 0.08,
+    "sustainLevel": 0.85,
+    "releaseTime": 0.2,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "chip_pulseDuck": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "rate": 2.0,
+    "depth": 0.5,
+    "shape": 4.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "chip_riser": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "duration": 2.0,
+    "octaves": 3.0,
+    "width": 0.4,
+    "sizzle": 0.35,
+    "release": 0.5
+  },
+  "chip_tickHat": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "openness": 0.0,
+    "tone": 7000.0
+  },
+  "chip_zapDown": {
+    "out": 0.0,
+    "freq": 1200.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "fall": 0.25,
+    "zapTime": 0.18,
+    "width": 0.5
+  },
+  "edm_blip": {
+    "out": 0.0,
+    "amp": 1.0,
+    "ratio": 1.0,
+    "pan": 0.0
+  },
+  "edm_chipSweep1": {
+    "out": 0.0,
+    "duration": 0.5,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_chipSweep2": {
+    "out": 0.0,
+    "duration": 0.5,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_chipSweep3": {
+    "out": 0.0,
+    "duration": 3.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_clank": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "ratio": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_clap": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_deepKick": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_ghostSnare": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_hat": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_hat2": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_hatLong": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_hatShort": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_kick": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_kickSoft": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_ping": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_revCymbal": {
+    "out": 0.0,
+    "duration": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_rubber1": {
+    "out": 0.0,
+    "amp": 1.0,
+    "ratio": 1.0,
+    "pan": 0.0
+  },
+  "edm_rubber2": {
+    "out": 0.0,
+    "amp": 1.0,
+    "ratio": 1.0,
+    "pan": 0.0
+  },
+  "edm_snare": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_snare2": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_subBass": {
+    "out": 0.0,
+    "duration": 1.0,
+    "freq": 55.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_sweep": {
+    "out": 0.0,
+    "duration": 2.3,
+    "release": 2.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_tom": {
+    "out": 0.0,
+    "freq": 180.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "edm_woodblock": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "ratio": 1.0,
+    "pan": 0.0
+  },
+  "edm_wub1": {
+    "out": 0.0,
+    "duration": 1.5,
+    "freq": 200.0,
+    "amp": 1.0
+  },
+  "edm_wub2": {
+    "out": 0.0,
+    "duration": 1.5,
+    "freq": 60.0,
+    "amp": 1.0
+  },
+  "edm_wub3": {
+    "out": 0.0,
+    "duration": 1.5,
+    "freq": 60.0,
+    "amp": 1.0
+  },
+  "lofi_beep": {
+    "out": 0.0,
+    "freq": 880.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "releaseTime": 0.35
+  },
+  "lofi_cresc": {
+    "out": 0.0,
+    "duration": 3.0,
+    "freq": 1320.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_driftPad": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.1,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "drift": 0.5,
+    "tone": 3.0,
+    "attackTime": 2.0,
+    "decayTime": 1.0,
+    "sustainLevel": 0.75,
+    "releaseTime": 3.0,
+    "peakLevel": 1.0,
+    "attackCurve": 0.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "lofi_dustCrackle": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_dustKick": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_dustPluck": {
+    "out": 0.0,
+    "freq": 440.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "releaseTime": 0.5,
+    "vibRate": 5.0,
+    "vibDepth": 0.0
+  },
+  "lofi_ghostSnare": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_glassLead": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.05,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "shimmer": 0.4,
+    "tone": 4.0,
+    "attackTime": 0.01,
+    "decayTime": 0.4,
+    "sustainLevel": 0.6,
+    "releaseTime": 0.9,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -3.0,
+    "releaseCurve": -4.0
+  },
+  "lofi_glitchBlip": {
+    "out": 0.0,
+    "seed": 0.0,
+    "duration": 0.08,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "toneLPF": 3800.0
+  },
+  "lofi_glitchBurst": {
+    "out": 0.0,
+    "seed": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "toneLPF": 4200.0
+  },
+  "lofi_glitchZap": {
+    "out": 0.0,
+    "seed": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0,
+    "toneLPF": 4500.0
+  },
+  "lofi_hazePad": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.1,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "detune": 0.07,
+    "tone": 2.5,
+    "wow": 0.3,
+    "attackTime": 1.5,
+    "decayTime": 1.0,
+    "sustainLevel": 0.8,
+    "releaseTime": 2.5,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "lofi_hissDust": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "hiss": 0.0015,
+    "hissLPF": 7000.0,
+    "crackle": 1.5,
+    "crackleAmp": 0.006,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "lofi_hushHat": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_hushHatOpen": {
+    "out": 0.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_lead": {
+    "out": 0.0,
+    "freq": 440.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.06,
+    "vibRate": 4.5,
+    "vibDepth": 0.15,
+    "vibDelay": 0.6,
+    "tone": 3.5,
+    "drive": 1.6,
+    "attackTime": 0.03,
+    "decayTime": 0.15,
+    "sustainLevel": 0.85,
+    "releaseTime": 0.6,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "lofi_rim": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_snare": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_subBass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "harm": 0.25,
+    "drive": 1.3,
+    "attackTime": 0.02,
+    "decayTime": 0.1,
+    "sustainLevel": 0.9,
+    "releaseTime": 0.3,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "lofi_tape": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "drive": 1.5,
+    "bias": 0.1,
+    "wowRate": 0.4,
+    "wowDepth": 1.2,
+    "flutterRate": 6.0,
+    "flutterDepth": 0.12,
+    "stereoDrift": 0.15,
+    "lowCut": 35.0,
+    "highCut": 5500.0,
+    "bumpFreq": 85.0,
+    "bumpDb": 2.5,
+    "hiss": 0.0012,
+    "hissFollow": 0.4,
+    "wear": 0.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "lofi_tapeBass": {
+    "out": 0.0,
+    "freq": 110.0,
+    "amp": 1.0,
+    "gate": 1.0,
+    "pan": 0.0,
+    "portamento": 0.08,
+    "vibRate": 5.0,
+    "vibDepth": 0.0,
+    "width": 0.4,
+    "tone": 2.8,
+    "wow": 0.5,
+    "attackTime": 0.01,
+    "decayTime": 0.12,
+    "sustainLevel": 0.75,
+    "releaseTime": 0.25,
+    "peakLevel": 1.0,
+    "attackCurve": -4.0,
+    "decayCurve": -2.0,
+    "releaseCurve": -4.0
+  },
+  "lofi_tapeCrash": {
+    "out": 0.0,
+    "freq": 220.0,
+    "duration": 2.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_tapePop": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_tapeRise": {
+    "out": 0.0,
+    "freq": 330.0,
+    "duration": 2.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_tapeSat": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "drive": 2.0,
+    "bias": 0.1,
+    "tone": 7500.0,
+    "lowCut": 30.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "lofi_tapeSnap": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_tapeTick": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_wash": {
+    "out": 0.0,
+    "freq": 440.0,
+    "duration": 2.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "lofi_wowFlutter": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "wowRate": 0.35,
+    "wowDepth": 2.0,
+    "flutterRate": 7.0,
+    "flutterDepth": 0.15,
+    "stereoDrift": 0.2,
+    "tone": 6500.0,
+    "mix": 1.0,
+    "gain": 1.0
+  },
+  "tr808_clap": {
+    "out": 0.0,
+    "verb": 0.5,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_clave": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_cowbell": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_cymbal": {
+    "out": 0.0,
+    "releaseTime": 2.0,
+    "tone": 0.5,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_hat": {
+    "out": 0.0,
+    "releaseTime": 0.42,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_hatOpen": {
+    "out": 0.0,
+    "releaseTime": 0.5,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_kick": {
+    "out": 0.0,
+    "freq": 56.0,
+    "releaseTime": 1.2,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_maracas": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_rim": {
+    "out": 0.0,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_snare": {
+    "out": 0.0,
+    "tone": 340.0,
+    "snappy": 0.3,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
+  },
+  "tr808_tom": {
+    "out": 0.0,
+    "freq": 80.0,
+    "releaseTime": 0.74,
+    "sweep1": 1.25,
+    "sweep2": 1.125,
+    "velocity": 1.0,
+    "amp": 1.0,
+    "pan": 0.0
   }
 }

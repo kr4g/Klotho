@@ -57,7 +57,10 @@ class Event:
         Initial pfield values. A tuple value means a simultaneity: one
         synth voice per element, exactly as in ``UC.set_pfields``.
     mfields : dict, optional
-        Engine meta-fields (``strum``, ``group``).
+        Engine meta-fields (``strum``, ``group``).  When ``group`` is
+        not given and *inst* carries an ensemble family tag (from
+        ``ens['name']`` or a family view), ``group`` defaults to that
+        family, so the event auto-routes to the family's track.
 
     Notes
     -----
@@ -77,6 +80,10 @@ class Event:
             k: _coerce_set_pfield_value(k, v) for k, v in (pfields or {}).items()
         }
         self.mfields = dict(mfields or {})
+        if 'group' not in self.mfields:
+            family = getattr(inst, '_ensemble_family', None)
+            if family is not None:
+                self.mfields['group'] = family
         self._sets: list = []
         self._release = None
         self._offset = 0.0

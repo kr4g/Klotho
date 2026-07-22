@@ -87,12 +87,25 @@ def load_ss_kinds():
     return {**_load_disk_kinds(), **runtime_kinds()}
 
 
+def canonical_def_name(name):
+    """'edm/kick' -> 'edm_kick'; idempotent; non-strings/plain names pass through.
+
+    ``'/'`` is reserved path syntax (it cannot appear in a real SynthDef
+    name, since the on-disk def name is the ``.scsyndef`` filename), so
+    the transform is purely syntactic — no alias table.
+    """
+    if isinstance(name, str) and '/' in name:
+        return name.replace('/', '_')
+    return name
+
+
 def ss_synth_kind(def_name):
     """Return ``'inst'``, ``'fx'``, or ``'infra'`` for ``def_name``.
 
     Unknown names default to ``'inst'`` (permissive: user-supplied or
     external defs are assumed playable).
     """
+    def_name = canonical_def_name(def_name)
     if isinstance(def_name, str) and def_name.startswith('__'):
         return 'infra'
     return load_ss_kinds().get(def_name, 'inst')
@@ -103,6 +116,7 @@ def ss_synth_controls(def_name):
 
     Returns an empty dict if the synth is not in the manifest.
     """
+    def_name = canonical_def_name(def_name)
     return load_ss_manifest().get(def_name, {})
 
 

@@ -258,7 +258,7 @@ flowchart LR
     end
 
     sc_events -->|"embedded in HTML"| HTML
-    scsyndef -->|"loaded via CDN"| SS
+    scsyndef -->|"embedded base64 (CDN fallback)"| SS
     HTML --> SS
     SS --> SCSYNTH
     SCSYNTH --> AUDIO
@@ -283,10 +283,39 @@ and nested `pfields`:
 
 ### Bundled SynthDefs
 
-Roughly **100 compiled synthdefs** ship with the package — the
+**183 compiled synthdefs** ship with the package — the
 `kl_*` Klotho family (`kl_tri`, `kl_sine`, `kl_kicktone`, …), a large
-`fd_*` FoxDot-derived set, and internal control/routing defs
+`fd_*` FoxDot-derived set, the MAT 111MC `edm_*`/`lofi_*`/`chip_*`
+kits, the `tr808_*` drum machine voices (adapted from Yoshinosuke
+Horiuchi's SC-808; all non-gated one-shots, `releaseTime` args in real
+seconds, exposed via `SynthDefKit.tr808()` and `Ensemble.tr808()`),
+and internal control/routing defs
 (`__klEnvCtrl`, `__busRouter`, `__chainLimiter`, …).
+
+#### Path-style names
+
+Anywhere a SynthDef name string is accepted (`play(inst=...)`,
+`SynthDefInstrument.from_manifest`, `SynthDefFX`, kit member dicts),
+a path-style spelling is sugar for the underscore name: `'edm/kick'` →
+`edm_kick`, `'lofi/tape'` → `lofi_tape`, `'kl/saw'` → `kl_saw`,
+`'fd/blip'` → `fd_blip`.  The transform
+(`klotho.thetos.instruments._shared.canonical_def_name`) is purely
+syntactic — `/` cannot appear in a real def name because the def name
+is the `.scsyndef` filename — so there is no alias table to maintain,
+and underscore names keep working unchanged.
+
+#### Kit selector resolution
+
+A `Kit` event's member is chosen by its selector pfield (default
+`voice`) at lowering time.  Valid selector values are **concrete**:
+a member key, an integer (wrapping mod the member count), a tuple of
+either (one synth voice per element), or absent (default member).
+An unknown *string* raises a `KeyError` listing the kit's members —
+including a hint when the string names a kit *family* (families are a
+composition-time concept: draw a key with `kit.family['tas'].pick()`
+or hand `kit.tas.pick` to `set_pfields(voice=...)` for per-leaf
+draws; the engine itself never sees family names, so lowering stays
+deterministic).
 
 Definitions are compiled `.scsyndef` files in
 `supersonic/assets/synthdefs/` (with `.scd` sources in

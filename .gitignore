@@ -163,6 +163,7 @@ klotho/utils/playback/supersonic/assets/synthdef_tester.scd
 klotho/utils/playback/supersonic/assets/tidal_synthdefs_add.scd
 !klotho/utils/playback/supersonic/assets/**/*.scsyndef
 !klotho/utils/playback/supersonic/assets/manifest.json
+!klotho/utils/playback/supersonic/assets/kinds.json
 
 # Graphify knowledge graph
 graphify-out/

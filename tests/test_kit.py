@@ -100,13 +100,20 @@ class TestKitResolution:
         kit = Kit({'kick': KICK, 'snare': SNARE})
         assert kit._resolve('snare') is SNARE
 
-    def test_resolve_missing_key_falls_back(self):
+    def test_resolve_missing_key_raises(self):
         kit = Kit({'kick': KICK, 'snare': SNARE})
-        assert kit._resolve('nonexistent') is KICK
+        with pytest.raises(KeyError, match="Unknown voice 'nonexistent'"):
+            kit._resolve('nonexistent')
 
-    def test_resolve_empty_string_falls_back(self):
+    def test_resolve_empty_string_raises(self):
         kit = Kit({'kick': KICK, 'snare': SNARE})
-        assert kit._resolve('') is KICK
+        with pytest.raises(KeyError, match="Unknown voice"):
+            kit._resolve('')
+
+    def test_resolve_family_name_raises_with_hint(self):
+        kit = Kit({'kick': KICK, 'snare': SNARE}, families={'drums': ['kick', 'snare']})
+        with pytest.raises(KeyError, match="'drums' is a family"):
+            kit._resolve('drums')
 
 
 class TestKitDunderProtocol:
