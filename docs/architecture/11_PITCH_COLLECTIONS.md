@@ -41,15 +41,14 @@ flowchart TD
 
 ## 2. Quick Reference Table
 
-| Class | Defined by | Has root? | Has equave? | Register-placed? | Use case |
+| Class | Defined by | Root | Has equave? | Register-placed? | Use case |
 |---|---|---|---|---|---|
 | `PitchCollectionBase` | *(abstract)* | — | — | — | Base interface |
-| `RelativePitchCollection` | Interval ratios | Via `.root()` | Optional | No | Abstract interval set |
-| `AbsolutePitchCollection` | Absolute ratios | Via `.root()` | Optional | No | Fixed frequency ratios |
-| `RootedPitchCollection` | Root + intervals | Yes | Yes | No | Rooted interval set |
-| `Scale` | Intervals | Via `.root()` | Yes | No | Repeating scale pattern |
-| `Chord` | Intervals | Via `.root()` | Yes | No | Abstract chord quality |
-| `Voicing` | Intervals + register | Via `.root()` | Yes | Yes | Specific pitch placement |
+| `RelativePitchCollection` | Interval ratios | Default C4; re-root via `.root()` | Optional | No | Abstract interval set |
+| `AbsolutePitchCollection` | Concrete pitches | Default C4; re-root via `.root()` | Optional | Yes | Fixed pitches |
+| `Scale` | Intervals | Default C4; re-root via `.root()` | Yes | No | Repeating scale pattern |
+| `Chord` | Intervals | Default C4; re-root via `.root()` | Yes | No | Abstract chord quality |
+| `Voicing` | Intervals + register | Default C4; re-root via `.root()` | Yes | Yes | Specific pitch placement |
 | `ChordSequence` | List of chords | — | — | — | Progression container |
 | `Contour` | Scale-degree indices | — | — | — | Pitch motion pattern |
 
@@ -66,31 +65,33 @@ classDiagram
         +degrees
         +pitches
         +intervals
+        +freqs : tuple
         +__len__()
         +is_relative : bool
-        +is_instanced : bool
-        +reference_pitch : Pitch | None
+        +reference_pitch : Pitch
+        +equave
+        +equave_cyclic : bool
+        +equave_shift(n)
+    }
+
+    class EquaveCyclicMixin {
+        <<mixin>>
+        _equave_cyclic_enabled = True
     }
 
     class RelativePitchCollection {
         +degrees : list[Fraction]
         +equave : Fraction
         +intervals : list[Fraction]
-        +is_instanced : bool
-        +root(pitch) collection
-        +relative() RelativePitchCollection
+        +root(pitch) same class
+        +transpose(interval) same class
+        +as_voicing()
     }
 
     class AbsolutePitchCollection {
         +pitches : list[Pitch]
         +intervals : list[Fraction]
         +root(pitch) AbsolutePitchCollection
-    }
-
-    class RootedPitchCollection {
-        +reference_pitch : Pitch
-        +degrees : list[Fraction]
-        +pitches : list[Pitch]
     }
 
     class Scale {
@@ -114,7 +115,8 @@ classDiagram
 
     PitchCollectionBase <|-- RelativePitchCollection
     PitchCollectionBase <|-- AbsolutePitchCollection
-    RelativePitchCollection <|-- RootedPitchCollection
+    EquaveCyclicMixin <|-- Scale
+    EquaveCyclicMixin <|-- Chord
     RelativePitchCollection <|-- Scale
     RelativePitchCollection <|-- Chord
     RelativePitchCollection <|-- Voicing
@@ -132,31 +134,29 @@ exist as conveniences that enforce particular invariants
 
 ---
 
-## 4. Relative vs Absolute vs Rooted
+## 4. Relative vs Absolute
 
-### Relative (`RelativePitchCollection`, `Scale`, `Chord`)
+### Relative (`RelativePitchCollection`, `Scale`, `Chord`, `Voicing`)
 
-Defined by **intervals** (frequency ratios or cents).  No concrete
-pitches until a root is applied.
+Defined by **intervals** (frequency ratios or cents), anchored to a
+reference pitch that **defaults to C4** — concrete pitches are always
+available; `.root(pitch)` re-anchors:
 
 ```python
 scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
-scale.degrees   # [Fraction(1,1), Fraction(9,8), …]
-scale.pitches   # raises ValueError — no reference pitch assigned
+scale.degrees          # [Fraction(1,1), Fraction(9,8), …]
+scale.reference_pitch  # Pitch(C4, 261.63 Hz) — the default
+scale.pitches          # [Pitch(C4), Pitch(D4+3.91¢), …]
 
-c_scale = scale.root("C4")  # → Scale instanced at C4
-c_scale.pitches  # [Pitch(C4), Pitch(D4+4¢), Pitch(E4-14¢), …]
+a_scale = scale.root("A4")   # → Scale re-anchored at A4
+a_scale.pitches              # [Pitch(A4, 440 Hz), …]
 ```
 
 ### Absolute (`AbsolutePitchCollection`)
 
-Defined by **fixed frequency ratios** — the pitches are absolute,
-not relative to any root.
-
-### Rooted (`RootedPitchCollection`, `InstancedScale`, `InstancedChord`)
-
-A relative collection **bound to a specific root pitch**.  Produces
-concrete `Pitch` objects with Hz values.
+Defined by **concrete pitches** (Pitch objects, MIDI numbers, or
+frequencies) rather than intervals; `degrees` are the pitches
+themselves.
 
 ---
 
@@ -210,33 +210,31 @@ flowchart TD
 
 ---
 
-## 7. The Instancing Pattern
+## 7. The Rooting Pattern
 
-"Instancing" converts a relative collection to concrete pitches by
-calling `.root(pitch)`.  For the named types (`Scale`, `Chord`,
-`Voicing`) this returns a **new instance of the same class** with its
-`reference_pitch` set; on a plain `RelativePitchCollection` it returns
-a `RootedPitchCollection`.  (Collections can also be constructed
-already-instanced by passing `reference_pitch=` to the constructor.)
+`.root(pitch)` re-anchors a collection, returning a **new instance of
+the same class** (`RelativePitchCollection` included) with its
+`reference_pitch` set.  Collections can also be constructed with an
+explicit root by passing `reference_pitch=` to the constructor; when
+none is given, the reference resolves to **C4**.
 
 ```mermaid
 flowchart LR
-    REL["Relative Collection<br/>(intervals only)"]
-    REL -->|".root(pitch)"| INST["Same class, now with<br/>reference_pitch → concrete Pitches"]
+    REL["Collection<br/>(reference defaults to C4)"]
+    REL -->|".root(pitch)"| INST["Same class, re-anchored<br/>reference_pitch → concrete Pitches"]
 
     subgraph "Examples"
-        S["Scale"] -->|".root('C4')"| IS["Scale (with root)"]
-        C["Chord"] -->|".root('A3')"| IC["Chord (with root)"]
-        V["Voicing"] -->|".root('E2')"| IV["Voicing (with root)"]
+        S["Scale"] -->|".root('C4')"| IS["Scale (rooted at C4)"]
+        C["Chord"] -->|".root('A3')"| IC["Chord (rooted at A3)"]
+        V["Voicing"] -->|".root('E2')"| IV["Voicing (rooted at E2)"]
     end
 ```
 
-> **Note:** `InstancedScale`, `InstancedChord`, and `InstancedVoicing`
-> are **type aliases** (`InstancedScale = Scale`, etc.), not separate
-> classes.  A "rooted Scale" and an "InstancedScale" are the same
-> object.
+> **Note:** the former `RootedPitchCollection` class and the
+> `InstancedScale` / `InstancedChord` / `InstancedVoicing` aliases no
+> longer exist — rooting never changes the class.
 
-An instanced collection computes each pitch as
+A rooted collection computes each pitch as
 `root_freq × degree_ratio`, producing `Pitch` objects with
 frequency, pitch class, octave, and cents-offset data.
 
@@ -249,13 +247,13 @@ indexing that wraps through equaves:
 
 ```python
 scale = Scale(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"])
-# 7 degrees (0–6)
+# 7 degrees (0–6); indexing yields Pitch objects at the reference (C4)
 
-scale[0]   # Fraction(1, 1)     — unison
-scale[6]   # Fraction(15, 8)    — major seventh
-scale[7]   # Fraction(2, 1)     — octave (wraps: 1/1 × 2/1)
-scale[14]  # Fraction(4, 1)     — two octaves up
-scale[-1]  # Fraction(15, 16)   — major seventh below unison
+scale[0]   # Pitch(C4)             — unison
+scale[6]   # Pitch(B4 −11.73¢)     — major seventh
+scale[7]   # Pitch(C5)             — octave (wraps: 1/1 × 2/1)
+scale[14]  # Pitch(C6)             — two octaves up
+scale[-1]  # Pitch(B3 −11.73¢)     — major seventh below unison
 ```
 
 This is controlled by `EquaveCyclicMixin`, which computes:

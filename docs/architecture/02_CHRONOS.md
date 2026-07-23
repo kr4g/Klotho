@@ -57,11 +57,11 @@ classDiagram
         +span : int
         +meas : Meas
         +subdivisions : tuple
-        +durations : list[Fraction]
-        +onsets : list[Fraction]
-        +leaf_nodes : list
+        +durations : tuple[Fraction]
+        +onsets : tuple[Fraction]
+        +leaf_nodes : tuple
         +info : str
-        +subdivide(node, subdivs)
+        +subdivide(node, S)
         +make_rest(node)
         +from_ratios(ratios, meas) RhythmTree$
         +_evaluate()
@@ -141,6 +141,8 @@ silent.
 | `strict_decomposition(lst, meas)` | Decompose preserving proportional structure |
 | `ratios_to_subdivs(ratios)` | Convert flat ratios to a subdivision tuple |
 | `auto_subdiv(subdivs, n=1)` | Automatic rotation-based re-subdivision |
+| `auto_subdiv_matrix(matrix, rotation_offset=1)` | `auto_subdiv` across a matrix of rows |
+| `clean_subdivs(subdivs)` | Normalize/clean a subdivision tuple |
 | `rhythm_pair(lst, MM=True)` | See RhythmPair below |
 | `segment(ratio)` | Split a ratio into an integer proportion pair |
 | `sum_proportions(S)` | Sum proportions at the top level |
@@ -215,11 +217,11 @@ classDiagram
         +start : float  %% read-only; 0 outside a Score
         +end : float
         +make_rest(node)
-        +subdivide(node, subdivs)
-        +sparsify(density)
+        +subdivide(node, S)
+        +sparsify(probability, node=None, seed=None)
         +repeat(n) TemporalUnitSequence
         +copy() TemporalUnit
-        +from_rt(rt, beat, bpm) TemporalUnit$
+        +from_rt(rt, beat=None, bpm=None) TemporalUnit$
     }
 
     class Chronon {
@@ -312,12 +314,16 @@ flowchart LR
 
 | Method | Description |
 |---|---|
-| `append(ut)` | Add to end |
+| `append(ut, repeat=1)` | Add to end (optionally repeated) |
 | `prepend(ut)` | Add to beginning |
 | `insert(i, ut)` | Insert at index |
 | `remove(i)` | Remove at index |
 | `replace(i, ut)` | Replace at index |
-| `extend(uts)` | Append multiple |
+| `extend(other_seq, repeat=1)` | Append another sequence's units |
+
+`TemporalUnit`, `TemporalUnitSequence`, and `TemporalBlock` all mix
+in `_RepeatableTemporal` (10.7.0), so `.repeat(n)` is available on
+each — on a UT it returns a `TemporalUnitSequence` of *n* copies.
 
 A sequence's total duration is determined by the sum of its members'
 durations and is fixed after construction.  To change the duration of a

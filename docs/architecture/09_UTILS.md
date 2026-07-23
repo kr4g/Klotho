@@ -144,7 +144,12 @@ A dictionary subclass used by `Instrument` for parameter storage:
 
 ### 2.2 `enums.py` — Shared Enumerations
 
-Common enumeration types used across subpackages.
+Two enumeration helpers used across subpackages:
+
+| Name | Role | Consumers |
+|---|---|---|
+| `DirectValueEnumMeta` | Metaclass: enum members evaluate to their value directly | `tonos.pitch`, `chronos.utils.tempo` |
+| `MinMaxEnum` | Enum whose members are `(min, max)` ranges | `thetos.instruments` |
 
 ### 2.3 `node_mapping.py` — NodeIdentityMapper
 
@@ -159,7 +164,12 @@ classDiagram
         +get_index(node_obj) int | None
         +get_object(index) object | None
         +remove_node(node_obj) bool
+        +remove_by_index(index) bool
         +has_node(node_obj) bool
+        +has_index(index) bool
+        +get_all_objects() List
+        +get_all_indices() List
+        +clear()
         +num_nodes() int
     }
 ```
@@ -171,47 +181,42 @@ inline dict rather than this class.)
 ### 2.4 `8th-octave.json`
 
 A JSON data file containing pitch-frequency mappings for the 8th
-octave, used as reference data for frequency conversion utilities.
+octave.  Currently not loaded by any package code — reference data
+only.
 
 ---
 
 ## 3. Algorithm Usage Map
 
-Where each algorithm module is consumed:
+Where each algorithm module is consumed inside the package (per
+actual imports at HEAD):
 
 ```mermaid
 flowchart TD
     subgraph "utils/algorithms"
         basis["basis.py"]
-        costs["costs.py"]
         factors["factors.py"]
-        graphs_alg["graphs.py"]
         ratios["ratios.py"]
-        random_mod["random.py"]
+        lists["lists.py"]
     end
 
     subgraph "Consumers"
-        TL["ToneLattice"]
-        CPS["CombinationProductSet"]
-        RT["RhythmTree"]
-        HT["HarmonicTree"]
-        PLAY["Playback converters"]
-        VIS["Visualization layouts"]
+        TL["ToneLattice<br/>(tonos.systems.tone_lattices)"]
+        TU["tonos.utils<br/>(interval normalization)"]
+        PAT["Pattern<br/>(topos.collections.sequences)"]
     end
 
     basis --> TL
-    basis --> CPS
-    costs --> CPS
-    costs --> VIS
     factors --> TL
-    factors --> CPS
-    factors --> HT
-    graphs_alg --> VIS
-    graphs_alg --> PLAY
+    factors --> TU
     ratios --> TL
-    ratios --> CPS
-    random_mod --> RT
+    lists --> PAT
 ```
+
+`costs.py`, `graphs.py`, and `random.py` have **no in-package
+consumers** — they are user-facing composition utilities, typically
+paired with `topos.graphs.generators.from_cost_matrix` and `Graph`
+objects in user code and notebooks.
 
 ---
 

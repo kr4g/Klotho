@@ -183,8 +183,10 @@ mutator on an immutable class is a plain `AttributeError`:
 **Where:** `plot()`, `play()`, `convert_to_events()`,
 `convert_to_sc_events()`
 
-Multiple functions use `isinstance` chains to route different Klotho
-types to specialized handlers:
+Multiple functions route different Klotho types to specialized
+handlers — `plot()` with a structural `match`/`case` statement,
+`play()` and the converters with `isinstance` chains and handler
+tables (`dispatch_convert`):
 
 ```mermaid
 flowchart LR
@@ -321,10 +323,15 @@ behavior achieved through:
 
 - **Layers** (e.g. `RhythmLayer` / `ParameterLayer` attached to one
   tree — the primary composition mechanism, see §1.1).
-- **One deliberate mixin**: `ParameterApiMixin` provides the parameter
-  API surface (`set_pfields`, `set_instrument`, `clear_fields`, …) to
-  both `ParameterTree` and `CompositionalTree(ParameterApiMixin,
-  RhythmTree)` — the only multiple-inheritance site in the core.
+- **A small set of deliberate mixins**: `ParameterApiMixin` provides
+  the parameter API surface (`set_pfields`, `set_instrument`,
+  `clear_fields`, …) to both `ParameterTree` and
+  `CompositionalTree(ParameterApiMixin, RhythmTree)`;
+  `EquaveCyclicMixin` turns on equave-cyclic indexing for
+  `Scale`/`Chord` (tonos); `ReferencePitchAware` gives
+  `ToneLattice`/`CombinationProductSet`/`MasterSet` a reference pitch
+  and `.root()`; `_RepeatableTemporal` gives UT/UTS/BT `.repeat(n)`
+  (chronos).
 - **Metaclasses** (`TemporalMeta` for `Chronon` / `TemporalUnit`).
 - **Composition**: `CompositionalUnit` *has-a* fused
   `CompositionalTree` (`uc._rt`), carrying rhythm and parameters on a

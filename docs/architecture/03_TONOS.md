@@ -15,17 +15,22 @@ harmonic trees, tone lattices, and combination product sets.
 ```
 tonos/
 ├── __init__.py
+├── tonality.py                # Tonality, Key, tonicize, approach (roman-numeral harmony)
+├── types.py                   # Unit wrappers: Frequency, Midi, Midicent, Cent, Ratio, Partial
 ├── pitch/
 │   ├── __init__.py
 │   ├── pitch.py               # Pitch
-│   ├── pitch_collections.py   # PitchCollection hierarchy + PitchCollection factory
+│   ├── pitch_collections.py   # PitchCollectionBase hierarchy + PitchCollection factory
+│   ├── reference.py           # ReferencePitchAware mixin (root() for lattice-family)
 │   └── contour.py             # Contour (scale-degree index sequence)
 ├── scales/
 │   ├── __init__.py
-│   └── scale.py               # Scale, InstancedScale
+│   └── scale.py               # Scale
 ├── chords/
 │   ├── __init__.py
-│   └── chord.py               # Chord, Voicing, ChordSequence
+│   ├── chord.py               # Chord, Voicing, ChordSequence
+│   ├── analysis.py            # root_index, chord_root (JI chord analysis)
+│   └── voice_leading.py       # fold, voice_lead
 ├── systems/
 │   ├── __init__.py
 │   ├── harmonic_trees/
@@ -35,11 +40,14 @@ tonos/
 │   │   └── algorithms.py      # harmonic evaluation helpers
 │   ├── tone_lattices/
 │   │   ├── __init__.py
-│   │   ├── tone_lattices.py   # ToneLattice(Lattice)
+│   │   ├── tone_lattices.py   # ToneLattice(ReferencePitchAware, Lattice)
 │   │   └── basis.py           # basis matrix, generator coordinates
+│   ├── tonnetz/
+│   │   ├── __init__.py
+│   │   └── tonnetz.py         # Tonnetz(ToneLattice) — triangular pitch lattice
 │   └── combination_product_sets/
 │       ├── __init__.py
-│       ├── combination_product_sets.py  # CombinationProductSet(CombinationSet)
+│       ├── combination_product_sets.py  # CombinationProductSet(ReferencePitchAware, CombinationSet)
 │       ├── master_set.py               # MasterSet layout templates + MASTER_SETS registry
 │       └── algorithms.py               # match_pattern, sub_cps, classify, faces
 └── utils/
@@ -61,20 +69,34 @@ abstract to concrete:
 classDiagram
     class PitchCollectionBase {
         <<abstract>>
+        +degrees
         +pitches
         +intervals
+        +freqs : tuple
         +__len__()
         +is_relative : bool
-        +is_instanced : bool
         +reference_pitch : Pitch | None
+        +equave
+        +equave_cyclic : bool
+        +equave_shift(n)
+        +index(value) int
+    }
+
+    class EquaveCyclicMixin {
+        <<mixin>>
+        _equave_cyclic_enabled = True
     }
 
     class RelativePitchCollection {
-        +degrees : list[Fraction]
-        +intervals : list[Fraction]
-        +is_instanced : bool
-        +root(pitch) collection
-        +relative() RelativePitchCollection
+        +degrees : list
+        +intervals : list
+        +degree_dtype : type | None
+        +root(pitch) same class
+        +transpose(interval) same class
+        +as_voicing()
+        +from_degrees(...)$
+        +from_intervals(...)$
+        +from_setclass(...)$
     }
 
     class AbsolutePitchCollection {
@@ -82,14 +104,17 @@ classDiagram
         +intervals : derived
     }
 
-    class RootedPitchCollection {
-        +reference_pitch : Pitch
-        +pitches : root × degrees
+    class PitchCollection {
+        <<factory>>
+        +from_degrees(...)$
+        +from_intervals(...)$
+        +from_setclass(...)$
     }
 
     PitchCollectionBase <|-- RelativePitchCollection
     PitchCollectionBase <|-- AbsolutePitchCollection
-    RelativePitchCollection <|-- RootedPitchCollection
+    EquaveCyclicMixin <|-- Scale
+    EquaveCyclicMixin <|-- Chord
     RelativePitchCollection <|-- Scale
     RelativePitchCollection <|-- Chord
     RelativePitchCollection <|-- Voicing
@@ -97,6 +122,8 @@ classDiagram
     class Scale {
         +degrees : tuple
         +mode(mode_number) Scale
+        +__invert__() Scale
+        +__neg__() Scale
         +root(pitch) Scale
     }
 
@@ -131,32 +158,45 @@ pitch-collections doc).
 ### Key Distinctions
 
 All of `Scale`, `Chord`, and `Voicing` extend `RelativePitchCollection`
-directly.  They are **not** subclasses of each other — they are
-specialized variants that enforce different constraints on the same
-interval-based foundation.  Any `RelativePitchCollection` can be
-given a root via `.root(pitch)` to produce concrete pitches.
+directly (`Scale` and `Chord` additionally mix in
+`EquaveCyclicMixin`, which turns on equave-cyclic indexing).  They
+are **not** subclasses of each other — they are specialized variants
+that enforce different constraints on the same interval-based
+foundation.
 
 | Class | Inherits from | Defined by | Key behavior |
 |---|---|---|---|
-| `RelativePitchCollection` | `PitchCollectionBase` | Interval ratios/cents | `.root(pitch)` → `RootedPitchCollection`; `.is_instanced` flag |
-| `RootedPitchCollection` | `RelativePitchCollection` | Root + intervals | Has `reference_pitch`; produces `Pitch` objects |
-| `Scale` | `RelativePitchCollection` | Intervals | Enforces unison, sorts, equave-reduces, adds `.mode(n)` |
-| `Chord` | `RelativePitchCollection` | Intervals | Sorts, equave-reduces, no unison required; inversion via `~chord` / `-chord` |
+| `RelativePitchCollection` | `PitchCollectionBase` | Interval ratios/cents | `.root(pitch)` → rooted copy of the **same class**; `.transpose(interval)` |
+| `Scale` | `EquaveCyclicMixin`, `RelativePitchCollection` | Intervals | Enforces unison, sorts, equave-reduces, adds `.mode(n)` |
+| `Chord` | `EquaveCyclicMixin`, `RelativePitchCollection` | Intervals | Sorts, equave-reduces, no unison required; inversion via `~chord` / `-chord` |
 | `Voicing` | `RelativePitchCollection` | Intervals | **No** equave reduction — preserves multi-octave spacing |
 | `AbsolutePitchCollection` | `PitchCollectionBase` | Absolute `Pitch` objects | Stores concrete pitches directly |
+| `PitchCollection` | *(factory class)* | — | Unified classmethod constructors (`from_degrees`, `from_intervals`, `from_setclass`, …) dispatching to Relative/Absolute |
 
 ### `Pitch`
 
 A single pitch, wrapping a frequency ratio (`Fraction`).  Supports
 conversion to/from MIDI, midicents, Hz, and pitch-class names.
 
-### Instanced Collections
+### Rooting
 
-`InstancedScale`, `InstancedChord`, `InstancedVoicing` are type
-aliases (not separate classes) — they are simply `Scale`, `Chord`,
-and `Voicing` respectively, constructed with a `reference_pitch`.
-Any relative collection becomes "instanced" when `.root(pitch)` is
-called, producing concrete `Pitch` objects with Hz values.
+There is no separate "rooted" or "instanced" class (the former
+`RootedPitchCollection` and `Instanced*` aliases are gone).  Every
+collection is anchored to a `reference_pitch` that **defaults to
+C4** — pass one at construction or call `.root(pitch)`, which
+returns a re-anchored copy of the same class whose `pitches`/`freqs`
+resolve to concrete Hz values:
+
+```python
+s = Scale([1, '9/8', '5/4', '4/3', '3/2', '5/3', '15/8'])
+a = s.root('A4')          # still a Scale; a.pitches[0] == Pitch(A4)
+```
+
+The graph-shaped tonal systems get the same idea from the
+**`ReferencePitchAware`** mixin (`pitch/reference.py`, 10.7.0):
+`CombinationProductSet`, `ToneLattice`, and `MasterSet` carry a
+`reference_pitch` (default C4) and a `.root(pitch)` that returns a
+re-anchored copy sharing the same immutable graph.
 
 ---
 
@@ -255,7 +295,7 @@ fundamental (Hz or `Pitch`) plus a list of partials — there is no
 ## 3. ToneLattice
 
 **File:** `tonos/systems/tone_lattices/tone_lattices.py`  
-**Inherits:** `Lattice` (from `topos.graphs`)
+**Inherits:** `ReferencePitchAware`, `Lattice` (from `topos.graphs`)
 
 An *n*-dimensional lattice where each coordinate axis corresponds to
 a prime (or user-defined generator) and each node represents a
@@ -266,13 +306,20 @@ frequency ratio.
 ```mermaid
 classDiagram
     Lattice <|-- ToneLattice
+    ReferencePitchAware <|-- ToneLattice
 
     class ToneLattice {
-        +generators : tuple[Fraction]
+        +generators : list[Fraction]
+        +prime_basis : list[int]
         +equave : Fraction
+        +equave_reduce : bool
         +bipolar : bool
+        +coord_label : str
+        +reference_pitch : Pitch
         +get_ratio(coord) Fraction
-        +get_coordinates_for_ratio(ratio, lookup, warn) tuple | list | None
+        +get_coordinates_for_ratio(ratio, lookup, warn, warn_once) tuple | list | None
+        +root(pitch) ToneLattice
+        +with_generators(generators) ToneLattice
         +from_generators(generators, resolution, ...)$ ToneLattice
     }
 ```
@@ -302,19 +349,61 @@ The **default** basis uses raw prime generators, one per axis
 - Axis 2 → powers of 7, etc.
 
 Stacked-interval bases like `(3/2, 5/4)` are opt-in via
-`from_generators`.  Ratio → coordinate lookup supports `"first"`,
-`"unique"`, and `"all"` modes and emits a `ToneLatticeLookupWarning`
-for ambiguous matches.
+`from_generators`; `with_generators(generators)` re-bases an existing
+lattice onto a new generator set over the same board (10.8.0).
+
+Ratio → coordinate lookup (`get_coordinates_for_ratio`) supports
+`"first"`, `"unique"`, and `"all"` modes and emits a
+`ToneLatticeLookupWarning` for ambiguous matches.  Matching is by
+**equave class** in both reduce modes (10.9.3): a target ratio finds
+a node whose ratio differs only by equave powers.
 
 The lattice is **immutable** after construction (inherited from
-`Lattice` — no mutators exist).
+`Lattice` — no mutators exist); `root(pitch)` returns a re-anchored
+copy sharing the same graph.
+
+---
+
+## 3b. Tonnetz
+
+**File:** `tonos/systems/tonnetz/tonnetz.py`  
+**Inherits:** `ToneLattice` (new in 10.9.0)
+
+A triangular pitch lattice (default fifths-by-thirds) whose cells are
+triangles.  Shapes (from `topos.shapes`) move over it with
+neo-Riemannian-style operations:
+
+```mermaid
+classDiagram
+    ToneLattice <|-- Tonnetz
+
+    class Tonnetz {
+        +directions : dict
+        +symmetries(reflections=False) list
+        +reflect(cells, edge=None, axis=None, through=(0,0)) Shape
+        +rotate(cells, n=1, about=(0,0)) Shape
+        +flip(cells, move) Shape
+        +perform(cells, moves) list[Shape]
+        +with_generators(generators) Tonnetz
+        +from_generators(...)$ Tonnetz
+    }
+```
+
+`flip(cells, move)` reflects a triangle across one of its own edges;
+the letter moves are named for the default basis — `'P'` (parallel),
+`'R'` (relative), `'L'` (leading-tone), `'S'` (slide) — and any other
+move is treated as an axis for the edge search.  `perform(cells,
+moves)` folds a move sequence into the list of visited shapes.
+`plot(tonnetz)` uses the triangular `layout='tonnetz'` rendering (see
+the semeios doc).
 
 ---
 
 ## 4. Combination Product Sets (CPS)
 
 **File:** `tonos/systems/combination_product_sets/combination_product_sets.py`  
-**Inherits:** `CombinationSet` (from `topos.collections.sets`, itself a `GraphCore`)
+**Inherits:** `ReferencePitchAware`, `CombinationSet` (from
+`topos.collections.sets`, itself a `GraphCore`)
 
 Erv Wilson's **Combination Product Sets**: given a set of *n*
 harmonic factors and a combination size *r*, the CPS is the set of
@@ -327,6 +416,8 @@ there is no separate `.graph` property.
 classDiagram
     GraphCore <|-- CombinationSet
     CombinationSet <|-- CombinationProductSet
+    ReferencePitchAware <|-- CombinationProductSet
+    ReferencePitchAware <|-- MasterSet
 
     class CombinationSet {
         +factors : tuple
@@ -343,6 +434,8 @@ classDiagram
         +master_set : str
         +master_set_instance : MasterSet
         +aliases : dict
+        +reference_pitch : Pitch
+        +root(pitch) CombinationProductSet
         +hexany(factors)$
         +dekany(factors, r)$
         +pentadekany(factors, r)$
@@ -408,6 +501,38 @@ CPS analysis helpers live in `algorithms.py`: `match_pattern`,
 
 ---
 
+## 4b. Tonality and Key
+
+**File:** `tonos/tonality.py` (new in 10.6.0)
+
+`Tonality` maps **chord symbols to sonorities** over any scale and
+tuning: a tonic, named "shelf" scales that supply chord roots,
+`qualities` that plant a scale-plus-stencil on a root, an explicit
+`chords` vocabulary, and weighted `functions`.  `Key(Tonality)` is
+the common-practice specialization: case-sensitive roman numerals
+over just-intonation modal shelves (`V7/V` recursion, `b`/`#`
+prefixes, `7 maj7 ø7 o o7` suffixes).
+
+| Symbol | Purpose |
+|---|---|
+| `Tonality(tonic, scale=None, shelves=None, qualities=None, chords=None, functions=None, …)` | General symbol → sonority mapping |
+| `Key(tonic, mode='major', …)` | Roman-numeral common-practice tonality |
+| `tonicize(symbols, probability, dominant='V7', skip=('I','i'), rng=None)` | Stochastically prefix secondary dominants |
+| `approach(symbols, probability, with_=('ii7','V7'), tritone=0.0, rng=None)` | Stochastically insert approach chords |
+
+## 4c. Chord Analysis and Voice Leading
+
+**Files:** `tonos/chords/analysis.py`, `tonos/chords/voice_leading.py`
+
+| Function | Purpose |
+|---|---|
+| `root_index(degrees, equave=2)` | Index of the perceptual root of a JI chord |
+| `chord_root(degrees, equave=2)` | The root degree itself |
+| `fold(collection, lo=None, hi=None) → Voicing` | Fold a collection's degrees into a register window |
+| `voice_lead(chords, lo=None, hi=None) → list[Voicing]` | Minimal-motion voice leading through a chord list |
+
+---
+
 ## 5. Tonos Utilities
 
 ### `frequency_conversion.py`
@@ -467,18 +592,29 @@ classDiagram
 
     PitchCollectionBase <|-- RelativePitchCollection
     PitchCollectionBase <|-- AbsolutePitchCollection
-    RelativePitchCollection <|-- RootedPitchCollection
+    EquaveCyclicMixin <|-- Scale
+    EquaveCyclicMixin <|-- Chord
     RelativePitchCollection <|-- Scale
     RelativePitchCollection <|-- Chord
     RelativePitchCollection <|-- Voicing
 
     Tree <|-- HarmonicTree
     Lattice <|-- ToneLattice
+    ToneLattice <|-- Tonnetz
     GraphCore <|-- CombinationSet
     CombinationSet <|-- CombinationProductSet
+    ReferencePitchAware <|-- ToneLattice
+    ReferencePitchAware <|-- CombinationProductSet
+    ReferencePitchAware <|-- MasterSet
+
+    Tonality <|-- Key
 ```
 
 `MasterSet` and the named CPS types (`Hexany`, `Dekany`, …) do not
-appear in the inheritance tree: the former is a standalone layout
-template, the latter are aliases to `CombinationProductSet`
-classmethods.
+appear as CPS subclasses: the former is a standalone layout template
+(now `ReferencePitchAware`), the latter are aliases to
+`CombinationProductSet` classmethods.  The `Unit` wrappers in
+`tonos/types.py` (`Frequency`, `Midi`, `Midicent`, `Cent`, `Ratio`,
+`Partial`, with factory functions `frequency`, `midi`, `midicent`,
+`cent`, `ratio`, `partial`) extend `topos.Unit` and are re-exported
+from `klotho.tonos`.

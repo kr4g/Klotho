@@ -3,7 +3,7 @@
 This document maps the actual `import` and `from … import`
 relationships between Klotho's subpackages and modules.  It is based
 on an AST scan of all cross-subpackage imports in the codebase at
-version 10.1.1 (intra-subpackage imports are omitted for clarity;
+version 10.11.0 (intra-subpackage imports are omitted for clarity;
 deferred function-body imports are counted and marked).
 
 ---
@@ -22,14 +22,16 @@ graph TD
 
     UTILS -->|"lists (deferred)"| TOPOS
     TOPOS -->|"Tree, Group,<br/>patterns, types"| CHRONOS
-    TOPOS -->|"Tree, Lattice,<br/>CombinationSet, types"| TONOS
+    TOPOS -->|"Tree, Lattice, Shape,<br/>CombinationSet, types"| TONOS
     TOPOS -->|"Tree, Lattice,<br/>Pattern, types"| THETOS
     TOPOS -->|"types (Unit)"| DYNATOS
+    TOPOS -->|"Graph<br/>(algorithms.graphs)"| UTILS
     UTILS -->|"enums"| CHRONOS
     UTILS -->|"factors, enums,<br/>ratios, basis"| TONOS
     UTILS -->|"SafeDict, playback"| THETOS
     CHRONOS -->|"TemporalUnit,<br/>Chronon, RhythmTree"| THETOS
     TONOS -->|"Pitch, Scale,<br/>Chord, HarmonicTree"| UTILS
+    TONOS -->|"Pitch, Chord, Voicing<br/>(deferred)"| THETOS
     DYNATOS -->|"Envelope"| THETOS
     DYNATOS -->|"freq_amp_scale"| UTILS
 
@@ -55,22 +57,28 @@ An arrow **A → B** means "B imports from A."  For example,
 ## 2. Dependency Counts
 
 How many files in each subpackage import from each other (AST scan at
-10.1.1; cells count importer files, includes deferred function-body
+10.11.0; cells count importer files, includes deferred function-body
 imports):
 
 | Imported by ↓ / Imports from → | topos | chronos | tonos | dynatos | thetos | semeios | utils |
 |---|---|---|---|---|---|---|---|
 | **topos** | — | | | | | | 1² |
 | **chronos** | 3 | — | | | 1¹ | | 2 |
-| **tonos** | 4 | | — | | | | 5 |
+| **tonos** | 7 | | — | | | | 5 |
 | **dynatos** | 1³ | | | — | | | |
-| **thetos** | 3 | 2 | | 1 | — | | 4 |
-| **semeios** | 3 | 2 | 2 | 1 | 4 | — | 8² |
-| **utils** | 1 | 4 | 4 | 1 | 8 | 1¹ | — |
+| **thetos** | 5 | 2 | 1¹ | 1 | — | | 7 |
+| **semeios** | 3 | 3 | 3 | 1 | 4 | — | 8² |
+| **utils** | 1 | 5 | 4 | 1 | 8 | 1¹ | — |
 
 ¹ Deferred (function-body) imports that break would-be cycles — see §6.  
 ² Mostly deferred imports of playback helpers from inside plot/animation functions.  
 ³ `dynatos/types.py` imports the `Unit` base from `topos.types`.
+
+Growth since the 10.1.1 scan: tonos←topos 4→7 (`contour.py`,
+`tonality.py`, `tonnetz.py`), thetos←utils 4→7 (`events.py`,
+`ensemble.py`, `synthdef.py`), thetos←tonos 0→1 (deferred, in
+`compositional.py`), semeios←chronos 2→3 (`svg_timeline.py`),
+utils←chronos 4→5 (`player.py`).
 
 ---
 
@@ -135,17 +143,18 @@ Also expected — the converter must handle every playable type.
 
 ### `thetos/composition/compositional.py`
 
-**Fan-out:** 4 cross-package targets  
-**Fan-in:** 8 external files — the most-imported module
+**Fan-out:** 5 cross-package targets  
+**Fan-in:** ~9 external files — the most-imported module
 
 Imports from: `chronos` (TemporalUnit, RhythmTree, Chronon, selector
 types), `dynatos.envelopes` (Envelope), `topos.collections.sequences`
-(Pattern), plus intra-thetos `parameters` and `instruments`
+(Pattern), `tonos` (Pitch/Chord/Voicing, deferred), plus intra-thetos
+`parameters` and `instruments`
 
-Imported by: semeios (`plots.py`, `plot_rt.py`, `svg_rt.py`), utils
-playback (`_converter_base.py`, `midi_player.py`,
-`tonejs/converters.py`, `supersonic/converters.py`), and chronos
-(`temporal_units/algorithms.py`, deferred)
+Imported by: semeios (`plots.py`, `plot_rt.py`, `svg_rt.py`,
+`_animation/base.py`), utils playback (`_converter_base.py`,
+`midi_player.py`, `tonejs/converters.py`, `supersonic/converters.py`),
+and chronos (`temporal_units/algorithms.py`, deferred)
 
 ### `thetos/composition/score.py`
 
@@ -216,7 +225,10 @@ flowchart LR
         ht["harmonic_trees.harmonic_tree"]
         tl["tone_lattices.tone_lattices"]
         tl_basis["tone_lattices.basis"]
+        tn["tonnetz.tonnetz"]
         cps["combination_product_sets"]
+        tone_contour["pitch.contour"]
+        tonality["tonality"]
         to_types["types"]
         t_freq["utils.frequency_conversion"]
         t_norm["utils.interval_normalization"]
@@ -227,6 +239,9 @@ flowchart LR
         tree["graphs (Tree)"]
         lattice["graphs.lattices (Lattice)"]
         combset["collections.sets (CombinationSet)"]
+        shapes["shapes (Shape)"]
+        grammars["formal_grammars (RuleSet)"]
+        pattern["collections.sequences (Pattern)"]
         t_types["types (Unit)"]
     end
 
@@ -239,6 +254,9 @@ flowchart LR
 
     tree --> ht
     lattice --> tl
+    shapes --> tn
+    pattern -.->|"deferred"| tone_contour
+    grammars -.->|"deferred"| tonality
     combset --> cps
     t_types --> to_types
     factors --> tl
@@ -261,10 +279,13 @@ flowchart LR
     subgraph thetos
         comp["composition.compositional"]
         score["composition.score"]
+        events["composition.events"]
         pt["parameters.parameter_tree"]
         pf["parameters.parameter_field"]
         inst_base["instruments.base"]
         inst_tone["instruments.tone"]
+        inst_sdef["instruments.synthdef"]
+        inst_ens["instruments.ensemble"]
         inst_shared["instruments._shared"]
     end
 
@@ -276,6 +297,10 @@ flowchart LR
 
     subgraph chronos
         ut["TemporalUnit, RhythmTree, Chronon"]
+    end
+
+    subgraph tonos
+        tpitch["Pitch, Chord, Voicing"]
     end
 
     subgraph dynatos
@@ -293,10 +318,14 @@ flowchart LR
     ut --> comp
     ut --> score
     env --> comp
+    tpitch -.->|"deferred"| comp
     safedict --> inst_base
     safedict --> inst_tone
     playback -.->|"deferred"| score
     playback -.->|"deferred"| inst_shared
+    playback -.->|"deferred"| inst_sdef
+    playback -.->|"deferred"| events
+    safedict --> inst_ens
 ```
 
 (`thetos/types.py` is intentionally empty — typed units live in the
@@ -309,11 +338,13 @@ flowchart LR
     subgraph semeios
         plots["visualization.plots"]
         plot_rt["_dispatch.plot_rt"]
+        plot_tline["_dispatch.plot_timeline"]
         plot_cps["_dispatch.plot_cps"]
         plot_lat["_dispatch.plot_lattice"]
         plot_pat["_plot_pattern"]
         klotho_plot["_dispatch._klotho_plot"]
         svg_rt["_renderers.svg_rt"]
+        svg_tline["_renderers.svg_timeline"]
         anim_base["_animation.base"]
         anim["_animation.animated"]
     end
@@ -370,9 +401,12 @@ flowchart LR
     comp --> plot_rt
     comp --> svg_rt
     comp --> anim_base
+    c_ut --> svg_tline
     cps_mod --> plot_cps
     t_lattice --> plot_lat
+    scales --> plot_lat
     playback -.-> plot_rt
+    playback -.-> plot_tline
     playback -.-> plot_cps
     playback -.-> plot_lat
     playback -.-> klotho_plot
@@ -449,6 +483,7 @@ flowchart LR
     inst -.->|"deferred"| registry
 
     score -.->|"deferred"| player
+    ut -.->|"deferred"| player
     kp -.->|"deferred"| player
 ```
 
@@ -476,9 +511,10 @@ There is also a structural cycle between `utils.playback.player`
 and `semeios.visualization._dispatch` (KlothoPlot), resolved the
 same way — the import in `player.py` is inside the function body.
 The same deferred-import pattern appears throughout: semeios dispatch
-and animation modules defer their playback imports, `score.py` and
-`instruments/_shared.py` defer their utils imports, and
-`supersonic/registry.py` defers its thetos import.
+and animation modules defer their playback imports; `score.py`,
+`events.py`, `instruments/_shared.py`, and `instruments/synthdef.py`
+defer their utils imports; `supersonic/registry.py` defers its thetos
+import; and `compositional.py` defers its tonos imports.
 
 ---
 

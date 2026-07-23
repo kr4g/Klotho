@@ -36,7 +36,7 @@ graph TD
 
     subgraph "Layer 2 — Domain"
         chronos["<b>chronos</b><br/>RhythmTree · TemporalUnit<br/>Sequences · Blocks"]
-        tonos["<b>tonos</b><br/>Pitch · Scale · Chord<br/>HarmonicTree · ToneLattice · CPS"]
+        tonos["<b>tonos</b><br/>Pitch · Scale · Chord<br/>HarmonicTree · ToneLattice · Tonnetz · CPS"]
         dynatos["<b>dynatos</b><br/>Envelope · DynamicRange"]
     end
 
@@ -73,8 +73,8 @@ mutators plus attachable `TreeLayer` objects for domain behavior, and
 (`path_graph`, `complete_graph`, …) are module-level functions in
 `topos.graphs.generators`.  Also: `Group`, collection types
 (`Pattern`, `CombinationSet`, `PartitionSet`, `Sieve`), formal
-grammars, and pure-math algorithms (prime factorization, cost
-matrices, graph traversals).
+grammars, polyomino shapes (`topos.shapes`), and pure-math
+algorithms (prime factorization, cost matrices, graph traversals).
 
 ### Layer 2 — Domain (`chronos`, `tonos`, `dynatos`)
 
@@ -83,7 +83,8 @@ Musical domains built on topos structures:
 - **chronos** — time and rhythm.  `RhythmTree` extends `Tree` and
   attaches a `RhythmLayer`.
 - **tonos** — pitch and harmony.  `HarmonicTree` extends `Tree`
-  (with a `HarmonicLayer`); `ToneLattice` extends `Lattice`;
+  (with a `HarmonicLayer`); `ToneLattice` extends `Lattice` (and
+  `Tonnetz` extends `ToneLattice`);
   `CombinationProductSet` extends `CombinationSet` (a `GraphCore`).
 - **dynatos** — dynamics and envelopes (standalone; no graph
   inheritance).
@@ -96,11 +97,13 @@ Bridges every domain layer into a unified composition object.
 parameter layer — yielding `Parametron` events that carry temporal
 and parametric data together.  (`ParameterTree` remains available as
 a standalone parameter tree and as the type of derived snapshots.)
-`Score` / `ScoreItem` arrange multiple units on a shared timeline.
+`Score` / `ScoreItem` arrange multiple units on a shared timeline
+(with `Event` / `EventItem` for one-shot score events).
 Instrument definitions (`SynthDefInstrument`, `MidiInstrument`,
-`ToneInstrument`, `Kit`, `Ensemble`) live here.  Typed unit wrappers
-(`frequency`, `midi`, `amplitude`, etc.) ensure dimensional
-correctness.
+`ToneInstrument`, `Kit`, `SynthDefKit`, `Ensemble`) live here, along
+with `Bind` for parameter binding and `Effect` / `SynthDefFX` for
+insert effects.  Typed unit wrappers (`frequency`, `midi`,
+`amplitude`, etc.) ensure dimensional correctness.
 
 ### Layer 4 — Output (`semeios`, `utils.playback`)
 
@@ -118,9 +121,9 @@ supports MIDI file export.
 |---|---|---|---|
 | `topos` | τόπος — "place" | Abstract structure | `GraphCore`, `Graph`, `Tree`, `Lattice`, `Group`, `Pattern`, `CombinationSet`, `PartitionSet`, `Sieve`, `GenCol` |
 | `chronos` | χρόνος — "time" | Rhythm & time | `RhythmTree`, `Meas`, `RhythmPair`, `TemporalUnit`, `TemporalUnitSequence`, `TemporalBlock`, `Chronon` |
-| `tonos` | τόνος — "tone" | Pitch & harmony | `Pitch`, `Scale`, `Chord`, `Voicing`, `ChordSequence`, `Contour`, `HarmonicTree`, `Spectrum`, `ToneLattice`, `CombinationProductSet`, `MasterSet` |
+| `tonos` | τόνος — "tone" | Pitch & harmony | `Pitch`, `Scale`, `Chord`, `Voicing`, `ChordSequence`, `Tonality`, `Key`, `Contour`, `HarmonicTree`, `Spectrum`, `ToneLattice`, `Tonnetz`, `CombinationProductSet`, `MasterSet` |
 | `dynatos` | δυνατός — "powerful" | Dynamics & expression | `Dynamic`, `DynamicRange`, `Envelope` |
-| `thetos` | θέτος — "placed" | Composition & params | `ParameterTree`, `ParameterField`, `CompositionalUnit`, `Parametron`, `Score`, `ScoreItem`, `Instrument`, `SynthDefInstrument`, `MidiInstrument`, `ToneInstrument`, `Kit`, `Ensemble`, `Unit` subclasses |
+| `thetos` | θέτος — "placed" | Composition & params | `ParameterTree`, `ParameterField`, `Bind`, `CompositionalUnit`, `Parametron`, `Score`, `ScoreItem`, `Event`, `EventItem`, `Instrument`, `SynthDefInstrument`, `MidiInstrument`, `ToneInstrument`, `Effect`, `SynthDefFX`, `Kit`, `SynthDefKit`, `Ensemble`, `Unit` subclasses |
 | `semeios` | σημεῖον — "sign" | Visualization & notation | `plot()`, `KlothoPlot` |
 | `utils` | — | Shared utilities | algorithms, data structures, playback engines |
 
@@ -159,7 +162,7 @@ These short aliases appear frequently in code and discussion:
 
 ## Module Count
 
-~160 Python modules across 7 main subpackages, organized in the tree
+~178 Python modules across 7 main subpackages, organized in the tree
 shown below.
 
 ```
@@ -167,11 +170,11 @@ klotho/
 ├── __init__.py
 ├── chronos/          (15 modules)
 ├── dynatos/          (11 modules)
-├── semeios/          (26 modules)
-├── thetos/           (19 modules)
-├── tonos/            (27 modules)
-├── topos/            (20 modules)
-└── utils/            (39 modules)
+├── semeios/          (29 modules)
+├── thetos/           (21 modules)
+├── tonos/            (33 modules)
+├── topos/            (27 modules)
+└── utils/            (40 modules)
 ```
 
 ---

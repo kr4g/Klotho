@@ -23,7 +23,8 @@ thetos/
 ├── composition/
 │   ├── __init__.py
 │   ├── compositional.py             # CompositionalTree, CompositionalUnit, Parametron, selectors
-│   └── score.py                     # Score, ScoreItem — multi-unit timeline
+│   ├── events.py                    # Event — one-shot score events (SetSpec/ReleaseSpec)
+│   └── score.py                     # Score, ScoreItem, EventItem — multi-unit timeline
 ├── instruments/
 │   ├── __init__.py
 │   ├── base.py                      # Instrument, Kit, Effect (bases)
@@ -35,6 +36,7 @@ thetos/
 │   └── presets.py                   # preset definitions
 └── parameters/
     ├── __init__.py
+    ├── bind.py                      # Bind — per-node re-evaluated pfield values
     ├── parameter_tree.py            # ParameterLayer, ParameterApiMixin, ParameterTree
     └── parameter_fields/
         ├── __init__.py
@@ -201,6 +203,13 @@ classDiagram
 | **mfields** (meta fields) | Metadata that affects rendering behavior | `group`, `slur`, `articulation` |
 
 Both follow the same inheritance model.
+
+### Bind
+
+`Bind` (`parameters/bind.py`) marks a pfield/mfield value that
+**re-evaluates per reading node** instead of being resolved once at
+write time — the late-binding escape hatch in the otherwise
+store-rich/lower-late parameter model.
 
 ### Instrument Resolution
 
@@ -433,7 +442,7 @@ classDiagram
         +events : DataFrame
         +set_pfields(node, **kwargs)
         +set_mfields(node, **kwargs)
-        +set_instrument(node, instrument)
+        +set_instrument(node, instrument, include_rests=False)
         +apply_envelope(envelope, pfields, node, ...)
         +apply_slur(node, offset, take, mode)
         +clear_parameters(node=None)
@@ -544,13 +553,19 @@ data (`pfields`/`mfields`/`instrument`) for the parent node. Parent
 views are not in the current distribution selection, so selection
 fields (`index`, `total`) are intentionally absent there.
 
+`set_instrument` accepts the same distribution forms (an
+`Instrument`, kit-member key, `Pattern`, or callable) and **skips
+rests by default** when distributing — pass `include_rests=True` to
+advance the pattern on rests too (10.9.1).
+
 ### Selector Surface (UT/UC)
 
 Selector traversal and targeting are now node-handle-first:
 
-- `for branch in uc.at_depth(d): ...` yields `NodeHandle` objects
+- `for branch in uc.at_depth(d): ...` yields node handles
+  (`UTNodeHandle` / `UCNodeHandle`)
 - raw integer IDs are available via `handle.id` and selection-level `.ids`
-- subtree navigation (`.leaves`, `.children`) lives on `NodeHandle`
+- subtree navigation (`.leaves`, `.children`) lives on the node handle
 - owner helpers `uc.leaves_of(...)` / `uc.successors(...)` stay singleton-only
   and accept an `int`, `NodeHandle`, or singleton selector
 - `uc.select(...)` accepts ints, node handles, selectors, and
@@ -642,6 +657,10 @@ Key surface:
 score-aware SuperSonic playback consume the assembled timeline (see
 the playback doc).
 
+One-shot score events use **`Event`** (`composition/events.py`, with
+`SetSpec`/`ReleaseSpec` action specs); adding one to a score wraps it
+in an **`EventItem(ScoreItem)`** rather than a plain `ScoreItem`.
+
 ---
 
 ## 7. End-to-End Composition Flow
@@ -691,15 +710,17 @@ flowchart TD
 
 ## 8. Exported API
 
-From `klotho.thetos`:
+`klotho.thetos.__all__`:
 
 ```python
-ParameterTree, ParameterField
-Instrument, Effect, SynthDefInstrument, SynthDefFX, MidiInstrument,
-ToneInstrument, Kit, SynthDefKit, Ensemble
-CompositionalUnit, Parametron, Score, ScoreItem
+ParameterTree, ParameterField, Bind
+Instrument, Effect, SynthDefFX, Kit, SynthDefKit, Ensemble
+CompositionalUnit, Parametron, Score, ScoreItem, Event, EventItem
 frequency, cent, midicent, midi, amplitude, decibel
 real_onset, real_duration, metric_onset, metric_duration
 ```
 
-The type factories are also available via the `klotho.types` module.
+The backend classes `SynthDefInstrument`, `MidiInstrument`, and
+`ToneInstrument` are importable from `klotho.thetos` (via
+`klotho.thetos.instruments`) though not listed in `__all__`.  The
+type factories are also available via the `klotho.types` module.

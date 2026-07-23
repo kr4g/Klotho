@@ -1,8 +1,31 @@
 Changelog
 =========
 
-Version 10.9.0 (Current)
-------------------------
+Version 10.11.1 (Current)
+-------------------------
+
+* Architecture documentation refreshed across all ``docs/architecture/``
+  guides for the 10.x API: Tonnetz, polyomino shapes, kit families and
+  SynthDef path aliases, score events, lattice scale/shape playback,
+  playback engine details, and updated module counts
+* Sphinx ``index.rst`` overview updated (Tonnetz, kits/ensembles, playback)
+
+Version 10.11.0
+---------------
+
+* ``plot(..., nodes=<Scale>)`` highlights lattice coordinates for scale
+  degrees with equave-run shape playback
+
+Version 10.10.0
+---------------
+
+* New SuperSonic SynthDef libraries: **chip**, **edm**, **lofi**, and
+  **tr808** (85 defs) with ``kinds.json`` classification
+* ``Kit``/``Ensemble`` **families** with ``pick``/``cycle`` views
+* SynthDef **path aliases** (``edm/kick`` → ``edm_kick``)
+
+Version 10.9.0
+--------------
 
 * New ``Tonnetz`` tone-lattice system (``klotho.tonos.systems.tonnetz``):
   a two-generator triangular lattice (default 3/2 x 5/4, derived third

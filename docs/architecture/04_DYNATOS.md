@@ -52,8 +52,8 @@ classDiagram
     }
 
     class DynamicRange {
-        +min_dynamic : float
-        +max_dynamic : float
+        +min_dynamic : Dynamic
+        +max_dynamic : Dynamic
         +curve : float
         +ranges : dict[str, Dynamic]
         +__getitem__(marking) Dynamic
@@ -99,15 +99,16 @@ classDiagram
     class Envelope {
         +values : list[float]
         +times : list[float]
+        +warp : str
         +time_scale : float
         +total_time : float
         +breakpoint_times : list[float]
         +normalized_times : list[float]
         +at_time(t) float
-        +perc(attackTime, releaseTime, curve)$
-        +adr(attackTime, decayTime, decayLevel, releaseTime)$
-        +adsr(attackTime, decayTime, sustainTime, sustainLevel, releaseTime)$
-        +pairs(pairs, curve)$
+        +perc(attackTime=0.01, releaseTime=1.0, curve=-4.0, ...)$
+        +adr(attackTime, decayTime, decayLevel, releaseTime, ...)$
+        +adsr(attackTime, decayTime, sustainTime, sustainLevel, releaseTime, ...)$
+        +pairs(pairs, curve=0.0, ...)$
     }
 ```
 
@@ -124,9 +125,12 @@ env = Envelope.adsr()          # classic shapes as classmethods
 env = Envelope.perc(attackTime=0.01, releaseTime=1.0)
 ```
 
-The constructor also accepts `normalize_values`, `normalize_times`,
-`value_scale`, and `time_scale` options.  (Curve data is internal —
-there is no public `curves` property.)
+The full constructor is `Envelope(values, times=1.0, curve=0.0,
+warp='lin', normalize_values=False, normalize_times=False,
+value_scale=1.0, time_scale=1.0)` — `times` may be a scalar (applied
+to every segment) or a per-segment list, and every classmethod
+factory also accepts `warp` and `time_scale`.  (Curve data is
+internal — there is no public `curves` property.)
 
 ### Curve Shapes
 
@@ -186,9 +190,9 @@ control-envelope for bus-based automation.
 
 | Function | Description |
 |---|---|
-| `line(start, end, n)` | Linear ramp |
-| `arch(n, curve)` | Arch-shaped envelope |
-| `map_curve(value, curve)` | Apply curve transform to a normalized value |
+| `line(start=0.0, end=1.0, steps=100, curve=0.0)` | Curved ramp from `start` to `end` over `steps` samples |
+| `arch(base=0.0, peak=1.0, steps=100, curve=0.0, axis=0)` | Arch rise-and-fall between `base` and `peak`; `axis` skews the apex |
+| `map_curve(value, in_range, out_range, curve=0.0)` | Map a value from `in_range` to `out_range` through a curve |
 
 ---
 

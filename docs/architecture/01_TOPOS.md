@@ -18,12 +18,19 @@ topos/
 ├── __init__.py
 ├── types.py               # abstract structural types
 ├── collections/
-│   ├── _pattern.py        # Pattern/Cyclic internals
+│   ├── _pattern.py        # Pattern runtime internals (NodeSpec, delegates)
 │   ├── patterns.py        # permutations, autoref, chaining
 │   ├── sequences.py       # Nørgård infinity series, Pattern iterator
 │   └── sets.py            # Operations, Sieve, GenCol, CombinationSet, PartitionSet
 ├── formal_grammars/
-│   └── grammars.py        # context-free grammar engine
+│   ├── alphabet.py        # Alphabet — symbol inventory
+│   ├── rules.py           # RuleSet — production rules
+│   ├── rewriting.py       # RewriteSystem, History + legacy helpers
+│   ├── derivation.py      # DerivationTree, derive()
+│   ├── interpreter.py     # Interpreter, State (turtle-style word interpretation)
+│   └── markov.py          # markov_walk()
+├── shapes/
+│   └── polyominoes.py     # Shape + polyomino generation/placement
 └── graphs/
     ├── core.py            # GraphCore — read-only base (RustworkX) + views
     ├── graphs.py          # Graph — mutable general-purpose graph
@@ -216,10 +223,11 @@ classDiagram
         +branch(node) tuple
         +siblings(node) tuple
         +lowest_common_ancestor(a, b) int
-        +subtree(node) Tree
-        +at_depth(n) list
+        +subtree(node, renumber=True) Tree
+        +at_depth(n, operator='==') list
         +path_signature(root, target) tuple
         +node_from_signature(root, signature) int
+        +map_parallel_nodes(other_tree) dict
         +attach_layer(layer)
         +set_node_data(node, **attr)
         +update_node_data(node, attrs)
@@ -228,6 +236,7 @@ classDiagram
         +add_subtree(parent, subtree, index)
         +prune(node)
         +remove_subtree(node)
+        +replace_node(old_node, **attr)
         +graft_subtree(target, subtree, mode)
         +move_subtree(node, new_parent, index)
         +prune_to_depth(max_depth)
@@ -237,11 +246,15 @@ classDiagram
     class TreeLayer {
         +owned_keys : frozenset
         +derived_keys : frozenset
+        +on_attach(tree)
         +normalize_attrs(tree, node, attrs, op)
         +validate_attrs(tree, node, attrs, op)
         +data_scope(tree, node, changed_keys, op)
         +on_structure_changed(tree, scope, op)
         +invalidate(tree)
+        +on_nodes_remapped(tree, mapping)
+        +on_clone(tree)
+        +clone_state(source_layer, new_tree, memo)
     }
 
     class Group {
@@ -383,10 +396,13 @@ classDiagram
         +dimensionality : int
         +resolution : list[int]
         +bipolar : bool
-        +coords : set[tuple]
+        +coords : list[tuple]
         +get_node(coord) int
         +get_coordinates(node_id) tuple
         +neighbors(coord) list[tuple]
+        +symmetries(reflections=False) list
+        +number_of_nodes() int
+        +number_of_edges() int
         +__getitem__(coord) MappingProxyType
         +__contains__(coord) bool
     }
@@ -400,11 +416,18 @@ classDiagram
 
 ### Key Properties
 
-- **`dimensionality`** — number of axes.
-- **`resolution`** — points per axis (int or list).
-- **`bipolar`** — if `True`, coordinates range `[-res, +res]`;
+- **`dimensionality`** — number of axes (default 2).
+- **`resolution`** — points per axis (int or list; default 10).
+- **`bipolar`** — if `True` (default), coordinates range `[-res, +res]`;
   otherwise `[0, res]`.
 - **`periodic`** — wraps edges at boundaries (torus topology).
+
+Large or high-dimensional lattices are built **lazily**: when the
+estimated size crosses a threshold (`_should_use_lazy`), coordinates
+are materialized on demand (`_materialize_coord`) instead of eagerly
+building the full grid.  `symmetries(reflections=False)` enumerates
+the lattice's orientation symmetries (used for shape placement,
+10.9.0).
 
 ### Coordinate ↔ Node Mapping
 
@@ -442,7 +465,9 @@ filters composed with logical operations (`&`, `|`, `^`, `~`).
 ### 5.3 `GenCol`
 
 Generated collection: multiplicative construction from a generator
-and modulus.
+ratio iterated within a period
+(`GenCol(generator='3/2', period=2, iterations=7)`).  Exposes
+`collection`, `normalized_collection` (period-reduced), and `steps`.
 
 ### 5.4 `CombinationSet`
 
@@ -466,18 +491,26 @@ properties: `data` (pandas DataFrame with `partition`, `unique_count`,
 
 ### 5.6 `Pattern`
 
-Cyclical iterator over nested iterables.  Flattens arbitrarily deep
-nesting and loops forever:
+Cyclical iterator over nested structure
+(`Pattern(iterable, end=False)`).  A nested list is a **sub-pattern**
+that advances by one element each time the enclosing pattern reaches
+it (it does *not* flatten):
 
 ```python
 p = Pattern([1, [2, 3], 4])
-[next(p) for _ in range(6)]  # [1, 2, 3, 4, 1, 2]
+[next(p) for _ in range(6)]  # [1, 2, 4, 1, 3, 4]
 ```
+
+The full cycle length is exposed as `length`; `materialize_period()`
+returns one full period without disturbing iteration state;
+`position` and `reset()` manage the cursor.  The compiled structure
+is available as `spec` (a `NodeSpec` from `_pattern.py`).
 
 ### 5.7 `Norg` (Nørgård infinity series)
 
 Per Nørgård's self-similar integer sequence, used as a pitch or
-rhythm generator.
+rhythm generator.  Static methods: `inf(start=0, size=128, step=1)`,
+`inf_num(n)`, `n_partite(seed, inv_pat, size=128)`, `lake()`.
 
 ### Collection Relationships Diagram
 
@@ -495,17 +528,25 @@ classDiagram
     class Sieve {
         +modulus : int
         +residue : int
+        +N : int
+        +period
+        +r
+        +congr
+        +compl
         +__and__()
         +__or__()
+        +__sub__()
         +__xor__()
         +__invert__()
-        +segment(lo, hi) list
     }
 
     class GenCol {
-        +generator
-        +modulus
-        +elements : set
+        +generator : Fraction
+        +period : Fraction
+        +iterations : int
+        +collection : list
+        +normalized_collection : list
+        +steps : set
     }
 
     class CombinationSet {
@@ -523,13 +564,18 @@ classDiagram
     }
 
     class Pattern {
+        +length : int
+        +position : int
         +__next__()
         +reset()
+        +materialize_period() tuple
     }
 
     class Norg {
         +inf(start, size, step)$
         +inf_num(n)$
+        +n_partite(seed, inv_pat, size)$
+        +lake()$
     }
 
     GraphCore <|-- CombinationSet
@@ -539,16 +585,52 @@ classDiagram
 
 ## 6. Formal Grammars
 
-### `grammars.py`
+`topos/formal_grammars/` is a full rewriting-system package (expanded
+in 10.5.0/10.6.0 from the old single-module engine):
 
-A context-free grammar engine:
+| Symbol | Module | Purpose |
+|---|---|---|
+| `Alphabet` | `alphabet.py` | Symbol inventory of a rewriting system |
+| `RuleSet(rules, alphabet=None)` | `rules.py` | Mapping of production rules (weighted options allowed) |
+| `RewriteSystem(rules, axiom, alphabet=None, rng=None)` | `rewriting.py` | L-system-style rewriting; `step(word)`, `generate(generations, word_limit=None, mutation=0.0)` → `History` |
+| `History(words, rules)` | `rewriting.py` | Sequence of words, one per generation |
+| `DerivationTree` / `derive(axiom, rules, max_depth=4, rng=None)` | `derivation.py` | Recursive (possibly stochastic) derivation as a tree |
+| `Interpreter(state=None, actions=None, brackets=None, …)` / `State` | `interpreter.py` | Turtle-style word interpretation; `run(word)` |
+| `markov_walk(table, start=None, length=16, rng=None)` | `markov.py` | First-order Markov chain walk |
+
+Word utilities in `rewriting.py`: `balance_brackets(word)`,
+`bracket_depth(word)`, `show_generations(history)`,
+`word_stats(word, alphabet=None)`.
+
+Legacy helpers (kept, now in `rewriting.py`):
 
 | Function | Purpose |
 |---|---|
 | `rand_rules(symbols, word_length_min=1, word_length_max=3)` | Generate random production rules |
 | `constrain_rules(rules, constraints)` | Mutate rules to satisfy constraints |
-| `apply_rules(rules={}, axiom='')` | One step of rule application |
-| `gen_str(generations=0, axiom='', rules={}, display=False)` | Dict of strings, one per derivation step |
+| `apply_rules(rules, axiom)` | One step of rule application |
+| `gen_str(generations=0, axiom='', rules=None, display=False)` | Dict of strings, one per derivation step |
+
+---
+
+## 7. Shapes (`topos/shapes/`)
+
+Polyomino generation and placement (new in 10.8.0):
+
+| Symbol | Purpose |
+|---|---|
+| `Shape` | Immutable tuple of cells with canonical form |
+| `polyominoes(n, dims=2, kind='one-sided')` | Generate all polyominoes (or polycubes) of *n* cells |
+| `normalize(cells)` | Translate cells to canonical origin |
+| `translate(cells, offset)` | Shift cells by an offset |
+| `rotations(cells, reflections=False, group=None)` | All orientations of a cell set |
+| `center(cells)` | Centroid of a cell set |
+| `fits(cells, lattice)` / `placements(piece, lattice, orientations=True)` | Test / enumerate placements on a lattice |
+| `overlap(a, b)` / `contact(a, b)` | Cell-set intersection / adjacency tests |
+
+Shapes pair with `Lattice.symmetries()` and the
+`plot(lattice, layout='cells', shape=…)` board-style visualization
+(see the semeios doc).
 
 ---
 

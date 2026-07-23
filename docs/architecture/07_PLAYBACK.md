@@ -31,6 +31,7 @@ utils/playback/
     ├── engine.py              # SuperSonicEngine — HTML widget
     ├── converters.py          # convert_to_sc_events(), convert_score_to_sc_events()
     ├── registry.py            # register_synthdef(), runtime synthdef registry
+    ├── samples.py             # bundled-sample manifest (sample_names, sample_info…)
     ├── cdn.py                 # SuperSonic CDN URLs
     ├── _js_fragments.py       # JS snippets shared by widgets
     ├── _engine_widget.js      # widget shell
@@ -43,8 +44,13 @@ utils/playback/
     │   └── regenerate_manifest.py  # rebuilds flat manifest.json from .scsyndef
     └── assets/
         ├── manifest.json      # flat {name: {control: default}} dict
-        ├── *.scd              # SC source for the bundled synthdefs
-        └── synthdefs/         # ~100 compiled .scsyndef files
+        ├── kinds.json         # synthdef kind/category metadata
+        ├── *.scd              # SC source, one file per family (klotho/edm/lofi/chip/foxdot)
+        ├── samples/           # bundled audio samples (sampler kit)
+        └── synthdefs/         # 183 compiled .scsyndef files
+            ├── instruments/   #   playable defs
+            ├── effects/       #   insert-FX defs
+            └── infra/         #   __klEnvCtrl, __busRouter, … control/routing defs
 ```
 
 ---
@@ -150,11 +156,12 @@ flowchart TD
 
 | Function | Purpose |
 |---|---|
-| `_get_addressed_collection(obj)` | Extract pitch data from any collection type |
+| `dispatch_convert(obj, kwargs, handlers, include_inst=False)` | Type-dispatch an object to the right conversion handler |
+| `resolve_instrument(inst)` | Normalize an instrument argument (name, Instrument, Kit) |
 | `scale_pitch_sequence(obj, equaves=1)` | Pitch sequence spanning *n* equaves of a collection |
 | `extract_convert_kwargs(kwargs)` | Parse `dur`, `arp`, `strum`, `mode` kwargs |
 | `lower_poly_pfields_to_voices(pfields)` | Expand polyphonic pfields (lists of freqs) into separate voice pfield dicts |
-| `lower_event_ir_to_voice_events(event)` | Flatten one intermediate event to a list of voice events |
+| `lower_event_ir_to_voice_events(event, step_index=None)` | Flatten one intermediate event to a list of voice events |
 | `iter_group_sequence(groups, dur, arp=False, strum=0, direction='u', pause=0.0)` | Iterate grouped pitch material into timed events |
 
 ### SC Assembly (`_sc_assembly.py`)
@@ -173,8 +180,8 @@ Handles:
 
 | Function | Purpose |
 |---|---|
-| `single_voice_amplitude(freq, n_voices)` | Compute amplitude for one voice in a chord |
-| `compute_voice_amplitudes(freqs)` | Frequency-dependent gain balancing |
+| `single_voice_amplitude(freq, target_amp=None)` | Frequency-compensated amplitude for one voice |
+| `compute_voice_amplitudes(freqs, target_amp=None)` | Frequency-dependent gain balancing across voices |
 
 Uses `freq_amp_scale()` from dynatos for equal-loudness compensation.
 
@@ -292,6 +299,16 @@ seconds, exposed via `SynthDefKit.tr808()` and `Ensemble.tr808()`),
 and internal control/routing defs
 (`__klEnvCtrl`, `__busRouter`, `__chainLimiter`, …).
 
+Family factories build ready-made kits/ensembles from these:
+`SynthDefKit.edm_drums/edm_hats/edm_perc/edm_sweeps/edm_wubs`,
+`SynthDefKit.lofi_drums/…`, `SynthDefKit.chip_drums/chip_accent`,
+`SynthDefKit.tr808()` (all taking `selector='voice'` + overrides), and
+`Ensemble.edm/lofi/chip/tr808(name=…, only=…, extras=…)`.
+`SynthDefInstrument.sampler(sample, name=None, **overrides)` builds a
+one-shot sample player over the bundled samples (`kl_sampler1`/mono,
+`kl_sampler2`/stereo; browse with
+`supersonic.samples.sample_names()` / `sample_info()`).
+
 #### Path-style names
 
 Anywhere a SynthDef name string is accepted (`play(inst=...)`,
@@ -352,7 +369,7 @@ merges with the bundled manifest:
 |---|---|
 | `register_synthdef(supriya_synthdef, name=None, pfields=None)` | Compile-and-register from a supriya `SynthDef` |
 | `register_compiled(def_name, compiled_bytes, controls)` | Register pre-compiled bytes |
-| `runtime_assets()` / `runtime_controls()` | Session-registered blobs / control dicts |
+| `runtime_assets()` / `runtime_controls()` / `runtime_kinds()` | Session-registered blobs / control dicts / kind tags |
 | `is_registered(def_name)` | Check the runtime registry |
 | `clear_runtime()` | Drop all runtime registrations |
 

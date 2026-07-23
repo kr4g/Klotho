@@ -33,7 +33,9 @@ Klotho is organized into six primary modules plus utilities:
 * **tonos** — Handles all aspects of pitch and harmonic material including tones, pitch
   collections, scales, chords, harmonic systems and spaces, interval relationships, and
   frequency-based transformations. Supports arbitrary n-TET/n-EDO systems, extended Just
-  Intonation frameworks, and n-dimensional microtonal lattices.
+  Intonation frameworks, n-dimensional microtonal lattices (including neo-Riemannian
+  Tonnetz operations), combination product sets, and roman-numeral tonality over any
+  tuning.
 
 * **dynatos** — Dedicated to dynamics, articulations, and expressive envelopes. Handles
   conversion of symbolic dynamics (p, mf, ff, etc.) into precise dB/amplitude values,
@@ -41,7 +43,8 @@ Klotho is organized into six primary modules plus utilities:
 
 * **thetos** — The compositional complement to Topos. Handles the concrete assembly and
   combination of musical materials across all dimensions — temporal, tonal, dynamic,
-  instrumental, and parametric.
+  instrumental, and parametric — including instruments, kits, and ensembles, and
+  multi-unit score timelines with per-track insert effects.
 
 * **semeios** — Manages all forms of musical representation including visualization,
   notation, plotting, animation, and multimedia output. Converts computational processes
