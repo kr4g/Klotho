@@ -121,6 +121,8 @@ class FieldFunction(ABC):
                 raise ValueError(f"Output dimension of function {i+1} must match input dimension of function {i}.")
         
         class ComposedFunction(FieldFunction):
+            """Right-to-left composition of the given field functions."""
+
             def __init__(self, *funcs):
                 super().__init__(funcs[-1].input_dim, funcs[0].output_dim, funcs[0].output_range)
                 self.functions = funcs

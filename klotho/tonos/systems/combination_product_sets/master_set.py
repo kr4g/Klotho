@@ -208,6 +208,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def tetrad(cls):
+        """Layout template ``'tetrad'``: Triangle with center: 4 factor symbols, 6 edges (2D). Default for hexany."""
         positions = {
             'A': (-1.5, -math.sqrt(3) / 2),
             'B': (0.0, math.sqrt(3)),
@@ -222,6 +223,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def asterisk(cls):
+        """Layout template ``'asterisk'``: Star of 5 spokes from a center: 6 symbols, 5 edges (2D). Default for pentadekany/eikosany."""
         r = 3.0
         angles = {
             'B': math.pi * 3 / 2,
@@ -238,6 +240,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def centered_pentagon(cls):
+        """Layout template ``'centered_pentagon'``: Pentagon around a center, spoke edges only: 6 symbols, 5 edges (2D)."""
         r = 3.0
         gen_angles = {
             ('B', 'F'): math.pi * 6 / 5,
@@ -265,6 +268,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def connected_centered_pentagon(cls):
+        """Layout template ``'connected_centered_pentagon'``: Pentagon around a center with ring and spokes: 6 symbols, 10 edges (2D)."""
         r = 3.0
         gen_angles = {
             ('B', 'F'): math.pi * 6 / 5,
@@ -294,6 +298,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def hexagon(cls):
+        """Layout template ``'hexagon'``: Regular hexagon ring: 6 symbols, 6 edges (2D)."""
         r = 3.0
         int_angles = [90, 150, 90, 150, 90, 150]
         order = ['C', 'F', 'A', 'E', 'B', 'D']
@@ -322,6 +327,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def irregular_hexagon(cls):
+        """Layout template ``'irregular_hexagon'``: Irregular hexagon ring: 6 symbols, 6 edges (2D)."""
         r = 3.0
         target_short = 2.333
 
@@ -362,6 +368,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def ogdoad(cls):
+        """Layout template ``'ogdoad'``: Star of 7 spokes from a center: 8 symbols, 7 edges (2D). Default for hebdomekontany."""
         r = 3.0
         outer = {
             'B': math.pi * 1 / 2,
@@ -384,6 +391,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def heptagon(cls):
+        """Layout template ``'heptagon'``: Regular heptagon ring: 7 symbols, 7 edges (2D)."""
         r = 3.0
         angles = [2 * math.pi * i / 7 + math.pi / 2 for i in range(7)]
         labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
@@ -393,6 +401,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def kite(cls):
+        """Layout template ``'kite'``: Kite quadrilateral with one diagonal: 4 symbols, 5 edges (2D)."""
         r = 3.0
         positions = {
             'A': ( 0,       r * 0.85),
@@ -405,6 +414,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def arrow(cls):
+        """Layout template ``'arrow'``: Arrowhead: 5 symbols, 5 edges (2D). Default for dekany."""
         r = 3.0
         positions = {
             'A': ( 0,        r),
@@ -418,6 +428,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def k23_bipartite(cls):
+        """Layout template ``'k23_bipartite'``: Complete bipartite K(2,3): 5 symbols, 6 edges (2D)."""
         r = 3.0
         positions = {
             'A': (-r * 0.5,  r * 0.6),
@@ -432,6 +443,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def wheel5(cls):
+        """Layout template ``'wheel5'``: Wheel: 5-cycle plus hub: 6 symbols, 10 edges (2D)."""
         r = 3.0
         angles = [2 * math.pi * i / 5 + math.pi / 2 for i in range(5)]
         outer = ['B', 'C', 'D', 'E', 'F']
@@ -444,6 +456,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def bowtie(cls):
+        """Layout template ``'bowtie'``: Two triangles sharing a vertex: 5 symbols, 6 edges (2D)."""
         r = 3.0
         positions = {
             'A': ( 0,          0),
@@ -458,6 +471,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def house(cls):
+        """Layout template ``'house'``: Square with a roof apex: 5 symbols, 6 edges (2D)."""
         sq = 2.0
         positions = {
             'A': ( 0,         sq * 1.2),
@@ -472,6 +486,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def wheel4(cls):
+        """Layout template ``'wheel4'``: Wheel: 4-cycle plus hub: 5 symbols, 8 edges (2D)."""
         sq = 2.0
         positions = {
             'A': ( 0,        0.15),
@@ -486,6 +501,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def h_shape(cls):
+        """Layout template ``'h_shape'``: H-shaped layout: 6 symbols, 7 edges (2D)."""
         r = 3.0
         positions = {
             'A': (-r,  r * 0.9),
@@ -501,6 +517,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def nested_triangles(cls):
+        """Layout template ``'nested_triangles'``: Two concentric triangles joined vertex-to-vertex: 6 symbols, 12 edges (2D)."""
         r_out = 3.0
         r_in = 1.0
         sy = 0.1
@@ -524,6 +541,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def tetrad_3d(cls):
+        """Layout template ``'tetrad_3d'``: Regular tetrahedron: 4 symbols, 6 edges (3D)."""
         base = cls.tetrad()
         apex_height = math.sqrt(6)
         positions = {
@@ -540,6 +558,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def octahedron(cls):
+        """Layout template ``'octahedron'``: Regular octahedron: 6 symbols, 12 edges (3D)."""
         s = 3.0
         d = 0.5
         positions = {
@@ -556,6 +575,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def trigonal_bipyramid(cls):
+        """Layout template ``'trigonal_bipyramid'``: Trigonal bipyramid: 5 symbols, 9 edges (3D)."""
         r = 3.0
         h = r * math.sqrt(2.0 / 3.0)
         s32 = r * math.sqrt(3) / 2
@@ -575,6 +595,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def triangular_prism(cls):
+        """Layout template ``'triangular_prism'``: Triangular prism: 6 symbols, 9 edges (3D)."""
         r = 3.0
         h = 3.0
         t = 2/3
@@ -596,6 +617,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def pentagonal_bipyramid(cls):
+        """Layout template ``'pentagonal_bipyramid'``: Pentagonal bipyramid: 7 symbols, 15 edges (3D)."""
         r = 3.0
         h = r * math.sqrt(2.0 / 3.0)
         angles = [2 * math.pi * i / 5 for i in range(5)]
@@ -617,6 +639,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def kite_pyramid(cls):
+        """Layout template ``'kite_pyramid'``: Kite-based pyramid: 5 symbols, 8 edges (3D)."""
         r = 3.0
         positions = {
             'A': ( 0,        r * 0.85, 0),
@@ -637,6 +660,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def asterisk_nd(cls):
+        """Layout template ``'asterisk_nd'``: Asterisk embedded in 5 dimensions: 6 symbols, 5 spoke edges (nD)."""
         r = 3.0
         outer_labels = ['B', 'C', 'D', 'E', 'F']
         n_dims = len(outer_labels)
@@ -650,6 +674,7 @@ class MasterSet(ReferencePitchAware):
 
     @classmethod
     def ogdoad_nd(cls):
+        """Layout template ``'ogdoad_nd'``: Ogdoad embedded in 7 dimensions: 8 symbols, 7 spoke edges (nD)."""
         r = 3.0
         outer_labels = ['B', 'C', 'D', 'E', 'F', 'G', 'H']
         n_dims = len(outer_labels)

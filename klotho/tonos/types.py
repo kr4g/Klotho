@@ -37,60 +37,78 @@ def _to_partial_array(value):
 
 
 class Frequency(Unit):
+    """A frequency in hertz (symbol ``Hz``)."""
+
     def __init__(self, magnitude):
         super().__init__(magnitude, 'frequency', 'Hz')
 
     @property
     def midicent(self):
+        """Midicent : This frequency converted to midicents."""
         return Midicent(freq_to_midicents(self.magnitude))
 
     @property
     def midi(self):
+        """Midi : This frequency converted to a MIDI note number."""
         return Midi(self.midicent.magnitude / 100)
 
 
 class Midi(Unit):
+    """A MIDI note number (may be fractional for microtones)."""
+
     def __init__(self, magnitude):
         super().__init__(magnitude, 'midi', 'MIDI')
 
     @property
     def frequency(self):
+        """Frequency : This MIDI note number converted to hertz."""
         return Frequency(midicents_to_freq(self.magnitude * 100))
 
     @property
     def midicent(self):
+        """Midicent : This MIDI note number converted to midicents."""
         return Midicent(self.magnitude * 100)
 
 
 class Midicent(Unit):
+    """A pitch in midicents — MIDI note number × 100 (symbol ``m¢``)."""
+
     def __init__(self, magnitude):
         super().__init__(magnitude, 'midicent', 'm¢')
 
     @property
     def midi(self):
+        """Midi : These midicents converted to a MIDI note number."""
         return Midi(self.magnitude / 100)
 
     @property
     def frequency(self):
+        """Frequency : These midicents converted to hertz."""
         return Frequency(midicents_to_freq(self.magnitude))
 
 
 class Cent(Unit):
+    """An interval in cents — 1/100 of an equal-tempered semitone (symbol ``¢``)."""
+
     def __init__(self, magnitude):
         super().__init__(magnitude, 'cent', '¢')
 
     @property
     def frequency_ratio(self):
+        """float : The frequency ratio these cents represent (``2 ** (cents/1200)``)."""
         return 2.0 ** (self.magnitude / 1200.0)
 
 
 class Ratio(Unit):
+    """A frequency ratio as an exact fraction (e.g. ``3/2``)."""
+
     def __init__(self, magnitude):
         magnitude = _to_fraction_array(magnitude)
         super().__init__(magnitude, 'ratio', '')
 
     @property
     def numerator(self):
+        """int : Numerator of the scalar ratio (raises AttributeError for arrays)."""
         try:
             return self.magnitude.item().numerator
         except ValueError:
@@ -98,6 +116,7 @@ class Ratio(Unit):
 
     @property
     def denominator(self):
+        """int : Denominator of the scalar ratio (raises AttributeError for arrays)."""
         try:
             return self.magnitude.item().denominator
         except ValueError:
@@ -105,32 +124,40 @@ class Ratio(Unit):
 
 
 class Partial(Unit):
+    """A partial number — Fraction for harmonic partials, float for inharmonic ones."""
+
     def __init__(self, magnitude):
         magnitude = _to_partial_array(magnitude)
         super().__init__(magnitude, 'partial', '')
 
 
 def frequency(value):
+    """Wrap a value as :class:`Frequency` (Hz)."""
     return Frequency(value)
 
 
 def midi(value):
+    """Wrap a value as :class:`Midi` (MIDI note number)."""
     return Midi(value)
 
 
 def midicent(value):
+    """Wrap a value as :class:`Midicent` (MIDI × 100)."""
     return Midicent(value)
 
 
 def cent(value):
+    """Wrap a value as :class:`Cent` (1/100 semitone)."""
     return Cent(value)
 
 
 def ratio(value):
+    """Wrap a value as :class:`Ratio` (exact frequency ratio)."""
     return Ratio(value)
 
 
 def partial(value):
+    """Wrap a value as :class:`Partial` (harmonic or inharmonic partial number)."""
     return Partial(value)
 
 

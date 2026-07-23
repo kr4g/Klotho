@@ -58,14 +58,17 @@ class Tree(GraphCore):
 
     @property
     def layers(self):
+        """tuple of TreeLayer : The domain layers attached to this tree."""
         return tuple(getattr(self, '_layers', ()))
 
     @property
     def root(self):
+        """int : The root node id."""
         return self._root
 
     @property
     def group(self):
+        """Group : The tree's ``(D, S)`` tuple representation, rebuilt lazily after mutation."""
         if getattr(self, '_group_dirty', False):
             self._rebuild_group()
             self._group_dirty = False
@@ -381,6 +384,27 @@ class Tree(GraphCore):
         return tuple(n for n in self.successors(parent) if n != node) if parent else tuple()
 
     def lowest_common_ancestor(self, node_a, node_b):
+        """
+        Find the deepest node that is an ancestor of both given nodes.
+
+        Parameters
+        ----------
+        node_a : int
+            First node id.
+        node_b : int
+            Second node id.
+
+        Returns
+        -------
+        int
+            The id of the lowest common ancestor (the root in the
+            worst case).
+
+        Raises
+        ------
+        ValueError
+            If either node is not in the tree.
+        """
         if node_a not in self or node_b not in self:
             raise ValueError("Both nodes must exist in the tree")
         branch_a = self.branch(node_a)

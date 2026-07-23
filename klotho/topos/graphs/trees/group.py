@@ -245,10 +245,12 @@ class Group(tuple):
     
     @property
     def D(self):
+        """int or Fraction : The duration value (first element of the ``(D, S)`` pair)."""
         return self[0]
-    
+
     @property
     def S(self):
+        """tuple : The subdivisions (second element of the ``(D, S)`` pair)."""
         return self[1]
     
     def __str__(self) -> str:

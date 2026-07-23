@@ -124,36 +124,43 @@ class PitchCollectionBase(ABC):
     @property
     @abstractmethod
     def is_relative(self) -> bool:
+        """bool : True when degrees are intervals relative to the reference pitch."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def reference_pitch(self) -> Optional[Pitch]:
+        """Pitch : The pitch anchoring this collection (defaults to C4)."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def equave(self) -> Union[float, Fraction]:
+        """Fraction or float : The interval of equivalence (ratio or cents)."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def equave_cyclic(self) -> bool:
+        """bool : Whether out-of-range indexing wraps through equaves."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def degrees(self) -> List[Union[Pitch, IntervalType]]:
+        """list : The defining degrees (intervals when relative, pitches when absolute)."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def pitches(self) -> List[Pitch]:
+        """list of Pitch : Concrete pitches resolved at the reference pitch."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def intervals(self) -> List[IntervalType]:
+        """list : Successive intervals between adjacent degrees."""
         raise NotImplementedError
 
     @abstractmethod

@@ -21,6 +21,7 @@ class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
   """Enumeration of pitch classes for 12-TET with both sharp and flat naming."""
   @member
   class N_TET_12(Enum, metaclass=DirectValueEnumMeta):
+    """Pitch-class values for 12-TET; sharp and flat spellings map to the same value."""
     C  = 0
     Cs = 1
     Db = 1
@@ -44,6 +45,7 @@ class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
   
     @member
     class names:
+      """Canonical 12-TET note-name spellings (``as_sharps`` / ``as_flats``)."""
       as_sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
       as_flats  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
 

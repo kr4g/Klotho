@@ -107,10 +107,12 @@ class UTNodeHandle:
 
     @property
     def id(self) -> int:
+        """int : The raw integer node id."""
         return self._node_id
 
     @property
     def node_id(self) -> int:
+        """int : The raw integer node id (alias of :attr:`id`)."""
         return self._node_id
 
     def _rt_node(self):
@@ -118,22 +120,26 @@ class UTNodeHandle:
 
     @property
     def depth(self) -> int:
+        """int : The node's depth in the tree (root = 0)."""
         return self._owner._rt.depth_of(self._node_id)
 
     @property
     def sibling_index(self) -> int:
+        """int : This node's position among its siblings (0 for the root)."""
         parent = self._owner._rt.parent(self._node_id)
         siblings = list(self._owner._rt.successors(parent)) if parent is not None else [self._node_id]
         return siblings.index(self._node_id)
 
     @property
     def sibling_total(self) -> int:
+        """int : The number of siblings including this node (1 for the root)."""
         parent = self._owner._rt.parent(self._node_id)
         siblings = list(self._owner._rt.successors(parent)) if parent is not None else [self._node_id]
         return len(siblings)
 
     @property
     def parent(self) -> Optional["UTNodeHandle"]:
+        """UTNodeHandle or None : A handle to the parent node (None at the root)."""
         parent_id = self._owner._rt.parent(self._node_id)
         if parent_id is None:
             return None
@@ -141,28 +147,34 @@ class UTNodeHandle:
 
     @property
     def proportion(self):
+        """int or float : The node's proportional weight (negative = rest, float = tied)."""
         return self._rt_node().get("proportion")
 
     @property
     def metric_onset(self):
+        """Fraction : Onset as a fraction of a whole note."""
         return self._rt_node().get("metric_onset")
 
     @property
     def metric_duration(self):
+        """Fraction : Duration as a fraction of a whole note."""
         return self._rt_node().get("metric_duration")
 
     @property
     def real_onset(self):
+        """float : Onset in seconds (computes the timing cache on first access)."""
         self._owner._ensure_timing_cache()
         return self._owner._real_times[self._node_id]["real_onset"]
 
     @property
     def real_duration(self):
+        """float : Duration in seconds (computes the timing cache on first access)."""
         self._owner._ensure_timing_cache()
         return self._owner._real_times[self._node_id]["real_duration"]
 
     @property
     def leaves(self) -> "UTNodeSelector":
+        """UTNodeSelector : Selection of this node's subtree leaves (the node itself if it is a leaf)."""
         rt = self._owner._rt
         if self._node_id in rt.leaf_nodes:
             ids = (self._node_id,)
@@ -172,34 +184,42 @@ class UTNodeHandle:
 
     @property
     def children(self) -> "UTNodeSelector":
+        """UTNodeSelector : Selection of this node's direct children."""
         return self._owner._node_selector_class(
             self._owner, tuple(self._owner._rt.successors(self._node_id))
         )
 
     @property
     def first_leaf(self):
+        """UTNodeHandle : Handle to the first leaf of this node's subtree."""
         return self.leaves.first
 
     @property
     def last_leaf(self):
+        """UTNodeHandle : Handle to the last leaf of this node's subtree."""
         return self.leaves.last
 
     @property
     def first_child(self):
+        """UTNodeHandle : Handle to this node's first child."""
         return self.children.first
 
     @property
     def last_child(self):
+        """UTNodeHandle : Handle to this node's last child."""
         return self.children.last
 
     def make_rest(self):
+        """Turn this node (and its subtree) into a rest; see :meth:`TemporalUnit.make_rest`."""
         return self._owner.make_rest(self._node_id)
 
     def subdivide(self, S):
+        """Subdivide this node by proportions ``S``; see :meth:`TemporalUnit.subdivide`. Returns the owner."""
         self._owner.subdivide(self._node_id, S)
         return self._owner
 
     def sparsify(self, probability, seed=None):
+        """Randomly rest leaves in this node's subtree; see :meth:`TemporalUnit.sparsify`."""
         return self._owner.sparsify(probability, node=self._node_id, seed=seed)
 
     def __getitem__(self, key):
@@ -208,6 +228,7 @@ class UTNodeHandle:
         return self._rt_node()[key]
 
     def get(self, key, default=None):
+        """Read a node-data key (or real-time field), returning ``default`` when absent."""
         if key in ("real_onset", "real_duration"):
             return getattr(self, key)
         return self._rt_node().get(key, default)
@@ -220,16 +241,25 @@ class UTNodeHandle:
 
 @dataclass(frozen=True)
 class NodeContext:
+    """A node handle enriched with its position in the current selection.
+
+    Wraps a :class:`UTNodeHandle` (``ref``) together with ``index`` (this
+    node's position in the selection) and ``total`` (the selection size);
+    every other attribute is forwarded to the underlying handle.
+    """
+
     ref: UTNodeHandle
     index: int
     total: int
 
     @property
     def id(self) -> int:
+        """int : The raw integer node id."""
         return self.ref.id
 
     @property
     def parent(self) -> Optional[UTNodeHandle]:
+        """UTNodeHandle or None : A handle to the parent node (None at the root)."""
         return self.ref.parent
 
     def __getattr__(self, key):
@@ -314,10 +344,12 @@ class UTNodeSelector:
 
     @property
     def first_id(self) -> int:
+        """int : The first raw node id in the selection."""
         return self._ids[0]
 
     @property
     def last_id(self) -> int:
+        """int : The last raw node id in the selection."""
         return self._ids[-1]
 
     @property
@@ -348,11 +380,13 @@ class UTNodeSelector:
         return self._ids[0]
 
     def selectors(self):
+        """Split this selection into a tuple of single-node selectors, one per node."""
         cls = type(self)
         owner = self._owner
         return tuple(cls(owner, (n,)) for n in self._ids)
 
     def singletons(self):
+        """Alias of :meth:`selectors` — one single-node selector per selected node."""
         return self.selectors()
 
     @property
@@ -374,18 +408,22 @@ class UTNodeSelector:
 
     @property
     def first_leaf(self) -> 'UTNodeSelector':
+        """UTNodeHandle : First leaf of this single node's subtree."""
         return self.leaves[0]
 
     @property
     def last_leaf(self) -> 'UTNodeSelector':
+        """UTNodeHandle : Last leaf of this single node's subtree."""
         return self.leaves[-1]
 
     @property
     def first_child(self) -> 'UTNodeSelector':
+        """UTNodeHandle : First direct child of this single node."""
         return self.children[0]
 
     @property
     def last_child(self) -> 'UTNodeSelector':
+        """UTNodeHandle : Last direct child of this single node."""
         return self.children[-1]
 
     # --- Composition (all preserve subclass) ---
@@ -524,6 +562,7 @@ class Chronon(metaclass=TemporalMeta):
         return self._rt_node()[key]
 
     def get(self, key, default=None):
+        """Read a node-data key (or real-time field), returning ``default`` when absent."""
         if key in ('real_onset', 'real_duration'):
             return self._real_data().get(key, default)
         return self._rt_node().get(key, default)
@@ -674,6 +713,7 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
 
     @property
     def nodes(self):
+        """UTNodeView : Node view; subscripting yields a :class:`Chronon` per node."""
         return UTNodeView(self)
 
     def _coerce_node_targets(self, node) -> list[int]:

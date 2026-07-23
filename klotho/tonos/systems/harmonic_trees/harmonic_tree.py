@@ -28,12 +28,14 @@ class HarmonicLayer(TreeLayer):
     derived_keys = frozenset({'multiple', 'harmonic', 'ratio'})
 
     def normalize_attrs(self, tree, node, attrs, op):
+        """Reject ``label`` writes (HarmonicTree nodes use ``factor``)."""
         normalized = dict(attrs) if isinstance(attrs, dict) else {}
         if 'label' in normalized:
             raise ValueError("HarmonicTree does not accept 'label'; use 'factor'")
         return normalized
 
     def validate_attrs(self, tree, node, attrs, op):
+        """Reject writes to any key other than ``factor`` (derived keys are read-only)."""
         mutable_keys = {'factor'}
         illegal = [k for k in attrs if k not in mutable_keys]
         if illegal:
@@ -42,16 +44,17 @@ class HarmonicLayer(TreeLayer):
             raise ValueError("multiple, harmonic, and ratio are derived and cannot be set directly")
 
     def data_scope(self, tree, node, changed_keys, op):
+        """Return the recompute scope for a factor change: the changed node itself."""
         if 'factor' in changed_keys:
             return node
         return None
 
     def on_structure_changed(self, tree, scope, op):
+        """Re-run ``_evaluate`` from the changed scope down."""
         tree._evaluate(scope)
 
 
 class HarmonicTree(Tree):
-    _node_value_attr = 'factor'
     """
     A tree structure that models multiplicative harmonic relationships.
 
@@ -75,6 +78,8 @@ class HarmonicTree(Tree):
     span : int, optional
         Number of equaves for the reduction window. Default is 1.
     """
+
+    _node_value_attr = 'factor'
 
     def __init__(self,
                  root:int                                  = 1,

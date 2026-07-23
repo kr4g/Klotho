@@ -45,6 +45,15 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
 
 @dataclass(frozen=True)
 class ParentDistributionView:
+    """Read-only view of a parent node during pfield/mfield distribution.
+
+    Carries the parent's structural handle (``ref``), rest status, current
+    effective ``pfields``/``mfields``, and resolved ``instrument``.
+    Selection fields (``index``/``total``) are intentionally absent —
+    parents are not part of the current distribution selection. ``parent``
+    chains upward lazily; unknown attributes forward to the handle.
+    """
+
     ref: UTNodeHandle
     is_rest: bool
     pfields: dict
@@ -54,10 +63,12 @@ class ParentDistributionView:
 
     @property
     def id(self) -> int:
+        """int : The raw integer node id."""
         return self.ref.id
 
     @property
     def parent(self) -> Optional['ParentDistributionView']:
+        """ParentDistributionView or None : Lazy view of the next parent up (None at the root)."""
         return self._owner._build_parent_distribution_view(self.id)
 
     def __getattr__(self, key):
@@ -66,6 +77,14 @@ class ParentDistributionView:
 
 @dataclass(frozen=True)
 class DistributionContext(NodeContext):
+    """Per-node context handed to callables during pfield/mfield distribution.
+
+    Extends :class:`NodeContext` (``index``/``total`` within the selection,
+    plus all handle attributes) with the node's rest status, current
+    effective ``pfields``/``mfields``, and resolved ``instrument``.
+    ``ctx.parent`` returns a :class:`ParentDistributionView`.
+    """
+
     is_rest: bool
     pfields: dict
     mfields: dict
@@ -74,6 +93,7 @@ class DistributionContext(NodeContext):
 
     @property
     def parent(self) -> Optional[ParentDistributionView]:
+        """ParentDistributionView or None : View of the parent node (None at the root)."""
         return self._owner._build_parent_distribution_view(self.id)
 
 
@@ -297,10 +317,12 @@ class Parametron(Chronon):
         return self._pt.get_instrument(self._node_id)
 
     def get_pfield(self, key: str, default=None):
+        """Resolved parameter-field value for this event (``default`` when unset)."""
         value = self._resolve_bind(key, self._pt.get_pfield(self._node_id, key))
         return default if value is None else value
 
     def get_mfield(self, key: str, default=None):
+        """Resolved meta-field value for this event (``default`` when unset)."""
         value = self._resolve_bind(key, self._pt.get_mfield(self._node_id, key))
         return default if value is None else value
 
@@ -374,28 +396,42 @@ class UCNodeSelector(UTNodeSelector):
 
     # --- Per-node getters (return list aligned with self._ids) ---
     def get_pfield(self, key: str, default=None) -> list:
+        """Per-node pfield values, one per selected node."""
         return [self._owner.get_pfield(n, key, default) for n in self._ids]
 
     def get_mfield(self, key: str, default=None) -> list:
+        """Per-node mfield values, one per selected node."""
         return [self._owner.get_mfield(n, key, default) for n in self._ids]
 
     def get_instrument(self) -> list:
+        """Per-node resolved instruments, one per selected node."""
         return [self._owner.get_instrument(n) for n in self._ids]
 
 
 class UCNodeHandle(UTNodeHandle):
+    """Node handle for :class:`CompositionalUnit` owners.
+
+    Extends :class:`UTNodeHandle` with the parameter surface — set/get
+    pfields, mfields, and instruments, apply envelopes and slurs — all
+    delegating to the owning UC with this node as the target.
+    """
+
     def set_pfields(self, include_rests: bool = False, **kwargs):
+        """Set parameter fields at this node; see :meth:`CompositionalUnit.set_pfields`."""
         return self._owner.set_pfields(self.id, include_rests=include_rests, **kwargs)
 
     def set_mfields(self, include_rests: bool = False, **kwargs):
+        """Set meta fields at this node; see :meth:`CompositionalUnit.set_mfields`."""
         return self._owner.set_mfields(self.id, include_rests=include_rests, **kwargs)
 
     def set_instrument(self, instrument, include_rests: bool = False):
+        """Assign an instrument at this node; see :meth:`CompositionalUnit.set_instrument`."""
         return self._owner.set_instrument(self.id, instrument, include_rests=include_rests)
 
     def apply_envelope(self, envelope, pfields, *, offset=0, take=None,
                        scope: str = 'span', control: bool = False,
                        endpoint: bool = True):
+        """Apply an envelope over this node's subtree; see :meth:`CompositionalUnit.apply_envelope`."""
         return self._owner.apply_envelope(
             envelope, pfields, node=self.id,
             offset=offset, take=take, scope=scope,
@@ -403,15 +439,18 @@ class UCNodeHandle(UTNodeHandle):
         )
 
     def apply_slur(self, *, offset=0, take=None, mode: str = 'span'):
+        """Slur this node's subtree; see :meth:`CompositionalUnit.apply_slur`."""
         return self._owner.apply_slur(
             node=self.id, offset=offset, take=take, mode=mode
         )
 
     def clear_parameters(self):
+        """Clear parameters on this node and its subtree; see :meth:`CompositionalUnit.clear_parameters`."""
         return self._owner.clear_parameters(self.id)
 
     def set(self, *, inst=None, include_rests: bool = False,
             pfields=None, mfields=None, **fields):
+        """Set instrument and auto-routed fields in one call; see :meth:`CompositionalUnit.set`."""
         return self._owner.set(
             self.id, inst=inst, include_rests=include_rests,
             pfields=pfields, mfields=mfields, **fields,
@@ -419,10 +458,12 @@ class UCNodeHandle(UTNodeHandle):
 
     @property
     def is_rest(self):
+        """bool : Whether this node is a rest (negative proportion)."""
         return self._owner._rt[self.id].get('proportion', 1) < 0
 
     @property
     def pfields(self):
+        """dict : Effective pfield values at this node (inherited + overrides)."""
         return {
             key: self._owner.get_pfield(self.id, key)
             for key in self._owner._rt.pfield_names
@@ -430,6 +471,7 @@ class UCNodeHandle(UTNodeHandle):
 
     @property
     def mfields(self):
+        """dict : Effective mfield values at this node (inherited + overrides)."""
         return {
             key: self._owner.get_mfield(self.id, key)
             for key in self._owner._rt.mfield_names
@@ -437,15 +479,19 @@ class UCNodeHandle(UTNodeHandle):
 
     @property
     def instrument(self):
+        """Instrument or None : The instrument governing this node (ancestor walk)."""
         return self._owner.get_instrument(self.id)
 
     def get_pfield(self, key: str, default=None):
+        """Effective pfield value at this node (``default`` when unset)."""
         return self._owner.get_pfield(self.id, key, default)
 
     def get_mfield(self, key: str, default=None):
+        """Effective mfield value at this node (``default`` when unset)."""
         return self._owner.get_mfield(self.id, key, default)
 
     def get_instrument(self):
+        """Instrument or None : The instrument governing this node (ancestor walk)."""
         return self._owner.get_instrument(self.id)
 
 
@@ -1227,6 +1273,7 @@ class CompositionalUnit(TemporalUnit):
             When True, rest nodes are included during callable/Pattern distribution.
         **kwargs
             Parameter field names and values. Value types:
+
             - Scalar: set directly on target node(s) (includes tuples, lists, or any non-callable/non-Pattern value)
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
             - Pattern: next() called once per target node
@@ -1423,6 +1470,16 @@ class CompositionalUnit(TemporalUnit):
         return env_id
 
     def resolved_control_envelopes(self):
+        """Resolve recorded control-envelope descriptors to concrete leaf spans.
+
+        Returns
+        -------
+        list of dict
+            One entry per active control envelope (``control=True`` at
+            application time), with its envelope, target pfields, and the
+            resolved leaf ids/timing — the payload the playback layer turns
+            into runtime bus automation.
+        """
         self._ensure_timing_cache()
         result = []
         for desc in self._control_envelopes.values():
@@ -1812,6 +1869,7 @@ class CompositionalUnit(TemporalUnit):
         self._heal_envelopes_after_subdivide(node, new_leaves)
 
     def add_child(self, parent, **attr):
+        """Add a child node (``label`` is coerced to ``proportion``); see :meth:`Tree.add_child`."""
         if 'label' in attr and 'proportion' not in attr:
             attr = dict(attr)
             attr['proportion'] = attr.pop('label')
@@ -1819,6 +1877,7 @@ class CompositionalUnit(TemporalUnit):
         return new_rt_node
 
     def prune(self, node):
+        """Remove a node and promote its children, healing slurs/envelopes that referenced it."""
         removed_set = {node}
         self._invalidate_slurs_for_removed_nodes(removed_set)
         self._invalidate_envelopes_for_removed_nodes(removed_set)
@@ -1826,6 +1885,7 @@ class CompositionalUnit(TemporalUnit):
         self._rt.prune(node)
 
     def remove_subtree(self, node):
+        """Remove a node and its descendants, healing slurs/envelopes that referenced them."""
         removed_set = {node} | set(self._rt.descendants(node))
         self._invalidate_slurs_for_removed_nodes(removed_set)
         self._invalidate_envelopes_for_removed_nodes(removed_set)

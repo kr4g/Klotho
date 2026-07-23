@@ -169,9 +169,10 @@ pitches = Pattern([float(p.freq) for p in scale.pitches])
 uc.leaves.set_pfields(freq=pitches)
 ```
 
-(Pfield values that reach the playback layer must be plain numbers —
-the SC event validator rejects `klotho.types` unit wrappers, so
-unwrap with `float()` when sourcing pitches from typed objects.)
+(`klotho.types` unit wrappers lower fine — the converter coerces them
+to plain numbers.  What the SC event validator *does* reject is a raw
+Python **list** as a pfield value: use a tuple for a chord/poly value,
+or `Pattern([...])` to cycle values across nodes.)
 
 The API is `set_pfields(node, **kwargs)` where the target is a node or
 list of nodes; the leaves selector (`uc.leaves.set_pfields(...)`)

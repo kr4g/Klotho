@@ -31,10 +31,45 @@ Sets
 Formal Grammars
 ---------------
 
-Grammars
+Alphabet
 ~~~~~~~~
 
-.. automodule:: klotho.topos.formal_grammars.grammars
+.. automodule:: klotho.topos.formal_grammars.alphabet
+   :members:
+   :show-inheritance:
+
+Rules
+~~~~~
+
+.. automodule:: klotho.topos.formal_grammars.rules
+   :members:
+   :show-inheritance:
+
+Rewriting
+~~~~~~~~~
+
+.. automodule:: klotho.topos.formal_grammars.rewriting
+   :members:
+   :show-inheritance:
+
+Derivation
+~~~~~~~~~~
+
+.. automodule:: klotho.topos.formal_grammars.derivation
+   :members:
+   :show-inheritance:
+
+Interpreter
+~~~~~~~~~~~
+
+.. automodule:: klotho.topos.formal_grammars.interpreter
+   :members:
+   :show-inheritance:
+
+Markov
+~~~~~~
+
+.. automodule:: klotho.topos.formal_grammars.markov
    :members:
    :show-inheritance:
 

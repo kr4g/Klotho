@@ -1,8 +1,16 @@
 Changelog
 =========
 
-Version 10.11.1 (Current)
+Version 10.11.2 (Current)
 -------------------------
+
+* NumPy-style docstring pass across chronos, thetos, tonos, topos, dynatos,
+  and playback modules
+* Sphinx ``docs/api/topos.rst`` formal-grammar reference split into submodule
+  pages; walkthrough note on pfield value types corrected
+
+Version 10.11.1
+---------------
 
 * Architecture documentation refreshed across all ``docs/architecture/``
   guides for the 10.x API: Tonnetz, polyomino shapes, kit families and

@@ -147,6 +147,7 @@ class Event:
         return self
 
     def copy(self) -> "Event":
+        """Return an independent deep-enough copy (pfields/mfields/action specs duplicated)."""
         dup = Event.__new__(Event)
         dup.inst = self.inst
         dup._dur = self._dur

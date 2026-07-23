@@ -74,15 +74,18 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
     Play a musical object as MIDI audio in Jupyter/Colab notebooks.
     
     Automatically detects the environment and uses appropriate MIDI synthesis:
+
     - Google Colab: Uses FluidSynth CLI with multi-channel support
     - Local Jupyter: Uses FluidSynth if available
     - Fallback: Returns MIDI file for download
     
     Parameters
     ----------
-    obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, Scale, Chord, Voicing, or ChordSequence
-        The musical object to play. Different object types have different playback behaviors:
+    obj : object
+        The musical object to play — RhythmTree, TemporalUnit,
+        CompositionalUnit, TemporalUnitSequence, TemporalBlock,
+        PitchCollection, Scale, Chord, Voicing, or ChordSequence. Different object types have different playback behaviors:
+
         - RhythmTree/TemporalUnit: Rhythmic playback with default pitch
         - PitchCollection: Sequential pitch playback
         - Scale: Ascending then descending playback
@@ -90,6 +93,7 @@ def play_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphony=
         - ChordSequence: Sequential playback of chords
     dur : float, optional
         Duration in seconds. Defaults depend on object type:
+
         - PitchCollection/Scale: 0.5 seconds per note
         - Chord/Voicing: 3.0 seconds total (or per note if arpeggiated)
         - ChordSequence: 3.0 seconds per chord
@@ -169,9 +173,8 @@ def create_midi(obj, dur=None, arp=False, prgm=0, max_channels=128, max_polyphon
     
     Parameters
     ----------
-    obj : RhythmTree, TemporalUnit, CompositionalUnit, TemporalUnitSequence, TemporalBlock,
-          PitchCollection, Scale, Chord, Voicing, or ChordSequence
-        The musical object to convert to MIDI. Same as play_midi().
+    obj : object
+        The musical object to convert to MIDI — same types as ``play_midi()``.
     dur : float, optional
         Duration in seconds. Same as play_midi().
     arp : bool, optional

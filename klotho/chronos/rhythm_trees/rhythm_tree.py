@@ -34,6 +34,7 @@ class RhythmLayer(TreeLayer):
     derived_keys = frozenset({'metric_duration', 'metric_onset'})
 
     def normalize_attrs(self, tree, node, attrs, op):
+        """Coerce proportion/tied writes to consistent types (float when tied, int otherwise)."""
         normalized = dict(attrs) if isinstance(attrs, dict) else {}
         if 'label' in normalized:
             raise ValueError("RhythmTree does not accept 'label'; use 'proportion'")
@@ -51,6 +52,7 @@ class RhythmLayer(TreeLayer):
         return normalized
 
     def validate_attrs(self, tree, node, attrs, op):
+        """Reject writes to any key other than ``proportion``/``tied`` (derived keys are read-only)."""
         mutable_keys = {'proportion', 'tied'}
         illegal = [k for k in attrs if k not in mutable_keys]
         if illegal:
@@ -59,6 +61,7 @@ class RhythmLayer(TreeLayer):
             raise ValueError("metric_duration and metric_onset are derived and cannot be set directly")
 
     def data_scope(self, tree, node, changed_keys, op):
+        """Return the recompute scope for a proportion change: the node's parent (root at the top)."""
         if 'proportion' in changed_keys or 'tied' in changed_keys:
             if node == tree.root:
                 return tree.root
@@ -67,6 +70,7 @@ class RhythmLayer(TreeLayer):
         return None
 
     def on_structure_changed(self, tree, scope, op):
+        """Default missing proportions to 1, then re-run ``_evaluate`` from the changed scope down."""
         for n in tree.nodes:
             data = tree._rx[n]
             if isinstance(data, dict) and 'proportion' not in data:
@@ -75,41 +79,34 @@ class RhythmLayer(TreeLayer):
 
 
 class RhythmTree(Tree):
+    """
+    A tree of integer proportions defining relative durations within a
+    time signature.
+
+    Each node carries a ``proportion`` (negative values are rests;
+    float values mark ties); the attached :class:`RhythmLayer` derives
+    ``metric_duration`` and ``metric_onset`` for every node as
+    fractions of a whole note, recomputed automatically after any
+    mutation. Leaf-level results are exposed as :attr:`durations` and
+    :attr:`onsets`.
+
+    The nested-tuple notation follows the rhythm-tree tradition of
+    OpenMusic and IRCAM: a tree is a ``(D, S)`` pair where ``D`` is a
+    duration (here ``span × meas.numerator``) and ``S`` is a tuple of
+    proportions, each of which may itself be a nested ``(D, S)`` pair.
+
+    See: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
+
+    Examples
+    --------
+    >>> rt = RhythmTree(span=1, meas='4/4', subdivisions=(1, (2, (1, 1)), 1))
+    >>> rt.durations
+    (Fraction(1, 4), Fraction(1, 4), Fraction(1, 4), Fraction(1, 4))
+    """
+
     _node_value_attr = 'proportion'
-    '''
-    A rhythm tree is a list representing a rhythmic structure. This list is organized 
-    hierarchically in sub lists, just as time is organized in measures, time signatures, 
-    pulses and rhythmic elements in the traditional notation.
 
-    Traditionally, rhythm is broken up into several data : meter, measure(s) and duration(s). 
-    Rhythm trees must enclose these information in lists and sub list.
-
-    This elementary rhythm:
-
-    [1/4, 1/4, 1/4, 1/4] --> (four 1/4-notes in 4/4 time)
-
-    can be expressed as follows :
-
-    ( ? ( (4//4 (1 1 1 1) ) ) )
-
-    A tree structure can be reduced to a list : (D (S)).
-
-
-    >> Main Components : Duration and Subdivisions
-
-    D = a duration , or number of measures : ( ? ) or a number ( n ).
-    When D = ?, OM calculates the duration.
-    By default, this duration is equal to 1.
-
-    S = subdivisions (S) of this duration, that is a time signature and rhythmic proportions.
-    Time signature = n // n   or ( n n ).
-    It must be specified at each new measure, even if it remains unchanged.
-
-    Rhythm = proportions : ( n n n n )
-
-    see: https://support.ircam.fr/docs/om/om6-manual/co/RT1.html
-    '''
-    def __init__(self, 
+    def __init__(self,
                  span:int                      = 1,
                  meas:Union[Meas,Fraction,str] = '1/1',
                  subdivisions:Tuple            = (1,1)):
@@ -599,10 +596,12 @@ class RhythmTree(Tree):
         return self
 
     def prune(self, node):
+        """Remove a node and promote its children (see :meth:`Tree.prune`); returns self for chaining."""
         super().prune(node)
         return self
 
     def remove_subtree(self, node):
+        """Remove a node and all its descendants (see :meth:`Tree.remove_subtree`); returns self for chaining."""
         super().remove_subtree(node)
         return self
 

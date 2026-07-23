@@ -126,6 +126,7 @@ class RhythmPair:
     
     @subdivs.setter
     def subdivs(self, value: bool):
+        """Set whether ``partitions``/``measures`` return subdivision-shaped output."""
         self._subdivs = value
 
     def _calculate_partitions(self) -> Tuple[Tuple[int, Tuple[int, ...]], ...]:

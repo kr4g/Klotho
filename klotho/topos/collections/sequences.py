@@ -193,30 +193,46 @@ class Pattern:
 
     @property
     def length(self) -> int:
+        """int : The number of steps in one full cycle of the pattern."""
         return self._pattern_length
 
     @property
     def spec(self) -> NodeSpec:
+        """NodeSpec : The compiled structure of the nested pattern."""
         return self._spec
 
     @property
     def pattern(self):
+        """The original iterable this pattern was built from."""
         return self._iterable
 
     @property
     def end(self):
+        """The terminal value (or Pattern) emitted after one full cycle, or ``False`` to cycle forever."""
         return self._end
 
     @property
     def position(self) -> int:
+        """int : The current step index within the cycle."""
         return self._current
 
     def reset(self):
+        """Rewind the pattern to its initial state (cursor and all sub-patterns)."""
         self._current = 0
         _reset_runtime(self._root)
         self._period_cache = None
 
     def materialize_period(self) -> tuple[Any, ...]:
+        """
+        Return one full cycle of values without disturbing iteration state.
+
+        Returns
+        -------
+        tuple
+            The ``length`` values of one complete period, computed from a
+            snapshot so the live cursor and sub-pattern positions are
+            unaffected.
+        """
         if self._period_cache is None:
             snap = self._snapshot()
             try:
@@ -266,6 +282,38 @@ class Pattern:
         weights: Optional[List[float]] = None,
         nesting_probability: float = 0.333,
     ) -> 'Pattern':
+        """
+        Build a Pattern with randomly generated nested structure.
+
+        Parameters
+        ----------
+        elements : list
+            The pool of values to draw from.
+        length : int, optional
+            Number of top-level slots. Default 5.
+        max_nesting_level : int, optional
+            Maximum depth of nested sub-patterns. Default 3.
+        max_inner_length : int, optional
+            Maximum length of a nested sub-pattern (0 disables
+            nesting). Default 3.
+        weights : list of float, optional
+            Relative draw weights, one per element (normalized to sum
+            to 1). Uniform when omitted.
+        nesting_probability : float, optional
+            Chance that a slot becomes a nested sub-pattern instead of
+            a single element. Default 0.333.
+
+        Returns
+        -------
+        Pattern
+            A pattern over the generated nested structure.
+
+        Raises
+        ------
+        ValueError
+            If ``weights`` is given with a length different from
+            ``elements``.
+        """
         from klotho.utils.algorithms.lists import normalize_sum
 
         if weights is not None:

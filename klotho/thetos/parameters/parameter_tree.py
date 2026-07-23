@@ -34,27 +34,33 @@ class ParameterLayer(TreeLayer):
 
     @property
     def owned_keys(self):
+        """frozenset : All registered pfield and mfield keys (this layer's writable keys)."""
         return frozenset(self._pfields | self._mfields)
 
     def invalidate(self, tree):
+        """Drop the effective-value cache (rebuilt lazily on the next read)."""
         self._effective_cache = None
 
     def on_structure_changed(self, tree, scope, op):
+        """Drop the effective-value cache after any structural mutation."""
         self._effective_cache = None
 
     def on_clone(self, tree):
+        """Reset to empty state on a bare topology clone (no keys, no instruments)."""
         self._pfields = set()
         self._mfields = set()
         self._node_instruments = {}
         self._effective_cache = None
 
     def clone_state(self, source_layer, new_tree, memo):
+        """Deep-copy registered keys and instrument bindings from a source layer."""
         self._pfields = set(source_layer._pfields)
         self._mfields = set(source_layer._mfields)
         self._node_instruments = copy.deepcopy(source_layer._node_instruments, memo)
         self._effective_cache = None
 
     def on_nodes_remapped(self, tree, mapping):
+        """Drop the effective-value cache after node ids are renumbered."""
         self._effective_cache = None
 
     # ------------------------------------------------------------------
@@ -75,16 +81,19 @@ class ParameterLayer(TreeLayer):
                 stack.append(c)
 
     def set_pfields(self, tree, node, **kwargs):
+        """Register the keys and write pfield overrides at *node*."""
         self._pfields.update(kwargs.keys())
         tree._write_node_data(node, kwargs, replace=False)
         self._effective_cache = None
 
     def set_mfields(self, tree, node, **kwargs):
+        """Register the keys and write mfield overrides at *node*."""
         self._mfields.update(kwargs.keys())
         tree._write_node_data(node, kwargs, replace=False)
         self._effective_cache = None
 
     def set_instrument(self, tree, node, instrument):
+        """Bind *instrument* at *node* and register its pfield keys."""
         if hasattr(instrument, 'pfields'):
             self._pfields.update(instrument.pfields.keys())
         self._node_instruments[node] = instrument
@@ -98,32 +107,38 @@ class ParameterLayer(TreeLayer):
         return None
 
     def get_instrument(self, tree, node):
+        """The instrument governing *node* (walks up the ancestor chain; None if unbound)."""
         governing = self._resolve_governing_instrument_node(tree, node)
         return self._node_instruments.get(governing) if governing is not None else None
 
     def get_pfield(self, tree, node, key):
+        """Effective pfield value at *node* (inherited overrides; None when unset)."""
         if key not in self._pfields:
             return None
         self._build_effective(tree)
         return self._effective_cache[node].get(key)
 
     def get_mfield(self, tree, node, key):
+        """Effective mfield value at *node* (inherited overrides; None when unset)."""
         if key not in self._mfields:
             return None
         self._build_effective(tree)
         return self._effective_cache[node].get(key)
 
     def get(self, tree, node, key):
+        """Effective value of any key at *node* (``'instrument'`` resolves the instrument)."""
         if key == 'instrument':
             return self.get_instrument(tree, node)
         self._build_effective(tree)
         return self._effective_cache[node].get(key)
 
     def items(self, tree, node):
+        """dict of all effective field values at *node*."""
         self._build_effective(tree)
         return dict(self._effective_cache[node])
 
     def remove_fields(self, tree, node, keys):
+        """Delete the given override keys at *node* (descendants revert to inherited values)."""
         raw = tree._rx[node]
         if isinstance(raw, dict):
             for k in keys:
@@ -131,6 +146,7 @@ class ParameterLayer(TreeLayer):
         self._effective_cache = None
 
     def clear_fields(self, tree, node=None):
+        """Remove all overrides and instrument bindings — whole tree, or *node*'s subtree."""
         keys = self._pfields | self._mfields
         if node is None:
             for n in tree.nodes:
@@ -161,64 +177,81 @@ class ParameterApiMixin:
 
     @property
     def pfields(self):
+        """list of str : Registered parameter-field names, sorted."""
         return sorted(self._param_layer._pfields)
 
     @property
     def mfields(self):
+        """list of str : Registered meta-field names, sorted."""
         return sorted(self._param_layer._mfields)
 
     @property
     def pfield_names(self):
+        """set of str : Registered parameter-field names."""
         return set(self._param_layer._pfields)
 
     @property
     def mfield_names(self):
+        """set of str : Registered meta-field names."""
         return set(self._param_layer._mfields)
 
     @property
     def node_instruments(self):
+        """dict : Per-node instrument bindings (node id → Instrument)."""
         return self._param_layer._node_instruments
 
     def register_pfields(self, keys):
+        """Register pfield names without writing any values."""
         self._param_layer._pfields.update(keys)
 
     def register_mfields(self, keys):
+        """Register mfield names without writing any values."""
         self._param_layer._mfields.update(keys)
 
     def set_pfields(self, node, **kwargs):
+        """Set parameter-field overrides at *node* (inherited by its descendants)."""
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
         self._param_layer.set_pfields(self, node, **kwargs)
 
     def set_mfields(self, node, **kwargs):
+        """Set meta-field overrides at *node* (inherited by its descendants)."""
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
         self._param_layer.set_mfields(self, node, **kwargs)
 
     def set_instrument(self, node, instrument):
+        """Bind an instrument at *node*; descendants resolve it via ancestor walk."""
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
         self._param_layer.set_instrument(self, node, instrument)
 
     def get_instrument(self, node):
+        """The instrument governing *node* (None if no ancestor binds one)."""
         return self._param_layer.get_instrument(self, node)
 
     def get_pfield(self, node, key):
+        """Effective pfield value at *node* (None when unset)."""
         return self._param_layer.get_pfield(self, node, key)
 
     def get_mfield(self, node, key):
+        """Effective mfield value at *node* (None when unset)."""
         return self._param_layer.get_mfield(self, node, key)
 
     def get(self, node, key):
+        """Effective value of any key at *node* (``'instrument'`` resolves the instrument)."""
         return self._param_layer.get(self, node, key)
 
     def items(self, node):
+        """dict of all effective field values at *node*."""
         return self._param_layer.items(self, node)
 
     def clear_fields(self, node=None):
+        """Remove all overrides and instruments — whole tree, or *node*'s subtree."""
         self._param_layer.clear_fields(self, node)
 
     def remove_fields(self, node, keys):
+        """Delete the given override keys at *node*."""
         self._param_layer.remove_fields(self, node, keys)
 
     def _resolve_governing_instrument_node(self, node):
@@ -264,9 +297,12 @@ class ParameterTree(ParameterApiMixin, Tree):
         dst._effective_cache = None
 
     def subtree(self, node, renumber=True):
+        """Extract *node*'s subtree as a new ParameterTree (see :meth:`Tree.subtree`)."""
         return super().subtree(node, renumber)
 
     def graft_subtree(self, target_node, subtree, mode='replace'):
+        """Graft a subtree (see :meth:`Tree.graft_subtree`), carrying over its parameter
+        overrides and instrument bindings when it is a ParameterTree."""
         if not isinstance(subtree, Tree):
             raise TypeError("subtree must be a Tree instance")
 
@@ -330,12 +366,15 @@ class ParameterNode:
         raise TypeError("Key must be a string")
 
     def get_instrument(self):
+        """The instrument governing this node (None if no ancestor binds one)."""
         return self._tree.get_instrument(self._node)
 
     def get_pfield(self, key):
+        """Effective pfield value at this node (None when unset)."""
         return self._tree.get_pfield(self._node, key)
 
     def get_mfield(self, key):
+        """Effective mfield value at this node (None when unset)."""
         return self._tree.get_mfield(self._node, key)
     
     def __setitem__(self, key, value):

@@ -45,6 +45,7 @@ class State(dict):
         self.depth = depth
 
     def copy(self):
+        """Return a shallow copy of this state, preserving its bracket depth."""
         return State(self, depth=self.depth)
 
 

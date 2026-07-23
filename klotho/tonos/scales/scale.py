@@ -344,30 +344,37 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     
     @classmethod
     def ionian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Just-intonation major (ionian) scale — the parent of the seven modes."""
         return cls(["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"], reference_pitch=reference_pitch)
     
     @classmethod
     def dorian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Dorian mode (mode 1 of the just ionian scale)."""
         return cls.ionian().mode(1).root(reference_pitch) if reference_pitch else cls.ionian().mode(1)
     
     @classmethod
     def phrygian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Phrygian mode (mode 2 of the just ionian scale)."""
         return cls.ionian().mode(2).root(reference_pitch) if reference_pitch else cls.ionian().mode(2)
     
     @classmethod
     def lydian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Lydian mode (mode 3 of the just ionian scale)."""
         return cls.ionian().mode(3).root(reference_pitch) if reference_pitch else cls.ionian().mode(3)
     
     @classmethod
     def mixolydian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Mixolydian mode (mode 4 of the just ionian scale)."""
         return cls.ionian().mode(4).root(reference_pitch) if reference_pitch else cls.ionian().mode(4)
     
     @classmethod
     def aeolian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Aeolian mode / natural minor (mode 5 of the just ionian scale)."""
         return cls.ionian().mode(5).root(reference_pitch) if reference_pitch else cls.ionian().mode(5)
     
     @classmethod
     def locrian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Locrian mode (mode 6 of the just ionian scale)."""
         return cls.ionian().mode(6).root(reference_pitch) if reference_pitch else cls.ionian().mode(6)
 
     @classmethod
@@ -406,6 +413,7 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
 
     @classmethod
     def bagpipes(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """Just-intonation Great Highland bagpipe scale (10 degrees)."""
         return cls(
             ['1/1', '9/8', '5/4', '4/3', '27/20', '3/2', '5/3', '7/4', '16/9', '9/5'],
             reference_pitch=reference_pitch
@@ -413,6 +421,7 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
 
     @classmethod
     def janus(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
+        """12-degree just-intonation scale mixing 3-, 5-, 7-, and 11-limit degrees."""
         return cls(
             ['1/1', '33/32', '9/8', '7/6', '5/4', '21/16', '11/8', '3/2', '99/64', '5/3', '7/4', '15/8'],
             reference_pitch=reference_pitch
