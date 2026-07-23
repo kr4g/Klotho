@@ -17,7 +17,8 @@ class SvgLatticeData(SvgFigureData):
                  'all_node_ids', 'path_node_indices', 'path_node_colors',
                  'dimmed_node_color',
                  'shape_group_node_indices', 'shape_group_edge_ids',
-                 'shape_colors', 'all_shape_edge_ids')
+                 'shape_colors', 'all_shape_edge_ids',
+                 'coord_to_node_id')
 
 
 def _svg_lattice_2d(lattice, coords, G, path, nodes,
@@ -559,4 +560,5 @@ def _svg_lattice_2d(lattice, coords, G, path, nodes,
         shape_group_edge_ids=svg_shape_group_edge_ids,
         shape_colors=used_shape_colors,
         all_shape_edge_ids=all_shape_el_ids,
+        coord_to_node_id=coord_to_node_id,
     )

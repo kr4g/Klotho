@@ -197,6 +197,74 @@ def _resolve_chord_shape(obj, shape):
     return shape_groups, freq_groups
 
 
+def _resolve_scale_nodes(obj, nodes):
+    """Resolve a Scale ``nodes`` argument against a lattice-family object.
+
+    Returns ``(scale, coords)`` — the scale itself and one lattice
+    coordinate per scale degree (via the object's ``_node_for_ratio``
+    hook, so equave conventions are respected) — or ``None`` when
+    *nodes* is not a Scale, falling through to the coordinate-list
+    path.  The coordinates highlight exactly like a hand-built
+    ``nodes=`` list; on ``.play()`` the scale runs up ``equaves``
+    equaves and back down, selecting each sounding node per step
+    (similar to the default CPS scale run).
+
+    Raises
+    ------
+    ValueError
+        If a degree does not correspond to any node of *obj*.
+    TypeError
+        If *obj* has no ratio-to-node lookup (not a lattice-family class).
+    """
+    from klotho.tonos.scales.scale import Scale
+
+    if not isinstance(nodes, Scale):
+        return None
+
+    if not hasattr(obj, '_node_for_ratio'):
+        raise TypeError(
+            f"nodes={type(nodes).__name__} requires a lattice-family object "
+            f"with ratio-to-node lookup; {type(obj).__name__} has none."
+        )
+
+    coords, unresolved = [], []
+    for degree in nodes.degrees:
+        node = obj._node_for_ratio(degree)
+        if node is None:
+            unresolved.append(str(degree))
+        else:
+            coords.append(node)
+    if unresolved:
+        raise ValueError(
+            f"Scale degrees {unresolved} do not correspond to nodes "
+            f"of this {type(obj).__name__}."
+        )
+    return nodes, coords
+
+
+def _scale_nodes_run(scale, coords, equaves=1):
+    """Build the ``nodes=<Scale>`` playback run.
+
+    Returns ``(freqs, run_coords)``: the scale played up ``equaves``
+    equaves and back down (mirroring the CPS scale run), and for each
+    step the lattice coordinate whose equave-reduced ratio sounds — so
+    octave-equivalent steps select the same node.  Returns None for an
+    empty scale.
+    """
+    n = len(coords)
+    if n == 0:
+        return None
+    eq = int(equaves) if equaves else 1
+    abs_eq = abs(eq) or 1
+    idxs = list(range(abs_eq * n + 1))
+    if eq < 0:
+        idxs = [-i for i in idxs]
+    idxs = idxs + idxs[-2::-1]
+    freqs = [float(scale[i].freq) for i in idxs]
+    run_coords = [coords[i % n] for i in idxs]
+    return freqs, run_coords
+
+
 def _ratio_freqs(items, get_ratio, ref_freq):
     """``ref_freq``-scaled frequencies for path/shape items.
 
@@ -565,13 +633,18 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
                               dur, arp, strum, direction, amp, kwargs,
                               preview_def_name='kl_tri', inst_pfields=None,
                               chord_freq_groups=None, layout='lattice',
-                              shape_colors=None, trail=False):
+                              shape_colors=None, trail=False,
+                              scale_run=None, equaves=1, nodes=None):
     has_shape = len(lattice_shape_groups) > 0
     from klotho.utils.playback._config import get_audio_engine
     engine_name = get_audio_engine()
 
     svg_threejs_kwargs = dict(
-        lattice=lattice, coords=coords, G=G, path=path, nodes=None,
+        lattice=lattice, coords=coords, G=G, path=path,
+        # The scale-run figure keeps its nodes= highlighting (connector
+        # edges between adjacent members); path/shape animations render
+        # without it, as before.
+        nodes=(nodes if scale_run is not None else None),
         highlighted_coords=highlighted_coords, coord_mapping=coord_mapping,
         original_coords=original_coords,
         effective_dimensionality=effective_dimensionality,
@@ -607,6 +680,48 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
             **extra,
         )
 
+    if scale_run is not None:
+        # nodes=<Scale>: play the scale up `equaves` equaves and back
+        # down, selecting each sounding node the way a mouse click does
+        # (similar to the default CPS scale run).
+        run = _scale_nodes_run(scale_run[0], scale_run[1], equaves)
+        if run is not None:
+            freqs, run_coords = run
+            audio_payload = _path_audio_payload(
+                freqs, dur, amp, extra_synth_kwargs, preview_def_name,
+                engine_name, kwargs)
+            plot_run = [coord_mapping.get(c, c) for c in run_coords]
+
+            if use_3d:
+                threejs_data = _render_3d()
+                pos_idx = {}
+                for i, p in enumerate(threejs_data.scene_data['nodes']):
+                    pos_idx[(round(p[0], 6), round(p[1], 6), round(p[2], 6))] = i
+
+                def _key3(c):
+                    x, y, z = (list(c) + [0.0, 0.0])[:3]
+                    return (round(float(x), 6), round(float(y), 6), round(float(z), 6))
+
+                threejs_data.scene_data['selectNodeIndices'] = [
+                    pos_idx.get(_key3(c), -1) for c in plot_run
+                ]
+                from .._animation import AnimatedLattice3dSelectFigure
+                return AnimatedLattice3dSelectFigure(
+                    threejs_data, audio_payload=audio_payload, dur=dur,
+                    **transport_kwargs(kwargs),
+                )
+
+            svg_data = _render_2d()
+            id_index = {nid: i for i, nid in enumerate(svg_data.all_node_ids)}
+            c2n = svg_data.coord_to_node_id
+            select_indices = [id_index.get(c2n.get(c, ''), -1) for c in plot_run]
+            from .._animation import AnimatedNodeSelectSvgFigure
+            return AnimatedNodeSelectSvgFigure(
+                svg_data, select_indices,
+                audio_payload=audio_payload, dur=dur,
+                **transport_kwargs(kwargs),
+            )
+
     if path and len(path) > 1:
         freqs = _ratio_freqs(path, _coord_ratio, reference_freq(lattice))
         return _animated_path_figure(
@@ -640,7 +755,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  animate: bool = False, dur: float = 0.5,
                  shape: list = None, shape_color: str = None,
                  arp: bool = False, strum: float = 0, direction: str = 'u',
-                 amp: float = None, **kwargs):
+                 amp: float = None, equaves: int = 1, **kwargs):
     """
     Render a Lattice as a 2D SVG or 3D Three.js grid visualization.
 
@@ -674,8 +789,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         Kernel for spectral embedding.
     spectral_gamma : float or None, optional
         Kernel coefficient for rbf.
-    nodes : list of tuple or None, optional
-        Coordinate tuples to highlight.
+    nodes : list of tuple, Scale, or None, optional
+        Coordinate tuples to highlight, or a ``Scale``: its degrees
+        resolve to lattice coordinates (all must resolve) and highlight,
+        and ``.play()`` runs the scale up ``equaves`` equaves and back
+        down, selecting each sounding node per step.
     path : list of tuple or None, optional
         Coordinate tuples defining a traversal path.
     path_mode : str, optional
@@ -710,8 +828,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         Return an animated figure when ``True``.
     dur : float, optional
         Seconds between animation steps.
-    shape : list or None, optional
-        Coordinate tuples (chord) or list of lists (chord sequence).
+    shape : list, Chord, ChordSequence, or None, optional
+        Coordinate tuples (chord), list of lists (chord sequence), or a
+        ``Chord``/``Voicing``/``ChordSequence`` (degrees resolved to
+        nodes, playback from the chord's own realization).  Scales go
+        to ``nodes=`` instead.
     shape_color : str or None, optional
         Group coloring policy. ``'one-sided'``: rotations and
         translations of the same shape share a color (the Tetris
@@ -726,6 +847,9 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         Per-note timing offset (0--1) in a chord.
     direction : str, optional
         ``'u'`` for ascending or ``'d'`` for descending pitch order.
+    equaves : int, optional
+        For ``nodes=<Scale>`` playback: how many equaves the scale run
+        ascends before descending (negative descends first). Default 1.
 
     Returns
     -------
@@ -763,6 +887,13 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
 
     preview_def_name, inst_pfields = _resolve_plot_inst(kwargs)
 
+    from klotho.tonos.scales.scale import Scale as _Scale
+    if isinstance(shape, _Scale):
+        raise TypeError(
+            "A Scale goes to nodes= (highlight + scale-run playback); "
+            "shape= takes chords, chord sequences, or coordinate groups."
+        )
+
     chord_freq_groups = None
     resolved = _resolve_chord_shape(lattice, shape)
     if resolved is not None:
@@ -771,6 +902,14 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         # downstream keys on list-ness of the outer elements).
         shape = [list(g) for g in shape_groups]
     shape_colors = _shape_group_colors(shape, shape_color)
+
+    scale_run = None
+    scale_resolved = _resolve_scale_nodes(lattice, nodes)
+    if scale_resolved is not None:
+        scale_obj, scale_coords = scale_resolved
+        scale_run = (scale_obj, scale_coords)
+        seen = set()
+        nodes = [c for c in scale_coords if not (c in seen or seen.add(c))]
 
     nodes = _coerce_to_tuples(nodes)
     path = _coerce_to_tuples(path)
@@ -889,6 +1028,7 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
         preview_def_name=preview_def_name, inst_pfields=inst_pfields,
         chord_freq_groups=chord_freq_groups, layout=layout,
         shape_colors=shape_colors, trail=trail,
+        scale_run=scale_run, equaves=equaves, nodes=nodes,
     )
 
     if animated_fig is not None:
