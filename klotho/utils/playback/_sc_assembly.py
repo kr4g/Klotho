@@ -195,6 +195,11 @@ def lower_compositional_ir_to_sc_assembly(
             if new_dur > 0:
                 ev["dur"] = new_dur
 
+    # Slur pre-pass: index slur-end events and find each group's maximum
+    # voice count (any tuple pfield makes an event multi-voice). Every
+    # event in a slur group is expanded to that maximum — duplicating
+    # voices where needed — so the voice count never changes mid-slur.
+    slur_max_voices: dict = {}
     for event in events_iterable:
         if event.is_rest:
             continue
@@ -203,6 +208,10 @@ def lower_compositional_ir_to_sc_assembly(
             continue
         if event.get_mfield('_slur_end', 0):
             slur_end_events[slur_id] = event
+        natural = max((len(v) for v in event.pfields.values()
+                       if isinstance(v, tuple) and v), default=1)
+        if natural > slur_max_voices.get(slur_id, 0):
+            slur_max_voices[slur_id] = natural
 
     time_offset = 0.0
     if animation and not use_absolute_time:
@@ -268,7 +277,9 @@ def lower_compositional_ir_to_sc_assembly(
         is_slur_start = event.get_mfield('_slur_start', 0)
         is_slur_end = event.get_mfield('_slur_end', 0)
         slur_id = event.get_mfield('_slur_id')
-        voice_events = lower_event_ir_to_voice_events(event, step_index=step_idx)
+        voice_events = lower_event_ir_to_voice_events(
+            event, step_index=step_idx,
+            voice_count=slur_max_voices.get(slur_id) if slur_id is not None else None)
 
         if slur_id is not None and not is_slur_start:
             base_start = float(event.start)
@@ -280,20 +291,6 @@ def lower_compositional_ir_to_sc_assembly(
         _kit_selector = instrument.selector if isinstance(instrument, Kit) else None
         active_uids = slur_voice_uids.setdefault(slur_id, []) if slur_id is not None else None
 
-        # Mid-slur: voice count drops. The dropped voice's most recent event
-        # becomes terminal (releaseAfter=true) with dur set so it fires at the
-        # transition point.
-        if (slur_id is not None and not is_slur_start
-                and active_uids is not None and len(active_uids) > len(voice_events)):
-            transition_time = (float(event.start)) - (time_offset if animation else 0.0)
-            for vi in range(len(voice_events), len(active_uids)):
-                uid = active_uids[vi]
-                if uid is None:
-                    continue
-                _mark_terminal(uid, terminal_time=transition_time)
-                active_uids[vi] = None
-            while active_uids and active_uids[-1] is None:
-                active_uids.pop()
         for voice_event in voice_events:
             voice_start = voice_event["start"] - time_offset if animation else voice_event["start"]
             voice_end = voice_event["end"] - time_offset if animation else voice_event["end"]
@@ -400,6 +397,10 @@ def lower_compositional_ir_to_sc_assembly(
                     _track_event(target_uid)
                     _record(event.node_id, target_uid, voice_start)
                 else:
+                    # Defensive only: uniform expansion pins every slur
+                    # event to the group's max voice count, so mid-slur
+                    # voices cannot appear through normal lowering. Kept
+                    # for hand-built IR that bypasses the pre-pass.
                     slur_uid = uuid4().hex
                     new_event = {
                         "type": "new",

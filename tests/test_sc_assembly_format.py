@@ -237,19 +237,20 @@ class TestSlurAssemblyFormat:
 
 
 class TestSlurMultiVoiceAssembly:
-    """Voice-aware slur lowering under the new ``releaseAfter`` contract.
+    """Voice-aware slur lowering with uniform group-wide voice expansion.
 
-    Rules enforced:
-      - Strum (mfield) is honored on the slur's starting event only; on
-        continuation/end events inside a slur, all voices update
-        simultaneously at the event's base start.
-      - A voice present in an earlier slur event but absent from a later one
-        has its **most recent ``new``/``set``** flagged ``releaseAfter:true``
-        with ``dur`` adjusted so the scheduler fires gate-off at the
-        transition point.
-      - A voice first appearing on a continuation/end event spawns a fresh
-        ``new`` (``releaseAfter:false``) at that event's start.
-      - At slur end, every still-active uid's most recent event is marked
+    Rules enforced (10.13):
+      - Every event in a slur group is expanded to the group's **maximum**
+        voice count (any tuple pfield makes an event multi-voice); scalar
+        or smaller events duplicate voices (tuples modulo-cycle, scalars
+        broadcast). Voices never enter or leave mid-slur.
+      - All of a group's ``new`` events therefore fire at the slur start;
+        continuation/end events lower to one ``set`` per voice.
+      - Strum (mfield) is honored on the slur's starting event only when
+        that event itself carried tuples; force-expanded scalar starts do
+        not strum. Continuation/end voices update simultaneously at the
+        event's base start.
+      - At slur end, every uid's most recent event is marked
         ``releaseAfter:true``; ``dur`` already reflects the leaf's duration.
       - The lowering layer never emits explicit ``type:"release"`` events.
     """
@@ -308,7 +309,7 @@ class TestSlurMultiVoiceAssembly:
                 if t.get('releaseAfter') is True}
         assert ends == {4.0}
 
-    def test_slur_chord_to_single_drops_voices_via_release_after(self):
+    def test_slur_chord_to_single_duplicates_the_scalar(self):
         uc = CompositionalUnit(
             tempus='4/4', prolatio=(1, 1), bpm=60,
             pfields={'freq': 440.0}, inst=_inst('tri'),
@@ -323,20 +324,22 @@ class TestSlurMultiVoiceAssembly:
 
         new_events = [e for e in events if e['type'] == 'new']
         set_events = [e for e in events if e['type'] == 'set']
+        # 3 voices for the whole group: all news at the slur start, the
+        # scalar continuation duplicated across all 3 voices as sets.
         assert len(new_events) == 3
-        assert len(set_events) == 1
+        assert all(e['start'] == 0.0 for e in new_events)
+        assert len(set_events) == 3
+        assert all(e['start'] == 2.0 for e in set_events)
+        assert {e['pfields']['freq'] for e in set_events} == {880.0}
 
-        # 3 uids total. The 2 dropped voices fire at the transition (t=2);
-        # the 1 surviving voice fires at slur end (t=4). All terminals
-        # carry releaseAfter=true.
+        # No voice drops early: all 3 uids run to the slur end (t=4).
         last_idx = self._terminal_events_per_uid(events)
         terminals = [events[i] for i in last_idx.values()]
         assert sum(1 for t in terminals if t.get('releaseAfter') is True) == 3
-        ends = sorted(round(t['start'] + t.get('dur', 0), 6) for t in terminals)
-        assert ends.count(2.0) == 2, f"expected 2 voices ending at 2.0, got {ends}"
-        assert ends.count(4.0) == 1, f"expected 1 voice ending at 4.0, got {ends}"
+        ends = {round(t['start'] + t.get('dur', 0), 6) for t in terminals}
+        assert ends == {4.0}
 
-    def test_slur_single_to_chord_spawns_midslur_voice_joins(self):
+    def test_slur_single_to_chord_expands_the_start(self):
         uc = CompositionalUnit(
             tempus='4/4', prolatio=(1, 1), bpm=60,
             pfields={'freq': 440.0}, inst=_inst('tri'),
@@ -351,12 +354,13 @@ class TestSlurMultiVoiceAssembly:
 
         new_events = [e for e in events if e['type'] == 'new']
         set_events = [e for e in events if e['type'] == 'set']
+        # The scalar start is expanded to 3 unison voices; no mid-slur
+        # spawns — the chord continuation is 3 sets on existing uids.
         assert len(new_events) == 3
-        assert len(set_events) == 1
-
-        new_starts = sorted(e['start'] for e in new_events)
-        assert new_starts[0] == 0.0
-        assert new_starts[1] == 2.0 and new_starts[2] == 2.0
+        assert all(e['start'] == 0.0 for e in new_events)
+        assert {e['pfields']['freq'] for e in new_events} == {440.0}
+        assert len(set_events) == 3
+        assert sorted(e['pfields']['freq'] for e in set_events) == [660.0, 770.0, 880.0]
 
         # All 3 uids end at slur end (t=4).
         last_idx = self._terminal_events_per_uid(events)
@@ -366,7 +370,7 @@ class TestSlurMultiVoiceAssembly:
                 if t.get('releaseAfter') is True}
         assert ends == {4.0}
 
-    def test_slur_drop_then_rejoin_spawns_fresh_synths(self):
+    def test_slur_drop_then_rejoin_keeps_voices_alive(self):
         uc = CompositionalUnit(
             tempus='4/4', prolatio=(1, 1, 1), bpm=60,
             pfields={'freq': 440.0}, inst=_inst('tri'),
@@ -381,26 +385,60 @@ class TestSlurMultiVoiceAssembly:
         self._no_release_events(events)
 
         new_events = [e for e in events if e['type'] == 'new']
-        assert len(new_events) == 5
+        set_events = [e for e in events if e['type'] == 'set']
+        # Exactly 3 synths for the whole group, all born at t=0; the
+        # scalar middle event duplicates to all 3 voices, and no fresh
+        # synths spawn at the third leaf.
+        assert len(new_events) == 3
+        assert all(e['start'] == 0.0 for e in new_events)
+        mid_sets = [e for e in set_events if abs(e['start'] - 4.0 / 3) < 1e-6]
+        end_sets = [e for e in set_events if abs(e['start'] - 8.0 / 3) < 1e-6]
+        assert len(mid_sets) == 3
+        assert {e['pfields']['freq'] for e in mid_sets} == {770.0}
+        assert len(end_sets) == 3
+        assert sorted(e['pfields']['freq'] for e in end_sets) == [880.0, 990.0, 1100.0]
 
-        drop_t = 4.0 / 3
-        rejoin_t = 8.0 / 3
-
-        # The 2 voices dropped at drop_t have terminals with start+dur==drop_t.
+        # All 3 uids survive to the slur end.
         last_idx = self._terminal_events_per_uid(events)
-        terminals = [events[i] for i in last_idx.values()
-                     if events[i].get('releaseAfter') is True]
-        ends = sorted(round(t['start'] + t.get('dur', 0), 6) for t in terminals)
-        assert ends.count(round(drop_t, 6)) == 2, \
-            f"expected 2 voices dropping at {drop_t}, got ends={ends}"
+        terminals = [events[i] for i in last_idx.values()]
+        assert sum(1 for t in terminals if t.get('releaseAfter') is True) == 3
+        ends = {round(t['start'] + t.get('dur', 0), 6) for t in terminals}
+        assert ends == {4.0}
 
-        rejoined = [e for e in new_events if abs(e['start'] - rejoin_t) < 1e-6]
-        assert len(rejoined) == 2, f"expected 2 voices rejoined at {rejoin_t}"
+    def test_all_scalar_slur_group_stays_single_voice(self):
+        uc = CompositionalUnit(
+            tempus='4/4', prolatio=(1, 1, 1), bpm=60,
+            pfields={'freq': 440.0}, inst=_inst('tri'),
+        )
+        leaves = list(uc.rt.leaf_nodes)
+        uc.set_pfields(leaves[1], freq=550.0)
+        uc.set_pfields(leaves[2], freq=660.0)
+        uc.apply_slur(node=leaves)
+        events = lower_compositional_ir_to_sc_assembly(uc)
+        _validate_assembly(events)
 
-        # Rejoining voices are fresh synths, distinct from the dropped uids.
-        rejoined_ids = {e['id'] for e in rejoined}
-        all_new_ids = {e['id'] for e in new_events}
-        assert rejoined_ids.issubset(all_new_ids)
+        new_events = [e for e in events if e['type'] == 'new']
+        set_events = [e for e in events if e['type'] == 'set']
+        assert len(new_events) == 1
+        assert len(set_events) == 2
+
+    def test_force_expanded_scalar_start_does_not_strum(self):
+        uc = CompositionalUnit(
+            tempus='4/4', prolatio=(1, 1), bpm=60,
+            pfields={'freq': 440.0}, mfields={'strum': 0.5}, inst=_inst('tri'),
+        )
+        leaves = list(uc.rt.leaf_nodes)
+        uc.set_pfields(leaves[0], freq=440.0)
+        uc.set_pfields(leaves[1], freq=(660.0, 770.0, 880.0))
+        uc.apply_slur(node=leaves)
+        events = lower_compositional_ir_to_sc_assembly(uc)
+        _validate_assembly(events)
+
+        new_events = [e for e in events if e['type'] == 'new']
+        # The scalar start was force-expanded to 3 voices, but it carried
+        # no tuples itself, so strum does not apply: simultaneous starts.
+        assert len(new_events) == 3
+        assert {e['start'] for e in new_events} == {0.0}
 
 
 class TestMixedHasGateAssemblyFormat:

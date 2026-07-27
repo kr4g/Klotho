@@ -134,6 +134,42 @@ def test_supersonic_compositional_unit_poly_strum_animation_metadata():
     assert len({ev["_polyGroupId"] for ev in new_events}) == 1
 
 
+def test_voice_count_override_expands_scalars_without_tuple_flag():
+    expanded, tuple_expanded = lower_poly_pfields_to_voices(
+        {"freq": 440.0, "amp": 0.5}, voice_count=3)
+    assert tuple_expanded is False
+    assert len(expanded) == 3
+    assert all(v == {"freq": 440.0, "amp": 0.5} for v in expanded)
+
+
+def test_voice_count_override_cycles_smaller_tuples():
+    expanded, tuple_expanded = lower_poly_pfields_to_voices(
+        {"freq": (440.0, 550.0), "amp": 0.5}, voice_count=5)
+    assert tuple_expanded is True
+    assert [v["freq"] for v in expanded] == [440.0, 550.0, 440.0, 550.0, 440.0]
+    assert all(v["amp"] == 0.5 for v in expanded)
+
+
+def test_voice_count_override_never_shrinks():
+    expanded, _ = lower_poly_pfields_to_voices(
+        {"freq": (440.0, 550.0, 660.0)}, voice_count=2)
+    assert len(expanded) == 3
+
+
+def test_event_voice_count_override_updates_poly_metadata():
+    event = _FakeEvent(node_id=7, start=1.0, duration=1.0,
+                       pfields={"freq": 440.0})
+    voices = lower_event_ir_to_voice_events(event, voice_count=4)
+    assert len(voices) == 4
+    assert all(v["poly_voice_count"] == 4 for v in voices)
+    assert sum(1 for v in voices if v["poly_is_leader"]) == 1
+    # force-expansion does not enable strum even with a strum mfield
+    strummed = _FakeEvent(node_id=8, start=0.0, duration=1.0,
+                          pfields={"freq": 440.0}, mfields={"strum": 0.9})
+    voices = lower_event_ir_to_voice_events(strummed, voice_count=3)
+    assert {v["start"] for v in voices} == {0.0}
+
+
 def test_sort_sc_events_orders_type_priority_at_same_start():
     unsorted_events = [
         {"type": "release", "start": 1.0, "id": "a"},

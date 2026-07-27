@@ -291,14 +291,26 @@ def _normalized_strum_value(raw_strum):
     return max(-1.0, min(1.0, float(raw_strum)))
 
 
-def lower_poly_pfields_to_voices(pfields):
+def lower_poly_pfields_to_voices(pfields, voice_count=None):
+    """Expand tuple pfields into per-voice pfield dicts.
+
+    The natural voice count is the longest tuple's length (1 with no
+    tuples); ``voice_count`` overrides it upward, with shorter tuples
+    modulo-cycling and scalars broadcasting — used by slur groups, which
+    expand every member event to the group's maximum so no voice enters
+    or leaves mid-slur. The second return value reports whether the
+    event itself contained tuples (force-expanded scalar events return
+    ``False``, so they never strum).
+    """
     tuple_fields = {k: v for k, v in pfields.items() if _is_tuple_value(v)}
-    if not tuple_fields:
+    tuple_expanded = bool(tuple_fields)
+    natural = max((len(v) for v in tuple_fields.values()), default=1)
+    target = max(natural, voice_count) if voice_count is not None else natural
+    if target == 1 and not tuple_fields:
         return [dict(pfields)], False
 
-    voice_count = max(len(v) for v in tuple_fields.values())
     expanded = []
-    for voice_index in range(voice_count):
+    for voice_index in range(target):
         voice_pfields = {}
         for key, value in pfields.items():
             if key in tuple_fields:
@@ -307,12 +319,13 @@ def lower_poly_pfields_to_voices(pfields):
             else:
                 voice_pfields[key] = value
         expanded.append(voice_pfields)
-    return expanded, True
+    return expanded, tuple_expanded
 
 
-def lower_event_ir_to_voice_events(event, step_index=None):
+def lower_event_ir_to_voice_events(event, step_index=None, voice_count=None):
     base_pfields = dict(event.pfields)
-    expanded_pfields, tuple_expanded = lower_poly_pfields_to_voices(base_pfields)
+    expanded_pfields, tuple_expanded = lower_poly_pfields_to_voices(
+        base_pfields, voice_count=voice_count)
     voice_count = len(expanded_pfields)
     base_start = float(event.start)
     duration = abs(float(event.duration))
