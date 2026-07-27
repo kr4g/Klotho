@@ -1,7 +1,10 @@
-// SuperSonic standalone playback widget.
+// SuperSonic standalone playback widget — a thin consumer of the shared
+// KlothoPlaybackBridge (engine lifecycle, scheduler, control-buffer
+// preload all live in the bridge; this file only wires the buttons).
 // Python replaces: __WID__, __EVENTS_JSON__, __NEEDED_JSON__,
 //                  __SS_CONFIG_JSON__, __META_JSON__,
-//                  __CONTROL_DATA_JSON__, __SAMPLES_JSON__, __RING_TIME__,
+//                  __CONTROL_DATA_JSON__, __SAMPLES_JSON__,
+//                  __MANIFEST_JSON__, __RING_TIME__,
 //                  __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
 
 (function __klothoSSInit___WID__() {
@@ -14,18 +17,19 @@
     var iconEl = document.getElementById(wid + "_icon");
     var loopBtn = document.getElementById(wid + "_loop");
     var loopSvg = document.getElementById(wid + "_loop_svg");
-    var allEvents = __EVENTS_JSON__;
-    var neededSynthdefs = __NEEDED_JSON__;
-    var ssConfig = __SS_CONFIG_JSON__;
-    var meta = __META_JSON__;
-    var controlData = __CONTROL_DATA_JSON__;
-    var sampleAssets = __SAMPLES_JSON__;
 
     var loopCtl = KlothoLoopControl(loopBtn, loopSvg, "__LOOP_MODE__", "__LOOP_COUNT__",
                                     "__LOOP_ENABLED__" === "true");
-    var scheduler = null;
-    var ready = false;
-    var _loadPromise = null;
+    var bridge = globalThis.KlothoPlaybackBridge({
+        audioPayload: { events: __EVENTS_JSON__ },
+        ringTime: __RING_TIME__,
+        neededSynthdefs: __NEEDED_JSON__,
+        sampleAssets: __SAMPLES_JSON__,
+        controlData: __CONTROL_DATA_JSON__,
+        meta: __META_JSON__,
+        ssConfig: __SS_CONFIG_JSON__,
+        manifest: __MANIFEST_JSON__,
+    });
 
     function setPlayIcon() {
         iconEl.style.cssText =
@@ -40,148 +44,46 @@
             + "margin-left:0;background:#ef4444";
     }
 
+    function doPlay() {
+        if (!bridge.hasPlayableEvents()) return;
+        setStopIcon();
+        bridge.play(null, {
+            loop: loopCtl.schedulerValue(),
+            onFinish: function() { setPlayIcon(); },
+        });
+    }
+
     loopCtl.onToggle = function() {
-        if (scheduler && scheduler.isPlaying) {
+        if (bridge.isPlaying()) {
             doPlay();
         }
     };
 
-    function ensureSharedSonic() {
-        if (typeof globalThis.__ensureSuperSonic === "function") {
-            return globalThis.__ensureSuperSonic();
-        }
-        var state = globalThis.__klothoSonic;
-        if (state && state.instance) return Promise.resolve(state.instance);
-        if (state && state.promise) return state.promise;
-        state = { instance: null, promise: null, loadedDefs: new Set() };
-        globalThis.__klothoSonic = state;
-        state.promise = (async function() {
-            try {
-                var mod = await import(ssConfig.baseURL.replace("/dist/",""));
-                globalThis.SuperSonic = mod.SuperSonic;
-                var s = new mod.SuperSonic(ssConfig);
-                await s.init();
-                state.instance = s;
-                return s;
-            } catch(e) {
-                return null;
-            }
-        })();
-        return state.promise;
-    }
-
-    async function loadDefs(sonic) {
-        var loaded = globalThis.__klothoSonic.loadedDefs;
-        var registry = globalThis.__klothoSynthdefAssets || {};
-        for (var i = 0; i < neededSynthdefs.length; i++) {
-            var name = neededSynthdefs[i];
-            if (loaded.has(name)) continue;
-            var b64 = registry[name];
-            if (b64) {
-                var bytes = Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
-                try { await sonic.loadSynthDef(bytes); loaded.add(name); } catch(e) {}
-            } else {
-                try { await sonic.loadSynthDef(name); loaded.add(name); } catch(e) {}
-            }
-        }
-    }
-
-    // Load referenced samples into scsynth buffers once per session.
-    // The name->bufnum map is shared across widgets and never freed;
-    // bufnums come from the same shared allocator the control-envelope
-    // path uses, so the two can never collide.
-    async function loadSamples(sonic) {
-        var state = globalThis.__klothoSonic;
-        if (!state.sampleMap) state.sampleMap = {};
-        if (state._nextBufnum == null) state._nextBufnum = 0;
-        for (var name in sampleAssets) {
-            if (!sampleAssets.hasOwnProperty(name)) continue;
-            if (state.sampleMap[name] != null) continue;
-            var b64 = sampleAssets[name].b64;
-            var bytes = Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
-            var bufnum = state._nextBufnum++;
-            try {
-                await sonic.loadSample(bufnum, bytes.buffer);
-                state.sampleMap[name] = bufnum;
-            } catch(e) {}
-        }
-    }
-
-    function ensureReady() {
-        if (ready) return Promise.resolve(true);
-        if (_loadPromise) return _loadPromise;
-        _loadPromise = (async function() {
-            var sonic = await ensureSharedSonic();
-            if (!sonic) {
-                _loadPromise = null;
-                return false;
-            }
-            await loadDefs(sonic);
-            await loadSamples(sonic);
-            scheduler = new BrowserScheduler({
-                sonic: sonic,
-                manifest: __MANIFEST_JSON__,
-                ringTime: __RING_TIME__,
-            });
-            // Pay the control-envelope buffer upload at init, not on
-            // press-to-play; replays reuse the same buffer.
-            if (controlData && controlData.bufferB64
-                    && typeof scheduler.preloadControlBuffer === "function") {
-                try { scheduler.preloadControlBuffer(controlData); } catch(e) {}
-            }
-            ready = true;
-            return true;
-        })();
-        return _loadPromise;
-    }
-
-    ensureReady();
-
-    function doPlay() {
-        var evts = allEvents;
-        if (evts.length === 0) return;
-
-        setStopIcon();
-        scheduler.play(evts, {
-            meta: meta,
-            controlData: controlData,
-            loop: loopCtl.schedulerValue(),
-            onFinish: function() {
-                setPlayIcon();
-            }
-        });
-    }
+    // Eager warm-up: boot + defs + samples + control-buffer preload start
+    // immediately; the (initially disabled/greyed) play button enables
+    // when the engine is ready.
+    KlothoGateToggle(toggleBtn, bridge.ensureReady());
 
     toggleBtn.addEventListener("click", async function() {
-        if (scheduler && scheduler.isPlaying) {
-            await scheduler.stop();
+        if (bridge.isPlaying()) {
+            await bridge.stop();
             setPlayIcon();
             return;
         }
-        if (_loadPromise && !ready) {
-            _loadPromise = null;
-            var sharedState = globalThis.__klothoSonic;
-            if (sharedState && !sharedState.instance) {
-                sharedState.promise = null;
-            }
-        }
-        var ok = await ensureReady();
+        // A failed session boot leaves a resolved-null promise behind;
+        // clearing it lets ensureReady retry the boot from scratch.
+        var _ss = globalThis.__klothoSonic;
+        if (_ss && !_ss.instance && _ss.promise) { _ss.promise = null; }
+        var ok = await bridge.ensureReady();
         if (!ok) return;
-        var sonic = globalThis.__klothoSonic.instance;
-        if (sonic.audioContext && sonic.audioContext.state === "suspended") {
-            await sonic.audioContext.resume();
-        }
+        await bridge.resumeAudio();
         doPlay();
     });
 
     var _orphanCheckId = setInterval(function() {
         if (toggleBtn && !toggleBtn.isConnected) {
-            if (scheduler) {
-                scheduler.stop();
-                if (typeof scheduler.releaseControlPreload === "function") {
-                    scheduler.releaseControlPreload();
-                }
-            }
+            bridge.stop();
+            bridge.releaseControlPreload();
             clearInterval(_orphanCheckId);
         }
     }, 1000);

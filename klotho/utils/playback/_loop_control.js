@@ -3,6 +3,25 @@
 // figures, SuperSonic engine, Tone.js engine) builds its loop state and
 // button behavior through this factory so the loop policy semantics
 // (off / infinite toggle / finite re-armed cycle count) stay identical.
+// KlothoGateToggle: the play button renders disabled/greyed (see
+// control_bar_html) and is enabled when the engine-ready promise settles.
+// It re-enables on failure too — with a tooltip hint — so a click can
+// retry the boot instead of leaving a dead control.
+(function () {
+    if (typeof globalThis.KlothoGateToggle === "function") return;
+    globalThis.KlothoGateToggle = function (toggleBtn, readyPromise) {
+        if (!toggleBtn) return;
+        function restore(ok) {
+            toggleBtn.disabled = false;
+            toggleBtn.style.opacity = "1";
+            toggleBtn.style.cursor = "pointer";
+            if (ok) toggleBtn.removeAttribute("title");
+            else toggleBtn.title = "Audio engine not ready — click to retry";
+        }
+        Promise.resolve(readyPromise).then(restore, function () { restore(false); });
+    };
+})();
+
 (function () {
     if (typeof globalThis.KlothoLoopControl === "function") return;
     globalThis.KlothoLoopControl = function (btn, svg, mode, count, enabled) {

@@ -7,6 +7,7 @@ _DIR = Path(__file__).parent
 _DRAW_JS_CACHE = None
 _SCHED_CORE_CACHE = None
 _SCHED_SCORE_CACHE = None
+_LIFECYCLE_JS_CACHE = None
 
 
 def _read_cached(path, attr_name):
@@ -26,6 +27,11 @@ def scheduler_core_js():
 
 def scheduler_score_js():
     return _read_cached(_DIR / "scheduler_score.js", "_SCHED_SCORE_CACHE")
+
+
+def lifecycle_js():
+    """The shared ``KlothoEngineLifecycle`` module (installed once per page)."""
+    return _read_cached(_DIR / "_lifecycle.js", "_LIFECYCLE_JS_CACHE")
 
 
 def ss_init_js(config_json=None):
@@ -97,15 +103,10 @@ def synthdef_loader_js(needed_json):
 }})();"""
 
 
-def control_bar_html(wid, show_status=False):
-    status_span = ""
-    if show_status:
-        status_span = f"""
-    <span id="{wid}_status" style="
-        color: #666;
-        font-size: 10px;
-        min-width: 60px;
-    ">ready</span>"""
+def control_bar_html(wid):
+    """Playback control bar. The play button renders disabled and greyed
+    out; the widget controller enables it via ``KlothoGateToggle`` when
+    the engine-ready warm-up settles."""
     return f'''<div id="{wid}" style="
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     display: inline-flex;
@@ -116,13 +117,14 @@ def control_bar_html(wid, show_status=False):
     border-radius: 6px;
     user-select: none;
 ">
-    <button id="{wid}_toggle" style="
+    <button id="{wid}_toggle" disabled style="
         width: 32px;
         height: 32px;
         border: none;
         border-radius: 4px;
         background: #16213e;
-        cursor: pointer;
+        cursor: not-allowed;
+        opacity: 0.3;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -156,5 +158,5 @@ def control_bar_html(wid, show_status=False):
             <path d="M7 22l-4-4 4-4"></path>
             <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
         </svg>
-    </button>{status_span}
+    </button>
 </div>'''

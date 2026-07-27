@@ -4,6 +4,12 @@
   function buildBridge(config) {
     var audioPayload = config.audioPayload || null;
     var ringTime = config.ringTime != null ? config.ringTime : 5;
+    var neededSynthdefs = config.neededSynthdefs || null;
+    var sampleAssets = config.sampleAssets || null;
+    var controlData = config.controlData || null;
+    var meta = config.meta || null;
+    var ssConfig = config.ssConfig || null;
+    var manifest = config.manifest || null;
 
     var _ssScheduler = null;
     var _ssSonic = null;
@@ -30,8 +36,11 @@
     async function _ensureSSReady() {
       if (_ssReady) return true;
       try {
+        var lifecycle = globalThis.KlothoEngineLifecycle;
         var sonic = null;
-        if (typeof globalThis.__ensureSuperSonic === "function") {
+        if (lifecycle) {
+          sonic = await lifecycle.ensureSonic(ssConfig);
+        } else if (typeof globalThis.__ensureSuperSonic === "function") {
           sonic = await globalThis.__ensureSuperSonic();
         }
         if (!sonic) {
@@ -40,12 +49,23 @@
           else if (state && state.promise) { sonic = await state.promise; }
         }
         if (!sonic) return false;
+        if (lifecycle) {
+          await lifecycle.loadDefs(sonic, neededSynthdefs);
+          await lifecycle.loadSamples(sonic, sampleAssets);
+        }
         _ssSonic = sonic;
         _ssScheduler = new globalThis.BrowserScheduler({
           sonic: sonic,
-          manifest: (typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : {},
+          manifest: manifest
+            || ((typeof globalThis.__klothoManifest !== "undefined") ? globalThis.__klothoManifest : {}),
           ringTime: ringTime,
         });
+        // Pay the control-envelope buffer upload at init, not on
+        // press-to-play; replays reuse the same buffer.
+        if (controlData && controlData.bufferB64
+            && typeof _ssScheduler.preloadControlBuffer === "function") {
+          try { _ssScheduler.preloadControlBuffer(controlData); } catch(e) {}
+        }
         _ssReady = true;
         return true;
       } catch(e) {
@@ -172,10 +192,18 @@
       }
       _ssScheduler.play(evts, {
         tailPause: _pause,
+        meta: meta,
+        controlData: controlData,
         loop: loopInfinite ? true : (loopFinite > 0 ? loopFinite : false),
         onEvent: onEvent || function(){},
         onFinish: onFinish || null,
       });
+    }
+
+    function releaseControlPreload() {
+      if (_ssScheduler && typeof _ssScheduler.releaseControlPreload === "function") {
+        try { _ssScheduler.releaseControlPreload(); } catch(e) {}
+      }
     }
 
     async function preview(params) {
@@ -225,6 +253,7 @@
       resumeAudio: resumeAudio,
       play: play,
       preview: preview,
+      releaseControlPreload: releaseControlPreload,
       getEvents: function() { return _scEvents(); },
       filterEventsForGroup: filterEventsForGroup,
       reorderEventsFrom: reorderEventsFrom,

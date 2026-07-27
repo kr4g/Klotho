@@ -37,6 +37,11 @@ var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
     })
     : null;
 
+// Eager warm-up: start booting the engine now; the play button renders
+// disabled/greyed and enables when ready (or on failure, for retry —
+// the silent-animation fallback still works without audio).
+KlothoGateToggle(toggleBtn, bridge ? bridge.ensureReady() : true);
+
 var trailOn = (typeof renderTrail === "function");
 var trailHistory = [];
 

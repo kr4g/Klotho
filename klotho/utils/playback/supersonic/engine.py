@@ -9,7 +9,7 @@ from klotho.utils.playback.supersonic.cdn import supersonic_config
 from klotho.utils.playback._helpers import convert_numpy_types
 from klotho.utils.playback.supersonic._js_fragments import (
     ss_init_js, draw_scheduler_js, scheduler_core_js, scheduler_score_js,
-    synthdef_registry_merge_js, control_bar_html,
+    synthdef_registry_merge_js, control_bar_html, lifecycle_js,
 )
 from klotho.thetos.instruments._shared import load_ss_manifest
 
@@ -171,7 +171,9 @@ class SuperSonicEngine:
 
         samples_json = json.dumps(self.sample_assets)
 
-        from klotho.utils.playback._helpers import get_loop_control_js, substitute_loop_tokens
+        from klotho.utils.playback._helpers import (
+            get_animation_bridge_js, get_loop_control_js, substitute_loop_tokens,
+        )
 
         widget_js = (_load_widget_template()
                      .replace('__WID__', wid)
@@ -188,7 +190,7 @@ class SuperSonicEngine:
         needs_score_js = self._is_score or bool(self.control_data.get("descriptors"))
         score_js = scheduler_score_js() if needs_score_js else ""
 
-        bar_html = control_bar_html(wid, show_status=True)
+        bar_html = control_bar_html(wid)
 
         html = f'''
 {bar_html}
@@ -200,6 +202,8 @@ class SuperSonicEngine:
 {score_js}
 globalThis.__klothoManifest = {manifest_json};
 {synthdef_registry_merge_js(synthdef_assets_json)}
+{lifecycle_js()}
+{get_animation_bridge_js()}
 {widget_js}
 </script>
 '''

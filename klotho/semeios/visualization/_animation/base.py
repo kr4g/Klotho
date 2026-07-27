@@ -54,7 +54,7 @@ def build_scripts_html(needed_synthdefs=None):
     import json
     from klotho.utils.playback.supersonic._js_fragments import (
         ss_init_js, draw_scheduler_js, scheduler_core_js,
-        synthdef_registry_merge_js, synthdef_loader_js,
+        synthdef_registry_merge_js, synthdef_loader_js, lifecycle_js,
     )
     from klotho.utils.playback.supersonic.engine import (
         _load_all_synthdef_assets, _filter_synthdef_assets, _INFRA_SYNTHDEFS,
@@ -79,6 +79,7 @@ def build_scripts_html(needed_synthdefs=None):
 globalThis.__klothoManifest = {manifest_json};
 {synthdef_registry_merge_js(assets_json)}
 {synthdef_loader_js(needed_json)}
+{lifecycle_js()}
 {bridge_js}
 </script>'''
 

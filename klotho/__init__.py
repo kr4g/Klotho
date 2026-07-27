@@ -36,4 +36,4 @@ __all__ = [
     'GraphCore', 'Graph', 'Tree', 'Lattice', 'Group',
 ]
 
-__version__ = '10.14.0'
+__version__ = '10.14.1'
