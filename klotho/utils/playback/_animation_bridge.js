@@ -3,11 +3,14 @@
 
   function buildBridge(config) {
     var audioPayload = config.audioPayload || null;
+    var _payloadObj = (audioPayload && !Array.isArray(audioPayload)) ? audioPayload : {};
     var ringTime = config.ringTime != null ? config.ringTime : 5;
     var neededSynthdefs = config.neededSynthdefs || null;
-    var sampleAssets = config.sampleAssets || null;
-    var controlData = config.controlData || null;
-    var meta = config.meta || null;
+    // Dict payloads (plot(score)) may carry these inline, since the
+    // figure templates only inject one JSON blob; explicit config wins.
+    var sampleAssets = config.sampleAssets || _payloadObj.sampleAssets || null;
+    var controlData = config.controlData || _payloadObj.controlData || null;
+    var meta = config.meta || _payloadObj.meta || null;
     var ssConfig = config.ssConfig || null;
     var manifest = config.manifest || null;
 

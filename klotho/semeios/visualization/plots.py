@@ -14,6 +14,7 @@ from klotho.tonos.pitch import Contour
 from klotho.dynatos.dynamics import DynamicRange
 from klotho.dynatos.envelopes import Envelope
 from klotho.thetos.composition.compositional import CompositionalUnit
+from klotho.thetos.composition.score import Score
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 from klotho.topos.collections.sequences import Pattern
 
@@ -30,7 +31,7 @@ import plotly.graph_objects as go
 import math
 from sklearn.manifold import MDS, SpectralEmbedding
 
-from ._dispatch import _plot_rt, _plot_timeline, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
+from ._dispatch import _plot_rt, _plot_timeline, _plot_score, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
 from ._dispatch import KlothoPlot
 from ._plot_pattern import plot_pattern
 from klotho.utils.dispatch_registry import TypeRegistry
@@ -186,6 +187,11 @@ def _dispatch_temporal_unit(obj, **kwargs):
 @_PLOT_REGISTRY.register(TemporalUnitSequence, TemporalBlock)
 def _dispatch_timeline(obj, **kwargs):
     return _wrap(_plot_timeline, obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(Score)
+def _dispatch_score(obj, **kwargs):
+    return _wrap(_plot_score, obj, dict(kwargs))
 
 
 @_PLOT_REGISTRY.register(Graph)

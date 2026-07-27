@@ -634,7 +634,7 @@ def _collect_control_descriptors(uc, node_to_event_ids, id_map=None):
     return control_descriptors
 
 
-def _lower_score_uc(uc, track_override):
+def _lower_score_uc(uc, track_override, animation=False):
     """Lower one UC to SC events + collect per-envelope targets.
 
     Returns a tuple ``(events, control_descriptors)`` where each event
@@ -642,6 +642,10 @@ def _lower_score_uc(uc, track_override):
     mfield), all event IDs are freshly regenerated (so that the same UC
     can appear in multiple items without uid collisions), and control
     descriptors are already re-keyed against the fresh IDs.
+
+    With ``animation=True`` the lowering stamps per-leaf ``_stepIndex``
+    metadata and keeps ``__rest__`` events (they carry step indices too);
+    absolute times are preserved either way.
     """
     from uuid import uuid4
 
@@ -652,7 +656,8 @@ def _lower_score_uc(uc, track_override):
     assembly_events, node_to_event_ids = lower_compositional_ir_to_sc_assembly(
         uc,
         extra_pfields=None,
-        animation=False,
+        animation=animation,
+        use_absolute_time=True,
         default_synth='kl_tri',
         normalize_sc_pfields=False,
         sort_output=True,
@@ -664,6 +669,8 @@ def _lower_score_uc(uc, track_override):
 
     for event in assembly_events:
         if event.get("defName") == "__rest__":
+            if animation:
+                events.append(event)
             continue
 
         event_type = event.get("type")
@@ -960,6 +967,109 @@ def convert_score_to_sc_events(score, start_time=None, **kwargs) -> dict:
         "events": all_events,
         "meta": meta,
         "control_data": control_data,
+    }
+
+
+def _payload_sample_assets(events):
+    """Sample assets referenced by ``buf*`` pfields, keyed by name.
+
+    Same discovery rule as ``SuperSonicEngine._needed_samples``; used by
+    the animated plot(score) payload, which travels as JSON.
+    """
+    from klotho.utils.playback.supersonic.samples import (
+        sample_info, sample_bytes_b64,
+    )
+    names = set()
+    for ev in events:
+        pfields = ev.get("pfields")
+        if not isinstance(pfields, dict):
+            continue
+        for key, val in pfields.items():
+            if isinstance(val, str) and key.startswith('buf'):
+                names.add(val)
+    return {
+        name: {"b64": sample_bytes_b64(name),
+               "channels": sample_info(name)["channels"]}
+        for name in sorted(names)
+    }
+
+
+def convert_score_to_sc_animation_events(score) -> dict:
+    """Score payload with global ``_stepIndex`` metadata for plot(score).
+
+    Mirrors :func:`convert_score_to_sc_events` (same item walk, same
+    negative-time pre-shift, same uid regeneration) but lowers each UC in
+    animation mode — keeping ``__rest__`` step markers — and assigns a
+    running global step offset per item: UCs contribute one step per
+    rhythm-tree leaf (in the same DFS order the Score SVG renderer
+    enumerates), loose Events contribute one step each. ``meta`` and the
+    JSON-safe ``controlData`` / ``sampleAssets`` ride along so the
+    animated widget's bridge can drive tracks, insert FX, control
+    envelopes, and samples exactly like the standalone widget.
+
+    Returns
+    -------
+    dict
+        ``{"events", "meta", "controlData", "sampleAssets"}``.
+    """
+    from klotho.chronos.temporal_units.temporal import _reoffset
+    from klotho.utils.playback.supersonic.engine import serialize_control_data
+
+    all_events: list[dict] = []
+    control_descriptors: list[dict] = []
+    step_offset = 0
+
+    items = list(score.items())
+    pre_shift = 0.0
+    if items:
+        score_start = min(item.start for item in items)
+        if score_start < 0:
+            pre_shift = -score_start
+
+    try:
+        if pre_shift:
+            for item in items:
+                _reoffset(item.unit, item.unit._offset + pre_shift)
+
+        for item in items:
+            if isinstance(item.unit, Event):
+                ev_list = _lower_score_event(item)
+                leader_marked = False
+                for ev in ev_list:
+                    ev["_stepIndex"] = step_offset
+                    if ev.get("type") == "new" and not leader_marked:
+                        ev["_animate"] = True
+                        leader_marked = True
+                all_events.extend(ev_list)
+                step_offset += 1
+                continue
+            for uc in _iter_ucs(item.unit):
+                uc_events, uc_ctrl = _lower_score_uc(uc, item.track,
+                                                     animation=True)
+                _shift_sc_step_indices(uc_events, step_offset)
+                step_offset += len(uc._rt.leaf_nodes)
+                all_events.extend(uc_events)
+                control_descriptors.extend(uc_ctrl)
+    finally:
+        if pre_shift:
+            for item in items:
+                _reoffset(item.unit, item.unit._offset - pre_shift)
+
+    all_events.sort(
+        key=lambda e: (e["start"], _SC_EVENT_PRIORITY.get(e["type"], 3))
+    )
+
+    from klotho.utils.playback._sc_validate import validate_sc_events
+    validate_sc_events(all_events, animation=True)
+
+    block_size = getattr(score, "_block_size", _DEFAULT_SCORE_BLOCK_SIZE)
+    control_data = _build_score_control_data(control_descriptors, block_size)
+
+    return {
+        "events": all_events,
+        "meta": _build_score_meta(score),
+        "controlData": serialize_control_data(control_data),
+        "sampleAssets": _payload_sample_assets(all_events),
     }
 
 

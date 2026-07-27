@@ -53,7 +53,7 @@ def build_nav_controls_html(wid, total_groups, display="inline-flex"):
 def build_scripts_html(needed_synthdefs=None):
     import json
     from klotho.utils.playback.supersonic._js_fragments import (
-        ss_init_js, draw_scheduler_js, scheduler_core_js,
+        ss_init_js, draw_scheduler_js, scheduler_core_js, scheduler_score_js,
         synthdef_registry_merge_js, synthdef_loader_js, lifecycle_js,
     )
     from klotho.utils.playback.supersonic.engine import (
@@ -76,6 +76,7 @@ def build_scripts_html(needed_synthdefs=None):
 {ss_init_js()}
 {draw_scheduler_js()}
 {scheduler_core_js()}
+{scheduler_score_js()}
 globalThis.__klothoManifest = {manifest_json};
 {synthdef_registry_merge_js(assets_json)}
 {synthdef_loader_js(needed_json)}

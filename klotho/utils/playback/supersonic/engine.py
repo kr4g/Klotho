@@ -62,6 +62,22 @@ def _load_widget_template():
     return _WIDGET_JS_TEMPLATE
 
 
+def serialize_control_data(control_data):
+    """JSON-safe control-envelope payload: the float32 buffer as base64.
+
+    Shared by the standalone widget and the animated plot(score) path.
+    """
+    cd = control_data or {}
+    result = {"blockSize": cd.get("blockSize", 512),
+              "descriptors": cd.get("descriptors", []),
+              "bufferB64": None, "numFrames": 0}
+    buf = cd.get("buffer")
+    if buf is not None:
+        result["bufferB64"] = base64.b64encode(buf.tobytes()).decode("ascii")
+        result["numFrames"] = len(buf)
+    return result
+
+
 class SuperSonicEngine:
     """Browser playback widget running SuperCollider synthesis via WebAssembly.
 
@@ -151,13 +167,7 @@ class SuperSonicEngine:
         return assets
 
     def _serialize_control_data(self):
-        cd = self.control_data
-        result = {"blockSize": cd.get("blockSize", 512), "descriptors": cd.get("descriptors", []), "bufferB64": None, "numFrames": 0}
-        buf = cd.get("buffer")
-        if buf is not None:
-            result["bufferB64"] = base64.b64encode(buf.tobytes()).decode("ascii")
-            result["numFrames"] = len(buf)
-        return result
+        return serialize_control_data(self.control_data)
 
     def _generate_html(self):
         events_json = json.dumps(self.events)
