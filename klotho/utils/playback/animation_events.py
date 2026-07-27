@@ -2,10 +2,6 @@ from klotho.utils.playback._amplitude import single_voice_amplitude, compute_voi
 from klotho.utils.playback._converter_base import iter_group_sequence
 
 
-def normalize_animation_payload_for_engine(audio_payload, engine):
-    return audio_payload
-
-
 def _plan_from_path(freqs, dur, amp=None, pause=0.0):
     plan = []
     cursor = 0.0
@@ -52,24 +48,6 @@ def _merged_pfields(base, extra, protected):
     return merged
 
 
-def _tone_payload_from_plan(plan, extra_pfields=None, pause=0.0):
-    events = []
-    for ev in plan:
-        pfields = _merged_pfields(
-            {"freq": ev["freq"], "vel": ev["amp"]},
-            extra_pfields,
-            protected={"freq"},
-        )
-        events.append({
-            "start": ev["start"],
-            "duration": ev["duration"],
-            "instrument": ev["instrument"],
-            "pfields": pfields,
-            "_stepIndex": ev["step"],
-        })
-    return {"events": events, "instruments": {}, "_engine": "tone", "pause": max(0.0, float(pause or 0.0))}
-
-
 def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0, def_name=None):
     events = []
     counter = 0
@@ -110,25 +88,11 @@ def _supersonic_payload_from_plan(plan, extra_pfields=None, pause=0.0, def_name=
     return {"events": events, "_engine": "supersonic", "pause": max(0.0, float(pause or 0.0))}
 
 
-def build_path_audio_events(freqs, dur, amp=None):
-    plan = _plan_from_path(freqs, dur, amp=amp, pause=0.0)
-    return _tone_payload_from_plan(plan, extra_pfields=None, pause=0.0)
-
-
-def build_shape_audio_events(freq_groups, dur, arp=False, strum=0, direction='u', amp=None):
-    plan = _plan_from_shape(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp, pause=0.25)
-    return _tone_payload_from_plan(plan, extra_pfields=None, pause=0.25)
-
-
-def build_path_engine_payload(freqs, dur, engine, amp=None, extra_pfields=None, pause=0.0, def_name=None):
+def build_path_payload(freqs, dur, amp=None, extra_pfields=None, pause=0.0, def_name=None):
     plan = _plan_from_path(freqs, dur, amp=amp, pause=pause)
-    if engine == "supersonic":
-        return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause, def_name=def_name)
-    return _tone_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause)
+    return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause, def_name=def_name)
 
 
-def build_shape_engine_payload(freq_groups, dur, engine, arp=False, strum=0, direction='u', amp=None, extra_pfields=None, pause=0.25, def_name=None):
+def build_shape_payload(freq_groups, dur, arp=False, strum=0, direction='u', amp=None, extra_pfields=None, pause=0.25, def_name=None):
     plan = _plan_from_shape(freq_groups, dur, arp=arp, strum=strum, direction=direction, amp=amp, pause=pause)
-    if engine == "supersonic":
-        return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause, def_name=def_name)
-    return _tone_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause)
+    return _supersonic_payload_from_plan(plan, extra_pfields=extra_pfields, pause=pause, def_name=def_name)

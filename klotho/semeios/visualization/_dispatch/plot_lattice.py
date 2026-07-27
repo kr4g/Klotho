@@ -284,11 +284,10 @@ def _ratio_freqs(items, get_ratio, ref_freq):
 def _path_audio_payload(freqs, dur, amp, extra_synth_kwargs, preview_def_name,
                         engine_name, kwargs):
     """Engine audio payload for a step-per-frequency (path-style) animation."""
-    from klotho.utils.playback.animation_events import build_path_engine_payload
-    return build_path_engine_payload(
+    from klotho.utils.playback.animation_events import build_path_payload
+    return build_path_payload(
         freqs,
         dur,
-        engine=engine_name,
         amp=amp,
         extra_pfields=extra_synth_kwargs,
         pause=kwargs.get("pause", 0.0) if kwargs else 0.0,
@@ -324,13 +323,12 @@ def _animated_shape_figure(freq_groups, use_3d, render_2d, render_3d, dur, arp,
                            preview_def_name, engine_name, kwargs, trail=False):
     """Shape (chord/chord-sequence) audio payload wrapped in the matching
     animated figure, mirroring :func:`_animated_path_figure`."""
-    from klotho.utils.playback.animation_events import build_shape_engine_payload
+    from klotho.utils.playback.animation_events import build_shape_payload
     from .._animation import AnimatedLatticeShapeFigure, AnimatedLattice3dShapeFigure
 
-    audio_payload = build_shape_engine_payload(
+    audio_payload = build_shape_payload(
         freq_groups,
         dur,
-        engine=engine_name,
         arp=arp,
         strum=strum,
         direction=direction,

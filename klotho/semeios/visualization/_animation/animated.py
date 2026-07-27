@@ -5,7 +5,6 @@ from .._cdn import (
     cdn_scripts,
     THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
 )
-from klotho.utils.playback.animation_events import normalize_animation_payload_for_engine
 
 from .base import (
     build_session_preamble, build_control_bar_html,
@@ -15,10 +14,6 @@ from .base import (
 from .._renderers.threejs_lattice import (
     THREEJS_CLICK_PREVIEW_JS, THREEJS_SHAPE_EDGES_JS, THREEJS_NODE_MESHES_JS,
 )
-
-
-def _maybe_convert_payload(audio_payload):
-    return normalize_animation_payload_for_engine(audio_payload, "supersonic")
 
 
 def _extract_needed_synthdefs(audio_payload):
@@ -125,7 +120,7 @@ class AnimatedLattice3dFigure:
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
         halo_json = json.dumps(sd.halo_data)
-        converted = _maybe_convert_payload(self.audio_payload)
+        converted = self.audio_payload
         payload_json = json.dumps(converted) if converted else "null"
 
         w = sd.width_px
@@ -630,7 +625,7 @@ class AnimatedRTSvgFigure:
         node_to_ids_json = json.dumps({str(k): v for k, v in sd.node_to_ids.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in sd.leaf_ancestors])
 
-        converted = _maybe_convert_payload(self.audio_payload)
+        converted = self.audio_payload
         payload_json = json.dumps(converted) if converted else "null"
 
         playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, ring_time=self.ring_time, loop=self.loop)
@@ -762,7 +757,7 @@ class AnimatedTimelineSvgFigure:
         bright_json = json.dumps(sd.step_bright_colors)
         base_json = json.dumps(sd.step_base_colors)
 
-        converted = _maybe_convert_payload(self.audio_payload)
+        converted = self.audio_payload
         payload_json = json.dumps(converted) if converted else "null"
 
         playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False,
@@ -904,7 +899,7 @@ class AnimatedLatticeSvgFigure:
         path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
         path_node_colors_json = json.dumps(getattr(sd, 'path_node_colors', []))
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        converted = _maybe_convert_payload(self.audio_payload)
+        converted = self.audio_payload
         payload_json = json.dumps(converted) if converted else "null"
 
         playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
@@ -1057,7 +1052,7 @@ class AnimatedNodeSelectSvgFigure:
         node_ids_json = json.dumps(sd.all_node_ids)
         select_json = json.dumps(self.select_node_indices)
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        converted = _maybe_convert_payload(self.audio_payload)
+        converted = self.audio_payload
         payload_json = json.dumps(converted) if converted else "null"
 
         playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
@@ -1222,7 +1217,7 @@ class _AnimatedShapeFigureBase:
         all_shape_edge_ids_json = json.dumps(sd.all_shape_edge_ids)
         node_ids_json = json.dumps(sd.all_node_ids)
         dimmed_color = sd.dimmed_node_color
-        converted = _maybe_convert_payload(self.audio_payload)
+        converted = self.audio_payload
         payload_json = json.dumps(converted) if converted else "null"
         total_groups = len(sd.shape_group_node_indices)
         is_multi = total_groups > 1
