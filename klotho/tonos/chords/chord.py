@@ -376,6 +376,12 @@ class Voicing(RelativePitchCollection):
         Interval of equivalence. Default is ``"2/1"``.
     reference_pitch : Pitch, str, or None, optional
         The root pitch. ``None`` (default) resolves to C4.
+    dedupe : bool, optional
+        Keyword-only. When ``True`` (default), exact duplicate degrees
+        are removed. ``dedupe=False`` preserves duplicates (sorted), so
+        unison doublings survive — used by
+        :func:`~klotho.tonos.chords.voice_leading.voice_lead` with a
+        fixed ``voices=`` count.
 
     Examples
     --------
@@ -391,12 +397,14 @@ class Voicing(RelativePitchCollection):
     def __init__(self, degrees: DegreeList = ["1/1", "5/4", "3/2"],
                  interval_type: str = "ratios",
                  equave: Union[float, Fraction, int, str] = "2/1",
-                 reference_pitch: Union[Pitch, str, None] = None):
+                 reference_pitch: Union[Pitch, str, None] = None,
+                 *, dedupe: bool = True):
         if interval_type not in ["ratios", "cents"]:
             raise ValueError("interval_type must be 'ratios' or 'cents'")
-        
+
         parsed_equave = _parse_equave(equave)
-        processed_degrees = self._process_sonority_degrees(degrees, interval_type, parsed_equave)
+        processed_degrees = self._process_sonority_degrees(degrees, interval_type, parsed_equave,
+                                                           dedupe=dedupe)
         
         if interval_type == "cents":
             if isinstance(parsed_equave, Fraction):
@@ -413,15 +421,18 @@ class Voicing(RelativePitchCollection):
         self._intervals = self._compute_sonority_intervals()
     
     def _process_sonority_degrees(self, degrees: DegreeList, interval_type: str,
-                                   equave: Union[float, Fraction]) -> List[IntervalType]:
+                                   equave: Union[float, Fraction],
+                                   dedupe: bool = True) -> List[IntervalType]:
         if not degrees:
             return []
-        
+
         converted = [_convert_degree(d) for d in degrees]
-        
+
         if interval_type == "cents":
             converted = [float(d) if isinstance(d, Fraction) else d for d in converted]
-            
+            if not dedupe:
+                return sorted(converted)
+
             unique = []
             for d in converted:
                 if not any(abs(d - existing) < 1e-6 for existing in unique):
@@ -432,14 +443,18 @@ class Voicing(RelativePitchCollection):
             has_float = any(isinstance(d, float) for d in converted)
             if has_float:
                 converted = [float(d) for d in converted]
+                if not dedupe:
+                    return sorted(converted)
                 unique = []
                 for d in converted:
                     if not any(abs(d - existing) < 1e-9 for existing in unique):
                         unique.append(d)
                 unique.sort()
             else:
+                if not dedupe:
+                    return sorted(converted)
                 unique = sorted(list(set(converted)))
-        
+
         return unique
     
     def _compute_sonority_intervals(self) -> List[IntervalType]:
@@ -573,11 +588,25 @@ class ChordSequence:
     >>> sequence = ChordSequence([chord1, chord2])
     >>> len(sequence)
     2
+
+    Sequences concatenate and repeat like lists:
+
+    >>> len(sequence + sequence)
+    4
+    >>> len(sequence * 3)
+    6
     """
-    
+
     def __init__(self, chords: List[Union[Chord, Voicing]] = None):
-        self._chords = chords if chords is not None else []
-    
+        chords = list(chords) if chords is not None else []
+        for ch in chords:
+            if not isinstance(ch, RelativePitchCollection):
+                raise TypeError(
+                    f"ChordSequence members must be relative pitch collections "
+                    f"(Chord, Voicing, ...); got {type(ch).__name__}"
+                )
+        self._chords = chords
+
     @property
     def chords(self) -> List[Union[Chord, Voicing]]:
         """list : A copy of the chord objects in this sequence."""
@@ -606,6 +635,25 @@ class ChordSequence:
     
     def __iter__(self):
         return iter(self._chords)
+
+    def __add__(self, other) -> 'ChordSequence':
+        if isinstance(other, ChordSequence):
+            return ChordSequence(self._chords + other._chords)
+        if isinstance(other, (list, tuple)):
+            return ChordSequence(self._chords + list(other))
+        return NotImplemented
+
+    def __radd__(self, other) -> 'ChordSequence':
+        if isinstance(other, (list, tuple)):
+            return ChordSequence(list(other) + self._chords)
+        return NotImplemented
+
+    def __mul__(self, n) -> 'ChordSequence':
+        if isinstance(n, int):
+            return ChordSequence(self._chords * n)
+        return NotImplemented
+
+    __rmul__ = __mul__
 
     def voicing(self, index: Union[int, slice, Sequence[int], np.ndarray]) -> 'ChordSequence':
         """
@@ -695,21 +743,37 @@ class ChordSequence:
         from .voice_leading import fold
         return ChordSequence([fold(chord, lo, hi) for chord in self._chords])
 
-    def voice_led(self, lo=None, hi=None) -> 'ChordSequence':
+    def voice_led(self, lo=None, hi=None, *, voices=None, anchor=None,
+                  doubling='harmonic') -> 'ChordSequence':
         """
-        Return a new sequence voice-led with minimal per-voice movement.
+        Return a new sequence voice-led with assignment-based minimal motion.
+
+        Each transition solves an optimal assignment between the previous
+        sounded voicing and the incoming chord's candidate placements
+        inside ``[lo, hi]``, holding common tones and minimizing total
+        log-frequency motion.
 
         Parameters
         ----------
         lo, hi : optional
             Register bounds, as in :func:`~klotho.tonos.chords.voice_leading.voice_lead`.
+        voices : int or None, optional
+            Lock the texture to a fixed voice count, completing smaller
+            chords through doublings.
+        anchor : int or iterable of int, optional
+            Chords that pass through verbatim (exempt from bounds); the
+            rest voice-lead smoothly to and from them.
+        doubling : {'harmonic', 'nearest'} or int or iterable of int, optional
+            Doubling policy for ``voices=``; see
+            :func:`~klotho.tonos.chords.voice_leading.voice_lead`.
 
         Returns
         -------
         ChordSequence
         """
         from .voice_leading import voice_lead
-        return ChordSequence(voice_lead(self._chords, lo, hi))
+        return ChordSequence(voice_lead(self._chords, lo, hi, voices=voices,
+                                        anchor=anchor, doubling=doubling))
 
     def __repr__(self) -> str:
         return f"ChordSequence({len(self._chords)} chords)"

@@ -52,6 +52,7 @@ from .systems.tonnetz import Tonnetz
 from .utils.intervals import ratio_to_cents, cents_to_ratio, cents_to_setclass, ratio_to_setclass
 from .utils.intervals import split_partial, harmonic_mean, arithmetic_mean, logarithmic_distance
 from .utils.intervals import interval_cost, n_tet, ratios_n_tet
+from .utils.intervals import harmonic_distance, indigestibility, harmonicity
 
 from .utils.frequency_conversion import freq_to_midicents, midicents_to_freq
 from .utils.frequency_conversion import midicents_to_pitchclass, freq_to_pitchclass, pitchclass_to_freq
@@ -120,6 +121,9 @@ __all__ = [
     'arithmetic_mean',
     'logarithmic_distance',
     'interval_cost',
+    'harmonic_distance',
+    'indigestibility',
+    'harmonicity',
     'n_tet',
     'ratios_n_tet',
     

@@ -1,6 +1,7 @@
 from klotho.utils.algorithms.factors import to_factors
 from typing import Union, List, Tuple, Dict, Set
 from collections import namedtuple
+from functools import lru_cache
 from fractions import Fraction
 import numpy as np
 from sympy import Rational, root
@@ -21,6 +22,8 @@ __all__ = [
     'harmonic_mean',
     'arithmetic_mean',
     'harmonic_distance',
+    'indigestibility',
+    'harmonicity',
     'logarithmic_distance',
     'interval_cost',
     'n_tet',
@@ -284,7 +287,110 @@ def harmonic_distance(ratio: Union[int, float, Fraction, str]) -> float:
     return float(np.log2(p * q))
 
 
-def logarithmic_distance(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str], 
+def indigestibility(n: int) -> float:
+    """
+    Compute Barlow's indigestibility of a positive integer.
+
+    For ``n = Π pᵢ^aᵢ`` the indigestibility is defined as
+    ``ξ(n) = 2 · Σ aᵢ · (pᵢ − 1)² / pᵢ`` (Barlow, *On the Quantification
+    of Harmony and Metre*).  Smooth, small-prime numbers digest easily
+    (low values); numbers built from large primes do not.
+
+    Parameters
+    ----------
+    n : int
+        A positive integer.  ``indigestibility(1)`` is ``0.0``.
+
+    Returns
+    -------
+    float
+        The indigestibility ξ(n).
+
+    Raises
+    ------
+    ValueError
+        If ``n`` is not a positive integer.
+
+    Examples
+    --------
+    >>> indigestibility(1)
+    0.0
+
+    >>> indigestibility(2)
+    1.0
+
+    >>> round(indigestibility(3), 4)
+    2.6667
+
+    >>> round(indigestibility(5), 4)
+    6.4
+    """
+    n = int(n)
+    if n < 1:
+        raise ValueError(f"indigestibility requires a positive integer, got {n}")
+    return _indigestibility_cached(n)
+
+
+@lru_cache(maxsize=None)
+def _indigestibility_cached(n: int) -> float:
+    if n == 1:
+        return 0.0
+    total = 0.0
+    for p, a in to_factors(n).items():
+        total += a * (p - 1) ** 2 / p
+    return 2.0 * total
+
+
+def harmonicity(ratio: Union[int, Fraction, str]) -> float:
+    """
+    Compute Barlow's harmonicity of a ratio.
+
+    For a ratio ``p/q`` in lowest terms the harmonicity is
+    ``sgn(ξ(p) − ξ(q)) / (ξ(p) + ξ(q))`` where ξ is
+    :func:`indigestibility`.  The magnitude measures how "tuneable" the
+    interval is (simpler ratios score higher); the sign carries Barlow's
+    polarity — positive when the numerator is the less digestible side
+    (otonal, e.g. the fifth ``3/2`` ≈ +0.2727), negative on the utonal
+    side (e.g. the fourth ``4/3`` ≈ −0.2143).  ``harmonicity(1)`` is
+    positive infinity by convention.
+
+    Parameters
+    ----------
+    ratio : int, Fraction, or str
+        The ratio to measure.  Strings like ``'3/2'`` are accepted.
+        Exact (rational) input is required; floats are rejected because
+        their binary expansion does not name the intended ratio.
+
+    Returns
+    -------
+    float
+        The signed Barlow harmonicity.
+
+    Examples
+    --------
+    >>> round(abs(harmonicity('3/2')), 4)
+    0.2727
+
+    >>> harmonicity(1)
+    inf
+    """
+    if isinstance(ratio, float):
+        raise TypeError(
+            "harmonicity requires an exact ratio (int, Fraction, or str); "
+            "floats are ambiguous"
+        )
+    r = Fraction(ratio)
+    p, q = abs(r.numerator), abs(r.denominator)
+    xi_p = _indigestibility_cached(p)
+    xi_q = _indigestibility_cached(q)
+    denom = xi_p + xi_q
+    if denom == 0.0:
+        return float('inf')
+    sign = 1.0 if xi_p > xi_q else (-1.0 if xi_p < xi_q else 0.0)
+    return sign / denom
+
+
+def logarithmic_distance(a: Union[int, float, Fraction, str], b: Union[int, float, Fraction, str],
                          equave: Union[int, float, Fraction, str] = 2) -> float:
     """
     Calculate the logarithmic distance between two musical intervals.

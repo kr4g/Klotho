@@ -205,6 +205,235 @@ class TestChordSequenceMethods:
                        for a, b in zip(cur_hz, prev_hz))
 
 
+def _greedy_total_motion(prev_hz, voicing):
+    """Reference: per-voice independent nearest-neighbor total motion."""
+    total = 0.0
+    for p in voicing.pitches:
+        total += min(abs(math.log2(p.freq / q)) for q in prev_hz)
+    return total
+
+
+class TestVoiceLeadQuality:
+    def test_spread_voicing_does_not_collapse(self):
+        # The pre-10.13 per-degree snapping turned this 2-octave spread
+        # into a 2-semitone cluster.
+        seq = [Voicing(['1/1', '2/1', '4/1'], reference_pitch='C4'),
+               Chord(['1/1', '16/15', '15/8'], reference_pitch='C5')]
+        led = voice_lead(seq, 'C3', 'C7')
+        freqs = sorted(p.freq for p in led[1].pitches)
+        spread = math.log2(freqs[-1] / freqs[0])
+        assert spread > 1.5
+
+    def test_assignment_no_worse_than_greedy(self):
+        seq = [Chord(['1/1', '5/4', '3/2'], reference_pitch='C4'),
+               Chord(['1/1', '9/8', '45/32', '5/3'], reference_pitch='E4'),
+               Chord(['1/1', '6/5', '3/2'], reference_pitch='B3')]
+        led = voice_lead(seq, 'C3', 'C6')
+        for prev, cur in zip(led, led[1:]):
+            prev_hz = [p.freq for p in prev.pitches]
+            total = 0.0
+            for p in cur.pitches:
+                total += min(abs(math.log2(p.freq / q)) for q in prev_hz)
+            assert total <= _greedy_total_motion(prev_hz, cur) + 1e-9
+
+    def test_common_tone_held(self):
+        seq = [Chord(['1/1', '5/4', '3/2'], reference_pitch='C4'),
+               Chord(['1/1', '5/4', '3/2'], reference_pitch='G4')]
+        led = voice_lead(seq)
+        cur = [p.freq for p in led[1].pitches]
+        g4 = Pitch('G4').freq
+        assert any(abs(math.log2(f / g4)) < 1e-4 for f in cur)
+
+    def test_result_cardinality_matches_input(self):
+        seq = [Chord(['1/1', '5/4', '3/2'], reference_pitch='C4'),
+               Chord(['1/1', '5/4', '3/2', '7/4', '9/8'], reference_pitch='A4')]
+        led = voice_lead(seq, 'C3', 'C6')
+        assert [len(v.pitches) for v in led] == [3, 5]
+
+
+class TestVoicesParameter:
+    def _triads(self):
+        return [Chord(['1/1', '5/4', '3/2'], reference_pitch='C4'),
+                Chord(['1/1', '5/4', '3/2'], reference_pitch='G4'),
+                Chord(['1/1', '5/4', '3/2'], reference_pitch='F4')]
+
+    def test_fixed_voice_count_with_doubling(self):
+        led = voice_lead(self._triads(), 'C3', 'C6', voices=4)
+        for v in led:
+            assert len(v.pitches) == 4
+            assert _in_window(v, Pitch('C3').freq, Pitch('C6').freq)
+
+    def test_first_chord_doubles_the_root(self):
+        # 4:5:6 doubling practice emerges from Barlow simplicity: the root
+        # forms the simplest interval classes with the whole sonority.
+        led = voice_lead(self._triads(), 'C3', 'C6', voices=4)
+        c4 = Pitch('C4').freq
+        pcs = sorted(round(1200 * math.log2(p.freq / c4)) % 1200
+                     for p in led[0].pitches)
+        assert pcs.count(0) == 2  # root doubled at the octave
+
+    def test_all_chord_tones_present(self):
+        led = voice_lead(self._triads(), 'C3', 'C6', voices=4)
+        for v, ch in zip(led, self._triads()):
+            got = {round(1200 * math.log2(p.freq / ch.reference_pitch.freq)) % 1200
+                   for p in v.pitches}
+            want = {round(1200 * math.log2(float(d))) % 1200 for d in ch.degrees}
+            assert want <= got
+
+    def test_voices_smaller_than_cardinality_raises(self):
+        with pytest.raises(ValueError, match='more than'):
+            voice_lead([Chord(['1/1', '5/4', '3/2', '7/4'])], voices=3)
+
+    def test_doubling_nearest_and_explicit(self):
+        led_nearest = voice_lead(self._triads(), 'C3', 'C6', voices=4,
+                                 doubling='nearest')
+        assert all(len(v.pitches) == 4 for v in led_nearest)
+        led_third = voice_lead(self._triads(), 'C3', 'C6', voices=4,
+                               doubling=1)
+        c4 = Pitch('C4').freq
+        pcs = sorted(round(1200 * math.log2(p.freq / c4)) % 1200
+                     for p in led_third[0].pitches)
+        assert pcs.count(386) == 2  # explicit: the third (5/4) is doubled
+
+    def test_cents_mode_triad_doubles_root_equivalent(self):
+        # 12-TET spelling: rational inference still finds the root.
+        seq = [Chord([0.0, 400.0, 700.0], 'cents', reference_pitch='C4'),
+               Chord([0.0, 400.0, 700.0], 'cents', reference_pitch='G4')]
+        led = voice_lead(seq, 'C3', 'C6', voices=4)
+        c4 = Pitch('C4').freq
+        pcs = sorted(round(1200 * math.log2(p.freq / c4)) % 1200
+                     for p in led[0].pitches)
+        assert pcs.count(0) == 2
+
+    def test_unison_doubling_survives_conversion(self):
+        from klotho.utils.playback.supersonic.converters import chord_to_sc_events
+        v = Voicing(['1/1', '1/1', '3/2'], dedupe=False)
+        assert len(v.pitches) == 3
+        events = chord_to_sc_events(v, duration=0.5)
+        news = [ev for ev in events if ev['type'] == 'new']
+        assert len(news) == 3
+
+
+class TestAnchors:
+    def _seq(self):
+        return [Chord(['1/1', '5/4', '3/2'], reference_pitch='C4'),
+                Chord(['1/1', '6/5', '3/2'], reference_pitch='A3'),
+                Chord(['1/1', '5/4', '3/2'], reference_pitch='F4')]
+
+    def test_anchor_passes_through_verbatim(self):
+        v = Voicing(['1/1', '5/4', '2/1'], reference_pitch='D4')
+        seq = [Chord(['1/1', '5/4', '3/2'], reference_pitch='C4'), v,
+               Chord(['1/1', '6/5', '3/2'], reference_pitch='A3')]
+        led = voice_lead(seq, 'C3', 'C5', anchor=1)
+        assert [p.freq for p in led[1].pitches] == [p.freq for p in v.pitches]
+
+    def test_anchor_exempt_from_bounds(self):
+        v = Voicing(['1/1', '5/4', '3/2'], reference_pitch='C7')  # above hi
+        seq = self._seq() + [v]
+        led = voice_lead(seq, 'C3', 'C5', anchor=3)
+        assert [p.freq for p in led[3].pitches] == [p.freq for p in v.pitches]
+        # free chords still bounded
+        for i in (0, 1, 2):
+            assert _in_window(led[i], Pitch('C3').freq, Pitch('C5').freq)
+
+    def test_anchor_single_int_and_negative(self):
+        seq = self._seq()
+        by_int = voice_lead(seq, 'C3', 'C5', anchor=2)
+        by_neg = voice_lead(seq, 'C3', 'C5', anchor=-1)
+        assert [[p.freq for p in a.pitches] for a in by_int] == \
+               [[p.freq for p in b.pitches] for b in by_neg]
+
+    def test_anchor_out_of_range_raises(self):
+        with pytest.raises(IndexError):
+            voice_lead(self._seq(), anchor=5)
+
+    def test_anchored_first_chord_not_folded(self):
+        c = Chord(['1/1', '5/4', '3/2'], reference_pitch='C6')  # above hi
+        led = voice_lead([c] + self._seq()[1:], 'C3', 'C5', anchor=0)
+        assert [p.freq for p in led[0].pitches] == [p.freq for p in c.pitches]
+
+    def test_adjacent_anchors(self):
+        seq = self._seq()
+        led = voice_lead(seq, 'C3', 'C5', anchor=[0, 1])
+        for i in (0, 1):
+            assert [p.freq for p in led[i].pitches] == \
+                   [p.freq for p in seq[i].pitches]
+
+    def test_drift_distributes_register_gap(self):
+        a0 = Voicing(['1/1', '5/4', '3/2'], reference_pitch='C3')
+        a4 = Voicing(['1/1', '5/4', '3/2'], reference_pitch='C6')
+        mids = [Chord(['1/1', '6/5', '3/2'], reference_pitch='A3'),
+                Chord(['1/1', '5/4', '3/2'], reference_pitch='F3'),
+                Chord(['1/1', '6/5', '3/2'], reference_pitch='D4')]
+        led = voice_lead([a0] + mids + [a4], anchor=[0, 4])
+        centroids = [sum(math.log2(p.freq) for p in v.pitches) / len(v.pitches)
+                     for v in led]
+        steps = [b - a for a, b in zip(centroids, centroids[1:])]
+        # monotone climb, no step carrying more than half the total gap
+        total = centroids[-1] - centroids[0]
+        assert all(s > 0 for s in steps)
+        assert max(steps) < total / 2
+
+    def test_anchor_with_voices_extends_without_moving(self):
+        v = Voicing(['1/1', '5/4', '3/2'], reference_pitch='D4')
+        led = voice_lead([self._seq()[0], v], 'C3', 'C6', voices=4, anchor=1)
+        anchored = [p.freq for p in led[1].pitches]
+        assert len(anchored) == 4
+        for f in [p.freq for p in v.pitches]:
+            assert any(abs(g - f) < 1e-6 for g in anchored)
+
+
+class TestChordSequenceConcatenation:
+    def _seq(self, n=1):
+        return ChordSequence([Chord(['1/1', '5/4', '3/2'])] * n)
+
+    def test_add_sequences(self):
+        s = self._seq(2) + self._seq(3)
+        assert isinstance(s, ChordSequence) and len(s) == 5
+
+    def test_add_list_and_radd(self):
+        assert len(self._seq(1) + [Chord(['1/1', '3/2'])]) == 2
+        assert len([Chord(['1/1', '3/2'])] + self._seq(1)) == 2
+
+    def test_mul(self):
+        assert len(self._seq(2) * 3) == 6
+        assert len(3 * self._seq(2)) == 6
+
+    def test_iadd_rebinds(self):
+        s = self._seq(1)
+        orig = s
+        s += self._seq(1)
+        assert len(s) == 2 and len(orig) == 1
+
+    def test_foreign_types_rejected(self):
+        with pytest.raises(TypeError):
+            self._seq(1) + 42
+        with pytest.raises(TypeError):
+            self._seq(1) + ['not a chord']
+
+    def test_constructor_rejects_non_collections(self):
+        with pytest.raises(TypeError, match='relative pitch collections'):
+            ChordSequence(['1/1', '5/4'])
+
+    def test_voice_led_forwards_kwargs(self):
+        seq = self._seq(3)
+        led = seq.voice_led('C3', 'C6', voices=4, anchor=0, doubling='nearest')
+        assert isinstance(led, ChordSequence)
+        assert all(len(v.pitches) == 4 for v in led)
+
+
+class TestVoiceLeadPerformance:
+    def test_benchmark_guard(self):
+        import time
+        chords = [Chord([f'{k}/8' for k in range(8, 16)],
+                        reference_pitch=Pitch('C4').transpose(f'{i + 8}/8'))
+                  for i in range(16)]
+        t0 = time.perf_counter()
+        voice_lead(chords, 'C2', 'C6')
+        elapsed = time.perf_counter() - t0
+        assert elapsed < 0.25, f"voice_lead too slow: {elapsed * 1000:.0f} ms"
+
+
 class TestScaleFactories:
     def test_octatonic(self):
         scale = Scale.octatonic()
