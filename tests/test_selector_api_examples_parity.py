@@ -38,14 +38,6 @@ def _canonical_sc_events(obj):
     return json.loads(json.dumps(_cap_mod._canonicalize(ev, id_norm), sort_keys=True))
 
 
-def _canonical_tone_payload(obj):
-    from klotho.utils.playback.tonejs.converters import convert_to_events
-
-    id_norm = _cap_mod._IdNormalizer()
-    payload = convert_to_events(obj)
-    return json.loads(json.dumps(_cap_mod._canonicalize(payload, id_norm), sort_keys=True))
-
-
 @pytest.mark.parametrize(
     "legacy_fn, fluent_fn",
     [
@@ -54,9 +46,9 @@ def _canonical_tone_payload(obj):
         (build_rt_preview_poly_legacy, build_rt_preview_poly_fluent),
     ],
 )
-def test_rt_preview_legacy_vs_fluent_tone_payload(legacy_fn, fluent_fn):
-    a = _canonical_tone_payload(legacy_fn())
-    b = _canonical_tone_payload(fluent_fn())
+def test_rt_preview_legacy_vs_fluent_sc_events(legacy_fn, fluent_fn):
+    a = _canonical_sc_events(legacy_fn())
+    b = _canonical_sc_events(fluent_fn())
     assert a == b
 
 

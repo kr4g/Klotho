@@ -39,9 +39,9 @@ class Instrument:
     """Engine-agnostic per-note voice with a name and default pfields.
 
     An Instrument carries the pfield defaults applied to every event it
-    plays. Engine-specific subclasses (``SynthDefInstrument``,
-    ``MidiInstrument``, ``ToneInstrument``) add backend details; this base
-    class is what node assignment APIs such as ``UC.set_instrument`` accept.
+    plays. Backend subclasses (``SynthDefInstrument``) add SynthDef
+    details; this base class is what node assignment APIs such as
+    ``UC.set_instrument`` accept.
 
     Parameters
     ----------

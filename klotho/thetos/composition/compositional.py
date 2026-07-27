@@ -1174,10 +1174,6 @@ class CompositionalUnit(TemporalUnit):
             return inst.name
         if hasattr(inst, 'defName'):
             return inst.defName
-        if hasattr(inst, 'tonejs_class'):
-            return inst.tonejs_class
-        if hasattr(inst, 'prgm'):
-            return inst.prgm
         return str(inst)
 
     @property
@@ -1906,8 +1902,7 @@ class CompositionalUnit(TemporalUnit):
               If the instrument carries an ``_ensemble_family`` tag (i.e. it
               was accessed through an Ensemble family view), the ``group``
               mfield is automatically set to the family name.
-            - str: raw synth reference (defName for SC, tonejs_class for Tone.js)
-            - int: raw program number (MIDI)
+            - str: raw synth reference (SynthDef name)
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
         include_rests : bool, default=False

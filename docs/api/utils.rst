@@ -121,24 +121,3 @@ SuperSonic Converters
    :members:
    :show-inheritance:
 
-MIDI Player
-~~~~~~~~~~~
-
-.. automodule:: klotho.utils.playback.midi_player
-   :members:
-   :show-inheritance:
-   :exclude-members: deque
-
-Tone.js Engine
-~~~~~~~~~~~~~~
-
-.. automodule:: klotho.utils.playback.tonejs.engine
-   :members:
-   :show-inheritance:
-
-Tone.js Converters
-~~~~~~~~~~~~~~~~~~
-
-.. automodule:: klotho.utils.playback.tonejs.converters
-   :members:
-   :show-inheritance:

@@ -157,15 +157,12 @@ class TestTimelineAnimated:
 
 
 class TestTimelineStepConsistency:
-    """Renderer step count == global _stepIndex range in both engines' payloads."""
+    """Renderer step count == global _stepIndex range in the SC payload."""
 
     @pytest.mark.parametrize('case', sorted(_timeline_cases()))
     def test_step_indices_match(self, case):
         from klotho.semeios.visualization._renderers.svg_timeline import (
             _resolve_lanes, _svg_timeline_ratios,
-        )
-        from klotho.utils.playback.tonejs.converters import (
-            temporal_container_to_animation_events,
         )
         from klotho.utils.playback.supersonic.converters import (
             temporal_container_to_sc_animation_events,
@@ -179,12 +176,6 @@ class TestTimelineStepConsistency:
         assert len(sd.step_element_ids) == total_steps
         assert len(sd.step_halo_ids) == total_steps
         assert len(sd.step_durations) == total_steps
-
-        tone = temporal_container_to_animation_events(obj)
-        tone_steps = {ev['_stepIndex'] for ev in tone['events']
-                      if ev.get('_stepIndex') is not None}
-        assert tone_steps == set(range(total_steps))
-        assert min(ev['start'] for ev in tone['events']) == 0.0
 
         sc = temporal_container_to_sc_animation_events(obj)
         sc_steps = {ev['_stepIndex'] for ev in sc

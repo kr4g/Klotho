@@ -5,7 +5,6 @@
 -r requirements.txt
 
 # Optional: MIDI audio playback
-midi2audio
 
 # Optional: Diversity-based sampling
 diversipy

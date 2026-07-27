@@ -84,49 +84,29 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
         return svg_data
 
     from .._animation import AnimatedRTSvgFigure
-    from klotho.utils.playback._config import get_audio_engine
     from klotho.chronos.temporal_units.temporal import TemporalUnit as _TemporalUnit
     from klotho.thetos.composition.compositional import CompositionalUnit as _CompositionalUnit
+    from klotho.utils.playback.supersonic.converters import (
+        rhythm_tree_to_sc_animation_events,
+        temporal_unit_to_sc_animation_events,
+        compositional_unit_to_sc_animation_events,
+    )
 
-    engine = get_audio_engine()
-
-    if engine == "supersonic":
-        from klotho.utils.playback.supersonic.converters import (
-            rhythm_tree_to_sc_animation_events,
-            temporal_unit_to_sc_animation_events,
-            compositional_unit_to_sc_animation_events,
-        )
-        if audio_source is not None:
-            if isinstance(audio_source, _CompositionalUnit):
-                audio_payload = compositional_unit_to_sc_animation_events(audio_source)
-            elif isinstance(audio_source, _TemporalUnit):
-                audio_payload = temporal_unit_to_sc_animation_events(audio_source, amp=amp)
-            else:
-                audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
+    if audio_source is not None:
+        if isinstance(audio_source, _CompositionalUnit):
+            audio_payload = compositional_unit_to_sc_animation_events(audio_source)
+        elif isinstance(audio_source, _TemporalUnit):
+            audio_payload = temporal_unit_to_sc_animation_events(audio_source, amp=amp)
         else:
             audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
     else:
-        from klotho.utils.playback.tonejs.converters import (
-            rhythm_tree_to_animation_events,
-            temporal_unit_to_animation_events,
-            compositional_unit_to_animation_events,
-        )
-        if audio_source is not None:
-            if isinstance(audio_source, _CompositionalUnit):
-                audio_payload = compositional_unit_to_animation_events(audio_source)
-            elif isinstance(audio_source, _TemporalUnit):
-                audio_payload = temporal_unit_to_animation_events(audio_source, amp=amp)
-            else:
-                audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
-        else:
-            audio_payload = rhythm_tree_to_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
+        audio_payload = rhythm_tree_to_sc_animation_events(rt, beat=beat, bpm=bpm, amp=amp)
 
     return AnimatedRTSvgFigure(
         svg_data=svg_data,
         audio_payload=audio_payload,
         dur=dur,
         glow=glow,
-        engine=engine,
         **transport_kwargs(kwargs),
     )
 

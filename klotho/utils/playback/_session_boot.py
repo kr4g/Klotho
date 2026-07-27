@@ -6,10 +6,6 @@ def boot_supersonic():
     if _booted:
         return
 
-    from ._config import get_audio_engine
-    if get_audio_engine() != "supersonic":
-        return
-
     try:
         get_ipython()
     except NameError:

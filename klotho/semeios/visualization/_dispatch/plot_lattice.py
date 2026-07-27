@@ -1050,6 +1050,5 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
 
     if is_tone_lattice:
         from .._animation import ClickPreviewFigure
-        return ClickPreviewFigure(static_fig, def_name=preview_def_name,
-                                  engine=preview_engine)
+        return ClickPreviewFigure(static_fig, def_name=preview_def_name)
     return static_fig

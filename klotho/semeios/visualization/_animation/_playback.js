@@ -1,5 +1,5 @@
 // Shared playback controller for animated Klotho figures.
-// Python replaces placeholders: __WID__, __DUR_MS__, __BOUNDARY_OP__, __ENGINE_TYPE__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
+// Python replaces placeholders: __WID__, __DUR_MS__, __BOUNDARY_OP__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
 // Caller must define: audioPayload, totalSteps, onStep, onBeforePlay, onReset
 
 var toggleBtn = document.getElementById("__WID___toggle");
@@ -9,10 +9,8 @@ var loopSvg   = document.getElementById("__WID___loop_svg");
 var playing = false;
 var loopCtl = KlothoLoopControl(loopBtn, loopSvg, "__LOOP_MODE__", "__LOOP_COUNT__",
                                 "__LOOP_ENABLED__" === "true");
-var engineType = "__ENGINE_TYPE__";
 var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
     ? globalThis.KlothoPlaybackBridge({
-        engine: engineType,
         audioPayload: audioPayload,
         ringTime: __RING_TIME__,
     })

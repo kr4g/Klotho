@@ -146,8 +146,7 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
 
     if animate:
         from .._animation import ClickPreviewFigure
-        return ClickPreviewFigure(static_fig, def_name=preview_def_name,
-                                  engine=engine_name)
+        return ClickPreviewFigure(static_fig, def_name=preview_def_name)
     return static_fig
 
 
@@ -567,7 +566,6 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
 
     if animate:
         from .._animation import ClickPreviewFigure
-        return ClickPreviewFigure(static_fig, def_name=preview_def_name,
-                                  engine=engine_name)
+        return ClickPreviewFigure(static_fig, def_name=preview_def_name)
     return static_fig
 

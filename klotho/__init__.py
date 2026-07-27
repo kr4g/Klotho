@@ -26,15 +26,14 @@ from .topos.graphs import GraphCore, Graph, Tree, Lattice, Group
 from .semeios.visualization import plot
 
 from .utils.playback.player import play
-from .utils.playback.midi_player import play_midi, create_midi
 from .utils.playback._config import set_audio_engine, get_audio_engine
 from .utils.playback.supersonic import register_synthdef
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
-    'plot', 'play', 'play_midi', 'create_midi', 'set_audio_engine', 'get_audio_engine',
+    'plot', 'play', 'set_audio_engine', 'get_audio_engine',
     'register_synthdef',
     'GraphCore', 'Graph', 'Tree', 'Lattice', 'Group',
 ]
 
-__version__ = '10.11.2'
+__version__ = '10.12.0'

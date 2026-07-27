@@ -2,12 +2,9 @@
   if (typeof globalThis.KlothoPlaybackBridge !== "undefined") return;
 
   function buildBridge(config) {
-    var engine = config.engine || "tone";
     var audioPayload = config.audioPayload || null;
     var ringTime = config.ringTime != null ? config.ringTime : 5;
 
-    var _aPlayer = null;
-    var _aInstruments = null;
     var _ssScheduler = null;
     var _ssSonic = null;
     var _ssReady = false;
@@ -24,24 +21,10 @@
       return Array.isArray(audioPayload.events) ? audioPayload.events : [];
     }
 
-    function _toneEvents() {
-      return _rawEvents();
-    }
-
     function _scEvents() {
       return _rawEvents().filter(function(e) {
         return e && (e.type === "new" || e.type === "set" || e.type === "release");
       });
-    }
-
-    function _hasToneAudio() {
-      if (_aPlayer) return true;
-      if (typeof Tone === "undefined"
-          || typeof globalThis.KLOTHO_BUILD_INSTRUMENTS !== "function"
-          || typeof globalThis.KlothoPlayer === "undefined") return false;
-      _aInstruments = globalThis.KLOTHO_BUILD_INSTRUMENTS((audioPayload && audioPayload.instruments) || {});
-      _aPlayer = globalThis.KlothoPlayer.create();
-      return true;
     }
 
     async function _ensureSSReady() {
@@ -71,20 +54,17 @@
     }
 
     async function ensureReady() {
-      if (engine === "supersonic") return _ensureSSReady();
-      return _hasToneAudio();
+      return _ensureSSReady();
     }
 
     function hasPlayableEvents() {
-      if (engine === "supersonic") return _scEvents().length > 0;
-      return _toneEvents().length > 0;
+      return _scEvents().length > 0;
     }
 
     function eventEnd(ev) {
       // Prefer the SuperSonic top-level ``dur`` (new event contract).
-      // Falls back to Tone's ``duration`` and the legacy in-pfields ``dur``
-      // (still used by ``_perc_note`` events) so existing payloads keep
-      // working.
+      // Falls back to the legacy in-pfields ``dur`` (still used by
+      // ``_perc_note`` events) so existing payloads keep working.
       if (!ev) return 0;
       if (typeof ev.dur === "number") return ev.start + ev.dur;
       if (ev.duration != null) return ev.start + ev.duration;
@@ -160,28 +140,16 @@
     }
 
     function isPlaying() {
-      if (engine === "supersonic") return !!(_ssScheduler && _ssScheduler.isPlaying);
-      return !!(_aPlayer && _aPlayer.isPlaying());
+      return !!(_ssScheduler && _ssScheduler.isPlaying);
     }
 
     async function stop() {
-      if (engine === "supersonic") {
-        if (_ssScheduler && _ssScheduler.isPlaying) await _ssScheduler.stop();
-        return;
-      }
-      if (_aPlayer && _aPlayer.isPlaying()) _aPlayer.stop();
+      if (_ssScheduler && _ssScheduler.isPlaying) await _ssScheduler.stop();
     }
 
     async function resumeAudio() {
-      if (engine === "supersonic") {
-        if (_ssSonic && _ssSonic.audioContext && _ssSonic.audioContext.state === "suspended") {
-          await _ssSonic.audioContext.resume();
-        }
-        return;
-      }
-      if (typeof Tone !== "undefined" && Tone.context && Tone.context.state === "suspended") {
-        try { await Tone.start(); } catch(_) {}
-        try { await Tone.context.resume(); } catch(_) {}
+      if (_ssSonic && _ssSonic.audioContext && _ssSonic.audioContext.state === "suspended") {
+        await _ssSonic.audioContext.resume();
       }
     }
 
@@ -197,48 +165,16 @@
       var onEvent = options.onEvent || null;
       var onFinish = options.onFinish || null;
 
-      if (engine === "supersonic") {
-        var evts = Array.isArray(events) ? events : _scEvents();
-        if (!_ssScheduler || evts.length === 0) {
-          if (onFinish) onFinish();
-          return;
-        }
-        _ssScheduler.play(evts, {
-          tailPause: _pause,
-          loop: loopInfinite ? true : (loopFinite > 0 ? loopFinite : false),
-          onEvent: onEvent || function(){},
-          onFinish: onFinish || null,
-        });
-        return;
-      }
-
-      var toneEvts = Array.isArray(events) ? events : _toneEvents();
-      if (!_aPlayer || toneEvts.length === 0) {
+      var evts = Array.isArray(events) ? events : _scEvents();
+      if (!_ssScheduler || evts.length === 0) {
         if (onFinish) onFinish();
         return;
       }
-      if (loopFinite > 0) {
-        var remaining = loopFinite;
-        var playFiniteToneCycle = async function() {
-          await _aPlayer.play(toneEvts, _aInstruments, {
-            loop: false,
-            onEvent: onEvent || function(){},
-            onStop: function() {},
-            onFinish: async function() {
-              remaining -= 1;
-              if (remaining > 0) await playFiniteToneCycle();
-              else if (onFinish) onFinish();
-            },
-          });
-        };
-        await playFiniteToneCycle();
-        return;
-      }
-      await _aPlayer.play(toneEvts, _aInstruments, {
-        loop: loopInfinite,
+      _ssScheduler.play(evts, {
+        tailPause: _pause,
+        loop: loopInfinite ? true : (loopFinite > 0 ? loopFinite : false),
         onEvent: onEvent || function(){},
-        onStop: function() { if (onFinish) onFinish(); },
-        onFinish: function() { if (onFinish) onFinish(); },
+        onFinish: onFinish || null,
       });
     }
 
@@ -253,66 +189,35 @@
       var defName = (params.defName || "kl_tri") + "";
       var pfields = (params.pfields && typeof params.pfields === "object") ? params.pfields : null;
 
-      if (engine === "supersonic") {
-        var ready = await _ensureSSReady();
-        if (!ready || !_ssSonic || typeof _ssSonic.send !== "function") return false;
-        // Click-to-play preview: trigger one synth for ``dur`` seconds.
-        // We always send ``gate, 1`` on /s_new and ``/n_set gate 0`` after
-        // ``dur`` regardless of whether the manifest happens to be loaded
-        // on the page. For non-gated synths, scsynth silently ignores the
-        // unknown control name; for gated synths this gives the proper
-        // release tail. This keeps click-to-play independent of whether
-        // a SuperSonic ``play()`` widget has injected ``__klothoManifest``.
-        var nodeId = _ssSonic.nextNodeId();
-        var args = ["/s_new", defName, nodeId, 0, 0,
-                    "freq", freq, "amp", amp, "gate", 1];
-        if (pfields) {
-          for (var k in pfields) {
-            if (!Object.prototype.hasOwnProperty.call(pfields, k)) continue;
-            if (k === "freq" || k === "amp" || k === "gate") continue;
-            var v = Number(pfields[k]);
-            if (!Number.isFinite(v)) continue;
-            args.push(k, v);
-          }
-        }
-        _ssSonic.send.apply(_ssSonic, args);
-        setTimeout(function() {
-          try { _ssSonic.send("/n_set", nodeId, "gate", 0); } catch(_) {}
-        }, Math.max(1, Math.round(dur * 1000)));
-        return true;
-      }
-
-      if (engine === "tone") {
-        if (typeof Tone === "undefined") return false;
-        try {
-          if (Tone.context && Tone.context.state === "suspended") {
-            try { await Tone.start(); } catch(_) {}
-            try { await Tone.context.resume(); } catch(_) {}
-          }
-          var synth = new Tone.Synth({
-            oscillator: { type: "sine" },
-            envelope: {
-              attack: 0.001,
-              decay: 0.01,
-              sustain: 1.0,
-              release: Math.max(0.01, dur),
-            },
-          }).toDestination();
-          synth.triggerAttackRelease(freq, dur, undefined, Math.min(1, Math.max(0, amp)));
-          setTimeout(function() {
-            try { synth.dispose(); } catch(_) {}
-          }, Math.max(20, Math.round((dur + 0.2) * 1000)));
-          return true;
-        } catch(_) {
-          return false;
+      var ready = await _ensureSSReady();
+      if (!ready || !_ssSonic || typeof _ssSonic.send !== "function") return false;
+      // Click-to-play preview: trigger one synth for ``dur`` seconds.
+      // We always send ``gate, 1`` on /s_new and ``/n_set gate 0`` after
+      // ``dur`` regardless of whether the manifest happens to be loaded
+      // on the page. For non-gated synths, scsynth silently ignores the
+      // unknown control name; for gated synths this gives the proper
+      // release tail. This keeps click-to-play independent of whether
+      // a SuperSonic ``play()`` widget has injected ``__klothoManifest``.
+      var nodeId = _ssSonic.nextNodeId();
+      var args = ["/s_new", defName, nodeId, 0, 0,
+                  "freq", freq, "amp", amp, "gate", 1];
+      if (pfields) {
+        for (var k in pfields) {
+          if (!Object.prototype.hasOwnProperty.call(pfields, k)) continue;
+          if (k === "freq" || k === "amp" || k === "gate") continue;
+          var v = Number(pfields[k]);
+          if (!Number.isFinite(v)) continue;
+          args.push(k, v);
         }
       }
-
-      return false;
+      _ssSonic.send.apply(_ssSonic, args);
+      setTimeout(function() {
+        try { _ssSonic.send("/n_set", nodeId, "gate", 0); } catch(_) {}
+      }, Math.max(1, Math.round(dur * 1000)));
+      return true;
     }
 
     return {
-      engine: engine,
       ensureReady: ensureReady,
       hasPlayableEvents: hasPlayableEvents,
       isPlaying: isPlaying,
@@ -320,7 +225,7 @@
       resumeAudio: resumeAudio,
       play: play,
       preview: preview,
-      getEvents: function() { return engine === "supersonic" ? _scEvents() : _toneEvents(); },
+      getEvents: function() { return _scEvents(); },
       filterEventsForGroup: filterEventsForGroup,
       reorderEventsFrom: reorderEventsFrom,
     };

@@ -157,7 +157,7 @@ def scale_pitch_sequence(obj, equaves=1):
 
 
 def dispatch_convert(obj, kwargs, handlers, include_inst=False):
-    """Shared type-dispatch for the supersonic and tonejs converters.
+    """Shared type-dispatch for the playback converters.
 
     The isinstance ladder, per-type argument wiring, and pause defaults
     live here once; each engine supplies its converter callables in

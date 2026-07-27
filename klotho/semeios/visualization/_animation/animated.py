@@ -1,12 +1,10 @@
 import json
 import uuid
 
-from klotho.utils.playback.tonejs.cdn import (
+from .._cdn import (
     cdn_scripts,
-    INSTRUMENTS_JS_PATH, PLAYER_JS_PATH,
     THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
 )
-from klotho.utils.playback._config import get_audio_engine
 from klotho.utils.playback.animation_events import normalize_animation_payload_for_engine
 
 from .base import (
@@ -19,8 +17,8 @@ from .._renderers.threejs_lattice import (
 )
 
 
-def _maybe_convert_payload(audio_payload, engine):
-    return normalize_animation_payload_for_engine(audio_payload, engine)
+def _maybe_convert_payload(audio_payload):
+    return normalize_animation_payload_for_engine(audio_payload, "supersonic")
 
 
 def _extract_needed_synthdefs(audio_payload):
@@ -41,33 +39,31 @@ class AnimatedLattice3dFigure:
 
     Wraps a ``ThreejsLatticeData`` scene with playback controls that
     progressively show path edges and update node colours.  Optional
-    audio events are dispatched through the Tone.js player.
+    audio events are dispatched through the SuperSonic scheduler.
 
     Parameters
     ----------
     scene_data : ThreejsLatticeData
         Pre-built Three.js scene descriptor.
     audio_payload : dict or None, optional
-        Tone.js-compatible event payload for audio playback.
+        SuperSonic-compatible event payload for audio playback.
     dur : float, optional
         Seconds between animation steps.
     """
 
-    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False):
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, ring_time=5, loop=False):
         self.scene_data = scene_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
         self.loop = loop
-        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_3d_{uuid.uuid4().hex[:8]}"
 
     def _nav_html(self, wid):
         return ""
 
-    def _controller_js(self, wid, eng):
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng,
-                                        ring_time=self.ring_time, loop=self.loop)
+    def _controller_js(self, wid):
+        playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
         return '''
     var totalSteps = pathSteps.length;
 
@@ -119,21 +115,17 @@ class AnimatedLattice3dFigure:
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.scene_data
         wid = self.widget_id
-        eng = self.engine
 
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(bool(self.audio_payload) and eng == "tone"),
-            include_threejs=True,
-            engine=eng)
+        cdn_html = build_session_preamble(include_threejs=True)
         controls_html = build_control_bar_html(wid)
         nav_html = self._nav_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
-                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        scripts_html = build_scripts_html(
+            needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
         halo_json = json.dumps(sd.halo_data)
-        converted = _maybe_convert_payload(self.audio_payload, eng)
+        converted = _maybe_convert_payload(self.audio_payload)
         payload_json = json.dumps(converted) if converted else "null"
 
         w = sd.width_px
@@ -144,7 +136,7 @@ class AnimatedLattice3dFigure:
         orbit_cdn = THREEJS_ORBIT_CDN
         trackball_cdn = THREEJS_TRACKBALL_CDN
 
-        controller_js = self._controller_js(wid, eng)
+        controller_js = self._controller_js(wid)
 
         html = f'''
 {cdn_html}
@@ -602,35 +594,31 @@ class AnimatedRTSvgFigure:
     svg_data : SvgRTData
         Pre-built SVG data for the rhythm tree.
     audio_payload : dict or None, optional
-        Tone.js-compatible event payload for audio playback.
+        SuperSonic-compatible event payload for audio playback.
     dur : float, optional
         Seconds between animation steps.
     glow : bool, optional
         Enable halo glow on the active leaf node.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, engine=None, ring_time=5, loop=False):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False, ring_time=5, loop=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.glow = glow
         self.ring_time = ring_time
         self.loop = loop
-        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
-        eng = self.engine
 
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(bool(self.audio_payload) and eng == "tone"),
-            engine=eng)
+        cdn_html = build_session_preamble()
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
-                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        scripts_html = build_scripts_html(
+            needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         leaf_path_ids_json = json.dumps(sd.leaf_path_ids)
         all_anim_ids_json = json.dumps(sd.all_animated_ids)
@@ -642,10 +630,10 @@ class AnimatedRTSvgFigure:
         node_to_ids_json = json.dumps({str(k): v for k, v in sd.node_to_ids.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in sd.leaf_ancestors])
 
-        converted = _maybe_convert_payload(self.audio_payload, eng)
+        converted = _maybe_convert_payload(self.audio_payload)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, engine=eng, ring_time=self.ring_time, loop=self.loop)
+        playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -741,7 +729,7 @@ class AnimatedTimelineSvgFigure:
     svg_data : SvgTimelineData
         Pre-built SVG data for the temporal container.
     audio_payload : dict or list or None, optional
-        Engine-specific event payload for audio playback.
+        SuperSonic event payload for audio playback.
     dur : float, optional
         Seconds between animation steps (no-audio fallback only).
     glow : bool, optional
@@ -749,28 +737,24 @@ class AnimatedTimelineSvgFigure:
     """
 
     def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False,
-                 engine=None, ring_time=5, loop=False):
+                 ring_time=5, loop=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.glow = glow
         self.ring_time = ring_time
         self.loop = loop
-        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
-        eng = self.engine
 
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(bool(self.audio_payload) and eng == "tone"),
-            engine=eng)
+        cdn_html = build_session_preamble()
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
-                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        scripts_html = build_scripts_html(
+            needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         step_ids_json = json.dumps(sd.step_element_ids)
         step_halo_ids_json = json.dumps(sd.step_halo_ids)
@@ -778,11 +762,11 @@ class AnimatedTimelineSvgFigure:
         bright_json = json.dumps(sd.step_bright_colors)
         base_json = json.dumps(sd.step_base_colors)
 
-        converted = _maybe_convert_payload(self.audio_payload, eng)
+        converted = _maybe_convert_payload(self.audio_payload)
         payload_json = json.dumps(converted) if converted else "null"
 
         playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False,
-                                        engine=eng, ring_time=self.ring_time, loop=self.loop)
+                                        ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -890,32 +874,28 @@ class AnimatedLatticeSvgFigure:
     svg_data : SvgLatticeData or SvgCPSData
         Pre-built SVG data for the lattice or CPS.
     audio_payload : dict or None, optional
-        Tone.js-compatible event payload for audio playback.
+        SuperSonic-compatible event payload for audio playback.
     dur : float, optional
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False):
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, ring_time=5, loop=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
         self.loop = loop
-        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_slat_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
-        eng = self.engine
 
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(bool(self.audio_payload) and eng == "tone"),
-            engine=eng)
+        cdn_html = build_session_preamble()
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
-                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        scripts_html = build_scripts_html(
+            needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         steps_json = json.dumps(sd.step_group_ids)
         halos_json = json.dumps(sd.halo_ids)
@@ -924,10 +904,10 @@ class AnimatedLatticeSvgFigure:
         path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
         path_node_colors_json = json.dumps(getattr(sd, 'path_node_colors', []))
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        converted = _maybe_convert_payload(self.audio_payload, eng)
+        converted = _maybe_convert_payload(self.audio_payload)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng, ring_time=self.ring_time, loop=self.loop)
+        playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -1049,43 +1029,38 @@ class AnimatedNodeSelectSvgFigure:
         For each animation step, the index into ``svg_data.all_node_ids``
         of the node to select (-1 for no highlight).
     audio_payload : dict or None, optional
-        Engine-specific event payload for audio playback.
+        SuperSonic event payload for audio playback.
     dur : float, optional
         Seconds between animation steps (no-audio fallback only).
     """
 
     def __init__(self, svg_data, select_node_indices, audio_payload=None,
-                 dur=0.5, engine=None, ring_time=5, loop=False):
+                 dur=0.5, ring_time=5, loop=False):
         self.svg_data = svg_data
         self.select_node_indices = list(select_node_indices)
         self.audio_payload = audio_payload
         self.dur = dur
         self.ring_time = ring_time
         self.loop = loop
-        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_ssel_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
-        eng = self.engine
 
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(bool(self.audio_payload) and eng == "tone"),
-            engine=eng)
+        cdn_html = build_session_preamble()
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
-                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        scripts_html = build_scripts_html(
+            needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         node_ids_json = json.dumps(sd.all_node_ids)
         select_json = json.dumps(self.select_node_indices)
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        converted = _maybe_convert_payload(self.audio_payload, eng)
+        converted = _maybe_convert_payload(self.audio_payload)
         payload_json = json.dumps(converted) if converted else "null"
 
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng,
-                                        ring_time=self.ring_time, loop=self.loop)
+        playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
 
         html = f'''
 {cdn_html}
@@ -1172,15 +1147,13 @@ class AnimatedLattice3dSelectFigure(AnimatedLattice3dFigure):
     per-step node indices.
     """
 
-    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None,
-                 ring_time=5, loop=False):
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, ring_time=5, loop=False):
         super().__init__(scene_data, audio_payload=audio_payload, dur=dur,
-                         engine=engine, ring_time=ring_time, loop=loop)
+                         ring_time=ring_time, loop=loop)
         self.widget_id = f"klotho_3dsel_{uuid.uuid4().hex[:8]}"
 
-    def _controller_js(self, wid, eng):
-        playback_js = build_playback_js(wid, self.dur * 1000, engine=eng,
-                                        ring_time=self.ring_time, loop=self.loop)
+    def _controller_js(self, wid):
+        playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
         return '''
     var selectNodeIndices = sceneData.selectNodeIndices || [];
     var _selOrigColors = (sceneData.nodeColors || []).slice();
@@ -1218,12 +1191,12 @@ class _AnimatedShapeFigureBase:
     svg_data : SvgLatticeData or SvgCPSData
         Pre-built SVG data containing shape group metadata.
     audio_payload : dict or None, optional
-        Tone.js-compatible event payload for audio playback.
+        SuperSonic-compatible event payload for audio playback.
     dur : float, optional
         Seconds between animation steps.
     """
 
-    def __init__(self, svg_data, audio_payload=None, dur=0.5, engine=None, ring_time=5, loop=False,
+    def __init__(self, svg_data, audio_payload=None, dur=0.5, ring_time=5, loop=False,
                  trail=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
@@ -1231,21 +1204,17 @@ class _AnimatedShapeFigureBase:
         self.ring_time = ring_time
         self.loop = loop
         self.trail = trail
-        self.engine = engine or get_audio_engine()
         self.widget_id = f"klotho_shp_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
         """Return a self-contained HTML string for Jupyter display."""
         sd = self.svg_data
         wid = self.widget_id
-        eng = self.engine
 
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(bool(self.audio_payload) and eng == "tone"),
-            engine=eng)
+        cdn_html = build_session_preamble()
         controls_html = build_control_bar_html(wid)
-        scripts_html = build_scripts_html(instruments_js, player_js, engine=eng,
-                                          needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        scripts_html = build_scripts_html(
+            needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
         group_node_indices_json = json.dumps(sd.shape_group_node_indices)
         group_edge_ids_json = json.dumps(sd.shape_group_edge_ids)
@@ -1253,7 +1222,7 @@ class _AnimatedShapeFigureBase:
         all_shape_edge_ids_json = json.dumps(sd.all_shape_edge_ids)
         node_ids_json = json.dumps(sd.all_node_ids)
         dimmed_color = sd.dimmed_node_color
-        converted = _maybe_convert_payload(self.audio_payload, eng)
+        converted = _maybe_convert_payload(self.audio_payload)
         payload_json = json.dumps(converted) if converted else "null"
         total_groups = len(sd.shape_group_node_indices)
         is_multi = total_groups > 1
@@ -1262,7 +1231,7 @@ class _AnimatedShapeFigureBase:
 
         shape_js = build_shape_playback_js(
             wid, self.dur * 1000, total_groups,
-            engine=eng, ring_time=self.ring_time, loop=self.loop)
+            ring_time=self.ring_time, loop=self.loop)
 
         trail_js = ''
         if self.trail:
@@ -1371,15 +1340,14 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
         Scene descriptor carrying ``shapeGroupNodeIndices``,
         ``shapeGroupEdges``, and ``shapeColors``.
     audio_payload : dict or None, optional
-        Engine event payload for audio playback.
+        SuperSonic event payload for audio playback.
     dur : float, optional
         Seconds between animation steps.
     """
 
-    def __init__(self, scene_data, audio_payload=None, dur=0.5, engine=None,
-                 ring_time=5, loop=False, trail=False):
+    def __init__(self, scene_data, audio_payload=None, dur=0.5, ring_time=5, loop=False, trail=False):
         super().__init__(scene_data, audio_payload=audio_payload, dur=dur,
-                         engine=engine, ring_time=ring_time, loop=loop)
+                         ring_time=ring_time, loop=loop)
         self.widget_id = f"klotho_3dshp_{uuid.uuid4().hex[:8]}"
         self.trail = trail
         groups = scene_data.scene_data.get('shapeGroupNodeIndices') or []
@@ -1389,10 +1357,10 @@ class AnimatedLattice3dShapeFigure(AnimatedLattice3dFigure):
         display = "inline-flex" if self.total_groups > 1 else "none"
         return build_nav_controls_html(wid, self.total_groups, display=display)
 
-    def _controller_js(self, wid, eng):
+    def _controller_js(self, wid):
         shape_js = build_shape_playback_js(
             wid, self.dur * 1000, self.total_groups,
-            engine=eng, ring_time=self.ring_time, loop=self.loop)
+            ring_time=self.ring_time, loop=self.loop)
         trail_js = ''
         if self.trail:
             trail_opacity = 0.35 if self.trail is True else float(self.trail)
@@ -1499,27 +1467,19 @@ class ClickPreviewFigure:
         The static figure to display.
     def_name : str, optional
         SynthDef used by the click preview (default ``'kl_tri'``).
-    engine : str or None, optional
-        Audio engine; defaults to the session engine.
     """
 
-    def __init__(self, inner, def_name='kl_tri', engine=None):
+    def __init__(self, inner, def_name='kl_tri'):
         self.inner = inner
         self.def_name = def_name or 'kl_tri'
-        self.engine = engine or get_audio_engine()
 
     def __getattr__(self, name):
         return getattr(self.inner, name)
 
     def to_html(self, **kwargs):
-        eng = self.engine
         include_threejs = hasattr(self.inner, 'scene_data')
-        cdn_html, instruments_js, player_js = build_session_preamble(
-            include_tone=(eng == "tone"),
-            include_threejs=include_threejs,
-            engine=eng)
+        cdn_html = build_session_preamble(include_threejs=include_threejs)
         scripts_html = build_scripts_html(
-            instruments_js, player_js, engine=eng,
             needed_synthdefs={self.def_name})
         return f'''
 {cdn_html}

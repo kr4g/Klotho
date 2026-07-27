@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from klotho.utils.playback.tonejs.cdn import cdn_scripts
+from .._cdn import cdn_scripts
 from klotho.utils.playback._helpers import (
     get_animation_bridge_js, get_loop_control_js,
     normalize_loop_policy, substitute_loop_tokens,
@@ -12,22 +12,8 @@ _PLAYBACK_JS_TEMPLATE = None
 _SHAPE_PLAYBACK_JS_TEMPLATE = None
 
 
-def build_session_preamble(include_plotly=False, include_tone=False, include_threejs=False,
-                           engine="tone"):
-    cdn_html = cdn_scripts(
-        include_plotly=include_plotly,
-        include_tone=(include_tone and engine != "supersonic"),
-        include_threejs=include_threejs,
-    )
-
-    if engine == "supersonic":
-        return cdn_html, "", ""
-
-    from klotho.utils.playback.tonejs.cdn import INSTRUMENTS_JS_PATH, PLAYER_JS_PATH
-    instruments_js = INSTRUMENTS_JS_PATH.read_text() if INSTRUMENTS_JS_PATH.exists() else ""
-    player_js = PLAYER_JS_PATH.read_text() if PLAYER_JS_PATH.exists() else ""
-
-    return cdn_html, instruments_js, player_js
+def build_session_preamble(include_plotly=False, include_threejs=False):
+    return cdn_scripts(include_plotly=include_plotly)
 
 
 def build_control_bar_html(wid):
@@ -64,30 +50,29 @@ def build_nav_controls_html(wid, total_groups, display="inline-flex"):
     </div>'''
 
 
-def build_scripts_html(instruments_js, player_js, engine="tone", needed_synthdefs=None):
-    if engine == "supersonic":
-        import json
-        from klotho.utils.playback.supersonic._js_fragments import (
-            ss_init_js, draw_scheduler_js, scheduler_core_js,
-            synthdef_registry_merge_js, synthdef_loader_js,
-        )
-        from klotho.utils.playback.supersonic.engine import (
-            _load_all_synthdef_assets, _filter_synthdef_assets, _INFRA_SYNTHDEFS,
-        )
-        from klotho.thetos.instruments._shared import load_ss_manifest
+def build_scripts_html(needed_synthdefs=None):
+    import json
+    from klotho.utils.playback.supersonic._js_fragments import (
+        ss_init_js, draw_scheduler_js, scheduler_core_js,
+        synthdef_registry_merge_js, synthdef_loader_js,
+    )
+    from klotho.utils.playback.supersonic.engine import (
+        _load_all_synthdef_assets, _filter_synthdef_assets, _INFRA_SYNTHDEFS,
+    )
+    from klotho.thetos.instruments._shared import load_ss_manifest
 
-        if needed_synthdefs is None:
-            needed_synthdefs = {'kl_tri', 'kl_kicktone', 'kl_sine', 'kl_saw', 'kl_sqr', 'kl_noisebpf'}
-        needed_synthdefs = needed_synthdefs | _INFRA_SYNTHDEFS | {'__klEnvCtrl'}
+    if needed_synthdefs is None:
+        needed_synthdefs = {'kl_tri', 'kl_kicktone', 'kl_sine', 'kl_saw', 'kl_sqr', 'kl_noisebpf'}
+    needed_synthdefs = needed_synthdefs | _INFRA_SYNTHDEFS | {'__klEnvCtrl'}
 
-        all_assets = _load_all_synthdef_assets()
-        assets = _filter_synthdef_assets(all_assets, needed_synthdefs)
-        assets_json = json.dumps(assets)
-        needed_json = json.dumps(list(needed_synthdefs))
-        manifest_json = json.dumps(load_ss_manifest())
+    all_assets = _load_all_synthdef_assets()
+    assets = _filter_synthdef_assets(all_assets, needed_synthdefs)
+    assets_json = json.dumps(assets)
+    needed_json = json.dumps(list(needed_synthdefs))
+    manifest_json = json.dumps(load_ss_manifest())
 
-        bridge_js = get_animation_bridge_js()
-        return f'''<script type="module">
+    bridge_js = get_animation_bridge_js()
+    return f'''<script type="module">
 {ss_init_js()}
 {draw_scheduler_js()}
 {scheduler_core_js()}
@@ -97,13 +82,8 @@ globalThis.__klothoManifest = {manifest_json};
 {bridge_js}
 </script>'''
 
-    bridge_js = get_animation_bridge_js()
-    return f'''<script type="module">{instruments_js}</script>
-<script type="module">{player_js}</script>
-<script type="module">{bridge_js}</script>'''
 
-
-def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring_time=5, loop=False):
+def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, ring_time=5, loop=False):
     global _PLAYBACK_JS_TEMPLATE
     if _PLAYBACK_JS_TEMPLATE is None:
         _PLAYBACK_JS_TEMPLATE = _PLAYBACK_JS_PATH.read_text()
@@ -112,12 +92,11 @@ def build_playback_js(wid, dur_ms, use_gt_for_boundary=True, engine="tone", ring
           .replace('__WID__', wid)
           .replace('__DUR_MS__', str(dur_ms))
           .replace('__BOUNDARY_OP__', boundary_op)
-          .replace('__ENGINE_TYPE__', engine)
           .replace('__RING_TIME__', str(ring_time)))
     return get_loop_control_js() + substitute_loop_tokens(js, loop)
 
 
-def build_shape_playback_js(wid, dur_ms, total_groups, engine="tone", ring_time=5, loop=False):
+def build_shape_playback_js(wid, dur_ms, total_groups, ring_time=5, loop=False):
     global _SHAPE_PLAYBACK_JS_TEMPLATE
     if _SHAPE_PLAYBACK_JS_TEMPLATE is None:
         _SHAPE_PLAYBACK_JS_TEMPLATE = _SHAPE_PLAYBACK_JS_PATH.read_text()
@@ -125,6 +104,5 @@ def build_shape_playback_js(wid, dur_ms, total_groups, engine="tone", ring_time=
           .replace('__WID__', wid)
           .replace('__DUR_MS__', str(dur_ms))
           .replace('__TOTAL_GROUPS__', str(total_groups))
-          .replace('__ENGINE_TYPE__', engine)
           .replace('__RING_TIME__', str(ring_time)))
     return get_loop_control_js() + substitute_loop_tokens(js, loop)

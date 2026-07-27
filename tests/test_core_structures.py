@@ -29,9 +29,9 @@ from klotho.chronos import (
 )
 from klotho.thetos import (
     CompositionalUnit as UC,
-    ToneInstrument as JsInst,
     ParameterTree,
 )
+from synth_fixtures import SynthFixtures as JsInst
 from klotho.dynatos import Envelope
 from klotho.topos import Pattern, PartitionSet as PS
 
@@ -458,11 +458,11 @@ class TestCompositionalUnit:
         uc = UC(tempus='4/4', prolatio=((3, (1,)*3), (2, (1,)*2)), beat='1/4', bpm=120, inst=JsInst.Kalimba())
         assert len(uc) == 5
         assert 'freq' in uc.pfields
-        assert 'vel' in uc.pfields
+        assert 'amp' in uc.pfields
         events = list(uc)
         for e in events:
             assert e.pfields.get('freq') == 440.0
-            assert e.pfields.get('vel') == 0.6
+            assert e.pfields.get('amp') == 0.1
 
     def test_set_pfields_root(self):
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=120, inst=JsInst.Kalimba())
@@ -490,7 +490,7 @@ class TestCompositionalUnit:
         expected_vels = [0.6498, 0.8803, 0.7928, 0.7395]
         for e, synth, vel in zip(events, expected_synths, expected_vels):
             inst = e._resolve_instrument()
-            assert inst.tonejs_class == synth
+            assert inst.name == synth
             assert abs(e.pfields.get('vel') - vel) < 0.001
 
     def test_set_mfields_inheritance(self):
@@ -549,14 +549,14 @@ class TestCompositionalUnitUseCases:
         expected_synths_0 = ['Kick', 'Snare', 'HatClosed', 'Kick']
         expected_vels_0 = [0.768911, 0.695231, 0.830198, 0.512579]
         for e, synth, vel in zip(unit0_events, expected_synths_0, expected_vels_0):
-            assert e._resolve_instrument().tonejs_class == synth
+            assert e._resolve_instrument().name == synth
             assert abs(e.pfields.get('vel') - vel) < 0.001
 
         unit1_events = list(uts[1])
         expected_synths_1 = ['Snare', 'HatClosed', 'Kick', 'Snare']
         expected_vels_1 = [0.823220, 0.726247, 0.619049, 0.518678]
         for e, synth, vel in zip(unit1_events, expected_synths_1, expected_vels_1):
-            assert e._resolve_instrument().tonejs_class == synth
+            assert e._resolve_instrument().name == synth
             assert abs(e.pfields.get('vel') - vel) < 0.001
 
     def test_multi_voice_block(self):
@@ -1020,36 +1020,40 @@ class TestPartitionSet:
 class TestConverters:
 
     def test_rt_converter(self):
-        from klotho.utils.playback.tonejs.converters import rhythm_tree_to_events
+        from klotho.utils.playback.supersonic.converters import (
+            rhythm_tree_to_sc_events, DEFAULT_RHYTHM_SYNTH,
+        )
         rt = RT(subdivisions=(1, 1, 1, 1))
-        result = rhythm_tree_to_events(rt, beat='1/4', bpm=120)
-        events = result['events']
-        assert len(events) == 4
-        assert events[0]['instrument'] == 'membrane'
-        assert abs(events[0]['start'] - 0.0) < 1e-9
-        assert abs(events[0]['duration'] - 0.5) < 1e-9
-        assert abs(events[3]['start'] - 1.5) < 1e-9
+        events = rhythm_tree_to_sc_events(rt, beat='1/4', bpm=120)
+        news = [ev for ev in events if ev['type'] == 'new']
+        assert len(news) == 4
+        assert news[0]['defName'] == DEFAULT_RHYTHM_SYNTH
+        assert abs(news[0]['start'] - 0.0) < 1e-9
+        assert abs(news[3]['start'] - 1.5) < 1e-9
 
     def test_ut_converter(self):
-        from klotho.utils.playback.tonejs.converters import temporal_unit_to_events
+        from klotho.utils.playback.supersonic.converters import (
+            temporal_unit_to_sc_events, DEFAULT_RHYTHM_SYNTH,
+        )
         ut = UT(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=120)
-        result = temporal_unit_to_events(ut)
-        events = result['events']
-        assert len(events) == 4
-        for ev in events:
-            assert ev['instrument'] == 'membrane'
+        events = temporal_unit_to_sc_events(ut)
+        news = [ev for ev in events if ev['type'] == 'new']
+        assert len(news) == 4
+        for ev in news:
+            assert ev['defName'] == DEFAULT_RHYTHM_SYNTH
 
     def test_uc_converter(self):
-        from klotho.utils.playback.tonejs.converters import convert_to_events
+        from klotho.utils.playback.supersonic.converters import (
+            compositional_unit_to_sc_events,
+        )
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=120, inst=JsInst.Kalimba())
         uc.set_pfields(1, freq=262)
         uc.set_pfields(2, freq=330)
         uc.set_pfields(3, freq=392)
         uc.set_pfields(4, freq=523)
-        result = convert_to_events(uc)
-        events = result['events']
-        assert len(events) == 4
-        assert events[0]['instrument'] == 'Kalimba'
-        assert events[0]['pfields']['freq'] == 262
-        assert events[3]['pfields']['freq'] == 523
-        assert 'Kalimba' in result.get('instruments', {})
+        events = compositional_unit_to_sc_events(uc)
+        news = [ev for ev in events if ev['type'] == 'new']
+        assert len(news) == 4
+        assert news[0]['defName'] == 'kl_tri'
+        assert news[0]['pfields']['freq'] == 262
+        assert news[3]['pfields']['freq'] == 523

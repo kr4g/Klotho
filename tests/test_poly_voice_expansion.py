@@ -1,13 +1,16 @@
-from mido import MidiFile
+"""Engine-independent multi-voice (tuple-pfield) expansion tests.
 
+Ported from the removed test_tuple_poly_events.py (whose MIDI/Tone.js
+halves went away with those engines in 10.12); Phase 4 of the refactor
+plan extends this file with slur-driven ``voice_count=`` override tests.
+"""
 from klotho.thetos import CompositionalUnit
-from klotho.thetos.instruments.tone import ToneInstrument
-from klotho.thetos.instruments.midi import MidiInstrument
-from klotho.utils.playback._converter_base import lower_event_ir_to_voice_events, lower_poly_pfields_to_voices
-from klotho.utils.playback.midi_player import _create_midi_from_compositional_unit
+from klotho.utils.playback._converter_base import (
+    lower_event_ir_to_voice_events,
+    lower_poly_pfields_to_voices,
+)
 from klotho.utils.playback._sc_assembly import sort_sc_assembly_events
 from klotho.utils.playback.supersonic.converters import compositional_unit_to_sc_events
-from klotho.utils.playback.tonejs.converters import compositional_unit_to_events
 
 
 class _FakeRT:
@@ -60,18 +63,6 @@ class _SimpleSCInstrument:
         self.has_gate = has_gate
         self.name = defName
         self.pfields = {}
-
-
-def _collect_note_on_events_with_ticks(midi_file):
-    events = []
-    for track in midi_file.tracks:
-        tick = 0
-        for msg in track:
-            tick += msg.time
-            if msg.type == "note_on" and getattr(msg, "velocity", 0) > 0:
-                events.append((tick, msg.note, msg.velocity))
-    events.sort(key=lambda item: item[0])
-    return events
 
 
 def test_expand_poly_pfields_loops_shorter_tuples():
@@ -141,44 +132,6 @@ def test_supersonic_compositional_unit_poly_strum_animation_metadata():
     assert all(ev["_stepIndex"] == 0 for ev in new_events)
     assert sum(1 for ev in new_events if ev["_animate"] is True) == 1
     assert len({ev["_polyGroupId"] for ev in new_events}) == 1
-
-
-def test_tonejs_compositional_unit_poly_strum_animation_metadata():
-    event = _FakeEvent(
-        node_id=2,
-        start=8.0,
-        duration=3.0,
-        pfields={"freq": (220.0, 330.0, 440.0), "vel": (0.4, 0.6)},
-        mfields={"strum": 0.5},
-    )
-    cu = _FakeCU([event], ToneInstrument(name="poly", tonejs_class="Synth", pfields={"vel": 0.5}))
-    payload = compositional_unit_to_events(cu, animation=True)
-    events = payload["events"]
-
-    assert len(events) == 3
-    assert [round(ev["start"], 6) for ev in events] == [0.0, 0.5, 1.0]
-    assert [round(ev["duration"], 6) for ev in events] == [3.0, 2.5, 2.0]
-    assert all(ev["_stepIndex"] == 0 for ev in events)
-    assert sum(1 for ev in events if ev["_animate"] is True) == 1
-    assert len({ev["_polyGroupId"] for ev in events}) == 1
-
-
-def test_midi_compositional_unit_expands_tuple_voices_with_strum():
-    event = _FakeEvent(
-        node_id=3,
-        start=5.0,
-        duration=2.0,
-        pfields={"note": (60, 64, 67), "velocity": (100, 90, 80)},
-        mfields={"strum": -0.5},
-    )
-    cu = _FakeCU([event], MidiInstrument(name="mid", prgm=1, is_Drum=False))
-    midi_file = _create_midi_from_compositional_unit(cu, max_channels=32)
-    assert isinstance(midi_file, MidiFile)
-
-    note_ons = _collect_note_on_events_with_ticks(midi_file)
-    assert len(note_ons) == 3
-    assert note_ons[0][1] == 67
-    assert len({tick for tick, _, _ in note_ons}) == 3
 
 
 def test_sort_sc_events_orders_type_priority_at_same_start():

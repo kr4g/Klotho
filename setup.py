@@ -25,13 +25,9 @@ setup(
         'networkx',
         'rustworkx',
         'scikit-learn>=1.8',
-        'mido',
         'IPython',
     ],
     extras_require={
-        'playback': [
-            'midi2audio',
-        ],
         'sampling': [
             'diversipy',
         ],

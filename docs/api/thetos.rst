@@ -23,20 +23,6 @@ SuperCollider SynthDef-backed instruments, effects, and kits.
    :members:
    :show-inheritance:
 
-MIDI Instruments
-~~~~~~~~~~~~~~~~
-
-.. automodule:: klotho.thetos.instruments.midi
-   :members:
-   :show-inheritance:
-
-Tone.js Instruments
-~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: klotho.thetos.instruments.tone
-   :members:
-   :show-inheritance:
-
 Ensembles
 ~~~~~~~~~
 

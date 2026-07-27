@@ -34,8 +34,8 @@ from klotho.chronos import (
 )
 from klotho.thetos import (
     CompositionalUnit as UC,
-    ToneInstrument as JsInst,
 )
+from synth_fixtures import SynthFixtures as JsInst
 from klotho.topos import Pattern
 from klotho.tonos import Scale
 

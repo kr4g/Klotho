@@ -217,7 +217,7 @@ def _static_threejs_html(sd):
     h = sd.height_px
     title_escaped = (sd.title or '').replace("'", "\\'").replace('"', '\\"')
 
-    from klotho.utils.playback.tonejs.cdn import (
+    from klotho.semeios.visualization._cdn import (
         THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
     )
     threejs_cdn = THREEJS_CDN

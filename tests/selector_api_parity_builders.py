@@ -10,7 +10,8 @@ import numpy as np
 
 from klotho.chronos import TemporalBlock as BT
 from klotho.chronos import TemporalUnitSequence as UTS
-from klotho.thetos import CompositionalUnit as UC, ToneInstrument as JsInst
+from klotho.thetos import CompositionalUnit as UC
+from synth_fixtures import SynthFixtures as JsInst
 from klotho.tonos import Scale
 from klotho.topos.collections.sequences import Pattern
 

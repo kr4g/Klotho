@@ -1,5 +1,5 @@
 // Shape playback controller for animated Klotho shape figures.
-// Python replaces: __WID__, __DUR_MS__, __ENGINE_TYPE__, __RING_TIME__, __TOTAL_GROUPS__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
+// Python replaces: __WID__, __DUR_MS__, __RING_TIME__, __TOTAL_GROUPS__, __LOOP_MODE__, __LOOP_COUNT__, __LOOP_ENABLED__
 // Caller must define: audioPayload, shapeColors, and the visual hooks
 //   dimAllNodes(), hideAllShapeEdges(), revealGroupVisual(gi, color)
 // (SVG figures implement the hooks on DOM elements; 3D figures on
@@ -22,7 +22,6 @@ var loopCtl = KlothoLoopControl(loopBtn, loopSvg, "__LOOP_MODE__", "__LOOP_COUNT
                                 "__LOOP_ENABLED__" === "true");
 var currentView = 0;
 var playbackOrigin = 0;
-var engineType = "__ENGINE_TYPE__";
 var totalGroups = __TOTAL_GROUPS__;
 var durMs = __DUR_MS__;
 var pauseMs = 0;
@@ -33,7 +32,6 @@ if (audioPayload && typeof audioPayload === "object" && audioPayload.pause != nu
 var stepMs = durMs + pauseMs;
 var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
     ? globalThis.KlothoPlaybackBridge({
-        engine: engineType,
         audioPayload: audioPayload,
         ringTime: __RING_TIME__,
     })

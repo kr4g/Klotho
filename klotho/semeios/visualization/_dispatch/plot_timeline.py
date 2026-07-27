@@ -64,26 +64,16 @@ def _plot_timeline(obj, layout: str = 'ratios',
         return svg_data
 
     from .._animation import AnimatedTimelineSvgFigure
-    from klotho.utils.playback._config import get_audio_engine
+    from klotho.utils.playback.supersonic.converters import (
+        temporal_container_to_sc_animation_events,
+    )
 
-    engine = get_audio_engine()
-
-    if engine == "supersonic":
-        from klotho.utils.playback.supersonic.converters import (
-            temporal_container_to_sc_animation_events,
-        )
-        audio_payload = temporal_container_to_sc_animation_events(obj, amp=amp)
-    else:
-        from klotho.utils.playback.tonejs.converters import (
-            temporal_container_to_animation_events,
-        )
-        audio_payload = temporal_container_to_animation_events(obj, amp=amp)
+    audio_payload = temporal_container_to_sc_animation_events(obj, amp=amp)
 
     return AnimatedTimelineSvgFigure(
         svg_data=svg_data,
         audio_payload=audio_payload,
         dur=dur,
         glow=glow,
-        engine=engine,
         **transport_kwargs(kwargs),
     )

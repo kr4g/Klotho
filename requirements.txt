@@ -8,5 +8,4 @@ tabulate
 networkx
 rustworkx
 scikit-learn>=1.8
-mido
 IPython
