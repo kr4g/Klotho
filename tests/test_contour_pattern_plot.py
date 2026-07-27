@@ -61,10 +61,10 @@ class TestContourPlot:
 
     def test_dispatch_case_exists(self):
         # plot() must dispatch Contour without raising TypeError.
-        import inspect
-        from klotho.semeios.visualization import plots
-        src = inspect.getsource(plots.plot)
-        assert 'Contour()' in src
+        from klotho.semeios.visualization.plots import _PLOT_REGISTRY
+        handler = _PLOT_REGISTRY.lookup(Contour([0, 1]))
+        assert handler is not None
+        assert handler.__name__ == '_dispatch_contour'
 
     def test_plot_single_value(self, tmp_path):
         from klotho.semeios.visualization.plots import _plot_contour

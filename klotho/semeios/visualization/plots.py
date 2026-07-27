@@ -33,8 +33,38 @@ from sklearn.manifold import MDS, SpectralEmbedding
 from ._dispatch import _plot_rt, _plot_timeline, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
 from ._dispatch import KlothoPlot
 from ._plot_pattern import plot_pattern
+from klotho.utils.dispatch_registry import TypeRegistry
 
 __all__ = ['plot']
+
+
+def _show(fig):
+    """Display a static figure immediately (Jupyter) and return None."""
+    if fig is not None:
+        try:
+            from IPython.display import display as ipy_display, HTML
+            import matplotlib.figure
+            if hasattr(fig, 'to_html'):
+                html_str = fig.to_html(full_html=False, include_plotlyjs=True)
+                ipy_display(HTML(html_str))
+            else:
+                ipy_display(fig)
+                if isinstance(fig, matplotlib.figure.Figure):
+                    plt.close(fig)
+        except ImportError:
+            pass
+
+
+def _wrap(plot_fn, target, kw):
+    """Wrap an animatable plot in a KlothoPlot (or animate immediately)."""
+    animate = kw.pop('animate', False)
+    if animate:
+        return _show(plot_fn(target, animate=True, **kw))
+    return KlothoPlot(plot_fn, target, kw)
+
+
+_PLOT_REGISTRY = TypeRegistry('plotting')
+
 
 def plot(obj, **kwargs):
     """
@@ -49,6 +79,11 @@ def plot(obj, **kwargs):
     For types without animation support, the figure is displayed
     immediately via ``IPython.display.display`` and ``None`` is
     returned.
+
+    Dispatch is a type registry resolved through the MRO (see
+    :class:`~klotho.utils.dispatch_registry.TypeRegistry`), so subclass
+    handlers always win over base-class handlers and new plottable types
+    register without touching this function.
 
     Parameters
     ----------
@@ -72,68 +107,96 @@ def plot(obj, **kwargs):
     TypeError
         If the object type is not supported for plotting.
     """
-    def _show(fig):
-        if fig is not None:
-            try:
-                from IPython.display import display as ipy_display, HTML
-                import matplotlib.figure
-                if hasattr(fig, 'to_html'):
-                    html_str = fig.to_html(full_html=False, include_plotlyjs=True)
-                    ipy_display(HTML(html_str))
-                else:
-                    ipy_display(fig)
-                    if isinstance(fig, matplotlib.figure.Figure):
-                        plt.close(fig)
-            except ImportError:
-                pass
+    return _PLOT_REGISTRY.dispatch(obj, **kwargs)
 
-    def _wrap(plot_fn, target, kw):
-        animate = kw.pop('animate', False)
-        if animate:
-            return _show(plot_fn(target, animate=True, **kw))
-        return KlothoPlot(plot_fn, target, kw)
 
-    match obj:
-        case Tree():
-            match obj:
-                case RhythmTree():
-                    return _wrap(_plot_rt, obj, dict(kwargs))
-                case ParameterTree():
-                    return _show(_plot_parameter_tree(obj, **kwargs))
-                case _:
-                    return _show(_plot_tree(obj, **kwargs))
-        case ParameterField():
-            return _show(_plot_field(obj, **kwargs))
-        case Lattice():
-            return _wrap(_plot_lattice, obj, dict(kwargs))
-        case MasterSet():
-            return _wrap(_plot_master_set, obj, dict(kwargs))
-        case CombinationProductSet():
-            return _wrap(_plot_cps, obj, dict(kwargs))
-        case CombinationSet():
-            return _show(_plot_cs(obj, **kwargs))
-        case Scale() | Chord() | Voicing():
-            return _show(_plot_scale_chord(obj, **kwargs))
-        case DynamicRange():
-            return _show(_plot_dynamic_range(obj, **kwargs))
-        case Envelope():
-            return _show(_plot_envelope(obj, **kwargs))
-        case Contour():
-            return _show(_plot_contour(obj, **kwargs))
-        case Pattern():
-            return _show(plot_pattern(obj, **kwargs))
-        case CompositionalUnit():
-            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
-        case TemporalUnit():
-            return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw), obj, dict(kwargs))
-        case TemporalUnitSequence() | TemporalBlock():
-            return _wrap(_plot_timeline, obj, dict(kwargs))
-        case Graph():
-            return _show(_plot_graph(obj._rx, **kwargs))
-        case _ if hasattr(obj, 'nodes') and hasattr(obj, 'edges'):
-            return _show(_plot_graph(obj, **kwargs))
-        case _:
-            raise TypeError(f"Unsupported object type for plotting: {type(obj)}")
+@_PLOT_REGISTRY.register(RhythmTree)
+def _dispatch_rhythm_tree(obj, **kwargs):
+    return _wrap(_plot_rt, obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(ParameterTree)
+def _dispatch_parameter_tree(obj, **kwargs):
+    return _show(_plot_parameter_tree(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(Tree)
+def _dispatch_tree(obj, **kwargs):
+    return _show(_plot_tree(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(ParameterField)
+def _dispatch_field(obj, **kwargs):
+    return _show(_plot_field(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(Lattice)
+def _dispatch_lattice(obj, **kwargs):
+    return _wrap(_plot_lattice, obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(MasterSet)
+def _dispatch_master_set(obj, **kwargs):
+    return _wrap(_plot_master_set, obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(CombinationProductSet)
+def _dispatch_cps(obj, **kwargs):
+    return _wrap(_plot_cps, obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(CombinationSet)
+def _dispatch_cs(obj, **kwargs):
+    return _show(_plot_cs(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(Scale, Chord, Voicing)
+def _dispatch_scale_chord(obj, **kwargs):
+    return _show(_plot_scale_chord(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(DynamicRange)
+def _dispatch_dynamic_range(obj, **kwargs):
+    return _show(_plot_dynamic_range(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(Envelope)
+def _dispatch_envelope(obj, **kwargs):
+    return _show(_plot_envelope(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(Contour)
+def _dispatch_contour(obj, **kwargs):
+    return _show(_plot_contour(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(Pattern)
+def _dispatch_pattern(obj, **kwargs):
+    return _show(plot_pattern(obj, **kwargs))
+
+
+@_PLOT_REGISTRY.register(TemporalUnit)
+def _dispatch_temporal_unit(obj, **kwargs):
+    # CompositionalUnit resolves here too (MRO): both plot their rhythm
+    # tree with the unit itself as the audio source.
+    return _wrap(lambda o, **kw: _plot_rt(o._rt, audio_source=o, **kw),
+                 obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(TemporalUnitSequence, TemporalBlock)
+def _dispatch_timeline(obj, **kwargs):
+    return _wrap(_plot_timeline, obj, dict(kwargs))
+
+
+@_PLOT_REGISTRY.register(Graph)
+def _dispatch_graph(obj, **kwargs):
+    return _show(_plot_graph(obj._rx, **kwargs))
+
+
+@_PLOT_REGISTRY.register_predicate(
+    lambda obj: hasattr(obj, 'nodes') and hasattr(obj, 'edges'))
+def _dispatch_graph_like(obj, **kwargs):
+    return _show(_plot_graph(obj, **kwargs))
 
 def _plot_parameter_tree(tree: ParameterTree, attributes: list[str] | None = None, figsize: tuple[float, float] = (20, 5), 
                         invert: bool = True, output_file: str | None = None) -> go.Figure:
