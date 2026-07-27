@@ -1,5 +1,11 @@
 (() => {
-  if (typeof globalThis.KlothoPlaybackBridge !== "undefined") return;
+  // Version-skew guard: saved notebook outputs from klotho <= 10.14.0
+  // install an older bridge under KlothoPlaybackBridge (first-wins) whose
+  // config contract differs (an `engine` key defaulting to the removed
+  // Tone.js path). Widgets rendered after those stale outputs must get
+  // THIS build, so the install guard keys on the versioned name and the
+  // public name is overwritten unconditionally.
+  if (typeof globalThis.__klothoPlaybackBridgeV2 !== "undefined") return;
 
   function buildBridge(config) {
     var audioPayload = config.audioPayload || null;
@@ -264,4 +270,5 @@
   }
 
   globalThis.KlothoPlaybackBridge = buildBridge;
+  globalThis.__klothoPlaybackBridgeV2 = buildBridge;
 })();
