@@ -30,13 +30,6 @@ Ensembles
    :members:
    :show-inheritance:
 
-Instrument Presets
-~~~~~~~~~~~~~~~~~~
-
-.. automodule:: klotho.thetos.instruments.presets
-   :members:
-   :show-inheritance:
-
 Parameters
 ----------
 

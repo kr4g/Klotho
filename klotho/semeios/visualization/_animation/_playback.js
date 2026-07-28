@@ -93,6 +93,7 @@ toggleBtn.addEventListener("click", async function() {
 var _orphanCheckId = setInterval(function() {
     if (toggleBtn && !toggleBtn.isConnected) {
         _stopAll();
+        if (bridge) bridge.releaseControlPreload();
         playing = false;
         clearInterval(_orphanCheckId);
     }
