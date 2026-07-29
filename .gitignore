@@ -114,9 +114,9 @@ check_docs.py
 *.pkl
 *.zip
 
-# ==========================
-# Domain-specific
-# ==========================
+# Course sample kits — fetched locally via fetch_samples(), not stored in repo
+examples/mat111mc_notebooks/mat_kit/
+
 *.asd
 *.scd
 *.json

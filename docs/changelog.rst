@@ -22,7 +22,7 @@ Version 10.16.0 (Current)
 * ``klotho.fetch_samples(url)`` / ``klotho.upload_samples()`` for getting
   hosted or local sample files onto the notebook runtime (Colab-friendly)
 * Demo notebook ``examples/mat111mc_notebooks/MAT_111MC___Custom_Sample_Kits.ipynb``
-  with a bundled ``mat_kit/`` sample folder
+  (samples fetched via ``fetch_samples()``, not bundled in the repo)
 * Engine boots with 32 output channels (stem-tap pairs; audible output
   unchanged) and a pinned SuperSonic version (0.71.0)
 * Fixes: the idle scheduler-queue flush now actually runs
