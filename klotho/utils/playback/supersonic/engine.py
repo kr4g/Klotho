@@ -103,9 +103,17 @@ class SuperSonicEngine:
         ``False`` (default) leaves the loop button off, ``True`` starts
         with infinite looping, and an int > 1 loops that many cycles.
         The widget's loop button toggles the configured policy.
+    record : bool, optional
+        When ``True``, the widget gains a record button: pressing it
+        plays the events exactly like play while capturing the audio,
+        and a 24-bit ``.wav`` download is offered once playback (plus
+        ring time) finishes. Score payloads with registered tracks also
+        get a "stems" checkbox that renders every track as a separate
+        time-aligned stem (plus the full mix) in one ZIP.
     """
 
-    def __init__(self, events, meta=None, control_data=None, ring_time=5, loop=False):
+    def __init__(self, events, meta=None, control_data=None, ring_time=5, loop=False,
+                 record=False):
         self.events = convert_numpy_types(events)
         self.meta = convert_numpy_types(meta or {})
         raw_control = control_data or {"buffer": None, "blockSize": 512, "descriptors": []}
@@ -115,6 +123,7 @@ class SuperSonicEngine:
         self.control_data["buffer"] = raw_buffer
         self.ring_time = ring_time
         self.loop = loop
+        self.record = bool(record)
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
         from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta
         validate_sc_events(self.events)
@@ -153,17 +162,33 @@ class SuperSonicEngine:
                     names.add(val)
         return names
 
+    _SAMPLE_EMBED_WARN_BYTES = 6 * 1024 * 1024
+
     def _load_needed_samples(self):
         from klotho.utils.playback.supersonic.samples import (
             sample_info, sample_bytes_b64,
         )
         assets = {}
+        total_b64 = 0
         for name in sorted(self._needed_samples()):
             info = sample_info(name)
+            b64 = sample_bytes_b64(name)
+            total_b64 += len(b64)
             assets[name] = {
-                "b64": sample_bytes_b64(name),
+                "b64": b64,
                 "channels": info["channels"],
             }
+        # b64 inflates by 4/3; compare the decoded size against the cap.
+        total_bytes = (total_b64 * 3) // 4
+        if total_bytes > self._SAMPLE_EMBED_WARN_BYTES:
+            import warnings
+            warnings.warn(
+                f"This widget embeds {total_bytes / 1048576:.1f} MB of sample "
+                f"audio in its HTML, and every play() re-embeds it (saved "
+                f"notebooks store it per cell; Colab cells cannot share it). "
+                f"Consider trimming samples or using fewer per piece.",
+                stacklevel=3,
+            )
         return assets
 
     def _serialize_control_data(self):
@@ -200,7 +225,12 @@ class SuperSonicEngine:
         needs_score_js = self._is_score or bool(self.control_data.get("descriptors"))
         score_js = scheduler_score_js() if needs_score_js else ""
 
-        bar_html = control_bar_html(wid)
+        stems = self.record and bool(self.meta.get("groups"))
+        bar_html = control_bar_html(wid, record=self.record, stems=stems)
+        recorder_js = ""
+        if self.record:
+            from klotho.utils.playback._helpers import get_recorder_js
+            recorder_js = get_recorder_js()
 
         html = f'''
 {bar_html}
@@ -214,6 +244,7 @@ globalThis.__klothoManifest = {manifest_json};
 {synthdef_registry_merge_js(synthdef_assets_json)}
 {lifecycle_js()}
 {get_animation_bridge_js()}
+{recorder_js}
 {widget_js}
 </script>
 '''

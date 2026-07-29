@@ -1,8 +1,15 @@
 (function() {
   if (!globalThis.BrowserScheduler) return;
-  if (globalThis.BrowserScheduler.prototype.setupTracks) return;
+  // Feature guard doubles as the version-skew guard: when the versioned
+  // core replaces a stale BrowserScheduler class, the new prototype has
+  // no setupTracks yet, so this extension re-installs onto it; a stale
+  // copy of this file running later sees the methods present and no-ops.
+  // Keyed on the V2 marker (not setupTracks) so pages carrying a stale
+  // pre-V2 copy from saved outputs get THIS build's preloadControlBuffer
+  // (the pre-V2 one raced /b_alloc and left control envelopes silent).
+  if (globalThis.BrowserScheduler.prototype.__klothoScoreExtV2) return;
 
-  var FIRST_PRIVATE_BUS = 16;
+  var FIRST_PRIVATE_BUS = 48; // keep in sync with scheduler_core.js
   var BUS_CHANNELS = 2;
   var CTRL_ENVELOPE_CHUNK = 200;
 
@@ -130,11 +137,13 @@
       var routerId = sonic.nextNodeId();
       sonic.send('/s_new', '__busRouter', routerId, 1, rTrack.parentGroup,
         'inBus', rTrack.fxBus, 'outBus', mainSrcBus, 'gain', 1.0);
+      rTrack.routerNode = routerId;
     }
 
     var mainRouterId = sonic.nextNodeId();
     sonic.send('/s_new', '__busRouter', mainRouterId, 1, trackMap["main"].parentGroup,
       'inBus', mainFxBus, 'outBus', 0, 'gain', 1.0);
+    trackMap["main"].routerNode = mainRouterId;
 
     if (!trackMap["default"]) {
       trackMap["default"] = trackMap["main"];
@@ -146,16 +155,51 @@
     // startup cushion covers engine-side processing. In postMessage mode
     // (Colab/Jupyter) a sync costs ~300ms of press-to-sound latency.
     this._trackMap = trackMap;
+    this._trackOrder = trackNames.slice();
+  };
+
+  // Stems recording: one extra __busRouter per non-main track, placed
+  // AFTER that track's summing router so it reads the post-fader signal
+  // off the track's fxBus (the router's ReplaceOut has already run) and
+  // sums it onto a dedicated hardware output pair for the capture node.
+  // The master pair (out 0/1) needs no tap. Taps live inside the track
+  // groups, so the normal /g_freeAll teardown frees them.
+  proto.setupStemTaps = function() {
+    if (!this._trackMap || !this._trackOrder) return null;
+    var STEM_OUT_BASE = 2;
+    var MAX_STEMS = 15; // output channels 2..31
+    var sonic = this.sonic;
+    var names = this._trackOrder;
+    if (names.length > MAX_STEMS) {
+      console.warn('[Klotho] stems: only the first ' + MAX_STEMS + ' of '
+        + names.length + ' tracks get separate stems (output-channel limit).');
+      names = names.slice(0, MAX_STEMS);
+    }
+    var layout = [];
+    for (var i = 0; i < names.length; i++) {
+      var track = this._trackMap[names[i]];
+      if (!track || track.routerNode == null) continue;
+      var outCh = STEM_OUT_BASE + 2 * i;
+      var tapId = sonic.nextNodeId();
+      sonic.send('/s_new', '__busRouter', tapId, 3, track.routerNode,
+        'inBus', track.fxBus, 'outBus', outCh, 'gain', 1.0);
+      layout.push({ name: names[i], ch: [outCh, outCh + 1] });
+    }
+    return layout;
   };
 
   // Upload the control-envelope buffer once per widget. Called from the
   // widget's ensureReady so the /b_alloc + /b_setn cost is paid at init,
-  // not on press-to-play, and replays reuse the same buffer. No sync
-  // round-trips: OSC messages are processed in order, so the /b_setn
-  // fills always land after the /b_alloc and before any /s_new that
-  // reads the buffer.
+  // not on press-to-play, and replays reuse the same buffer. /b_alloc is
+  // an ASYNC scsynth command (completes on the NRT thread after later
+  // messages have already been processed), so the /b_setn fills must
+  // wait behind a /sync round-trip — sent immediately they land on the
+  // not-yet-allocated buffer and are dropped, leaving every envelope
+  // reading zeros (mapped params pinned to 0 = silent voices). Returns
+  // the fill-completion promise; setupControlEnvelopes awaits it before
+  // any __klEnvCtrl can read the buffer.
   proto.preloadControlBuffer = function(controlData) {
-    if (this._ctrlPreload) return;
+    if (this._ctrlPreload) return this._ctrlPreload.ready;
     if (!controlData || !controlData.bufferB64 || !controlData.descriptors || controlData.descriptors.length === 0) {
       return;
     }
@@ -178,17 +222,22 @@
     }
 
     sonic.send('/b_alloc', bufnum, controlData.numFrames, 1);
-    for (var off = 0; off < floats.length; off += CTRL_ENVELOPE_CHUNK) {
-      var end = Math.min(off + CTRL_ENVELOPE_CHUNK, floats.length);
-      var chunk = [];
-      for (var ci = off; ci < end; ci++) chunk.push(floats[ci]);
-      sonic.send.apply(sonic, ['/b_setn', bufnum, off, chunk.length].concat(chunk));
-    }
+
+    var ready = (async function() {
+      try { await sonic.sync(); } catch (e) {}
+      for (var off = 0; off < floats.length; off += CTRL_ENVELOPE_CHUNK) {
+        var end = Math.min(off + CTRL_ENVELOPE_CHUNK, floats.length);
+        var chunk = [];
+        for (var ci = off; ci < end; ci++) chunk.push(floats[ci]);
+        sonic.send.apply(sonic, ['/b_setn', bufnum, off, chunk.length].concat(chunk));
+      }
+    })();
 
     // The buffer lives for the widget's lifetime (NOT in _activeBuffers,
     // which is freed on ring-out); the widget's orphan cleanup calls
     // releaseControlPreload.
-    this._ctrlPreload = { bufnum: bufnum, floats: floats };
+    this._ctrlPreload = { bufnum: bufnum, floats: floats, ready: ready };
+    return ready;
   };
 
   proto.releaseControlPreload = function() {
@@ -203,11 +252,12 @@
       return;
     }
 
-    this.preloadControlBuffer(controlData);
+    var preloadReady = this.preloadControlBuffer(controlData);
     if (!this._ctrlPreload) {
       this._controlBusMap = [];
       return;
     }
+    if (preloadReady) await preloadReady;
 
     var sonic = this.sonic;
     var bufnum = this._ctrlPreload.bufnum;
@@ -292,4 +342,6 @@
     }
     return mappings;
   };
+
+  proto.__klothoScoreExtV2 = true;
 })();

@@ -54,6 +54,7 @@
     }
 
     loopCtl.onToggle = function() {
+        if (bridge.isRecording && bridge.isRecording()) return;
         if (bridge.isPlaying()) {
             doPlay();
         }
@@ -65,8 +66,17 @@
     KlothoGateToggle(toggleBtn, bridge.ensureReady());
 
     toggleBtn.addEventListener("click", async function() {
-        if (bridge.isPlaying()) {
-            await bridge.stop();
+        // Stopping while recording cancels the recording (capture is
+        // discarded); the record flow resets its own visuals when its
+        // promise resolves null.
+        if (bridge.isPlaying() || (bridge.isRecording && bridge.isRecording())) {
+            // stop() drains frees through a bounded /sync before flushing the
+            // queue (up to ~750ms on a busy page); the engine-side cut is
+            // already in flight, so flip the icon immediately and settle
+            // again once the drain resolves.
+            var stopping = bridge.stop();
+            setPlayIcon();
+            await stopping;
             setPlayIcon();
             return;
         }
@@ -79,6 +89,57 @@
         await bridge.resumeAudio();
         doPlay();
     });
+
+    // Record button (present only when the widget was built with
+    // record=True — the controller keys off element presence).
+    var recBtn = document.getElementById(wid + "_rec");
+    if (recBtn && typeof bridge.record === "function") {
+        var stemsBox = document.getElementById(wid + "_stems");
+        var dlEl = document.getElementById(wid + "_dl");
+        var recReady = bridge.ensureReady();
+        KlothoGateToggle(recBtn, recReady);
+        // A page whose engine was booted by a stale pre-10.16 output has
+        // no stem output channels; say so on the control, not just the
+        // console.
+        if (stemsBox && typeof bridge.stemCapacity === "function") {
+            recReady.then(function(ok) {
+                if (ok && bridge.stemCapacity() === 0) {
+                    stemsBox.disabled = true;
+                    stemsBox.checked = false;
+                    var lbl = stemsBox.parentElement;
+                    if (lbl) {
+                        lbl.style.opacity = "0.4";
+                        lbl.title = "Stems need a page reload: this page's "
+                            + "audio engine was started by an output saved "
+                            + "with an older Klotho.";
+                    }
+                }
+            });
+        }
+        recBtn.addEventListener("click", async function() {
+            if (bridge.isPlaying() || bridge.isRecording()) return;
+            var _ss = globalThis.__klothoSonic;
+            if (_ss && !_ss.instance && _ss.promise) { _ss.promise = null; }
+            var ok = await bridge.ensureReady();
+            if (!ok || !bridge.hasPlayableEvents()) return;
+            await bridge.resumeAudio();
+            setStopIcon();
+            recBtn.style.background = "#7f1d1d";
+            recBtn.style.opacity = "1";
+            loopBtn.disabled = true;
+            loopBtn.style.opacity = "0.3";
+            var result = await bridge.record(null, {
+                stems: !!(stemsBox && stemsBox.checked),
+            });
+            recBtn.style.background = "#16213e";
+            loopBtn.disabled = false;
+            loopCtl.sync();
+            setPlayIcon();
+            if (result && result.files && globalThis.KlothoRecorder) {
+                globalThis.KlothoRecorder.deliver(result.files, dlEl);
+            }
+        });
+    }
 
     var _orphanCheckId = setInterval(function() {
         if (toggleBtn && !toggleBtn.isConnected) {

@@ -30,10 +30,7 @@ thetos/
 │   ├── base.py                      # Instrument, Kit, Effect (bases)
 │   ├── _shared.py                   # shared constants
 │   ├── synthdef.py                  # SynthDefInstrument, SynthDefFX, SynthDefKit (SuperCollider)
-│   ├── midi.py                      # MidiInstrument (General MIDI)
-│   ├── tone.py                      # ToneInstrument (Tone.js)
-│   ├── ensemble.py                  # Ensemble — named instrument grouping
-│   └── presets.py                   # preset definitions
+│   └── ensemble.py                  # Ensemble — named instrument grouping
 └── parameters/
     ├── __init__.py
     ├── bind.py                      # Bind — per-node re-evaluated pfield values
@@ -282,8 +279,9 @@ Unlike `Lattice`, `ParameterField` allows **node attribute writes**
 
 **File:** `thetos/instruments/`
 
-Three instrument backends, all inheriting from a common `Instrument`
-base class.
+One SuperCollider-backed instrument backend (SuperSonic playback), all
+classes inheriting from a common `Instrument` base. (The MIDI and
+Tone.js backends were removed in 10.12.0.)
 
 ### Class Hierarchy
 
@@ -296,8 +294,6 @@ classDiagram
     }
 
     Instrument <|-- SynthDefInstrument
-    Instrument <|-- MidiInstrument
-    Instrument <|-- ToneInstrument
     Instrument <|-- Kit
     Kit <|-- SynthDefKit
     Effect <|-- SynthDefFX
@@ -306,21 +302,7 @@ classDiagram
         +defName : str
         +has_gate : bool
         +from_manifest(defName)$
-    }
-
-    class MidiInstrument {
-        +prgm : int
-        +is_Drum : bool
-        +AcousticGrandPiano$
-        +DrumKit$
-    }
-
-    class ToneInstrument {
-        +tonejs_class : str
-        +from_preset()$
-        +Harmonics$
-        +Kick$
-        +Snare$
+        +sampler(sample_or_path)$
     }
 
     class Kit {
@@ -330,6 +312,15 @@ classDiagram
         +family : FamilyAccessor
         +pick(family)
         +cycle(family)
+    }
+
+    class SynthDefKit {
+        +from_manifest(members)$
+        +from_samples(samples)$
+        +from_folder(path)$
+        +beatbox()$
+        +tabla()$
+        +tr808()$
     }
 
     class Effect {
@@ -347,11 +338,12 @@ Both classes share one grammar — **dots navigate, brackets look up,
 methods act**:
 
 ```python
-kit['snare']            # member Instrument (str key or wrapping int index)
-kit.family['tas']       # KitFamilyView; dot shorthand: kit.tas
-kit.pick('tas')         # random selector KEY (pass as voice=)
-kit.cycle('tas')        # Pattern of keys, round-robin
-kit.tas.pick            # bound method = 0-arg callable: a fresh draw
+kit['snare_b']          # member Instrument (str key or wrapping int index)
+kit.family['snare']     # KitFamilyView; dot shorthand: kit.snare
+                        #   call form works too: kit.family('snare')
+kit.pick('snare')       # random selector KEY (pass as voice=)
+kit.cycle('snare')      # Pattern of keys, round-robin, placed by hand
+kit.snare.pick          # bound method = 0-arg callable: a fresh draw
                         # per sounding leaf in set_pfields(voice=...)
 
 ens['kick']             # member, tagged with its family (auto-routes)
@@ -360,15 +352,19 @@ ens.pick('drums')       # random tagged Instrument (pass as inst=)
 ens.cycle('drums')      # Pattern of tagged Instruments
 ```
 
-Kits are driven by the ``voice=`` selector pfield (member key, or an
-integer wrapping mod the member count); ``pick``/``cycle`` therefore
-speak *keys*.  Ensembles are rosters whose members are full
-instruments; their ``pick``/``cycle`` speak *tagged Instruments*.
-Kit ``families=`` groupings may overlap; family names are validated
-against member keys and class attributes (no reserved-name list).
-An unknown string selector raises a ``KeyError`` listing the members
-(with a hint when the string names a family) rather than silently
-playing the default member.
+Kits are driven by the ``voice=`` selector pfield: a member key, an
+integer wrapping mod the member count, or — since 10.16.0 — a **family
+name**, which selects that family's members **round-robin** hit by hit.
+A family whose members are variants of one sound is therefore a
+rotation pool (``voice='snare'`` cycles the snares; ``voice='snare_b'``
+still pins one). Rotation is deterministic per piece — replays render
+identically, and random draws remain opt-in via ``pick``.
+``pick``/``cycle`` speak *keys*; Ensembles are rosters whose members
+are full instruments, so their ``pick``/``cycle`` speak *tagged
+Instruments*. Kit ``families=`` groupings may overlap; family names are
+validated against member keys and class attributes. An unknown string
+selector raises a ``KeyError`` listing the members and families rather
+than silently playing the default member.
 
 ### SynthDefInstrument (SuperCollider)
 
@@ -385,6 +381,21 @@ can be registered at runtime with `klotho.register_synthdef` (see the
 playback doc).  `SynthDefKit.from_manifest({...})` builds a multi-member
 kit keyed by a selector mfield.
 
+### Sample-based instruments
+
+`SynthDefInstrument.sampler(sample)` builds a one-shot sample player
+(`kl_sampler1`/mono or `kl_sampler2`/stereo, chosen from the sample's
+channel count). *sample* may be a bundled name (`'bb_kick'`), a name
+registered with `klotho.register_sample`, or a **path to a `.wav`
+file**, which auto-registers under its filename stem.
+
+`SynthDefKit.from_folder(path)` builds a whole kit from a folder of
+`.wav` files: subfolders are families (a family of variants of one
+sound is a round-robin pool), loose files are plain members, and a
+`NN_` filename prefix orders members. See the playback doc (§5,
+Samples) and the demo notebook
+`examples/mat111mc_notebooks/MAT_111MC___Custom_Sample_Kits.ipynb`.
+
 Key property: **`has_gate`** — a derived `bool` (`'gate' in self._pfields`).
 If the synthdef has a `gate` control, events emitted for it carry
 `releaseAfter:true` and the runtime scheduler fires `gate=0` at
@@ -392,17 +403,6 @@ If the synthdef has a `gate` control, events emitted for it carry
 to keep in sync; to make an instrument "one-shot," omit `gate` from
 its pfields. To suppress auto-release on a single event, set
 `releaseAfter=False` on that event.
-
-### MidiInstrument (General MIDI)
-
-Wraps a General MIDI program number.  Factory class methods for all
-128 GM instruments plus drum kit.  `is_Drum` routes to MIDI channel
-10.
-
-### ToneInstrument (Tone.js)
-
-Wraps a Tone.js synthesis class name and preset parameters.  Factory
-presets for common sounds (`Harmonics`, `Kick`, `Snare`, etc.).
 
 ---
 
@@ -623,7 +623,7 @@ uc.apply_slur(node=uc.root, offset=0, take=None, mode="span")
 
 Resolves `node` to subtree leaves and marks the selected span with
 a slur mfield.  During playback, slurred notes are rendered with
-tied gates (SuperSonic) or legato (Tone.js/MIDI).
+tied gates (one sustained synth per voice, updated via `set`).
 
 ---
 
@@ -720,7 +720,7 @@ frequency, cent, midicent, midi, amplitude, decibel
 real_onset, real_duration, metric_onset, metric_duration
 ```
 
-The backend classes `SynthDefInstrument`, `MidiInstrument`, and
-`ToneInstrument` are importable from `klotho.thetos` (via
-`klotho.thetos.instruments`) though not listed in `__all__`.  The
-type factories are also available via the `klotho.types` module.
+The backend class `SynthDefInstrument` is importable from
+`klotho.thetos` (via `klotho.thetos.instruments`) though not listed in
+`__all__`.  The type factories are also available via the
+`klotho.types` module.

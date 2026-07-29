@@ -110,10 +110,13 @@ class TestKitResolution:
         with pytest.raises(KeyError, match="Unknown voice"):
             kit._resolve('')
 
-    def test_resolve_family_name_raises_with_hint(self):
+    def test_resolve_family_name_round_robins(self):
+        # 10.16: a family name is a valid selector — it rotates through
+        # the family's members (the old behavior raised with a hint).
         kit = Kit({'kick': KICK, 'snare': SNARE}, families={'drums': ['kick', 'snare']})
-        with pytest.raises(KeyError, match="'drums' is a family"):
-            kit._resolve('drums')
+        assert kit._resolve('drums') is KICK
+        assert kit._resolve('drums') is SNARE
+        assert kit._resolve('drums') is KICK
 
 
 class TestKitDunderProtocol:

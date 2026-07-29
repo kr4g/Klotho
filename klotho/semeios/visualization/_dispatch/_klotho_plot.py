@@ -14,6 +14,7 @@ _PLAYBACK_KWARGS = frozenset(
         "ring_time",
         "inst",
         "defName",
+        "record",
     }
 )
 

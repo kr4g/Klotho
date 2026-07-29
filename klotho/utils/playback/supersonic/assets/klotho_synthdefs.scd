@@ -166,7 +166,16 @@ SynthDef(\__chainLimiter, { |inBus=0, outBus=0, gain=1.0, preGain=1.0, limitLeve
 
 SynthDef(\__klEnvCtrl, { |bufnum=0, bus=0, dur=1, startFrame=0, numFrames=512|
     var phase = Line.kr(startFrame, startFrame + numFrames - 1, dur, doneAction: 2);
-    Out.kr(bus, BufRd.kr(1, bufnum, phase, interpolation: 2));
+    // Sample-and-hold the bus in ~30ms steps instead of writing every control
+    // block: instrument params glide through VarLag(warp:\exp) / the FoxDot
+    // idiom, which expand to a Changed()-retriggered EnvGen — against a bus
+    // that moves EVERY block the trigger never re-arms, and mapped params
+    // freeze at their onset value (freq envelopes played as a static cluster
+    // while chase-free params like amp followed theirs). Discrete steps pulse
+    // Changed() once per step; the synth's own portamento smooths the glide.
+    var stepFrames = ((numFrames / dur) * 0.03).max(1.0);
+    var stepped = startFrame + (((phase - startFrame) / stepFrames).floor * stepFrames);
+    Out.kr(bus, BufRd.kr(1, bufnum, stepped, interpolation: 2));
 }).writeDefFile(infraDir);
 
 SynthDef(\kl_reverb, { |inBus=0, outBus=0, mix=0.3, room=0.7, damp=0.5, gain=1.0|

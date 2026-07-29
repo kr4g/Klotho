@@ -4,8 +4,11 @@
   // config contract differs (an `engine` key defaulting to the removed
   // Tone.js path). Widgets rendered after those stale outputs must get
   // THIS build, so the install guard keys on the versioned name and the
-  // public name is overwritten unconditionally.
-  if (typeof globalThis.__klothoPlaybackBridgeV2 !== "undefined") return;
+  // public name is overwritten unconditionally. V3 (10.16, adds record())
+  // is a strict superset of V2, so it also claims the V2 name — otherwise
+  // a stale 10.15 output rendered after a 10.16 widget would see V2 unset
+  // and clobber the public name with a build lacking record().
+  if (typeof globalThis.__klothoPlaybackBridgeV3 !== "undefined") return;
 
   function buildBridge(config) {
     var audioPayload = config.audioPayload || null;
@@ -174,6 +177,8 @@
 
     async function stop() {
       if (_ssScheduler && _ssScheduler.isPlaying) await _ssScheduler.stop();
+      // Stopping mid-record cancels the recording (discards the capture).
+      if (_recCancel) { var c = _recCancel; _recCancel = null; c(); }
     }
 
     async function resumeAudio() {
@@ -204,9 +209,166 @@
         meta: meta,
         controlData: controlData,
         loop: loopInfinite ? true : (loopFinite > 0 ? loopFinite : false),
+        stemTaps: !!options.stemTaps,
         onEvent: onEvent || function(){},
         onFinish: onFinish || null,
       });
+    }
+
+    // ------------------------------------------------------------------
+    // Recording: play once (loop forced off) while a capture worklet taps
+    // the engine node, then encode downloads after the ring tail.
+    // Resolves {files: [{name, blob}]} or null when cancelled/unavailable.
+    // Cancel by calling stop() (or the widget's orphan sweep doing so).
+    // ------------------------------------------------------------------
+    var _recSession = null;
+    var _recCancel = null;
+
+    function isRecording() {
+      return _recSession != null;
+    }
+
+    // How many stem pairs the PAGE's engine can carry: output channels
+    // beyond the master pair. The live engine's own system report is
+    // authoritative (it reflects whichever output actually booted it —
+    // including a 10.16 boot whose output predates the bootConfig
+    // stash); the ss_init bootConfig stash is the fallback. An engine
+    // booted by a stale pre-10.16 output reports 2 channels, so this
+    // returns 0 — the recorder then degrades to mixdown with a reload
+    // hint instead of shipping a ZIP of silent or missing stems.
+    function stemCapacity() {
+      var outs = 0;
+      try {
+        if (_ssSonic && typeof _ssSonic.getSystemReport === "function") {
+          var rep = _ssSonic.getSystemReport();
+          if (rep && rep.audio && rep.audio.channelCount) {
+            outs = rep.audio.channelCount;
+          }
+        }
+      } catch (e) {}
+      if (!outs) {
+        var st = globalThis.__klothoSonic;
+        var so = st && st.bootConfig && st.bootConfig.scsynthOptions;
+        outs = (so && so.numOutputBusChannels) ? so.numOutputBusChannels : 2;
+      }
+      return Math.max(0, Math.floor((outs - 2) / 2));
+    }
+
+    async function record(events, options) {
+      options = options || {};
+      var recorder = globalThis.KlothoRecorder;
+      if (!recorder) {
+        console.warn("[Klotho] recorder module not loaded on this page");
+        return null;
+      }
+      var ready = await _ensureSSReady();
+      if (!ready || !_ssSonic || !_ssScheduler) return null;
+      var evts = Array.isArray(events) ? events : _scEvents();
+      if (evts.length === 0) return null;
+      if (_recSession) {
+        console.warn("[Klotho] this widget is already recording");
+        return null;
+      }
+
+      // Stems only make sense for Score payloads (track groups in meta),
+      // within the page engine's output-pair budget (15 on a 10.16 boot).
+      var wantStems = !!options.stems;
+      var groups = (meta && Array.isArray(meta.groups)) ? meta.groups : [];
+      if (wantStems && groups.length === 0) wantStems = false;
+      var capacity = stemCapacity();
+      if (wantStems && capacity === 0) {
+        console.warn("[Klotho] stems unavailable: this page's audio engine "
+          + "was started by an output saved with an older Klotho (2 output "
+          + "channels). Reload the notebook page (after re-running the "
+          + "cells) and record again; recording the mixdown instead.");
+        wantStems = false;
+      }
+      if (wantStems && typeof _ssScheduler.setupStemTaps !== "function") {
+        console.warn("[Klotho] stems unavailable: this page is running an "
+          + "older Klotho scheduler. Reload the notebook page and record "
+          + "again; recording the mixdown instead.");
+        wantStems = false;
+      }
+      var stemCount = Math.min(groups.length, capacity);
+      if (wantStems && groups.length > capacity) {
+        console.warn("[Klotho] stems: only the first " + capacity + " of "
+          + groups.length + " tracks get separate stems.");
+      }
+      var channels = wantStems ? 2 + 2 * stemCount : 2;
+
+      var session = await recorder.start(_ssSonic, channels, options.maxSeconds);
+      if (!session) return null;
+      _recSession = session;
+
+      var ringMs = Math.max(0, ringTime) * 1000 + 250;
+      var data = await new Promise(function(resolve) {
+        var settled = false;
+        function settle(v) {
+          if (settled) return;
+          settled = true;
+          resolve(v);
+        }
+        _recCancel = function() {
+          session.abort();
+          settle(null);
+        };
+        play(evts, {
+          loop: false,
+          stemTaps: wantStems,
+          onEvent: options.onEvent || null,
+          onFinish: function() {
+            if (options.onFinish) { try { options.onFinish(); } catch (e) {} }
+            // Piece (+ tail pause) is done; keep capturing through the
+            // ring-out so release tails land in the files.
+            setTimeout(function() {
+              if (settled) return;
+              session.stop().then(settle, function() { settle(null); });
+            }, ringMs);
+          },
+        });
+      });
+      _recSession = null;
+      _recCancel = null;
+      if (!data || !data.channels || data.channels.length < 2) return null;
+
+      // Trim the capture so t=0 of every file is the scheduler's play
+      // start. startedPerfMs is the main thread's receipt of the capture
+      // worklet's "started" message, i.e. at or after the true capture
+      // start — so the computed offset can only under-trim. The safety
+      // margin biases the same direction: never clip the first attack.
+      var trimStart = 0;
+      var playStartPerf = _ssScheduler._playStartPerfMs;
+      if (playStartPerf && session.startedPerfMs) {
+        var SAFETY_S = 0.05;
+        var offsetS = (playStartPerf - session.startedPerfMs) / 1000 - SAFETY_S;
+        trimStart = Math.max(0, Math.round(offsetS * data.sampleRate));
+        if (trimStart >= data.frames) trimStart = 0;
+      }
+      function ch(i) {
+        var arr = data.channels[i];
+        return trimStart > 0 ? arr.subarray(trimStart) : arr;
+      }
+
+      var base = recorder.defaultBaseName();
+      var files = [];
+      if (!wantStems) {
+        var wav = recorder.encodeWav24([ch(0), ch(1)], data.sampleRate);
+        files.push({ name: base + ".wav", blob: new Blob([wav], { type: "audio/wav" }) });
+      } else {
+        var layout = _ssScheduler._stemLayout || [];
+        var entries = [{ name: "main.wav",
+                         data: recorder.encodeWav24([ch(0), ch(1)], data.sampleRate) }];
+        for (var s = 0; s < layout.length; s++) {
+          var c0 = layout[s].ch[0], c1 = layout[s].ch[1];
+          if (c1 >= data.channels.length) continue;
+          entries.push({ name: layout[s].name + ".wav",
+                         data: recorder.encodeWav24([ch(c0), ch(c1)], data.sampleRate) });
+        }
+        var zip = recorder.zipStore(entries);
+        files.push({ name: base + "_stems.zip",
+                     blob: new Blob([zip], { type: "application/zip" }) });
+      }
+      return { files: files };
     }
 
     function releaseControlPreload() {
@@ -261,6 +423,12 @@
       stop: stop,
       resumeAudio: resumeAudio,
       play: play,
+      record: record,
+      isRecording: isRecording,
+      stemCapacity: stemCapacity,
+      hasStemTracks: function() {
+        return !!(meta && Array.isArray(meta.groups) && meta.groups.length > 0);
+      },
       preview: preview,
       releaseControlPreload: releaseControlPreload,
       getEvents: function() { return _scEvents(); },
@@ -271,4 +439,5 @@
 
   globalThis.KlothoPlaybackBridge = buildBridge;
   globalThis.__klothoPlaybackBridgeV2 = buildBridge;
+  globalThis.__klothoPlaybackBridgeV3 = buildBridge;
 })();

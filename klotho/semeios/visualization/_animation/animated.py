@@ -9,7 +9,7 @@ from .._cdn import (
 from .base import (
     build_session_preamble, build_control_bar_html,
     build_nav_controls_html, build_scripts_html, build_playback_js,
-    build_shape_playback_js,
+    build_shape_playback_js, build_recorder_js,
 )
 from .._renderers.threejs_lattice import (
     THREEJS_CLICK_PREVIEW_JS, THREEJS_SHAPE_EDGES_JS, THREEJS_NODE_MESHES_JS,
@@ -732,13 +732,14 @@ class AnimatedTimelineSvgFigure:
     """
 
     def __init__(self, svg_data, audio_payload=None, dur=0.5, glow=False,
-                 ring_time=5, loop=False):
+                 ring_time=5, loop=False, record=False):
         self.svg_data = svg_data
         self.audio_payload = audio_payload
         self.dur = dur
         self.glow = glow
         self.ring_time = ring_time
         self.loop = loop
+        self.record = bool(record)
         self.widget_id = f"klotho_svg_{uuid.uuid4().hex[:8]}"
 
     def to_html(self, **kwargs):
@@ -747,9 +748,13 @@ class AnimatedTimelineSvgFigure:
         wid = self.widget_id
 
         cdn_html = build_session_preamble()
-        controls_html = build_control_bar_html(wid)
+        payload_meta = (self.audio_payload or {}).get("meta") \
+            if isinstance(self.audio_payload, dict) else None
+        stems = self.record and bool((payload_meta or {}).get("groups"))
+        controls_html = build_control_bar_html(wid, record=self.record, stems=stems)
         scripts_html = build_scripts_html(
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
+        recorder_js = build_recorder_js(self.record)
 
         step_ids_json = json.dumps(sd.step_element_ids)
         step_halo_ids_json = json.dumps(sd.step_halo_ids)
@@ -769,6 +774,7 @@ class AnimatedTimelineSvgFigure:
 {controls_html}
 {scripts_html}
 <script type="module">
+{recorder_js}
 (function() {{
     var elCache = {{}};
     function getEl(id) {{ if (!elCache[id]) elCache[id] = document.getElementById(id); return elCache[id]; }}

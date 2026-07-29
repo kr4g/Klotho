@@ -1,8 +1,116 @@
 Changelog
 =========
 
-Version 10.11.2 (Current)
+Version 10.16.0 (Current)
 -------------------------
+
+* **Recording**: ``play(..., record=True)`` and ``plot(score).play(record=True)``
+  add a record button to the playback widget — playback is captured in the
+  browser and downloaded as 24-bit WAV when the piece (plus ring time)
+  finishes. ``Score`` widgets gain a **stems** checkbox rendering every
+  track as a separate, sample-aligned stereo stem plus the full mix in one
+  ZIP (single realtime pass via per-track output-channel taps)
+* **Custom samples**: runtime sample registry
+  (``klotho.register_sample``); ``SynthDefInstrument.sampler`` accepts
+  ``.wav`` paths; ``SynthDefKit.from_folder`` builds a kit from a folder
+  (subfolders = families, ``NN_`` prefixes order members); stdlib WAV
+  header parser with friendly format errors
+* **Round-robin kits**: a family name is now a valid ``voice=`` selector,
+  rotating deterministically through the family's members per hit —
+  variant pools for humanized drums; direct member access, integer
+  indices, and ``pick``/``cycle`` unchanged
+* ``klotho.fetch_samples(url)`` / ``klotho.upload_samples()`` for getting
+  hosted or local sample files onto the notebook runtime (Colab-friendly)
+* Demo notebook ``examples/mat111mc_notebooks/MAT_111MC___Custom_Sample_Kits.ipynb``
+  with a bundled ``mat_kit/`` sample folder
+* Engine boots with 32 output channels (stem-tap pairs; audible output
+  unchanged) and a pinned SuperSonic version (0.71.0)
+* Fixes: the idle scheduler-queue flush now actually runs
+  (``/clearSched`` is blocked in SuperSonic — replaced with ``purge()``);
+  sample load failures and unresolvable ``buf`` names warn instead of
+  playing silence; ``ens.family('drums')`` call form works as documented
+* **Control-envelope playback was silent** — ``apply_envelope(...,
+  control=True)`` uploaded its envelope buffer with ``/b_setn`` fills
+  sent immediately after ``/b_alloc``, but ``/b_alloc`` is an async
+  scsynth command, so the fills were dropped and every ``__klEnvCtrl``
+  streamed zeros (mapped pfields pinned to 0). The fills now wait behind
+  a ``/sync`` round-trip, ``setupControlEnvelopes`` awaits the upload,
+  and the score-extension install guard is versioned
+  (``__klothoScoreExtV2``) so stale saved outputs get the fix
+* **Stop didn't silence playback** — a side effect of the ``purge()``
+  fix above: stop's ``/g_freeAll`` rides the OSC out-ring while
+  ``purge()``'s clearSched signal rides the worklet port, an unordered
+  channel that could wipe the ring before the frees drained — stopped
+  notes kept sounding with their scheduled gate-offs flushed, and
+  restarts orphaned them permanently. ``stop()`` and ``play()``'s
+  restart path now drain the frees through a ``/sync`` round-trip
+  before flushing the queue
+* **Late queue-flush acks corrupted the next play** — ``purge()`` is
+  async, and an ack landing after a subsequent ``play()`` had already
+  scheduled its batch wiped a random slice of it: eaten ``/n_map``/
+  ``__klEnvCtrl`` bundles froze control envelopes (pieces played as a
+  static cluster), eaten gate-offs and frees made stop intermittently
+  hang on sounding notes. ``_unregisterPlayer`` now records the
+  in-flight purge on the shared scheduler state, ``play()`` awaits it
+  before scheduling, and all sync/purge awaits are time-bounded so a
+  lost ack can never hang stop or play
+* **Scheduler install guard bumped to** ``__klothoSchedCoreV3`` — pages
+  carrying saved 10.16-dev outputs already claim the V2 marker, so the
+  fixed core deferred to the raced build and none of the three fixes
+  above took effect there. V3 keys on its own name (still claiming V2 so
+  a stale core rendering later cannot downgrade the class), and the
+  stale-page probe gains a ``stale_1016dev`` state covering it
+* **Frequency control envelopes never moved the synth** — ``kl_*``/
+  ``fd_*`` instruments glide ``freq`` through ``VarLag(warp: \\exp)``
+  (or the FoxDot idiom it matches), which compiles to a ``Changed()``-
+  retriggered EnvGen chase. Against a control bus that moves every
+  block — exactly what ``__klEnvCtrl`` wrote — the trigger never
+  re-arms, so mapped freqs froze at their onset value: freq envelopes
+  played as a static cluster while chase-free params (``amp``) followed
+  theirs. The bus itself was verifiably correct the whole time, which
+  hid the bug from every payload/OSC/bus-level check; only spectrum
+  analysis of recorded audio exposed it. ``__klEnvCtrl`` now
+  sample-and-holds its writes in ~30 ms steps (floor-quantized BufRd
+  phase), pulsing ``Changed()`` once per step so the chase retriggers
+  and the synth's own portamento smooths the glide
+* **Page-stale synthdef bytes** — the synthdef asset registry merged
+  first-wins, so saved outputs from older sessions (whose scripts run
+  at page load) pinned their compiled defs for the page's lifetime and
+  freshly rendered widgets kept ``/d_recv``-ing the old builds. The
+  merge is now last-wins on changed bytes and invalidates the
+  loaded-defs registry so the replacement is re-sent to the engine
+* Demo notebook ``examples/mat111mc_notebooks/MAT_111MC___The_Deep_Note.ipynb``
+  — the THX Deep Note as 30 single-note voices driven entirely by
+  ``control=True`` frequency/amplitude envelopes (``warp='exp'``)
+
+Version 10.15.x
+---------------
+
+* ``plot(score)`` with animated SuperSonic playback (10.15.0); fix for
+  silent playback on pages with stale pre-10.15 widget outputs (10.15.1);
+  QC follow-ups (10.15.2)
+
+Version 10.14.x
+---------------
+
+* Plot/convert dispatch ladders replaced by an MRO-walking
+  ``TypeRegistry`` (10.14.0); playback widgets unified on the shared
+  bridge, buttons greyed until engine-ready (10.14.1)
+
+Version 10.13.x
+---------------
+
+* Real assignment-based voice leading with anchors and smart doubling
+  (10.13.0); uniform slur voice expansion (10.13.1)
+
+Version 10.12.0
+---------------
+
+* MIDI and Tone.js playback engines removed — playback is
+  SuperSonic-only; dead visualization/playback code culled
+
+Version 10.11.2
+---------------
 
 * NumPy-style docstring pass across chronos, thetos, tonos, topos, dynatos,
   and playback modules

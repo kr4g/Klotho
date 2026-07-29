@@ -1,5 +1,29 @@
 (function() {
-  if (globalThis.BrowserScheduler) return;
+  // Bus-floor guard, re-asserted on EVERY inclusion (deliberately before the
+  // install guard below): output buses 2..31 are stem-tap pairs under the
+  // 10.16 boot config, so the shared private-bus cursor must never sit
+  // inside the hardware span. This also repairs pages where a stale
+  // pre-10.16 scheduler (floor 16) was installed first — the stale code
+  // still allocates from this shared cursor, so raising it is sufficient.
+  // Keep the literal in sync with FIRST_PRIVATE_BUS below.
+  if (globalThis.__klothoBusAlloc && globalThis.__klothoBusAlloc.nextAudio < 48) {
+    globalThis.__klothoBusAlloc.nextAudio = 48;
+  }
+
+  // Version-skew guard, same pattern as the playback bridge: saved
+  // notebook outputs from klotho <= 10.15 install an older scheduler
+  // under BrowserScheduler (first-wins) that lacks setupStemTaps and the
+  // 10.16 bus floor. Widgets rendered after those stale outputs must get
+  // THIS build, so the install guard keys on the versioned name and the
+  // public class is overwritten unconditionally; stale code can never
+  // downgrade it back (its own guard sees BrowserScheduler defined).
+  // Old scheduler instances constructed before the overwrite keep their
+  // old prototype and behave as before.
+  // V3 (sync-drained stop/play, purge-ack fencing): pages carrying saved
+  // 10.16-dev outputs already set the V2 marker, and their stale core has
+  // the free-vs-purge race — so V3 must key on its own name to install
+  // over them. Old instances keep the old prototype; new widgets get V3.
+  if (globalThis.__klothoSchedCoreV3) return;
 
   // The supersonic-scsynth engine holds at most SCHEDULER_SLOT_COUNT (512)
   // timestamped bundles; when that queue is full an arriving bundle is
@@ -20,7 +44,11 @@
   var NTP_EPOCH_OFFSET = 2208988800;
   var STARTUP_DELAY = 0.1;
   var DEFAULT_RING_TIME = 5;
-  var FIRST_PRIVATE_BUS = 16;
+  // Must stay >= the engine's hardware bus span (numOutputBusChannels +
+  // numInputBusChannels from supersonic_config(), currently 32 + 2): output
+  // buses 2..31 are stem-tap pairs for recording, and track/FX routing must
+  // never allocate into them. Keep in sync with scheduler_score.js.
+  var FIRST_PRIVATE_BUS = 48;
   var BUS_CHANNELS = 2;
 
   if (!globalThis.__klothoBusAlloc) {
@@ -262,6 +290,8 @@
     // scheduled queue: stale bundles from a stopped play would otherwise
     // occupy slots until due (and fire /s_new into freed groups). Guarded by
     // the active-player count so a concurrent widget's playback survives.
+    // Must be purge(): /clearSched is a blocked command in SuperSonic (it
+    // throws), and only purge() clears the JS pre-scheduler as well.
     _unregisterPlayer() {
       if (!this._playerRegistered) return;
       this._playerRegistered = false;
@@ -270,8 +300,33 @@
       if (g.activePlayers <= 0) {
         g.activePlayers = 0;
         g.dues.length = 0;
-        try { this.sonic.send('/clearSched'); } catch(e) {}
+        // The flush is async: clearSched rides the worklet port and is
+        // acked later. Record the in-flight promise on the shared state —
+        // the next play() (on ANY widget sharing this engine) must await
+        // it before scheduling, or the late ack wipes that play's own
+        // freshly queued bundles: eaten n_maps / __klEnvCtrl spawns show
+        // up as frozen control envelopes, eaten gate releases and frees
+        // as stuck notes. Which slice dies depends on timing, which is
+        // why the failures looked intermittent.
+        try {
+          if (typeof this.sonic.purge === 'function') {
+            var p = this.sonic.purge();
+            g.purgePromise = p;
+            var clearP = function() { if (g.purgePromise === p) g.purgePromise = null; };
+            if (p && typeof p.then === 'function') p.then(clearP, clearP);
+          }
+        } catch(e) {}
       }
+    }
+
+    // Await a promise, but never longer than ms. sync()/purge() acks can
+    // be lost when the engine is mid-reload or the reply channel is
+    // wedged; an unbounded await here hangs stop() (stuck UI, poisoned
+    // queue for every later play) or play() (piece never starts).
+    async _awaitBounded(promise, ms) {
+      if (!promise || typeof promise.then !== 'function') return;
+      var timeout = new Promise(function(res) { setTimeout(res, ms); });
+      try { await Promise.race([promise, timeout]); } catch(e) {}
     }
 
     _snapshotMetrics() {
@@ -352,10 +407,19 @@
         if (typeof val === 'object') continue;
         if (typeof val === 'string') {
           // Symbolic sample name on a buf* pfield: substitute the bufnum
-          // allocated by the widget's loadSamples. Drop unresolvable
-          // strings so they never reach the OSC encoder.
+          // allocated by the widget's loadSamples. Unresolvable strings
+          // must never reach the OSC encoder — but dropping one means the
+          // synth plays buffer 0 (silence or the wrong sample), so say so.
           if (key.indexOf('buf') === 0 && sampleMap[val] != null) {
             out[key] = sampleMap[val];
+          } else if (key.indexOf('buf') === 0) {
+            var warned = globalThis.__klothoBufWarned || (globalThis.__klothoBufWarned = {});
+            if (!warned[val]) {
+              warned[val] = true;
+              console.warn('[Klotho] sample ' + JSON.stringify(val)
+                + ' is not loaded on this page; events using it will be '
+                + 'silent or play the wrong buffer.');
+            }
           }
           continue;
         }
@@ -638,15 +702,29 @@
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
 
-      // Restarting while a previous play is live: surface its loss metrics
-      // and release its player registration (flushing the engine queue when
-      // nothing else is playing) before the new burst goes out.
+      // Restarting while a previous play is live: free its nodes, then
+      // release its player registration (flushing the engine queue when
+      // nothing else is playing) before the new burst goes out. The frees
+      // MUST be drained ahead of the flush: /g_freeAll rides the OSC
+      // out-ring while purge() signals clearSched over the worklet port —
+      // an unordered channel that can wipe the ring before it drains,
+      // eating the frees and leaving the old notes sounding forever. The
+      // /sync round-trip guarantees the frees are consumed first.
       this._reportLossMetrics();
-      this._unregisterPlayer();
-
       this._cancelAllDeferredRings();
       this._freeGroup();
       this._freeBuffers();
+      try {
+        if (typeof this.sonic.sync === 'function') {
+          await this._awaitBounded(this.sonic.sync(), 750);
+        }
+      } catch(e) {}
+      this._unregisterPlayer();
+      // If a queue flush is in flight — fired just above, or by a recent
+      // stop() on any widget sharing this engine — it MUST settle before
+      // this play schedules anything: a late clearSched ack would eat a
+      // random slice of the new batch (n_maps, control synths, releases).
+      await this._awaitBounded(_schedLoad().purgePromise, 750);
 
       this.nodeMap.clear();
       this._defNames.clear();
@@ -676,6 +754,14 @@
         await this.setupTracks(scoreMeta, this._scoreGroupId);
       } else {
         this._createGroup();
+      }
+
+      // Stems recording: tap each track's post-FX bus onto its own
+      // hardware output pair for the widget's capture node.
+      this._stemLayout = null;
+      if (options.stemTaps && this._trackMap
+          && typeof this.setupStemTaps === 'function') {
+        this._stemLayout = this.setupStemTaps();
       }
 
       // Control envelopes are independent of track/insert setup: they fire
@@ -743,6 +829,18 @@
       this._cancelAllDeferredRings();
       this._freeGroup();
       this._freeBuffers();
+      // Same free-vs-purge ordering hazard as play()'s restart path: the
+      // frees ride the OSC out-ring, purge()'s clearSched rides the
+      // worklet port, and the port message can win — wiping the ring
+      // before the frees are consumed. Stop must actually silence the
+      // synths, so drain via /sync before flushing the queue. Bounded:
+      // a lost /synced reply must degrade to a best-effort flush, not
+      // hang stop() forever with the queue still poisoned.
+      try {
+        if (typeof this.sonic.sync === 'function') {
+          await this._awaitBounded(this.sonic.sync(), 750);
+        }
+      } catch(e) {}
       this._unregisterPlayer();
       this.nodeMap.clear();
       this._defNames.clear();
@@ -751,4 +849,6 @@
       this.drawScheduler.clear();
     }
   };
+  globalThis.__klothoSchedCoreV2 = true;
+  globalThis.__klothoSchedCoreV3 = true;
 })();

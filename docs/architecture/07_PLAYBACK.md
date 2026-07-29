@@ -1,8 +1,11 @@
 # Playback — Audio Rendering Pipeline
 
 `klotho.utils.playback` converts Klotho musical objects into audible
-output within Jupyter notebooks.  It supports two browser-based
-synthesis engines (Tone.js and SuperSonic) plus MIDI file export.
+output within Jupyter notebooks. Playback is **SuperSonic-only**
+(browser-based scsynth via WebAssembly); the Tone.js and MIDI engines
+were removed in 10.12.0. Widgets can also **record** what they play —
+including per-track stems for `Score` — and instruments can be built
+from **user-supplied samples** at runtime.
 
 ---
 
@@ -12,31 +15,30 @@ synthesis engines (Tone.js and SuperSonic) plus MIDI file export.
 utils/playback/
 ├── __init__.py
 ├── player.py                  # play() — top-level dispatcher
-├── _config.py                 # set_audio_engine / get_audio_engine
+├── _config.py                 # set_audio_engine / get_audio_engine ('supersonic' only)
 ├── _converter_base.py         # shared conversion logic
 ├── _amplitude.py              # voice amplitude computation
 ├── _sc_assembly.py            # CompositionalUnit → SC event assembly
 ├── _sc_validate.py            # SC event-list validation
-├── _helpers.py                # shared helpers
+├── _helpers.py                # loop-policy helpers + JS fragment loaders
 ├── _session_boot.py           # boot_supersonic()
-├── animation_events.py        # events/payloads for animated KlothoPlot playback
-├── midi_player.py             # play_midi(), create_midi()
-├── tonejs/
-│   ├── __init__.py
-│   ├── engine.py              # ToneEngine — HTML widget
-│   ├── converters.py          # convert_to_events()
-│   └── cdn.py                 # CDN URLs for Tone.js, Plotly, Three.js
+├── _animation_bridge.js       # KlothoPlaybackBridge — shared widget/engine bridge
+├── _loop_control.js           # KlothoLoopControl + KlothoGateToggle
+├── _recorder.js               # KlothoRecorder — capture worklet, WAV/ZIP encoders
+├── animation_events.py        # payloads for animated KlothoPlot playback
 └── supersonic/
     ├── __init__.py
     ├── engine.py              # SuperSonicEngine — HTML widget
-    ├── converters.py          # convert_to_sc_events(), convert_score_to_sc_events()
+    ├── converters.py          # convert_to_sc_events(), convert_score_to_sc_events(), …
     ├── registry.py            # register_synthdef(), runtime synthdef registry
-    ├── samples.py             # bundled-sample manifest (sample_names, sample_info…)
-    ├── cdn.py                 # SuperSonic CDN URLs
-    ├── _js_fragments.py       # JS snippets shared by widgets
-    ├── _engine_widget.js      # widget shell
-    ├── scheduler_core.js      # core JS scheduler
-    ├── scheduler_score.js     # score-aware JS scheduler
+    ├── samples.py             # bundled-sample manifest + runtime sample registry
+    ├── _wav_meta.py           # stdlib RIFF/WAVE header parser
+    ├── cdn.py                 # pinned SuperSonic CDN URLs + scsynth boot options
+    ├── _js_fragments.py       # control bar + boot/loader JS snippets
+    ├── _engine_widget.js      # standalone widget controller
+    ├── _lifecycle.js          # KlothoEngineLifecycle — boot/defs/samples loaders
+    ├── scheduler_core.js      # core JS scheduler (batching, buses, ring-out)
+    ├── scheduler_score.js     # track mixer, insert FX, control envelopes, stem taps
     ├── draw.js                # widget drawing
     ├── _vendor/
     │   └── synthdef_parser/   # vendored .scsyndef parser (MIT)
@@ -46,12 +48,17 @@ utils/playback/
         ├── manifest.json      # flat {name: {control: default}} dict
         ├── kinds.json         # synthdef kind/category metadata
         ├── *.scd              # SC source, one file per family (klotho/edm/lofi/chip/foxdot)
-        ├── samples/           # bundled audio samples (sampler kit)
+        ├── samples/           # bundled audio samples (beatbox/tabla kits)
         └── synthdefs/         # 183 compiled .scsyndef files
             ├── instruments/   #   playable defs
             ├── effects/       #   insert-FX defs
             └── infra/         #   __klEnvCtrl, __busRouter, … control/routing defs
 ```
+
+Related, outside this package: `klotho.utils.fetch` provides
+`fetch_samples(url, dest)` / `upload_samples(dest)` for getting sample
+files onto the notebook runtime (Colab-friendly), both exported at the
+top level.
 
 ---
 
@@ -62,55 +69,47 @@ utils/playback/
 ```python
 from klotho import play
 
-play(obj)                     # uses default engine
-play(obj, engine='tone')      # force Tone.js
-play(obj, engine='supersonic')  # force SuperSonic
+play(obj)                    # SuperSonic playback widget
+play(obj, loop=True)         # loop button pre-armed
+play(obj, ring_time=8)       # longer release/reverb tail
+play(obj, record=True)       # adds a record button (see §4)
 ```
 
 ### Dispatch Flow
 
 ```mermaid
 flowchart TD
-    P["play(obj, engine, **kwargs)"] --> SCORE{"isinstance<br/>Score?"}
+    P["play(obj, **kwargs)"] --> SCORE{"isinstance<br/>Score?"}
     SCORE -->|Yes| S_CONV["convert_score_to_sc_events(score)"]
-    S_CONV --> S_ENG["SuperSonicEngine(events,<br/>meta, control_data, ring_time)"]
+    S_CONV --> S_ENG["SuperSonicEngine(events,<br/>meta, control_data, ring_time, loop, record)"]
     S_ENG --> DISP["engine.display()<br/>→ HTML widget"]
 
     SCORE -->|No| KP{"isinstance<br/>KlothoPlot?"}
     KP -->|Yes| KPLAY["obj.play(**kwargs)<br/>(animated)"]
     KP -->|No| BOOT["boot_supersonic()"]
-    BOOT --> ENG{"engine?"}
-
-    ENG -->|supersonic| SC_CONV["convert_to_sc_events(obj)"]
-    SC_CONV --> SC_ENG["SuperSonicEngine(events, ring_time)"]
+    BOOT --> UCQ{"UC / UTS / BT?"}
+    UCQ -->|Yes| PAYLOAD["convert_to_sc_payload(obj)"]
+    UCQ -->|No| SC_CONV["convert_to_sc_events(obj)"]
+    PAYLOAD --> SC_ENG["SuperSonicEngine(events, control_data, …)"]
+    SC_CONV --> SC_ENG
     SC_ENG --> DISP
-
-    ENG -->|tone| T_CONV["convert_to_events(obj)"]
-    T_CONV --> T_ENG["ToneEngine(events)"]
-    T_ENG --> DISP
 ```
 
-`Score` playback is always SuperSonic: the converter returns a payload
-with `events`, track/FX `meta`, and control-envelope `control_data`,
-and the widget accepts a `ring_time` tail (default 5 s).
+`Score` playback returns a payload with `events`, track/FX `meta`, and
+control-envelope `control_data`; the widget accepts a `ring_time` tail
+(default 5 s), a `loop` policy, and `record`.
 
 ### Engine Configuration
 
 ```python
 from klotho import set_audio_engine, get_audio_engine
 
-set_audio_engine('supersonic')  # default
-set_audio_engine('tone')        # switch to Tone.js
+set_audio_engine('supersonic')  # the default — and only — engine
 ```
-
-The default engine is `'supersonic'` (browser-based scsynth).
 
 ---
 
 ## 2. Event Conversion Pipeline
-
-Both engines share a common conversion pipeline that transforms Klotho
-objects into flat event lists.
 
 ### Supported Input Types
 
@@ -127,13 +126,16 @@ objects into flat event lists.
 | `TemporalUnitSequence` | Temporal sequence |
 | `TemporalBlock` | Parallel temporal |
 | `CompositionalUnit` | Full composition |
-| `Score` | Multi-unit timeline (SuperSonic only) |
+| `Score` | Multi-unit timeline |
+
+Dispatch is an MRO-walking `TypeRegistry`
+(`klotho.utils.dispatch_registry`, 10.14.0), shared with `plot()`.
 
 ### Conversion Architecture
 
 ```mermaid
 flowchart TD
-    OBJ["Klotho Object"] --> TD{"type dispatch"}
+    OBJ["Klotho Object"] --> TD{"TypeRegistry dispatch"}
 
     TD -->|"CompositionalUnit"| UCIR["lower_compositional_ir_to_sc_assembly()"]
     TD -->|"TemporalUnit/Sequence/Block"| UTIR["build events from RT timing"]
@@ -145,11 +147,7 @@ flowchart TD
     PCIR --> VOICE
     HTIR --> VOICE
 
-    VOICE --> FLAT["flat event list"]
-
-    FLAT --> FMT{"target engine?"}
-    FMT -->|Tone.js| TJ["Tone.js event format"]
-    FMT -->|SuperSonic| SC["SC event format<br/>(new / set / release)"]
+    VOICE --> SC["SC event format<br/>(new / set / release)"]
 ```
 
 ### Shared Converter Base (`_converter_base.py`)
@@ -160,7 +158,7 @@ flowchart TD
 | `resolve_instrument(inst)` | Normalize an instrument argument (name, Instrument, Kit) |
 | `scale_pitch_sequence(obj, equaves=1)` | Pitch sequence spanning *n* equaves of a collection |
 | `extract_convert_kwargs(kwargs)` | Parse `dur`, `arp`, `strum`, `mode` kwargs |
-| `lower_poly_pfields_to_voices(pfields)` | Expand polyphonic pfields (lists of freqs) into separate voice pfield dicts |
+| `lower_poly_pfields_to_voices(pfields)` | Expand polyphonic pfields (tuples) into per-voice pfield dicts |
 | `lower_event_ir_to_voice_events(event, step_index=None)` | Flatten one intermediate event to a list of voice events |
 | `iter_group_sequence(groups, dur, arp=False, strum=0, direction='u', pause=0.0)` | Iterate grouped pitch material into timed events |
 
@@ -170,11 +168,14 @@ Specialized conversion for `CompositionalUnit` → SuperSonic events.
 Handles:
 
 - **Gated vs free instruments** — gated instruments use `new` + `set`
-  + `release` triplets; free instruments use a single `new`.
+  + auto-release; free instruments use a single `new`.
 - **Slur rendering** — slurred notes sustain across boundaries, with
-  `set` messages updating pitch/amp mid-note.
-- **Polyphonic voice expansion** — pfields containing lists (e.g.
-  chords) are expanded into concurrent voice events.
+  `set` messages updating pitch/amp mid-note; voice counts are pinned
+  per slur group (10.13.1).
+- **Polyphonic voice expansion** — tuple pfields expand into concurrent
+  voice events.
+- **Kit member resolution** — per voice, from the selector pfield (see
+  §5, including family round-robin).
 
 ### Amplitude Computation (`_amplitude.py`)
 
@@ -187,57 +188,91 @@ Uses `freq_amp_scale()` from dynatos for equal-loudness compensation.
 
 ---
 
-## 3. Tone.js Engine
+## 3. Widgets and the Shared Bridge
 
-**File:** `utils/playback/tonejs/engine.py`
+Every playback surface — the standalone `play()` widget and all
+animated `plot(...).play()` figures — is a thin controller over the
+same page-level modules:
 
-### ToneEngine
+| Module | Global | Role |
+|---|---|---|
+| `_lifecycle.js` | `KlothoEngineLifecycle` | boot the shared SuperSonic instance, load synthdefs/samples once per page |
+| `_animation_bridge.js` | `KlothoPlaybackBridge` | build a per-widget bridge: `ensureReady`, `play`, `stop`, `record`, `preview`, … |
+| `_loop_control.js` | `KlothoLoopControl` / `KlothoGateToggle` | loop policy; buttons render disabled/greyed until engine-ready |
+| `_recorder.js` | `KlothoRecorder` | capture worklet + WAV/ZIP encoders (only injected when `record=True`) |
+| `scheduler_core.js` | `BrowserScheduler` | NTP-timestamped OSC batching against the engine's 512-slot queue |
+| `scheduler_score.js` | (extends the scheduler) | track groups/buses, insert FX, control envelopes, stem taps |
 
-Generates an HTML/JS widget that:
+Version skew: saved notebook outputs embed their own copies of these
+modules, so installs are guarded by **versioned globals**
+(`__klothoPlaybackBridgeV3`, `__klothoRecorderV1`, …). Newer builds are
+supersets and claim the older guard names too, so stale outputs on the
+same page can neither clobber nor be broken by new widgets.
 
-1. Loads Tone.js from CDN.
-2. Creates synthesizer instances for each instrument.
-3. Schedules events on the Tone.js Transport.
-4. Renders play/stop/loop controls.
+### Engine boot configuration
 
-```mermaid
-flowchart LR
-    subgraph "Python (server)"
-        events["event list (JSON)"]
-    end
-
-    subgraph "Browser (client)"
-        HTML["HTML widget"]
-        TONEJS["Tone.js Transport"]
-        SYNTH["Tone.Synth instances"]
-        AUDIO["Web Audio API"]
-    end
-
-    events -->|"embedded in HTML"| HTML
-    HTML --> TONEJS
-    TONEJS --> SYNTH
-    SYNTH --> AUDIO
-```
-
-### Event Format (Tone.js)
-
-Musical parameters are nested under `pfields`, not flattened:
-
-```json
-{
-  "start": 0.0,
-  "duration": 0.5,
-  "instrument": "Harmonics",
-  "pfields": {"freq": 440.0, "amp": 0.8, "vel": 0.8}
-}
-```
-
-The converter returns a payload of `{"events": [...], "instruments":
-{...}}` so the widget can instantiate the right Tone.js classes.
+`cdn.py` pins the SuperSonic version and boots scsynth with
+`scsynthOptions: {numOutputBusChannels: 32, numAudioBusChannels: 256}`.
+Output channels 0/1 are the audible master pair (the browser clamps the
+speaker path to the hardware's channel count); channels 2–31 are
+**stem-tap pairs** used only while recording stems. Consequently the JS
+schedulers allocate private track/FX buses from `FIRST_PRIVATE_BUS = 48`
+(kept in sync across `scheduler_core.js` / `scheduler_score.js`, with a
+page-level floor guard against stale pre-10.16 outputs).
 
 ---
 
-## 4. SuperSonic Engine
+## 4. Recording (`record=True`)
+
+```python
+play(score, record=True)          # widget gains a ● record button
+plot(score).play(record=True)     # same, on the animated timeline
+```
+
+Pressing record plays the piece exactly like play (the play button
+becomes a stop button) while a **capture AudioWorklet** taps the
+engine's output node in parallel. When playback finishes — piece
+duration + tail pause + `ring_time` — the capture is encoded to
+**24-bit PCM WAV** at the page's sample rate and offered as a download:
+an automatic download is attempted *and* a persistent `⬇` link is left
+in the widget bar (Colab's sandboxed outputs can block programmatic
+clicks). Stopping mid-record cancels and discards the capture; the
+record pass always runs loop-off.
+
+### Stems
+
+For a `Score` with registered tracks the widget adds a **stems**
+checkbox. When enabled, the scheduler places one extra `__busRouter`
+per track **after** that track's summing router — reading the track's
+post-insert-FX bus and summing it onto a dedicated output-channel pair
+(2/3, 4/5, …) — and the capture worklet records all channels in the
+same single realtime pass. The result is one ZIP (STORE-only, built in
+JS) containing `main.wav` (the full mix from channels 0/1) plus one
+time-aligned stereo WAV per track, trimmed so every file starts at the
+scheduler's play start: drop them into a DAW and they line up. Up to 15
+stems (output-channel budget); the master needs no tap.
+
+This mirrors the native `EventScheduler.sc` stems design (one tap synth
+per track after its bus router), with the `DiskOut` half replaced by
+the Web Audio capture: the browser build of scsynth has no filesystem,
+`/b_write` is a blocked command, and SuperSonic's built-in capture API
+is SAB-only and 1-second-capped — hence the worklet tap.
+
+```mermaid
+flowchart LR
+    subgraph "scsynth (WASM)"
+        T1["track fxBus"] -->|"__busRouter (sum)"| MAIN["main srcBus → out 0/1"]
+        T1 -->|"stem tap __busRouter"| CH["out 2+2i"]
+    end
+    NODE["engine AudioWorkletNode<br/>(32 ch)"] --> DEST["speakers (ch 0/1)"]
+    NODE --> CAP["capture worklet<br/>(records N ch)"]
+    CAP --> ENC["24-bit WAV encode<br/>(+ STORE ZIP for stems)"]
+    ENC --> DL["download + ⬇ link"]
+```
+
+---
+
+## 5. SuperSonic Engine
 
 **File:** `utils/playback/supersonic/engine.py`
 
@@ -245,33 +280,13 @@ The converter returns a payload of `{"events": [...], "instruments":
 
 Generates an HTML widget that:
 
-1. Loads SuperSonic (browser-based scsynth) from CDN.
-2. Loads compiled `.scsyndef` synth definitions.
+1. Loads SuperSonic (browser-based scsynth) from the pinned CDN.
+2. Loads compiled `.scsyndef` synth definitions and referenced samples
+   (both embedded base64 in the widget HTML).
 3. Schedules `new` / `set` / `release` messages on a timeline.
-4. Renders play/stop controls.
+4. Renders play/loop (and optionally record/stems) controls.
 
-```mermaid
-flowchart LR
-    subgraph "Python (server)"
-        sc_events["SC event list (JSON)"]
-        scsyndef[".scsyndef files"]
-    end
-
-    subgraph "Browser (client)"
-        HTML["HTML widget"]
-        SS["SuperSonic runtime"]
-        SCSYNTH["scsynth (WASM)"]
-        AUDIO["Web Audio API"]
-    end
-
-    sc_events -->|"embedded in HTML"| HTML
-    scsyndef -->|"embedded base64 (CDN fallback)"| SS
-    HTML --> SS
-    SS --> SCSYNTH
-    SCSYNTH --> AUDIO
-```
-
-### Event Format (SuperSonic)
+### Event Format
 
 Three message types, keyed by a string `id` (uid) with `start` times
 and nested `pfields`:
@@ -287,6 +302,9 @@ and nested `pfields`:
   parameter changes, insert-FX automation).
 - **`release`** — free the node explicitly (normally superseded by the
   `dur`/`releaseAfter` auto-release contract below).
+
+Score events additionally carry a top-level `"group"` (track name),
+which the score scheduler routes onto that track's bus chain.
 
 ### Bundled SynthDefs
 
@@ -304,10 +322,6 @@ Family factories build ready-made kits/ensembles from these:
 `SynthDefKit.lofi_drums/…`, `SynthDefKit.chip_drums/chip_accent`,
 `SynthDefKit.tr808()` (all taking `selector='voice'` + overrides), and
 `Ensemble.edm/lofi/chip/tr808(name=…, only=…, extras=…)`.
-`SynthDefInstrument.sampler(sample, name=None, **overrides)` builds a
-one-shot sample player over the bundled samples (`kl_sampler1`/mono,
-`kl_sampler2`/stereo; browse with
-`supersonic.samples.sample_names()` / `sample_info()`).
 
 #### Path-style names
 
@@ -324,15 +338,21 @@ and underscore names keep working unchanged.
 #### Kit selector resolution
 
 A `Kit` event's member is chosen by its selector pfield (default
-`voice`) at lowering time.  Valid selector values are **concrete**:
-a member key, an integer (wrapping mod the member count), a tuple of
-either (one synth voice per element), or absent (default member).
-An unknown *string* raises a `KeyError` listing the kit's members —
-including a hint when the string names a kit *family* (families are a
-composition-time concept: draw a key with `kit.family['tas'].pick()`
-or hand `kit.tas.pick` to `set_pfields(voice=...)` for per-leaf
-draws; the engine itself never sees family names, so lowering stays
-deterministic).
+`voice`) at lowering time. Valid selector values: a member key, an
+integer (wrapping mod the member count), a **family name**, a tuple of
+any of these (one synth voice per element), or absent (default member).
+
+A family name selects its members **round-robin** — a family whose
+members are variants of one sound (three snare hits) is a rotation
+pool, so `voice='snare'` cycles a different variant per hit while
+`voice='snare_b'` still pins a specific one. Rotation is deterministic:
+tree-based lowering keys the choice on the leaf's position among the
+tree's leaves (so display, compose-time defaults, and per-voice
+lowering all agree, and replays are bit-identical), and the loose-Event
+path uses per-conversion counters that the converter entry points
+reset. Random selection stays opt-in via `kit.pick(family)`;
+`kit.cycle(family)` returns a `Pattern` of keys for manual placement.
+An unknown string raises a `KeyError` listing members and families.
 
 Definitions are compiled `.scsyndef` files in
 `supersonic/assets/synthdefs/` (with `.scd` sources in
@@ -350,9 +370,8 @@ install).
 
 ### Runtime SynthDef Registration (`registry.py`)
 
-New in 10.1.0: synthdefs can be registered at runtime without touching
-the bundled assets, exposed at the top level as
-`klotho.register_synthdef`:
+Synthdefs can be registered at runtime without touching the bundled
+assets, exposed at the top level as `klotho.register_synthdef`:
 
 ```python
 import klotho
@@ -361,10 +380,6 @@ klotho.register_synthdef(my_supriya_synthdef)          # from a supriya SynthDef
 inst = SynthDefInstrument.from_manifest('my_synth')    # then usable like any other
 ```
 
-The registry (`supersonic/registry.py`) stores compiled bytes plus
-parsed controls in a session-scoped runtime store that the engine
-merges with the bundled manifest:
-
 | Function | Purpose |
 |---|---|
 | `register_synthdef(supriya_synthdef, name=None, pfields=None)` | Compile-and-register from a supriya `SynthDef` |
@@ -372,6 +387,39 @@ merges with the bundled manifest:
 | `runtime_assets()` / `runtime_controls()` / `runtime_kinds()` | Session-registered blobs / control dicts / kind tags |
 | `is_registered(def_name)` | Check the runtime registry |
 | `clear_runtime()` | Drop all runtime registrations |
+
+### Samples: bundled + runtime (`samples.py`)
+
+Events reference samples symbolically: a `buf*` pfield carrying a
+string is a sample name, resolved to an scsynth bufnum by the widget at
+load time (`_lifecycle.js loadSamples`; unresolvable names and decode
+failures warn on the console). 22 samples ship bundled (`beatbox`,
+`tabla` groups, described by `assets/samples/samples.json`).
+
+**Runtime registry** (10.16.0) — user samples join the same namespace,
+so `sampler()`, kits, the engine's sample collection, and the animated
+payload builders all see them with no further plumbing:
+
+| Function | Purpose |
+|---|---|
+| `register_sample(name, source, group='user', replace=False)` | Register a `.wav` (path or bytes); metadata via `_wav_meta.py` |
+| `unregister_sample(name)` / `registered_samples()` / `clear_runtime_samples()` | Registry management |
+| `sample_names()` / `sample_groups()` / `sample_info()` / `sample_bytes_b64()` | Unified accessors (runtime entries win; claiming a bundled name requires `replace=True`) |
+
+Student-facing entry points (see `05_THETOS.md` for the instrument
+side):
+
+```python
+Inst.sampler('bb_kick')               # bundled name
+Inst.sampler('loops/my_break.wav')    # a path auto-registers under its stem
+SynthDefKit.from_folder('my_kit')     # folder → kit (subfolders = families)
+klotho.fetch_samples(url)             # download/unpack hosted audio (Colab setup cell)
+```
+
+Sample bytes are embedded base64 in every widget that references them
+(~4/3× file size, per `play()` call, stored in saved notebook outputs;
+Colab renders each cell in its own iframe, so nothing is shared across
+cells). The engine warns when one widget embeds more than ~6 MB.
 
 ### Event-list contract: `dur` + `releaseAfter` (auto-release)
 
@@ -404,62 +452,9 @@ that lands, SC scheduling falls back to consuming any explicit
 ### Session Boot
 
 `boot_supersonic()` runs at import of `player.py` and again on each
-`play()` invocation (it is idempotent).  It checks whether SuperSonic
-is available and pre-loads the CDN resources.  In Jupyter/Colab
-environments, it injects the required `<script>` tags.
-
----
-
-## 5. MIDI Export
-
-**File:** `utils/playback/midi_player.py`
-
-### `play_midi(obj, …)`
-
-Converts a Klotho object to MIDI events, renders to audio (if
-FluidSynth is available), and returns an `IPython.display.Audio`
-widget.
-
-### `create_midi(obj, …)`
-
-Returns a `mido.MidiFile` for saving to disk.
-
-### MIDI Conversion Flow
-
-```mermaid
-flowchart TD
-    OBJ["Klotho Object"] --> TD{"type dispatch"}
-    TD --> MIDI_CREATE["type-specific MIDI creator"]
-    MIDI_CREATE --> MIDO["mido.MidiFile"]
-
-    MIDO --> SAVE["save to .mid"]
-    MIDO --> FS{"FluidSynth<br/>available?"}
-    FS -->|Yes| AUDIO["render to audio<br/>→ IPython.display.Audio"]
-    FS -->|No| LINK["IPython.display.FileLink<br/>(download .mid)"]
-```
-
-### MIDI Features
-
-- **Multi-port MIDI** — up to 256 channels (16 channels × 16 ports)
-  for large orchestrations.
-- **Microtonal pitch bend** — sub-semitone pitches are rendered using
-  per-note pitch-bend messages.
-- **Drum routing** — `MidiInstrument.is_Drum` routes events to MIDI
-  channel 10.
-- **Program changes** — instruments with `prgm` numbers insert program
-  change events.
-
-### Supported Types for MIDI
-
-| Type | MIDI Output |
-|---|---|
-| `CompositionalUnit` | Full parametric events with instruments |
-| `TemporalUnit` / `TemporalUnitSequence` / `TemporalBlock` | Rhythm with default pitch |
-| `RhythmTree` | Rhythm with default pitch |
-| `ChordSequence` | Chords with timing |
-| `Scale` | Ascending scale |
-| `Chord` / `Voicing` | Simultaneous pitches |
-| Pitch collection types | Arpeggiated or simultaneous |
+`play()` invocation (it is idempotent). In IPython environments it
+displays a `<script>` block that installs the shared engine promise,
+the draw scheduler, and the core scheduler; outside IPython it no-ops.
 
 ---
 
@@ -467,18 +462,13 @@ flowchart TD
 
 **File:** `utils/playback/animation_events.py`
 
-Bridges the playback system with the animation system in semeios:
+Payload builders for animated `KlothoPlot` playback (lattice paths,
+CPS/shape figures):
 
 | Function | Purpose |
 |---|---|
-| `build_path_audio_events(freqs, dur, amp=None)` | Audio events for lattice path animation |
-| `build_shape_audio_events(freq_groups, dur, arp=False, strum=0, direction='u', amp=None)` | Audio events for CPS shape animation |
-| `build_path_engine_payload(freqs, dur, engine, …)` | Engine-specific payload for a path animation |
-| `build_shape_engine_payload(freq_groups, dur, engine, …)` | Engine-specific payload for a shape animation |
-| `normalize_animation_payload_for_engine(audio_payload, engine)` | Convert animation events to engine-specific format |
-
-These functions are called by `KlothoPlot.play()` to synchronize
-audio with visual animation.
+| `build_path_payload(freqs, dur, amp=None, extra_pfields=None, pause=0.0, def_name=None)` | SuperSonic payload for lattice path animation |
+| `build_shape_payload(freq_groups, dur, arp=False, strum=0, direction='u', amp=None, extra_pfields=None, pause=0.25, def_name=None)` | SuperSonic payload for CPS shape animation |
 
 ---
 
@@ -494,19 +484,16 @@ flowchart TD
     end
 
     subgraph "Conversion"
-        CONV["convert_to_events()<br/>convert_to_sc_events()<br/>convert_score_to_sc_events()<br/>create_midi()"]
+        CONV["convert_to_sc_events()<br/>convert_to_sc_payload()<br/>convert_score_to_sc_events()"]
     end
 
     subgraph "Rendering"
-        TONE["ToneEngine<br/>(Tone.js)"]
         SS["SuperSonicEngine<br/>(scsynth WASM)"]
-        MIDI["mido.MidiFile"]
     end
 
     subgraph "Output"
-        WIDGET["Jupyter HTML Widget<br/>(play/stop/loop)"]
-        FILE[".mid file"]
-        AUDIO["IPython.display.Audio"]
+        WIDGET["Jupyter HTML Widget<br/>(play / loop / record)"]
+        WAV["24-bit .wav download<br/>(+ stems ZIP for Scores)"]
     end
 
     SCR --> CONV
@@ -514,12 +501,7 @@ flowchart TD
     UT --> CONV
     PC --> CONV
 
-    CONV --> TONE
     CONV --> SS
-    CONV --> MIDI
-
-    TONE --> WIDGET
     SS --> WIDGET
-    MIDI --> FILE
-    MIDI --> AUDIO
+    WIDGET -->|"record=True"| WAV
 ```

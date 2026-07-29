@@ -1,9 +1,27 @@
 import numbers
 import random as _random
+import weakref
 from collections import OrderedDict
 from uuid import uuid4
 
 from klotho.utils.data_structures.dictionaries import SafeDict
+
+# Kits whose loose-Event family rotation counters have advanced (see
+# Kit._resolve). Keyed by id() — Instrument equality is value-based, so
+# an eq-keyed container would conflate distinct kits with equal pfields.
+_ROTATED_KITS = weakref.WeakValueDictionary()
+
+
+def reset_kit_rotations():
+    """Reset every kit's family round-robin counters.
+
+    Called at the start of each lowering pass (the converter entry
+    points) so repeated ``play()`` of the same piece renders
+    identically. Only the loose-Event lowering path uses these counters;
+    tree-based lowering resolves families statelessly by leaf position.
+    """
+    for kit in list(_ROTATED_KITS.values()):
+        kit._family_rotation.clear()
 
 
 class _FamilyAccessor:
@@ -11,7 +29,8 @@ class _FamilyAccessor:
 
     Shared by :class:`Kit` and ``Ensemble``; the owner supplies the view
     type via its ``_family_view(name)`` method and the name list via its
-    ``_families`` mapping.
+    ``_families`` mapping. The call form ``obj.family('name')`` is an
+    alias for the subscript form.
     """
 
     __slots__ = ('_owner',)
@@ -20,6 +39,9 @@ class _FamilyAccessor:
         self._owner = owner
 
     def __getitem__(self, name):
+        return self._owner._family_view(name)
+
+    def __call__(self, name):
         return self._owner._family_view(name)
 
     def __iter__(self):
@@ -221,6 +243,7 @@ class Kit(Instrument):
         if self._default not in self._members:
             raise KeyError(f"Default key '{self._default}' not found in members")
         self._selector = selector
+        self._family_rotation = {}
         self._families = OrderedDict()
         if families:
             for fname, keys in families.items():
@@ -315,18 +338,45 @@ class Kit(Instrument):
 
     def _unknown_selector_error(self, key):
         msg = (f"Unknown {self._selector} {key!r} for Kit "
-               f"(members: {list(self._members)})")
-        if key in self._families:
-            msg += (f". '{key}' is a family -- draw a member with "
-                    f"kit.family['{key}'].pick() (or kit.{key}.pick())")
+               f"(members: {list(self._members)}")
+        if self._families:
+            msg += f"; families: {list(self._families)}"
+        msg += ")"
         return KeyError(msg)
 
-    def _resolve(self, key=None):
+    def _family_member_key_at(self, family, ordinal):
+        """Round-robin member key for *family* at rotation position *ordinal*.
+
+        The stateless form of family rotation: tree-based lowering keys
+        the ordinal on the leaf's position among the tree's leaves (plus
+        the voice index for tuple selectors), so the same leaf always
+        resolves the same member — display, compose-time defaults, and
+        per-voice lowering all agree, and replays are identical.
+        """
+        keys = self._families[family]
+        return keys[int(ordinal) % len(keys)]
+
+    def _resolve(self, key=None, *, advance=True):
+        """Resolve a selector value to a member Instrument.
+
+        A family name selects its members round-robin: each advancing
+        resolve steps that family's counter (used by the loose-Event
+        lowering path; the converter entry points reset the counters so
+        repeated plays are identical). ``advance=False`` peeks at the
+        counter's current member without stepping — for compose-time
+        introspection that must not perturb playback.
+        """
         if key is None:
             return self._members[self._default]
         if isinstance(key, str):
             if key in self._members:
                 return self._members[key]
+            if key in self._families:
+                idx = self._family_rotation.get(key, 0)
+                if advance:
+                    self._family_rotation[key] = idx + 1
+                    _ROTATED_KITS[id(self)] = self
+                return self._members[self._family_member_key_at(key, idx)]
             raise self._unknown_selector_error(key)
         if key in self._members:
             return self._members[key]

@@ -2,6 +2,7 @@ from ._klotho_plot import transport_kwargs
 
 _PASSTHROUGH_KWARGS = frozenset({
     'beat', 'bpm', 'arp', 'strum', 'direction', 'pause', 'loop', 'ring_time',
+    'record',
 })
 
 
@@ -63,5 +64,6 @@ def _plot_score(score, figsize: tuple[float, float] | None = None,
         audio_payload=audio_payload,
         dur=dur,
         glow=glow,
+        record=bool(kwargs.get('record', False)),
         **transport_kwargs(kwargs),
     )

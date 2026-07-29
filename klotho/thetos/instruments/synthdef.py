@@ -1,9 +1,54 @@
 import copy
+import re
+from collections import OrderedDict
+from pathlib import Path
 
 from .base import Instrument, Kit, Effect
 from ._shared import (
     canonical_def_name, ss_synth_controls, load_ss_manifest, load_ss_kinds,
 )
+
+_ORDER_PREFIX_RE = re.compile(r'^\d+[_-]')
+
+
+def _strip_order_prefix(stem):
+    """Drop a leading ``NN_``/``NN-`` ordering prefix (``0_bb_kick`` -> ``bb_kick``)."""
+    stripped = _ORDER_PREFIX_RE.sub('', stem)
+    return stripped or stem
+
+
+def _order_key(path_or_name):
+    """Sort key honoring numeric ``NN_`` prefixes, then case-insensitive name."""
+    stem = path_or_name.stem if hasattr(path_or_name, 'stem') else str(path_or_name)
+    m = re.match(r'^(\d+)', stem)
+    return ((0, int(m.group(1))) if m else (1, 0), stem.lower())
+
+
+def _ensure_sample_name(sample):
+    """Resolve a sampler source to a registered sample name.
+
+    Known names (bundled or session-registered) always pass through
+    untouched — a local file can never shadow them. Anything path-like
+    (a ``Path``, or a string with a slash or ``.wav`` suffix) is
+    auto-registered under its filename stem (minus any ``NN_`` ordering
+    prefix) and that name is returned.
+    """
+    from klotho.utils.playback.supersonic import samples as _samples
+
+    if isinstance(sample, str) and (
+            sample in _samples._RUNTIME_SAMPLES
+            or sample in _samples.load_sample_manifest()):
+        return sample
+    if isinstance(sample, (str, Path)):
+        p = Path(sample)
+        looks_like_path = (isinstance(sample, Path)
+                           or p.suffix.lower() == '.wav'
+                           or '/' in str(sample) or '\\' in str(sample))
+        if looks_like_path:
+            if not p.is_file():
+                raise FileNotFoundError(f"Sample file not found: {sample}")
+            return _samples.register_sample(_strip_order_prefix(p.stem), p)
+    return sample
 
 
 class SynthDefInstrument(Instrument):
@@ -52,8 +97,8 @@ class SynthDefInstrument(Instrument):
         return 'gate' in self._pfields
 
     @classmethod
-    def sampler(cls, sample: str, name: str = None, **overrides):
-        """Create a one-shot sample-player instrument for a bundled sample.
+    def sampler(cls, sample, name: str = None, **overrides):
+        """Create a one-shot sample-player instrument.
 
         Picks ``kl_sampler1`` (mono) or ``kl_sampler2`` (stereo) based on
         the sample's channel count and sets the ``buf`` pfield to the
@@ -69,9 +114,16 @@ class SynthDefInstrument(Instrument):
 
         Parameters
         ----------
-        sample : str
-            Bundled sample name (e.g. ``'bb_kick'``); see
-            ``klotho.utils.playback.supersonic.samples.sample_names()``.
+        sample : str or Path
+            A sample name — bundled (e.g. ``'bb_kick'``; see
+            ``klotho.utils.playback.supersonic.samples.sample_names()``)
+            or registered via
+            ``klotho.utils.playback.supersonic.samples.register_sample``
+            — or a path to your own ``.wav`` file, which is registered
+            automatically under its filename stem (minus any ``NN_``
+            ordering prefix). Known names always win over paths, so
+            ``sampler('bb_kick')`` can never be shadowed by a local
+            file.
         name : str or None, optional
             Display name. Defaults to the sample name.
         **overrides
@@ -86,6 +138,7 @@ class SynthDefInstrument(Instrument):
         """
         from klotho.utils.playback.supersonic.samples import sample_info
 
+        sample = _ensure_sample_name(sample)
         info = sample_info(sample)
         def_name = 'kl_sampler2' if info['channels'] >= 2 else 'kl_sampler1'
         pfields = copy.deepcopy(ss_synth_controls(def_name))
@@ -281,6 +334,128 @@ class SynthDefKit(Kit):
                 f"Available: {', '.join(sample_groups())}"
             )
         return cls.from_samples(names, selector=selector, families=families, **overrides)
+
+    @classmethod
+    def from_folder(cls, path, name=None, default=None, selector='voice',
+                    **overrides):
+        """Build a SynthDefKit from a folder of ``.wav`` files.
+
+        Folder convention::
+
+            my_kit/
+            ├── clap.wav              # loose file -> member 'clap'
+            ├── snare/                # subfolder  -> family 'snare'
+            │   ├── 0_snare_a.wav     #   member 'snare_a' (default of the pool)
+            │   ├── 1_snare_b.wav     #   member 'snare_b'
+            │   └── 2_snare_c.wav     #   member 'snare_c'
+            └── sfx/
+                ├── riser.wav
+                └── vinyl.wav
+
+        - **Subfolders are families.** A family of variants of one sound
+          is a round-robin pool: ``voice='snare'`` rotates through its
+          members hit by hit, while ``voice='snare_b'`` still picks a
+          specific one.
+        - **Loose files are plain members** (no family).
+        - **A numeric ``NN_`` prefix orders members** (and strips from
+          the member name); without prefixes, files sort alphabetically.
+          The kit's default member is the first member overall (loose
+          files first, then families) unless ``default=`` says otherwise.
+
+        Every file is registered in the session sample registry under
+        ``<kit>_<member>`` (so two kits can use the same member names)
+        and members are built with :meth:`SynthDefInstrument.sampler`.
+
+        Parameters
+        ----------
+        path : str or Path
+            The kit folder.
+        name : str or None, optional
+            Kit name (registry prefix and display). Defaults to the
+            folder's name.
+        default : str or None, optional
+            Member key of the default voice.
+        selector : str, optional
+            Selector pfield name (default ``'voice'``).
+        **overrides
+            Passed to ``SynthDefInstrument.sampler`` for every member
+            (e.g. ``amp=0.7``, ``duration=None``).
+        """
+        from klotho.utils.playback.supersonic.samples import register_sample
+
+        folder = Path(path)
+        if not folder.is_dir():
+            raise NotADirectoryError(f"Kit folder not found: {path}")
+        kit_name = name or _strip_order_prefix(folder.name)
+
+        def wavs_in(d):
+            return sorted(
+                (f for f in d.iterdir()
+                 if f.is_file() and f.suffix.lower() == '.wav'),
+                key=_order_key,
+            )
+
+        member_files = []   # (member_key, path) in kit order
+        seen = {}
+
+        def add(f):
+            member = _strip_order_prefix(f.stem)
+            if member in seen:
+                raise ValueError(
+                    f"Duplicate kit member name '{member}': {seen[member]} "
+                    f"and {f}. Rename one of the files."
+                )
+            seen[member] = f
+            member_files.append((member, f))
+            return member
+
+        for f in wavs_in(folder):
+            add(f)
+
+        families = OrderedDict()
+        subdirs = sorted(
+            (d for d in folder.iterdir()
+             if d.is_dir() and not d.name.startswith(('.', '_'))),
+            key=_order_key,
+        )
+        for d in subdirs:
+            fam = _strip_order_prefix(d.name)
+            fam_files = wavs_in(d)
+            if not fam_files:
+                continue
+            fam_members = [add(f) for f in fam_files]
+            if len(fam_members) == 1 and fam_members[0] == fam:
+                continue  # kick/kick.wav: a plain member, not a one-member family
+            if fam in fam_members:
+                raise ValueError(
+                    f"In {d}: file '{fam}.wav' has the same name as its "
+                    f"family folder. Rename the variants (e.g. "
+                    f"'0_{fam}_a.wav', '1_{fam}_b.wav') so the family "
+                    f"name stays free for round-robin selection."
+                )
+            families[fam] = fam_members
+
+        if not member_files:
+            raise ValueError(
+                f"No .wav files found in {folder} (top level or one "
+                f"subfolder level). Expected e.g. my_kit/kick.wav or "
+                f"my_kit/snare/0_snare_a.wav."
+            )
+
+        built = OrderedDict()
+        for member, f in member_files:
+            reg_name = f"{kit_name}_{member}"
+            register_sample(reg_name, f, group=kit_name)
+            built[member] = SynthDefInstrument.sampler(
+                reg_name, name=member, **overrides)
+
+        if default is not None and default not in built:
+            raise KeyError(
+                f"default {default!r} is not a member of this kit "
+                f"(members: {list(built)})"
+            )
+        return cls(built, default=default, selector=selector,
+                   families=dict(families) or None)
 
     @classmethod
     def beatbox(cls, selector='voice', **overrides):

@@ -59,7 +59,9 @@ function _stopAll() {
 }
 
 toggleBtn.addEventListener("click", async function() {
-    if (playing) {
+    // Cancels a recording too (bridge.stop() discards the capture) —
+    // including during the ring-out, when `playing` is already false.
+    if (playing || (bridge && bridge.isRecording && bridge.isRecording())) {
         _stopAll();
         finishPlayback();
         return;
@@ -89,6 +91,61 @@ toggleBtn.addEventListener("click", async function() {
         _runAnimation(0);
     }
 });
+
+// Record button (present only when the figure was built with
+// record=True — the controller keys off element presence).
+var _recBtn = document.getElementById("__WID___rec");
+if (_recBtn && bridge && typeof bridge.record === "function") {
+    var _stemsBox = document.getElementById("__WID___stems");
+    var _dlEl = document.getElementById("__WID___dl");
+    var _recReady = bridge.ensureReady();
+    KlothoGateToggle(_recBtn, _recReady);
+    // Stale-page engine (pre-10.16 boot): no stem output channels —
+    // disable the checkbox with the reload hint.
+    if (_stemsBox && typeof bridge.stemCapacity === "function") {
+        _recReady.then(function(ok) {
+            if (ok && bridge.stemCapacity() === 0) {
+                _stemsBox.disabled = true;
+                _stemsBox.checked = false;
+                var lbl = _stemsBox.parentElement;
+                if (lbl) {
+                    lbl.style.opacity = "0.4";
+                    lbl.title = "Stems need a page reload: this page's "
+                        + "audio engine was started by an output saved "
+                        + "with an older Klotho.";
+                }
+            }
+        });
+    }
+    _recBtn.addEventListener("click", async function() {
+        if (playing || bridge.isRecording()) return;
+        var _ss = globalThis.__klothoSonic;
+        if (_ss && !_ss.instance && _ss.promise) { _ss.promise = null; }
+        var ok = await bridge.ensureReady();
+        if (!ok || !bridge.hasPlayableEvents()) return;
+        await bridge.resumeAudio();
+        playing = true;
+        setStopIcon();
+        _recBtn.style.background = "#7f1d1d";
+        _recBtn.style.opacity = "1";
+        if (loopBtn) { loopBtn.disabled = true; loopBtn.style.opacity = "0.3"; }
+        onBeforePlay();
+        var result = await bridge.record(null, {
+            stems: !!(_stemsBox && _stemsBox.checked),
+            onEvent: function(stepIdx) { if (playing) onStep(stepIdx); },
+            // Fires at piece end; capture continues through the ring-out,
+            // but the animation is done.
+            onFinish: function() { finishPlayback(); },
+        });
+        _recBtn.style.background = "#16213e";
+        if (loopBtn) { loopBtn.disabled = false; }
+        loopCtl.sync();
+        if (playing) finishPlayback(); else setPlayIcon();
+        if (result && result.files && globalThis.KlothoRecorder) {
+            globalThis.KlothoRecorder.deliver(result.files, _dlEl);
+        }
+    });
+}
 
 var _orphanCheckId = setInterval(function() {
     if (toggleBtn && !toggleBtn.isConnected) {

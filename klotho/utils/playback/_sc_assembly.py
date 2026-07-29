@@ -265,9 +265,14 @@ def lower_compositional_ir_to_sc_assembly(
         resolved_instrument = instrument
         kit_tuple_selector = False
         if isinstance(instrument, Kit):
+            # Raw tree value (may still be a family name — the IR's
+            # pfields carry the concretized member key instead), used
+            # only for preliminary def/controls; per-voice resolution
+            # below is authoritative. Peek so rotation state (owned by
+            # the loose-Event path) is never stepped from here.
             selector_val = event.get_pfield(instrument.selector)
             kit_tuple_selector = isinstance(selector_val, tuple)
-            resolved_instrument = instrument._resolve(selector_val)
+            resolved_instrument = instrument._resolve(selector_val, advance=False)
 
         def_name = _resolve_event_synth(resolved_instrument, default_synth)
         controls, has_gate, controls_from_manifest = _resolve_instrument_controls(

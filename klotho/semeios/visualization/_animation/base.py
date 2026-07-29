@@ -16,9 +16,19 @@ def build_session_preamble(include_plotly=False, include_threejs=False):
     return cdn_scripts(include_plotly=include_plotly)
 
 
-def build_control_bar_html(wid):
+def build_control_bar_html(wid, record=False, stems=False):
     from klotho.utils.playback.supersonic._js_fragments import control_bar_html
-    return control_bar_html(wid)
+    return control_bar_html(wid, record=record, stems=stems)
+
+
+def build_recorder_js(record=False):
+    """The ``KlothoRecorder`` module, or '' when the figure has no record
+    button — widgets key off element presence, so this only needs to be
+    on the page when a record control is."""
+    if not record:
+        return ''
+    from klotho.utils.playback._helpers import get_recorder_js
+    return get_recorder_js()
 
 
 def build_nav_controls_html(wid, total_groups, display="inline-flex"):

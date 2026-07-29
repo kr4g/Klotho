@@ -68,7 +68,12 @@
             try {
                 await sonic.loadSample(bufnum, bytes.buffer);
                 state.sampleMap[name] = bufnum;
-            } catch(e) {}
+            } catch(e) {
+                // Leave the name unmapped (the scheduler warns per event
+                // batch), but say why here — a corrupt/undecodable wav
+                // otherwise plays as pure silence with zero feedback.
+                console.warn('[Klotho] sample load failed: ' + name, e);
+            }
         }
     }
 

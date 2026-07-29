@@ -4,6 +4,8 @@ _ANIMATION_BRIDGE_JS_PATH = Path(__file__).parent / '_animation_bridge.js'
 _ANIMATION_BRIDGE_JS_CACHE = None
 _LOOP_CONTROL_JS_PATH = Path(__file__).parent / '_loop_control.js'
 _LOOP_CONTROL_JS_CACHE = None
+_RECORDER_JS_PATH = Path(__file__).parent / '_recorder.js'
+_RECORDER_JS_CACHE = None
 
 
 def normalize_loop_policy(loop):
@@ -45,6 +47,16 @@ def get_animation_bridge_js():
     if _ANIMATION_BRIDGE_JS_CACHE is None:
         _ANIMATION_BRIDGE_JS_CACHE = _ANIMATION_BRIDGE_JS_PATH.read_text() if _ANIMATION_BRIDGE_JS_PATH.exists() else ""
     return _ANIMATION_BRIDGE_JS_CACHE
+
+
+def get_recorder_js():
+    """The shared ``KlothoRecorder`` module (installed once per page).
+
+    Only included in widgets built with ``record=True``."""
+    global _RECORDER_JS_CACHE
+    if _RECORDER_JS_CACHE is None:
+        _RECORDER_JS_CACHE = _RECORDER_JS_PATH.read_text() if _RECORDER_JS_PATH.exists() else ""
+    return _RECORDER_JS_CACHE
 
 
 def convert_numpy_types(obj):

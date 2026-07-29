@@ -37,6 +37,13 @@ def play(obj, **kwargs):
         loop button off, ``True`` starts with infinite looping, and an
         int > 1 loops that many cycles.
 
+        ``record=True`` adds a record button to the widget: pressing it
+        plays exactly like play while capturing the audio, then offers a
+        24-bit ``.wav`` download after playback (piece + ring time). For
+        a ``Score`` with registered tracks, a "stems" checkbox renders
+        every track as a separate time-aligned stem (plus the full mix)
+        delivered as one ZIP.
+
         ``inst`` selects the instrument for pitch-like objects
         (``Pitch``, ``PitchCollection``, ``Scale``, ``Chord``,
         ``Spectrum``): pass a SynthDef name string (exact match,
@@ -63,6 +70,7 @@ def play(obj, **kwargs):
         boot_supersonic()
         ring_time = kwargs.pop('ring_time', 5)
         loop = kwargs.pop('loop', False)
+        record = kwargs.pop('record', False)
         payload = convert_score_to_sc_events(obj, **kwargs)
         engine_obj = SuperSonicEngine(
             payload["events"],
@@ -70,6 +78,7 @@ def play(obj, **kwargs):
             control_data=payload.get("control_data"),
             ring_time=ring_time,
             loop=loop,
+            record=record,
         )
         return engine_obj.display()
 
@@ -82,6 +91,7 @@ def play(obj, **kwargs):
     from .supersonic import SuperSonicEngine, convert_to_sc_events
     ring_time = kwargs.pop('ring_time', 5)
     loop = kwargs.pop('loop', False)
+    record = kwargs.pop('record', False)
 
     from klotho.chronos.temporal_units.temporal import (
         TemporalBlock, TemporalUnitSequence,
@@ -95,7 +105,9 @@ def play(obj, **kwargs):
             control_data=payload["control_data"],
             ring_time=ring_time,
             loop=loop,
+            record=record,
         ).display()
 
     events = convert_to_sc_events(obj, **kwargs)
-    return SuperSonicEngine(events, ring_time=ring_time, loop=loop).display()
+    return SuperSonicEngine(events, ring_time=ring_time, loop=loop,
+                            record=record).display()

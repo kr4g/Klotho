@@ -105,6 +105,44 @@ PFieldContext = DistributionContext
 ENGINE_MFIELDS = frozenset({'strum', 'group'})
 
 
+def _leaf_ordinal(pt, node):
+    """Position of *node* among the tree's leaves (0 for non-leaves).
+
+    The rotation ordinal for family round-robin: keyed on tree position
+    rather than call order, so resolving the same leaf any number of
+    times (display, IR build, per-voice lowering) picks the same member
+    and replays are identical.
+    """
+    try:
+        return list(pt.leaf_nodes).index(node)
+    except (AttributeError, ValueError):
+        return 0
+
+
+def _concretize_family_selector(kit, selector_val, pt, node):
+    """Map family names in a selector value to concrete member keys.
+
+    Scalars rotate by the leaf's position among the tree's leaves; tuple
+    elements offset that ordinal by their position, so simultaneous
+    voices drawing from one pool get different variants. Non-family
+    values pass through unchanged (``is``-identity preserved).
+    """
+    if isinstance(selector_val, str) and selector_val in kit._families:
+        return kit._family_member_key_at(selector_val, _leaf_ordinal(pt, node))
+    if isinstance(selector_val, tuple) and selector_val:
+        base = None
+        out = list(selector_val)
+        changed = False
+        for i, el in enumerate(selector_val):
+            if isinstance(el, str) and el in kit._families:
+                if base is None:
+                    base = _leaf_ordinal(pt, node)
+                out[i] = kit._family_member_key_at(el, base + i)
+                changed = True
+        return tuple(out) if changed else selector_val
+    return selector_val
+
+
 def _merge_kit_member_defaults(kit, selector_tuple):
     """Element-wise merge of member default pfields for a tuple selector.
 
@@ -114,7 +152,7 @@ def _merge_kit_member_defaults(kit, selector_tuple):
     tuple otherwise (so each expanded voice gets its own member's
     defaults, e.g. per-voice ``buf`` for sampler kits).
     """
-    members = [kit._resolve(k) for k in selector_tuple]
+    members = [kit._resolve(k, advance=False) for k in selector_tuple]
     dicts = [dict(m.pfields) if hasattr(m, 'pfields') else {} for m in members]
     keys = []
     for d in dicts:
@@ -138,12 +176,15 @@ def _merge_kit_member_defaults(kit, selector_tuple):
 def _resolve_kit_member(inst, pt, node):
     if isinstance(inst, Kit):
         selector_val = pt.get_pfield(node, inst.selector)
+        selector_val = _concretize_family_selector(inst, selector_val, pt, node)
         if isinstance(selector_val, tuple) and selector_val:
             from types import SimpleNamespace
             return SimpleNamespace(
                 pfields=_merge_kit_member_defaults(inst, selector_val)
             )
-        return inst._resolve(selector_val)
+        # Compose-time introspection: never step the loose-Event rotation
+        # counters (families were concretized above anyway).
+        return inst._resolve(selector_val, advance=False)
     return inst
 
 
@@ -298,6 +339,14 @@ class Parametron(Chronon):
                 eff_pfields = effective.pfields
                 if k in eff_pfields:
                     result[k] = eff_pfields[k]
+        # A family-name selector rotates to a concrete member per leaf;
+        # surface the member key (matching the defaults merged above) so
+        # the lowered voice events resolve the same member downstream.
+        if isinstance(inst, Kit):
+            sel = result.get(inst.selector)
+            concrete = _concretize_family_selector(inst, sel, self._pt, self._node_id)
+            if concrete is not sel:
+                result[inst.selector] = concrete
         return result
 
     @property

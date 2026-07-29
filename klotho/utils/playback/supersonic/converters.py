@@ -510,6 +510,8 @@ _SC_CONVERT_HANDLERS = {
 
 
 def convert_to_sc_events(obj, **kwargs):
+    from klotho.thetos.instruments.base import reset_kit_rotations
+    reset_kit_rotations()
     return dispatch_convert(obj, kwargs, _SC_CONVERT_HANDLERS, include_inst=True)
 
 
@@ -916,6 +918,11 @@ def convert_score_to_sc_events(score, start_time=None, **kwargs) -> dict:
         ``blockSize``, and ``descriptors``.
     """
     from klotho.chronos.temporal_units.temporal import _reoffset
+    from klotho.thetos.instruments.base import reset_kit_rotations
+
+    # Family round-robin counters (loose-Event lowering) restart per
+    # conversion so replaying a score renders identically.
+    reset_kit_rotations()
 
     all_events: list[dict] = []
     control_descriptors: list[dict] = []
@@ -1014,6 +1021,11 @@ def convert_score_to_sc_animation_events(score) -> dict:
     """
     from klotho.chronos.temporal_units.temporal import _reoffset
     from klotho.utils.playback.supersonic.engine import serialize_control_data
+    from klotho.thetos.instruments.base import reset_kit_rotations
+
+    # Same reset as convert_score_to_sc_events: keeps play(score) and
+    # plot(score).play() byte-identical for family round-robin kits.
+    reset_kit_rotations()
 
     all_events: list[dict] = []
     control_descriptors: list[dict] = []
@@ -1148,7 +1160,9 @@ def convert_to_sc_payload(obj, block_size=_DEFAULT_SCORE_BLOCK_SIZE, **kwargs):
     ``control_data``.
     """
     from klotho.utils.playback._sc_validate import validate_sc_events
+    from klotho.thetos.instruments.base import reset_kit_rotations
 
+    reset_kit_rotations()
     if isinstance(obj, CompositionalUnit):
         events, descriptors = _compositional_unit_payload_parts(obj)
     elif isinstance(obj, (TemporalUnitSequence, TemporalBlock)):

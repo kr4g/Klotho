@@ -136,10 +136,13 @@ class TestSelectorErrors:
         with pytest.raises(KeyError, match="Unknown voice 'typo'"):
             _kit()._resolve('typo')
 
-    def test_family_name_selector_raises_with_hint(self):
+    def test_family_name_selector_round_robins(self):
+        # 10.16: a family name is a valid selector — it rotates through
+        # the family's members; peeking never advances the rotation.
         kit = _kit(families={'drums': ['kick', 'snare']})
-        with pytest.raises(KeyError, match="'drums' is a family"):
-            kit._resolve('drums')
+        assert kit._resolve('drums', advance=False) is KICK
+        assert kit._resolve('drums') is KICK
+        assert kit._resolve('drums') is SNARE
 
     def test_none_and_int_selectors_unchanged(self):
         kit = _kit(families={'drums': ['kick', 'snare']})
