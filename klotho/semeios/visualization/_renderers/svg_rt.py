@@ -66,7 +66,18 @@ def _rt_node_tooltip(rt, node_id, audio_source=None):
     return "\n".join(parts)
 
 
-def _svg_halo_ellipses(prefix, cx, cy, rx, ry):
+def _svg_halo_gradient_def(grad_id):
+    base = _HALO_NOTE_COLOR
+    return (
+        f'<defs><radialGradient id="{grad_id}">'
+        f'<stop offset="0%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0.5"/>'
+        f'<stop offset="60%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0.15"/>'
+        f'<stop offset="100%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0"/>'
+        f'</radialGradient></defs>'
+    )
+
+
+def _svg_halo_ellipses(prefix, cx, cy, rx, ry, grad_id=None):
     """
     Generate SVG elements for a radial halo ellipse around a leaf node.
 
@@ -75,20 +86,20 @@ def _svg_halo_ellipses(prefix, cx, cy, rx, ry):
     tuple of (list of str, list of str)
         ``(halo_element_ids, svg_element_strings)``.
     """
-    base = _HALO_NOTE_COLOR
-    grad_id = f"{prefix}_rg"
     eid = f"{prefix}_h"
-    elements = [
-        f'<defs><radialGradient id="{grad_id}">'
-        f'<stop offset="0%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0.5"/>'
-        f'<stop offset="60%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0.15"/>'
-        f'<stop offset="100%" stop-color="rgb({base[0]},{base[1]},{base[2]})" stop-opacity="0"/>'
-        f'</radialGradient></defs>',
+    elements = []
+    if grad_id is None:
+        # legacy per-halo gradient (identical content, unique id);
+        # renderers pass a shared per-document grad_id instead — the
+        # per-event defs were ~500KB of redundancy on a 2K-event score
+        grad_id = f"{prefix}_rg"
+        elements.append(_svg_halo_gradient_def(grad_id))
+    elements.append(
         f'<ellipse id="{eid}" cx="{cx:.4f}" cy="{cy:.4f}" '
         f'rx="{rx * 1.5:.4f}" ry="{ry * 1.5:.4f}" '
         f'fill="url(#{grad_id})" '
-        f'style="display:none" pointer-events="none"/>',
-    ]
+        f'style="display:none" pointer-events="none"/>'
+    )
     return [eid], elements
 
 
@@ -218,7 +229,10 @@ def _svg_rt_ratios(rt, figsize=(11, 0.5), audio_source=None):
         if ratio < 0:
             leaf_halo_ids.append([])
         else:
-            hids, h_els = _svg_halo_ellipses(f"{uid}_r{i}", cx, cy, hw, hh)
+            if not halo_els:
+                halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
+            hids, h_els = _svg_halo_ellipses(f"{uid}_r{i}", cx, cy, hw, hh,
+                                             grad_id=f"{uid}_halo_rg")
             leaf_halo_ids.append(hids)
             halo_els.extend(h_els)
 
@@ -607,8 +621,11 @@ def _svg_rt_containers(rt, figsize=(11, 2), invert=True,
             if is_rest_l:
                 leaf_halo_ids.append([])
             else:
+                if not halo_els:
+                    halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
                 hids, h_els = _svg_halo_ellipses(
-                    f"{uid}_hl{i}", cx, cy, hw * 1.2, hh * 1.4
+                    f"{uid}_hl{i}", cx, cy, hw * 1.2, hh * 1.4,
+                    grad_id=f"{uid}_halo_rg"
                 )
                 leaf_halo_ids.append(hids)
                 halo_els.extend(h_els)
@@ -849,7 +866,10 @@ def _svg_rt_tree(rt, attributes=None, figsize=(11, 2), invert=True, audio_source
             if is_rest_leaf:
                 leaf_halo_ids.append([])
             else:
-                hids, h_els = _svg_halo_ellipses(f"{uid}_hl{i}", lx, ly, halo_r_x, halo_r_y)
+                if not halo_els:
+                    halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
+                hids, h_els = _svg_halo_ellipses(f"{uid}_hl{i}", lx, ly, halo_r_x, halo_r_y,
+                                                 grad_id=f"{uid}_halo_rg")
                 leaf_halo_ids.append(hids)
                 halo_els.extend(h_els)
         else:

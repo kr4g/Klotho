@@ -22,7 +22,7 @@ from klotho.thetos.composition.events import Event
 
 from .._shared.svg_utils import SvgFigureData, svg_wrap_viewbox
 from .._shared.svg_shared import render_tooltip_system
-from .svg_rt import _rt_node_tooltip, _svg_halo_ellipses
+from .svg_rt import _rt_node_tooltip, _svg_halo_ellipses, _svg_halo_gradient_def
 from .svg_timeline import _resolve_lanes, _unit_tooltip_header
 
 _TRACK_LABEL_COLOR = 'rgba(200,200,200,0.75)'
@@ -69,10 +69,20 @@ def _score_bands(score):
     return [(name, by_band[name]) for name in ordered]
 
 
-def _item_lane_height(item):
+def _resolve_lanes_memo(unit, memo):
+    """One _resolve_lanes full-DFS per unit per render pass (it was run
+    3x per item: band-height sizing, strip drawing, outline sizing)."""
+    key = id(unit)
+    hit = memo.get(key)
+    if hit is None:
+        hit = memo[key] = _resolve_lanes(unit)
+    return hit
+
+
+def _item_lane_height(item, memo):
     if isinstance(item.unit, Event):
         return 1
-    _, _, height = _resolve_lanes(item.unit)
+    _, _, height = _resolve_lanes_memo(item.unit, memo)
     return height
 
 
@@ -99,6 +109,8 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
     if not items:
         raise ValueError("Cannot plot an empty Score")
 
+    lanes_memo = {}  # id(unit) -> _resolve_lanes result, one render pass
+
     t_min = min(item.start for item in items)
     t_max = max(item.end for item in items)
     total_time = t_max - t_min
@@ -109,7 +121,7 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
     band_layout = []      # (name, lane_start, lane_count, {item name -> item lane offset})
     lane_cursor = 0
     for name, band_items in bands:
-        height = max((_item_lane_height(it) for it in band_items), default=1)
+        height = max((_item_lane_height(it, lanes_memo) for it in band_items), default=1)
         band_layout.append((name, lane_cursor, height, band_items))
         lane_cursor += height
     lanes = max(lane_cursor, 1)
@@ -210,7 +222,10 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             if is_rest:
                 step_halo_ids.append([])
             else:
-                hids, h_els = _svg_halo_ellipses(f"{uid}_s{step}", cx, cy, hw, hh)
+                if not halo_els:
+                    halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
+                hids, h_els = _svg_halo_ellipses(f"{uid}_s{step}", cx, cy, hw, hh,
+                                                 grad_id=f"{uid}_halo_rg")
                 step_halo_ids.append(hids)
                 halo_els.extend(h_els)
 
@@ -261,15 +276,18 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             )
             cx = (x0 + x1) / 2
             cy = (by0 + by1) / 2
+            if not halo_els:
+                halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
             hids, h_els = _svg_halo_ellipses(f"{uid}_s{step}", cx, cy,
                                              (x1 - x0) / 2 * 1.1,
-                                             (by1 - by0) / 2 * 2.0)
+                                             (by1 - by0) / 2 * 2.0,
+                                             grad_id=f"{uid}_halo_rg")
             step_halo_ids.append(hids)
             halo_els.extend(h_els)
             step += 1
             continue
 
-        placements, _, _ = _resolve_lanes(item.unit)
+        placements, _, _ = _resolve_lanes_memo(item.unit, lanes_memo)
         for unit_index, placement in enumerate(placements):
             header = (f"Item: {item.name}"
                       + (f" [{item.track}]" if item.track else "")
@@ -281,7 +299,7 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             x0 = tx_px(item.start) - 1.5
             x1 = tx_px(item.end) + 1.5
             y0 = band_lane * lane_h + min(3.0, lane_h * 0.1)
-            y1 = (band_lane + _item_lane_height(item)) * lane_h - min(3.0, lane_h * 0.1)
+            y1 = (band_lane + _item_lane_height(item, lanes_memo)) * lane_h - min(3.0, lane_h * 0.1)
             if x1 > x0 and y1 > y0:
                 els.append(
                     f'<rect x="{x0:.2f}" y="{y0:.2f}" '
