@@ -57,9 +57,12 @@ def _rt_node_tooltip(rt, node_id, audio_source=None):
                         parts.append(f"Instrument: {inst.name}")
                 except Exception:
                     pass
-                if hasattr(chronon, 'pfields'):
+                # getattr once: hasattr() would run the pfields property
+                # getter (a full per-event dict build) just to discard it
+                pf = getattr(chronon, 'pfields', None)
+                if pf is not None:
                     skip = {'group'}
-                    for k, v in chronon.pfields.items():
+                    for k, v in pf.items():
                         if k not in skip:
                             parts.append(f"{k}: {v}")
 
