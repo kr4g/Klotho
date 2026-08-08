@@ -7,8 +7,10 @@ human perception of sound at different frequencies and levels.
 """
 
 import numpy as np
-from scipy import interpolate
+from klotho.utils.lazy import LazyModule
 from .amplitude import dbamp
+
+interpolate = LazyModule('scipy.interpolate')
 
 __all__ = [
     'freq_amp_scale',

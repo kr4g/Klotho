@@ -1,5 +1,7 @@
 import numpy as np
-import matplotlib as mpl
+from klotho.utils.lazy import LazyModule
+
+mpl = LazyModule('matplotlib')
 
 
 SHAPE_COLORS = ["#90EE90", "#FFD700", "#FF6B6B", "#87CEEB", "#DDA0DD", "#FFA07A"]

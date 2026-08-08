@@ -1,6 +1,8 @@
 import math
 import numpy as np
-import networkx as nx
+from klotho.utils.lazy import LazyModule
+
+nx = LazyModule('networkx')
 
 from klotho.topos.graphs.lattices import Lattice
 

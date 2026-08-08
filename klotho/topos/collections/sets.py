@@ -6,7 +6,6 @@ from fractions import Fraction
 from functools import cached_property
 from typing import List, Tuple, Set, Dict, Any, Union, Literal
 import sympy as sp
-from scipy.spatial.distance import pdist, squareform
 from ..graphs import Graph, GraphCore
 from ..graphs.generators import complete_graph
 

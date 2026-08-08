@@ -1,7 +1,9 @@
 import math
 
-import matplotlib.pyplot as plt
-import networkx as nx
+from klotho.utils.lazy import LazyModule
+
+plt = LazyModule('matplotlib.pyplot')
+nx = LazyModule('networkx')
 
 from klotho.topos.collections.sequences import Pattern
 from klotho.topos.collections._pattern import pattern_to_graph

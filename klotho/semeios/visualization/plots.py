@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from klotho.topos.graphs import Graph, Tree
 from klotho.topos.collections.sets import CombinationSet
 from klotho.topos.graphs.lattices import Lattice
@@ -18,18 +20,33 @@ from klotho.thetos.composition.score import Score
 from klotho.thetos.parameters.parameter_tree import ParameterTree
 from klotho.topos.collections.sequences import Pattern
 
-try:
-    import networkx as nx
-except ImportError:
-    class _NetworkXCompat:
-        def __getattr__(self, name):
-            raise ImportError(f"NetworkX function '{name}' not available. Visualization may be limited.")
-    nx = _NetworkXCompat()
-import matplotlib.pyplot as plt
+class _LazyNetworkX:
+    """Import networkx on first use; degrade to a clear error if absent."""
+
+    _mod = None
+
+    def __getattr__(self, name):
+        if _LazyNetworkX._mod is None:
+            try:
+                import networkx
+                _LazyNetworkX._mod = networkx
+            except ImportError:
+                raise ImportError(
+                    f"NetworkX function '{name}' not available. "
+                    "Visualization may be limited.")
+        return getattr(_LazyNetworkX._mod, name)
+
+
+nx = _LazyNetworkX()
 import numpy as np
-import plotly.graph_objects as go
 import math
-from sklearn.manifold import MDS, SpectralEmbedding
+from klotho.utils.lazy import LazyModule
+
+# heavy plotting backends load on first use, not at import klotho time
+# (sklearn.manifold is imported inside _reduce_dimensions_and_plot, the
+# only place it is used)
+plt = LazyModule('matplotlib.pyplot')
+go = LazyModule('plotly.graph_objects')
 
 from ._dispatch import _plot_rt, _plot_timeline, _plot_score, _plot_master_set, _plot_cps, _reduce_positions, _cps_node_positions, _plot_lattice
 from ._dispatch import KlothoPlot
