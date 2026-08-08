@@ -1,5 +1,6 @@
 import rustworkx as rx
 import copy
+from contextlib import contextmanager
 from typing import List, TypeVar, Optional, Any, Union, Dict, Tuple
 from types import MappingProxyType
 
@@ -107,7 +108,35 @@ class GraphCore:
             new_data = dict(existing)
             new_data.update(normalized)
         self._rx[node] = new_data
-        self._invalidate_caches()
+        if self._write_batch_depth:
+            self._write_batch_dirty = True
+        else:
+            self._invalidate_caches()
+
+    # Batch-write coalescing: inside batch_writes(), node-DATA writes skip
+    # the per-write _invalidate_caches (and therefore the per-write layer
+    # invalidation sweep on trees); one invalidation runs at exit. This is
+    # for data writes only — structural mutators invalidate immediately
+    # regardless.
+    _write_batch_depth = 0
+    _write_batch_dirty = False
+
+    @contextmanager
+    def batch_writes(self):
+        """Coalesce cache invalidation across a run of node-data writes.
+
+        Usage: ``with tree.batch_writes(): ...many set_pfields...``.
+        Re-entrant; the single invalidation fires when the outermost
+        context exits (only if a write actually happened).
+        """
+        self._write_batch_depth += 1
+        try:
+            yield self
+        finally:
+            self._write_batch_depth -= 1
+            if self._write_batch_depth == 0 and self._write_batch_dirty:
+                self._write_batch_dirty = False
+                self._invalidate_caches()
 
     def _clear_raw(self):
         """Remove all nodes and edges directly."""

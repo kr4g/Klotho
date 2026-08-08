@@ -90,17 +90,48 @@ class ParameterLayer(TreeLayer):
             for c in tree.successors(node):
                 stack.append(c)
 
+    def _patch_effective(self, tree, node):
+        """Recompute the effective cache for *node*'s subtree only.
+
+        A value write at *node* changes effective values exactly for the
+        node and its descendants; the rest of the cache stays valid. Only
+        callable when the cache exists (structural mutations drop it to
+        None and the next read rebuilds in full).
+        """
+        cache = self._effective_cache
+        keys = self._pfields | self._mfields
+        stack = [node]
+        while stack:
+            n = stack.pop()
+            p = tree.parent(n)
+            parent_eff = cache[p] if p is not None else {}
+            raw = tree._rx[n]
+            own = {k: v for k, v in raw.items() if k in keys} if isinstance(raw, dict) else {}
+            cache[n] = {**parent_eff, **own}
+            for c in tree.successors(n):
+                stack.append(c)
+
     def set_pfields(self, tree, node, **kwargs):
         """Register the keys and write pfield overrides at *node*."""
         self._pfields.update(kwargs.keys())
+        cache = self._effective_cache
         tree._write_node_data(node, kwargs, replace=False)
-        self._effective_cache = None
+        if cache is not None:
+            # the write's invalidation sweep dropped the cache; restore it
+            # and patch just the written subtree (read-after-write loops
+            # like _distribute_to_targets would otherwise rebuild the whole
+            # tree per write)
+            self._effective_cache = cache
+            self._patch_effective(tree, node)
 
     def set_mfields(self, tree, node, **kwargs):
         """Register the keys and write mfield overrides at *node*."""
         self._mfields.update(kwargs.keys())
+        cache = self._effective_cache
         tree._write_node_data(node, kwargs, replace=False)
-        self._effective_cache = None
+        if cache is not None:
+            self._effective_cache = cache
+            self._patch_effective(tree, node)
 
     def set_instrument(self, tree, node, instrument):
         """Bind *instrument* at *node* and register its pfield keys."""

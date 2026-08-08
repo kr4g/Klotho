@@ -12,6 +12,7 @@ from fractions import Fraction
 from dataclasses import dataclass, field
 import inspect
 import warnings
+import weakref
 import pandas as pd
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
@@ -193,13 +194,28 @@ def _build_pfield_context(uc, node: int, index: int, total: int, is_rest: bool) 
     return uc._build_node_context(node, index, total)
 
 
+_CALLABLE_ARITY_MEMO = weakref.WeakKeyDictionary()
+
+
 def _callable_arity(fn):
+    # inspect.signature costs 13-102us per call and target loops used to
+    # re-derive it per node; memoize on the function object (weakly, so
+    # user lambdas are not pinned)
+    try:
+        return _CALLABLE_ARITY_MEMO[fn]
+    except (KeyError, TypeError):
+        pass
     try:
         sig = inspect.signature(fn)
-        return len([p for p in sig.parameters.values()
-                    if p.default is inspect.Parameter.empty])
+        arity = len([p for p in sig.parameters.values()
+                     if p.default is inspect.Parameter.empty])
     except (ValueError, TypeError):
-        return 0
+        arity = 0
+    try:
+        _CALLABLE_ARITY_MEMO[fn] = arity
+    except TypeError:
+        pass
+    return arity
 
 
 def _reject_fx_as_instrument(def_name):
@@ -1283,27 +1299,32 @@ class CompositionalUnit(TemporalUnit):
                        if self._rt[n].get('proportion', 1) >= 0]
 
         total = len(targets)
-        for i, n in enumerate(targets):
-            ctx = _build_pfield_context(
-                self, n, i, total,
-                is_rest=self._rt[n].get('proportion', 1) < 0
-            )
-            resolved = {}
-            for k, v in fields.items():
-                if callable(v):
-                    arity = _callable_arity(v)
-                    resolved[k] = v(ctx) if arity >= 1 else v()
-                elif isinstance(v, Pattern):
-                    val = next(v)
-                    if val is not None:
-                        resolved[k] = val
-            if resolved:
-                if setter == 'pfields':
-                    resolved = {k: _coerce_set_pfield_value(k, v)
-                                for k, v in resolved.items()}
-                    self._rt.set_pfields(n, **resolved)
-                else:
-                    self._rt.set_mfields(n, **resolved)
+        arities = {k: _callable_arity(v) for k, v in fields.items()
+                   if callable(v) and not isinstance(v, Pattern)}
+        # batch_writes coalesces cache invalidation across the loop; the
+        # incremental effective-cache patch in ParameterLayer keeps a write
+        # to target i visible to target i+1's DistributionContext
+        with self._rt.batch_writes():
+            for i, n in enumerate(targets):
+                ctx = _build_pfield_context(
+                    self, n, i, total,
+                    is_rest=self._rt[n].get('proportion', 1) < 0
+                )
+                resolved = {}
+                for k, v in fields.items():
+                    if callable(v):
+                        resolved[k] = v(ctx) if arities.get(k, 0) >= 1 else v()
+                    elif isinstance(v, Pattern):
+                        val = next(v)
+                        if val is not None:
+                            resolved[k] = val
+                if resolved:
+                    if setter == 'pfields':
+                        resolved = {k: _coerce_set_pfield_value(k, v)
+                                    for k, v in resolved.items()}
+                        self._rt.set_pfields(n, **resolved)
+                    else:
+                        self._rt.set_mfields(n, **resolved)
 
     def set_pfields(self, node, include_rests=False, **kwargs) -> None:
         """
@@ -1336,9 +1357,10 @@ class CompositionalUnit(TemporalUnit):
                         for k, v in kwargs.items()
                         if k not in distributable_fields}
 
-        for n in targets:
-            if static_fields:
-                self._rt.set_pfields(n, **static_fields)
+        if static_fields:
+            with self._rt.batch_writes():
+                for n in targets:
+                    self._rt.set_pfields(n, **static_fields)
 
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='pfields')
@@ -1369,9 +1391,10 @@ class CompositionalUnit(TemporalUnit):
         static_fields = {k: v for k, v in kwargs.items()
                         if k not in distributable_fields}
 
-        for n in targets:
-            if static_fields:
-                self._rt.set_mfields(n, **static_fields)
+        if static_fields:
+            with self._rt.batch_writes():
+                for n in targets:
+                    self._rt.set_mfields(n, **static_fields)
 
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
@@ -1407,14 +1430,15 @@ class CompositionalUnit(TemporalUnit):
             time_scale=duration / raw_total if raw_total > 0 else 1.0
         )
         self._invalidate_bind_memo_subtree(sounding, pfields_list)
-        for node in sounding:
-            event_time = self.nodes[node]['real_onset']
-            relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
-            try:
-                env_value = scaled_envelope.at_time(relative_time)
-            except ValueError:
-                env_value = scaled_envelope.values[0] if relative_time <= 0 else scaled_envelope.values[-1]
-            self._rt.set_pfields(node, **{pfield: env_value for pfield in pfields_list})
+        with self._rt.batch_writes():
+            for node in sounding:
+                event_time = self.nodes[node]['real_onset']
+                relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
+                try:
+                    env_value = scaled_envelope.at_time(relative_time)
+                except ValueError:
+                    env_value = scaled_envelope.values[0] if relative_time <= 0 else scaled_envelope.values[-1]
+                self._rt.set_pfields(node, **{pfield: env_value for pfield in pfields_list})
 
     def _resolve_control_envelope_leaves(self, desc):
         anchor = desc["anchor_node"]
@@ -1982,34 +2006,37 @@ class CompositionalUnit(TemporalUnit):
             if not isinstance(instrument, Effect):
                 _reject_fx_as_instrument(getattr(instrument, 'defName', None))
             family = getattr(instrument, '_ensemble_family', None)
-            for n in targets:
-                self._rt.set_instrument(n, instrument)
-                if family is not None:
-                    self._rt.set_mfields(n, group=family)
+            with self._rt.batch_writes():
+                for n in targets:
+                    self._rt.set_instrument(n, instrument)
+                    if family is not None:
+                        self._rt.set_mfields(n, group=family)
         elif callable(instrument) or isinstance(instrument, Pattern):
             if not include_rests:
                 targets = [n for n in targets
                            if self._rt[n].get('proportion', 1) >= 0]
             total = len(targets)
-            for i, n in enumerate(targets):
-                if isinstance(instrument, Pattern):
-                    inst = next(instrument)
-                else:
-                    ctx = _build_pfield_context(
-                        self, n, i, total,
-                        is_rest=self._rt[n].get('proportion', 1) < 0
-                    )
-                    arity = _callable_arity(instrument)
-                    inst = instrument(ctx) if arity >= 1 else instrument()
-                if inst is not None:
-                    if isinstance(inst, str):
-                        _reject_fx_as_instrument(inst)
-                    elif isinstance(inst, Instrument) and not isinstance(inst, Effect):
-                        _reject_fx_as_instrument(getattr(inst, 'defName', None))
-                    self._rt.set_instrument(n, inst)
-                    family = getattr(inst, '_ensemble_family', None)
-                    if family is not None:
-                        self._rt.set_mfields(n, group=family)
+            arity = (None if isinstance(instrument, Pattern)
+                     else _callable_arity(instrument))
+            with self._rt.batch_writes():
+                for i, n in enumerate(targets):
+                    if isinstance(instrument, Pattern):
+                        inst = next(instrument)
+                    else:
+                        ctx = _build_pfield_context(
+                            self, n, i, total,
+                            is_rest=self._rt[n].get('proportion', 1) < 0
+                        )
+                        inst = instrument(ctx) if arity >= 1 else instrument()
+                    if inst is not None:
+                        if isinstance(inst, str):
+                            _reject_fx_as_instrument(inst)
+                        elif isinstance(inst, Instrument) and not isinstance(inst, Effect):
+                            _reject_fx_as_instrument(getattr(inst, 'defName', None))
+                        self._rt.set_instrument(n, inst)
+                        family = getattr(inst, '_ensemble_family', None)
+                        if family is not None:
+                            self._rt.set_mfields(n, group=family)
 
     def set(self, node, *, inst=None, include_rests=False,
             pfields=None, mfields=None, **fields):
