@@ -141,7 +141,7 @@ class SynthDefInstrument(Instrument):
         sample = _ensure_sample_name(sample)
         info = sample_info(sample)
         def_name = 'kl_sampler2' if info['channels'] >= 2 else 'kl_sampler1'
-        pfields = copy.deepcopy(ss_synth_controls(def_name))
+        pfields = dict(ss_synth_controls(def_name))
         pfields['buf'] = sample
         pfields.update(overrides)
         pfields = {k: v for k, v in pfields.items() if v is not None}
@@ -175,7 +175,7 @@ class SynthDefInstrument(Instrument):
         """
         defName = canonical_def_name(defName)
         controls = ss_synth_controls(defName)
-        pfields = copy.deepcopy(controls)
+        pfields = dict(controls)
         pfields.update(overrides)
         return cls(
             name=name or defName,

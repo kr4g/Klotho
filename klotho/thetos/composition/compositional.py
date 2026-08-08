@@ -13,7 +13,12 @@ from dataclasses import dataclass, field
 import inspect
 import warnings
 import weakref
+import numpy as _np
 import pandas as pd
+
+_PARAMETRON_TEMPORAL_ATTRS = frozenset({
+    'start', 'duration', 'end', 'proportion', 'metric_duration',
+    'metric_onset', 'node_id', 'is_rest', 'real_onset', 'real_duration'})
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon, NodeContext, UTNodeHandle, UTNodeSelector
@@ -115,8 +120,8 @@ def _leaf_ordinal(pt, node):
     and replays are identical.
     """
     try:
-        return list(pt.leaf_nodes).index(node)
-    except (AttributeError, ValueError):
+        return pt.leaf_index_map.get(node, 0)
+    except AttributeError:
         return 0
 
 
@@ -227,8 +232,11 @@ def _reject_fx_as_instrument(def_name):
     """
     if not isinstance(def_name, str) or not def_name:
         return
-    from klotho.thetos.instruments._shared import ss_synth_kind
-    kind = ss_synth_kind(def_name)
+    global _ss_synth_kind
+    if _ss_synth_kind is None:
+        from klotho.thetos.instruments._shared import ss_synth_kind
+        _ss_synth_kind = ss_synth_kind
+    kind = _ss_synth_kind(def_name)
     if kind == 'fx':
         raise TypeError(
             f"'{def_name}' is an effect SynthDef, not an instrument. Use "
@@ -242,12 +250,28 @@ def _reject_fx_as_instrument(def_name):
         )
 
 
+# Lazy singletons for per-call imports in the setter hot paths (the
+# imports themselves are cheap dict hits, but 4 of them per coerced value
+# added up to 71us per 4-tuple in the audit profile).
+_ss_synth_kind = None
+_PITCH_TYPES = None
+
+
+def _pitch_types():
+    global _PITCH_TYPES
+    if _PITCH_TYPES is None:
+        from klotho.tonos import Pitch
+        from klotho.tonos.chords.chord import Chord, Voicing
+        from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
+        _PITCH_TYPES = (Pitch, Chord, Voicing, PitchCollectionBase)
+    return _PITCH_TYPES
+
+
 def _is_pitch_collection_value(value):
     """Pitch collections define ``__call__`` (index delegation), so they must
     be excluded from the callable/distributable classification in setters and
     treated as static values instead."""
-    from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
-    return isinstance(value, PitchCollectionBase)
+    return isinstance(value, _pitch_types()[3])
 
 
 def _coerce_set_pfield_value(key, value):
@@ -264,10 +288,7 @@ def _coerce_set_pfield_value(key, value):
     Rich values (``Pitch``, ``Fraction``) are stored as-is in the tree and
     lowered to floats at playback assembly.
     """
-    import numpy as _np
-    from klotho.tonos import Pitch
-    from klotho.tonos.chords.chord import Chord, Voicing
-    from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
+    Pitch, Chord, Voicing, PitchCollectionBase = _pitch_types()
 
     if isinstance(value, Bind):
         return value
@@ -392,8 +413,7 @@ class Parametron(Chronon):
         return default if value is None else value
 
     def __getitem__(self, key: str):
-        temporal_attrs = {'start', 'duration', 'end', 'proportion', 'metric_duration', 'metric_onset', 'node_id', 'is_rest', 'real_onset', 'real_duration'}
-        if key in temporal_attrs:
+        if key in _PARAMETRON_TEMPORAL_ATTRS:
             return getattr(self, key)
         v = self.get_pfield(key)
         if v is not None:
@@ -2343,7 +2363,15 @@ class CompositionalUnit(TemporalUnit):
         c._bpm = self._bpm
         c._offset = self._offset
         c._timing_dirty = True
-        c._slur_specs = {
+        c._slur_specs = self._copy_slur_specs()
+        c._next_slur_id = self._next_slur_id
+        c._control_envelopes = self._copy_control_envelopes()
+        c._next_envelope_id = self._next_envelope_id
+        return c
+
+    def _copy_slur_specs(self):
+        """Fresh containers for slur specs (node ids carried verbatim)."""
+        return {
             slur_id: {
                 'leaf_nodes': tuple(spec['leaf_nodes']),
                 'leaf_set': set(spec['leaf_set']),
@@ -2351,8 +2379,11 @@ class CompositionalUnit(TemporalUnit):
             }
             for slur_id, spec in self._slur_specs.items()
         }
-        c._next_slur_id = self._next_slur_id
-        c._control_envelopes = {
+
+    def _copy_control_envelopes(self):
+        """Fresh descriptor containers; Envelope objects are shared (the
+        production copy semantics — envelopes are treated as immutable)."""
+        return {
             env_id: {
                 "envelope": desc["envelope"],
                 "pfields": list(desc["pfields"]),
@@ -2363,8 +2394,6 @@ class CompositionalUnit(TemporalUnit):
             }
             for env_id, desc in self._control_envelopes.items()
         }
-        c._next_envelope_id = self._next_envelope_id
-        return c
 
     def _copy_rebuild(self):
         """Legacy copy path: reconstruct from prolatio and remap node data.

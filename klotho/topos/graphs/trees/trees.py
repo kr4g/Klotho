@@ -147,7 +147,7 @@ class Tree(GraphCore):
     def _invalidate_caches(self):
         """Invalidate all tree caches"""
         super()._invalidate_caches()
-        for attr in ['depth', 'k', 'leaf_nodes']:
+        for attr in ['depth', 'k', 'leaf_nodes', 'leaf_index_map']:
             if attr in self.__dict__:
                 del self.__dict__[attr]
         self._group_dirty = True
@@ -191,6 +191,16 @@ class Tree(GraphCore):
 
         collect_leaves(self.root)
         return tuple(leaf_nodes_list)
+
+    @cached_property
+    def leaf_index_map(self):
+        """dict : Leaf node id -> ordinal position among the tree's leaves.
+
+        O(1) leaf-membership tests and ordinal lookups for every consumer
+        (kit round-robin ordinals, node handles, selectors) instead of
+        repeated ``list(leaf_nodes).index(...)`` scans.
+        """
+        return {leaf: i for i, leaf in enumerate(self.leaf_nodes)}
 
     def subtree_leaves(self, node):
         """Return leaf nodes of the subtree rooted at the given node, in left-right order."""

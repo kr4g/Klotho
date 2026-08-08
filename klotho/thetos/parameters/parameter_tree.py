@@ -41,6 +41,25 @@ class ParameterLayer(TreeLayer):
         """Drop the effective-value cache (rebuilt lazily on the next read)."""
         self._effective_cache = None
 
+    def pfields_frozen(self):
+        """frozenset view of registered pfield names, memoized on the
+        registry size (keys are only ever added, never removed)."""
+        cached = getattr(self, '_pfields_frozen', None)
+        if cached is not None and len(cached) == len(self._pfields):
+            return cached
+        cached = frozenset(self._pfields)
+        self._pfields_frozen = cached
+        return cached
+
+    def mfields_frozen(self):
+        """frozenset view of registered mfield names (see pfields_frozen)."""
+        cached = getattr(self, '_mfields_frozen', None)
+        if cached is not None and len(cached) == len(self._mfields):
+            return cached
+        cached = frozenset(self._mfields)
+        self._mfields_frozen = cached
+        return cached
+
     def on_structure_changed(self, tree, scope, op):
         """Drop the effective-value cache after any structural mutation."""
         self._effective_cache = None
@@ -228,13 +247,14 @@ class ParameterApiMixin:
 
     @property
     def pfield_names(self):
-        """set of str : Registered parameter-field names."""
-        return set(self._param_layer._pfields)
+        """frozenset of str : Registered parameter-field names (memoized;
+        keys are only ever added, so the size keys the cache)."""
+        return self._param_layer.pfields_frozen()
 
     @property
     def mfield_names(self):
-        """set of str : Registered meta-field names."""
-        return set(self._param_layer._mfields)
+        """frozenset of str : Registered meta-field names."""
+        return self._param_layer.mfields_frozen()
 
     @property
     def node_instruments(self):

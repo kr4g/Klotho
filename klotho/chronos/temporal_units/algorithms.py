@@ -211,7 +211,7 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
     """
     from klotho.thetos.composition.compositional import CompositionalUnit
     
-    ratio = ut.duration / beat_duration(str(ut.tempus * ut.span), bpm, beat)
+    ratio = ut.duration / beat_duration((ut.tempus * ut.span).to_fraction(), bpm, beat)
     new_tempus = Meas(ut.tempus * ut.span * ratio)
     
     if isinstance(ut, CompositionalUnit):
@@ -224,9 +224,9 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
             pfields=ut.pfields
         )
         new_cu._mirror_param_state(ut)
-        new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
+        new_cu._slur_specs = ut._copy_slur_specs()
         new_cu._next_slur_id = ut._next_slur_id
-        new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
+        new_cu._control_envelopes = ut._copy_control_envelopes()
         new_cu._next_envelope_id = ut._next_envelope_id
         return new_cu
     else:
@@ -264,7 +264,7 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
     if not isinstance(tempus, Meas):
         tempus = Meas(tempus)
     
-    ratio = beat_duration(str(tempus * span), ut.bpm, ut.beat) / beat_duration(str(ut.tempus * ut.span), ut.bpm, ut.beat)
+    ratio = beat_duration((tempus * span).to_fraction(), ut.bpm, ut.beat) / beat_duration((ut.tempus * ut.span).to_fraction(), ut.bpm, ut.beat)
 
     if isinstance(ut, CompositionalUnit):
         new_cu = CompositionalUnit(
@@ -276,9 +276,9 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
             pfields=ut.pfields
         )
         new_cu._mirror_param_state(ut)
-        new_cu._slur_specs = copy.deepcopy(ut._slur_specs)
+        new_cu._slur_specs = ut._copy_slur_specs()
         new_cu._next_slur_id = ut._next_slur_id
-        new_cu._control_envelopes = copy.deepcopy(ut._control_envelopes)
+        new_cu._control_envelopes = ut._copy_control_envelopes()
         new_cu._next_envelope_id = ut._next_envelope_id
         return new_cu
     else:

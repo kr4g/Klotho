@@ -16,6 +16,10 @@ def _load_disk_manifest():
     return _SS_DISK_MANIFEST_CACHE
 
 
+_SS_MANIFEST_MERGE_CACHE = (None, None)  # (registry_version, merged dict)
+_SS_KINDS_MERGE_CACHE = (None, None)
+
+
 def load_ss_manifest():
     """Return the flat ``{synth_name: {control_name: default_value}}`` dict.
 
@@ -25,9 +29,19 @@ def load_ss_manifest():
     :mod:`klotho.utils.playback.supersonic.registry` are overlaid on top
     (taking precedence) so they are immediately introspectable by the
     instrument layer and the browser auto-release logic.
+
+    The merged view is memoized on the registry's version counter — it
+    was rebuilt (183 keys) on every call.
     """
-    from klotho.utils.playback.supersonic.registry import runtime_controls
-    return {**_load_disk_manifest(), **runtime_controls()}
+    global _SS_MANIFEST_MERGE_CACHE
+    from klotho.utils.playback.supersonic.registry import (
+        registry_version, runtime_controls)
+    version = registry_version()
+    if _SS_MANIFEST_MERGE_CACHE[0] == version:
+        return _SS_MANIFEST_MERGE_CACHE[1]
+    merged = {**_load_disk_manifest(), **runtime_controls()}
+    _SS_MANIFEST_MERGE_CACHE = (version, merged)
+    return merged
 
 
 def _load_disk_kinds():
@@ -47,8 +61,15 @@ def load_ss_kinds():
     script; runtime registrations are overlaid on top. Names absent from
     the map should be treated as ``'inst'`` (see :func:`ss_synth_kind`).
     """
-    from klotho.utils.playback.supersonic.registry import runtime_kinds
-    return {**_load_disk_kinds(), **runtime_kinds()}
+    global _SS_KINDS_MERGE_CACHE
+    from klotho.utils.playback.supersonic.registry import (
+        registry_version, runtime_kinds)
+    version = registry_version()
+    if _SS_KINDS_MERGE_CACHE[0] == version:
+        return _SS_KINDS_MERGE_CACHE[1]
+    merged = {**_load_disk_kinds(), **runtime_kinds()}
+    _SS_KINDS_MERGE_CACHE = (version, merged)
+    return merged
 
 
 def canonical_def_name(name):

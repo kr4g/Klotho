@@ -176,7 +176,7 @@ class UTNodeHandle:
     def leaves(self) -> "UTNodeSelector":
         """UTNodeSelector : Selection of this node's subtree leaves (the node itself if it is a leaf)."""
         rt = self._owner._rt
-        if self._node_id in rt.leaf_nodes:
+        if self._node_id in rt.leaf_index_map:
             ids = (self._node_id,)
         else:
             ids = tuple(rt.subtree_leaves(self._node_id))
@@ -913,10 +913,21 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     @property
     def duration(self):
         """The total duration (in seconds) of the TemporalUnit."""
-        return beat_duration(ratio      = str(self._rt.meas * self._rt.span),
-                             beat_ratio = self.beat,
-                             bpm        = self.bpm
+        # duration depends only on (meas x span, beat, bpm); meas/span are
+        # fixed after construction, so the cache keys on (bpm, beat) and
+        # needs no explicit invalidation hooks (container re-layout reads
+        # this once per member per cascade — it was 3,930 calls per
+        # notebook-score build)
+        key = (self._bpm, self._beat)
+        cached = self.__dict__.get('_duration_cache')
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        value = beat_duration(ratio      = (self._rt.meas * self._rt.span).to_fraction(),
+                              beat_ratio = self.beat,
+                              bpm        = self.bpm
                 )
+        self.__dict__['_duration_cache'] = (key, value)
+        return value
     
     @property
     def end(self) -> float:

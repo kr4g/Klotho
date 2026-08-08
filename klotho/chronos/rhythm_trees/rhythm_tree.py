@@ -204,7 +204,15 @@ class RhythmTree(Tree):
         -------
         Meas
         """
-        return Meas(self._meta['meas'])
+        # parse once per distinct stored string (Meas is immutable; the
+        # identity check invalidates if _meta['meas'] is ever rebound)
+        s = self._meta['meas']
+        cached = getattr(self, '_meas_cache', None)
+        if cached is not None and cached[0] is s:
+            return cached[1]
+        m = Meas(s)
+        self._meas_cache = (s, m)
+        return m
 
     @property
     def subdivisions(self):
@@ -322,7 +330,8 @@ class RhythmTree(Tree):
         -------
         tuple of Fraction
         """
-        return tuple(self.nodes[n]['metric_duration'] for n in self.leaf_nodes)
+        rx = self._rx
+        return tuple(rx.get_node_data(n)['metric_duration'] for n in self.leaf_nodes)
     
     @property
     def onsets(self):
@@ -333,7 +342,8 @@ class RhythmTree(Tree):
         -------
         tuple of Fraction
         """
-        return tuple(self.nodes[n]['metric_onset'] for n in self.leaf_nodes)
+        rx = self._rx
+        return tuple(rx.get_node_data(n)['metric_onset'] for n in self.leaf_nodes)
     
     @property
     def info(self):
@@ -402,12 +412,12 @@ class RhythmTree(Tree):
         if root_node is None:
             root_node = self.root
         self._rx[self.root]['metric_duration'] = self.meas * self.span
-        parent_ratio = self.span * self.meas.to_fraction() if root_node == self.root else Fraction(self[root_node]['metric_duration'])
+        parent_ratio = self.span * self.meas.to_fraction() if root_node == self.root else Fraction(self._rx[root_node]['metric_duration'])
 
         leaf_onset_acc = [Fraction(0)]
 
         def _process_child(child, div, parent_ratio, parent_is_negative):
-            child_data = self[child]
+            child_data = self._rx[child]
             s = child_data.get('proportion', 1)
             child_is_tied = isinstance(s, float) or bool(child_data.get('tied', False))
             if 'meta' in child_data:
@@ -443,15 +453,17 @@ class RhythmTree(Tree):
                 self._rx[node]['metric_onset'] = leaf_onset_acc[0]
                 leaf_onset_acc[0] += abs(ratio)
                 return
-            div = int(sum(
-                abs(self[c].get('proportion', 1)) *
-                (self[c]['meta']['span'] if 'meta' in self[c] else 1)
-                for c in children
-            ))
+            rx = self._rx
+            div = 0
+            for c in children:
+                c_data = rx[c]
+                div += abs(c_data.get('proportion', 1)) * \
+                    (c_data['meta']['span'] if 'meta' in c_data else 1)
+            div = int(div)
             node_is_negative = label_value < 0
             for child in children:
                 _process_child(child, div, parent_ratio, node_is_negative)
-            self._rx[node]['metric_onset'] = self[children[0]]['metric_onset']
+            self._rx[node]['metric_onset'] = self._rx[children[0]]['metric_onset']
 
         if root_node != self.root:
             # hoisted once: leaf order, subtree-leaf set, and leaf->ordinal
@@ -486,7 +498,7 @@ class RhythmTree(Tree):
         return 'complex' if measure_complexity(self.subdivisions) else 'simple'
 
     def __len__(self):
-        return len(self.durations)
+        return len(self.leaf_nodes)
 
     def __str__(self):
         return f"RhythmTree(span={self.span}, meas={self.meas}, subdivisions={format_subdivisions(self.subdivisions)})"

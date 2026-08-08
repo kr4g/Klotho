@@ -22,6 +22,13 @@ each call, so registrations take effect immediately (no reimport).
 import base64
 
 _RUNTIME: dict[str, dict] = {}
+_REGISTRY_VERSION = 0
+
+
+def registry_version() -> int:
+    """Monotonic counter bumped on every runtime (un)registration; lets
+    consumers memoize merged manifest views."""
+    return _REGISTRY_VERSION
 
 
 def register_compiled(def_name: str, compiled_bytes: bytes, controls: dict,
@@ -48,11 +55,13 @@ def register_compiled(def_name: str, compiled_bytes: bytes, controls: dict,
     """
     if kind not in ("inst", "fx"):
         raise ValueError(f"kind must be 'inst' or 'fx', got {kind!r}")
+    global _REGISTRY_VERSION
     _RUNTIME[def_name] = {
         "b64": base64.b64encode(bytes(compiled_bytes)).decode("ascii"),
         "controls": dict(controls),
         "kind": kind,
     }
+    _REGISTRY_VERSION += 1
     return def_name
 
 
@@ -78,7 +87,9 @@ def is_registered(def_name: str) -> bool:
 
 def clear_runtime() -> None:
     """Drop all runtime registrations (primarily for tests)."""
+    global _REGISTRY_VERSION
     _RUNTIME.clear()
+    _REGISTRY_VERSION += 1
 
 
 def _controls_from_compiled(compiled_bytes: bytes, def_name: str) -> dict:
