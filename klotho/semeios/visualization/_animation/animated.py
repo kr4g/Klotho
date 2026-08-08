@@ -1,6 +1,6 @@
-import json
 import uuid
 
+from .._shared.svg_shared import _script_json
 from .._cdn import (
     cdn_scripts,
     THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,
@@ -37,7 +37,7 @@ def _payload_json_memo(fig):
     if cached is not None:
         return cached
     payload = fig.audio_payload
-    payload_json = json.dumps(payload) if payload else "null"
+    payload_json = _script_json(payload) if payload else "null"
     try:
         fig._payload_json_cache = payload_json
     except AttributeError:
@@ -133,9 +133,9 @@ class AnimatedLattice3dFigure:
         scripts_html = build_scripts_html(
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
-        scene_json = json.dumps(sd.scene_data)
-        steps_json = json.dumps(sd.path_steps)
-        halo_json = json.dumps(sd.halo_data)
+        scene_json = _script_json(sd.scene_data)
+        steps_json = _script_json(sd.path_steps)
+        halo_json = _script_json(sd.halo_data)
         payload_json = _payload_json_memo(self)
 
         w = sd.width_px
@@ -630,15 +630,15 @@ class AnimatedRTSvgFigure:
         scripts_html = build_scripts_html(
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
-        leaf_path_ids_json = json.dumps(sd.leaf_path_ids)
-        all_anim_ids_json = json.dumps(sd.all_animated_ids)
-        leaf_halo_ids_json = json.dumps(sd.leaf_halo_ids)
-        leaf_x_json = json.dumps(sd.leaf_x_positions)
-        bright_json = json.dumps(sd.leaf_bright_colors)
-        base_json = json.dumps(sd.leaf_base_colors)
+        leaf_path_ids_json = _script_json(sd.leaf_path_ids)
+        all_anim_ids_json = _script_json(sd.all_animated_ids)
+        leaf_halo_ids_json = _script_json(sd.leaf_halo_ids)
+        leaf_x_json = _script_json(sd.leaf_x_positions)
+        bright_json = _script_json(sd.leaf_bright_colors)
+        base_json = _script_json(sd.leaf_base_colors)
 
-        node_to_ids_json = json.dumps({str(k): v for k, v in sd.node_to_ids.items()})
-        leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in sd.leaf_ancestors])
+        node_to_ids_json = _script_json({str(k): v for k, v in sd.node_to_ids.items()})
+        leaf_ancestors_json = _script_json([[str(n) for n in path] for path in sd.leaf_ancestors])
 
         payload_json = _payload_json_memo(self)
 
@@ -770,11 +770,11 @@ class AnimatedTimelineSvgFigure:
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
         recorder_js = build_recorder_js(self.record)
 
-        step_ids_json = json.dumps(sd.step_element_ids)
-        step_halo_ids_json = json.dumps(sd.step_halo_ids)
-        step_durs_json = json.dumps(sd.step_durations)
-        bright_json = json.dumps(sd.step_bright_colors)
-        base_json = json.dumps(sd.step_base_colors)
+        step_ids_json = _script_json(sd.step_element_ids)
+        step_halo_ids_json = _script_json(sd.step_halo_ids)
+        step_durs_json = _script_json(sd.step_durations)
+        bright_json = _script_json(sd.step_bright_colors)
+        base_json = _script_json(sd.step_base_colors)
 
         payload_json = _payload_json_memo(self)
 
@@ -911,12 +911,12 @@ class AnimatedLatticeSvgFigure:
         scripts_html = build_scripts_html(
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
-        steps_json = json.dumps(sd.step_group_ids)
-        halos_json = json.dumps(sd.halo_ids)
-        all_path_json = json.dumps(sd.all_path_ids)
-        node_ids_json = json.dumps(getattr(sd, 'all_node_ids', []))
-        path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
-        path_node_colors_json = json.dumps(getattr(sd, 'path_node_colors', []))
+        steps_json = _script_json(sd.step_group_ids)
+        halos_json = _script_json(sd.halo_ids)
+        all_path_json = _script_json(sd.all_path_ids)
+        node_ids_json = _script_json(getattr(sd, 'all_node_ids', []))
+        path_node_indices_json = _script_json(getattr(sd, 'path_node_indices', []))
+        path_node_colors_json = _script_json(getattr(sd, 'path_node_colors', []))
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
         payload_json = _payload_json_memo(self)
 
@@ -1067,8 +1067,8 @@ class AnimatedNodeSelectSvgFigure:
         scripts_html = build_scripts_html(
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
-        node_ids_json = json.dumps(sd.all_node_ids)
-        select_json = json.dumps(self.select_node_indices)
+        node_ids_json = _script_json(sd.all_node_ids)
+        select_json = _script_json(self.select_node_indices)
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
         payload_json = _payload_json_memo(self)
 
@@ -1228,11 +1228,11 @@ class _AnimatedShapeFigureBase:
         scripts_html = build_scripts_html(
             needed_synthdefs=_extract_needed_synthdefs(self.audio_payload))
 
-        group_node_indices_json = json.dumps(sd.shape_group_node_indices)
-        group_edge_ids_json = json.dumps(sd.shape_group_edge_ids)
-        shape_colors_json = json.dumps(sd.shape_colors)
-        all_shape_edge_ids_json = json.dumps(sd.all_shape_edge_ids)
-        node_ids_json = json.dumps(sd.all_node_ids)
+        group_node_indices_json = _script_json(sd.shape_group_node_indices)
+        group_edge_ids_json = _script_json(sd.shape_group_edge_ids)
+        shape_colors_json = _script_json(sd.shape_colors)
+        all_shape_edge_ids_json = _script_json(sd.all_shape_edge_ids)
+        node_ids_json = _script_json(sd.all_node_ids)
         dimmed_color = sd.dimmed_node_color
         payload_json = _payload_json_memo(self)
         total_groups = len(sd.shape_group_node_indices)
