@@ -1222,6 +1222,18 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
         self._seq    = [ut.copy() for ut in ut_seq]
         self._offset = 0.0
         self._set_offsets()
+
+    @classmethod
+    def _adopt(cls, members, offset=0.0):
+        """Private: build a sequence that takes ownership of *members*
+        WITHOUT copying them. Used by ``copy()`` (whose members are
+        already fresh copies) to avoid the constructor's second copy of
+        every member."""
+        c = cls.__new__(cls)
+        c._seq = list(members)
+        c._offset = offset
+        c._set_offsets()
+        return c
     
     def _set_offsets(self):
         """Updates the offsets of all members based on their position in the sequence.
@@ -1441,10 +1453,8 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
         :class:`TemporalBlock` and :class:`~klotho.thetos.composition.score.Score`
         can rebuild their layouts cleanly.
         """
-        c = TemporalUnitSequence(ut_seq=[ut.copy() for ut in self._seq])
-        c._offset = self._offset
-        c._set_offsets()
-        return c
+        return TemporalUnitSequence._adopt(
+            [ut.copy() for ut in self._seq], offset=self._offset)
 
 
 class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
@@ -1483,8 +1493,21 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         self._axis = axis
         self._offset = 0.0
         self._sort_rows = sort_rows
-        
+
         self._align_rows()
+
+    @classmethod
+    def _adopt(cls, rows, axis=-1, sort_rows=True, offset=0.0):
+        """Private: build a block that takes ownership of *rows* WITHOUT
+        copying them. Used by ``copy()`` (whose rows are already fresh
+        copies) to avoid the constructor's second copy of every row."""
+        c = cls.__new__(cls)
+        c._rows = list(rows)
+        c._axis = axis
+        c._offset = offset
+        c._sort_rows = sort_rows
+        c._align_rows()
+        return c
       
     # TODO: make free method in UT algos
     # Matrix to Block
@@ -1756,14 +1779,12 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         :class:`~klotho.thetos.composition.score.Score` can rebuild its
         timeline cleanly.
         """
-        c = TemporalBlock(
-            rows=[row.copy() for row in self._rows],
+        return TemporalBlock._adopt(
+            [row.copy() for row in self._rows],
             axis=self._axis,
             sort_rows=self._sort_rows,
+            offset=self._offset,
         )
-        c._offset = self._offset
-        c._align_rows()
-        return c
 
 
 def _reoffset(unit, t: float) -> None:

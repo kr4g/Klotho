@@ -50,38 +50,44 @@ TemporalLike = Union[
 # ---------------------------------------------------------------------------
 
 
-def _promote_to_uc(unit: TemporalLike) -> TemporalLike:
+def _promote_in_place(unit: TemporalLike) -> TemporalLike:
     """Recursively promote bare :class:`TemporalUnit` nodes to
-    :class:`CompositionalUnit`.
+    :class:`CompositionalUnit`, mutating containers IN PLACE.
 
-    Containers (:class:`TemporalUnitSequence`, :class:`TemporalBlock`) are
-    walked and rebuilt with promoted members; existing
-    :class:`CompositionalUnit` instances pass through unchanged.  The
-    outer structure's private ``_offset`` is preserved so that internal
-    cascades (``_set_offsets`` / ``_align_rows``) re-align correctly after
-    reconstruction.
+    Only for objects the caller already owns (a fresh ``.copy()``).
+    Containers keep their identity; a member list is only rewritten (and
+    the ``_set_offsets`` / ``_align_rows`` cascade re-run) when a member
+    was actually promoted, so the common all-UC case touches nothing.
     """
-    if isinstance(unit, Event):
-        return unit
-    if isinstance(unit, CompositionalUnit):
+    if isinstance(unit, (Event, CompositionalUnit)):
         return unit
     if isinstance(unit, TemporalUnit):
         return CompositionalUnit.from_ut(unit)
     if isinstance(unit, TemporalUnitSequence):
-        new_seq = [_promote_to_uc(u) for u in unit._seq]
-        new_uts = TemporalUnitSequence(ut_seq=new_seq)
-        new_uts._offset = unit._offset
-        new_uts._set_offsets()
-        return new_uts
+        promoted = [_promote_in_place(u) for u in unit._seq]
+        if any(p is not o for p, o in zip(promoted, unit._seq)):
+            unit._seq = promoted
+            unit._set_offsets()
+        return unit
     if isinstance(unit, TemporalBlock):
-        new_rows = [_promote_to_uc(r) for r in unit._rows]
-        new_bt = TemporalBlock(
-            rows=new_rows, axis=unit._axis, sort_rows=unit._sort_rows
-        )
-        new_bt._offset = unit._offset
-        new_bt._align_rows()
-        return new_bt
+        promoted = [_promote_in_place(r) for r in unit._rows]
+        if any(p is not o for p, o in zip(promoted, unit._rows)):
+            unit._rows = promoted
+            unit._align_rows()
+        return unit
     raise TypeError(f"Unsupported unit type: {type(unit).__name__}")
+
+
+def _own_promoted(unit: TemporalLike) -> TemporalLike:
+    """Copy *unit* once and promote bare TemporalUnits on the owned copy.
+
+    Replaces the old ``_promote_to_uc(unit).copy()`` pattern, whose
+    promotion pass rebuilt containers through constructors that copy
+    every member (recursively compounding) before ``.copy()`` copied
+    everything AGAIN — ~4 structural copies per member for the common
+    no-promotion case.
+    """
+    return _promote_in_place(unit.copy())
 
 
 # ---------------------------------------------------------------------------
@@ -420,7 +426,7 @@ class Score:
                 f"No item named {at!r} (for at=); existing: {list(self._items)}"
             )
 
-        owned = _promote_to_uc(unit).copy()
+        owned = _own_promoted(unit)
 
         if after is not None:
             t = self._items[after].end
@@ -474,7 +480,7 @@ class Score:
     ) -> ScoreItem:
         """Prepend *unit* at time 0, shifting every existing item right
         by ``unit.duration``."""
-        owned = _promote_to_uc(unit).copy()
+        owned = _own_promoted(unit)
         shift_by = owned.duration
 
         for existing in self._items.values():

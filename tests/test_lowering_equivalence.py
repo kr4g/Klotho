@@ -123,8 +123,13 @@ def build_miniature_score() -> Score:
     plk = UC(tempus='3/4', prolatio=(1, -2, 3), beat='1/4', bpm=112,
              inst=pluck, pfields=['amp'])
 
+    # -- bare TemporalUnits (exercise Score's UT->UC auto-promotion, both
+    # standalone and mixed into a container)
+    bare_ut = UT(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=112)
+
     # -- containers: UTS + BT on all three axes, nested
-    seq = UTS([mel.copy(), plk.copy()])
+    seq = UTS([mel.copy(), plk.copy(), UT(tempus='2/4', prolatio=(1, -1),
+                                          beat='1/4', bpm=112)])
     block_left = BT([drums.copy(), pad_uc.copy()], axis=-1)
     block_center = BT([mel.copy(), plk.copy()], axis=0)
     block_right = BT([seq, block_center], axis=1)
@@ -138,6 +143,7 @@ def build_miniature_score() -> Score:
     score.add(Event(inst=_inst('hit', has_gate=False), dur=0.5,
                     pfields={'freq': 880.0, 'amp': 0.3}),
               name='loose_hit', at=2.25)
+    score.add(bare_ut, name='bare_promotion', at=1.0)
     return score
 
 
