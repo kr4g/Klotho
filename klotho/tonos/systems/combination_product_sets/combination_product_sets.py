@@ -111,20 +111,24 @@ class CombinationProductSet(ReferencePitchAware, CS):
       return
       
     combo_to_node = {}
+    combo_to_alias = {}
     for node, attrs in self.nodes(data=True):
       if 'combo' in attrs:
         combo_to_node[attrs['combo']] = node
-    
+        combo_to_alias[attrs['combo']] = attrs['alias']
+
     for c1 in self._combos:
       node1 = combo_to_node[c1]
+      alias1 = combo_to_alias[c1]
       for c2 in self._combos:
         if c1 != c2:
           node2 = combo_to_node[c2]
-          
-          alias1 = self.get_attrs_by('combo', c1)['alias']
-          alias2 = self.get_attrs_by('combo', c2)['alias']
-          sym_ratio = sp.simplify(alias1 / alias2)
-          
+
+          # Aliases are monomials over factor symbols; sympy's automatic
+          # Mul canonicalization on division already yields the canonical
+          # form, so no simplify() pass is needed for the dict lookup.
+          sym_ratio = alias1 / combo_to_alias[c2]
+
           if sym_ratio in relationship_dict:
             rel_data = relationship_dict[sym_ratio]
             self._add_edge_raw(node1, node2, 
