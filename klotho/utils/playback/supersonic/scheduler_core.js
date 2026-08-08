@@ -23,7 +23,12 @@
   // 10.16-dev outputs already set the V2 marker, and their stale core has
   // the free-vs-purge race — so V3 must key on its own name to install
   // over them. Old instances keep the old prototype; new widgets get V3.
-  if (globalThis.__klothoSchedCoreV3) return;
+  // V4 (ring-out purge holdoff): the V3 core purged the engine queue at
+  // the finish INSTANT — the exact due time of the piece's final gate
+  // releases — so the last notes' releases could be wiped before they
+  // fired (stuck final chord, hard-cut by the deferred ring free). V4
+  // defers the idle purge past the ring-out; same marker discipline.
+  if (globalThis.__klothoSchedCoreV4) return;
 
   // The supersonic-scsynth engine holds at most SCHEDULER_SLOT_COUNT (512)
   // timestamped bundles; when that queue is full an arriving bundle is
@@ -44,6 +49,12 @@
   var NTP_EPOCH_OFFSET = 2208988800;
   var STARTUP_DELAY = 0.1;
   var DEFAULT_RING_TIME = 5;
+  // Idle purge waits ring-out + this margin after natural finish, so the
+  // final gate releases (due exactly at pieceDur) and the deferred ring
+  // frees (due at pieceDur + ringTime, riding the unordered OSC out-ring)
+  // are consumed before purge()'s clearSched can wipe the queue. Also the
+  // whole guard when ringTime is 0.
+  var PURGE_HOLDOFF_MS = 250;
   // Must stay >= the engine's hardware bus span (numOutputBusChannels +
   // numInputBusChannels from supersonic_config(), currently 32 + 2): output
   // buses 2..31 are stem-tap pairs for recording, and track/FX routing must
@@ -141,6 +152,7 @@
       this._playStartPerfMs = 0;
       this._batchTimeoutId = null;
       this._finishTimeoutId = null;
+      this._purgeHoldoffId = null;
       this._deferredRings = [];
       this._batchBundleCount = 0;
       this._playerRegistered = false;
@@ -370,13 +382,44 @@
 
     _finishPlayback() {
       this.isPlaying = false;
-      this._unregisterPlayer();
       this._reportLossMetrics();
       if (this.onFinish) this.onFinish();
       if (this._groupId != null) {
         this._freeGroupDeferred(this._groupId);
         this._groupId = null;
       }
+      this._deferUnregister();
+    }
+
+    // Natural finish fires at pieceDur — the exact due time of the last
+    // gate releases — and unregistering the final player purges the
+    // engine's scheduled queue. Purging at that instant races the very
+    // bundles that end the piece (eaten releases = the last chord stuck
+    // at full sustain until the ring free hard-cuts it). Hold the
+    // unregister until the ring-out has passed, then sync-drain so the
+    // deferred /g_freeAll (which rides the unordered OSC out-ring at
+    // ringTime) is consumed before purge()'s clearSched can wipe it.
+    // stop() and play()'s restart path keep their immediate unregister:
+    // both already sync-drain first, and there the flush is the point.
+    _deferUnregister() {
+      var self = this;
+      var token = this.stopToken;
+      var delayMs = Math.max(0, this.ringTime || 0) * 1000 + PURGE_HOLDOFF_MS;
+      this._purgeHoldoffId = setTimeout(function() {
+        self._purgeHoldoffId = null;
+        if (token !== self.stopToken) return;
+        var finish = function() {
+          if (token !== self.stopToken) return;
+          self._unregisterPlayer();
+        };
+        try {
+          if (typeof self.sonic.sync === 'function') {
+            self._awaitBounded(self.sonic.sync(), 750).then(finish, finish);
+            return;
+          }
+        } catch(e) {}
+        finish();
+      }, delayMs);
     }
 
     // Unified send stream: note events plus (when the score extension is
@@ -701,6 +744,8 @@
       this._batchTimeoutId = null;
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
+      clearTimeout(this._purgeHoldoffId);
+      this._purgeHoldoffId = null;
 
       // Restarting while a previous play is live: free its nodes, then
       // release its player registration (flushing the engine queue when
@@ -825,6 +870,8 @@
       this._batchTimeoutId = null;
       clearTimeout(this._finishTimeoutId);
       this._finishTimeoutId = null;
+      clearTimeout(this._purgeHoldoffId);
+      this._purgeHoldoffId = null;
       this._reportLossMetrics();
       this._cancelAllDeferredRings();
       this._freeGroup();
@@ -851,4 +898,5 @@
   };
   globalThis.__klothoSchedCoreV2 = true;
   globalThis.__klothoSchedCoreV3 = true;
+  globalThis.__klothoSchedCoreV4 = true;
 })();

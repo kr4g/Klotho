@@ -49,7 +49,7 @@ class TestBusFloorContract:
         versioned early-return — so it also repairs pages where a
         stale pre-10.16 scheduler was installed first."""
         guard = CORE_SRC.index("__klothoBusAlloc.nextAudio < 48")
-        install = CORE_SRC.index("if (globalThis.__klothoSchedCoreV3) return;")
+        install = CORE_SRC.index("if (globalThis.__klothoSchedCoreV4) return;")
         assert guard < install
 
     def test_cdn_version_pinned(self):
@@ -64,15 +64,18 @@ class TestSchedulerVersionSkew:
     setupStemTaps, so stems ZIPs silently contained only main.wav)."""
 
     def test_core_install_guard_is_versioned(self):
-        # V3 keys on its own name (pages with saved 10.16-dev outputs
-        # already set V2, and their core has the free-vs-purge race)…
-        assert "if (globalThis.__klothoSchedCoreV3) return;" in CORE_SRC
+        # V4 keys on its own name (pages with saved V3 outputs already set
+        # V3, and their core purges at the finish instant — the eaten
+        # final-release bug)…
+        assert "if (globalThis.__klothoSchedCoreV4) return;" in CORE_SRC
         assert "if (globalThis.BrowserScheduler) return;" not in CORE_SRC
-        assert "globalThis.__klothoSchedCoreV3 = true;" in CORE_SRC
-        # …but still claims the V2 marker so a stale 10.16-dev core
-        # rendering later can never downgrade the installed class.
+        assert "globalThis.__klothoSchedCoreV4 = true;" in CORE_SRC
+        # …but still claims every older marker so a stale core rendering
+        # later can never downgrade the installed class.
         assert "globalThis.__klothoSchedCoreV2 = true;" in CORE_SRC
+        assert "globalThis.__klothoSchedCoreV3 = true;" in CORE_SRC
         assert "if (globalThis.__klothoSchedCoreV2) return;" not in CORE_SRC
+        assert "if (globalThis.__klothoSchedCoreV3) return;" not in CORE_SRC
 
     def test_boot_stashes_config_for_capacity_checks(self):
         from klotho.utils.playback.supersonic._js_fragments import ss_init_js
