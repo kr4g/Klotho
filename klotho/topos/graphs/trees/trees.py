@@ -739,6 +739,39 @@ class Tree(GraphCore):
 
         self._post_mutation(scope_node=None, op='prune_leaves')
 
+    def structural_clone(self):
+        """Fast data-preserving clone: same topology, same node ids.
+
+        Clones the backing rustworkx graph (node ids preserved), gives every
+        node a fresh payload dict (values shared — required because
+        ``_evaluate`` and other internal writers mutate payload dicts in
+        place), and carries layer state over via
+        :meth:`~klotho.topos.graphs.trees.layers.TreeLayer.adopt_state`.
+        Derived node data (e.g. evaluated metric durations) rides along
+        verbatim, so the clone needs no re-evaluation.
+        """
+        cls = self.__class__
+        new_tree = cls.__new__(cls)
+
+        new_rx = self._rx.copy()
+        for idx in new_rx.node_indices():
+            payload = new_rx.get_node_data(idx)
+            if isinstance(payload, dict):
+                new_rx[idx] = dict(payload)
+        new_tree._rx = new_rx
+        new_tree._meta = copy.deepcopy(self._meta)
+        new_tree._structure_version = 0
+
+        new_tree._root = self._root
+        new_tree._list = self._list  # Group is an immutable tuple subclass
+        new_tree._group_dirty = getattr(self, '_group_dirty', False)
+        new_tree._layers = []
+        new_tree._init_layers()
+        for old_layer, new_layer in zip(getattr(self, '_layers', ()), new_tree._layers):
+            new_layer.adopt_state(old_layer, new_tree)
+
+        return new_tree
+
     def __deepcopy__(self, memo):
         """Create a deep copy of the tree including Tree-specific attributes."""
         new_tree = self.__class__.__new__(self.__class__)

@@ -60,3 +60,15 @@ class TreeLayer:
     def clone_state(self, source_layer, new_tree, memo):
         """Copy identity-keyed side state from ``source_layer`` during deepcopy."""
         pass
+
+    def adopt_state(self, source_layer, new_tree):
+        """Copy side state from ``source_layer`` during a structural clone.
+
+        Unlike :meth:`clone_state` (deepcopy semantics), a structural clone
+        shares leaf values — node ids are identical between the trees, so
+        identity-keyed state carries over without remapping, and referenced
+        objects (instruments, envelopes) are shared exactly as production
+        ``copy()`` semantics require. Defaults to :meth:`clone_state` with a
+        fresh memo for layers that have not opted in.
+        """
+        self.clone_state(source_layer, new_tree, {})

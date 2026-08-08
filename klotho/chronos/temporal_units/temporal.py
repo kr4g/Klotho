@@ -1148,6 +1148,25 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         The copy preserves any internal placement (``_offset``) so that
         containers like :class:`TemporalUnitSequence` can rebuild cleanly.
         """
+        if type(self) is not TemporalUnit:
+            return self._copy_rebuild()
+        c = TemporalUnit.__new__(TemporalUnit)
+        c._type = self._type
+        c._rt = self._rt.structural_clone()
+        c._real_times = {}
+        c._beat = self._beat
+        c._bpm = self._bpm
+        c._offset = self._offset
+        c._timing_dirty = True
+        return c
+
+    def _copy_rebuild(self):
+        """Legacy copy path: reconstruct from prolatio (renumbers node ids).
+
+        Kept for subclasses without their own ``copy()`` (which have always
+        received a plain ``TemporalUnit`` here) and as an equivalence oracle
+        for the structural-clone fast path.
+        """
         c = TemporalUnit(
             span=self.span,
             tempus=self.tempus,

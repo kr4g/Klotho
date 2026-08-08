@@ -59,6 +59,16 @@ class ParameterLayer(TreeLayer):
         self._node_instruments = copy.deepcopy(source_layer._node_instruments, memo)
         self._effective_cache = None
 
+    def adopt_state(self, source_layer, new_tree):
+        """Carry key registrations and instrument bindings into a structural
+        clone. Instrument objects are shared, matching ``UC.copy()``'s
+        long-standing semantics (the rebuild path re-bound the same
+        instances)."""
+        self._pfields = set(source_layer._pfields)
+        self._mfields = set(source_layer._mfields)
+        self._node_instruments = dict(source_layer._node_instruments)
+        self._effective_cache = None
+
     def on_nodes_remapped(self, tree, mapping):
         """Drop the effective-value cache after node ids are renumbered."""
         self._effective_cache = None

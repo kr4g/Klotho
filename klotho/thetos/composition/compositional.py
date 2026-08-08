@@ -2259,11 +2259,58 @@ class CompositionalUnit(TemporalUnit):
         :class:`~klotho.thetos.composition.score.Score` can rebuild
         their layouts cleanly.
 
+        Node ids are preserved (structural clone), so slur specs, envelope
+        anchors, and instrument bindings carry over without remapping.
+        Parameter values, instruments, and envelope objects are shared
+        between the copy and the original; per-node override placement
+        (inheritance structure) is preserved as-is.
+
         Returns
         -------
         CompositionalUnit
             A new CompositionalUnit with identical structure, parameters,
             instruments, envelopes, and slurs.
+        """
+        if type(self) is not CompositionalUnit:
+            return self._copy_rebuild()
+        c = CompositionalUnit.__new__(CompositionalUnit)
+        c._bind_memo = {}
+        c._bind_active = set()
+        c._type = self._type
+        c._rt = self._rt.structural_clone()
+        c._real_times = {}
+        c._beat = self._beat
+        c._bpm = self._bpm
+        c._offset = self._offset
+        c._timing_dirty = True
+        c._slur_specs = {
+            slur_id: {
+                'leaf_nodes': tuple(spec['leaf_nodes']),
+                'leaf_set': set(spec['leaf_set']),
+                'index_range': tuple(spec['index_range']),
+            }
+            for slur_id, spec in self._slur_specs.items()
+        }
+        c._next_slur_id = self._next_slur_id
+        c._control_envelopes = {
+            env_id: {
+                "envelope": desc["envelope"],
+                "pfields": list(desc["pfields"]),
+                "endpoint": desc["endpoint"],
+                "anchor_node": desc["anchor_node"],
+                "leaf_subset": (tuple(desc["leaf_subset"])
+                                if desc["leaf_subset"] is not None else None),
+            }
+            for env_id, desc in self._control_envelopes.items()
+        }
+        c._next_envelope_id = self._next_envelope_id
+        return c
+
+    def _copy_rebuild(self):
+        """Legacy copy path: reconstruct from prolatio and remap node data.
+
+        Kept for subclasses without their own ``copy()`` and as an
+        equivalence oracle for the structural-clone fast path.
         """
         c = self.__class__(
             span     = self.span,
