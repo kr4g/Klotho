@@ -15,7 +15,9 @@ G3 = Pitch('G3').freq
 G4 = Pitch('G4').freq
 
 
-def _in_window(voicing, lo_hz, hi_hz, tol=1e-6):
+def _in_window(voicing, lo_hz, hi_hz, tol=1e-3):
+    # tol covers the 4-decimal rounding of the bound constants vs the
+    # exact pitch frequencies collections now carry (<= 5e-5 Hz)
     return all(lo_hz - tol <= p.freq <= hi_hz + tol for p in voicing.pitches)
 
 

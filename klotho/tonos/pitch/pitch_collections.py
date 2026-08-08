@@ -640,7 +640,9 @@ class RelativePitchCollection(PitchCollectionBase):
         else:
             freq = self._reference_pitch.freq * float(degree)
             partial = degree
-        return Pitch.from_freq(freq, partial)
+        # exact frequency preserved: from_freq would re-derive it from the
+        # symbolic name rounded to 4 decimals, discarding the exact value
+        return Pitch._from_exact_freq(freq, partial)
 
     def __len__(self) -> int:
         return len(self._degrees)

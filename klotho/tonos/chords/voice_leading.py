@@ -643,7 +643,9 @@ def voice_lead(chords, lo=None, hi=None, *,
 
         voicing = Voicing(degrees, mode, c.equave, ref, dedupe=False)
         result.append(voicing)
-        sounded = sorted(p.freq for p in voicing.pitches)
+        # same arithmetic as the voicing's pitch materialization (exact
+        # freqs), without building Pitch objects just to read .freq back
+        sounded = sorted(_degree_hz(d, mode, ref.freq) for d in degrees)
         if sounded:
             prev_hz = sounded
 

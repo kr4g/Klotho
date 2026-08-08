@@ -92,7 +92,26 @@ class Pitch:
             A new Pitch instance corresponding to the given frequency.
         """
         return cls(*freq_to_pitchclass(freq), partial=partial)
-    
+
+    @classmethod
+    def _from_exact_freq(cls, freq: float, partial: Union[int, float, Fraction] = 1):
+        """Build a Pitch that carries *freq* EXACTLY.
+
+        The public constructor re-derives the frequency from the symbolic
+        name rounded to 4 decimals; collection materialization computes
+        exact frequencies (reference x ratio) and must not lose them to
+        that round-trip. Symbolic fields (pitchclass/octave/cents) are
+        still derived for display.
+        """
+        pc, octave, cents = freq_to_pitchclass(freq)
+        p = cls.__new__(cls)
+        p._pitchclass = pc
+        p._octave = octave
+        p._cents_offset = cents
+        p._partial = partial
+        p._freq = freq
+        return p
+
     @classmethod
     def from_midi(cls, midi_note: float, partial: Union[int, float, Fraction] = 1):
         """

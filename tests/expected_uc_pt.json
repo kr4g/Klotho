@@ -8863,28 +8863,28 @@
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 263.4045
+            "freq": 263.40448
           },
           "5": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 296.33
+            "freq": 296.33004
           },
           "6": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 329.2556
+            "freq": 329.25559999999996
           },
           "7": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 370.4125
+            "freq": 370.41255
           },
           "8": {
             "group": "default",
@@ -8904,28 +8904,28 @@
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 263.4045
+            "freq": 263.40448
           },
           "11": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 296.33
+            "freq": 296.33004
           },
           "12": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 329.2556
+            "freq": 329.25559999999996
           },
           "13": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 370.4125
+            "freq": 370.41255
           },
           "14": {
             "group": "default",
@@ -8945,28 +8945,28 @@
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 263.4045
+            "freq": 263.40448
           },
           "17": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 296.33
+            "freq": 296.33004
           },
           "18": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 329.2556
+            "freq": 329.25559999999996
           },
           "19": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 370.4125
+            "freq": 370.41255
           },
           "20": {
             "group": "default",
@@ -8986,28 +8986,28 @@
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 263.4045
+            "freq": 263.40448
           },
           "23": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 296.33
+            "freq": 296.33004
           },
           "24": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 329.2556
+            "freq": 329.25559999999996
           },
           "25": {
             "group": "default",
             "idx": 0,
             "drct": 1,
             "offset": 0,
-            "freq": 370.4125
+            "freq": 370.41255
           },
           "26": {
             "group": "default",
@@ -9026,7 +9026,7 @@
             "idx": 7,
             "drct": -1,
             "offset": 5,
-            "freq": 790.2134
+            "freq": 790.21344
           },
           "29": {
             "group": "default",
@@ -9040,7 +9040,7 @@
             "idx": 7,
             "drct": -1,
             "offset": 5,
-            "freq": 658.5112
+            "freq": 658.5111999999999
           },
           "31": {
             "group": "default",
@@ -9060,14 +9060,14 @@
             "idx": 7,
             "drct": -1,
             "offset": 4,
-            "freq": 658.5112
+            "freq": 658.5111999999999
           },
           "34": {
             "group": "default",
             "idx": 7,
             "drct": -1,
             "offset": 4,
-            "freq": 592.6601
+            "freq": 592.66008
           },
           "35": {
             "group": "default",
@@ -9080,21 +9080,21 @@
             "idx": 7,
             "drct": -1,
             "offset": 3,
-            "freq": 658.5112
+            "freq": 658.5111999999999
           },
           "37": {
             "group": "default",
             "idx": 7,
             "drct": -1,
             "offset": 3,
-            "freq": 592.6601
+            "freq": 592.66008
           },
           "38": {
             "group": "default",
             "idx": 7,
             "drct": -1,
             "offset": 3,
-            "freq": 526.809
+            "freq": 526.80896
           },
           "39": {
             "group": "default",
@@ -9107,14 +9107,14 @@
             "idx": 7,
             "drct": -1,
             "offset": 2,
-            "freq": 592.6601
+            "freq": 592.66008
           },
           "41": {
             "group": "default",
             "idx": 7,
             "drct": -1,
             "offset": 2,
-            "freq": 526.809
+            "freq": 526.80896
           },
           "42": {
             "group": "default",
@@ -9134,7 +9134,7 @@
             "idx": 7,
             "drct": -1,
             "offset": 1,
-            "freq": 526.809
+            "freq": 526.80896
           },
           "45": {
             "group": "default",
@@ -9148,7 +9148,7 @@
             "idx": 7,
             "drct": -1,
             "offset": 1,
-            "freq": 444.4951
+            "freq": 444.49506
           }
         },
         "node_pfields": {
@@ -9182,28 +9182,28 @@
           },
           "4": {
             "amp": null,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "gate": null,
             "out": null,
             "pan": null
           },
           "5": {
             "amp": null,
-            "freq": 296.33,
+            "freq": 296.33004,
             "gate": null,
             "out": null,
             "pan": null
           },
           "6": {
             "amp": null,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "gate": null,
             "out": null,
             "pan": null
           },
           "7": {
             "amp": null,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "gate": null,
             "out": null,
             "pan": null
@@ -9224,28 +9224,28 @@
           },
           "10": {
             "amp": null,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "gate": null,
             "out": null,
             "pan": null
           },
           "11": {
             "amp": null,
-            "freq": 296.33,
+            "freq": 296.33004,
             "gate": null,
             "out": null,
             "pan": null
           },
           "12": {
             "amp": null,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "gate": null,
             "out": null,
             "pan": null
           },
           "13": {
             "amp": null,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "gate": null,
             "out": null,
             "pan": null
@@ -9266,28 +9266,28 @@
           },
           "16": {
             "amp": null,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "gate": null,
             "out": null,
             "pan": null
           },
           "17": {
             "amp": null,
-            "freq": 296.33,
+            "freq": 296.33004,
             "gate": null,
             "out": null,
             "pan": null
           },
           "18": {
             "amp": null,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "gate": null,
             "out": null,
             "pan": null
           },
           "19": {
             "amp": null,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "gate": null,
             "out": null,
             "pan": null
@@ -9308,28 +9308,28 @@
           },
           "22": {
             "amp": null,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "gate": null,
             "out": null,
             "pan": null
           },
           "23": {
             "amp": null,
-            "freq": 296.33,
+            "freq": 296.33004,
             "gate": null,
             "out": null,
             "pan": null
           },
           "24": {
             "amp": null,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "gate": null,
             "out": null,
             "pan": null
           },
           "25": {
             "amp": null,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "gate": null,
             "out": null,
             "pan": null
@@ -9350,7 +9350,7 @@
           },
           "28": {
             "amp": null,
-            "freq": 790.2134,
+            "freq": 790.21344,
             "gate": null,
             "out": null,
             "pan": null
@@ -9364,7 +9364,7 @@
           },
           "30": {
             "amp": null,
-            "freq": 658.5112,
+            "freq": 658.5111999999999,
             "gate": null,
             "out": null,
             "pan": null
@@ -9385,14 +9385,14 @@
           },
           "33": {
             "amp": null,
-            "freq": 658.5112,
+            "freq": 658.5111999999999,
             "gate": null,
             "out": null,
             "pan": null
           },
           "34": {
             "amp": null,
-            "freq": 592.6601,
+            "freq": 592.66008,
             "gate": null,
             "out": null,
             "pan": null
@@ -9406,21 +9406,21 @@
           },
           "36": {
             "amp": null,
-            "freq": 658.5112,
+            "freq": 658.5111999999999,
             "gate": null,
             "out": null,
             "pan": null
           },
           "37": {
             "amp": null,
-            "freq": 592.6601,
+            "freq": 592.66008,
             "gate": null,
             "out": null,
             "pan": null
           },
           "38": {
             "amp": null,
-            "freq": 526.809,
+            "freq": 526.80896,
             "gate": null,
             "out": null,
             "pan": null
@@ -9434,14 +9434,14 @@
           },
           "40": {
             "amp": null,
-            "freq": 592.6601,
+            "freq": 592.66008,
             "gate": null,
             "out": null,
             "pan": null
           },
           "41": {
             "amp": null,
-            "freq": 526.809,
+            "freq": 526.80896,
             "gate": null,
             "out": null,
             "pan": null
@@ -9462,7 +9462,7 @@
           },
           "44": {
             "amp": null,
-            "freq": 526.809,
+            "freq": 526.80896,
             "gate": null,
             "out": null,
             "pan": null
@@ -9476,7 +9476,7 @@
           },
           "46": {
             "amp": null,
-            "freq": 444.4951,
+            "freq": 444.49506,
             "gate": null,
             "out": null,
             "pan": null
@@ -11100,10 +11100,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11116,16 +11116,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11138,16 +11138,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 296.33,
+            "freq": 296.33004,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11160,16 +11160,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11182,16 +11182,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11210,10 +11210,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11226,16 +11226,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11248,16 +11248,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 296.33,
+            "freq": 296.33004,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11270,16 +11270,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11292,16 +11292,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11320,10 +11320,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11336,16 +11336,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11358,16 +11358,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 296.33,
+            "freq": 296.33004,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11380,16 +11380,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11402,16 +11402,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11430,10 +11430,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11446,16 +11446,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 263.4045,
+            "freq": 263.40448,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11468,16 +11468,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 296.33,
+            "freq": 296.33004,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11490,16 +11490,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 329.2556,
+            "freq": 329.25559999999996,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11512,16 +11512,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 370.4125,
+            "freq": 370.41255,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
             "drct": 1,
-            "offset": 0
+            "offset": 0,
+            "group": "default"
           }
         },
         {
@@ -11534,16 +11534,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 790.2134,
+            "freq": 790.21344,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 5
+            "offset": 5,
+            "group": "default"
           }
         },
         {
@@ -11562,10 +11562,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 5
+            "offset": 5,
+            "group": "default"
           }
         },
         {
@@ -11578,16 +11578,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 658.5112,
+            "freq": 658.5111999999999,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 5
+            "offset": 5,
+            "group": "default"
           }
         },
         {
@@ -11606,10 +11606,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 4
+            "offset": 4,
+            "group": "default"
           }
         },
         {
@@ -11622,16 +11622,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 658.5112,
+            "freq": 658.5111999999999,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 4
+            "offset": 4,
+            "group": "default"
           }
         },
         {
@@ -11644,16 +11644,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 592.6601,
+            "freq": 592.66008,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 4
+            "offset": 4,
+            "group": "default"
           }
         },
         {
@@ -11666,16 +11666,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 658.5112,
+            "freq": 658.5111999999999,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 3
+            "offset": 3,
+            "group": "default"
           }
         },
         {
@@ -11688,16 +11688,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 592.6601,
+            "freq": 592.66008,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 3
+            "offset": 3,
+            "group": "default"
           }
         },
         {
@@ -11710,16 +11710,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 526.809,
+            "freq": 526.80896,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 3
+            "offset": 3,
+            "group": "default"
           }
         },
         {
@@ -11732,16 +11732,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 592.6601,
+            "freq": 592.66008,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 2
+            "offset": 2,
+            "group": "default"
           }
         },
         {
@@ -11754,16 +11754,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 526.809,
+            "freq": 526.80896,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 2
+            "offset": 2,
+            "group": "default"
           }
         },
         {
@@ -11782,10 +11782,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 2
+            "offset": 2,
+            "group": "default"
           }
         },
         {
@@ -11798,16 +11798,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 526.809,
+            "freq": 526.80896,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 1
+            "offset": 1,
+            "group": "default"
           }
         },
         {
@@ -11826,10 +11826,10 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 1
+            "offset": 1,
+            "group": "default"
           }
         },
         {
@@ -11842,16 +11842,16 @@
           "metric_duration": "9/140",
           "pfields": {
             "amp": 0.1,
-            "freq": 444.4951,
+            "freq": 444.49506,
             "pan": 0.0,
             "gate": 1,
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 7,
             "drct": -1,
-            "offset": 1
+            "offset": 1,
+            "group": "default"
           }
         }
       ]
@@ -23713,7 +23713,7 @@
           },
           "9": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.34044600469728353
           },
           "10": {
@@ -23721,12 +23721,12 @@
           },
           "11": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.10823379771832098
           },
           "12": {
             "group": "default",
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "vel": 0.4329770563201687
           },
           "13": {
@@ -23808,7 +23808,7 @@
           },
           "38": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.4862528132298238
           },
           "39": {
@@ -23824,7 +23824,7 @@
           },
           "42": {
             "group": "default",
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "vel": 0.2760609974958405
           },
           "43": {
@@ -23841,7 +23841,7 @@
           },
           "47": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.20351199264000677
           },
           "48": {
@@ -23870,12 +23870,12 @@
           },
           "56": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.4100531293444458
           },
           "57": {
             "group": "default",
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "vel": 0.45793094017105956
           },
           "58": {
@@ -23886,7 +23886,7 @@
           },
           "60": {
             "group": "default",
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "vel": 0.1353970008207678
           },
           "61": {
@@ -23929,7 +23929,7 @@
           },
           "73": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.12982025747190834
           },
           "74": {
@@ -23937,7 +23937,7 @@
           },
           "75": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.40889790771866297
           },
           "76": {
@@ -23948,7 +23948,7 @@
           },
           "78": {
             "group": "default",
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "vel": 0.38274293753904687
           },
           "79": {
@@ -23970,7 +23970,7 @@
           },
           "84": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.3493192507310232
           },
           "85": {
@@ -24004,7 +24004,7 @@
           },
           "94": {
             "group": "default",
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "vel": 0.28888597006477973
           },
           "95": {
@@ -24015,7 +24015,7 @@
           },
           "97": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.404314019446759
           },
           "98": {
@@ -24023,7 +24023,7 @@
           },
           "99": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.2975182385457563
           },
           "100": {
@@ -24058,7 +24058,7 @@
           },
           "110": {
             "group": "default",
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "vel": 0.19971689165954998
           },
           "111": {
@@ -24066,7 +24066,7 @@
           },
           "112": {
             "group": "default",
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "vel": 0.191519266196649
           },
           "113": {
@@ -24148,7 +24148,7 @@
           },
           "9": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24164,7 +24164,7 @@
           },
           "11": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24172,7 +24172,7 @@
           },
           "12": {
             "amp": null,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24380,7 +24380,7 @@
           },
           "38": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24412,7 +24412,7 @@
           },
           "42": {
             "amp": null,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24452,7 +24452,7 @@
           },
           "47": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24524,7 +24524,7 @@
           },
           "56": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24532,7 +24532,7 @@
           },
           "57": {
             "amp": null,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24556,7 +24556,7 @@
           },
           "60": {
             "amp": null,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24660,7 +24660,7 @@
           },
           "73": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24676,7 +24676,7 @@
           },
           "75": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24700,7 +24700,7 @@
           },
           "78": {
             "amp": null,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24748,7 +24748,7 @@
           },
           "84": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24828,7 +24828,7 @@
           },
           "94": {
             "amp": null,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24852,7 +24852,7 @@
           },
           "97": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24868,7 +24868,7 @@
           },
           "99": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24956,7 +24956,7 @@
           },
           "110": {
             "amp": null,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "gate": null,
             "out": null,
             "pan": null,
@@ -24972,7 +24972,7 @@
           },
           "112": {
             "amp": null,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "gate": null,
             "out": null,
             "pan": null,
@@ -28860,7 +28860,7 @@
           "metric_duration": "3/112",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -28880,7 +28880,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -28900,7 +28900,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29282,7 +29282,7 @@
           "metric_duration": "3/176",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29341,7 +29341,7 @@
           "metric_duration": "3/176",
           "pfields": {
             "amp": 0.1,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29418,7 +29418,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29533,7 +29533,7 @@
           "metric_duration": "9/448",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29553,7 +29553,7 @@
           "metric_duration": "9/448",
           "pfields": {
             "amp": 0.1,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29592,7 +29592,7 @@
           "metric_duration": "3/224",
           "pfields": {
             "amp": 0.1,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29784,7 +29784,7 @@
           "metric_duration": "1/64",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29804,7 +29804,7 @@
           "metric_duration": "1/80",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29862,7 +29862,7 @@
           "metric_duration": "1/80",
           "pfields": {
             "amp": 0.1,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -29959,7 +29959,7 @@
           "metric_duration": "1/80",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -30075,7 +30075,7 @@
           "metric_duration": "1/48",
           "pfields": {
             "amp": 0.1,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -30114,7 +30114,7 @@
           "metric_duration": "1/48",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -30153,7 +30153,7 @@
           "metric_duration": "1/48",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -30325,7 +30325,7 @@
           "metric_duration": "3/242",
           "pfields": {
             "amp": 0.1,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -30364,7 +30364,7 @@
           "metric_duration": "3/242",
           "pfields": {
             "amp": 0.1,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -37207,7 +37207,7 @@
           },
           "7": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.4214688307596458
           },
           "8": {
@@ -37215,7 +37215,7 @@
           },
           "9": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.3157368967662603
           },
           "10": {
@@ -37223,7 +37223,7 @@
           },
           "11": {
             "group": "default",
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "vel": 0.4584365199693973
           },
           "12": {
@@ -37272,7 +37272,7 @@
           },
           "26": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.2292811728083021
           },
           "27": {
@@ -37285,7 +37285,7 @@
           },
           "29": {
             "group": "default",
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "vel": 0.4849789179768445
           },
           "30": {
@@ -37329,7 +37329,7 @@
           },
           "43": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.19582475626678897
           },
           "44": {
@@ -37343,12 +37343,12 @@
           },
           "47": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.19682210860460017
           },
           "48": {
             "group": "default",
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "vel": 0.4046478461314871
           },
           "49": {
@@ -37356,7 +37356,7 @@
           },
           "50": {
             "group": "default",
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "vel": 0.2471132530877013
           },
           "51": {
@@ -37399,7 +37399,7 @@
           },
           "63": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.10663513157114246
           },
           "64": {
@@ -37425,12 +37425,12 @@
           },
           "71": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.254694138520215
           },
           "72": {
             "group": "default",
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "vel": 0.1550083776583973
           },
           "73": {
@@ -37455,7 +37455,7 @@
           },
           "79": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.322080324639785
           },
           "80": {
@@ -37495,7 +37495,7 @@
           },
           "91": {
             "group": "default",
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "vel": 0.45884410398103087
           },
           "92": {
@@ -37503,7 +37503,7 @@
           },
           "93": {
             "group": "default",
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "vel": 0.41195021834304957
           },
           "94": {
@@ -37520,7 +37520,7 @@
           },
           "98": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.342571623863836
           },
           "99": {
@@ -37549,7 +37549,7 @@
           },
           "107": {
             "group": "default",
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "vel": 0.3607845038010402
           },
           "108": {
@@ -37557,7 +37557,7 @@
           },
           "109": {
             "group": "default",
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "vel": 0.19489963499872004
           },
           "110": {
@@ -37570,7 +37570,7 @@
           },
           "112": {
             "group": "default",
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "vel": 0.3630451569201374
           },
           "113": {
@@ -37636,7 +37636,7 @@
           },
           "7": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37652,7 +37652,7 @@
           },
           "9": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37668,7 +37668,7 @@
           },
           "11": {
             "amp": null,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37788,7 +37788,7 @@
           },
           "26": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37812,7 +37812,7 @@
           },
           "29": {
             "amp": null,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37924,7 +37924,7 @@
           },
           "43": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37956,7 +37956,7 @@
           },
           "47": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37964,7 +37964,7 @@
           },
           "48": {
             "amp": null,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "gate": null,
             "out": null,
             "pan": null,
@@ -37980,7 +37980,7 @@
           },
           "50": {
             "amp": null,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38084,7 +38084,7 @@
           },
           "63": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38148,7 +38148,7 @@
           },
           "71": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38156,7 +38156,7 @@
           },
           "72": {
             "amp": null,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38212,7 +38212,7 @@
           },
           "79": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38308,7 +38308,7 @@
           },
           "91": {
             "amp": null,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38324,7 +38324,7 @@
           },
           "93": {
             "amp": null,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38364,7 +38364,7 @@
           },
           "98": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38436,7 +38436,7 @@
           },
           "107": {
             "amp": null,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38452,7 +38452,7 @@
           },
           "109": {
             "amp": null,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "gate": null,
             "out": null,
             "pan": null,
@@ -38476,7 +38476,7 @@
           },
           "112": {
             "amp": null,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "gate": null,
             "out": null,
             "pan": null,
@@ -42326,7 +42326,7 @@
           "metric_duration": "3/112",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42365,7 +42365,7 @@
           "metric_duration": "3/112",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42385,7 +42385,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42615,7 +42615,7 @@
           "metric_duration": "3/128",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42674,7 +42674,7 @@
           "metric_duration": "1/32",
           "pfields": {
             "amp": 0.1,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42865,7 +42865,7 @@
           "metric_duration": "3/176",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42923,7 +42923,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42943,7 +42943,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -42982,7 +42982,7 @@
           "metric_duration": "1/44",
           "pfields": {
             "amp": 0.1,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43155,7 +43155,7 @@
           "metric_duration": "3/224",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43251,7 +43251,7 @@
           "metric_duration": "1/64",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43271,7 +43271,7 @@
           "metric_duration": "1/64",
           "pfields": {
             "amp": 0.1,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43387,7 +43387,7 @@
           "metric_duration": "1/80",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43541,7 +43541,7 @@
           "metric_duration": "1/48",
           "pfields": {
             "amp": 0.1,
-            "freq": 103.7089,
+            "freq": 103.70893333333333,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43561,7 +43561,7 @@
           "metric_duration": "1/48",
           "pfields": {
             "amp": 0.1,
-            "freq": 69.1393,
+            "freq": 69.13928888888888,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43638,7 +43638,7 @@
           "metric_duration": "1/48",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43772,7 +43772,7 @@
           "metric_duration": "3/242",
           "pfields": {
             "amp": 0.1,
-            "freq": 55.3114,
+            "freq": 55.31143111111111,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43811,7 +43811,7 @@
           "metric_duration": "3/242",
           "pfields": {
             "amp": 0.1,
-            "freq": 110.6229,
+            "freq": 110.62286222222222,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -43870,7 +43870,7 @@
           "metric_duration": "3/242",
           "pfields": {
             "amp": 0.1,
-            "freq": 82.9671,
+            "freq": 82.96714666666666,
             "pan": 0.0,
             "gate": 1,
             "out": 0,
@@ -45613,9 +45613,9 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
-            "drct": 1
+            "drct": 1,
+            "group": "default"
           }
         },
         {
@@ -45634,9 +45634,9 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
-            "drct": 1
+            "drct": 1,
+            "group": "default"
           }
         },
         {
@@ -45655,9 +45655,9 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 0,
-            "drct": 1
+            "drct": 1,
+            "group": "default"
           }
         },
         {
@@ -45676,9 +45676,9 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 5,
-            "drct": -1
+            "drct": -1,
+            "group": "default"
           }
         },
         {
@@ -45697,9 +45697,9 @@
             "out": 0
           },
           "mfields": {
-            "group": "default",
             "idx": 5,
-            "drct": -1
+            "drct": -1,
+            "group": "default"
           }
         }
       ]
