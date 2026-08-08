@@ -447,6 +447,10 @@ def _transition(collection, prev_hz, lo, hi, *, drift=None,
         b = (mu_prev - mu_nat) / log_eq
         k_bases = sorted({math.floor(b), round(b), math.ceil(b)})
 
+    # loop-invariant: doubling scores depend only on the collection
+    harmonic_scores = (_doubling_scores(collection)
+                       if doubling_mode == 'harmonic' else None)
+
     best = None
     for k_base in k_bases:
         # cost[j][i] and the displacement that achieves it
@@ -486,8 +490,7 @@ def _transition(collection, prev_hz, lo, hi, *, drift=None,
         else:
             free_cols = [i for i in range(n) if i not in assignment.values()]
             if doubling_mode == 'harmonic':
-                scores = _doubling_scores(collection)
-                pen = [_DOUBLING_WEIGHT * (1.0 - s) for s in scores]
+                pen = [_DOUBLING_WEIGHT * (1.0 - s) for s in harmonic_scores]
             else:
                 pen = [0.0] * m
             pool = doubling_idx if doubling_mode == 'explicit' else range(m)

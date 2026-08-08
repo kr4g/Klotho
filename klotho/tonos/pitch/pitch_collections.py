@@ -512,8 +512,21 @@ class RelativePitchCollection(PitchCollectionBase):
     @property
     def pitches(self) -> List[Pitch]:
         """list of Pitch : Concrete pitches resolved from degrees and the
-        reference pitch."""
-        return [self._calculate_pitch(i) for i in range(len(self._degrees))]
+        reference pitch.
+
+        Memoized on the identity of the degree list and reference pitch
+        (both are only ever rebound, never mutated — ``root()`` shallow-
+        copies and rebinds the reference, which invalidates naturally).
+        Pitch objects are immutable, so sharing them across accesses is
+        safe; a fresh outer list is returned each call.
+        """
+        cached = self.__dict__.get('_pitches_cache')
+        if (cached is not None and cached[0] is self._degrees
+                and cached[1] is self._reference_pitch):
+            return list(cached[2])
+        value = [self._calculate_pitch(i) for i in range(len(self._degrees))]
+        self.__dict__['_pitches_cache'] = (self._degrees, self._reference_pitch, value)
+        return list(value)
 
     @property
     def intervals(self) -> List[IntervalType]:
