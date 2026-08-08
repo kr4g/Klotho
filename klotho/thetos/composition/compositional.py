@@ -1276,6 +1276,13 @@ class CompositionalUnit(TemporalUnit):
         -------
         pandas.DataFrame
         """
+        key = (self._rt._structure_version, self._bpm, self._beat,
+               self._offset,
+               getattr(self._rt._param_layer, '_instruments_version', 0))
+        cached = self.__dict__.get('_events_df_cache')
+        in_batch = self._rt._write_batch_depth
+        if cached is not None and cached[0] == key and not in_batch:
+            return cached[1].copy()
         events = self._materialize_events()
         all_pf_keys: list[str] = []
         all_mf_keys: list[str] = []
@@ -1311,7 +1318,11 @@ class CompositionalUnit(TemporalUnit):
                 row[k] = mf.get(k)
             data.append(row)
 
-        return pd.DataFrame(data, index=range(len(rows)))
+        df = pd.DataFrame(data, index=range(len(rows)))
+        if not in_batch:
+            self.__dict__['_events_df_cache'] = (key, df)
+            return df.copy()
+        return df
     
     def _distribute_to_targets(self, targets, fields, include_rests, setter='pfields'):
         if not include_rests:

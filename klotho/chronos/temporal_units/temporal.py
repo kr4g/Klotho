@@ -623,17 +623,17 @@ class Chronon(metaclass=TemporalMeta):
         return self._rt_node()['proportion'] < 0
 
     def __str__(self):
-        return pd.DataFrame({
-            'node_id': [self.node_id],
-            'start': [self.start],
-            'duration': [self.duration], 
-            'end': [self.end],
-            'is_rest': [self.is_rest],
-            'proportion': [self.proportion],
-            'metric_onset': [self.metric_onset],
-            'metric_duration': [self.metric_duration],
-        }, index=['']).__str__()
-    
+        # plain formatting — building a 1-row DataFrame per repr made
+        # printing events in a loop pathologically slow
+        return (
+            f"{type(self).__name__}("
+            f"node_id={self.node_id}, start={self.start:g}, "
+            f"duration={self.duration:g}, end={self.end:g}, "
+            f"is_rest={self.is_rest}, proportion={self.proportion}, "
+            f"metric_onset={self.metric_onset}, "
+            f"metric_duration={self.metric_duration})"
+        )
+
     def __repr__(self):
         return self.__str__()
 
@@ -948,8 +948,12 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         -------
         pandas.DataFrame
         """
+        key = (self._rt._structure_version, self._bpm, self._beat, self._offset)
+        cached = self.__dict__.get('_events_df_cache')
+        if cached is not None and cached[0] == key and not self._rt._write_batch_depth:
+            return cached[1].copy()
         events = self._materialize_events()
-        return pd.DataFrame([{
+        df = pd.DataFrame([{
             'node_id': c.node_id,
             'start': c.start,
             'duration': c.duration,
@@ -959,6 +963,10 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
             'metric_onset': c.metric_onset,
             'metric_duration': c.metric_duration,
         } for c in events], index=range(len(events)))
+        if not self._rt._write_batch_depth:
+            self.__dict__['_events_df_cache'] = (key, df)
+            return df.copy()
+        return df
         
     def _scale_bpm(self, factor: float) -> None:
         """Multiply bpm by ``factor`` (private; used by ``ScoreItem``).

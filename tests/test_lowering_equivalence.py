@@ -200,6 +200,35 @@ class TestGoldenPayload:
             'insert uid collides with event id'
 
 
+class TestFastIdGenerator:
+    def test_ids_unique_across_concurrent_conversions(self):
+        """Two conversions running interleaved (threads) must never mint
+        colliding ids — the uuid-prefix + shared-counter scheme depends
+        on the counter being atomic."""
+        import threading
+        from klotho.utils.ids import fast_id
+        results = [[] for _ in range(4)]
+
+        def mint(bucket):
+            bucket.extend(fast_id() for _ in range(5000))
+
+        threads = [threading.Thread(target=mint, args=(b,)) for b in results]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        all_ids = [i for b in results for i in b]
+        assert len(all_ids) == len(set(all_ids))
+        assert all(len(i) == 32 for i in all_ids[:10])
+
+    def test_two_conversions_share_no_ids(self):
+        a = lower(build_miniature_score())
+        b = lower(build_miniature_score())
+        ids_a = {e['id'] for e in a['events'] if 'id' in e}
+        ids_b = {e['id'] for e in b['events'] if 'id' in e}
+        assert not (ids_a & ids_b)
+
+
 class TestCopyEquivalence:
     def test_fast_copy_vs_rebuild_byte_identical(self, monkeypatch):
         fast = normalize_payload(lower(build_miniature_score()))

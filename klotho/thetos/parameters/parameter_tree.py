@@ -31,6 +31,7 @@ class ParameterLayer(TreeLayer):
         self._mfields = set()
         self._node_instruments = {}
         self._effective_cache = None
+        self._instruments_version = 0
 
     @property
     def owned_keys(self):
@@ -157,6 +158,7 @@ class ParameterLayer(TreeLayer):
         if hasattr(instrument, 'pfields'):
             self._pfields.update(instrument.pfields.keys())
         self._node_instruments[node] = instrument
+        self._instruments_version = getattr(self, '_instruments_version', 0) + 1
 
     def _resolve_governing_instrument_node(self, tree, node):
         if node in self._node_instruments:
@@ -207,6 +209,7 @@ class ParameterLayer(TreeLayer):
 
     def clear_fields(self, tree, node=None):
         """Remove all overrides and instrument bindings — whole tree, or *node*'s subtree."""
+        self._instruments_version = getattr(self, '_instruments_version', 0) + 1
         keys = self._pfields | self._mfields
         if node is None:
             for n in tree.nodes:

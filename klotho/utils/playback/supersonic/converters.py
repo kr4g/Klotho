@@ -1,4 +1,4 @@
-from uuid import uuid4
+from klotho.utils.ids import fast_id
 
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
@@ -35,7 +35,7 @@ DEFAULT_COMPOSITION_SYNTH = "kl_tri"
 
 
 def _uid():
-    return uuid4().hex
+    return fast_id()
 
 
 def _resolve_synth(inst, default_synth):
@@ -229,7 +229,7 @@ def chord_sequence_to_sc_events(obj, duration=None, arp=False, strum=0, directio
 
 def spectrum_to_sc_events(obj, duration=None, arp=False, strum=0, direction='u',
                           amp=None, extra_pfields=None, inst=None):
-    pitches = [row['pitch'] for _, row in obj.data.iterrows()]
+    pitches = obj.data['pitch'].tolist()
     if direction.lower() == 'd':
         pitches = list(reversed(pitches))
     synth, inst_ctx = _resolve_synth(inst, DEFAULT_SPECTRUM_SYNTH)
@@ -649,8 +649,6 @@ def _lower_score_uc(uc, track_override, animation=False):
     metadata and keeps ``__rest__`` events (they carry step indices too);
     absolute times are preserved either way.
     """
-    from uuid import uuid4
-
     from klotho.utils.playback._sc_assembly import (
         lower_compositional_ir_to_sc_assembly,
     )
@@ -683,7 +681,7 @@ def _lower_score_uc(uc, track_override, animation=False):
             event["group"] = "default"
 
         if event_type == "new":
-            new_uid = uuid4().hex
+            new_uid = fast_id()
             id_map[event["id"]] = new_uid
             event["id"] = new_uid
             events.append(event)
@@ -779,7 +777,7 @@ def _lower_score_event(item):
     voice_ids = []
 
     for voice in voices:
-        uid = uuid4().hex
+        uid = fast_id()
         voice_ids.append(uid)
 
         user_pf = coerce_sc_pfield_values(voice["pfields"])

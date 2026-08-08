@@ -1,6 +1,6 @@
 import math
 import numbers
-from uuid import uuid4
+from klotho.utils.ids import fast_id
 
 from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
@@ -370,7 +370,7 @@ def lower_event_ir_to_voice_events(event, step_index=None, voice_count=None):
     strum_raw = mfields.get("strum", 0.0)
     strum_value = _normalized_strum_value(strum_raw)
     apply_strum = tuple_expanded and voice_count > 1 and strum_value != 0.0
-    logical_step_id = uuid4().hex
+    logical_step_id = fast_id()
     voices = []
 
     for voice_index, voice_pfields in enumerate(expanded_pfields):

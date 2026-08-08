@@ -1,4 +1,4 @@
-from uuid import uuid4
+from klotho.utils.ids import fast_id
 
 from klotho.thetos.instruments.synthdef import SynthDefInstrument
 from klotho.thetos.instruments.base import Effect
@@ -225,7 +225,7 @@ def lower_compositional_ir_to_sc_assembly(
             if animation:
                 rest = {
                     "type": "new",
-                    "id": uuid4().hex,
+                    "id": fast_id(),
                     "defName": "__rest__",
                     "start": event.start - time_offset,
                     "pfields": {},
@@ -367,7 +367,7 @@ def lower_compositional_ir_to_sc_assembly(
                 merged_pfields[inject_key] = voice_dur
 
             if is_slur_start:
-                slur_uid = uuid4().hex
+                slur_uid = fast_id()
                 new_event = {
                     "type": "new",
                     "id": slur_uid,
@@ -406,7 +406,7 @@ def lower_compositional_ir_to_sc_assembly(
                     # event to the group's max voice count, so mid-slur
                     # voices cannot appear through normal lowering. Kept
                     # for hand-built IR that bypasses the pre-pass.
-                    slur_uid = uuid4().hex
+                    slur_uid = fast_id()
                     new_event = {
                         "type": "new",
                         "id": slur_uid,
@@ -427,7 +427,7 @@ def lower_compositional_ir_to_sc_assembly(
                 continue
 
             # Non-slur leaf: terminal immediately.
-            uid = uuid4().hex
+            uid = fast_id()
             new_event = {
                 "type": "new",
                 "id": uid,
