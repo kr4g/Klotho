@@ -31,13 +31,13 @@ from typing import Any
 import numpy as np
 
 
-_HEX_ID_RE = re.compile(r'^[0-9a-f]{12}(?:[0-9a-f]{20})?$')
+_HEX_ID_RE = re.compile(r'^(?:[0-9a-f]{12}|[0-9a-f]{16}|[0-9a-f]{32})$')
 
 
 def _is_hex_id(value: Any) -> bool:
     if not isinstance(value, str):
         return False
-    if len(value) not in (12, 32):
+    if len(value) not in (12, 16, 32):
         return False
     return bool(_HEX_ID_RE.match(value))
 

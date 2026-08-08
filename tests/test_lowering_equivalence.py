@@ -43,7 +43,10 @@ GOLDEN_PATH = Path(__file__).parent / 'fixtures' / 'lowering_equivalence_golden.
 
 _UUID_RE = re.compile(
     r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-    r'|(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])', re.I)
+    r'|(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])'
+    # 16-hex fast_id: quote-bounded (full JSON string value only) so the
+    # 16-digit runs inside float reprs can never match
+    r'|(?<=")[0-9a-f]{16}(?=")', re.I)
 _UID_FIELD_RE = re.compile(r'("uid": ")([0-9a-f]{6,32})(")', re.I)
 
 
@@ -219,7 +222,7 @@ class TestFastIdGenerator:
             t.join()
         all_ids = [i for b in results for i in b]
         assert len(all_ids) == len(set(all_ids))
-        assert all(len(i) == 32 for i in all_ids[:10])
+        assert all(len(i) == 16 for i in all_ids[:10])
 
     def test_two_conversions_share_no_ids(self):
         a = lower(build_miniature_score())
