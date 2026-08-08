@@ -5,6 +5,9 @@ import rustworkx as rx
 from functools import cached_property
 from .group import Group
 import copy
+from fractions import Fraction
+
+_IMMUTABLE_META_TYPES = (str, int, float, bool, type(None), Fraction)
 
 
 class Tree(GraphCore):
@@ -813,7 +816,11 @@ class Tree(GraphCore):
             if isinstance(payload, dict):
                 new_rx[idx] = dict(payload)
         new_tree._rx = new_rx
-        new_tree._meta = copy.deepcopy(self._meta)
+        meta = self._meta
+        if all(isinstance(v, _IMMUTABLE_META_TYPES) for v in meta.values()):
+            new_tree._meta = dict(meta)
+        else:
+            new_tree._meta = copy.deepcopy(meta)
         new_tree._structure_version = 0
 
         new_tree._root = self._root
