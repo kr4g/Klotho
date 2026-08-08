@@ -1855,7 +1855,7 @@ def _plot_envelope(envelope: Envelope, figsize=(20, 5), show_points: bool = True
     plt.gcf().set_facecolor('black')
     
     x = np.linspace(0, envelope.total_time, resolution)
-    y = np.array([envelope.at_time(t) for t in x])
+    y = np.array(envelope.sample(x))
     
     ax.plot(x, y, color='#e6e6e6', linewidth=2.5)
     

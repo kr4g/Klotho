@@ -574,10 +574,7 @@ def _build_score_control_data(control_descriptors, block_size):
             samples = np.full(block_size, float(env.values[0]), dtype=np.float32)
         else:
             sample_times = np.linspace(0.0, total, block_size, dtype=np.float64)
-            samples = np.array(
-                [env.at_time(float(x)) for x in sample_times],
-                dtype=np.float32,
-            )
+            samples = np.array(env.sample(sample_times), dtype=np.float32)
         blocks.append(samples)
 
         serializable.append({

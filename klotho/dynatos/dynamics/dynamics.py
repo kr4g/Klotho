@@ -6,7 +6,6 @@ individual dynamic markings and dynamic ranges.
 """
 
 import numpy as np
-from functools import lru_cache
 from .utils import dbamp
 
 __all__ = [
@@ -169,7 +168,6 @@ class DynamicRange:
     def __getitem__(self, dynamic):
         return self._range[dynamic]
 
-    @lru_cache(maxsize=128)
     def at(self, position):
         """
         Get the dynamic at a normalized position within the range.
@@ -189,13 +187,23 @@ class DynamicRange:
         ValueError
             If position is not between 0 and 1.
         """
+        # per-instance memo — the old @lru_cache on this method was
+        # process-global keyed on self and retained every DynamicRange
+        # for the life of the interpreter
+        memo = self.__dict__.setdefault('_at_memo', {})
+        hit = memo.get(position)
+        if hit is not None:
+            return hit
+
         if position < 0 or position > 1:
             raise ValueError(f"Position {position} must be between 0 and 1")
-        
+
         if position == 0:
-            return self._range[self._dynamics[0]]
+            result = memo[position] = self._range[self._dynamics[0]]
+            return result
         if position == 1:
-            return self._range[self._dynamics[-1]]
+            result = memo[position] = self._range[self._dynamics[-1]]
+            return result
         
         num_dynamics = len(self._dynamics)
         dynamic_positions = np.linspace(0, 1, num_dynamics)
@@ -219,5 +227,6 @@ class DynamicRange:
             curved_pos = (np.exp(self._curve * position) - 1) / (np.exp(self._curve) - 1)
             
         db_value = min_db + curved_pos * (max_db - min_db)
-        
-        return Dynamic(marking, db_value) 
+
+        result = memo[position] = Dynamic(marking, db_value)
+        return result 

@@ -6,6 +6,8 @@ time-varying amplitude or parameter envelopes with support for various
 curve shapes and normalization options.
 """
 
+from bisect import bisect_left
+
 import numpy as np
 
 __all__ = [
@@ -228,10 +230,30 @@ class Envelope:
         """Time scale factor applied to segment durations."""
         return self._time_scale
     
+    def _segment_state(self):
+        """Precomputed (scaled_times, cumulative_boundaries, total).
+
+        Envelopes are immutable after construction (values/times/scale are
+        only written in ``__init__``), so this is computed once — at_time
+        used to re-sum total_time twice and rebuild the scaled-times list
+        on every call.
+        """
+        state = self.__dict__.get('_segment_state_cache')
+        if state is None:
+            scaled = [t * self._time_scale for t in self._times]
+            boundaries = [0.0]
+            current = 0.0
+            for t in scaled:
+                current += t
+                boundaries.append(current)
+            state = (scaled, boundaries, boundaries[-1] if scaled else 0.0)
+            self.__dict__['_segment_state_cache'] = state
+        return state
+
     @property
     def total_time(self):
         """Total duration of the envelope."""
-        return sum(t * self._time_scale for t in self._times)
+        return self._segment_state()[2]
     
     @property
     def breakpoint_times(self):
@@ -279,49 +301,65 @@ class Envelope:
         cached = self._at_time_cache.get(time)
         if cached is not None:
             return cached
-
-        if time < 0 or time > self.total_time:
-            raise ValueError(f"Time {time} is outside envelope duration [0, {self.total_time}]")
-
-        if time == 0:
-            result = self._values[0]
-            self._at_time_cache[time] = result
-            return result
-        if time == self.total_time:
-            result = self._values[-1]
-            self._at_time_cache[time] = result
-            return result
-
-        scaled_times = [t * self._time_scale for t in self._times]
-        current_time = 0
-
-        for i in range(len(self._values) - 1):
-            segment_duration = scaled_times[i]
-            segment_end_time = current_time + segment_duration
-
-            if time <= segment_end_time:
-                segment_progress = (time - current_time) / segment_duration
-                start_val = self._values[i]
-                end_val = self._values[i + 1]
-                curve_val = self._curve[i]
-
-                if curve_val == 0:
-                    progress = segment_progress
-                else:
-                    progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
-
-                if self._warp == 'exp':
-                    result = start_val * (end_val / start_val) ** progress
-                else:
-                    result = start_val + (end_val - start_val) * progress
-                self._at_time_cache[time] = result
-                return result
-
-            current_time = segment_end_time
-
-        result = self._values[-1]
+        result = self._at_time_uncached(time)
+        if len(self._at_time_cache) >= 1024:
+            # bound the memo: linspace-style sweeps never repeat a key and
+            # used to grow this dict without limit
+            self._at_time_cache.clear()
         self._at_time_cache[time] = result
         return result
+
+    def _at_time_uncached(self, time):
+        scaled_times, boundaries, total = self._segment_state()
+
+        if time < 0 or time > total:
+            raise ValueError(f"Time {time} is outside envelope duration [0, {total}]")
+        if time == 0:
+            return self._values[0]
+        if time == total:
+            return self._values[-1]
+
+        # first segment whose end boundary is >= time — identical to the
+        # old linear scan's `time <= segment_end_time`, without rebuilding
+        # the scaled-times list per call
+        seg = bisect_left(boundaries, time) - 1
+        n_segments = len(self._values) - 1
+        if seg >= n_segments:
+            return self._values[-1]
+        current_time = boundaries[seg]
+        segment_duration = scaled_times[seg]
+        segment_progress = (time - current_time) / segment_duration
+        start_val = self._values[seg]
+        end_val = self._values[seg + 1]
+        curve_val = self._curve[seg]
+
+        if curve_val == 0:
+            progress = segment_progress
+        else:
+            progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
+
+        if self._warp == 'exp':
+            return start_val * (end_val / start_val) ** progress
+        return start_val + (end_val - start_val) * progress
+
+    def sample(self, times):
+        """
+        Evaluate the envelope at each time in *times* (batch ``at_time``).
+
+        Parameters
+        ----------
+        times : iterable of float
+            Query times, each within ``[0, total_time]``.
+
+        Returns
+        -------
+        list of float
+            Envelope values, sample-for-sample identical to calling
+            :meth:`at_time` per element (shared precomputed segment
+            state; no per-call memoization traffic).
+        """
+        at = self._at_time_uncached
+        return [at(float(t)) for t in times]
 
     def __str__(self):
         def format_list(lst):
