@@ -61,9 +61,50 @@ def beat_duration(ratio:Union[int, float, Fraction, str], bpm:Union[int, float],
     0.5
     """
     tempo_factor = 60 / bpm
-    ratio_value  = float(Fraction(ratio))
-    beat_ratio   = Fraction(beat_ratio)
+    if type(ratio) is Fraction:
+        ratio_value = ratio.numerator / ratio.denominator
+    else:
+        ratio_value = _ratio_as_float(ratio)
+    if type(beat_ratio) is not Fraction:
+        beat_ratio = _parse_beat_ratio(beat_ratio)
     return tempo_factor * ratio_value * (beat_ratio.denominator / beat_ratio.numerator)
+
+
+# Parse caches: beat_duration is called once per node per timing pass, but the
+# distinct (ratio, beat_ratio) inputs per session are few — mostly repeated
+# strings like '3/8'. Values are bounded by a hard cap so pathological streams
+# of unique keys cannot grow memory without limit.
+_RATIO_FLOAT_CACHE: dict = {}
+_BEAT_RATIO_CACHE: dict = {}
+_PARSE_CACHE_MAX = 4096
+
+
+def _ratio_as_float(ratio) -> float:
+    try:
+        return _RATIO_FLOAT_CACHE[ratio]
+    except KeyError:
+        pass
+    except TypeError:
+        return float(Fraction(ratio))
+    value = float(Fraction(ratio))
+    if len(_RATIO_FLOAT_CACHE) >= _PARSE_CACHE_MAX:
+        _RATIO_FLOAT_CACHE.clear()
+    _RATIO_FLOAT_CACHE[ratio] = value
+    return value
+
+
+def _parse_beat_ratio(beat_ratio) -> Fraction:
+    try:
+        return _BEAT_RATIO_CACHE[beat_ratio]
+    except KeyError:
+        pass
+    except TypeError:
+        return Fraction(beat_ratio)
+    value = Fraction(beat_ratio)
+    if len(_BEAT_RATIO_CACHE) >= _PARSE_CACHE_MAX:
+        _BEAT_RATIO_CACHE.clear()
+    _BEAT_RATIO_CACHE[beat_ratio] = value
+    return value
 
 def calc_onsets(durations:tuple):
     """

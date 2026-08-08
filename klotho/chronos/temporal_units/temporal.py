@@ -1069,15 +1069,23 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
                 raise ValueError(f'Invalid prolatio type: {type(prolatio)}')
 
     def _compute_timing_cache(self):
-        """Recompute real-time onset/duration cache for all nodes."""
+        """Recompute real-time onset/duration cache for all nodes.
+
+        Inlines :func:`~klotho.chronos.utils.beat_duration` with the
+        per-unit factors hoisted out of the loop; the float operation
+        order matches beat_duration exactly, so results are bit-identical.
+        """
         self._real_times.clear()
-        for node in self._rt.nodes:
-            metric_duration = self._rt[node]['metric_duration']
-            metric_onset = self._rt[node]['metric_onset']
-            
-            real_duration = beat_duration(ratio=metric_duration, bpm=self.bpm, beat_ratio=self.beat)
-            real_onset = beat_duration(ratio=metric_onset, bpm=self.bpm, beat_ratio=self.beat) + self._offset
-            
+        tempo_factor = 60 / self.bpm
+        beat = self._beat
+        beat_factor = beat.denominator / beat.numerator
+        offset = self._offset
+        rt = self._rt
+        rx = rt._rx
+        for node in rt.nodes:
+            data = rx.get_node_data(node)
+            real_duration = tempo_factor * float(data['metric_duration']) * beat_factor
+            real_onset = tempo_factor * float(data['metric_onset']) * beat_factor + offset
             self._real_times[node] = {'real_duration': real_duration, 'real_onset': real_onset}
         self._timing_dirty = False
 
