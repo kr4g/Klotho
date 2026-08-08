@@ -1,10 +1,28 @@
 import math
+from collections import deque
 from typing import Tuple
 from math import prod
 from fractions import Fraction
 import sympy as sp
 import rustworkx as rx
 from tabulate import tabulate
+
+
+def _sym_exp_key(expr):
+  """Canonical exponent-tuple key for a product of symbol powers.
+
+  ``(('A', 1), ('B', -1))`` for ``A/B``. Two such expressions are
+  sympy-equal iff their exponent tuples are equal (aliases are monic
+  products of symbols), which lets pair matching use tuple hashing
+  instead of sympy Mul division + expression hashing.
+  """
+  items = []
+  for base, exp in expr.as_powers_dict().items():
+    e = int(exp)
+    if e:
+      items.append((str(base), e))
+  items.sort()
+  return tuple(items)
 
 from klotho.topos.collections import CombinationSet as CS
 from klotho.tonos.utils.interval_normalization import equave_reduce
@@ -49,6 +67,8 @@ class CombinationProductSet(ReferencePitchAware, CS):
   (Fraction(35, 32), Fraction(5, 4), Fraction(21, 16), Fraction(3, 2), Fraction(7, 4), Fraction(15, 8))
   """
 
+  _MASTER_SET_PRESET_CACHE = {}
+
   @staticmethod
   def _resolve_master_set(master_set, factors):
     if master_set is None:
@@ -61,8 +81,14 @@ class CombinationProductSet(ReferencePitchAware, CS):
         raise ValueError(
           f"Unknown master set '{name}'. "
           f"Available: {list(MASTER_SETS.keys())}")
-        
-      ms = MASTER_SETS[name]()
+
+      # factor-less presets are pure templates (with_factors returns a
+      # fresh instance below) — build each once per process instead of
+      # twice per CPS
+      cache = CombinationProductSet._MASTER_SET_PRESET_CACHE
+      ms = cache.get(name)
+      if ms is None:
+        ms = cache[name] = MASTER_SETS[name]()
     elif isinstance(master_set, MasterSet):
       name = master_set.name
       ms = master_set
@@ -109,29 +135,42 @@ class CombinationProductSet(ReferencePitchAware, CS):
   def _build_master_set_structure(self, relationship_dict):
     if not relationship_dict:
       return
-      
+
+    # Re-key the relationship dict by canonical exponent tuples once
+    # (O(edges)), then match pairs by integer-dict subtraction — the old
+    # loop performed a sympy Mul division and expression-hash lookup for
+    # every ordered pair (hebdomekontany: 4,830 pairs, 94% of build).
+    # The stored sympy key IS the canonical form of alias1/alias2 for a
+    # matching pair, so the edge payload is unchanged.
+    exp_rel = {}
+    for sym_key, rel_data in relationship_dict.items():
+      exp_rel[_sym_exp_key(sym_key)] = (sym_key, rel_data)
+
     combo_to_node = {}
-    combo_to_alias = {}
+    combo_to_exp = {}
     for node, attrs in self.nodes(data=True):
       if 'combo' in attrs:
         combo_to_node[attrs['combo']] = node
-        combo_to_alias[attrs['combo']] = attrs['alias']
+        combo_to_exp[attrs['combo']] = {
+          name: e for name, e in _sym_exp_key(attrs['alias'])}
 
     for c1 in self._combos:
       node1 = combo_to_node[c1]
-      alias1 = combo_to_alias[c1]
+      e1 = combo_to_exp[c1]
       for c2 in self._combos:
         if c1 != c2:
-          node2 = combo_to_node[c2]
-
-          # Aliases are monomials over factor symbols; sympy's automatic
-          # Mul canonicalization on division already yields the canonical
-          # form, so no simplify() pass is needed for the dict lookup.
-          sym_ratio = alias1 / combo_to_alias[c2]
-
-          if sym_ratio in relationship_dict:
-            rel_data = relationship_dict[sym_ratio]
-            self._add_edge_raw(node1, node2, 
+          e2 = combo_to_exp[c2]
+          diff = dict(e1)
+          for name, e in e2.items():
+            ne = diff.get(name, 0) - e
+            if ne:
+              diff[name] = ne
+            else:
+              diff.pop(name, None)
+          hit = exp_rel.get(tuple(sorted(diff.items())))
+          if hit is not None:
+            sym_ratio, rel_data = hit
+            self._add_edge_raw(combo_to_node[c1], combo_to_node[c2],
                                relation=sym_ratio,
                                angle=rel_data['angle'],
                                distance=rel_data['distance'],
@@ -157,10 +196,10 @@ class CombinationProductSet(ReferencePitchAware, CS):
       start = min(all_nodes - visited_global)
       pos = {start: tuple(0.0 for _ in range(n_dims))}
       visited = {start}
-      queue = [start]
+      queue = deque([start])
 
       while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         for nb in list(G.successors(current)) + list(G.predecessors(current)):
           if nb in visited:
             continue
