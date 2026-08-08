@@ -349,6 +349,22 @@ class Parametron(Chronon):
             return resolver(self._node_id, key, value)
         return value
 
+    def _bind_key_set(self):
+        """Field keys that may hold a Bind, or ``None`` when unknowable.
+
+        ``None`` means "resolve every key" (no bind index available, or the
+        index cache is suspended inside a write batch — recomputing the
+        all-nodes scan per event would cost more than the skipped calls).
+        """
+        ut = self._ut
+        getter = getattr(ut, '_bind_field_keys', None)
+        if getter is None:
+            return None
+        rt = getattr(ut, '_rt', None)
+        if rt is not None and getattr(rt, '_write_batch_depth', 0):
+            return None
+        return getter()
+
     @property
     def pfields(self):
         """
@@ -366,16 +382,21 @@ class Parametron(Chronon):
         result = {}
         inst = self._resolve_instrument()
         effective = _resolve_kit_member(inst, self._pt, self._node_id) if inst is not None else inst
+        eff_pfields = None
         if effective is not None and hasattr(effective, 'pfields'):
-            result.update(dict(effective.pfields))
-        for k in self._pt.pfield_names:
-            v = self._resolve_bind(k, self._pt.get_pfield(self._node_id, k))
+            eff_pfields = effective.pfields
+            result.update(eff_pfields)
+        bind_keys = self._bind_key_set()
+        pt = self._pt
+        nid = self._node_id
+        for k in pt.pfield_names:
+            v = pt.get_pfield(nid, k)
+            if bind_keys is None or k in bind_keys:
+                v = self._resolve_bind(k, v)
             if v is not None:
                 result[k] = v
-            elif effective is not None and hasattr(effective, 'pfields'):
-                eff_pfields = effective.pfields
-                if k in eff_pfields:
-                    result[k] = eff_pfields[k]
+            elif eff_pfields is not None and k in eff_pfields:
+                result[k] = eff_pfields[k]
         # A family-name selector rotates to a concrete member per leaf;
         # surface the member key (matching the defaults merged above) so
         # the lowered voice events resolve the same member downstream.
@@ -396,8 +417,13 @@ class Parametron(Chronon):
         dict
             Dictionary of meta field names and values
         """
-        return {k: self._resolve_bind(k, self._pt.get_mfield(self._node_id, k))
-                for k in self._pt.mfield_names}
+        bind_keys = self._bind_key_set()
+        pt = self._pt
+        nid = self._node_id
+        return {k: self._resolve_bind(k, pt.get_mfield(nid, k))
+                if (bind_keys is None or k in bind_keys)
+                else pt.get_mfield(nid, k)
+                for k in pt.mfield_names}
 
     def _resolve_instrument(self):
         return self._pt.get_instrument(self._node_id)
