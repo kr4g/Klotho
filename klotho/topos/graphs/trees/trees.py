@@ -565,8 +565,10 @@ class Tree(GraphCore):
     # ------------------------------------------------------------------
     # Structural mutators
     # ------------------------------------------------------------------
-    def add_child(self, parent, index=None, **attr):
-        """Add a child node to a parent. Returns the new child node id."""
+    def _add_child_raw(self, parent, **attr):
+        """Insert a child (layer-normalized/validated) WITHOUT the
+        post-mutation sweep. For internal batch inserts — the caller MUST
+        run _post_mutation over a scope covering every inserted node."""
         normalized = dict(attr)
         for layer in self._layers:
             normalized = layer.normalize_attrs(self, parent, normalized, 'add_child')
@@ -574,6 +576,11 @@ class Tree(GraphCore):
             layer.validate_attrs(self, parent, normalized, 'add_child')
         child_id = self._add_node_raw(**normalized)
         self._add_edge_raw(parent, child_id)
+        return child_id
+
+    def add_child(self, parent, index=None, **attr):
+        """Add a child node to a parent. Returns the new child node id."""
+        child_id = self._add_child_raw(parent, **attr)
         self._post_mutation(scope_node=parent, op='add_child')
         return child_id
 

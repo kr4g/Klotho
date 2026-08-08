@@ -1400,8 +1400,16 @@ class CompositionalUnit(TemporalUnit):
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
 
     def _bake_envelope(self, selected, envelope, pfields_list, endpoint):
+        # timing reads go straight to the (offset-free) cache with the
+        # offset added exactly as the Chronon accessors do — each
+        # self.nodes[n][...] read used to allocate a proxy and re-check
+        # the timing cache three times per leaf
         self._ensure_timing_cache()
-        sounding = [n for n in selected if self.nodes[n].get('proportion', 1) >= 0]
+        rx = self._rt._rx
+        times = self._real_times
+        offset = self._offset
+        sounding = [n for n in selected
+                    if rx.get_node_data(n).get('proportion', 1) >= 0]
         if not sounding:
             warnings.warn(
                 "apply_envelope: selection resolves to no sounding leaves; envelope not applied",
@@ -1415,11 +1423,12 @@ class CompositionalUnit(TemporalUnit):
                 RuntimeWarning, stacklevel=3
             )
             endpoint = True
-        start_time = min(self.nodes[n]['real_onset'] for n in sounding)
+        start_time = min(times[n]['real_onset'] + offset for n in sounding)
         if endpoint:
-            end_time = max(self.nodes[n]['real_onset'] + abs(self.nodes[n]['real_duration']) for n in sounding)
+            end_time = max(times[n]['real_onset'] + offset + abs(times[n]['real_duration'])
+                           for n in sounding)
         else:
-            end_time = max(self.nodes[n]['real_onset'] for n in sounding)
+            end_time = max(times[n]['real_onset'] + offset for n in sounding)
         duration = end_time - start_time
         raw_total = sum(envelope.times)
         scaled_envelope = Envelope(
@@ -1432,7 +1441,7 @@ class CompositionalUnit(TemporalUnit):
         self._invalidate_bind_memo_subtree(sounding, pfields_list)
         with self._rt.batch_writes():
             for node in sounding:
-                event_time = self.nodes[node]['real_onset']
+                event_time = times[node]['real_onset'] + offset
                 relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
                 try:
                     env_value = scaled_envelope.at_time(relative_time)
@@ -1478,21 +1487,42 @@ class CompositionalUnit(TemporalUnit):
         if not sounding:
             return (0.0, 0.0)
         self._ensure_timing_cache()
-        start = min(self.nodes[n]['real_onset'] for n in sounding)
+        times = self._real_times
+        offset = self._offset
+        start = min(times[n]['real_onset'] + offset for n in sounding)
         if desc["endpoint"]:
-            end = max(self.nodes[n]['real_onset'] + abs(self.nodes[n]['real_duration']) for n in sounding)
+            end = max(times[n]['real_onset'] + offset + abs(times[n]['real_duration'])
+                      for n in sounding)
         else:
-            end = max(self.nodes[n]['real_onset'] for n in sounding)
+            end = max(times[n]['real_onset'] + offset for n in sounding)
         return (start, end)
+
+    def _resolved_envelope_leaf_set(self, env_id, desc):
+        """Resolved leaf set for a control envelope, memoized on the tree's
+        structure version plus the descriptor fields that define the
+        resolution (anchor + leaf_subset, both replaced — never mutated —
+        on healing). Kills the O(envelopes^2 x leaves) re-resolution in
+        _check_envelope_overlap."""
+        memo = getattr(self, '_envelope_leafset_memo', None)
+        if memo is None:
+            memo = self._envelope_leafset_memo = {}
+        key = (self._rt._structure_version,
+               desc["anchor_node"], desc["leaf_subset"])
+        hit = memo.get(env_id)
+        if hit is not None and hit[0] == key:
+            return hit[1]
+        leaves = set(self._resolve_control_envelope_leaves(desc))
+        memo[env_id] = (key, leaves)
+        return leaves
 
     def _check_envelope_overlap(self, new_pfields, new_leaves):
         new_pf_set = set(new_pfields)
         new_leaf_set = set(new_leaves)
-        for desc in self._control_envelopes.values():
+        for env_id, desc in self._control_envelopes.items():
             shared_pf = new_pf_set.intersection(desc["pfields"])
             if not shared_pf:
                 continue
-            existing_leaves = set(self._resolve_control_envelope_leaves(desc))
+            existing_leaves = self._resolved_envelope_leaf_set(env_id, desc)
             shared_leaves = new_leaf_set.intersection(existing_leaves)
             if shared_leaves:
                 raise ValueError(

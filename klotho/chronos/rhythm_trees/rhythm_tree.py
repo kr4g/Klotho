@@ -39,6 +39,11 @@ class RhythmLayer(TreeLayer):
         if 'label' in normalized:
             raise ValueError("RhythmTree does not accept 'label'; use 'proportion'")
 
+        if op == 'add_child' and 'proportion' not in normalized:
+            # default at write time — on_structure_changed no longer scans
+            # the whole tree to backfill missing proportions per mutation
+            normalized['proportion'] = 1
+
         if 'tied' in normalized and 'proportion' not in normalized:
             current = tree[node].get('proportion', 1)
             normalized['proportion'] = float(current) if normalized['tied'] else int(current)
@@ -70,11 +75,13 @@ class RhythmLayer(TreeLayer):
         return None
 
     def on_structure_changed(self, tree, scope, op):
-        """Default missing proportions to 1, then re-run ``_evaluate`` from the changed scope down."""
-        for n in tree.nodes:
-            data = tree._rx[n]
-            if isinstance(data, dict) and 'proportion' not in data:
-                data['proportion'] = 1
+        """Re-run ``_evaluate`` from the changed scope down.
+
+        Missing proportions default to 1 inside ``_evaluate`` itself (it
+        reads with ``.get('proportion', 1)`` and writes the value back), so
+        no whole-tree backfill scan is needed here; ``add_child`` inserts
+        additionally default at write time via :meth:`normalize_attrs`.
+        """
         tree._evaluate(scope)
 
 
@@ -447,23 +454,30 @@ class RhythmTree(Tree):
             self._rx[node]['metric_onset'] = self[children[0]]['metric_onset']
 
         if root_node != self.root:
-            for n in self.leaf_nodes:
-                if n in self.subtree_leaves(root_node):
+            # hoisted once: leaf order, subtree-leaf set, and leaf->ordinal
+            # map (the old code recomputed list(...).index() and
+            # subtree_leaves per leaf — quadratic in leaf count)
+            leaf_order = self.leaf_nodes
+            sub_leaves = self.subtree_leaves(root_node)
+            sub_leaf_set = set(sub_leaves)
+            for n in leaf_order:
+                if n in sub_leaf_set:
                     break
-                leaf_onset_acc[0] += abs(Fraction(self[n]['metric_duration']))
+                leaf_onset_acc[0] += abs(Fraction(self._rx[n]['metric_duration']))
 
         _process_subtree(root_node, parent_ratio)
 
         if root_node != self.root:
-            leaves_after = [n for n in self.leaf_nodes if list(self.leaf_nodes).index(n) > max(list(self.leaf_nodes).index(l) for l in self.subtree_leaves(root_node))]
-            for n in leaves_after:
+            leaf_index = {leaf: i for i, leaf in enumerate(leaf_order)}
+            max_sub_idx = max(leaf_index[l] for l in sub_leaves)
+            for n in leaf_order[max_sub_idx + 1:]:
                 self._rx[n]['metric_onset'] = leaf_onset_acc[0]
-                leaf_onset_acc[0] += abs(Fraction(self[n]['metric_duration']))
+                leaf_onset_acc[0] += abs(Fraction(self._rx[n]['metric_duration']))
+            scope_desc = set(self.descendants(root_node))
             for node in reversed(list(self.topological_sort())):
-                if self.out_degree(node) > 0 and node != root_node:
-                    if node not in self.descendants(root_node):
-                        children = list(self.successors(node))
-                        self._rx[node]['metric_onset'] = self[children[0]]['metric_onset']
+                if self.out_degree(node) > 0 and node != root_node and node not in scope_desc:
+                    children = self.successors(node)
+                    self._rx[node]['metric_onset'] = self._rx[children[0]]['metric_onset']
 
     def _set_type(self):
         div = sum_proportions(self.subdivisions)
@@ -581,13 +595,15 @@ class RhythmTree(Tree):
         S = self._cast_subdivs(S)
 
         def add_children(parent, children):
+            # raw inserts: one _post_mutation (and thus one _evaluate)
+            # below instead of a full-tree re-evaluate per added child
             for child in children:
                 if isinstance(child, tuple) and len(child) == 2:
                     D, sub = child
-                    child_id = self.add_child(parent, proportion=D)
+                    child_id = self._add_child_raw(parent, proportion=D)
                     add_children(child_id, sub)
                 else:
-                    self.add_child(parent, proportion=child)
+                    self._add_child_raw(parent, proportion=child)
 
         for n in nodes:
             add_children(n, S)
