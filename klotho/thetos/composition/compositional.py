@@ -1149,15 +1149,27 @@ class CompositionalUnit(TemporalUnit):
         return min(idx), max(idx)
 
     def _bind_field_keys(self):
-        """Field keys that carry a Bind override anywhere in the tree."""
+        """Field keys that carry a Bind override anywhere in the tree.
+
+        Memoized on the tree's structure version (Bind writes go through
+        set_pfields/set_mfields, which bump it) — the all-nodes-x-keys
+        scan used to run once per effective-tree build.
+        """
+        version = self._rt._structure_version
+        cached = self.__dict__.get('_bind_keys_cache')
+        if cached is not None and cached[0] == version:
+            return cached[1]
         keys = self._rt.pfield_names | self._rt.mfield_names
         found = set()
+        rx = self._rt._rx
         for node in self._rt.nodes:
-            raw = self._rt._rx[node]
+            raw = rx[node]
             if isinstance(raw, dict):
                 for k, v in raw.items():
                     if k in keys and isinstance(v, Bind):
                         found.add(k)
+        if not self._rt._write_batch_depth:
+            self.__dict__['_bind_keys_cache'] = (version, found)
         return found
 
     def _materialize_bound_values(self, pt_snapshot):
@@ -1183,7 +1195,22 @@ class CompositionalUnit(TemporalUnit):
                     resolved = self._resolve_bound_value(node, key, value)
                     pt_snapshot.set_mfields(node, **{key: resolved})
 
-    def _build_effective_parameter_tree(self):
+    def _build_effective_parameter_tree(self, _fresh=False):
+        """Effective PT snapshot (binds materialized, slur markers set).
+
+        Internal callers share a snapshot memoized on (structure version,
+        slur state, instrument version) — event iteration used to clone
+        the whole tree per event context. ``_fresh=True`` (the public
+        ``.pt`` property) always builds a new object, preserving its
+        documented copy semantics for user mutation.
+        """
+        key = (self._rt._structure_version, self._next_slur_id,
+               len(self._slur_specs),
+               getattr(self._rt._param_layer, '_instruments_version', 0))
+        if not _fresh and not self._rt._write_batch_depth:
+            cached = self.__dict__.get('_eff_pt_cache')
+            if cached is not None and cached[0] == key:
+                return cached[1]
         pt_snapshot = self._extract_parameter_tree()
         self._materialize_bound_values(pt_snapshot)
         for slur_id, slur_spec in self._slur_specs.items():
@@ -1198,6 +1225,8 @@ class CompositionalUnit(TemporalUnit):
                     _slur_end=1 if leaf == last else 0,
                     _slur_id=slur_id
                 )
+        if not _fresh and not self._rt._write_batch_depth:
+            self.__dict__['_eff_pt_cache'] = (key, pt_snapshot)
         return pt_snapshot
 
     def _event_context(self):
@@ -1223,7 +1252,7 @@ class CompositionalUnit(TemporalUnit):
             A copy of the parameter tree with UC overlays materialized for plotting
             and inspection (e.g., envelope-applied values and slur markers).
         """
-        return self._build_effective_parameter_tree()
+        return self._build_effective_parameter_tree(_fresh=True)
     
     @property
     def pfields(self) -> list:

@@ -502,7 +502,9 @@ class CombinationProductSet(ReferencePitchAware, CS):
           for f in combo:
             expr *= aliases[f]
           product = prod(combo)
-          key = sp.simplify(expr)
+          # monomial over factor symbols: Mul auto-canonicalization already
+          # yields the canonical form (verified 0/324 mismatches incl. hash)
+          key = expr
           if key not in seen:
             seen.add(key)
             expressions.append({'combo': combo, 'alias': expr, 'product': product})
@@ -512,7 +514,9 @@ class CombinationProductSet(ReferencePitchAware, CS):
         for f in factors_sorted:
           expr = aliases[f] ** k
           product = f ** k
-          key = sp.simplify(expr)
+          # monomial over factor symbols: Mul auto-canonicalization already
+          # yields the canonical form (verified 0/324 mismatches incl. hash)
+          key = expr
           if key not in seen:
             seen.add(key)
             expressions.append({'combo': (f,) * k, 'alias': expr, 'product': product})
@@ -532,7 +536,7 @@ class CombinationProductSet(ReferencePitchAware, CS):
               den_expr *= aliases[f]
             expr = num_expr / den_expr
             product = Fraction(prod(num_combo), prod(den_combo))
-            key = sp.simplify(expr)
+            key = expr
             if key not in seen:
               seen.add(key)
               expressions.append({'combo': (num_combo, den_combo), 'alias': expr, 'product': product})
