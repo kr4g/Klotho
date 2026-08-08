@@ -164,7 +164,7 @@ class UTNodeHandle:
     def real_onset(self):
         """float : Onset in seconds (computes the timing cache on first access)."""
         self._owner._ensure_timing_cache()
-        return self._owner._real_times[self._node_id]["real_onset"]
+        return self._owner._real_times[self._node_id]["real_onset"] + self._owner._offset
 
     @property
     def real_duration(self):
@@ -545,11 +545,15 @@ class Chronon(metaclass=TemporalMeta):
         return self._ut._rt[self._node_id]
 
     def _real_data(self):
+        """Raw (offset-free) timing entry for this node — internal only;
+        every outward-facing read adds ``self._ut._offset`` to onsets."""
         self._ut._ensure_timing_cache()
         return self._ut._real_times.get(self._node_id, {})
 
     def __getattr__(self, key):
-        if key in ('real_onset', 'real_duration'):
+        if key == 'real_onset':
+            return self._real_data()[key] + self._ut._offset
+        if key == 'real_duration':
             return self._real_data()[key]
         try:
             return self._rt_node()[key]
@@ -557,14 +561,20 @@ class Chronon(metaclass=TemporalMeta):
             raise AttributeError(f"'{type(self).__name__}' has no attribute '{key}'")
 
     def __getitem__(self, key):
-        if key in ('real_onset', 'real_duration'):
+        if key == 'real_onset':
+            return self._real_data()[key] + self._ut._offset
+        if key == 'real_duration':
             return self._real_data()[key]
         return self._rt_node()[key]
 
     def get(self, key, default=None):
         """Read a node-data key (or real-time field), returning ``default`` when absent."""
         if key in ('real_onset', 'real_duration'):
-            return self._real_data().get(key, default)
+            data = self._real_data()
+            if key not in data:
+                return default
+            value = data[key]
+            return value + self._ut._offset if key == 'real_onset' else value
         return self._rt_node().get(key, default)
 
     def __contains__(self, key):
@@ -891,7 +901,8 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     def onsets(self):
         """The real-time onset of each leaf event in seconds."""
         self._ensure_timing_cache()
-        return tuple(self._real_times[n]['real_onset'] for n in self._rt.leaf_nodes)
+        offset = self._offset
+        return tuple(self._real_times[n]['real_onset'] + offset for n in self._rt.leaf_nodes)
 
     @property
     def durations(self):
@@ -1074,23 +1085,33 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         Inlines :func:`~klotho.chronos.utils.beat_duration` with the
         per-unit factors hoisted out of the loop; the float operation
         order matches beat_duration exactly, so results are bit-identical.
+
+        Onsets are stored OFFSET-FREE: ``self._offset`` is added at the
+        read sites (node handles, Chronon accessors, ``onsets``). Container
+        re-layout (`_reoffset`) therefore only rewrites ``_offset`` and
+        never invalidates this cache. Adding the offset at read preserves
+        the historical operation order (offset was always added last).
         """
         self._real_times.clear()
         tempo_factor = 60 / self.bpm
         beat = self._beat
         beat_factor = beat.denominator / beat.numerator
-        offset = self._offset
         rt = self._rt
         rx = rt._rx
         for node in rt.nodes:
             data = rx.get_node_data(node)
-            real_duration = tempo_factor * float(data['metric_duration']) * beat_factor
-            real_onset = tempo_factor * float(data['metric_onset']) * beat_factor + offset
+            md = data['metric_duration']
+            mo = data['metric_onset']
+            real_duration = tempo_factor * (md.numerator / md.denominator) * beat_factor
+            real_onset = tempo_factor * (mo.numerator / mo.denominator) * beat_factor
             self._real_times[node] = {'real_duration': real_duration, 'real_onset': real_onset}
         self._timing_dirty = False
 
     def _ensure_timing_cache(self):
-        if self._timing_dirty or len(self._real_times) != len(self._rt):
+        # Compare against the graph's node count: _real_times is keyed by
+        # ALL nodes, while len(self._rt) is RhythmTree.__len__ = leaf count
+        # — comparing those would recompute on every read forever.
+        if self._timing_dirty or len(self._real_times) != self._rt._rx.num_nodes():
             self._compute_timing_cache()
 
     def _make_node_proxy(self, node_id: int):
@@ -1757,5 +1778,5 @@ def _reoffset(unit, t: float) -> None:
         unit._set_offsets()
     elif isinstance(unit, TemporalBlock):
         unit._align_rows()
-    elif hasattr(unit, '_invalidate_timing_cache'):
-        unit._invalidate_timing_cache()
+    # Plain units need no cache invalidation: the timing cache stores
+    # offset-free onsets and reads add _offset on the fly.

@@ -91,6 +91,41 @@ class TestChrononReadSurface:
         assert ut[2].start == 0.0
 
 
+class TestTimingCacheInvalidationOnStructuralMutation:
+    """UC.add_child/prune/remove_subtree mutate the rhythm tree and must
+    invalidate the timing cache explicitly: the cache guard compares node
+    counts, so a mutation sequence with a net-zero node-count change
+    (prune then add_child) would otherwise serve stale onsets."""
+
+    def test_prune_then_add_child_serves_fresh_timings(self):
+        uc = _uc(prolatio=(1, (1, (1, 1)), 1))
+        before = uc.durations  # warm the cache
+        branch = next(
+            n for n in uc._rt.nodes
+            if n != uc._rt.root and n not in set(uc._rt.leaf_nodes))
+        uc.prune(branch)
+        uc.add_child(uc._rt.root, proportion=2)
+        # node count is back to its pre-mutation value; only explicit
+        # invalidation makes these reads recompute. A fresh structural
+        # copy computes its cache from scratch off the same tree data.
+        fresh = uc.copy()
+        assert uc.durations == fresh.durations
+        assert uc.onsets == fresh.onsets
+        assert uc.durations != before  # the mutation really moved timings
+
+    def test_add_child_refreshes_timings(self):
+        uc = _uc()
+        _ = uc.onsets
+        uc.add_child(uc._rt.root, proportion=1)
+        assert uc.durations == _uc(prolatio=(1, 1, 1, 1, 1)).durations
+
+    def test_remove_subtree_refreshes_timings(self):
+        uc = _uc()
+        _ = uc.onsets
+        uc.remove_subtree(list(uc._rt.leaf_nodes)[-1])
+        assert uc.durations == _uc(prolatio=(1, 1, 1)).durations
+
+
 class TestSlurHealingAfterMutation:
     def _slurred_leaf_ids(self, uc):
         return {n for spec in uc._slur_specs.values()

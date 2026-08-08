@@ -1919,6 +1919,7 @@ class CompositionalUnit(TemporalUnit):
             attr = dict(attr)
             attr['proportion'] = attr.pop('label')
         new_rt_node = self._rt.add_child(parent, **attr)
+        self._invalidate_timing_cache()
         return new_rt_node
 
     def prune(self, node):
@@ -1928,6 +1929,7 @@ class CompositionalUnit(TemporalUnit):
         self._invalidate_envelopes_for_removed_nodes(removed_set)
         self._invalidate_bind_memo(removed_set)
         self._rt.prune(node)
+        self._invalidate_timing_cache()
 
     def remove_subtree(self, node):
         """Remove a node and its descendants, healing slurs/envelopes that referenced them."""
@@ -1936,6 +1938,7 @@ class CompositionalUnit(TemporalUnit):
         self._invalidate_envelopes_for_removed_nodes(removed_set)
         self._invalidate_bind_memo(removed_set)
         self._rt.remove_subtree(node)
+        self._invalidate_timing_cache()
 
     def set_instrument(self, node, instrument, include_rests: bool = False) -> None:
         """
