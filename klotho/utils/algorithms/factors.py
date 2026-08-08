@@ -1,9 +1,11 @@
 from fractions import Fraction
-from sympy import factorint, prime as sympy_prime, isprime
+from sympy import factorint, primepi, isprime
 from typing import Union, Dict, List, Optional, Sequence
 from functools import lru_cache
 import numpy as np
 import sympy as sp
+
+from klotho.utils.algorithms.exact_solve import precompute_exact_solver, solve_exact
 
 def to_factors(value: Union[int, Fraction, str]) -> Dict[int, int]:
     """
@@ -57,11 +59,19 @@ def to_factors(value: Union[int, Fraction, str]) -> Dict[int, int]:
             ratio = Fraction(s)
         case _:
             raise TypeError("Unsupported type")
+    # callers may mutate the returned dict, so the memo stores an
+    # immutable snapshot (factorint dominates the cost: this sits under
+    # indigestibility, interval-cost, and coordinate paths)
+    return dict(_to_factors_cached(ratio))
+
+
+@lru_cache(maxsize=8192)
+def _to_factors_cached(ratio: Fraction):
     num_factors = factorint(ratio.numerator)
     den_factors = factorint(ratio.denominator)
     for p, e in den_factors.items():
         num_factors[p] = num_factors.get(p, 0) - e
-    return num_factors
+    return tuple(num_factors.items())
 
 def from_factors(factors: Dict[int, int]) -> Fraction:
     """
@@ -150,11 +160,10 @@ def nth_prime(prime: int) -> int:
     """
     if not isprime(prime):
         raise ValueError(f"{prime} is not a prime number")
-    
-    nth = 1
-    while sympy_prime(nth) != prime:
-        nth += 1
-    return nth
+
+    # pi(p) IS the ordinal of a prime p — the old loop recomputed
+    # sympy.prime(n) for every n up to the answer
+    return int(primepi(prime))
 
 def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int] = None) -> np.ndarray:
     """
@@ -292,22 +301,14 @@ def ratio_to_coordinate(
             f"ratio contains primes not present in basis_primes: {sorted(missing_primes)}"
         )
 
-    A = sp.Matrix(
-        [
-            [to_factors(g).get(p, 0) for g in parsed_generators]
-            for p in primes
-        ]
-    )
-    x = sp.Matrix([ratio_factors.get(p, 0) for p in primes])
-    y_symbols = sp.symbols(f"y0:{len(parsed_generators)}", integer=True)
-    solutions = sp.linsolve((A, x), y_symbols)
-    if not solutions:
+    solver = _generator_solver(tuple(parsed_generators), tuple(primes))
+    x = [ratio_factors.get(p, 0) for p in primes]
+    status, y = solve_exact(solver, x)
+    if status == 'inconsistent':
         raise ValueError("ratio is not representable with provided generators")
-    solution = next(iter(solutions))
-    if any(expr.free_symbols for expr in solution):
+    if status == 'non_unique':
         raise ValueError("ratio does not have a unique integer coordinate in provided generators")
-    y = sp.Matrix(solution)
-    if any(sp.denom(v) != 1 for v in y):
+    if any(v.denominator != 1 for v in y):
         raise ValueError("ratio is not representable with integer generator coordinates")
 
     coord = [int(v) for v in y]
@@ -321,6 +322,18 @@ def ratio_to_coordinate(
     arr = np.array(coord, dtype=int)
     arr.setflags(write=False)
     return arr
+
+
+@lru_cache(maxsize=256)
+def _generator_solver(parsed_generators, primes):
+    """Precomputed exact solver per (generators, primes) basis — the
+    batch loop in ratios_to_coordinates hits the same basis per call."""
+    return precompute_exact_solver(
+        [
+            [to_factors(g).get(p, 0) for g in parsed_generators]
+            for p in primes
+        ]
+    )
 
 
 def ratios_to_coordinates(

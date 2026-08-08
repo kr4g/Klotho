@@ -64,13 +64,23 @@ class ReferencePitchAware:
 
         The query is equave-reduced before matching, so degrees from
         voiced or equave-shifted chords resolve to the same node.
+        Matching goes through a {reduced_ratio: node} map cached on the
+        structure version (the old linear scan re-ran per lookup;
+        first-match-wins order is preserved by insertion order).
         """
         from klotho.tonos.utils.interval_normalization import equave_reduce
         reduced = equave_reduce(ratio)
-        for node, attrs in self.nodes(data=True):
-            if attrs.get('ratio') == reduced:
-                return node
-        return None
+        version = self._structure_version
+        cached = self.__dict__.get('_ratio_node_cache')
+        if cached is None or cached[0] != version:
+            index = {}
+            for node, attrs in self.nodes(data=True):
+                r = attrs.get('ratio')
+                if r is not None and r not in index:
+                    index[r] = node
+            cached = (version, index)
+            self.__dict__['_ratio_node_cache'] = cached
+        return cached[1].get(reduced)
 
     def chord(self, nodes, root: Union[Pitch, str, None] = None, equave=None):
         """

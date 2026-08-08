@@ -156,10 +156,16 @@ class MasterSet(ReferencePitchAware):
     def _node_for_ratio(self, ratio):
         from klotho.tonos.utils.interval_normalization import equave_reduce
         reduced = equave_reduce(ratio)
-        for alias, info in self.node_data().items():
-            if info.get('ratio') == reduced:
-                return alias
-        return None
+        # factors are fixed at construction, so the reverse map is built once
+        index = getattr(self, '_ratio_alias_cache', None)
+        if index is None:
+            index = {}
+            for alias, info in self.node_data().items():
+                r = info.get('ratio')
+                if r is not None and r not in index:
+                    index[r] = alias
+            self._ratio_alias_cache = index
+        return index.get(reduced)
 
     def node_data(self):
         """

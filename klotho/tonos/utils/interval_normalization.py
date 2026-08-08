@@ -43,6 +43,23 @@ def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fracti
   """
   interval = Fraction(interval)
   equave = Fraction(equave)
+  if equave == 2 and interval > 0:
+    # octave fast path: the multiply/divide loops are single bit-shifts.
+    # Semantics preserved exactly: <1 multiplies until first >=1 (lands
+    # in [1/2..1)*2 = [1,2)); >=2^n divides until first <2^n (lands in
+    # [2^(n-1), 2^n)); in-range inputs pass through untouched.
+    p, q = interval.numerator, interval.denominator
+    if p < q:
+      k = q.bit_length() - p.bit_length()
+      if (p << k) < q:
+        k += 1
+      return Fraction(p << k, q)
+    if p >= (q << n_equaves):
+      m = max(1, p.bit_length() - q.bit_length() - n_equaves)
+      while p >= (q << (n_equaves + m)):
+        m += 1
+      return Fraction(p, q << m)
+    return interval
   while interval < 1:
     interval *= equave
   while interval >= equave**n_equaves:

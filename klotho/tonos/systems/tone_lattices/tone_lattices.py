@@ -8,6 +8,7 @@ from sympy import prime as sympy_prime, isprime
 from klotho.topos.graphs.lattices import Lattice
 from klotho.tonos.pitch.reference import ReferencePitchAware
 from klotho.utils.algorithms.factors import to_factors
+from klotho.utils.algorithms.exact_solve import precompute_exact_solver, solve_exact
 
 
 class ToneLatticeLookupWarning(RuntimeWarning):
@@ -227,24 +228,25 @@ class ToneLattice(ReferencePitchAware, Lattice):
         for factors in self._generator_factors:
             basis_primes.update(factors.keys())
         self._basis_primes = sorted(basis_primes)
-        self._generator_matrix = sp.Matrix(
+        # exact-rational solver precomputed once per generator state —
+        # the matrix is fixed, only the rhs (a ratio's prime exponents)
+        # varies per query. sympy.linsolve here cost 14.5ms per ratio.
+        self._generator_solver = precompute_exact_solver(
             [
                 [factors.get(p, 0) for factors in self._generator_factors]
                 for p in self._basis_primes
             ]
         )
-        self._generator_symbols = sp.symbols(f"y0:{len(self._generators)}", integer=True)
 
         equave_factors = to_factors(equave)
         self._augmented_basis_primes = sorted(basis_primes | set(equave_factors.keys()))
-        self._augmented_matrix = sp.Matrix(
+        self._augmented_solver = precompute_exact_solver(
             [
                 [factors.get(p, 0) for factors in self._generator_factors]
                 + [equave_factors.get(p, 0)]
                 for p in self._augmented_basis_primes
             ]
         )
-        self._augmented_symbols = sp.symbols(f"z0:{len(self._generators) + 1}", integer=True)
 
         self._is_monzo_basis = (
             len(self._generators) > 0
@@ -392,27 +394,23 @@ class ToneLattice(ReferencePitchAware, Lattice):
             # (e.g. 2 in 16/15 with a (3,5) basis) still resolve. The
             # equave exponent is solved for and then discarded.
             basis_primes = self._augmented_basis_primes
-            matrix = self._augmented_matrix
-            symbols = self._augmented_symbols
+            solver = self._augmented_solver
         else:
             basis_primes = self._basis_primes
-            matrix = self._generator_matrix
-            symbols = self._generator_symbols
+            solver = self._generator_solver
 
         missing_primes = [p for p, e in ratio_factors.items() if e != 0 and p not in basis_primes]
         if missing_primes:
             raise ValueError(
                 f"ratio contains primes not present in prime_basis: {sorted(missing_primes)}"
             )
-        x = sp.Matrix([ratio_factors.get(p, 0) for p in basis_primes])
-        solutions = sp.linsolve((matrix, x), symbols)
-        if not solutions:
+        x = [ratio_factors.get(p, 0) for p in basis_primes]
+        status, y = solve_exact(solver, x)
+        if status == 'inconsistent':
             raise ValueError("ratio is not representable with provided generators")
-        solution = next(iter(solutions))
-        if any(expr.free_symbols for expr in solution):
+        if status == 'non_unique':
             raise ValueError("ratio does not have a unique integer coordinate in provided generators")
-        y = sp.Matrix(solution)
-        if any(sp.denom(v) != 1 for v in y):
+        if any(v.denominator != 1 for v in y):
             raise ValueError("ratio is not representable with integer generator coordinates")
         return tuple(int(v) for v in y[: self.dimensionality])
 
