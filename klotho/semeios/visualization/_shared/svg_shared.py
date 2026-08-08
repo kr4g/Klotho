@@ -219,12 +219,52 @@ def compute_svg_layout(
     }
 
 
+def _script_json(obj):
+    """``json.dumps`` safe for embedding inside a ``<script>`` element:
+    ``</`` becomes ``<\\/`` (a no-op after JS string parsing) so no data
+    string — e.g. a tooltip containing ``</script>`` — can terminate the
+    element early."""
+    return json.dumps(obj).replace('</', '<\\/')
+
+
+def _dedup_hover_texts(hover_texts):
+    """Line-table encoding of tooltip texts: ``(unique_lines, index_lists)``.
+
+    Tooltip texts repeat whole lines heavily (item/unit headers, field
+    labels); shipping each line once plus per-text index arrays cuts the
+    embedded JSON to roughly a third. Reconstruction — in JS below, and
+    mirrored by tests — is ``'\\n'.join(lines[i] for i in idxs)``, exact
+    for every string including empty lines.
+    """
+    table = {}
+    lines = []
+    encoded = []
+    for text in hover_texts:
+        idxs = []
+        for ln in text.split('\n'):
+            i = table.get(ln)
+            if i is None:
+                i = table[ln] = len(lines)
+                lines.append(ln)
+            idxs.append(i)
+        encoded.append(idxs)
+    return lines, encoded
+
+
 def render_tooltip_system(svg_uid, hover_texts, is_active=None, node_freqs=None, preview_config=None,
                           dimmed_node_color='#111111'):
-    data_json = json.dumps(hover_texts)
+    if hover_texts and all(isinstance(t, str) for t in hover_texts):
+        tip_lines, tip_idx = _dedup_hover_texts(hover_texts)
+        data_json = (
+            f'(function(){{var L={_script_json(tip_lines)};'
+            f'return {json.dumps(tip_idx)}.map(function(a){{'
+            f'return a.map(function(i){{return L[i];}}).join("\\n");}});}})()'
+        )
+    else:
+        data_json = _script_json(hover_texts)
     active_json = json.dumps(is_active) if is_active is not None else "null"
     freqs_json = json.dumps(node_freqs) if node_freqs is not None else "null"
-    preview_json = json.dumps(preview_config or {})
+    preview_json = _script_json(preview_config or {})
     dimmed_json = json.dumps(dimmed_node_color)
 
     return f"""<script type="module">{get_animation_bridge_js()}</script>
