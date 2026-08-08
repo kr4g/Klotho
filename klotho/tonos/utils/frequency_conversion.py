@@ -1,5 +1,6 @@
 from klotho.utils.data_structures.enums import DirectValueEnumMeta, Enum
 from collections import namedtuple
+import math
 import numpy as np
 from enum import member
 
@@ -50,6 +51,10 @@ class PITCH_CLASSES(Enum, metaclass=DirectValueEnumMeta):
       as_flats  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
 
 
+_PitchclassResult = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
+# hoisted: namedtuple() generates a class via exec — doing that per call
+# cost ~300us under every pitch materialization
+
 def freq_to_midicents(frequency: float) -> float:
   """
   Convert a frequency in Hertz to MIDI cents notation.
@@ -73,7 +78,7 @@ def freq_to_midicents(frequency: float) -> float:
   >>> freq_to_midicents(440.0)
   6900.0
   """
-  return 100 * (12 * np.log2(frequency / A4_Hz) + A4_MIDI)
+  return 100 * (12 * math.log2(frequency / A4_Hz) + A4_MIDI)
 
 def midicents_to_freq(midicents: float) -> float:
   """
@@ -111,7 +116,7 @@ def midicents_to_pitchclass(midicents: float) -> namedtuple:
       A named tuple with fields ``pitchclass``, ``octave``, and
       ``cents_offset``.
   """
-  result = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
+  result = _PitchclassResult
   PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
   midi = midicents / 100
   midi_round = round(midi)
@@ -139,10 +144,10 @@ def freq_to_pitchclass(freq: float, cent_round: int = 4) -> namedtuple:
         A named tuple with fields ``pitchclass``, ``octave``, and
         ``cents_offset``.
     """
-    result = namedtuple('result', ['pitchclass', 'octave', 'cents_offset'])
+    result = _PitchclassResult
     PITCH_LABELS = PITCH_CLASSES.N_TET_12.names.as_sharps
     n_PITCH_LABELS = len(PITCH_LABELS)
-    midi = A4_MIDI + n_PITCH_LABELS * np.log2(freq / A4_Hz)
+    midi = A4_MIDI + n_PITCH_LABELS * math.log2(freq / A4_Hz)
     midi_round = round(midi)
     note_index = int(midi_round) % n_PITCH_LABELS
     octave = int(midi_round // n_PITCH_LABELS) - 1  # MIDI starts from C-1
