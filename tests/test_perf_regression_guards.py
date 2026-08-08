@@ -126,6 +126,52 @@ class TestTimingCacheInvalidationOnStructuralMutation:
         assert uc.durations == _uc(prolatio=(1, 1, 1)).durations
 
 
+class TestTraversalCacheSemantics:
+    """Per-instance version-keyed traversal caches (formerly process-global
+    @lru_cache: any write to any tree cleared every tree's cache and pinned
+    instances against GC via the strong self keys)."""
+
+    def test_branch_refreshes_after_structural_mutation(self):
+        # the old @lru_cache on Tree.branch was never cache_clear()'d
+        uc = _uc()
+        leaf = list(uc._rt.leaf_nodes)[0]
+        assert uc._rt.branch(leaf) == (uc._rt.root, leaf)
+        uc.subdivide(leaf, 2)
+        child = uc._rt.successors(leaf)[0]
+        assert uc._rt.branch(child) == (uc._rt.root, leaf, child)
+        assert uc._rt.branch(leaf) == (uc._rt.root, leaf)
+
+    def test_traversals_refresh_after_mutation(self):
+        uc = _uc()
+        root = uc._rt.root
+        before = uc._rt.descendants(root)
+        new = uc.add_child(root, proportion=1)
+        after = uc._rt.descendants(root)
+        assert new in after and new not in before
+        assert uc._rt.parent(new) == root
+        assert new in uc._rt.successors(root)
+        assert uc._rt.ancestors(new) == (root,)
+
+    def test_instances_do_not_share_cache_state(self):
+        a, b = _uc(), _uc()
+        a_succ = a._rt.successors(a._rt.root)
+        b.add_child(b._rt.root, proportion=1)
+        assert a._rt.successors(a._rt.root) == a_succ
+        assert len(b._rt.successors(b._rt.root)) == 5
+
+    def test_warm_caches_do_not_pin_trees_against_gc(self):
+        import gc
+        import weakref
+        uc = _uc()
+        tree = uc._rt
+        _ = tree.descendants(tree.root)
+        _ = tree.parent(list(tree.leaf_nodes)[0])
+        ref = weakref.ref(tree)
+        del uc, tree
+        gc.collect()
+        assert ref() is None, 'tree kept alive by traversal caches'
+
+
 class TestSlurHealingAfterMutation:
     def _slurred_leaf_ids(self, uc):
         return {n for spec in uc._slur_specs.values()

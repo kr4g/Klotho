@@ -235,5 +235,8 @@ def from_cost_matrix(cost_matrix: np.ndarray, items: List[T]) -> Graph:
 
     if edge_list:
         graph._rx.add_edges_from(edge_list)
+        # direct _rx write bypasses _add_edge_raw's invalidation, and
+        # traversal caches are per-instance now — invalidate explicitly
+        graph._invalidate_caches()
 
     return graph

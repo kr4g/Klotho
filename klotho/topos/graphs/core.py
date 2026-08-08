@@ -1,6 +1,5 @@
 import rustworkx as rx
 import copy
-from functools import lru_cache
 from typing import List, TypeVar, Optional, Any, Union, Dict, Tuple
 from types import MappingProxyType
 
@@ -115,17 +114,28 @@ class GraphCore:
         self._rx.clear()
         self._invalidate_caches()
 
+    # Per-instance traversal cache, keyed on _structure_version and
+    # invalidated lazily: _invalidate_caches only bumps the version, and
+    # the next cached read discards the stale dict. Class-level defaults
+    # mean every construction path (__init__, __new__ + manual setup in
+    # structural_clone, __deepcopy__) starts consistent without help.
+    # (These were process-global @lru_cache methods before: any write to
+    # any graph cleared every graph's cache and pinned instances against
+    # GC via the strong self keys.)
+    _trav_cache = None
+    _trav_cache_version = -1
+
+    def _traversal_cache(self):
+        cache = self._trav_cache
+        if cache is None or self._trav_cache_version != self._structure_version:
+            cache = {}
+            self._trav_cache = cache
+            self._trav_cache_version = self._structure_version
+        return cache
+
     def _invalidate_caches(self):
         """Invalidate all caches when structure changes"""
         self._structure_version += 1
-        if hasattr(self, 'descendants'):
-            self.descendants.cache_clear()
-        if hasattr(self, 'ancestors'):
-            self.ancestors.cache_clear()
-        if hasattr(self, 'successors'):
-            self.successors.cache_clear()
-        if hasattr(self, 'predecessors'):
-            self.predecessors.cache_clear()
 
     def out_degree(self, node):
         """Get the out-degree of a node"""
@@ -161,42 +171,65 @@ class GraphCore:
         """Get neighbors of a node"""
         return list(self._rx.neighbors(node))
 
-    @lru_cache(maxsize=None)
     def predecessors(self, node):
         """Returns all predecessors of a node."""
-        _ = self._structure_version
+        cache = self._traversal_cache()
+        key = ('g_pred', node)
+        try:
+            return cache[key]
+        except KeyError:
+            pass
         if hasattr(self._rx, 'predecessor_indices'):
-            return tuple(self._rx.predecessor_indices(node))
+            result = tuple(self._rx.predecessor_indices(node))
         else:
-            return tuple(self.neighbors(node))
+            result = tuple(self.neighbors(node))
+        cache[key] = result
+        return result
 
-    @lru_cache(maxsize=None)
     def successors(self, node):
         """Returns all successors of a node in sorted order (left-to-right)."""
-        _ = self._structure_version
+        cache = self._traversal_cache()
+        key = ('g_succ', node)
+        try:
+            return cache[key]
+        except KeyError:
+            pass
         if hasattr(self._rx, 'successor_indices'):
-            succ_indices = self._rx.successor_indices(node)
-            return tuple(sorted(succ_indices))
+            result = tuple(sorted(self._rx.successor_indices(node)))
         else:
-            return tuple(sorted(self.neighbors(node)))
+            result = tuple(sorted(self.neighbors(node)))
+        cache[key] = result
+        return result
 
-    @lru_cache(maxsize=None)
     def descendants(self, node):
         """Returns all descendants of a node using native RustworkX algorithm."""
-        _ = self._structure_version
+        cache = self._traversal_cache()
+        key = ('g_desc', node)
         try:
-            return tuple(rx.descendants(self._rx, node))
+            return cache[key]
+        except KeyError:
+            pass
+        try:
+            result = tuple(rx.descendants(self._rx, node))
         except Exception:
-            return tuple()
+            result = tuple()
+        cache[key] = result
+        return result
 
-    @lru_cache(maxsize=None)
     def ancestors(self, node):
         """Returns all ancestors of a node using native RustworkX algorithm."""
-        _ = self._structure_version
+        cache = self._traversal_cache()
+        key = ('g_anc', node)
         try:
-            return tuple(rx.ancestors(self._rx, node))
+            return cache[key]
+        except KeyError:
+            pass
+        try:
+            result = tuple(rx.ancestors(self._rx, node))
         except Exception:
-            return tuple()
+            result = tuple()
+        cache[key] = result
+        return result
 
     def topological_sort(self):
         """Returns nodes in topological order."""

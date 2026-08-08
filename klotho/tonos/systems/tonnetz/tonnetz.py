@@ -204,6 +204,7 @@ class Tonnetz(ToneLattice):
                 f"(note that a generator equal to the equave is dropped when "
                 f"equave_reduce is True)"
             )
+        added = False
         for q, r in self.coords:
             other = (q + 1, r - 1)
             if other in self:
@@ -211,6 +212,11 @@ class Tonnetz(ToneLattice):
                 v = self._get_node_for_coord(other)
                 if not self._rx.has_edge(u, v):
                     self._rx.add_edge(u, v, None)
+                    added = True
+        if added:
+            # direct _rx writes bypass _add_edge_raw's invalidation, and
+            # traversal caches are per-instance now — invalidate explicitly
+            self._invalidate_caches()
 
     # ------------------------------------------------------------------
     # Geometry

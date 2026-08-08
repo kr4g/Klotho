@@ -2,7 +2,7 @@ from ..core import GraphCore
 from ..graphs import Graph
 from .layers import TreeLayer
 import rustworkx as rx
-from functools import cached_property, lru_cache
+from functools import cached_property
 from .group import Group
 import copy
 
@@ -150,8 +150,6 @@ class Tree(GraphCore):
         for attr in ['depth', 'k', 'leaf_nodes']:
             if attr in self.__dict__:
                 del self.__dict__[attr]
-        if hasattr(self, 'parent'):
-            self.parent.cache_clear()
         self._group_dirty = True
         for layer in getattr(self, '_layers', ()):
             layer.invalidate(self)
@@ -234,15 +232,31 @@ class Tree(GraphCore):
 
         return depth
 
-    @lru_cache(maxsize=None)
     def parent(self, node):
         """Returns the parent of a node, or None if the node is the root."""
+        cache = self._traversal_cache()
+        key = ('t_parent', node)
+        try:
+            return cache[key]
+        except KeyError:
+            pass
         parents = list(self.predecessors(node))
-        return parents[0] if parents else None
+        result = parents[0] if parents else None
+        cache[key] = result
+        return result
 
-    @lru_cache(maxsize=None)
     def ancestors(self, node):
         """Return all ancestors of a node from root to parent (excluding the node)."""
+        cache = self._traversal_cache()
+        key = ('t_anc', node)
+        try:
+            return cache[key]
+        except KeyError:
+            pass
+        cache[key] = result = self._ancestors_uncached(node)
+        return result
+
+    def _ancestors_uncached(self, node):
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
 
@@ -265,9 +279,18 @@ class Tree(GraphCore):
         ancestor_indices.reverse()
         return tuple(self._get_node_object(ai) for ai in ancestor_indices)
 
-    @lru_cache(maxsize=None)
     def descendants(self, node):
         """Return all descendants of a node in depth-first order."""
+        cache = self._traversal_cache()
+        key = ('t_desc', node)
+        try:
+            return cache[key]
+        except KeyError:
+            pass
+        cache[key] = result = self._descendants_uncached(node)
+        return result
+
+    def _descendants_uncached(self, node):
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
 
@@ -286,9 +309,23 @@ class Tree(GraphCore):
 
         return tuple(self._get_node_object(di) for di in descendant_indices)
 
-    @lru_cache(maxsize=None)
     def branch(self, node):
-        """Return all nodes on the branch from the root to the given node (inclusive)."""
+        """Return all nodes on the branch from the root to the given node (inclusive).
+
+        (Version-keyed per-instance cache: the old @lru_cache here was
+        never cache_clear()'d by _invalidate_caches, so it could serve
+        stale branches after structural mutations.)
+        """
+        cache = self._traversal_cache()
+        key = ('t_branch', node)
+        try:
+            return cache[key]
+        except KeyError:
+            pass
+        cache[key] = result = self._branch_uncached(node)
+        return result
+
+    def _branch_uncached(self, node):
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
 
