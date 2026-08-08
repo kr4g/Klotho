@@ -22,7 +22,8 @@ from klotho.thetos.composition.events import Event
 
 from .._shared.svg_utils import SvgFigureData, svg_wrap_viewbox
 from .._shared.svg_shared import render_tooltip_system
-from .svg_rt import _rt_node_tooltip, _svg_halo_ellipses, _svg_halo_gradient_def
+from .svg_rt import (_rt_node_tooltip, _svg_halo_class_style,
+                     _svg_halo_ellipses, _svg_halo_gradient_def)
 from .svg_timeline import _resolve_lanes, _unit_tooltip_header
 
 _TRACK_LABEL_COLOR = 'rgba(200,200,200,0.75)'
@@ -211,7 +212,7 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             els.append(
                 f'<rect id="{eid}" x="{x0:.2f}" y="{by0:.2f}" '
                 f'width="{w:.2f}" height="{by1 - by0:.2f}" '
-                f'fill="{color}" stroke="none" '
+                f'fill="{color}" '
                 f'data-idx="{step}" data-tip-uid="{uid}"/>'
             )
 
@@ -224,8 +225,11 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             else:
                 if not halo_els:
                     halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
+                    halo_els.append(_svg_halo_class_style(f"{uid}_hl",
+                                                          f"{uid}_halo_rg"))
                 hids, h_els = _svg_halo_ellipses(f"{uid}_s{step}", cx, cy, hw, hh,
-                                                 grad_id=f"{uid}_halo_rg")
+                                                 grad_id=f"{uid}_halo_rg",
+                                                 css_class=f"{uid}_hl")
                 step_halo_ids.append(hids)
                 halo_els.extend(h_els)
 
@@ -233,11 +237,12 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             edge_positions.append(ux0 + pos * uw)
             step += 1
 
-        for px in edge_positions:
-            els.append(
-                f'<line x1="{px:.2f}" y1="{bdy0:.2f}" x2="{px:.2f}" y2="{bdy1:.2f}" '
-                f'stroke="#aaaaaa" stroke-width="2"/>'
-            )
+        # One path per strip for the leaf-edge ticks (was one <line> per
+        # tick — ~70 bytes more each). Same stroke geometry: M x,y0 V y1.
+        ticks = ''.join(f'M{px:.2f} {bdy0:.2f}V{bdy1:.2f}'
+                        for px in edge_positions)
+        els.append(f'<path d="{ticks}" fill="none" '
+                   f'stroke="#aaaaaa" stroke-width="2"/>')
         return step
 
     # Items in insertion order — the global step enumeration.
@@ -278,10 +283,13 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
             cy = (by0 + by1) / 2
             if not halo_els:
                 halo_els.append(_svg_halo_gradient_def(f"{uid}_halo_rg"))
+                halo_els.append(_svg_halo_class_style(f"{uid}_hl",
+                                                      f"{uid}_halo_rg"))
             hids, h_els = _svg_halo_ellipses(f"{uid}_s{step}", cx, cy,
                                              (x1 - x0) / 2 * 1.1,
                                              (by1 - by0) / 2 * 2.0,
-                                             grad_id=f"{uid}_halo_rg")
+                                             grad_id=f"{uid}_halo_rg",
+                                             css_class=f"{uid}_hl")
             step_halo_ids.append(hids)
             halo_els.extend(h_els)
             step += 1

@@ -77,9 +77,16 @@ def _svg_halo_gradient_def(grad_id):
     )
 
 
-def _svg_halo_ellipses(prefix, cx, cy, rx, ry, grad_id=None):
+def _svg_halo_ellipses(prefix, cx, cy, rx, ry, grad_id=None, css_class=None):
     """
     Generate SVG elements for a radial halo ellipse around a leaf node.
+
+    ``css_class`` moves the invariant fill/pointer-events attributes into a
+    document-level class the caller must emit (see
+    ``_svg_halo_class_style``). ``display:none`` stays an inline style
+    either way — the animation JS shows halos by clearing
+    ``el.style.display`` to ``""``, which would fall back to a class rule
+    and never show them.
 
     Returns
     -------
@@ -94,13 +101,27 @@ def _svg_halo_ellipses(prefix, cx, cy, rx, ry, grad_id=None):
         # per-event defs were ~500KB of redundancy on a 2K-event score
         grad_id = f"{prefix}_rg"
         elements.append(_svg_halo_gradient_def(grad_id))
-    elements.append(
-        f'<ellipse id="{eid}" cx="{cx:.4f}" cy="{cy:.4f}" '
-        f'rx="{rx * 1.5:.4f}" ry="{ry * 1.5:.4f}" '
-        f'fill="url(#{grad_id})" '
-        f'style="display:none" pointer-events="none"/>'
-    )
+    if css_class is not None:
+        elements.append(
+            f'<ellipse id="{eid}" class="{css_class}" '
+            f'cx="{cx:.1f}" cy="{cy:.1f}" '
+            f'rx="{rx * 1.5:.1f}" ry="{ry * 1.5:.1f}" '
+            f'style="display:none"/>'
+        )
+    else:
+        elements.append(
+            f'<ellipse id="{eid}" cx="{cx:.4f}" cy="{cy:.4f}" '
+            f'rx="{rx * 1.5:.4f}" ry="{ry * 1.5:.4f}" '
+            f'fill="url(#{grad_id})" '
+            f'style="display:none" pointer-events="none"/>'
+        )
     return [eid], elements
+
+
+def _svg_halo_class_style(css_class, grad_id):
+    """``<style>`` rule pairing with ``_svg_halo_ellipses(css_class=...)``."""
+    return (f'<style>.{css_class}{{fill:url(#{grad_id});'
+            f'pointer-events:none}}</style>')
 
 
 def _wrap_svg(inner_svg, width_px, height_px, y_min, y_max):
