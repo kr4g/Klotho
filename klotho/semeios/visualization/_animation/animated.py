@@ -29,6 +29,22 @@ def _extract_needed_synthdefs(audio_payload):
     return names if names else None
 
 
+
+def _payload_json_memo(fig):
+    """Serialize fig.audio_payload once per figure — to_html runs on every
+    display/update and the payload dump dominates it."""
+    cached = getattr(fig, '_payload_json_cache', None)
+    if cached is not None:
+        return cached
+    payload = fig.audio_payload
+    payload_json = json.dumps(payload) if payload else "null"
+    try:
+        fig._payload_json_cache = payload_json
+    except AttributeError:
+        pass  # __slots__ without the cache attr: skip memoization
+    return payload_json
+
+
 class AnimatedLattice3dFigure:
     """Animated Three.js 3D lattice figure with step-by-step path reveal.
 
@@ -120,8 +136,7 @@ class AnimatedLattice3dFigure:
         scene_json = json.dumps(sd.scene_data)
         steps_json = json.dumps(sd.path_steps)
         halo_json = json.dumps(sd.halo_data)
-        converted = self.audio_payload
-        payload_json = json.dumps(converted) if converted else "null"
+        payload_json = _payload_json_memo(self)
 
         w = sd.width_px
         h = sd.height_px
@@ -625,8 +640,7 @@ class AnimatedRTSvgFigure:
         node_to_ids_json = json.dumps({str(k): v for k, v in sd.node_to_ids.items()})
         leaf_ancestors_json = json.dumps([[str(n) for n in path] for path in sd.leaf_ancestors])
 
-        converted = self.audio_payload
-        payload_json = json.dumps(converted) if converted else "null"
+        payload_json = _payload_json_memo(self)
 
         playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False, ring_time=self.ring_time, loop=self.loop)
 
@@ -762,8 +776,7 @@ class AnimatedTimelineSvgFigure:
         bright_json = json.dumps(sd.step_bright_colors)
         base_json = json.dumps(sd.step_base_colors)
 
-        converted = self.audio_payload
-        payload_json = json.dumps(converted) if converted else "null"
+        payload_json = _payload_json_memo(self)
 
         playback_js = build_playback_js(wid, self.dur * 1000, use_gt_for_boundary=False,
                                         ring_time=self.ring_time, loop=self.loop)
@@ -905,8 +918,7 @@ class AnimatedLatticeSvgFigure:
         path_node_indices_json = json.dumps(getattr(sd, 'path_node_indices', []))
         path_node_colors_json = json.dumps(getattr(sd, 'path_node_colors', []))
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        converted = self.audio_payload
-        payload_json = json.dumps(converted) if converted else "null"
+        payload_json = _payload_json_memo(self)
 
         playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
 
@@ -1058,8 +1070,7 @@ class AnimatedNodeSelectSvgFigure:
         node_ids_json = json.dumps(sd.all_node_ids)
         select_json = json.dumps(self.select_node_indices)
         dimmed_color = getattr(sd, 'dimmed_node_color', '#111111')
-        converted = self.audio_payload
-        payload_json = json.dumps(converted) if converted else "null"
+        payload_json = _payload_json_memo(self)
 
         playback_js = build_playback_js(wid, self.dur * 1000, ring_time=self.ring_time, loop=self.loop)
 
@@ -1223,8 +1234,7 @@ class _AnimatedShapeFigureBase:
         all_shape_edge_ids_json = json.dumps(sd.all_shape_edge_ids)
         node_ids_json = json.dumps(sd.all_node_ids)
         dimmed_color = sd.dimmed_node_color
-        converted = self.audio_payload
-        payload_json = json.dumps(converted) if converted else "null"
+        payload_json = _payload_json_memo(self)
         total_groups = len(sd.shape_group_node_indices)
         is_multi = total_groups > 1
 

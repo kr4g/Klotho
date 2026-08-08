@@ -146,7 +146,7 @@ class RewriteSystem:
         words = [word]
         snapshots = [rules]
         for _ in range(generations):
-            word = rules.rewrite(word, rng=self._rng)
+            word = rules.rewrite(word, rng=self._rng, word_limit=word_limit)
             if word_limit is not None and len(word) > word_limit:
                 if brackets is not None:
                     cut = word_limit

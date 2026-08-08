@@ -1,10 +1,6 @@
 from klotho.utils.algorithms.factors import to_factors
 from typing import Union, List, Tuple, Dict, Set
-from collections import namedtuple
 from fractions import Fraction
-import numpy as np
-from sympy import Rational, root
-import pandas as pd
 
 A4_Hz   = 440.0
 A4_MIDI = 69

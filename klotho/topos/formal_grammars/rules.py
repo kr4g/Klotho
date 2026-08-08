@@ -175,14 +175,50 @@ class RuleSet(Mapping):
         weights = [w for w, _ in options]
         return rng.choices(words, weights=weights)[0]
 
-    def rewrite(self, word, rng=None):
+    def _string_translate_table(self):
+        """``str.translate`` table for deterministic single-char string
+        rules, or None when the rule set does not qualify. Built once
+        (rule sets are immutable; ``mutate`` returns a new instance)."""
+        if '_translate_table' in self.__dict__:
+            return self.__dict__['_translate_table']
+        table = {}
+        for symbol, options in self._rules.items():
+            if (len(options) != 1 or not isinstance(symbol, str)
+                    or len(symbol) != 1
+                    or not isinstance(options[0][1], str)):
+                table = None
+                break
+            table[ord(symbol)] = options[0][1]
+        self.__dict__['_translate_table'] = table
+        return table
+
+    def rewrite(self, word, rng=None, word_limit=None):
         """
         Apply one parallel rewrite pass to *word*.
 
         Tokens with no rule map to themselves. Returns a ``str`` when given
         a string, otherwise a tuple of tokens.
+
+        Parameters
+        ----------
+        word : str or sequence
+            The word to rewrite.
+        rng : random.Random or int, optional
+            Randomness source for stochastic rules.
+        word_limit : int, optional
+            For deterministic rule sets, stop expanding once the output
+            reaches this length (the caller trims/rebalances) — blow-up
+            protection applied inside the pass instead of after the full
+            expansion is materialized. Stochastic rule sets ignore it so
+            the per-token rng draw sequence is unchanged.
         """
+        if isinstance(word, str) and not self._token_mode:
+            table = self._string_translate_table()
+            if table is not None:
+                # single-option single-char string rules: one C-level pass
+                return word.translate(table)
         rng = _coerce_rng(rng)
+        limit = word_limit if not self.is_stochastic else None
         out = []
         for token in word:
             expansion = self.sample(token, rng)
@@ -190,6 +226,10 @@ class RuleSet(Mapping):
                 out.append(token)
             else:
                 out.extend(expansion)
+            if limit is not None and len(out) > limit:
+                # strict >: an exact-length landing must fall through to the
+                # caller's trim/rebalance branch just like the full expansion
+                break
         if isinstance(word, str) and not self._token_mode:
             return ''.join(out)
         return tuple(out)
