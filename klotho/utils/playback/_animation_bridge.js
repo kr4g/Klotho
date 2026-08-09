@@ -179,7 +179,11 @@
     }
 
     async function stop() {
-      if (_ssScheduler && _ssScheduler.isPlaying) await _ssScheduler.stop();
+      // Unconditional: during the ring-out isPlaying is already false,
+      // but stop must still cut the ringing tails (cancel the deferred
+      // ring frees, drain, purge) — stop means STOP. On a truly idle
+      // scheduler this is a cheap bounded no-op.
+      if (_ssScheduler) await _ssScheduler.stop();
       // Stopping mid-record cancels the recording (discards the capture).
       if (_recCancel) { var c = _recCancel; _recCancel = null; c(); }
     }

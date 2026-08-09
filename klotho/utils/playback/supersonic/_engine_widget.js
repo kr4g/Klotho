@@ -44,16 +44,20 @@
             + "margin-left:0;background:#ef4444";
     }
 
+    // The icon re-arms at onIdle — finish + ring-out + teardown — so
+    // "play" never shows while tails still ring. `ringing` marks that
+    // window: a press during it STOPS (cuts the tails and re-arms) — a
+    // button showing "stop" must never produce more sound. Restart is
+    // stop then play; both presses are fast.
+    var ringing = false;
     function doPlay() {
         if (!bridge.hasPlayableEvents()) return;
         setStopIcon();
+        ringing = false;
         bridge.play(null, {
             loop: loopCtl.schedulerValue(),
-            // The icon re-arms at onIdle — finish + ring-out + teardown —
-            // so "play" never shows while tails still ring; a press during
-            // the ring-out restarts in one press. Manual stop below keeps
-            // its immediate flip.
-            onIdle: function() { setPlayIcon(); },
+            onFinish: function() { ringing = true; },
+            onIdle: function() { ringing = false; setPlayIcon(); },
         });
     }
 
@@ -72,13 +76,16 @@
     toggleBtn.addEventListener("click", async function() {
         // Stopping while recording cancels the recording (capture is
         // discarded); the record flow resets its own visuals when its
-        // promise resolves null.
-        if (bridge.isPlaying() || (bridge.isRecording && bridge.isRecording())) {
-            // stop() drains frees through a bounded /sync before flushing the
-            // queue (up to ~750ms on a busy page); the engine-side cut is
-            // already in flight, so flip the icon immediately and settle
-            // again once the drain resolves.
+        // promise resolves null. During the ring-out (`ringing`) the
+        // same press cuts the tails — stop means STOP.
+        if (bridge.isPlaying() || ringing
+            || (bridge.isRecording && bridge.isRecording())) {
+            // stop() drains frees through a bounded fence before flushing
+            // the queue; the engine-side cut is already in flight, so flip
+            // the icon immediately and settle again once the drain
+            // resolves.
             var stopping = bridge.stop();
+            ringing = false;
             setPlayIcon();
             await stopping;
             setPlayIcon();

@@ -77,17 +77,19 @@ function revealAndTrack(gi) {
 function restoreView() { revealGroup(currentView); updateCounter(); }
 // Visual reset happens at the piece's end (score-time semantics); the
 // transport icon re-arms only at onIdle — finish + ring-out + teardown —
-// so "play" never shows while the previous play's tails still ring. A
-// press during the ring-out restarts in one press (the scheduler's own
-// restart teardown cuts the tails). Silent fallback and manual stop have
-// no ring-out to wait for and use the combined finishPlayback().
+// so "play" never shows while the previous play's tails still ring.
+// `ringing` marks that window: a press during it STOPS (cuts the tails
+// and re-arms) — a button showing "stop" must never produce more sound.
+// Restart is stop then play; both presses are fast. Silent fallback and
+// manual stop have no ring-out and use the combined finishPlayback().
+var ringing = false;
 function resetVisuals() {
     playing = false;
     currentView = playbackOrigin;
     if (trailOn) trailHistory = _browseTrail(currentView);
     restoreView();
 }
-function finishPlayback() { resetVisuals(); setPlayIcon(); }
+function finishPlayback() { ringing = false; resetVisuals(); setPlayIcon(); }
 
 function setPlayIcon() {
     iconEl.style.cssText =
@@ -167,7 +169,7 @@ function _runAnimation(step) {
 }
 
 toggleBtn.addEventListener("click", async function() {
-    if (playing) {
+    if (playing || ringing) {
         _stopAll();
         finishPlayback();
         return;
@@ -193,8 +195,8 @@ toggleBtn.addEventListener("click", async function() {
             await bridge.play(soloEvts, {
                 loop: loopCtl.schedulerValue(),
                 onEvent: function() {},
-                onFinish: function() { resetVisuals(); },
-                onIdle: function() { setPlayIcon(); },
+                onFinish: function() { ringing = true; resetVisuals(); },
+                onIdle: function() { ringing = false; setPlayIcon(); },
             });
         } else {
             var reordered = reorderEventsFrom(allEvts, currentView, totalGroups);
@@ -205,8 +207,8 @@ toggleBtn.addEventListener("click", async function() {
                 onEvent: function(stepIdx) {
                     if (playing) revealAndTrack(reordered.seqMap[stepIdx]);
                 },
-                onFinish: function() { resetVisuals(); },
-                onIdle: function() { setPlayIcon(); },
+                onFinish: function() { ringing = true; resetVisuals(); },
+                onIdle: function() { ringing = false; setPlayIcon(); },
             });
         }
     } else {

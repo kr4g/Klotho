@@ -23,12 +23,14 @@ KlothoGateToggle(toggleBtn, bridge ? bridge.ensureReady() : true);
 
 // Visual reset happens at the piece's end (score-time semantics); the
 // transport icon re-arms only at onIdle — finish + ring-out + teardown —
-// so "play" never shows while the previous play's tails still ring. A
-// press during the ring-out restarts in one press (the scheduler's own
-// restart teardown cuts the tails). Silent fallback and manual stop have
-// no ring-out to wait for and use the combined finishPlayback().
+// so "play" never shows while the previous play's tails still ring.
+// `ringing` marks that window: a press during it STOPS (cuts the tails
+// and re-arms) — a button showing "stop" must never produce more sound.
+// Restart is stop then play; both presses are fast. Silent fallback and
+// manual stop have no ring-out and use the combined finishPlayback().
+var ringing = false;
 function resetVisuals() { playing = false; onReset(); }
-function finishPlayback() { resetVisuals(); setPlayIcon(); }
+function finishPlayback() { ringing = false; resetVisuals(); setPlayIcon(); }
 
 function setPlayIcon() {
     iconEl.style.cssText =
@@ -68,7 +70,8 @@ function _stopAll() {
 toggleBtn.addEventListener("click", async function() {
     // Cancels a recording too (bridge.stop() discards the capture) —
     // including during the ring-out, when `playing` is already false.
-    if (playing || (bridge && bridge.isRecording && bridge.isRecording())) {
+    if (playing || ringing
+        || (bridge && bridge.isRecording && bridge.isRecording())) {
         _stopAll();
         finishPlayback();
         return;
@@ -88,8 +91,8 @@ toggleBtn.addEventListener("click", async function() {
         await bridge.play(null, {
             loop: loopCtl.schedulerValue(),
             onEvent: function(stepIdx) { if (playing) onStep(stepIdx); },
-            onFinish: function() { resetVisuals(); },
-            onIdle: function() { setPlayIcon(); },
+            onFinish: function() { ringing = true; resetVisuals(); },
+            onIdle: function() { ringing = false; setPlayIcon(); },
         });
     } else {
         playing = true;

@@ -176,6 +176,40 @@ class TestBridgeRecordContract:
         assert "onIdle: onIdle," in BRIDGE_SRC
         assert "if (onIdle) onIdle();" in BRIDGE_SRC
 
+    def test_bridge_stop_is_not_gated_on_is_playing(self):
+        """During the ring-out isPlaying is already false, but a stop
+        press must still cut the ringing tails — an isPlaying gate here
+        silently no-ops the cut (stop means STOP)."""
+        assert "if (_ssScheduler) await _ssScheduler.stop();" in BRIDGE_SRC
+        assert "_ssScheduler.isPlaying) await _ssScheduler.stop()" not in BRIDGE_SRC
+
+
+class TestRingOutTransportContract:
+    """The stop-means-stop rule: while tails ring (icon still 'stop'),
+    a press cuts them and re-arms — it must NEVER start a new playback.
+    Restart during ring-out is stop then play, two fast presses."""
+
+    _CONTROLLERS = {
+        "playback": (Path(__file__).parent.parent / "klotho" / "semeios"
+                     / "visualization" / "_animation" / "_playback.js"),
+        "shape": (Path(__file__).parent.parent / "klotho" / "semeios"
+                  / "visualization" / "_animation" / "_shape_playback.js"),
+        "engine_widget": _SS_DIR / "_engine_widget.js",
+    }
+
+    @pytest.mark.parametrize("name", sorted(_CONTROLLERS))
+    def test_controller_routes_ring_press_to_stop(self, name):
+        src = self._CONTROLLERS[name].read_text()
+        assert "var ringing = false;" in src
+        assert "ringing = true" in src   # armed at onFinish
+        assert "|| ringing" in src       # stop branch covers the ring window
+
+    @pytest.mark.parametrize("name", ["playback", "shape"])
+    def test_controller_ring_flags_track_idle(self, name):
+        src = self._CONTROLLERS[name].read_text()
+        assert "onFinish: function() { ringing = true;" in src
+        assert "onIdle: function() { ringing = false;" in src
+
     def test_record_forces_loop_off_and_waits_for_ring(self):
         m = re.search(r"async function record\(.*?\n    }\n", BRIDGE_SRC, re.S)
         assert m, "record() not found"
