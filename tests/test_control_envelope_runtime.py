@@ -74,33 +74,41 @@ class TestStopFreeVsPurgeContract:
 
     def test_stop_syncs_between_frees_and_purge(self):
         body = self._method_body(CORE_SRC, "async stop()")
-        free = body.index("this._freeGroup();")
-        drain = body.index("await this._beginTeardown()")
-        assert free < drain
+        free = body.index("self._freeGroup();")
+        sync = body.index("await self._fastSync(")
+        unreg = body.index("self._unregisterPlayer();")
+        assert free < sync < unreg
 
     def test_play_restart_syncs_between_frees_and_purge(self):
-        body = self._method_body(CORE_SRC, "async play(events, options)")
-        free = body.index("this._freeGroup();")
-        drain = body.index("await this._beginTeardown()")
-        assert free < drain
-
-    def test_teardown_drains_before_unregister(self):
-        """Inside _beginTeardown the fast fence must complete before the
-        unregister (whose purge would race the frees)."""
-        body = self._method_body(CORE_SRC, "_beginTeardown(superseded)")
-        fence = body.index("await self._fastSync(")
+        body = self._method_body(CORE_SRC, "async play(events, options)", span=4000)
+        free = body.index("self._freeGroup();")
+        sync = body.index("await self._fastSync(")
         unreg = body.index("self._unregisterPlayer();")
-        assert fence < unreg
+        assert free < sync < unreg
 
-    def test_play_awaits_inflight_teardown_before_scheduling(self):
-        """A stop()'s drain may be mid-flight with its purge not yet
-        recorded when a quick play lands on another widget; play() must
-        await the recorded teardown, then the recorded purge."""
+    def test_teardowns_serialize_on_shared_chain(self):
+        """Act 3 (V5): every frees->fence->unregister sequence rides the
+        shared _engineLock chain. Sequential awaits over the shared state
+        are not enough — two presses in the same task can both read "no
+        teardown pending" before either records one, and the second
+        press's purge then eats the first's frees and in-flight /sync
+        (browser-verified failure mode)."""
+        assert "_engineLock(work)" in CORE_SRC
+        for method, span in (("async stop()", 2600),
+                             ("async play(events, options)", 4000),
+                             ("_deferUnregister()", 2200)):
+            body = self._method_body(CORE_SRC, method, span=span)
+            assert "._engineLock(" in body, f"{method} not serialized"
+
+    def test_play_flush_section_settles_before_scheduling(self):
+        """The purge ack must settle inside play()'s serialized section,
+        before anything is scheduled: a late clearSched ack would eat a
+        random slice of the new batch."""
         body = self._method_body(CORE_SRC, "async play(events, options)", span=7000)
-        td = body.index("_awaitBounded(_schedLoad().teardownPromise")
+        lock = body.index("await this._engineLock(")
         purge = body.index("_awaitBounded(_schedLoad().purgePromise")
         plan = body.index("this._buildSendPlan(evts)")
-        assert td < purge < plan
+        assert lock < purge < plan
 
     def test_unregister_records_inflight_purge(self):
         """The purge promise must be observable by the next play()."""
@@ -109,7 +117,7 @@ class TestStopFreeVsPurgeContract:
 
     def test_play_awaits_inflight_purge_before_scheduling(self):
         body = self._method_body(CORE_SRC, "async play(events, options)", span=7000)
-        unreg = body.index("this._unregisterPlayer();")
+        unreg = body.index("self._unregisterPlayer();")
         purge_await = body.index("_awaitBounded(_schedLoad().purgePromise")
         plan = body.index("this._buildSendPlan(evts)")
         assert unreg < purge_await < plan

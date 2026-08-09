@@ -405,30 +405,29 @@
       });
     }
 
-    // Record an in-flight teardown on the shared state: drain the frees
-    // just sent (fast fence), then release the player registration —
-    // which records any triggered purge on purgePromise BEFORE this
-    // promise resolves, so an awaiter that then awaits purgePromise
-    // observes the flush. play() on ANY widget sharing the engine awaits
-    // the recorded teardown before scheduling; this closes the race
-    // where a quick play lands while a stop()'s drain is mid-flight and
-    // its purge is not yet recorded (the old unconditional sync masked
-    // it by accident). Recorded when the teardown ACTIONS start — never
-    // when the idle holdoff is merely armed, which would stall fresh
-    // plays on other widgets for the whole ring-out.
-    // ``superseded`` (optional) aborts the unregister when a newer
-    // play/stop on this instance has taken over its registration.
-    _beginTeardown(superseded) {
-      var self = this;
+    // Engine-wide teardown serializer. Every sequence that can end in a
+    // queue flush — frees, the /synced drain, the unregister whose purge
+    // nukes the engine queue — runs as ONE section on this shared chain.
+    // Purge is indiscriminate: fired while ANY widget's frees or /sync
+    // are still in the out-ring, it eats them (stuck notes; fences
+    // degraded to their timeout bound). Sequential awaits over the
+    // shared state are NOT enough: two presses in the same task can both
+    // read "no teardown pending" before either records one (verified in
+    // the browser — the second press's purge ate the first's fence).
+    // Serialized sections keep every purge behind a fence covering every
+    // free sent before it, page-wide. Sections are internally bounded
+    // (fence/purge awaits), so the chain cannot wedge; it clears itself
+    // when idle, so a clean fresh play acquires it for free.
+    _engineLock(work) {
       var g = _schedLoad();
+      var prev = g.teardownChain || null;
       var p = (async function() {
-        try { await self._fastSync(750); } catch (e) {}
-        if (superseded && superseded()) return;
-        self._unregisterPlayer();
+        if (prev) { try { await prev; } catch (e) {} }
+        return work();
       })();
-      g.teardownPromise = p;
-      var clear = function() { if (g.teardownPromise === p) g.teardownPromise = null; };
-      p.then(clear, clear);
+      var settle = function() { if (g.teardownChain === p) g.teardownChain = null; };
+      p.then(settle, settle);
+      g.teardownChain = p;
       return p;
     }
 
@@ -499,16 +498,17 @@
       this._purgeHoldoffId = setTimeout(function() {
         self._purgeHoldoffId = null;
         if (token !== self.stopToken) return;
-        var teardown = self._beginTeardown(function() {
-          return token !== self.stopToken;
-        });
-        // Transport re-arm: only after the teardown AND its recorded
-        // purge ack settle is the fast play path guaranteed. Superseded
-        // chains (a newer play/stop bumped the token) never fire — the
-        // newer lifecycle owns the button.
-        teardown.then(function() {
-          return self._awaitBounded(_schedLoad().purgePromise, 1250);
+        self._engineLock(async function() {
+          if (token !== self.stopToken) return;
+          try { await self._fastSync(750); } catch (e) {}
+          if (token !== self.stopToken) return;
+          self._unregisterPlayer();
+          await self._awaitBounded(_schedLoad().purgePromise, 1250);
         }).then(function() {
+          // Transport re-arm: only after the teardown AND its purge ack
+          // settle is the fast play path guaranteed. Superseded chains
+          // (a newer play/stop bumped the token) never fire — the newer
+          // lifecycle owns the button.
           if (token !== self.stopToken) return;
           if (self.onIdle) { try { self.onIdle(); } catch (e) {} }
         });
@@ -851,29 +851,35 @@
       // out-ring while purge() signals clearSched over the worklet port —
       // an unordered channel that can wipe the ring before it drains,
       // eating the frees and leaving the old notes sounding forever. The
-      // /synced round-trip guarantees the frees are consumed first.
-      // Liveness is captured BEFORE the frees reset it: a fresh or fully
-      // idle widget has nothing in flight to drain, so it skips the
-      // fence and press-to-sound stays at ~STARTUP_DELAY.
+      // whole teardown runs as one serialized section (see _engineLock);
+      // the purge ack settles inside it, because a late clearSched ack
+      // would eat a random slice of the new batch (n_maps, control
+      // synths, releases). A clean instance (nothing live, never
+      // registered) skips the fence, so a fresh press-to-sound stays at
+      // ~STARTUP_DELAY. Superseded sections (a newer press bumped the
+      // token) do nothing — the newest press owns the full teardown.
       this._reportLossMetrics();
-      var wasLive = (this._groupId != null)
-        || this._activeBuffers.length > 0
-        || this._deferredRings.length > 0;
-      this._cancelAllDeferredRings();
-      this._freeGroup();
-      this._freeBuffers();
-      if (wasLive) {
-        await this._beginTeardown();
-      } else {
-        this._unregisterPlayer();
-      }
-      // A teardown started elsewhere — a stop() or idle holdoff on any
-      // widget sharing this engine — may be mid-flight with its purge
-      // not yet recorded: await it, THEN the recorded purge. A late
-      // clearSched ack would otherwise eat a random slice of the new
-      // batch (n_maps, control synths, releases).
-      await this._awaitBounded(_schedLoad().teardownPromise, 750);
-      await this._awaitBounded(_schedLoad().purgePromise, 750);
+      var self = this;
+      await this._engineLock(async function() {
+        if (token !== self.stopToken) return;
+        var wasLive = (self._groupId != null)
+          || self._activeBuffers.length > 0
+          || self._deferredRings.length > 0;
+        self._cancelAllDeferredRings();
+        self._freeGroup();
+        self._freeBuffers();
+        // _playerRegistered covers the post-finish window where the ring
+        // frees just fired but the idle holdoff hasn't unregistered yet:
+        // those frees are still in the out-ring, and the unregister
+        // below fires the purge.
+        if (wasLive || self._playerRegistered) {
+          try { await self._fastSync(750); } catch (e) {}
+          if (token !== self.stopToken) return;
+        }
+        self._unregisterPlayer();
+        await self._awaitBounded(_schedLoad().purgePromise, 750);
+      });
+      if (token !== this.stopToken) return;
 
       this.nodeMap.clear();
       this._defNames.clear();
@@ -975,6 +981,7 @@
 
     async stop() {
       this.stopToken++;
+      var token = this.stopToken;
       this.isPlaying = false;
       clearTimeout(this._batchTimeoutId);
       this._batchTimeoutId = null;
@@ -983,17 +990,27 @@
       clearTimeout(this._purgeHoldoffId);
       this._purgeHoldoffId = null;
       this._reportLossMetrics();
-      this._cancelAllDeferredRings();
-      this._freeGroup();
-      this._freeBuffers();
       // Same free-vs-purge ordering hazard as play()'s restart path: the
       // frees ride the OSC out-ring, purge()'s clearSched rides the
       // worklet port, and the port message can win — wiping the ring
       // before the frees are consumed. Stop must actually silence the
-      // synths, so drain via the fast /synced fence before flushing the
-      // queue (bounded inside _beginTeardown: a lost reply degrades to a
-      // best-effort flush, never a hung stop() with a poisoned queue).
-      await this._beginTeardown();
+      // synths, so frees + drain + unregister run as one serialized
+      // section (see _engineLock); the fence is bounded, so a lost reply
+      // degrades to a best-effort flush, never a hung stop() with a
+      // poisoned queue. If a newer play() takes over mid-section (token
+      // bump), it owns the registration, the teardown, and the maps —
+      // leave everything to it.
+      var self = this;
+      await this._engineLock(async function() {
+        if (token !== self.stopToken) return;
+        self._cancelAllDeferredRings();
+        self._freeGroup();
+        self._freeBuffers();
+        try { await self._fastSync(750); } catch (e) {}
+        if (token !== self.stopToken) return;
+        self._unregisterPlayer();
+      });
+      if (token !== this.stopToken) return;
       this.nodeMap.clear();
       this._defNames.clear();
       this._trackMap = null;
