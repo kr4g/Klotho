@@ -148,7 +148,10 @@ function _runAnimation(step) {
             dimAllNodes(); hideAllShapeEdges();
             _timerId = setTimeout(function() { _runAnimation(0); }, stepMs);
         } else {
-            _timerId = setTimeout(function() { finishPlayback(); }, pauseMs);
+            // stepMs (durMs + pauseMs) has already elapsed since the last
+            // reveal — the trailing pause is spent. Finishing now gives one
+            // pause total, matching audio playback's finish at dur + pause.
+            finishPlayback();
         }
         return;
     }

@@ -28,7 +28,12 @@
   // releases — so the last notes' releases could be wiped before they
   // fired (stuck final chord, hard-cut by the deferred ring free). V4
   // defers the idle purge past the ring-out; same marker discipline.
-  if (globalThis.__klothoSchedCoreV4) return;
+  // V5 (finish honors the trailing pause + fast fences + teardown handoff):
+  // the V4 core armed both finish arms at the piece's musical end, ignoring
+  // the payload's tail pause (shape widgets reset their visuals early on
+  // every play), and paid supersonic sync()'s ~300 ms postMessage settling
+  // sleep on every teardown fence; same marker discipline.
+  if (globalThis.__klothoSchedCoreV5) return;
 
   // The supersonic-scsynth engine holds at most SCHEDULER_SLOT_COUNT (512)
   // timestamped bundles; when that queue is full an arriving bundle is
@@ -157,6 +162,7 @@
       this._batchBundleCount = 0;
       this._playerRegistered = false;
       this._metricsAtPlay = null;
+      this._tailPause = 0;
 
       this.drawScheduler = new DrawScheduler();
       this.onEvent = null;
@@ -702,7 +708,10 @@
       } else if (loopState) {
         var nextCycle = cycleIndex + 1;
         if (loopState.finiteCycles > 0 && nextCycle >= loopState.finiteCycles) {
-          var endNTP = this._playStartNTP + relOffset + pieceDur;
+          // Last finite cycle ends at its musical end PLUS the trailing
+          // pause (between-cycle spacing already honors it via cycleDur).
+          var endNTP = this._playStartNTP + relOffset + pieceDur
+            + (loopState.tailPause || 0);
           var remaining = (endNTP - now) * 1000;
           this._finishTimeoutId = setTimeout(function() {
             if (token !== self.stopToken) return;
@@ -725,7 +734,8 @@
           }, Math.max(1, delay2));
         }
       } else {
-        var endNTP = this._playStartNTP + relOffset + pieceDur;
+        // Non-loop finish: musical end plus the trailing pause.
+        var endNTP = this._playStartNTP + relOffset + pieceDur + this._tailPause;
         var remaining = (endNTP - now) * 1000;
         this._finishTimeoutId = setTimeout(function() {
           if (token !== self.stopToken) return;
@@ -845,8 +855,12 @@
       this.isPlaying = true;
 
       var basePieceDur = this._computePieceDur(evts);
+      // The trailing pause is part of the piece: the finish arms in
+      // _scheduleBatch add it (via this._tailPause / loopState.tailPause)
+      // so the visual reset and teardown chain don't fire early, while
+      // batching lookahead math stays on the base duration.
       var tailPause = Math.max(0, options.tailPause || 0);
-      var pieceDur = basePieceDur + tailPause;
+      this._tailPause = tailPause;
       var loopFinite = (typeof options.loop === "number" && Number.isFinite(options.loop) && options.loop > 1)
         ? Math.floor(options.loop)
         : 0;
@@ -899,4 +913,5 @@
   globalThis.__klothoSchedCoreV2 = true;
   globalThis.__klothoSchedCoreV3 = true;
   globalThis.__klothoSchedCoreV4 = true;
+  globalThis.__klothoSchedCoreV5 = true;
 })();
