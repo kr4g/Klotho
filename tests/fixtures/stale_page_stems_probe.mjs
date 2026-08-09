@@ -106,6 +106,6 @@ process.stdout.write(JSON.stringify({
   tapSends: taps.map((t) => ({ after: t[4], inBus: t[6], outBus: t[8] })),
   hasSetupStemTaps: typeof scheduler.setupStemTaps === 'function',
   busAllocNextAudio: sandbox.__klothoBusAlloc?.nextAudio,
-  stopHasSyncDrain: /_awaitBounded/.test(
+  stopHasSyncDrain: /_fastSync/.test(
     sandbox.BrowserScheduler.prototype.stop.toString()),
 }));

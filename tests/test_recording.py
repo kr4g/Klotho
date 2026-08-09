@@ -110,6 +110,26 @@ class TestSchedulerVersionSkew:
         assert result["stopHasSyncDrain"] is True
 
 
+class TestTeardownFenceContract:
+    def test_teardown_fences_use_fast_sync(self):
+        """stop(), play()'s restart drain and the idle-holdoff chain fence
+        frees via the direct /synced round-trip; the upstream sync() pads
+        every call with ~2x snapshotIntervalMs (~300 ms) of settling sleep
+        in postMessage mode."""
+        assert "_fastSync(" in CORE_SRC
+        assert "this.sonic.sync()" not in CORE_SRC
+
+    def test_buffer_fill_fence_keeps_upstream_sync(self):
+        """preloadControlBuffer's /b_alloc rides supersonic's async
+        buffer-command chain (the /b_alloc family is not written straight
+        to the out-ring), and only the full sonic.sync() awaits that
+        chain. A raw /sync round-trip can overtake the alloc, landing the
+        /b_setn fills on an unallocated buffer — the control-envelope
+        silence bug. Do not convert this site to _fastSync."""
+        assert "await sonic.sync();" in SCORE_SRC
+        assert "_fastSync" not in SCORE_SRC
+
+
 class TestSchedulerRecordingContract:
     def test_no_blocked_clearsched_command(self):
         """SuperSonic blocks /clearSched client-side (it throws); the

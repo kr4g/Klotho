@@ -347,6 +347,55 @@
       try { await Promise.race([promise, timeout]); } catch(e) {}
     }
 
+    // Direct /sync round-trip: resolves on scsynth's matching /synced
+    // reply — the command-stream ordering guarantee the teardown fences
+    // need. The upstream sonic.sync() adds ~2x snapshotIntervalMs
+    // (~300 ms) of settling sleep in postMessage mode so its main-thread
+    // state mirrors catch up, and also fences its internal async
+    // buffer-command chain (the /b_alloc family is dispatched off a
+    // promise chain, not written straight to the out-ring). Neither
+    // matters here: these fences only order the /synced reply behind
+    // /g_freeAll, /n_free and /b_free, which are direct out-ring sends.
+    // scheduler_score.js's preloadControlBuffer MUST keep the full
+    // sonic.sync(): its /b_alloc rides that async chain, and a raw /sync
+    // can overtake it (b_setn fills would land on an unallocated buffer
+    // — the control-envelope silence bug).
+    // The 'in' event delivers each incoming OSC message as a decoded
+    // flat array: [address, ...args] (supersonic-scsynth 0.71.0).
+    // Self-bounded: resolves after timeoutMs even on a lost reply, and
+    // always unhooks its listener. Engines without the emitter fall back
+    // to the padded upstream sync().
+    _fastSync(timeoutMs) {
+      var sonic = this.sonic;
+      if (!sonic || typeof sonic.on !== 'function'
+          || typeof sonic.send !== 'function') {
+        try {
+          if (sonic && typeof sonic.sync === 'function') {
+            return this._awaitBounded(sonic.sync(), timeoutMs);
+          }
+        } catch (e) {}
+        return Promise.resolve();
+      }
+      var id = (Math.floor(Math.random() * 0x3fffffff) | 1);
+      return new Promise(function(resolve) {
+        var off = null;
+        var done = function() {
+          if (off) { try { off(); } catch (e) {} off = null; }
+          resolve();
+        };
+        try {
+          off = sonic.on('in', function(msg) {
+            if (msg && msg[0] === '/synced' && msg[1] === id) done();
+          });
+          sonic.send('/sync', id);
+        } catch (e) {
+          done();
+          return;
+        }
+        setTimeout(done, timeoutMs);
+      });
+    }
+
     _snapshotMetrics() {
       try {
         if (typeof this.sonic.getMetrics === 'function') {
@@ -418,13 +467,7 @@
           if (token !== self.stopToken) return;
           self._unregisterPlayer();
         };
-        try {
-          if (typeof self.sonic.sync === 'function') {
-            self._awaitBounded(self.sonic.sync(), 750).then(finish, finish);
-            return;
-          }
-        } catch(e) {}
-        finish();
+        self._fastSync(750).then(finish, finish);
       }, delayMs);
     }
 
@@ -764,16 +807,12 @@
       // out-ring while purge() signals clearSched over the worklet port —
       // an unordered channel that can wipe the ring before it drains,
       // eating the frees and leaving the old notes sounding forever. The
-      // /sync round-trip guarantees the frees are consumed first.
+      // /synced round-trip guarantees the frees are consumed first.
       this._reportLossMetrics();
       this._cancelAllDeferredRings();
       this._freeGroup();
       this._freeBuffers();
-      try {
-        if (typeof this.sonic.sync === 'function') {
-          await this._awaitBounded(this.sonic.sync(), 750);
-        }
-      } catch(e) {}
+      try { await this._fastSync(750); } catch(e) {}
       this._unregisterPlayer();
       // If a queue flush is in flight — fired just above, or by a recent
       // stop() on any widget sharing this engine — it MUST settle before
@@ -894,14 +933,10 @@
       // frees ride the OSC out-ring, purge()'s clearSched rides the
       // worklet port, and the port message can win — wiping the ring
       // before the frees are consumed. Stop must actually silence the
-      // synths, so drain via /sync before flushing the queue. Bounded:
-      // a lost /synced reply must degrade to a best-effort flush, not
-      // hang stop() forever with the queue still poisoned.
-      try {
-        if (typeof this.sonic.sync === 'function') {
-          await this._awaitBounded(this.sonic.sync(), 750);
-        }
-      } catch(e) {}
+      // synths, so drain via the fast /synced fence before flushing the
+      // queue. Bounded: a lost reply must degrade to a best-effort
+      // flush, not hang stop() forever with the queue still poisoned.
+      try { await this._fastSync(750); } catch(e) {}
       this._unregisterPlayer();
       this.nodeMap.clear();
       this._defNames.clear();

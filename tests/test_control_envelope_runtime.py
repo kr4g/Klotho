@@ -75,14 +75,14 @@ class TestStopFreeVsPurgeContract:
     def test_stop_syncs_between_frees_and_purge(self):
         body = self._method_body(CORE_SRC, "async stop()")
         free = body.index("this._freeGroup();")
-        sync = body.index("await this._awaitBounded(this.sonic.sync()")
+        sync = body.index("await this._fastSync(")
         unreg = body.index("this._unregisterPlayer();")
         assert free < sync < unreg
 
     def test_play_restart_syncs_between_frees_and_purge(self):
         body = self._method_body(CORE_SRC, "async play(events, options)")
         free = body.index("this._freeGroup();")
-        sync = body.index("await this._awaitBounded(this.sonic.sync()")
+        sync = body.index("await this._fastSync(")
         unreg = body.index("this._unregisterPlayer();")
         assert free < sync < unreg
 
