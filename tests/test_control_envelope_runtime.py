@@ -75,16 +75,32 @@ class TestStopFreeVsPurgeContract:
     def test_stop_syncs_between_frees_and_purge(self):
         body = self._method_body(CORE_SRC, "async stop()")
         free = body.index("this._freeGroup();")
-        sync = body.index("await this._fastSync(")
-        unreg = body.index("this._unregisterPlayer();")
-        assert free < sync < unreg
+        drain = body.index("await this._beginTeardown()")
+        assert free < drain
 
     def test_play_restart_syncs_between_frees_and_purge(self):
         body = self._method_body(CORE_SRC, "async play(events, options)")
         free = body.index("this._freeGroup();")
-        sync = body.index("await this._fastSync(")
-        unreg = body.index("this._unregisterPlayer();")
-        assert free < sync < unreg
+        drain = body.index("await this._beginTeardown()")
+        assert free < drain
+
+    def test_teardown_drains_before_unregister(self):
+        """Inside _beginTeardown the fast fence must complete before the
+        unregister (whose purge would race the frees)."""
+        body = self._method_body(CORE_SRC, "_beginTeardown(superseded)")
+        fence = body.index("await self._fastSync(")
+        unreg = body.index("self._unregisterPlayer();")
+        assert fence < unreg
+
+    def test_play_awaits_inflight_teardown_before_scheduling(self):
+        """A stop()'s drain may be mid-flight with its purge not yet
+        recorded when a quick play lands on another widget; play() must
+        await the recorded teardown, then the recorded purge."""
+        body = self._method_body(CORE_SRC, "async play(events, options)", span=7000)
+        td = body.index("_awaitBounded(_schedLoad().teardownPromise")
+        purge = body.index("_awaitBounded(_schedLoad().purgePromise")
+        plan = body.index("this._buildSendPlan(evts)")
+        assert td < purge < plan
 
     def test_unregister_records_inflight_purge(self):
         """The purge promise must be observable by the next play()."""

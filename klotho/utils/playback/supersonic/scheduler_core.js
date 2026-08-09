@@ -253,6 +253,10 @@
           try { sonic.send('/b_free', bufs[i]); } catch(e) {}
         }
         self._reclaimBusRange(audioStart, audioEnd, controlStart, controlEnd);
+        // Done entries leave the list so an idle replay reads as clean
+        // (play()'s dirty check) and doesn't re-free dead nodes.
+        var ix = self._deferredRings.indexOf(entry);
+        if (ix !== -1) self._deferredRings.splice(ix, 1);
       }, ringMs);
       this._deferredRings.push(entry);
       this._activeBuffers = [];
@@ -396,6 +400,33 @@
       });
     }
 
+    // Record an in-flight teardown on the shared state: drain the frees
+    // just sent (fast fence), then release the player registration —
+    // which records any triggered purge on purgePromise BEFORE this
+    // promise resolves, so an awaiter that then awaits purgePromise
+    // observes the flush. play() on ANY widget sharing the engine awaits
+    // the recorded teardown before scheduling; this closes the race
+    // where a quick play lands while a stop()'s drain is mid-flight and
+    // its purge is not yet recorded (the old unconditional sync masked
+    // it by accident). Recorded when the teardown ACTIONS start — never
+    // when the idle holdoff is merely armed, which would stall fresh
+    // plays on other widgets for the whole ring-out.
+    // ``superseded`` (optional) aborts the unregister when a newer
+    // play/stop on this instance has taken over its registration.
+    _beginTeardown(superseded) {
+      var self = this;
+      var g = _schedLoad();
+      var p = (async function() {
+        try { await self._fastSync(750); } catch (e) {}
+        if (superseded && superseded()) return;
+        self._unregisterPlayer();
+      })();
+      g.teardownPromise = p;
+      var clear = function() { if (g.teardownPromise === p) g.teardownPromise = null; };
+      p.then(clear, clear);
+      return p;
+    }
+
     _snapshotMetrics() {
       try {
         if (typeof this.sonic.getMetrics === 'function') {
@@ -463,11 +494,7 @@
       this._purgeHoldoffId = setTimeout(function() {
         self._purgeHoldoffId = null;
         if (token !== self.stopToken) return;
-        var finish = function() {
-          if (token !== self.stopToken) return;
-          self._unregisterPlayer();
-        };
-        self._fastSync(750).then(finish, finish);
+        self._beginTeardown(function() { return token !== self.stopToken; });
       }, delayMs);
     }
 
@@ -808,16 +835,27 @@
       // an unordered channel that can wipe the ring before it drains,
       // eating the frees and leaving the old notes sounding forever. The
       // /synced round-trip guarantees the frees are consumed first.
+      // Liveness is captured BEFORE the frees reset it: a fresh or fully
+      // idle widget has nothing in flight to drain, so it skips the
+      // fence and press-to-sound stays at ~STARTUP_DELAY.
       this._reportLossMetrics();
+      var wasLive = (this._groupId != null)
+        || this._activeBuffers.length > 0
+        || this._deferredRings.length > 0;
       this._cancelAllDeferredRings();
       this._freeGroup();
       this._freeBuffers();
-      try { await this._fastSync(750); } catch(e) {}
-      this._unregisterPlayer();
-      // If a queue flush is in flight — fired just above, or by a recent
-      // stop() on any widget sharing this engine — it MUST settle before
-      // this play schedules anything: a late clearSched ack would eat a
-      // random slice of the new batch (n_maps, control synths, releases).
+      if (wasLive) {
+        await this._beginTeardown();
+      } else {
+        this._unregisterPlayer();
+      }
+      // A teardown started elsewhere — a stop() or idle holdoff on any
+      // widget sharing this engine — may be mid-flight with its purge
+      // not yet recorded: await it, THEN the recorded purge. A late
+      // clearSched ack would otherwise eat a random slice of the new
+      // batch (n_maps, control synths, releases).
+      await this._awaitBounded(_schedLoad().teardownPromise, 750);
       await this._awaitBounded(_schedLoad().purgePromise, 750);
 
       this.nodeMap.clear();
@@ -934,10 +972,9 @@
       // worklet port, and the port message can win — wiping the ring
       // before the frees are consumed. Stop must actually silence the
       // synths, so drain via the fast /synced fence before flushing the
-      // queue. Bounded: a lost reply must degrade to a best-effort
-      // flush, not hang stop() forever with the queue still poisoned.
-      try { await this._fastSync(750); } catch(e) {}
-      this._unregisterPlayer();
+      // queue (bounded inside _beginTeardown: a lost reply degrades to a
+      // best-effort flush, never a hung stop() with a poisoned queue).
+      await this._beginTeardown();
       this.nodeMap.clear();
       this._defNames.clear();
       this._trackMap = null;
