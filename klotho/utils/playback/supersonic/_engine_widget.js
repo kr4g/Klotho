@@ -49,7 +49,11 @@
         setStopIcon();
         bridge.play(null, {
             loop: loopCtl.schedulerValue(),
-            onFinish: function() { setPlayIcon(); },
+            // The icon re-arms at onIdle — finish + ring-out + teardown —
+            // so "play" never shows while tails still ring; a press during
+            // the ring-out restarts in one press. Manual stop below keeps
+            // its immediate flip.
+            onIdle: function() { setPlayIcon(); },
         });
     }
 

@@ -157,14 +157,24 @@ class TestSchedulerRecordingContract:
 
 
 class TestBridgeRecordContract:
-    def test_versioned_guard_bumped_to_v3(self):
-        assert '__klothoPlaybackBridgeV3 !== "undefined"' in BRIDGE_SRC
+    def test_versioned_guard_bumped_to_v4(self):
+        assert '__klothoPlaybackBridgeV4 !== "undefined"' in BRIDGE_SRC
+        assert '__klothoPlaybackBridgeV3 !== "undefined"' not in BRIDGE_SRC
 
-    def test_v3_claims_all_versioned_names(self):
-        """A stale 10.15 output rendered after a 10.16 widget must not
-        clobber the public name: V3 is a superset, so it owns V2 too."""
+    def test_v4_claims_all_versioned_names(self):
+        """A stale 10.15/10.16 output rendered after a newer widget must
+        not clobber the public name: V4 is a superset, so it owns every
+        older name too."""
         assert "globalThis.__klothoPlaybackBridgeV2 = buildBridge" in BRIDGE_SRC
         assert "globalThis.__klothoPlaybackBridgeV3 = buildBridge" in BRIDGE_SRC
+        assert "globalThis.__klothoPlaybackBridgeV4 = buildBridge" in BRIDGE_SRC
+
+    def test_bridge_plumbs_on_idle_to_scheduler(self):
+        """Controllers re-arm their play button at onIdle (finish +
+        ring-out + teardown); the bridge must pass it through — and fire
+        it on the no-events early return, or the icon sticks on stop."""
+        assert "onIdle: onIdle," in BRIDGE_SRC
+        assert "if (onIdle) onIdle();" in BRIDGE_SRC
 
     def test_record_forces_loop_off_and_waits_for_ring(self):
         m = re.search(r"async function record\(.*?\n    }\n", BRIDGE_SRC, re.S)

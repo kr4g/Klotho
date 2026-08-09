@@ -40,3 +40,10 @@ class TestFinishTiming:
         # Two cycles: between-cycle spacing (base 2 + pause 1) was already
         # correct in V4; the last cycle's END must add the pause too.
         assert _run("loop2-pause1")["finishAtMs"] == pytest.approx(6100, abs=0.01)
+
+    def test_transport_idle_fires_after_finish(self):
+        # onIdle (transport re-arm) fires strictly after onFinish, once
+        # the ring-out holdoff teardown and its purge ack have settled.
+        result = _run("pause1")
+        assert result["idleFired"] is True
+        assert result["idleAfterFinish"] is True

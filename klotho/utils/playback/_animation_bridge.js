@@ -8,7 +8,10 @@
   // is a strict superset of V2, so it also claims the V2 name — otherwise
   // a stale 10.15 output rendered after a 10.16 widget would see V2 unset
   // and clobber the public name with a build lacking record().
-  if (typeof globalThis.__klothoPlaybackBridgeV3 !== "undefined") return;
+  // V4 (V5-scheduler batch): plumbs onIdle through play() so transports
+  // re-arm after ring-out + teardown, not at finish. Same discipline:
+  // keys on its own name, claims every older one.
+  if (typeof globalThis.__klothoPlaybackBridgeV4 !== "undefined") return;
 
   function buildBridge(config) {
     var audioPayload = config.audioPayload || null;
@@ -198,10 +201,12 @@
       }
       var onEvent = options.onEvent || null;
       var onFinish = options.onFinish || null;
+      var onIdle = options.onIdle || null;
 
       var evts = Array.isArray(events) ? events : _scEvents();
       if (!_ssScheduler || evts.length === 0) {
         if (onFinish) onFinish();
+        if (onIdle) onIdle();
         return;
       }
       _ssScheduler.play(evts, {
@@ -212,6 +217,7 @@
         stemTaps: !!options.stemTaps,
         onEvent: onEvent || function(){},
         onFinish: onFinish || null,
+        onIdle: onIdle,
       });
     }
 
@@ -440,4 +446,5 @@
   globalThis.KlothoPlaybackBridge = buildBridge;
   globalThis.__klothoPlaybackBridgeV2 = buildBridge;
   globalThis.__klothoPlaybackBridgeV3 = buildBridge;
+  globalThis.__klothoPlaybackBridgeV4 = buildBridge;
 })();

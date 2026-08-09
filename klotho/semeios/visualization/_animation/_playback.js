@@ -21,7 +21,14 @@ var bridge = (typeof globalThis.KlothoPlaybackBridge === "function")
 // the silent-animation fallback still works without audio).
 KlothoGateToggle(toggleBtn, bridge ? bridge.ensureReady() : true);
 
-function finishPlayback() { playing = false; onReset(); setPlayIcon(); }
+// Visual reset happens at the piece's end (score-time semantics); the
+// transport icon re-arms only at onIdle — finish + ring-out + teardown —
+// so "play" never shows while the previous play's tails still ring. A
+// press during the ring-out restarts in one press (the scheduler's own
+// restart teardown cuts the tails). Silent fallback and manual stop have
+// no ring-out to wait for and use the combined finishPlayback().
+function resetVisuals() { playing = false; onReset(); }
+function finishPlayback() { resetVisuals(); setPlayIcon(); }
 
 function setPlayIcon() {
     iconEl.style.cssText =
@@ -81,7 +88,8 @@ toggleBtn.addEventListener("click", async function() {
         await bridge.play(null, {
             loop: loopCtl.schedulerValue(),
             onEvent: function(stepIdx) { if (playing) onStep(stepIdx); },
-            onFinish: function() { finishPlayback(); },
+            onFinish: function() { resetVisuals(); },
+            onIdle: function() { setPlayIcon(); },
         });
     } else {
         playing = true;

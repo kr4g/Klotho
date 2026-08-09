@@ -75,13 +75,19 @@ function revealAndTrack(gi) {
     updateCounter();
 }
 function restoreView() { revealGroup(currentView); updateCounter(); }
-function finishPlayback() {
+// Visual reset happens at the piece's end (score-time semantics); the
+// transport icon re-arms only at onIdle — finish + ring-out + teardown —
+// so "play" never shows while the previous play's tails still ring. A
+// press during the ring-out restarts in one press (the scheduler's own
+// restart teardown cuts the tails). Silent fallback and manual stop have
+// no ring-out to wait for and use the combined finishPlayback().
+function resetVisuals() {
     playing = false;
     currentView = playbackOrigin;
     if (trailOn) trailHistory = _browseTrail(currentView);
     restoreView();
-    setPlayIcon();
 }
+function finishPlayback() { resetVisuals(); setPlayIcon(); }
 
 function setPlayIcon() {
     iconEl.style.cssText =
@@ -187,7 +193,8 @@ toggleBtn.addEventListener("click", async function() {
             await bridge.play(soloEvts, {
                 loop: loopCtl.schedulerValue(),
                 onEvent: function() {},
-                onFinish: function() { finishPlayback(); },
+                onFinish: function() { resetVisuals(); },
+                onIdle: function() { setPlayIcon(); },
             });
         } else {
             var reordered = reorderEventsFrom(allEvts, currentView, totalGroups);
@@ -198,7 +205,8 @@ toggleBtn.addEventListener("click", async function() {
                 onEvent: function(stepIdx) {
                     if (playing) revealAndTrack(reordered.seqMap[stepIdx]);
                 },
-                onFinish: function() { finishPlayback(); },
+                onFinish: function() { resetVisuals(); },
+                onIdle: function() { setPlayIcon(); },
             });
         }
     } else {

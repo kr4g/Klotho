@@ -92,7 +92,7 @@ class TestRecordControls:
         assert f'id="{wid}_rec"' in html
         assert f'id="{wid}_stems"' in html  # score with tracks
         assert 'globalThis.KlothoRecorder = KlothoRecorder' in html
-        assert '__klothoPlaybackBridgeV3' in html
+        assert '__klothoPlaybackBridgeV4' in html
 
     def test_plain_widget_has_no_record_artifacts(self):
         eng = self._engine()

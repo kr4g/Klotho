@@ -167,6 +167,11 @@
       this.drawScheduler = new DrawScheduler();
       this.onEvent = null;
       this.onFinish = null;
+      // Fired when the piece is DONE done: finish + ring-out + teardown
+      // (incl. any purge ack) — the earliest instant the fast play path
+      // is guaranteed again. Transports re-arm their play button here,
+      // not at onFinish.
+      this.onIdle = null;
     }
 
     // "Now" on the clock scsynth actually fires bundles against: the
@@ -494,7 +499,19 @@
       this._purgeHoldoffId = setTimeout(function() {
         self._purgeHoldoffId = null;
         if (token !== self.stopToken) return;
-        self._beginTeardown(function() { return token !== self.stopToken; });
+        var teardown = self._beginTeardown(function() {
+          return token !== self.stopToken;
+        });
+        // Transport re-arm: only after the teardown AND its recorded
+        // purge ack settle is the fast play path guaranteed. Superseded
+        // chains (a newer play/stop bumped the token) never fire — the
+        // newer lifecycle owns the button.
+        teardown.then(function() {
+          return self._awaitBounded(_schedLoad().purgePromise, 1250);
+        }).then(function() {
+          if (token !== self.stopToken) return;
+          if (self.onIdle) { try { self.onIdle(); } catch (e) {} }
+        });
       }, delayMs);
     }
 
@@ -872,9 +889,11 @@
       var evts = events || [];
       this.onEvent = options.onEvent || null;
       this.onFinish = options.onFinish || null;
+      this.onIdle = options.onIdle || null;
 
       if (evts.length === 0) {
         if (this.onFinish) this.onFinish();
+        if (this.onIdle) { try { this.onIdle(); } catch (e) {} }
         return;
       }
 
