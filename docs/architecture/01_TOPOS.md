@@ -232,8 +232,8 @@ classDiagram
         +set_node_data(node, **attr)
         +update_node_data(node, attrs)
         +replace_node_data(node, attrs)
-        +add_child(parent, index, **attr) int
-        +add_subtree(parent, subtree, index)
+        +add_child(parent, **attr) int
+        +add_subtree(parent, subtree)
         +prune(node)
         +remove_subtree(node)
         +replace_node(old_node, **attr)

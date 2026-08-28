@@ -154,7 +154,16 @@ class ParameterLayer(TreeLayer):
             self._patch_effective(tree, node)
 
     def set_instrument(self, tree, node, instrument):
-        """Bind *instrument* at *node* and register its pfield keys."""
+        """Bind *instrument* at *node* and register its pfield keys.
+
+        Raises TypeError on any shape that cannot lower to a synth. This is
+        the layer-level backstop: it catches what a distribution *callable*
+        returned, which the caller-level guard never sees.
+        """
+        from ..composition.compositional import _instrument_shape_error
+        from ..instruments.base import Instrument, Effect
+        if not isinstance(instrument, (str, int, Instrument, Effect)):
+            raise TypeError(_instrument_shape_error(instrument))
         if hasattr(instrument, 'pfields'):
             self._pfields.update(instrument.pfields.keys())
         self._node_instruments[node] = instrument

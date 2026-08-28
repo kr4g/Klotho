@@ -89,7 +89,16 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     *args
         One or two lists to generate rotation matrices from.
     mode : str, optional
-        Rotation mode ('G', 'S', 'D', or 'C'). Default is 'G'.
+        Rotation mode. Default is ``'G'``.
+
+        - ``'G'`` (group): both lists rotate together by the row index --
+          heads and tails stay locked.
+        - ``'S'``: heads stay fixed; each row shears the tails one extra
+          step (``i + j + 1``).
+        - ``'D'``: tails are frozen to ``autoref(lst2)`` column-wise; only
+          the heads rotate.
+        - ``'C'`` (circular): as ``'D'``, but the frozen tail table
+          alternates by row parity between phase offsets 0 and 2.
     preserve_signs : bool, optional
         If True, preserves signs while rotating absolute values (default is False).
 
@@ -97,6 +106,11 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     -------
     tuple
         Tuple of rotation matrices based on the specified mode.
+
+    Examples
+    --------
+    >>> autoref_rotmat((3, 4, 5, 7), mode='C')[1]
+    ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)))
     '''
     if len(args) == 1:
         lst1 = lst2 = tuple(args[0])
@@ -123,7 +137,19 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
                              for j, elem in enumerate(permute_list(lst1, i, preserve_signs))) 
                         for i in range(len(lst1)))
         case 'C':
-            return None
+            # Circular rotation: heads sweep like mode D, but the tail table
+            # alternates by row parity between two phase offsets (0 and 2).
+            # Restored from the pre-generalization implementation (commit
+            # 17a9996, 2024-03-27), whose docstring specified the expected
+            # matrix; the restoration reproduces that matrix element-for-
+            # element. It was lost as collateral damage in the one-list ->
+            # two-list generalization (ceb30ca), never by a design decision.
+            even = autoref(lst2, preserve_signs=preserve_signs)
+            odd = autoref(permute_list(lst2, 2, preserve_signs),
+                          preserve_signs=preserve_signs)
+            return tuple(tuple((elem, (even if i % 2 == 0 else odd)[j][1])
+                             for j, elem in enumerate(permute_list(lst1, i, preserve_signs)))
+                        for i in range(len(lst1)))
         case _:
             raise ValueError('Invalid mode. Choose from G, S, D, or C.')
 

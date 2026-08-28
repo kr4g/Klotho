@@ -212,8 +212,15 @@ def _callable_arity(fn):
         pass
     try:
         sig = inspect.signature(fn)
+        # count POSITIONAL slots, not required ones: a defaulted positional
+        # (lambda c=None: ...) still wants the context, while the documented
+        # zero-arg bound-method idiom (ens.drums.pick, signature (*, rng=None))
+        # must keep reporting 0 -- so keyword-only and **kwargs never count.
+        _POSITIONAL = (inspect.Parameter.POSITIONAL_ONLY,
+                       inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                       inspect.Parameter.VAR_POSITIONAL)
         arity = len([p for p in sig.parameters.values()
-                     if p.default is inspect.Parameter.empty])
+                     if p.kind in _POSITIONAL])
     except (ValueError, TypeError):
         arity = 0
     try:
@@ -221,6 +228,23 @@ def _callable_arity(fn):
     except TypeError:
         pass
     return arity
+
+
+def _instrument_shape_error(instrument):
+    """Message naming every shape ``set_instrument`` accepts.
+
+    Shared by CompositionalUnit.set_instrument (which rejects the argument
+    itself) and ParameterLayer.set_instrument (which rejects whatever a
+    callable RETURNED), so both report the same accept-list.
+    """
+    return (
+        f"set_instrument got {type(instrument).__name__!r}, which is not a "
+        f"usable instrument: {instrument!r}. Accepted: an Instrument or "
+        f"Effect instance, a SynthDef name (str), a synth id (int), a "
+        f"Pattern, or a 0-/1-arg callable returning one of those. "
+        f"(An Ensemble family view is not itself an instrument -- call it, "
+        f"e.g. ens.drums.pick, or index a member.)"
+    )
 
 
 def _reject_fx_as_instrument(def_name):
@@ -2153,6 +2177,8 @@ class CompositionalUnit(TemporalUnit):
                         family = getattr(inst, '_ensemble_family', None)
                         if family is not None:
                             self._rt.set_mfields(n, group=family)
+        else:
+            raise TypeError(_instrument_shape_error(instrument))
 
     def set(self, node, *, inst=None, include_rests=False,
             pfields=None, mfields=None, **fields):

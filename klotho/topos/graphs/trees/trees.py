@@ -591,13 +591,19 @@ class Tree(GraphCore):
         self._add_edge_raw(parent, child_id)
         return child_id
 
-    def add_child(self, parent, index=None, **attr):
-        """Add a child node to a parent. Returns the new child node id."""
+    def add_child(self, parent, **attr):
+        """Add a child node to a parent. Returns the new child node id.
+
+        Node data is passed as keyword attributes only -- the owning layer
+        names them (``proportion`` on a RhythmTree, ``factor`` on a
+        HarmonicTree, arbitrary fields on a ParameterTree). A positional
+        second argument raises TypeError rather than being discarded.
+        """
         child_id = self._add_child_raw(parent, **attr)
         self._post_mutation(scope_node=parent, op='add_child')
         return child_id
 
-    def add_subtree(self, parent, subtree, index=None):
+    def add_subtree(self, parent, subtree):
         """Add a subtree as a child of a parent node. Returns the attached subtree root id."""
         if not isinstance(subtree, Tree):
             raise TypeError("subtree must be a Tree instance")
