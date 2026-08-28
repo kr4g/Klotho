@@ -121,6 +121,30 @@ def _duration_inject_key(controls, has_gate, from_manifest, event_pfields):
     ``Env.linen(0, duration, ...)`` envelope, so their internal envelope
     tracks the rhythmic value). A ``dur`` control gets it only on
     non-gated synths.
+
+    Precedence, as shipped (WL-36, ruled 2026-08-28): the injected slot
+    duration WINS over an explicitly authored ``duration`` pfield. The
+    auto-fill is the behavior wanted almost all of the time, so authoring
+    ``duration`` on a leaf does not override it -- the authored value is
+    replaced without warning.
+
+    Two caveats worth knowing before relying on this:
+
+    - It holds for OBJECT instruments. When the instrument is a string,
+      ``from_manifest`` is True and the guard below stands down, so an
+      authored ``duration`` survives instead. The two lowering paths for
+      simple objects and Score events behave like the string case as
+      well, so precedence is NOT uniform across the three paths.
+    - The escape hatch, if you need an authored value to survive today,
+      is a control not named literally ``duration``/``dur``.
+
+    The intended long-term answer is duration *scaling* expressed at the
+    TemporalUnit/CompositionalUnit level rather than a precedence fight
+    down here. Until then, treat this function as the single place that
+    decides, and do not add a per-leaf warning: the canonical corpus
+    idiom ``set_pfields(duration=lambda c: c.real_duration)`` authors a
+    value equal to the slot duration on every leaf, so a naive
+    conflict warning would fire on material that is entirely correct.
     """
     if 'duration' in controls:
         key = 'duration'

@@ -19,6 +19,7 @@ from klotho.chronos.utils import calc_onsets, beat_duration, seconds_to_hmsms
 from enum import Enum
 import pandas as pd
 import copy
+import warnings
 
 class ProlatioTypes(Enum):
     """
@@ -1476,6 +1477,23 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
             [ut.copy() for ut in self._seq], offset=self._offset)
 
 
+_SORT_ROWS_UNSET = object()
+
+
+def _validate_axis(axis):
+    """Validate and coerce an alignment axis. Single source of truth.
+
+    NEW-11: the setter validated and the constructor did not, so
+    ``TemporalBlock(axis=5)`` was accepted and pushed rows outside the
+    block's own span, while ``blk.axis = 5`` raised. The setter also
+    coerced to float and the constructor did not, so ``BT(axis=0).axis``
+    was ``0`` but ``blk.axis = 0`` gave ``0.0``.
+    """
+    if not -1 <= axis <= 1:
+        raise ValueError("Axis must be between -1 and 1")
+    return float(axis)
+
+
 class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     """
     A collection of parallel temporal structures representing simultaneous events.
@@ -1489,31 +1507,69 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     rows : list, optional
         Temporal structures (``TemporalUnit``, ``TemporalUnitSequence``,
         or ``TemporalBlock``). Default is an empty list.
+
+        Rows are **copied on entry**. Mutating the original afterwards
+        does not reach the block, and ``blk[0] is row`` is False. The same
+        applies to every mutator (``append``, ``prepend``, ``insert``,
+        ``replace``, ``extend``).
     axis : float, optional
         Alignment axis from -1 (left) through 0 (center) to 1 (right).
-        Default is -1.
+        Default is -1. Must lie in [-1, 1].
     sort_rows : bool, optional
-        Whether to sort rows by duration (longest first). Default is True.
+        Whether to sort rows by duration, longest first (index 0). Default
+        is True.
+
+        .. warning::
+           This default is scheduled to become ``False``. While it is
+           True, **row order is not the order you passed**: ``BT([short,
+           long])`` comes back ``[long, short]``, which silently renames
+           anything keyed by row index -- lane assignment in playback,
+           plot lanes, and Score promotion. It also makes ``append``,
+           ``prepend`` and ``insert`` positionally meaningless, since
+           every mutator re-sorts. Pass ``sort_rows`` explicitly to
+           silence the FutureWarning and to pin the behavior you want.
 
     Notes
     -----
     Outside a :class:`~klotho.thetos.composition.score.Score`, a block
     always starts at time 0 and its total duration is fixed after
     construction.
+
+    The sort is **destructive**: the pre-sort order is not retained, so
+    setting ``sort_rows = False`` afterwards realigns but cannot restore
+    the order you passed.
     """
     
     def __init__(self,
                  rows:Union[list[Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']], None]=None,
                  axis:float = -1,
-                 sort_rows:bool=True):
+                 sort_rows=_SORT_ROWS_UNSET):
         if rows is None:
             rows = []
+        explicit = sort_rows is not _SORT_ROWS_UNSET
+        if not explicit:
+            sort_rows = True
         self._rows = [row.copy() for row in rows] if rows else []
-        self._axis = axis
+        self._axis = _validate_axis(axis)
         self._offset = 0.0
         self._sort_rows = sort_rows
 
+        pre_sort = list(self._rows)
         self._align_rows()
+        # WL-32: warn only when the default actually reordered somebody's
+        # rows. Silent for explicit callers, single-row blocks, and blocks
+        # that were already in longest-first order -- so the warning marks
+        # real exposure to the coming flip, not merely constructing a block.
+        if not explicit and sort_rows and len(self._rows) > 1 and self._rows != pre_sort:
+            warnings.warn(
+                "TemporalBlock currently sorts rows by duration (longest "
+                "first), so the row order is not the order you passed. This "
+                "default will become sort_rows=False. Pass sort_rows "
+                "explicitly to pin the behavior you want and silence this "
+                "warning.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
     @classmethod
     def _adopt(cls, rows, axis=-1, sort_rows=True, offset=0.0):
@@ -1522,7 +1578,7 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         copies) to avoid the constructor's second copy of every row."""
         c = cls.__new__(cls)
         c._rows = list(rows)
-        c._axis = axis
+        c._axis = _validate_axis(axis)
         c._offset = offset
         c._sort_rows = sort_rows
         c._align_rows()
@@ -1532,7 +1588,8 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     # Matrix to Block
     @classmethod
     def from_tree_mat(cls, matrix, meas_denom:int=1, subdiv:bool=False,
-                      rotation_offset:int=1, beat=None, bpm=None):
+                      rotation_offset:int=1, beat=None, bpm=None,
+                      axis:float=-1, sort_rows=_SORT_ROWS_UNSET):
         """
         Create a ``TemporalBlock`` from a matrix of tree specifications.
 
@@ -1569,7 +1626,7 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
                                         bpm      = bpm,
                                         beat     = beat))
             tb.append(TemporalUnitSequence(seq))
-        return cls(tuple(tb))
+        return cls(tuple(tb), axis=axis, sort_rows=sort_rows)
 
     def _align_rows(self):
         """
@@ -1652,9 +1709,7 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         ValueError
             If *axis* is outside [-1, 1].
         """
-        if not -1 <= axis <= 1:
-            raise ValueError("Axis must be between -1 and 1")
-        self._axis = float(axis)
+        self._axis = _validate_axis(axis)
         self._align_rows()
 
     def _scale_bpm(self, factor: float) -> None:
@@ -1672,6 +1727,11 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         """
         Add a temporal structure at the beginning (index 0) of the block.
 
+        Note that under the default ``sort_rows=True`` the block re-sorts
+        after every mutation, so the resulting position is determined by
+        duration, not by this call. Row position is only meaningful with
+        ``sort_rows=False``. The row is copied on entry.
+
         Parameters
         ----------
         row : TemporalUnit, TemporalUnitSequence, or TemporalBlock
@@ -1684,6 +1744,11 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         """
         Add a temporal structure at the end (highest index) of the block.
 
+        Note that under the default ``sort_rows=True`` the block re-sorts
+        after every mutation, so the resulting position is determined by
+        duration, not by this call. Row position is only meaningful with
+        ``sort_rows=False``. The row is copied on entry.
+
         Parameters
         ----------
         row : TemporalUnit, TemporalUnitSequence, or TemporalBlock
@@ -1695,6 +1760,11 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     def insert(self, index: int, row: Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']) -> None:
         """
         Insert a temporal structure at the specified index.
+
+        Note that under the default ``sort_rows=True`` the block re-sorts
+        after every mutation, so the resulting position is determined by
+        duration, not by this call. Row position is only meaningful with
+        ``sort_rows=False``. The row is copied on entry.
 
         Parameters
         ----------
