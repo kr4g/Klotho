@@ -47,6 +47,7 @@
         "_polyVoiceCount": 1,
         "_polyVoiceIndex": 0,
         "dur": 0.3636363636363636,
+        "group": "default",
         "id": "__id_1",
         "pfields": {
           "amp": 0.3,
@@ -121,6 +122,7 @@
         "_polyVoiceCount": 1,
         "_polyVoiceIndex": 0,
         "dur": 0.36363636363636354,
+        "group": "default",
         "id": "__id_4",
         "pfields": {
           "amp": 0.3,

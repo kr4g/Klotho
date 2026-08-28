@@ -85,6 +85,24 @@ class TestTrackOverride:
         new_events = [e for e in payload['events'] if e.get('type') == 'new']
         assert all(e.get('group') == 'default' for e in new_events)
 
+    def test_slurred_uc_with_group_mfield_keeps_track_on_sets(self):
+        # Regression: leaf-level group routing + slur. The continuation
+        # "set" events must carry the head's group, not fall back to
+        # "default" (which re-pointed the synth's out bus off-track
+        # mid-slur).
+        s = Score().track('arps')
+        uc = _uc()
+        uc.leaves.set(freq=440.0, group='arps')
+        uc.root.apply_slur()
+        s.add(uc, name='a')
+        payload = convert_score_to_sc_events(s)
+        new_events = [e for e in payload['events'] if e.get('type') == 'new']
+        set_events = [e for e in payload['events'] if e.get('type') == 'set']
+        assert len(new_events) == 1
+        assert len(set_events) == 3
+        assert all(e.get('group') == 'arps' for e in new_events)
+        assert all(e.get('group') == 'arps' for e in set_events)
+
 
 class TestControlEnvelopeCollection:
     def test_envelope_descriptor_appears_in_payload(self):

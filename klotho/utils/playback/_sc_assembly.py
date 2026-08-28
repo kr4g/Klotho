@@ -218,6 +218,12 @@ def lower_compositional_ir_to_sc_assembly(
         time_offset = min((ev.start for ev in events_iterable), default=0.0)
 
     slur_voice_uids: dict = {}
+    # Group (track routing) of the synth each slur uid was created in. A
+    # continuation "set" cannot move the synth, so it must carry the same
+    # group as its head "new" — otherwise downstream stamping (e.g.
+    # _lower_score_uc) defaults it and the scheduler re-points the out
+    # bus off-track mid-slur.
+    slur_uid_groups: dict = {}
 
     for event in events_iterable:
         step_idx = node_to_step.get(event.node_id, None) if animation else None
@@ -379,6 +385,7 @@ def lower_compositional_ir_to_sc_assembly(
                 }
                 if group is not None:
                     new_event["group"] = group
+                    slur_uid_groups[slur_uid] = group
                 events.append(_attach_poly_meta(new_event, voice_event))
                 _track_event(slur_uid)
                 while len(active_uids) <= voice_index:
@@ -398,6 +405,9 @@ def lower_compositional_ir_to_sc_assembly(
                         "releaseAfter": False,
                         "pfields": merged_pfields,
                     }
+                    head_group = slur_uid_groups.get(target_uid)
+                    if head_group is not None:
+                        set_event["group"] = head_group
                     events.append(_attach_poly_meta(set_event, voice_event))
                     _track_event(target_uid)
                     _record(event.node_id, target_uid, voice_start)
@@ -418,6 +428,7 @@ def lower_compositional_ir_to_sc_assembly(
                     }
                     if group is not None:
                         new_event["group"] = group
+                        slur_uid_groups[slur_uid] = group
                     events.append(_attach_poly_meta(new_event, voice_event))
                     _track_event(slur_uid)
                     while len(active_uids) <= voice_index:

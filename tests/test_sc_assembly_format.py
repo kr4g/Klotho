@@ -235,6 +235,21 @@ class TestSlurAssemblyFormat:
         slur_sets = [e for e in set_events if e['id'] == slur_id]
         assert len(slur_sets) == 1
 
+    def test_slur_continuation_sets_inherit_head_group(self):
+        uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=120, inst=_inst('tri'))
+        uc.leaves.set(freq=440.0, group='arps')
+        uc.root.apply_slur()
+        events = lower_compositional_ir_to_sc_assembly(uc, sort_output=True)
+        _validate_assembly(events)
+        new_events = [e for e in events if e['type'] == 'new']
+        set_events = [e for e in events if e['type'] == 'set']
+        assert len(new_events) == 1
+        assert new_events[0].get('group') == 'arps'
+        assert len(set_events) == 3
+        for e in set_events:
+            assert e.get('group') == 'arps', \
+                "slur continuation set must carry its head new's group"
+
 
 class TestSlurMultiVoiceAssembly:
     """Voice-aware slur lowering with uniform group-wide voice expansion.
