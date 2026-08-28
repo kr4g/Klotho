@@ -60,9 +60,18 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     """
     Decompose a temporal structure into its constituent parts.
 
-    When *depth* is given, subtrees at that depth become the new units.
-    Otherwise, each leaf duration becomes an independent unit with the
-    specified *prolatio*.
+    When *depth* is given, the units are the depth-*depth* frontier: every
+    subtree rooted at that depth **plus** every leaf that terminates above
+    it, in temporal (onset) order — so the resulting sequence always spans
+    the same total duration as the source. ``depth=0`` yields one unit
+    equal to the whole structure. Otherwise, each leaf becomes an
+    independent unit with the specified *prolatio*.
+
+    Rests are preserved in both branches: a rest leaf decomposes to a rest
+    unit regardless of *prolatio*. For a CompositionalUnit, per-leaf
+    parameters, instruments, and contained overlays are preserved; slurs or
+    envelopes spanning multiple resulting units cannot survive and are
+    discarded.
 
     Parameters
     ----------
@@ -70,15 +79,26 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
         The temporal structure to decompose.
     prolatio : tuple, str, or None, optional
         The subdivision specification for the resulting units. When None,
-        defaults to ``'d'`` (duration). Default is None.
+        defaults to ``'d'`` (duration). On a CompositionalUnit an explicit
+        *prolatio* re-prolates each leaf, with the source leaf's effective
+        pfields cascading from the new unit's root. Default is None.
     depth : int or None, optional
-        If given, decompose at the specified tree depth rather than at
-        the leaf level. Default is None.
+        If given, decompose at the specified frontier depth rather than at
+        the leaf level. Must be within ``[0, tree depth]``. Cannot be
+        combined with *prolatio* on a CompositionalUnit (re-prolating the
+        subtrees would discard the per-leaf parameters the depth branch
+        exists to preserve). Default is None.
 
     Returns
     -------
     TemporalUnitSequence
         A sequence of the resulting temporal units.
+
+    Raises
+    ------
+    ValueError
+        If *depth* is outside ``[0, tree depth]``, or if *prolatio* and
+        *depth* are combined on a CompositionalUnit.
     """
     
     # Import here to avoid circular imports
@@ -97,21 +117,48 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
         
     prolatio_cycle = cycle(prolatio_cycle)
     
-    if depth:
-        nodes_at_depth = ut._rt.at_depth(depth)
+    if depth is not None:
+        max_depth = ut._rt.depth
+        if not isinstance(depth, int) or isinstance(depth, bool) or not (0 <= depth <= max_depth):
+            raise ValueError(
+                f"depth must be an int in [0, {max_depth}] for this tree, got {depth!r}"
+            )
+        if isinstance(ut, CompositionalUnit) and prolatio is not None:
+            raise ValueError(
+                "prolatio cannot be combined with depth on a CompositionalUnit: "
+                "re-prolating the subtrees would discard the per-leaf parameters "
+                "the depth decomposition exists to preserve. Decompose without "
+                "prolatio, or re-prolate the resulting units afterwards."
+            )
+        # The frontier: nodes at exactly `depth` plus every leaf that
+        # terminates above it, in temporal order — otherwise shallow
+        # branches silently vanish from the result.
+        frontier = set(ut._rt.at_depth(depth))
+        frontier.update(n for n in ut._rt.leaf_nodes if ut._rt.depth_of(n) < depth)
+        nodes_at_depth = sorted(frontier, key=lambda n: ut._rt[n]['metric_onset'])
+        leaf_set = set(ut._rt.leaf_nodes)
         units = []
-        
+
         for node in nodes_at_depth:
             subtree = ut._rt.subtree(node)
-            
+
             if isinstance(ut, CompositionalUnit):
                 cu_subtree = ut.from_subtree(node)
                 units.append(cu_subtree)
             else:
+                metric_duration = ut._rt[node]['metric_duration']
+                is_rest_leaf = (node in leaf_set
+                                and ut._rt[node].get('proportion', 1) < 0)
+                if is_rest_leaf:
+                    node_prolatio = 'r'
+                elif not prolatio:
+                    node_prolatio = subtree.group.S
+                else:
+                    node_prolatio = next(prolatio_cycle)
                 unit = TemporalUnit(
                     span     = 1,
-                    tempus   = subtree[subtree.root]['metric_duration'],
-                    prolatio = subtree.group.S if not prolatio else next(prolatio_cycle),
+                    tempus   = abs(metric_duration),
+                    prolatio = node_prolatio,
                     beat     = ut._beat,
                     bpm      = ut._bpm
                 )
@@ -142,35 +189,47 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
         return TemporalUnitSequence(units)
     else:
         units = []
-        
-        # Create units based on leaf node durations/ratios
-        for ratio in ut._rt.durations:
-            if isinstance(ut, CompositionalUnit):
-                # For CompositionalUnit, create new CompositionalUnit instances 
-                # with the same parameter structure but duration-based timing
-                unit = CompositionalUnit(
-                    span     = 1,
-                    tempus   = abs(ratio),
-                    prolatio = next(prolatio_cycle),
-                    beat     = ut._beat,
-                    bpm      = ut._bpm,
-                    pfields  = ut.pfields
-                )
-                
-                instrument = ut.get_instrument(ut._rt.root)
-                if instrument is not None:
-                    unit.set_instrument(unit._rt.root, instrument)
+
+        if isinstance(ut, CompositionalUnit):
+            if prolatio is None:
+                # from_subtree preserves the leaf's effective pfields,
+                # governing instrument, and rest state.
+                for leaf in ut._rt.leaf_nodes:
+                    units.append(ut.from_subtree(leaf))
             else:
-                # Original behavior for TemporalUnit
+                # An explicit prolatio reshapes each leaf: the source leaf's
+                # effective pfields cascade from the new unit's root. Rest
+                # leaves stay rests regardless of the requested prolatio.
+                for ordinal, leaf in enumerate(ut._rt.leaf_nodes):
+                    metric_duration = ut._rt[leaf]['metric_duration']
+                    is_rest = ut._rt[leaf].get('proportion', 1) < 0
+                    unit = CompositionalUnit(
+                        span     = 1,
+                        tempus   = abs(metric_duration),
+                        prolatio = 'r' if is_rest else next(prolatio_cycle),
+                        beat     = ut._beat,
+                        bpm      = ut._bpm,
+                        pfields  = ut.pfields
+                    )
+                    if not is_rest:
+                        unit.set_pfields(unit._rt.root, **ut[ordinal].pfields)
+                    governing = ut._rt._resolve_governing_instrument_node(leaf)
+                    if governing is not None and governing in ut._rt.node_instruments:
+                        unit.set_instrument(unit._rt.root, ut._rt.node_instruments[governing])
+                    units.append(unit)
+        else:
+            # Rest leaves (negative ratios) decompose to rest units — the
+            # decomposed sequence must sound identical to the source.
+            for ratio in ut._rt.durations:
                 unit = TemporalUnit(
                     span     = 1,
                     tempus   = abs(ratio),
-                    prolatio = next(prolatio_cycle),
+                    prolatio = 'r' if ratio < 0 else next(prolatio_cycle),
                     beat     = ut._beat,
                     bpm      = ut._bpm
                 )
-            units.append(unit)
-        
+                units.append(unit)
+
         return TemporalUnitSequence(units)
 
 # def transform(structure: TemporalMeta) -> TemporalMeta:
