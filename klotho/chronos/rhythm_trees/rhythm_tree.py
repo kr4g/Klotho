@@ -11,6 +11,7 @@ notation.
 
 See: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 """
+import numbers
 from fractions import Fraction
 from typing import Union, Tuple
 from tabulate import tabulate
@@ -64,6 +65,17 @@ class RhythmLayer(TreeLayer):
             raise ValueError(f"Illegal RhythmTree node attribute update: {illegal}")
         if 'metric_duration' in attrs or 'metric_onset' in attrs:
             raise ValueError("metric_duration and metric_onset are derived and cannot be set directly")
+        # NEW-05: a zero proportion has no representable rest form
+        # (``-abs(0) == 0``), so make_rest silently no-ops on it and the
+        # node stays neither sounding nor resting. Zero is rejected at
+        # construction; reject it on the write path too, or mutation
+        # reopens the same hole.
+        if 'proportion' in attrs and attrs['proportion'] == 0:
+            raise ValueError(
+                "proportion cannot be zero -- a zero-duration leaf breaks "
+                "strictly-increasing onsets and cannot be made a rest. "
+                "Use a negative proportion for a rest."
+            )
 
     def data_scope(self, tree, node, changed_keys, op):
         """Return the recompute scope for a proportion change: the node's parent (root at the top)."""
@@ -129,6 +141,7 @@ class RhythmTree(Tree):
             be integers or nested ``(D, S)`` tuples. Default is ``(1, 1)``.
         """
         casted = self._cast_subdivs(subdivisions)
+        self._validate_s_grammar(casted)
         super().__init__(Meas(meas).numerator * span, casted)
         
         self._meta['span'] = span
@@ -219,6 +232,16 @@ class RhythmTree(Tree):
         """
         The proportional subdivisions (S part) of this tree.
 
+        Reports the structure AS AUTHORED until the tree is mutated, and
+        the structure as rebuilt from the graph afterwards. Those two agree
+        on every proportion -- construction-time validation (NEW-04/WL-24)
+        rejects the one input class that made them disagree, a non-whole
+        float, which used to display as ``(1, 1.5, 1)`` while playing
+        ``(1, 1, 1)``. They can still differ in *representation*: a rest
+        group authored ``(-1, (1, 1, 1, 1))`` rebuilds as
+        ``(-1, (-1, -1, -1, -1))``, which is the same music written the
+        other way round.
+
         Returns
         -------
         tuple
@@ -247,6 +270,72 @@ class RhythmTree(Tree):
             return item
         
         return tuple(convert_to_tuple(child) for child in children)
+
+    @staticmethod
+    def _validate_s_grammar(s, _path='S'):
+        """Validate the S-form of *subdivisions* at construction time.
+
+        Deliberately more lenient than :meth:`_validate_s_form`, which
+        guards ``subdivide`` and legitimately demands at least two parts.
+        This one guards the CONSTRUCTOR, so it must accept every shape
+        Klotho itself round-trips:
+
+        - any length, including ``()`` and ``(1,)`` -- the ``'d'``/``'r'``
+          prolatio presets build length-1 S, and ``subtree``/``decompose``
+          emit both;
+        - whole-valued floats -- these are the tie markers ``_evaluate``
+          writes and re-reads, so ``2.0`` is data, not a typo;
+        - negative values -- rests;
+        - ``numbers.Integral`` generally, so numpy scalars pass.
+
+        What it rejects is what silently corrupted the tree before: a
+        non-whole float (truncated to int and marked tied), a zero (a
+        0-duration leaf that breaks strictly-increasing onsets), and a
+        malformed pair (previously a bare ``abs()`` TypeError with no
+        indication of WHERE).
+        """
+        def _check_scalar(v, path, what):
+            if isinstance(v, bool) or isinstance(v, numbers.Integral):
+                value = int(v)
+            elif isinstance(v, float):
+                if not v.is_integer():
+                    raise ValueError(
+                        f"{what} at {path} must be a whole number "
+                        f"(an int, or a float marking a tie); got {v!r}. "
+                        f"Fractional proportions are truncated, not honoured -- "
+                        f"scale the whole S instead, e.g. (2, 3, 2) for (1, 1.5, 1)."
+                    )
+                value = int(v)
+            else:
+                raise ValueError(
+                    f"{what} at {path} must be an int or a whole-valued float; "
+                    f"got {type(v).__name__}: {v!r}."
+                )
+            if value == 0:
+                raise ValueError(
+                    f"{what} at {path} cannot be zero -- a zero proportion "
+                    f"builds a 0-duration leaf and breaks strictly-increasing "
+                    f"onsets. Use a negative value for a rest."
+                )
+
+        if not isinstance(s, (tuple, list)):
+            raise ValueError(
+                f"subdivisions at {_path} must be a tuple or list; "
+                f"got {type(s).__name__}: {s!r}."
+            )
+        for i, elem in enumerate(s):
+            path = f"{_path}[{i}]"
+            if isinstance(elem, (tuple, list)):
+                if len(elem) != 2:
+                    raise ValueError(
+                        f"nested element at {path} must be a (D, S) pair of "
+                        f"exactly 2 items; got {len(elem)}: {elem!r}."
+                    )
+                d, sub = elem
+                _check_scalar(d, f"{path}[0]", 'D')
+                RhythmTree._validate_s_grammar(sub, f"{path}[1]")
+            else:
+                _check_scalar(elem, path, 'proportion')
 
     def _validate_s_form(self, s):
         """Validate S is in valid S-form. Each element is non-zero int or (D, S) tuple.
@@ -559,13 +648,13 @@ class RhythmTree(Tree):
         subtree : RhythmTree or Tree
             The subtree to graft.
         mode : str, optional
-            Grafting mode (``'replace'`` or ``'append'``). Default is
-            ``'replace'``.
+            Grafting mode (``'replace'`` or ``'adopt'``). Default is
+            ``'replace'``. See :meth:`~klotho.topos.graphs.trees.Tree.graft_subtree`.
 
         Returns
         -------
-        RhythmTree
-            The modified tree (self).
+        int
+            The id of the grafted target node.
         """
         return super().graft_subtree(target_node, subtree, mode)
 

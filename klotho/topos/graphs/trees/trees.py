@@ -680,7 +680,28 @@ class Tree(GraphCore):
                 self._list = Group((structure, tuple()))
 
     def graft_subtree(self, target_node, subtree, mode='replace'):
-        """Graft a subtree onto the tree at the specified leaf node."""
+        """Graft a subtree onto the tree at the specified leaf node.
+
+        This is the canonical description of the grafting modes; the
+        RhythmTree and ParameterTree overrides refer back to it.
+
+        Parameters
+        ----------
+        target_node : int
+            The leaf to graft at. Grafting to a non-leaf raises.
+        subtree : Tree
+            The subtree to graft.
+        mode : str, optional
+            ``'replace'`` (default) -- the target leaf is replaced by the
+            subtree's root, so the subtree stands in its place.
+            ``'adopt'`` -- the target leaf is kept and the subtree's
+            children are attached beneath it.
+
+        Returns
+        -------
+        int
+            The id of the grafted target node.
+        """
         if not isinstance(subtree, Tree):
             raise TypeError("subtree must be a Tree instance")
 
