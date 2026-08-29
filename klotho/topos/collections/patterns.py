@@ -102,9 +102,11 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     preserve_signs : bool, optional
         If True, preserves signs while rotating absolute values (default is False).
 
-    The four modes are Haddad's, from section 2.3.8 ("Les modes de rotation
-    sur un rythme autoreferentiel") of *Vers une temporalite musicale
-    repensee* (2020); mode names follow the thesis: Group, S, D, circulaire.
+    The four modes are Haddad's, from section 2.3.8, "Les modes de rotation
+    sur un rythme autoreferentiel" ("Rotation modes on a self-referential
+    rhythm"), of *Vers une temporalite musicale repensee* ("Toward a
+    Rethought Musical Temporality", 2020). Mode names follow the thesis:
+    Group, S, D, and circulaire (circular).
 
     Returns
     -------
@@ -141,10 +143,12 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
                              for j, elem in enumerate(permute_list(lst1, i, preserve_signs))) 
                         for i in range(len(lst1)))
         case 'C':
-            # Haddad 2020, sec 2.3.8.4 "La rotation en mode circulaire":
-            # "une rotation circulaire pour les elements D, et une
-            # permutation circulaire pour les elements S" -- the heads
-            # advance one step per row, the tails two. Verified against the
+            # Haddad 2020, sec 2.3.8.4, "La rotation en mode circulaire"
+            # ("Rotation in circular mode"): "une rotation circulaire pour
+            # les elements D, et une permutation circulaire pour les
+            # elements S" -- "a circular rotation for the D elements, and a
+            # circular permutation for the S elements". So the heads advance
+            # one step per row and the tails two. Verified against the
             # thesis matrix for (3 4 5 7).
             #
             # The thesis gives only that n=4 example, where 2i mod 4 is

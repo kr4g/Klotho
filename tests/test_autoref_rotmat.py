@@ -5,9 +5,10 @@ how mode 'C' could sit dead for four months while both the docstring and the
 error message advertised it (WL-28).
 
 The expected matrices below are transcribed from the PRIMARY SOURCE: Karim
-Haddad, *Vers une temporalite musicale repensee* (2020), section 2.3.8 "Les
-modes de rotation sur un rythme autoreferentiel", figures 2.22-2.25, for the
-proportions (3 4 5 7). They are NOT captured from Klotho's own output, so
+Haddad, *Vers une temporalite musicale repensee* ("Toward a Rethought
+Musical Temporality", 2020), section 2.3.8, "Les modes de rotation sur un
+rythme autoreferentiel" ("Rotation modes on a self-referential rhythm"),
+figures 2.22-2.25, for the proportions (3 4 5 7). They are NOT captured from Klotho's own output, so
 they are a real oracle rather than a snapshot of whatever the code does.
 """
 
@@ -20,22 +21,22 @@ LST = (3, 4, 5, 7)
 
 
 THESIS = {
-    # Figure 2.22 -- "La rotation en mode Group"
+    # Figure 2.22 -- "La rotation en mode Group" (rotation in Group mode)
     'G': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
           ((4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3))),
           ((5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4))),
           ((7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)))),
-    # Figure 2.23 -- "La rotation en mode S" (D fixed, S rotates)
+    # Figure 2.23 -- "La rotation en mode S" (rotation in S mode: D fixed, S rotates)
     'S': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
           ((3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3))),
           ((3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)), (5, (4, 5, 7, 3)), (7, (5, 7, 3, 4))),
           ((3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)))),
-    # Figure 2.24 -- "La rotation en mode D" (S fixed, D rotates)
+    # Figure 2.24 -- "La rotation en mode D" (rotation in D mode: S fixed, D rotates)
     'D': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
           ((4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)), (3, (3, 4, 5, 7))),
           ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7))),
           ((7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)))),
-    # Figure 2.25 -- "La rotation en mode circulaire"
+    # Figure 2.25 -- "La rotation en mode circulaire" (rotation in circular mode)
     'C': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
           ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4))),
           ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7))),
