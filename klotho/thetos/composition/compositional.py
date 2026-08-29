@@ -1026,7 +1026,13 @@ class CompositionalUnit(TemporalUnit):
         if not isinstance(value, Bind):
             return value
         memo_key = (node, key)
-        if memo_key in self._bind_memo:
+        # A selection-reading Bind is a pure function of structure, so
+        # memoizing it across a structural edit is what makes a pan spread go
+        # incoherent: old nodes keep values computed against the old total
+        # while new ones use the new one. Stochastic Binds still memoize --
+        # that is the point of the memo.
+        selection_bound = getattr(value, 'reads_selection', False)
+        if not selection_bound and memo_key in self._bind_memo:
             return self._bind_memo[memo_key]
         if memo_key in self._bind_active:
             raise ValueError(
@@ -1040,6 +1046,16 @@ class CompositionalUnit(TemporalUnit):
         except ValueError:
             index = 0
         total = len(leaves)
+        if selection_bound and total < 2 and len(self._rt.leaf_nodes) > 1:
+            raise ValueError(
+                f"Bind.index for field {key!r} is stored on node {origin}, whose "
+                f"read set is that single node -- so every node reading it would "
+                f"get index 0 of 1 and the value would be constant. The read set "
+                f"is the leaf descendants of the node holding the Bind, so store "
+                f"it on the common ancestor of the nodes you want to spread "
+                f"across (uc.root.set_pfields({key}=...)) rather than on the "
+                f"leaves themselves."
+            )
         self._bind_active.add(memo_key)
         try:
             ctx = self._build_node_context(node, index, total)
@@ -1054,7 +1070,8 @@ class CompositionalUnit(TemporalUnit):
             )
         if key in self._rt.pfield_names:
             result = _coerce_set_pfield_value(key, result)
-        self._bind_memo[memo_key] = result
+        if not selection_bound:
+            self._bind_memo[memo_key] = result
         return result
 
     def _invalidate_bind_memo(self, nodes=None, keys=None):
@@ -2069,9 +2086,16 @@ class CompositionalUnit(TemporalUnit):
         ValueError
             If the node is not found or is not a leaf.
         """
+        # items() returns EFFECTIVE values, so this copy materializes whatever
+        # the node inherited as a raw override on each new child. Harmless for
+        # a plain value -- the child would have inherited the same thing -- but
+        # fatal for a Bind: a raw Bind on a leaf makes that leaf its own read
+        # set, so Bind.index collapses to 0 of 1. Binds inherit; do not copy.
         parent_data = self._rt.items(node)
-        pfields = {k: v for k, v in parent_data.items() if k in self._rt.pfield_names}
-        mfields = {k: v for k, v in parent_data.items() if k in self._rt.mfield_names}
+        pfields = {k: v for k, v in parent_data.items()
+                   if k in self._rt.pfield_names and not isinstance(v, Bind)}
+        mfields = {k: v for k, v in parent_data.items()
+                   if k in self._rt.mfield_names and not isinstance(v, Bind)}
 
         self._rt.subdivide(node, S)
         self._invalidate_timing_cache()
