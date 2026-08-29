@@ -16,7 +16,7 @@ from tabulate import tabulate
 from klotho.topos.graphs import Tree, Group, format_subdivisions
 from klotho.topos.graphs.trees import TreeLayer
 from .meas import Meas
-from .algorithms import sum_proportions, measure_complexity, ratios_to_subdivs
+from .algorithms import ratios_to_subdivs
 from ..utils.beat import calc_onsets
 
 
@@ -162,7 +162,6 @@ class RhythmTree(Tree):
         
         self._meta['span'] = span
         self._meta['meas'] = str(Meas(meas))
-        self._meta['type'] = None
         self._list = Group((Meas(meas).numerator * span, casted))
         
         self._evaluate()
@@ -268,7 +267,6 @@ class RhythmTree(Tree):
         super()._post_structure_clone()
         self._meta['span'] = 1
         self._meta['meas'] = '1/1'
-        self._meta['type'] = None
         for node in self._rx.node_indices():
             self._rx[node] = {'proportion': 1}
         self._evaluate()
@@ -517,7 +515,7 @@ class RhythmTree(Tree):
         -------
         str
         """
-        ordered_meta = {k: self._meta[k] for k in ['span', 'meas', 'type']}
+        ordered_meta = {k: self._meta[k] for k in ['span', 'meas']}
         ordered_meta['depth'] = self.depth
         ordered_meta['k'] = self.k
         meta_str = ' | '.join(f"{k}: {v}" for k, v in ordered_meta.items())
@@ -658,12 +656,6 @@ class RhythmTree(Tree):
                 if self.out_degree(node) > 0 and node != root_node and node not in scope_desc:
                     children = self.successors(node)
                     self._rx[node]['metric_onset'] = self._rx[children[0]]['metric_onset']
-
-    def _set_type(self):
-        div = sum_proportions(self.subdivisions)
-        if bin(div).count('1') != 1 and div != self.meas.numerator:
-            return 'complex'
-        return 'complex' if measure_complexity(self.subdivisions) else 'simple'
 
     def __len__(self):
         return len(self.leaf_nodes)
