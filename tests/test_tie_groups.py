@@ -350,6 +350,51 @@ class TestTieLowering:
         assert len(news) == 3
 
 
+class TestTieAwareDecompose:
+    """ALG-2 at the temporal surface (charter sect9)."""
+
+    def test_ut_decomposes_one_unit_per_group(self):
+        from klotho.chronos.temporal_units.algorithms import decompose
+        ut = TemporalUnit(tempus='4/4', prolatio=(1, 1.0, 1, 1), bpm=120)
+        seq = decompose(ut)
+        assert len(seq.seq) == 3
+        assert str(seq.seq[0].tempus) == '2/4'  # unreduced group sum
+        assert seq.seq[0].duration == pytest.approx(1.0)
+
+    def test_decomposed_sequence_sounds_identical(self):
+        from klotho.chronos.temporal_units.algorithms import decompose
+        ut = TemporalUnit(tempus='4/4', prolatio=(1, 1.0, -1, 1), bpm=120)
+        seq = decompose(ut)
+        assert sum(u.duration for u in seq.seq) == pytest.approx(ut.duration)
+        assert len(seq.seq) == len(ut)
+
+    def test_dangling_leading_tie_keeps_its_marker(self):
+        from klotho.chronos.temporal_units.algorithms import decompose
+        ut = TemporalUnit(tempus='3/4', prolatio=(1.0, 1, 1), bpm=120)
+        seq = decompose(ut)
+        first_rt = seq.seq[0]._rt
+        assert first_rt[first_rt.leaf_nodes[0]]['tied'] is True
+
+    def test_cu_group_takes_the_heads_parameters(self):
+        from klotho.chronos.temporal_units.algorithms import decompose
+        uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1.0, 1, 1), bpm=120)
+        uc.set_pfields(uc._rt.leaf_nodes[0], freq=333.0)
+        seq = decompose(uc)
+        assert len(seq.seq) == 3
+        grp = seq.seq[0]
+        assert str(grp.tempus) == '2/4'
+        assert grp.duration == pytest.approx(1.0)
+        assert grp[0].pfields.get('freq') == 333.0
+
+    def test_cu_explicit_prolatio_groups_too(self):
+        from klotho.chronos.temporal_units.algorithms import decompose
+        uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1.0, 1, 1), bpm=120)
+        seq = decompose(uc, prolatio=(1, 1))
+        assert len(seq.seq) == 3
+        assert str(seq.seq[0].tempus) == '2/4'
+        assert sum(u.duration for u in seq.seq) == pytest.approx(uc.duration)
+
+
 class TestSlurOverTie:
     """First coverage of slur x tie (charter sect8 names the gap)."""
 

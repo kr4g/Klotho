@@ -1,6 +1,8 @@
 from typing import Union, TYPE_CHECKING
 from fractions import Fraction
+from functools import reduce as _reduce
 from itertools import cycle
+from math import lcm as _lcm
 import copy
 from .temporal import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
 from klotho.chronos.utils import beat_duration
@@ -82,6 +84,15 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     instrument survive: authored mfields and contained control envelopes
     are dropped (that arm hand-builds each unit rather than extracting the
     subtree).
+
+    Ties (07_TIES_CHARTER.md sect9): the leaf branch decomposes one unit
+    per tie GROUP — a tied group is one sound, so it comes back as one
+    fundamental unit whose tempus is the unreduced sum of the members'
+    durations (16/21 + 32/35 = 176/105). The group's parameters are the
+    head's. In the *depth* branch, ties internal to a frontier subtree
+    ride along verbatim; a group crossing a frontier boundary is split
+    and its continuation dangles (renders as an attack with a warning)
+    until sequence-level resolution exists.
 
     Parameters
     ----------
@@ -199,23 +210,52 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
         return TemporalUnitSequence(units)
     else:
         units = []
+        # One product per tie GROUP (charter sect9): a tied group is one
+        # sound, so it decomposes to one fundamental unit whose tempus is
+        # the unreduced raw-int sum of the members' durations on their
+        # common denominator (TEMPO-5's discipline). On a tie-free tree
+        # every group is a single leaf and nothing changes.
+        groups = ut._rt.tie_groups
+
+        def _group_meas(group):
+            if len(group) == 1:
+                return Meas(abs(ut._rt[group[0]]['metric_duration']))
+            mds = [ut._rt[n]['metric_duration'] for n in group]
+            den = _reduce(_lcm, (m.denominator for m in mds), 1)
+            num = sum(m.numerator * (den // m.denominator) for m in mds)
+            return Meas(num, den)
 
         if isinstance(ut, CompositionalUnit):
             if prolatio is None:
                 # from_subtree preserves the leaf's effective pfields,
-                # governing instrument, and rest state.
-                for leaf in ut._rt.leaf_nodes:
-                    units.append(ut.from_subtree(leaf))
+                # governing instrument, and rest state. A tied group takes
+                # the HEAD's subtree (the head governs, charter sect4) and
+                # re-spells its tempus to the group sum at the source
+                # tempo; a dangling leading tie is dropped by the subtree
+                # extraction (the NEW-40 residue class).
+                for group in groups:
+                    head = group[0]
+                    sub = ut.from_subtree(head)
+                    if len(group) > 1:
+                        grp = modulate_tempus(sub, 1, _group_meas(group))
+                        grp._bpm = sub.bpm  # tempus rewrite at FIXED tempo:
+                        # duration expands to the group span
+                        grp._invalidate_timing_cache()
+                        units.append(grp)
+                    else:
+                        units.append(sub)
             else:
-                # An explicit prolatio reshapes each leaf: the source leaf's
-                # effective pfields cascade from the new unit's root. Rest
-                # leaves stay rests regardless of the requested prolatio.
-                for ordinal, leaf in enumerate(ut._rt.leaf_nodes):
-                    metric_duration = ut._rt[leaf]['metric_duration']
-                    is_rest = ut._rt[leaf].get('proportion', 1) < 0
+                # An explicit prolatio reshapes each sounding event: the
+                # head's effective pfields cascade from the new unit's
+                # root. Rests stay rests regardless of the requested
+                # prolatio. (ut[ordinal] is event-indexed, so it IS the
+                # group's head event.)
+                for ordinal, group in enumerate(groups):
+                    head = group[0]
+                    is_rest = ut._rt[head].get('proportion', 1) < 0
                     unit = CompositionalUnit(
                         span     = 1,
-                        tempus   = abs(metric_duration),
+                        tempus   = _group_meas(group),
                         prolatio = 'r' if is_rest else next(prolatio_cycle),
                         beat     = ut._beat,
                         bpm      = ut._bpm,
@@ -223,18 +263,30 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
                     )
                     if not is_rest:
                         unit.set_pfields(unit._rt.root, **ut[ordinal].pfields)
-                    governing = ut._rt._resolve_governing_instrument_node(leaf)
+                    governing = ut._rt._resolve_governing_instrument_node(head)
                     if governing is not None and governing in ut._rt.node_instruments:
                         unit.set_instrument(unit._rt.root, ut._rt.node_instruments[governing])
                     units.append(unit)
         else:
-            # Rest leaves (negative ratios) decompose to rest units — the
-            # decomposed sequence must sound identical to the source.
-            for ratio in ut._rt.durations:
+            # Rest groups decompose to rest units -- the decomposed
+            # sequence must sound identical to the source. A dangling
+            # leading tie (head itself tied) keeps its marker under the
+            # default prolatio, so a later sequence resolution can still
+            # see it.
+            rx = ut._rt._rx
+            for group in groups:
+                head_data = rx.get_node_data(group[0])
+                is_rest = head_data.get('proportion', 1) < 0
+                if is_rest:
+                    prol = 'r'
+                else:
+                    prol = next(prolatio_cycle)
+                    if prol == 'd' and head_data.get('tied', False):
+                        prol = (1.0,)
                 unit = TemporalUnit(
                     span     = 1,
-                    tempus   = abs(ratio),
-                    prolatio = 'r' if ratio < 0 else next(prolatio_cycle),
+                    tempus   = _group_meas(group),
+                    prolatio = prol,
                     beat     = ut._beat,
                     bpm      = ut._bpm
                 )
