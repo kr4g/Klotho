@@ -73,6 +73,25 @@ class RhythmLayer(TreeLayer):
                 "strictly-increasing onsets and cannot be made a rest. "
                 "Use a negative proportion for a rest."
             )
+        # Ties are leaf-only and never on rests (07_TIES_CHARTER.md sect1);
+        # the same rules run at construction in _validate_s_grammar.
+        tie_requested = (bool(attrs.get('tied', False))
+                         or isinstance(attrs.get('proportion'), float))
+        if tie_requested:
+            prop = attrs.get('proportion', tree[node].get('proportion', 1))
+            if prop < 0:
+                raise ValueError(
+                    "a rest cannot be tied -- a rest continues nothing and "
+                    "nothing sounds through it. Clear the rest first, or tie "
+                    "a sounding leaf."
+                )
+            if op != 'add_child' and tree.out_degree(node) > 0:
+                raise ValueError(
+                    "tied is leaf-only -- a tie continues a sound, and only "
+                    "leaves sound. Tie the group's first leaf instead. "
+                    "(Resolved against OpenMusic: a float group value has no "
+                    "meaning there either -- OM silently rounds it.)"
+                )
 
     def data_scope(self, tree, node, changed_keys, op):
         """Return the recompute scope for a proportion change: the node's parent (root at the top)."""
@@ -302,6 +321,25 @@ class RhythmTree(Tree):
                         f"Fractional proportions are truncated, not honoured -- "
                         f"scale the whole S instead, e.g. (2, 3, 2) for (1, 1.5, 1)."
                     )
+                if what == 'D':
+                    # Ties are leaf-only (07_TIES_CHARTER.md sect1, resolved
+                    # against OpenMusic 2026-08-29: OM6 and om-sharp both give
+                    # a float group value NO tie meaning -- fullratio and
+                    # tree2ratio silently round it). Refusing beats silently
+                    # corrupting.
+                    raise ValueError(
+                        f"D at {path} cannot be a float -- ties are leaf-only. "
+                        f"A tie continues a sound, and only leaves sound; tie "
+                        f"the group's first leaf instead, e.g. "
+                        f"({int(v)}, (1.0, ...))."
+                    )
+                if v < 0:
+                    raise ValueError(
+                        f"{what} at {path} is a tied rest ({v!r}), which is "
+                        f"illegal -- a rest continues nothing and nothing "
+                        f"sounds through it. Use a plain negative int for the "
+                        f"rest, or a positive float for the tie."
+                    )
                 value = int(v)
             else:
                 raise ValueError(
@@ -430,6 +468,44 @@ class RhythmTree(Tree):
         """
         rx = self._rx
         return tuple(rx.get_node_data(n)['metric_onset'] for n in self.leaf_nodes)
+
+    @property
+    def tie_groups(self):
+        """
+        The tie groups of the leaf surface, derived from node flags.
+
+        A tied group is a maximal run, in leaf order, of leaves where every
+        member after the first has ``tied=True`` (07_TIES_CHARTER.md sect1-2).
+        The first member is the head; the rest are continuations. Groups
+        legitimately span branch boundaries — leaf ORDER, not subtree
+        containment, is what joins them. Rests are always singleton groups
+        and break runs; a tied leaf whose predecessor is a rest (or which
+        starts the tree) heads its own group — a dangling continuation,
+        which renders as an attack (charter sect6). Untied leaves are
+        singleton groups, so on a tie-free tree there is one group per leaf.
+
+        Derived on every read — nothing is stored, so structural edits can
+        never orphan a group.
+
+        Returns
+        -------
+        tuple of tuple of int
+            One tuple of leaf node ids per group, head first.
+        """
+        rx = self._rx
+        groups = []
+        current = None
+        for n in self.leaf_nodes:
+            data = rx.get_node_data(n)
+            if data.get('proportion', 1) < 0:
+                groups.append((n,))
+                current = None
+            elif data.get('tied', False) and current is not None:
+                current.append(n)
+            else:
+                current = [n]
+                groups.append(current)
+        return tuple(tuple(g) if isinstance(g, list) else g for g in groups)
     
     @property
     def info(self):
@@ -511,6 +587,10 @@ class RhythmTree(Tree):
             s = int(s) if isinstance(s, float) else s
             if parent_is_negative and s > 0:
                 s = -s
+            if s < 0:
+                # tied rests are illegal (07_TIES_CHARTER.md sect1): a node
+                # rested from above sheds any tie instead of carrying it
+                child_is_tied = False
             ratio = Fraction(s, div) * parent_ratio
             if s < 0:
                 ratio = -abs(ratio)
@@ -529,8 +609,10 @@ class RhythmTree(Tree):
                 node_data['proportion'] = node_data.get('proportion', 1) * node_data['meta']['span']
             label = node_data.get('proportion', 1)
             is_tied = isinstance(label, float) or bool(node_data.get('tied', False))
-            self._rx[node]['tied'] = is_tied
             label_value = int(label) if is_tied else label
+            if label_value < 0:
+                is_tied = False  # tied rests are illegal (charter sect1)
+            self._rx[node]['tied'] = is_tied
             self._rx[node]['proportion'] = float(label_value) if is_tied else label_value
             children = list(self.successors(node))
             if not children:
@@ -739,16 +821,32 @@ class RhythmTree(Tree):
         def add_children(parent, children):
             # raw inserts: one _post_mutation (and thus one _evaluate)
             # below instead of a full-tree re-evaluate per added child
+            first_id = None
             for child in children:
                 if isinstance(child, tuple) and len(child) == 2:
                     D, sub = child
                     child_id = self._add_child_raw(parent, proportion=D)
                     add_children(child_id, sub)
                 else:
-                    self._add_child_raw(parent, proportion=child)
+                    child_id = self._add_child_raw(parent, proportion=child)
+                if first_id is None:
+                    first_id = child_id
+            return first_id
 
         for n in nodes:
-            add_children(n, S)
+            # Subdividing a tied leaf would strand the tie on an interior
+            # node, where it has no meaning (charter sect1, the OpenMusic
+            # resolution). "Continues my predecessor" has exactly one
+            # lossless landing spot: the group's first leaf.
+            was_tied = bool(self._rx[n].get('tied', False))
+            if was_tied:
+                self._rx[n]['tied'] = False
+                self._rx[n]['proportion'] = int(self._rx[n]['proportion'])
+            first_child = add_children(n, S)
+            if was_tied and first_child is not None:
+                self._rx[first_child]['tied'] = True
+                self._rx[first_child]['proportion'] = float(
+                    self._rx[first_child].get('proportion', 1))
         scope = self.parent(nodes[0]) if len(nodes) == 1 else None
         self._post_mutation(scope_node=scope, op='subdivide')
         return self
@@ -785,8 +883,11 @@ class RhythmTree(Tree):
         for n in descendants_to_modify:
             node_data = self[n]
             if 'proportion' in node_data and node_data['proportion'] > 0:
+                # sign-flips clear `tied` (07_TIES_CHARTER.md sect1) -- a
+                # tied rest is illegal, so the flip must not manufacture one
                 self._write_node_data(n, {
-                    'proportion': -abs(node_data['proportion']),
+                    'proportion': -abs(int(node_data['proportion'])),
                     'metric_duration': -abs(node_data['metric_duration']),
+                    'tied': False,
                 })
         self._invalidate_caches()

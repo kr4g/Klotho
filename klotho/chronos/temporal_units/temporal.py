@@ -615,11 +615,17 @@ class Chronon(metaclass=TemporalMeta):
     ut : TemporalUnit
         The parent temporal unit that owns this node.
     """
-    __slots__ = ('_node_id', '_ut')
+    __slots__ = ('_node_id', '_ut', '_group_nodes')
 
-    def __init__(self, node_id: int, ut: 'TemporalUnit'):
+    def __init__(self, node_id: int, ut: 'TemporalUnit', group=None):
         self._node_id = node_id
         self._ut = ut
+        # A multi-member tie group makes this Chronon the whole sounding
+        # event (07_TIES_CHARTER.md sect2): anchored at the head node, with
+        # duration reads summed over the members. None for the ordinary
+        # one-leaf event, so the singleton paths stay exactly as they were.
+        self._group_nodes = (tuple(group)
+                             if group is not None and len(group) > 1 else None)
 
     def _rt_node(self):
         return self._ut._rt[self._node_id]
@@ -629,6 +635,16 @@ class Chronon(metaclass=TemporalMeta):
         every outward-facing read adds ``self._ut._offset`` to onsets."""
         self._ut._ensure_timing_cache()
         return self._ut._real_times.get(self._node_id, {})
+
+    def _event_real_duration(self):
+        """The event's real duration: the leaf's own for a one-leaf event,
+        the sum over members for a tied group (charter sect2)."""
+        group = self._group_nodes
+        if group is None:
+            return self._real_data()['real_duration']
+        self._ut._ensure_timing_cache()
+        times = self._ut._real_times
+        return sum(times[n]['real_duration'] for n in group)
 
     def __dir__(self):
         # __getattr__ serves node-data keys plus the two real-time fields;
@@ -644,7 +660,7 @@ class Chronon(metaclass=TemporalMeta):
         if key == 'real_onset':
             return self._real_data()[key] + self._ut._offset
         if key == 'real_duration':
-            return self._real_data()[key]
+            return self._event_real_duration()
         try:
             return self._rt_node()[key]
         except KeyError:
@@ -654,7 +670,7 @@ class Chronon(metaclass=TemporalMeta):
         if key == 'real_onset':
             return self._real_data()[key] + self._ut._offset
         if key == 'real_duration':
-            return self._real_data()[key]
+            return self._event_real_duration()
         return self._rt_node()[key]
 
     def get(self, key, default=None):
@@ -663,8 +679,9 @@ class Chronon(metaclass=TemporalMeta):
             data = self._real_data()
             if key not in data:
                 return default
-            value = data[key]
-            return value + self._ut._offset if key == 'real_onset' else value
+            if key == 'real_onset':
+                return data[key] + self._ut._offset
+            return self._event_real_duration()
         return self._rt_node().get(key, default)
 
     def __contains__(self, key):
@@ -694,8 +711,28 @@ class Chronon(metaclass=TemporalMeta):
 
     @property
     def metric_duration(self):
-        """The fractional metric duration relative to the measure."""
-        return self._rt_node()['metric_duration']
+        """The fractional metric duration relative to the measure.
+
+        For a tied-group event this is the sum over the members — a derived
+        read; the members' own node data is never widened (charter sect3).
+        Dict-style access (``chronon['metric_duration']``) stays the head
+        node's raw value, which is the leaf surface.
+        """
+        group = self._group_nodes
+        if group is None:
+            return self._rt_node()['metric_duration']
+        rt = self._ut._rt
+        return sum(rt[n]['metric_duration'] for n in group)
+
+    @property
+    def tie_group(self):
+        """The leaf node ids this event sounds through, head first.
+
+        A one-tuple for an ordinary event; the full member run for a tied
+        group. Derived from the RT flags — never stored (charter sect2).
+        """
+        group = self._group_nodes
+        return group if group is not None else (self._node_id,)
 
     @property
     def metric_onset(self):
@@ -989,16 +1026,45 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     
     @property
     def onsets(self):
-        """The real-time onset of each leaf event in seconds."""
+        """The real-time onset of each sounding event in seconds.
+
+        Event surfaces count tie groups (07_TIES_CHARTER.md sect2): one
+        entry per group (anchored at its head) plus rests. Identical to
+        per-leaf onsets on a tie-free unit.
+        """
         self._ensure_timing_cache()
         offset = self._offset
-        return tuple(self._real_times[n]['real_onset'] + offset for n in self._rt.leaf_nodes)
+        return tuple(self._real_times[g[0]]['real_onset'] + offset
+                     for g in self._rt.tie_groups)
 
     @property
     def durations(self):
-        """The real-time duration of each leaf event in seconds."""
+        """The real-time duration of each sounding event in seconds.
+
+        One entry per tie group — the sum of the members' durations — plus
+        rests, whose entries stay signed (WL-19's pinned choice). Identical
+        to per-leaf durations on a tie-free unit.
+        """
         self._ensure_timing_cache()
-        return tuple(self._real_times[n]['real_duration'] for n in self._rt.leaf_nodes)
+        times = self._real_times
+        return tuple(
+            times[g[0]]['real_duration'] if len(g) == 1
+            else sum(times[n]['real_duration'] for n in g)
+            for g in self._rt.tie_groups
+        )
+
+    @property
+    def attacks(self):
+        """Selector of attack leaves: the head of every sounding tie group.
+
+        The companion of ``leaves.sounding`` (which keeps continuations —
+        they do sound): ``attacks`` keeps only the leaves that START a
+        sound. On a tie-free unit this is exactly the sounding leaves.
+        """
+        rx = self._rt._rx
+        heads = tuple(g[0] for g in self._rt.tie_groups
+                      if rx.get_node_data(g[0]).get('proportion', 1) >= 0)
+        return self._node_selector_class(self, heads)
 
     @property
     def duration(self):
@@ -1258,33 +1324,41 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         self._ensure_timing_cache()
         return None
 
-    def _make_event(self, node_id: int, event_context=None):
-        return Chronon(node_id, self)
+    def _make_event(self, node_id: int, event_context=None, group=None):
+        return Chronon(node_id, self, group=group)
 
     def _materialize_events(self):
-        """Materialize leaf Chronons lazily from current tree state."""
-        leaf_nodes = tuple(self._rt.leaf_nodes)
+        """Materialize event Chronons lazily from current tree state.
+
+        One event per tie group (07_TIES_CHARTER.md sect2), anchored at the
+        group's head; on a tie-free tree this is one event per leaf, exactly
+        as before ties meant anything.
+        """
         event_context = self._event_context()
-        return tuple(self._make_event(node_id, event_context) for node_id in leaf_nodes)
+        return tuple(self._make_event(g[0], event_context, group=g)
+                     for g in self._rt.tie_groups)
 
     def _invalidate_timing_cache(self):
         self._timing_dirty = True
 
     def __getitem__(self, idx):
-        leaf_nodes = tuple(self._rt.leaf_nodes)
+        groups = self._rt.tie_groups
         event_context = self._event_context()
         if isinstance(idx, slice):
-            return tuple(self._make_event(node_id, event_context) for node_id in leaf_nodes[idx])
-        return self._make_event(leaf_nodes[idx], event_context)
-    
+            return tuple(self._make_event(g[0], event_context, group=g)
+                         for g in groups[idx])
+        g = groups[idx]
+        return self._make_event(g[0], event_context, group=g)
+
     def __iter__(self):
-        leaf_nodes = tuple(self._rt.leaf_nodes)
         event_context = self._event_context()
-        for node_id in leaf_nodes:
-            yield self._make_event(node_id, event_context)
-    
+        for g in self._rt.tie_groups:
+            yield self._make_event(g[0], event_context, group=g)
+
     def __len__(self):
-        return len(self._rt.leaf_nodes)
+        # sounding events, not leaves: n_events <= n_leaves, equal exactly
+        # when no ties (charter sect2). The leaf count is len(self.leaves).
+        return len(self._rt.tie_groups)
         
     def __str__(self):
         result = (

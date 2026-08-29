@@ -416,7 +416,7 @@ class Parametron(Chronon):
     
     __slots__ = ('_pt',)
 
-    def __init__(self, node_id: int, ut, pt: ParameterTree):
+    def __init__(self, node_id: int, ut, pt: ParameterTree, group=None):
         """
         Initialize a Parametron.
 
@@ -429,8 +429,11 @@ class Parametron(Chronon):
         pt : ParameterTree
             The parameter tree providing field values (including instrument via
             ``pt.get(node_id, 'instrument')``).
+        group : tuple of int or None, optional
+            The tie-group members when this event is a tied group (head
+            first); parameter reads stay head-anchored (charter sect4).
         """
-        super().__init__(node_id, ut)
+        super().__init__(node_id, ut, group=group)
         self._pt = pt
 
     def _resolve_bind(self, key, value):
@@ -1365,9 +1368,9 @@ class CompositionalUnit(TemporalUnit):
         self._ensure_timing_cache()
         return Parametron(node_id, self, self._rt)
 
-    def _make_event(self, node_id: int, event_context=None):
+    def _make_event(self, node_id: int, event_context=None, group=None):
         eval_pt = event_context if event_context is not None else self._build_effective_parameter_tree()
-        return Parametron(node_id, self, eval_pt)
+        return Parametron(node_id, self, eval_pt, group=group)
 
     @property
     def pt(self) -> ParameterTree:

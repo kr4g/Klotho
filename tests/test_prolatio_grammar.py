@@ -99,9 +99,16 @@ class TestAcceptsWhatKlothoRoundTrips:
         assert rt is not None
 
     def test_whole_valued_float_D(self):
-        """A tied interior node round-trips D as 2.0."""
-        assert RhythmTree(span=1, meas='4/4',
-                          subdivisions=(1, (2.0, (1, 1)), 1)) is not None
+        """AMENDED 2026-08-29 (HAD-ALG; 07_TIES_CHARTER.md sect1): a float D
+        on an interior node is now REFUSED. This pin originally asserted the
+        round-trip ("a tied interior node round-trips D as 2.0") — but the
+        marker propagated to nothing, and the wake condition's OpenMusic
+        check found OM6 and om-sharp both give a float group value no tie
+        meaning (fullratio/tree2ratio silently round it). Refusing loudly
+        beats OM's silent rounding; tie the group's first leaf instead."""
+        with pytest.raises(ValueError, match='leaf'):
+            RhythmTree(span=1, meas='4/4',
+                       subdivisions=(1, (2.0, (1, 1)), 1))
 
     def test_negative_proportions_are_rests(self):
         rt = RhythmTree(span=1, meas='4/4', subdivisions=(1, -1, 1))
