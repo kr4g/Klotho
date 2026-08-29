@@ -183,3 +183,23 @@ graphify-out/
 *_UX_AUDIT.md
 
 .claude-tmp/
+
+# ==========================
+# Package source is never ignored
+# ==========================
+# The blanket rules above -- bare `*.json`, and `scripts/` with no leading
+# slash so it matches at any depth -- are meant for the working tree, not for
+# the distributed package. Both have already swallowed shipped package source
+# once: API-R (2026-08-28) found four files that MANIFEST.in was shipping from
+# the working tree because git had never tracked them.
+#
+# These negations are scoped to `klotho/` on purpose. Narrowing the rules
+# themselves would change what is ignored across the whole tree, which is a
+# larger change than this footgun warrants.
+!klotho/**/*.json
+!klotho/**/scripts/
+!klotho/**/scripts/**
+
+# ...but the negations above must not drag caches back in.
+klotho/**/__pycache__/
+klotho/**/*.py[cod]
