@@ -48,6 +48,58 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         super()._init_layers()
         self._param_layer = self.attach_layer(ParameterLayer())
 
+    def _after_subtree_built(self, new_tree, node_mapping, renumber):
+        """Carry the parameter layer onto a subtree extracted from this tree.
+
+        Without this hook ``uc._rt.subtree(node)`` came back rhythm-only:
+        the field registries, every per-node override and every instrument
+        binding were dropped, and silently. It is the same gap NEW-21 closed
+        on the graft path, which fixed only the direction it was scoped to.
+
+        Values are written as **effective** values at every node, matching
+        what :class:`ParameterTree` already does -- its subtree copies each
+        node's effective dict -- and what the graft path does. The subtree's
+        root has lost its ancestors, so anything it inherited from outside
+        would otherwise vanish. The governing instrument is carried across
+        for the same reason: it is inherited by the same ancestor walk, and
+        a subtree that keeps its pfields but loses its instrument does not
+        play.
+
+        Writes route through ``set_pfields``/``set_mfields`` rather than
+        ``update_node_data``, because on a ``CompositionalTree`` the rhythm
+        layer owns the write path and rejects param keys.
+        """
+        new_tree.register_pfields(self.pfield_names)
+        new_tree.register_mfields(self.mfield_names)
+
+        pfield_names = self.pfield_names
+        mfield_names = self.mfield_names
+        for old_node, new_node in node_mapping.items():
+            effective = self.items(old_node)
+            pfields = {k: v for k, v in effective.items() if k in pfield_names}
+            mfields = {k: v for k, v in effective.items() if k in mfield_names}
+            if pfields:
+                new_tree.set_pfields(new_node, **pfields)
+            if mfields:
+                new_tree.set_mfields(new_node, **mfields)
+
+        for old_node, instrument in self.node_instruments.items():
+            mapped = node_mapping.get(old_node)
+            if mapped is not None:
+                new_tree.set_instrument(mapped, instrument)
+
+        if new_tree.get_instrument(new_tree.root) is None:
+            source_root = next(
+                (old for old, new in node_mapping.items() if new == new_tree.root),
+                None,
+            )
+            if source_root is not None:
+                governing = self.get_instrument(source_root)
+                if governing is not None:
+                    new_tree.set_instrument(new_tree.root, governing)
+
+        new_tree._param_layer._effective_cache = None
+
 
 @dataclass(frozen=True)
 class ParentDistributionView:

@@ -613,7 +613,12 @@ class RhythmTree(Tree):
         Returns
         -------
         RhythmTree
-            A new RhythmTree representing the subtree
+            A new tree of the same class as ``self`` representing the
+            subtree. Subclasses that carry data beyond the rhythm — a
+            :class:`~klotho.thetos.composition.compositional.CompositionalTree`
+            and its parameters — restore it through the
+            ``_after_subtree_built`` hook, exactly as :meth:`Tree.subtree`
+            does.
         """
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
@@ -630,12 +635,51 @@ class RhythmTree(Tree):
         else:
             meas = Meas(node_duration)
         
-        new_rt = RhythmTree(span=1, meas=meas, subdivisions=subdivisions)
-        
+        new_rt = self.__class__(span=1, meas=meas, subdivisions=subdivisions)
+
+        # This override rebuilds the subtree from its S-form rather than
+        # copying nodes, so it never reaches Tree.subtree's hook. Call it
+        # here, or a subclass silently loses everything but the rhythm.
+        after_subtree_built = getattr(self, '_after_subtree_built', None)
+        if after_subtree_built is not None:
+            mapping = self._subtree_node_mapping(node, new_rt)
+            after_subtree_built(new_rt, mapping, renumber)
+
         if renumber:
             new_rt.renumber_nodes()
-        
+
         return new_rt
+
+    def _subtree_node_mapping(self, node, new_rt):
+        """Map this tree's ids under ``node`` onto ``new_rt``'s ids.
+
+        The rebuilt tree is isomorphic to the source subtree — it is built
+        from that subtree's own S-form — so a parallel walk in sorted child
+        order pairs the nodes up. The one exception is a leaf: it has no
+        S-form of its own, so ``subtree`` gives it the fallback ``(1,)`` and
+        the new root gains a child that no source node corresponds to. That
+        child needs no mapping — it inherits from the new root, which is
+        mapped.
+
+        Only :meth:`subtree` calls this, and only when a subclass hook needs
+        the mapping, so plain rhythm trees pay nothing for it.
+        """
+        mapping = {}
+        stack = [(node, new_rt.root)]
+        while stack:
+            old_node, new_node = stack.pop()
+            mapping[old_node] = new_node
+            old_children = sorted(self.successors(old_node))
+            if not old_children:
+                continue
+            new_children = sorted(new_rt.successors(new_node))
+            if len(old_children) != len(new_children):
+                raise RuntimeError(
+                    f"subtree rebuild diverged from the source at node {old_node}: "
+                    f"{len(old_children)} children became {len(new_children)}"
+                )
+            stack.extend(zip(old_children, new_children))
+        return mapping
     
     def graft_subtree(self, target_node, subtree, mode='replace'):
         """
