@@ -212,7 +212,7 @@ auto-filling mechanism" — true of paths 1 and 2, false of 1b and 3.
 two reasons:
 
 - Making the paths agree would break a shipped, named test,
-  `tests/test_sampler_kit.py::test_explicit_duration_overrides_injection`,
+  `tests/test_sampler_kit.py::TestScoreNewKit::test_explicit_duration_overrides_injection`,
   which pins the path-3 behaviour on purpose.
 - A per-leaf conflict warning would be noise. The canonical corpus idiom
   `set_pfields(duration=lambda c: c.real_duration)` authors a value equal

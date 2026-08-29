@@ -238,7 +238,7 @@ classDiagram
         +remove_subtree(node)
         +replace_node(old_node, **attr)
         +graft_subtree(target, subtree, mode)
-        +move_subtree(node, new_parent, index)
+        +move_subtree(node, new_parent)
         +prune_to_depth(max_depth)
         +prune_leaves(n)
     }

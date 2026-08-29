@@ -806,11 +806,11 @@ def _lower_score_event(item):
             v_def_name, v_inst_pfields, v_has_gate = resolve_instrument(member)
         pf = coerce_sc_pfield_values(_combine_extras(v_inst_pfields, user_pf))
         if not is_hold:
-            # Precedence (WL-36, path 3 of 3): an explicitly authored
+            # Precedence (WL-36, path 3): an explicitly authored
             # duration/dur in user_pf WINS -- injection only fills a slot
-            # the user left empty. Same as path 2, opposite of the
-            # CompositionalUnit path for object instruments. Pinned by
-            # tests/test_sampler_kit.py::test_explicit_duration_overrides_injection;
+            # the user left empty. Same as path 1b (string-instrument CU);
+            # OPPOSITE of paths 1 and 2, where injection wins. Pinned by
+            # tests/test_sampler_kit.py::TestScoreNewKit::test_explicit_duration_overrides_injection;
             # _sc_assembly._duration_inject_key states the whole picture.
             if 'duration' in v_inst_pfields and 'duration' not in user_pf:
                 pf['duration'] = voice["duration"]

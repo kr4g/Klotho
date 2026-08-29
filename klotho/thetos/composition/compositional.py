@@ -2214,10 +2214,12 @@ class CompositionalUnit(TemporalUnit):
             Target node(s). Single node: instrument set on that node, inherits
             to descendants. List of nodes: instrument evaluated once per node.
         instrument : Instrument, str, int, Pattern, or callable
-            - Instrument: set directly on node, and its pfield defaults are
-              materialized onto the node -- afterwards the node's ``pfields``
-              holds every control of the SynthDef, so each one can be read
-              and overridden individually.
+            - Instrument: set directly on node, and its control names are
+              registered onto the node -- afterwards the node's ``pfields``
+              holds a key for every control of the SynthDef, so each one
+              can be addressed and overridden individually. The keys read
+              ``None`` until authored; the real default values first appear
+              in the lowered event.
               If the instrument carries an ``_ensemble_family`` tag (i.e. it
               was accessed through an Ensemble family view), the ``group``
               mfield is automatically set to the family name.
@@ -2230,6 +2232,11 @@ class CompositionalUnit(TemporalUnit):
               object's ``.pfields``.
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
+
+            During Pattern/callable distribution, a ``None`` result skips
+            that node: its existing binding (or inheritance) is left
+            untouched. This is the deliberate "leave this one alone" idiom,
+            not an error.
         include_rests : bool, default=False
             When True, rest nodes are included during callable/Pattern
             distribution. By default rests are skipped, so a Pattern unrolls

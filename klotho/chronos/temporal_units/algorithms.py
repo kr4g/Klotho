@@ -68,10 +68,14 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     independent unit with the specified *prolatio*.
 
     Rests are preserved in both branches: a rest leaf decomposes to a rest
-    unit regardless of *prolatio*. For a CompositionalUnit, per-leaf
-    parameters, instruments, and contained overlays are preserved; slurs or
-    envelopes spanning multiple resulting units cannot survive and are
-    discarded.
+    unit regardless of *prolatio*. For a CompositionalUnit without an
+    explicit *prolatio*, per-leaf parameters, instruments, and contained
+    overlays are preserved; slurs or envelopes spanning multiple resulting
+    units cannot survive and are discarded. With an explicit *prolatio* on
+    a CompositionalUnit, only the effective pfields and the governing
+    instrument survive: authored mfields and contained control envelopes
+    are dropped (that arm hand-builds each unit rather than extracting the
+    subtree).
 
     Parameters
     ----------

@@ -761,8 +761,8 @@ class Tree(GraphCore):
         self._post_mutation(scope_node=target_node, op='graft_subtree')
         return target_node
 
-    def move_subtree(self, node, new_parent, index=None):
-        """Move a subtree to a new parent."""
+    def move_subtree(self, node, new_parent):
+        """Move a subtree to a new parent (appended after its existing children)."""
         if node == self.root:
             raise ValueError("Cannot move the root node")
 
