@@ -141,6 +141,7 @@
       this._scoreGroupId = null;
       this._groupId = null;
       this._trackMap = null;
+      globalThis.__klothoTrackWarned = {};
       this._controlGroupId = null;
       this._controlBusMap = [];
       this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
@@ -591,8 +592,24 @@
       var pf = this._resolveDefPfields(defName, ev.pfields || {});
 
       if (this._trackMap) {
-        var group = ev.group || "default";
-        var trackInfo = this._trackMap[group] || this._trackMap["default"] || this._trackMap["main"];
+      var group = ev.group || "default";
+        var trackInfo = this._trackMap[group];
+        if (!trackInfo) {
+          // setupTracks always aliases "default" to "main" before publishing
+          // _trackMap, so falling through here means the group named a track
+          // that does not exist -- a typo plays on the main chain with none of
+          // the inserts that were asked for. Warn once per name: a batch can
+          // carry 500 events and this is inside the scheduling loop.
+          var warned = globalThis.__klothoTrackWarned
+            || (globalThis.__klothoTrackWarned = {});
+          if (!warned[group]) {
+            warned[group] = true;
+            console.warn("[Klotho] no track named '" + group + "'; its events "
+              + "play on the main chain. Known tracks: "
+              + Object.keys(this._trackMap).join(", "));
+          }
+          trackInfo = this._trackMap["default"];
+        }
         target = trackInfo ? trackInfo.srcGroup : (this._scoreGroupId || this._groupId || 0);
         if (trackInfo) {
           pf.out = trackInfo.srcBus;
@@ -639,8 +656,24 @@
       // don't accidentally re-route a running synth from the track's
       // srcBus back to the synth's baked default (typically out=0).
       if (this._trackMap) {
-        var group = ev.group || "default";
-        var trackInfo = this._trackMap[group] || this._trackMap["default"] || this._trackMap["main"];
+      var group = ev.group || "default";
+        var trackInfo = this._trackMap[group];
+        if (!trackInfo) {
+          // setupTracks always aliases "default" to "main" before publishing
+          // _trackMap, so falling through here means the group named a track
+          // that does not exist -- a typo plays on the main chain with none of
+          // the inserts that were asked for. Warn once per name: a batch can
+          // carry 500 events and this is inside the scheduling loop.
+          var warned = globalThis.__klothoTrackWarned
+            || (globalThis.__klothoTrackWarned = {});
+          if (!warned[group]) {
+            warned[group] = true;
+            console.warn("[Klotho] no track named '" + group + "'; its events "
+              + "play on the main chain. Known tracks: "
+              + Object.keys(this._trackMap).join(", "));
+          }
+          trackInfo = this._trackMap["default"];
+        }
         if (trackInfo) {
           pf.out = trackInfo.srcBus;
         }
@@ -885,6 +918,7 @@
       this._defNames.clear();
       this.drawScheduler.clear();
       this._trackMap = null;
+      globalThis.__klothoTrackWarned = {};
       this._controlBusMap = [];
       this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
       this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
@@ -1014,6 +1048,7 @@
       this.nodeMap.clear();
       this._defNames.clear();
       this._trackMap = null;
+      globalThis.__klothoTrackWarned = {};
       this._controlBusMap = [];
       this.drawScheduler.clear();
     }

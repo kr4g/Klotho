@@ -164,3 +164,42 @@ def validate_sc_meta(meta):
                 for required in ('uid', 'defName', 'args'):
                     if required not in spec:
                         raise AssemblyValidationError(f"meta.inserts['{track_name}'][{j}] missing '{required}'")
+
+
+# Once-per-process dedupe, mirroring converters._event_fyi. Playback always
+# continues -- a misrouted score still plays, it just plays on the wrong chain.
+_WARNED_UNKNOWN_TRACKS: set = set()
+
+
+def warn_unknown_event_groups(events, meta):
+    """Print a note for any event whose ``group`` names no configured track.
+
+    The scheduler resolves a track as ``trackMap[group] -> default -> main``,
+    so a typo in a group name lands its events on the main chain and plays --
+    with none of the inserts the caller asked for, and no error anywhere. The
+    scheduler is JavaScript and nothing bridges its ``console.warn`` back to
+    Python, so a notebook user would never see a browser-side warning.
+
+    Parameters
+    ----------
+    events : list of dict
+        Lowered SC events.
+    meta : dict
+        The Score meta dict; its ``groups`` list names the configured tracks.
+    """
+    if not isinstance(meta, dict):
+        return
+    known = set(meta.get('groups') or ()) | {'main', 'default'}
+    for event in events:
+        group = event.get('group') if isinstance(event, dict) else None
+        if not group or group in known:
+            continue
+        tag = ('unknown-track', group)
+        if tag in _WARNED_UNKNOWN_TRACKS:
+            continue
+        _WARNED_UNKNOWN_TRACKS.add(tag)
+        print(
+            f"Klotho FYI: no track named {group!r}, so its events play on the "
+            f"main chain with none of that track's inserts. "
+            f"Known tracks: {sorted(known)}"
+        )

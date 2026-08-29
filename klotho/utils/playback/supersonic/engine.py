@@ -125,10 +125,15 @@ class SuperSonicEngine:
         self.loop = loop
         self.record = bool(record)
         self.widget_id = f"klotho_ss_{uuid.uuid4().hex[:8]}"
-        from klotho.utils.playback._sc_validate import validate_sc_events, validate_sc_meta
+        from klotho.utils.playback._sc_validate import (
+            validate_sc_events, validate_sc_meta, warn_unknown_event_groups,
+        )
         validate_sc_events(self.events)
         if self.meta:
             validate_sc_meta(self.meta)
+        # The only place holding both halves; a misrouted group is otherwise
+        # silent all the way to the speakers.
+        warn_unknown_event_groups(self.events, self.meta)
         self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
         self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), self._needed)
         self.sample_assets = self._load_needed_samples()
