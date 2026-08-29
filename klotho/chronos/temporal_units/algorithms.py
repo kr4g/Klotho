@@ -5,6 +5,12 @@ import copy
 from .temporal import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
 from klotho.chronos.utils import beat_duration
 from klotho.chronos.rhythm_trees.algorithms import segment
+from klotho.chronos.rhythm_trees.algorithms import (
+    decompose as _rt_decompose,
+    fuse as _rt_fuse,
+    flatten as _rt_flatten,
+    _fuse_parts,
+)
 
 if TYPE_CHECKING:
     from klotho.thetos.composition.compositional import CompositionalUnit
@@ -250,6 +256,178 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
             
 #         case _:
 #             raise ValueError(f"Unknown temporal structure type: {type(structure)}")
+
+def fuse(*operands, reference=None):
+    """
+    Fuse temporal material into ONE unit — Haddad's ‖, lifted (ruling R13).
+
+    The symbolic core is :func:`klotho.chronos.rhythm_trees.algorithms.fuse`;
+    this surface lifts each operand to its tree, reconciles mixed tempi by
+    THE rule (LAYER-3), fuses symbolically, and re-temporalises at the
+    reference. Closure per layer: all-RhythmTree operands return a
+    RhythmTree; TemporalUnit operands return a TemporalUnit.
+
+    **The reconciliation rule** (R13-B/C/D): when operands' (beat, bpm)
+    differ, each is re-expressed at the FIRST temporalised operand's
+    reference by sect4.4.4 (T' = T x (bpm_ref/bpm) x (beat_ref/beat)), in
+    exact rational arithmetic with the tempus assembled unreduced
+    (TEMPO-5) — every operand's real clock durations are retained and only
+    metric spellings change. The result carries the reference, never a
+    third value. ``reference=(beat, bpm)`` overrides; no operator ever
+    defaults to a reference the operands don't carry.
+
+    Nesting (R13-I — reconcile representation, refuse musical decisions):
+
+    - a ``TemporalUnitSequence`` fuses depth-first into one part;
+    - a bare ``RhythmTree`` among temporalised operands adopts the
+      reference verbatim (his p. 97 convention: when fixed-time and
+      mobile-time units combine, the relative units' relativity takes
+      precedence and the absolute takes the shared reference);
+    - a ``TemporalBlock`` REFUSES loudly — collapsing polyphony into one
+      voice has no unique answer (fuse per row via BT-3's row-wise verb
+      and choose explicitly);
+    - a ``CompositionalUnit`` is the next staged surface (R13-E) and
+      raises ``NotImplementedError`` until its parameter-state merge
+      ships.
+
+    Parameters
+    ----------
+    *operands : RhythmTree, TemporalUnit, or TemporalUnitSequence
+        The material, in temporal order. A single list/tuple argument is
+        unrolled.
+    reference : tuple of (beat, bpm), optional
+        Explicit reconciliation reference. Only legal when at least one
+        operand is temporalised.
+
+    Returns
+    -------
+    RhythmTree or TemporalUnit
+    """
+    from klotho.thetos.composition.compositional import CompositionalUnit
+
+    ops = list(operands[0]) if (
+        len(operands) == 1 and isinstance(operands[0], (list, tuple))
+    ) else list(operands)
+    if not ops:
+        raise ValueError("fuse requires at least one operand")
+
+    resolved = []
+    for op in ops:
+        if isinstance(op, TemporalBlock):
+            raise ValueError(
+                "a TemporalBlock cannot be fused: collapsing polyphony "
+                "into one voice has no unique answer, and choosing one "
+                "would choose music for the composer. Fuse each row to a "
+                "uniform Tempus instead (the row-wise verb, docket BT-3), "
+                "then decide what the rows become."
+            )
+        if isinstance(op, CompositionalUnit):
+            raise NotImplementedError(
+                "fuse for CompositionalUnits is the next staged surface "
+                "(R13-E): the parameter/slur/envelope state must merge "
+                "under the raw-copy discipline. Fuse `uc.rt` for the "
+                "rhythm alone, or wait for the staged surface."
+            )
+        if isinstance(op, TemporalUnitSequence):
+            resolved.append(fuse(*op.seq, reference=reference))
+        elif isinstance(op, (TemporalUnit, RhythmTree)):
+            resolved.append(op)
+        else:
+            raise TypeError(
+                f"fuse takes RhythmTree, TemporalUnit, or "
+                f"TemporalUnitSequence operands; got {type(op).__name__}"
+            )
+
+    units = [op for op in resolved if isinstance(op, TemporalUnit)]
+    if not units:
+        if reference is not None:
+            raise ValueError(
+                "symbolic operands carry no tempo to reconcile; a "
+                "reference applies only when temporalised operands are "
+                "present. Temporalise with TemporalUnit.from_rt, or drop "
+                "reference=."
+            )
+        return _rt_fuse(resolved)
+
+    if reference is not None:
+        ref_beat, ref_bpm = Fraction(reference[0]), reference[1]
+    else:
+        ref_beat, ref_bpm = units[0].beat, units[0].bpm
+
+    parts = []
+    for op in resolved:
+        if isinstance(op, TemporalUnit):
+            factor = ((_exact_tempo_ratio(ref_bpm) / _exact_tempo_ratio(op.bpm))
+                      * (ref_beat / op.beat) * Fraction(op.span))
+            parts.append((op.tempus.numerator * factor.numerator,
+                          op.tempus.denominator * factor.denominator,
+                          op.prolationis))
+        else:  # RhythmTree: untimed — adopts the reference verbatim
+            parts.append((op.meas.numerator * op.span,
+                          op.meas.denominator, op.subdivisions))
+    total, den, s_out = _fuse_parts(parts)
+    out = TemporalUnit(span=1, tempus=Meas(total, den), prolatio=s_out,
+                       beat=ref_beat, bpm=ref_bpm)
+    # Attribution (NEW-39's lift-rule wrinkle): the computed tempus is
+    # attributed by definition; beat/bpm are attributed only if the caller
+    # gave a reference or some operand attributed them — a fuse of
+    # unattributed operands stays unattributed and keeps following the
+    # future ambient dial.
+    attributed = {'tempus'}
+    if reference is not None:
+        attributed |= {'beat', 'bpm'}
+    else:
+        for slot in ('beat', 'bpm'):
+            if any(slot in u.attributed for u in units):
+                attributed.add(slot)
+    out._attributed = frozenset(attributed)
+    return out
+
+
+def flatten(obj):
+    """
+    Project temporal material onto its canonical one-level spelling —
+    Haddad's *réduction* (ALG-4), lifted per ruling R13.
+
+    The symbolic core is
+    :func:`klotho.chronos.rhythm_trees.algorithms.flatten`. On a
+    TemporalUnit the projection is unary and tempo is untouched: the
+    result re-temporalises at the unit's own beat/bpm, so it sounds
+    identical to the source (exact onsets and durations), with one term
+    per sounding event and ``sum(|prolatio|) == meas.numerator``.
+    Idempotent; a no-op exactly on already-canonical input.
+
+    Parameters
+    ----------
+    obj : RhythmTree or TemporalUnit
+        A CompositionalUnit raises ``NotImplementedError`` until its
+        staged surface ships (R13-E); for a sequence, use :func:`fuse`.
+
+    Returns
+    -------
+    RhythmTree or TemporalUnit
+    """
+    from klotho.thetos.composition.compositional import CompositionalUnit
+    if isinstance(obj, CompositionalUnit):
+        raise NotImplementedError(
+            "flatten for CompositionalUnits is a staged surface (R13-E); "
+            "flatten `uc.rt` for the rhythm alone."
+        )
+    if isinstance(obj, TemporalUnit):
+        flat = _rt_flatten(obj._rt)
+        out = TemporalUnit(span=1, tempus=flat.meas,
+                           prolatio=flat.subdivisions,
+                           beat=obj.beat, bpm=obj.bpm)
+        out._attributed = frozenset(
+            {'tempus'} | (obj.attributed & {'beat', 'bpm'}))
+        return out
+    if isinstance(obj, RhythmTree):
+        return _rt_flatten(obj)
+    raise TypeError(
+        f"flatten is unary on a RhythmTree or TemporalUnit; got "
+        f"{type(obj).__name__}. For a sequence, use fuse(...)."
+    )
+
 
 def _exact_tempo_ratio(value) -> Fraction:
     """Exact rational form of a tempo/beat quantity for reconciliation.

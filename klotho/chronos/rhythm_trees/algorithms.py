@@ -125,6 +125,158 @@ def strict_decomposition(lst:Tuple[Fraction], meas) -> tuple:
     )
 
 # ------------------------------------------------------------------------------------
+# The Chapter-4 symbolic core (ruling R13: the algebra lives here, on the
+# untimed layer — exact Meas/Fraction arithmetic, no tempo in scope).
+# UT/UC surfaces lift to these through the LAYER-3 reconciliation rule
+# (temporal_units.algorithms).
+# ------------------------------------------------------------------------------------
+
+def _fuse_parts(parts):
+    """Fold ``(numerator, denominator, S)`` parts into one ``(total, den,
+    S_out)`` on the lcm denominator, raw ints throughout (TEMPO-5: no gcd
+    reduction anywhere). A fundamental part (single plain leaf) contributes
+    a bare proportion — negative when it is a rest, float when its leaf is
+    tied (a leading tie rides into the fused S, where it finally has a
+    predecessor); a composed part nests as ``(w, S)``."""
+    den = reduce(lcm, (d for _, d, _ in parts), 1)
+    total = 0
+    s_out = []
+    for n, d, s in parts:
+        w = n * (den // d)
+        total += abs(w)
+        if len(s) == 1 and not isinstance(s[0], tuple):
+            first = s[0]
+            if isinstance(first, float):
+                s_out.append(float(w))
+            elif first < 0:
+                s_out.append(-w)
+            else:
+                s_out.append(w)
+        elif len(s) == 0:
+            s_out.append(w)
+        else:
+            s_out.append((w, tuple(s)))
+    return total, den, tuple(s_out)
+
+
+def decompose(rt) -> tuple:
+    """
+    Decompose a rhythm tree into fundamental trees, one per sounding event.
+
+    The RT-level sibling of :func:`klotho.chronos.temporal_units.algorithms.decompose`
+    (LAYER-2) — Haddad's decomposition on the untimed layer, where his
+    sect4.5.1 puts it. Sign-carrying (ALG-1: a rest leaf comes back as a
+    positive tempus with a rest-encoded S ``(-1,)``) and tie-aware (ALG-2,
+    charter sect9: one fundamental unit per tie GROUP, its tempus the
+    unreduced raw-int sum of the members' durations on their common
+    denominator — ``16/21 + 32/35 = 176/105``, which is why Haddad's
+    ``[x]`` is 10 units, not 11).
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to decompose.
+
+    Returns
+    -------
+    tuple of RhythmTree
+        One fundamental tree per tie group (span 1; ``S = (1,)`` for a
+        sound, ``(-1,)`` for a rest). Singleton parts keep the reduced
+        per-leaf spelling (his fig. 4.108 form); only group sums stay
+        unreduced, because only there is a spelling being *constructed*.
+    """
+    from .rhythm_tree import RhythmTree
+    from .meas import Meas
+    parts = []
+    rx = rt._rx
+    for group in rt.tie_groups:
+        if len(group) == 1:
+            md = rx.get_node_data(group[0])['metric_duration']
+            s = (-1,) if md < 0 else (1,)
+            parts.append(RhythmTree(span=1, meas=Meas(abs(md)),
+                                    subdivisions=s))
+        else:
+            mds = [rx.get_node_data(n)['metric_duration'] for n in group]
+            den = reduce(lcm, (m.denominator for m in mds), 1)
+            num = sum(m.numerator * (den // m.denominator) for m in mds)
+            parts.append(RhythmTree(span=1, meas=Meas(num, den),
+                                    subdivisions=(1,)))
+    return tuple(parts)
+
+
+def fuse(rts) -> 'object':
+    """
+    Fuse rhythm trees into ONE tree — Haddad's ‖ ("concatenation").
+
+    Named ``fuse`` (R13-G): his ‖ folds a sequence of units into one unit
+    with a unified Tempus — that is a fold, not a concatenation, and
+    append/prepend already own that word. The inverse of decomposition:
+    ``fuse(6/20, 3/20, 3/20, 3/20) => 15/20 (6 3 3 3)``, unreduced
+    spelling kept (TEMPO-5).
+
+    A common denominator is NOT required (his sect4.4.6.5: same-denominator
+    parts guarantee a *simple* composed unit; variable denominators
+    produce a *complex* one — both legal, and he sometimes prefers keeping
+    the complex spelling). Fundamental operands contribute bare
+    proportions (sign-carrying for rests, tie-marking floats preserved);
+    composed operands nest as ``(D, S)`` pairs. Spans fold into the
+    contribution.
+
+    Parameters
+    ----------
+    rts : iterable of RhythmTree
+        The operands, in temporal order.
+
+    Returns
+    -------
+    RhythmTree
+        One tree; ``meas`` is the unreduced sum on the lcm denominator.
+    """
+    from .rhythm_tree import RhythmTree
+    from .meas import Meas
+    rts = list(rts)
+    if not rts:
+        raise ValueError("fuse requires at least one operand")
+    for r in rts:
+        if not isinstance(r, RhythmTree):
+            raise TypeError(
+                f"fuse at RT level takes RhythmTrees; got "
+                f"{type(r).__name__}. For TemporalUnits use "
+                f"klotho.chronos.temporal_units.algorithms.fuse, which "
+                f"lifts, reconciles tempo, and re-temporalises."
+            )
+    parts = [(r.meas.numerator * r.span, r.meas.denominator, r.subdivisions)
+             for r in rts]
+    total, den, s_out = _fuse_parts(parts)
+    return RhythmTree(span=1, meas=Meas(total, den), subdivisions=s_out)
+
+
+def flatten(rt) -> 'object':
+    """
+    Project a rhythm tree onto its canonical one-level spelling —
+    Haddad's *réduction* (the overline), decompose-then-fuse in one step.
+
+    Named ``flatten`` (R13-G): ``reduce`` collides with gcd-reduction —
+    the exact thing this operation does NOT do (it un-reduces toward the
+    leaf grid) — and with ``functools.reduce``, whose fold shape belongs
+    to :func:`fuse`. A projection, not an identity: the result sounds
+    identical (exact Fraction onsets and durations), carries one term per
+    sounding event with ``sum(|prolatio|) == meas.numerator``, is
+    idempotent, and is a no-op exactly on already-canonical input.
+    ``3/4 (2 1 1 1) => 15/20 (6 3 3 3)``.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+
+    Returns
+    -------
+    RhythmTree
+    """
+    return fuse(decompose(rt))
+
+
+# ------------------------------------------------------------------------------------
 
 def ratios_to_subdivs(ratios:tuple[Fraction]) -> tuple[int]:
     """
