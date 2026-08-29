@@ -140,6 +140,55 @@ class TestFuseAttribution:
         assert {'beat', 'bpm'} <= out.attributed
 
 
+class TestConvolveContract:
+    """ALG-5: the hardcoded '1/4' @ 60 reference is repealed (R13-B);
+    signs and ties flow from the reworked decompose; zeros delete."""
+
+    def test_reference_defaults_to_first_operand(self):
+        from klotho.chronos.temporal_units.algorithms import convolve
+        x = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=90)
+        h = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=90)
+        out = convolve(x, h)
+        assert all(u.bpm == 90 and u.beat == Fraction(1, 4)
+                   for u in out.seq)
+
+    def test_same_reference_terms_are_raw_products(self):
+        # identity reconciliation is a no-op (TEMPO-5), so the terms are
+        # the plain metric products: (1/4)*(1/4) etc.
+        from klotho.chronos.temporal_units.algorithms import convolve
+        x = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=60)
+        h = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=60)
+        out = convolve(x, h)
+        assert [u.tempus.to_fraction() for u in out.seq] == [
+            Fraction(1, 16), Fraction(1, 8), Fraction(1, 16)]
+
+    def test_rests_carry_sign_and_render_as_rests(self):
+        from klotho.chronos.temporal_units.algorithms import convolve
+        x = TemporalUnit(tempus='2/4', prolatio=(1, -1), beat='1/4', bpm=60)
+        h = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=60)
+        out = convolve(x, h)
+        # y = [1/16, 0 (deleted), -1/16]
+        assert len(out.seq) == 2
+        assert out.seq[0]._rt[out.seq[0]._rt.leaf_nodes[0]]['proportion'] > 0
+        assert out.seq[1]._rt[out.seq[1]._rt.leaf_nodes[0]]['proportion'] < 0
+
+    def test_ties_shorten_the_operand(self):
+        from klotho.chronos.temporal_units.algorithms import convolve
+        x = TemporalUnit(tempus='3/4', prolatio=(1, 1.0, 1), beat='1/4', bpm=60)
+        h = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=60)
+        out = convolve(x, h)
+        # x decomposes to 2 terms (the tie merges), so y_len = 2 + 2 - 1
+        assert len(out.seq) == 3
+
+    def test_explicit_reference_override(self):
+        from klotho.chronos.temporal_units.algorithms import convolve
+        x = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=60)
+        h = TemporalUnit(tempus='2/4', prolatio=(1, 1), beat='1/4', bpm=60)
+        out = convolve(x, h, reference=('1/8', 120))
+        assert all(u.bpm == 120 and u.beat == Fraction(1, 8)
+                   for u in out.seq)
+
+
 class TestFlattenSurface:
     def test_flatten_ut_published_example(self):
         ut = TemporalUnit(tempus='3/4', prolatio=(2, 1, 1, 1), bpm=120)

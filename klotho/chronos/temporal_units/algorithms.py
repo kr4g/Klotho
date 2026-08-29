@@ -616,48 +616,85 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
             bpm=ut.bpm * ratio
         )
 
-def convolve(x: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], h: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], beat: Union[Fraction, str, float] = '1/4', bpm: Union[int, float] = 60) -> TemporalUnitSequence:
+def _is_rest_unit(ut) -> bool:
+    """Whether a unit is silence throughout (every leaf a rest)."""
+    rx = ut._rt._rx
+    return all(rx.get_node_data(n).get('proportion', 1) < 0
+               for n in ut._rt.leaf_nodes)
+
+
+def convolve(x: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], h: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], reference=None) -> TemporalUnitSequence:
     """
     Convolve two temporal structures to produce a new sequence.
 
-    Both inputs are first decomposed (if not already sequences), then
-    their tempus values are convolved in the signal-processing sense to
-    produce a sequence of ``y_len = len(x) + len(h) - 1`` units.
+    Both inputs are first decomposed (if not already sequences) — the
+    decomposition is sign-carrying and tie-aware, so rests contribute
+    NEGATIVE terms (products carry the sign algebra, and negative outputs
+    render as rests) and a tied group counts as one term. Terms are
+    reconciled to one reference by sect4.4.4 modulation (real durations
+    preserved; TEMPO-5's unreduced discipline, so a same-tempo
+    reconciliation is a true no-op), then convolved in the
+    signal-processing sense. Zero-valued outputs are deleted, per his
+    stated algorithm.
+
+    **The reference contract (R13-B, repealing the old hardcoded
+    ``'1/4' @ 60``):** the reference defaults to the FIRST operand's own
+    (beat, bpm); no reference the operands don't carry is ever chosen
+    silently. Because convolution is bilinear in the operands' metric
+    values, the choice of reference scales the metric results — which is
+    why it must be the caller's, explicitly or through the first operand.
 
     Parameters
     ----------
     x : TemporalUnit, CompositionalUnit, or TemporalUnitSequence
-        The first temporal structure (signal).
+        The first temporal structure (signal). Its (beat, bpm) — or its
+        first unit's, for a sequence — is the default reference.
     h : TemporalUnit, CompositionalUnit, or TemporalUnitSequence
         The second temporal structure (kernel).
-    beat : Fraction, str, or float, optional
-        Beat reference for the output units. Default is ``'1/4'``.
-    bpm : int or float, optional
-        Beats per minute for the output units. Default is 60.
+    reference : tuple of (beat, bpm), optional
+        Explicit reconciliation reference.
 
     Returns
     -------
     TemporalUnitSequence
-        The convolved sequence.
+        At most ``len(x) + len(h) - 1`` units at the reference tempo
+        (zero terms deleted); negative terms come back as rests.
     """
-    beat = Fraction(beat)
-    bpm = float(bpm)
-    
     from klotho.thetos.composition.compositional import CompositionalUnit
-    
+
     if isinstance(x, (TemporalUnit, CompositionalUnit)):
         x = decompose(x)
     if isinstance(h, (TemporalUnit, CompositionalUnit)):
         h = decompose(h)
-        
-    y_len = len(x) + len(h) - 1
+    if not x.seq or not h.seq:
+        raise ValueError("convolve requires non-empty operands")
+
+    if reference is None:
+        beat, bpm = x.seq[0].beat, x.seq[0].bpm
+    else:
+        beat, bpm = Fraction(reference[0]), reference[1]
+
+    def _terms(seq):
+        vals = []
+        for u in seq.seq:
+            value = modulate_tempo(u, beat, bpm).tempus.to_fraction()
+            vals.append(-value if _is_rest_unit(u) else value)
+        return vals
+
+    xs, hs = _terms(x), _terms(h)
     y = []
-    for n in range(y_len):
+    for n in range(len(xs) + len(hs) - 1):
         s = Fraction(0, 1)
-        for k in range(len(x)):
+        for k in range(len(xs)):
             m = n - k
-            if 0 <= m < len(h):
-                s += modulate_tempo(x.seq[k], beat, bpm).tempus.to_fraction() * modulate_tempo(h.seq[m], beat, bpm).tempus.to_fraction()
-        y.append(s)
-        
-    return TemporalUnitSequence([TemporalUnit(span=1, tempus=r, prolatio='d' if r > 0 else 'r', beat=beat, bpm=bpm) for r in y])
+            if 0 <= m < len(hs):
+                s += xs[k] * hs[m]
+        if s != 0:
+            y.append(s)
+
+    return TemporalUnitSequence([
+        TemporalUnit(span=1, tempus=abs(r),
+                     prolatio='d' if r > 0 else 'r',
+                     beat=beat, bpm=bpm)
+        for r in y
+    ])
