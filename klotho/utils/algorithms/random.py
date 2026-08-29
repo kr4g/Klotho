@@ -1,19 +1,11 @@
-import random as _random
 import warnings
+
+from .._rng import _coerce_rng
 
 import numpy as np
 from typing import Any, List, Optional, Sequence, Tuple, Union
 
 __all__ = ['diverse_sample', 'sample_with_replacement']
-
-
-def _coerce_rng(seed):
-    """Return a random source for ``seed`` (mirrors the graph/lattice walks)."""
-    if seed is None or seed is _random:
-        return _random
-    if isinstance(seed, _random.Random):
-        return seed
-    return _random.Random(seed)
 
 
 def sample_with_replacement(pool: Sequence[Any],

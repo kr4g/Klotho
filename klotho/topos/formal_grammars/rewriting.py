@@ -19,7 +19,8 @@ from collections import Counter
 from collections.abc import Sequence
 
 from .alphabet import Alphabet, DEFAULT_BRACKETS
-from .rules import RuleSet, _coerce_rng
+from klotho.utils._rng import _coerce_rng
+from .rules import RuleSet
 
 __all__ = [
     'RewriteSystem', 'History',

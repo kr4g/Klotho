@@ -1,6 +1,6 @@
 from typing import List, Callable, Optional
-import random
 from ...topos.graphs import Graph
+from .._rng import _coerce_rng
 
 
 __all__ = [
@@ -14,21 +14,6 @@ __all__ = [
     'dijkstra_order_traversal',
     'weighted_dfs_traversal'
 ]
-
-
-def _coerce_rng(seed):
-    """Return a random source for ``seed``.
-
-    ``None`` draws from the global ``random`` stream, as these walks always
-    have. Any other seed value gets its own :class:`random.Random`, so a
-    reproducible walk does not reseed the caller's global stream; a
-    ``random.Random`` is passed through unchanged.
-    """
-    if seed is None or seed is random:
-        return random
-    if isinstance(seed, random.Random):
-        return seed
-    return random.Random(seed)
 
 
 def _edge_weight(G, u, v, key='weight', default=1.0):

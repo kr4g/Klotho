@@ -16,20 +16,12 @@ Rule sets are value-like: :meth:`constrain`, :meth:`require`, and
 :meth:`mutate` return new rule sets rather than mutating in place.
 """
 
-import random as _random
 from collections.abc import Mapping
 
+from klotho.utils._rng import _coerce_rng
 from .alphabet import Alphabet
 
 __all__ = ['RuleSet']
-
-
-def _coerce_rng(rng):
-    if rng is None or rng is _random:
-        return _random
-    if isinstance(rng, _random.Random):
-        return rng
-    return _random.Random(rng)
 
 
 def _is_weighted_options(rhs):

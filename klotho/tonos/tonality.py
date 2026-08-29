@@ -23,6 +23,7 @@ secondary dominants at arbitrary depth in any tonality.
 (``I ii V7 bIII viiø7 V7/V ...``) over just-intonation modal shelves.
 """
 
+from klotho.utils._rng import _coerce_rng
 from .pitch import Pitch
 from .scales import Scale
 from .chords import ChordSequence, Voicing
@@ -527,15 +528,6 @@ class Key(Tonality):
 # ----------------------------------------------------------------------
 # Word-level transforms (Rohrmeier's scale-degree rules)
 # ----------------------------------------------------------------------
-def _coerce_rng(rng):
-    import random as _random
-    if rng is None or rng is _random:
-        return _random
-    if isinstance(rng, _random.Random):
-        return rng
-    return _random.Random(rng)
-
-
 def tonicize(symbols, probability, dominant='V7', skip=('I', 'i'), rng=None):
     """
     Sprinkle applied dominants over a progression (rule ``X → D(X) X``).

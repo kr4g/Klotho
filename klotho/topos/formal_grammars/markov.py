@@ -2,7 +2,7 @@
 Weighted random walks over transition tables.
 """
 
-from .rules import _coerce_rng
+from klotho.utils._rng import _coerce_rng
 
 __all__ = ['markov_walk']
 

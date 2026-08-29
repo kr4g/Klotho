@@ -1,24 +1,8 @@
 from typing import List, Tuple, Optional
-import random
 import rustworkx as rx
+from klotho.utils._rng import _coerce_rng
 from .lattices import Lattice
 
-
-def _coerce_rng(seed):
-    """Return a random source for ``seed``.
-
-    ``None`` keeps the historical behaviour of drawing from the global
-    ``random`` stream. An int (or any other seed value) gets its own
-    :class:`random.Random`, so seeding a walk no longer reseeds the caller's
-    global stream as a side effect. A ``random.Random`` is passed through.
-    Seeded output is unchanged: the module-level ``random`` functions are
-    bound methods of one such instance.
-    """
-    if seed is None or seed is random:
-        return random
-    if isinstance(seed, random.Random):
-        return seed
-    return random.Random(seed)
 
 
 

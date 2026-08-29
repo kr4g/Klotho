@@ -10,7 +10,8 @@ notation, and :meth:`DerivationTree.to_tree` bridges it into a real
 :class:`~klotho.topos.graphs.trees.Tree`.
 """
 
-from .rules import RuleSet, _coerce_rng
+from klotho.utils._rng import _coerce_rng
+from .rules import RuleSet
 
 __all__ = ['DerivationTree', 'derive']
 
