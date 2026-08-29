@@ -4,6 +4,7 @@ from ...topos.graphs import Graph
 
 
 __all__ = [
+    'greedy_tsp',
     'minimum_cost_path',
     'greedy_random_walk',
     'probabilistic_random_walk',
@@ -29,7 +30,26 @@ def _coerce_rng(seed):
         return seed
     return random.Random(seed)
 
-def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
+
+def _edge_weight(G, u, v, key='weight', default=1.0):
+    """Weight of the edge ``u``--``v``, or ``default`` when it carries none.
+
+    Every traversal in this module used to read ``G[u][v].get(key, 1.0)``.
+    But ``G[u]`` is the *node data* mapping, not an adjacency row, so
+    ``[v]`` raised ``KeyError`` on every graph ever built and the swallowing
+    ``except`` handed back 1.0 -- which made all eight traversals
+    weight-blind and reduced them to whatever order they happened to visit
+    nodes in. The edge view is the real accessor.
+    """
+    if not G.has_edge(u, v):
+        return default
+    data = G.edges[(u, v)]
+    if not isinstance(data, dict):
+        return default
+    return data.get(key, default)
+
+
+def greedy_tsp(G: Graph, source=None, weight: str = 'weight', **kwargs) -> List[int]:
     """
     Simple greedy TSP approximation algorithm.
     
@@ -39,6 +59,9 @@ def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
         Weighted graph
     source : node, optional
         Starting node. If None, uses first node.
+    weight : str, optional
+        Edge attribute to use as cost (default: 'weight'). Edges without it
+        cost 1.0.
     **kwargs
         Additional parameters (ignored)
         
@@ -66,15 +89,10 @@ def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
         
         for node in sorted(unvisited):
             if G.has_edge(current, node):
-                try:
-                    weight = G[current][node].get('weight', 1.0)
-                    if weight < min_weight:
-                        min_weight = weight
-                        next_node = node
-                except (KeyError, TypeError):
-                    if 1.0 < min_weight:
-                        min_weight = 1.0
-                        next_node = node
+                edge_weight = _edge_weight(G, current, node, weight)
+                if edge_weight < min_weight:
+                    min_weight = edge_weight
+                    next_node = node
         
         if next_node is None:
             # No direct edge; jump to the lowest-numbered unvisited node.
@@ -201,11 +219,7 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
             
         neighbor_weights = []
         for neighbor in neighbors:
-            try:
-                edge_weight = G[current][neighbor].get(weight, 1.0)
-                neighbor_weights.append((neighbor, edge_weight))
-            except (KeyError, TypeError):
-                neighbor_weights.append((neighbor, 1.0))
+            neighbor_weights.append((neighbor, _edge_weight(G, current, neighbor, weight)))
         
         min_weight = min(neighbor_weights, key=lambda x: x[1])[1]
         
@@ -268,11 +282,7 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
             
         weights = []
         for neighbor in neighbors:
-            try:
-                edge_weight = G[current][neighbor].get(weight, 1.0)
-                weights.append(edge_weight)
-            except (KeyError, TypeError):
-                weights.append(1.0)
+            weights.append(_edge_weight(G, current, neighbor, weight))
         
         if inverse_weights:
             inv_weights = [1.0 / max(w, 1e-10) for w in weights]
@@ -336,15 +346,10 @@ def deterministic_greedy_walk(G, source, steps: int = 10, weight: str = 'weight'
         min_weight = float('inf')
         
         for neighbor in neighbors:
-            try:
-                edge_weight = G[current][neighbor].get(weight, 1.0)
-                if edge_weight < min_weight:
-                    min_weight = edge_weight
-                    min_neighbor = neighbor
-            except (KeyError, TypeError):
-                if 1.0 < min_weight:
-                    min_weight = 1.0
-                    min_neighbor = neighbor
+            edge_weight = _edge_weight(G, current, neighbor, weight)
+            if edge_weight < min_weight:
+                min_weight = edge_weight
+                min_neighbor = neighbor
         
         if min_neighbor is None:
             break
@@ -395,17 +400,11 @@ def prim_order_traversal(G, source, weight: str = 'weight', **kwargs) -> List[in
         for node in sorted(visited):
             for neighbor in G.neighbors(node):
                 if neighbor not in visited:
-                    try:
-                        edge_weight = G[node][neighbor].get(weight, 1.0)
-                        if edge_weight < min_weight:
-                            min_weight = edge_weight
-                            min_edge = (node, neighbor)
-                            next_node = neighbor
-                    except (KeyError, TypeError):
-                        if 1.0 < min_weight:
-                            min_weight = 1.0
-                            min_edge = (node, neighbor)
-                            next_node = neighbor
+                    edge_weight = _edge_weight(G, node, neighbor, weight)
+                    if edge_weight < min_weight:
+                        min_weight = edge_weight
+                        min_edge = (node, neighbor)
+                        next_node = neighbor
         
         if next_node is None:
             break
@@ -452,15 +451,10 @@ def greedy_nearest_unvisited(G, source, weight: str = 'weight', **kwargs) -> Lis
         
         for neighbor in G.neighbors(current):
             if neighbor not in visited:
-                try:
-                    edge_weight = G[current][neighbor].get(weight, 1.0)
-                    if edge_weight < min_weight:
-                        min_weight = edge_weight
-                        min_neighbor = neighbor
-                except (KeyError, TypeError):
-                    if 1.0 < min_weight:
-                        min_weight = 1.0
-                        min_neighbor = neighbor
+                edge_weight = _edge_weight(G, current, neighbor, weight)
+                if edge_weight < min_weight:
+                    min_weight = edge_weight
+                    min_neighbor = neighbor
         
         if min_neighbor is not None:
             visited.add(min_neighbor)
@@ -478,17 +472,11 @@ def greedy_nearest_unvisited(G, source, weight: str = 'weight', **kwargs) -> Lis
             for visited_node in sorted(visited):
                 for unvisited_node in sorted(unvisited):
                     if G.has_edge(visited_node, unvisited_node):
-                        try:
-                            edge_weight = G[visited_node][unvisited_node].get(weight, 1.0)
-                            if edge_weight < min_distance:
-                                min_distance = edge_weight
-                                best_next = unvisited_node
-                                best_path_node = visited_node
-                        except (KeyError, TypeError):
-                            if 1.0 < min_distance:
-                                min_distance = 1.0
-                                best_next = unvisited_node
-                                best_path_node = visited_node
+                        edge_weight = _edge_weight(G, visited_node, unvisited_node, weight)
+                        if edge_weight < min_distance:
+                            min_distance = edge_weight
+                            best_next = unvisited_node
+                            best_path_node = visited_node
             
             if best_next is not None:
                 current = best_path_node
@@ -546,18 +534,10 @@ def dijkstra_order_traversal(G, source, weight: str = 'weight', **kwargs) -> Lis
         
         for neighbor in G.neighbors(current_node):
             if neighbor not in visited:
-                try:
-                    edge_weight = G[current_node][neighbor].get(weight, 1.0)
-                    new_distance = current_dist + edge_weight
-                    
-                    if new_distance < distances[neighbor]:
-                        distances[neighbor] = new_distance
-                        heapq.heappush(heap, (new_distance, neighbor))
-                except (KeyError, TypeError):
-                    new_distance = current_dist + 1.0
-                    if new_distance < distances[neighbor]:
-                        distances[neighbor] = new_distance
-                        heapq.heappush(heap, (new_distance, neighbor))
+                new_distance = current_dist + _edge_weight(G, current_node, neighbor, weight)
+                if new_distance < distances[neighbor]:
+                    distances[neighbor] = new_distance
+                    heapq.heappush(heap, (new_distance, neighbor))
     
     return path
 
@@ -601,11 +581,8 @@ def weighted_dfs_traversal(G, source, weight: str = 'weight', **kwargs) -> List[
         neighbors_with_weights = []
         for neighbor in G.neighbors(node):
             if neighbor not in visited:
-                try:
-                    edge_weight = G[node][neighbor].get(weight, 1.0)
-                    neighbors_with_weights.append((edge_weight, neighbor))
-                except (KeyError, TypeError):
-                    neighbors_with_weights.append((1.0, neighbor))
+                neighbors_with_weights.append(
+                    (_edge_weight(G, node, neighbor, weight), neighbor))
         
         neighbors_with_weights.sort(key=lambda x: x[0])
         
