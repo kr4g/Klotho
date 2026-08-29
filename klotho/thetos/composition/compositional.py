@@ -22,6 +22,7 @@ _PARAMETRON_TEMPORAL_ATTRS = frozenset({
 
 from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon, NodeContext, UTNodeHandle, UTNodeSelector
+from klotho.chronos.temporal_units.temporal import _UNSET as _UT_UNSET
 from klotho.thetos.parameters import ParameterTree
 from klotho.thetos.parameters.parameter_tree import ParameterApiMixin, ParameterLayer
 from klotho.thetos.parameters.bind import Bind
@@ -753,7 +754,7 @@ class CompositionalUnit(TemporalUnit):
 
     def __init__(self,
                  span     : Union[int, float, Fraction]            = 1,
-                 tempus   : Union[Meas, Fraction, int, float, str] = '4/4',
+                 tempus   : Union[Meas, Fraction, int, float, str] = _UT_UNSET,
                  prolatio : Union[tuple, str]                      = 'd',
                  beat     : Union[None, Fraction, int, float, str] = None,
                  bpm      : Union[None, int, float]                = None,
@@ -2597,6 +2598,7 @@ class CompositionalUnit(TemporalUnit):
         c._real_times = {}
         c._beat = self._beat
         c._bpm = self._bpm
+        c._attributed = self._attributed
         c._offset = self._offset
         c._timing_dirty = True
         c._slur_specs = self._copy_slur_specs()
@@ -2695,6 +2697,7 @@ class CompositionalUnit(TemporalUnit):
             }
         c._next_envelope_id = self._next_envelope_id
 
+        c._attributed = self._attributed  # rebuild passed every slot; restore truth
         c._offset = self._offset
         c._invalidate_timing_cache()
         return c

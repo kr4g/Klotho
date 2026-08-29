@@ -18,6 +18,12 @@ import pandas as pd
 import copy
 import warnings
 
+# Distinguishes "omitted" from "explicitly passed the default value" for
+# constructor slots whose default is a real value (tempus). See
+# TemporalUnit.attributed.
+_UNSET = object()
+
+
 class ProlatioTypes(Enum):
     """
     Enum of prolatio (subdivision) types for a temporal unit.
@@ -790,10 +796,13 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         a string selects a preset (``'d'`` = duration, ``'r'`` = rest,
         ``'p'`` = pulse). Default is ``'d'``.
     beat : Fraction, int, float, str, or None, optional
-        The beat reference for tempo calculation. When None, the
-        denominator of the time signature is used. Default is None.
+        The beat reference for tempo calculation. When None, defaults to
+        ``1/tempus-denominator`` (6/8 gets 1/8) — a default for now, an
+        ambient-context read later (NEW-39); never "tempo-free", which is
+        what a bare :class:`RhythmTree` is. Zero raises. Default is None.
     bpm : int, float, or None, optional
-        Beats per minute. Default is None (falls back to 60).
+        Beats per minute. When None, defaults to 60 (same contract as
+        *beat*). Zero raises. Default is None.
 
     Examples
     --------
@@ -803,22 +812,71 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     """
     def __init__(self,
                  span     : Union[int,float,Fraction]          = 1,
-                 tempus   : Union[Meas,Fraction,int,float,str] = '4/4',
+                 tempus   : Union[Meas,Fraction,int,float,str] = _UNSET,
                  prolatio : Union[tuple,str]                   = 'd',
                  beat     : Union[None,Fraction,int,float,str] = None,
                  bpm      : Union[None,int,float]              = None,
         ):
-        
+
         self._type   = None
-        
+
+        # Attribution (NEW-39's prerequisite, ruled with LAYER-5): record
+        # which tempo slots were explicitly given. Only the constructor
+        # ever knows -- UT(bpm=60) is attributed AT the default value, so
+        # the flag cannot be reconstructed later. Inert metadata until the
+        # ambient context lands. The sentinel exists because tempus has a
+        # real default: without it UT() and UT(tempus='4/4') would be
+        # indistinguishable, and that distinction IS the future semantics
+        # (explicit stays sticky under an ambient dial, omitted follows).
+        attributed = set()
+        if tempus is _UNSET:
+            tempus = '4/4'
+        else:
+            attributed.add('tempus')
+
         self._rt     = self._set_rt(span, abs(Meas(tempus)), prolatio)
         self._real_times = {}
-        
-        self._beat   = Fraction(beat) if beat else Fraction(1, self._rt.meas._denominator)
-        self._bpm    = bpm if bpm else 60
+
+        # `is None`, not truthiness: beat=0/bpm=0 used to coerce silently
+        # to the defaults (NEW-38). R13-F: zeros raise, nothing is inferred.
+        if beat is None:
+            self._beat = Fraction(1, self._rt.meas._denominator)
+        else:
+            self._beat = Fraction(beat)
+            if self._beat == 0:
+                raise ValueError(
+                    "beat cannot be zero -- a zero beat has no duration and "
+                    "no tempo can be inferred from it. Omit beat for the "
+                    "default (1/tempus-denominator)."
+                )
+            attributed.add('beat')
+        if bpm is None:
+            self._bpm = 60
+        else:
+            if bpm == 0:
+                raise ValueError(
+                    "bpm cannot be zero -- nothing is inferred from it. "
+                    "Omit bpm for the default (60)."
+                )
+            self._bpm = bpm
+            attributed.add('bpm')
+        self._attributed = frozenset(attributed)
         self._offset = 0.0
 
         self._timing_dirty = True
+
+    @property
+    def attributed(self):
+        """The tempo slots explicitly given at construction.
+
+        A frozenset drawn from ``{'tempus', 'beat', 'bpm'}``. Explicitly
+        passing a slot's default value still counts — attribution is about
+        the composer's gesture, not the value, and only the constructor
+        can see the difference. Inert metadata today; the future ambient
+        musical context (NEW-39) resolves unattributed slots against a
+        revisable dial while attributed ones stay sticky.
+        """
+        return self._attributed
     
     @classmethod
     def from_rt(cls, rt:RhythmTree, beat = None, bpm = None):
@@ -1388,6 +1446,7 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         c._real_times = {}
         c._beat = self._beat
         c._bpm = self._bpm
+        c._attributed = self._attributed
         c._offset = self._offset
         c._timing_dirty = True
         return c
@@ -1406,6 +1465,7 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
             beat=self.beat,
             bpm=self.bpm,
         )
+        c._attributed = self._attributed  # rebuild passed every slot; restore truth
         c._offset = self._offset
         c._invalidate_timing_cache()
         return c
