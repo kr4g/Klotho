@@ -4,9 +4,11 @@ This family had ZERO test coverage before 10.18 (charter NEW-07), which is
 how mode 'C' could sit dead for four months while both the docstring and the
 error message advertised it (WL-28).
 
-The mode 'C' expectations here are not invented: they are the matrix written
-by hand in the function's own 2024 docstring (commit 17a9996), which is an
-independent oracle for the restored implementation.
+The expected matrices below are transcribed from the PRIMARY SOURCE: Karim
+Haddad, *Vers une temporalite musicale repensee* (2020), section 2.3.8 "Les
+modes de rotation sur un rythme autoreferentiel", figures 2.22-2.25, for the
+proportions (3 4 5 7). They are NOT captured from Klotho's own output, so
+they are a real oracle rather than a snapshot of whatever the code does.
 """
 
 import pytest
@@ -17,37 +19,71 @@ from klotho.topos.collections.patterns import autoref, autoref_rotmat, permute_l
 LST = (3, 4, 5, 7)
 
 
+THESIS = {
+    # Figure 2.22 -- "La rotation en mode Group"
+    'G': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
+          ((4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3))),
+          ((5, (7, 3, 4, 5)), (7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4))),
+          ((7, (3, 4, 5, 7)), (3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)))),
+    # Figure 2.23 -- "La rotation en mode S" (D fixed, S rotates)
+    'S': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
+          ((3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3))),
+          ((3, (7, 3, 4, 5)), (4, (3, 4, 5, 7)), (5, (4, 5, 7, 3)), (7, (5, 7, 3, 4))),
+          ((3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)))),
+    # Figure 2.24 -- "La rotation en mode D" (S fixed, D rotates)
+    'D': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
+          ((4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)), (7, (7, 3, 4, 5)), (3, (3, 4, 5, 7))),
+          ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7))),
+          ((7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)), (4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)))),
+    # Figure 2.25 -- "La rotation en mode circulaire"
+    'C': (((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
+          ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4))),
+          ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7))),
+          ((7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4)))),
+}
+
+
+class TestAgainstTheThesis:
+    """Every implemented mode must reproduce Haddad's own published matrix."""
+
+    @pytest.mark.parametrize('mode', ['G', 'S', 'D', 'C'])
+    def test_mode_matches_the_published_matrix(self, mode):
+        assert autoref_rotmat(LST, mode=mode) == THESIS[mode]
+
+
 class TestModeC:
     """WL-28 — mode 'C' returned None while being advertised as valid."""
 
     def test_mode_c_is_not_none(self):
         assert autoref_rotmat(LST, mode='C') is not None
 
-    def test_mode_c_matches_the_original_docstring_matrix(self):
-        # verbatim from the pre-generalization docstring (commit 17a9996)
-        expected = (
-            ((3, (4, 5, 7, 3)), (4, (5, 7, 3, 4)), (5, (7, 3, 4, 5)), (7, (3, 4, 5, 7))),
-            ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4))),
-            ((5, (4, 5, 7, 3)), (7, (5, 7, 3, 4)), (3, (7, 3, 4, 5)), (4, (3, 4, 5, 7))),
-            ((7, (7, 3, 4, 5)), (3, (3, 4, 5, 7)), (4, (4, 5, 7, 3)), (5, (5, 7, 3, 4))),
-        )
-        assert autoref_rotmat(LST, mode='C') == expected
-
-    def test_mode_c_alternates_tail_table_by_row_parity(self):
-        """The defining property of 'C' vs 'D': tails oscillate, heads sweep."""
-        mat = autoref_rotmat(LST, mode='C')
-        even_tails = [row[j][1] for row in mat[0::2] for j in range(len(LST))]
-        odd_tails = [row[j][1] for row in mat[1::2] for j in range(len(LST))]
-        # even rows all draw from autoref(lst); odd rows from the phase-2 table
-        assert even_tails[:4] == [t for _, t in autoref(LST)]
-        assert odd_tails[:4] == [t for _, t in autoref(permute_list(LST, 2))]
-        assert even_tails[:4] != odd_tails[:4]
-
     def test_mode_c_is_case_insensitive(self):
         assert autoref_rotmat(LST, mode='c') == autoref_rotmat(LST, mode='C')
 
     def test_mode_c_differs_from_mode_d(self):
         assert autoref_rotmat(LST, mode='C') != autoref_rotmat(LST, mode='D')
+
+    def test_heads_advance_once_per_row_tails_twice(self):
+        """The thesis rule: circular rotation of D, circular permutation of S.
+
+        Pinned at n=5, where it distinguishes the real rule from the n=4
+        coincidence -- alternating tails by row parity reproduces the
+        published n=4 matrix too, but oscillates instead of permuting.
+        """
+        lst = (3, 4, 5, 7, 11)
+        mat = autoref_rotmat(lst, mode='C')
+        base = [t for _, t in autoref(lst)]
+        advance = []
+        for row in mat:
+            tails = [t for _, t in row]
+            advance.append(next(k for k in range(len(lst))
+                                if tails == base[k:] + base[:k]))
+        assert advance == [0, 2, 4, 1, 3]
+
+    def test_heads_advance_by_one_per_row(self):
+        lst = (3, 4, 5, 7, 11)
+        heads = [row[0][0] for row in autoref_rotmat(lst, mode='C')]
+        assert heads == list(lst)
 
 
 class TestModeShapeParity:

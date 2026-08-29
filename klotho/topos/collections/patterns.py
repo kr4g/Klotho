@@ -97,10 +97,14 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
           step (``i + j + 1``).
         - ``'D'``: tails are frozen to ``autoref(lst2)`` column-wise; only
           the heads rotate.
-        - ``'C'`` (circular): as ``'D'``, but the frozen tail table
-          alternates by row parity between phase offsets 0 and 2.
+        - ``'C'`` (circular): heads rotate by the row index and tails by
+          twice it, so both permute circularly but at different rates.
     preserve_signs : bool, optional
         If True, preserves signs while rotating absolute values (default is False).
+
+    The four modes are Haddad's, from section 2.3.8 ("Les modes de rotation
+    sur un rythme autoreferentiel") of *Vers une temporalite musicale
+    repensee* (2020); mode names follow the thesis: Group, S, D, circulaire.
 
     Returns
     -------
@@ -137,17 +141,21 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
                              for j, elem in enumerate(permute_list(lst1, i, preserve_signs))) 
                         for i in range(len(lst1)))
         case 'C':
-            # Circular rotation: heads sweep like mode D, but the tail table
-            # alternates by row parity between two phase offsets (0 and 2).
-            # Restored from the pre-generalization implementation (commit
-            # 17a9996, 2024-03-27), whose docstring specified the expected
-            # matrix; the restoration reproduces that matrix element-for-
-            # element. It was lost as collateral damage in the one-list ->
-            # two-list generalization (ceb30ca), never by a design decision.
-            even = autoref(lst2, preserve_signs=preserve_signs)
-            odd = autoref(permute_list(lst2, 2, preserve_signs),
-                          preserve_signs=preserve_signs)
-            return tuple(tuple((elem, (even if i % 2 == 0 else odd)[j][1])
+            # Haddad 2020, sec 2.3.8.4 "La rotation en mode circulaire":
+            # "une rotation circulaire pour les elements D, et une
+            # permutation circulaire pour les elements S" -- the heads
+            # advance one step per row, the tails two. Verified against the
+            # thesis matrix for (3 4 5 7).
+            #
+            # The thesis gives only that n=4 example, where 2i mod 4 is
+            # indistinguishable from alternating 0/2 by row parity (which is
+            # what the 2024 implementation did, and what was first restored
+            # here). They diverge from n=5: parity oscillates between two
+            # tail tables, while 2i keeps permuting circularly through all
+            # of them -- which is what the text actually describes, and what
+            # modes G and S already do at rate 1. n=4 output is unchanged.
+            return tuple(tuple((elem, autoref(permute_list(lst2, 2 * i, preserve_signs),
+                                              preserve_signs=preserve_signs)[j][1])
                              for j, elem in enumerate(permute_list(lst1, i, preserve_signs)))
                         for i in range(len(lst1)))
         case _:
