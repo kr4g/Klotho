@@ -1976,6 +1976,7 @@ class CompositionalUnit(TemporalUnit):
         if mode == "span":
             selected = self._resolve_leaf_selection(node=node)
             selected = self._apply_offset_take(selected, offset=offset, take=take)
+            selected = self._snap_to_tie_heads(selected)
             if len(selected) < 2:
                 raise ValueError("Slur requires at least two leaves")
             rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
@@ -1994,6 +1995,7 @@ class CompositionalUnit(TemporalUnit):
             reserved_sets = []
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
+                selected = self._snap_to_tie_heads(selected)
                 rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
                 segments = self._partition_non_rest_segments(selected, rest_set)
                 for segment in segments:
@@ -2003,6 +2005,29 @@ class CompositionalUnit(TemporalUnit):
                     slur_ids.append(slur_id)
             return slur_ids
         raise ValueError(f"Unknown mode: {mode}")
+
+    def _snap_to_tie_heads(self, selected):
+        """Snap a slur selection onto tie-group heads (charter sect8).
+
+        Tie groups are atomic for slur membership: a continuation is part
+        of the head's sound, so a selection touching one has exactly one
+        lossless meaning — the group, addressed by its head. Order is
+        preserved; duplicates collapse.
+        """
+        head_of = {}
+        for g in self._rt.tie_groups:
+            if len(g) > 1:
+                for n in g:
+                    head_of[n] = g[0]
+        if not head_of:
+            return selected
+        out, seen = [], set()
+        for n in selected:
+            h = head_of.get(n, n)
+            if h not in seen:
+                seen.add(h)
+                out.append(h)
+        return type(selected)(out) if isinstance(selected, tuple) else out
 
     def _split_slurs_for_rests(self, nodes_to_rest: set[int]):
         for slur_id, spec in list(self._slur_specs.items()):

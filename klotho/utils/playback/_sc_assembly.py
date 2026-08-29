@@ -1,3 +1,5 @@
+import warnings
+
 from klotho.utils.ids import fast_id
 
 from klotho.thetos.instruments.synthdef import SynthDefInstrument
@@ -163,6 +165,149 @@ def _duration_inject_key(controls, has_gate, from_manifest, event_pfields):
     return key
 
 
+# --- Tie lowering (07_TIES_CHARTER.md sect3-6) --------------------------
+#
+# The event surface (TemporalUnit/CompositionalUnit iteration) already
+# yields one merged event per tie group, anchored at the head with the
+# duration summed upstream of voice expansion -- so `dur`, the injected
+# duration pfield, and the runtime gate-off all read the same number by
+# construction. What lowering adds is the precondition (sect5), the
+# divergence test (sect4), and the uniform failure doctrine (sect6): a
+# group that cannot legally join is downgraded to per-leaf attacks with
+# ONE warning naming why. Never silent, never a hard refusal.
+
+# Keys excluded from the divergence comparison beyond envelope-covered
+# ones: the literal duration mirrors. The canonical corpus idiom
+# ``set_pfields(duration=lambda c: c.real_duration)`` authors each leaf's
+# slot duration, which differs across group members by construction; the
+# merge recomputes the slot and the head's value governs what ships
+# (charter sect4: the head's effective values are the event's values).
+_TIE_DIVERGENCE_EXEMPT = frozenset({'duration', 'dur'})
+
+
+def _describe_tie_instrument(inst):
+    if inst is None:
+        return 'UNBOUND'
+    if isinstance(inst, str):
+        return repr(inst)
+    if isinstance(inst, int):
+        return f'synth id {inst}'
+    name = getattr(inst, 'defName', None)
+    return f'{type(inst).__name__}({name!r})' if name else type(inst).__name__
+
+
+def _tie_instruments_join(a, b):
+    """Whether two RESOLVED instruments count as the same instrument for a
+    tie join (charter sect5): compared by kind -- None never joins a bound
+    instrument (UNBOUND is its own kind, never silently the default
+    synth); strings by canonical def name; int synth ids by value;
+    Instrument/Kit instances by ``a is b``, else ``a == b`` AND equal
+    ``defName`` (bare ``==`` is defName-blind -- measured)."""
+    if a is b:
+        return True
+    if a is None or b is None:
+        return False
+    if isinstance(a, str) or isinstance(b, str):
+        return (isinstance(a, str) and isinstance(b, str)
+                and canonical_def_name(a) == canonical_def_name(b))
+    if isinstance(a, int) or isinstance(b, int):
+        return isinstance(a, int) and isinstance(b, int) and a == b
+    try:
+        equal = bool(a == b)
+    except Exception:
+        equal = False
+    return equal and getattr(a, 'defName', None) == getattr(b, 'defName', None)
+
+
+def _control_envelope_cover(obj):
+    """``{leaf_id: set(pfield keys)}`` covered by control-envelope
+    descriptors -- exempt from the divergence test (charter sect4: control
+    envelopes ride through via the node map). Pure bake-mode envelopes
+    leave no descriptor (one-shot writes), so their per-leaf values are
+    indistinguishable from authorship and fall under the general
+    divergence rule instead -- loudly, with the key named."""
+    cover = {}
+    resolver = getattr(obj, 'resolved_control_envelopes', None)
+    if resolver is None:
+        return cover
+    for entry in resolver():
+        for n in entry['target_nodes']:
+            cover.setdefault(n, set()).update(entry['pfields'])
+    return cover
+
+
+def _tie_voice_count(pfields):
+    return max((len(v) for v in pfields.values()
+                if isinstance(v, tuple) and v), default=1)
+
+
+def _tie_join_reason(obj, members, env_cover):
+    """``None`` when the group may join as one event; else the reason it
+    fails (charter sect4-5). ``members`` are per-leaf IR events, head
+    first, built from the same effective context as the lowering."""
+    head = members[0]
+    head_inst = obj.get_instrument(head.node_id)
+    if isinstance(head_inst, Effect):
+        return ("the instrument is an Effect -- it emits sets on a "
+                "persistent node; there is no attack to tie")
+    head_group = head.get_mfield('group')
+    head_pf = head.pfields
+    head_voices = _tie_voice_count(head_pf)
+    kit_selector = head_inst.selector if isinstance(head_inst, Kit) else None
+    for m in members[1:]:
+        inst = obj.get_instrument(m.node_id)
+        if isinstance(inst, Effect):
+            return ("a continuation's instrument is an Effect -- there is "
+                    "no attack to tie")
+        if not _tie_instruments_join(head_inst, inst):
+            return (f"instrument mismatch "
+                    f"({_describe_tie_instrument(head_inst)} vs "
+                    f"{_describe_tie_instrument(inst)})")
+        m_pf = m.pfields
+        if kit_selector is not None:
+            # concretized member key off the event IR, never the authored
+            # selector -- a rotating family makes consecutive leaves
+            # differ BY CONSTRUCTION, so the failure here is truthful
+            if head_pf.get(kit_selector) != m_pf.get(kit_selector):
+                return (f"kit voice mismatch "
+                        f"({head_pf.get(kit_selector)!r} vs "
+                        f"{m_pf.get(kit_selector)!r})")
+        m_group = m.get_mfield('group')
+        if m_group != head_group:
+            # group is track routing: a cross-group tie would silently
+            # move a note between tracks mid-sound
+            return f"group mismatch ({head_group!r} vs {m_group!r})"
+        m_voices = _tie_voice_count(m_pf)
+        if m_voices != head_voices:
+            return f"voice-count mismatch ({head_voices} vs {m_voices})"
+        exempt = (_TIE_DIVERGENCE_EXEMPT
+                  | env_cover.get(head.node_id, set())
+                  | env_cover.get(m.node_id, set()))
+        for key in set(head_pf) | set(m_pf):
+            if key in exempt:
+                continue
+            if head_pf.get(key) != m_pf.get(key):
+                return (f"effective-value divergence on '{key}' "
+                        f"({head_pf.get(key)!r} vs {m_pf.get(key)!r})")
+    return None
+
+
+def _warn_tie_failure(group_nodes, reason):
+    warnings.warn(
+        f"tie group at leaves {tuple(group_nodes)} cannot join: {reason}; "
+        f"rendering as separate attacks",
+        UserWarning, stacklevel=3,
+    )
+
+
+def _warn_dangling_tie(head_node):
+    warnings.warn(
+        f"leading tie at leaf {head_node} has no predecessor here; "
+        f"rendering as an attack",
+        UserWarning, stacklevel=3,
+    )
+
+
 def _attach_poly_meta(event_record, voice_event):
     event_record["_polyGroupId"] = voice_event["poly_group_id"]
     event_record["_logicalStepId"] = voice_event["logical_step_id"]
@@ -201,6 +346,50 @@ def lower_compositional_ir_to_sc_assembly(
     slur_end_events = {}
     sustain_param_cache = {}
 
+    # Tie resolution (charter sect4-6): the surface merged every group
+    # structurally; lowering is where the instrument facts live, so the
+    # precondition and divergence test run here. A failing group is
+    # downgraded to per-leaf attacks with one warning naming why; a
+    # dangling leading tie (no predecessor in this unit) warns and
+    # attacks. tie_continuations maps a surviving merged event (by
+    # identity) to its continuation nodes for node-map registration and
+    # animation step reservation.
+    tie_continuations = {}
+    # Hand-built IR (fakes, loose Events) has no tie_group attribute and
+    # possibly no real rhythm tree behind obj._rt -- events without the
+    # attribute are passed through untouched.
+    _needs_tie_pass = False
+    for ev in events_iterable:
+        g = getattr(ev, 'tie_group', None)
+        if g is None:
+            continue
+        if len(g) > 1 or (not ev.is_rest and obj._rt[g[0]].get('tied', False)):
+            _needs_tie_pass = True
+            break
+    if _needs_tie_pass:
+        ctx = obj._event_context()
+        env_cover = _control_envelope_cover(obj)
+        resolved = []
+        for ev in events_iterable:
+            group_nodes = getattr(ev, 'tie_group', None)
+            if group_nodes is None:
+                resolved.append(ev)
+                continue
+            if not ev.is_rest and obj._rt[group_nodes[0]].get('tied', False):
+                _warn_dangling_tie(group_nodes[0])
+            if len(group_nodes) < 2:
+                resolved.append(ev)
+                continue
+            members = [obj._make_event(n, ctx) for n in group_nodes]
+            reason = _tie_join_reason(obj, members, env_cover)
+            if reason is None:
+                resolved.append(ev)
+                tie_continuations[id(ev)] = group_nodes[1:]
+            else:
+                _warn_tie_failure(group_nodes, reason)
+                resolved.extend(members)
+        events_iterable = tuple(resolved)
+
     if extra_pfields:
         extra_pfields = coerce_sc_pfield_values(extra_pfields)
 
@@ -215,16 +404,16 @@ def lower_compositional_ir_to_sc_assembly(
     def _track_event(uid):
         last_event_index_by_uid[uid] = len(events) - 1
 
-    def _mark_terminal(uid, terminal_time=None):
+    def _mark_terminal(uid):
+        # NEW-43: the old ``terminal_time`` branch rewrote ev["dur"]
+        # without touching the injected duration pfield, so any caller
+        # shipped a synth whose gate-off and internal envelope disagreed.
+        # It was dead (the only call site passed None) and the ties
+        # charter forbids resurrecting it (sect3) -- removed.
         idx = last_event_index_by_uid.get(uid)
         if idx is None:
             return
-        ev = events[idx]
-        ev["releaseAfter"] = True
-        if terminal_time is not None:
-            new_dur = terminal_time - ev.get("start", 0.0)
-            if new_dur > 0:
-                ev["dur"] = new_dur
+        events[idx]["releaseAfter"] = True
 
     # Slur pre-pass: index slur-end events and find each group's maximum
     # voice count (any tuple pfield makes an event multi-voice). Every
@@ -387,6 +576,12 @@ def lower_compositional_ir_to_sc_assembly(
                     end_event = slur_end_events.get(slur_id)
                     if end_event is not None:
                         voice_pfields[sustain_param] = end_event.end - voice_event["start"]
+                elif sustain_param and slur_id is None and id(event) in tie_continuations:
+                    # charter sect3: an ungated instrument's sustain control
+                    # gets the summed tie span -- the tie extends the SLOT;
+                    # a one-shot sample still sounds only as long as the
+                    # sample sounds
+                    voice_pfields[sustain_param] = voice_dur
 
             voice_pfields = coerce_sc_pfield_values(voice_pfields)
             _warn_unknown_pfields(voice_def_name, voice_pfields, manifest)
@@ -485,6 +680,33 @@ def lower_compositional_ir_to_sc_assembly(
             _track_event(uid)
             _record(event.node_id, uid, voice_start)
 
+        # Tied-group bookkeeping (charter sect3/sect11): every continuation
+        # node registers in the node map against the head's uids at the
+        # head's start -- exactly as slur continuations do -- or control
+        # envelopes anchored on continuation nodes are dropped without
+        # warning. Under animation, each continuation also reserves its
+        # step index with a marker the way rests do, or every plot
+        # downstream of a tie shifts by one.
+        _conts = tie_continuations.get(id(event))
+        if _conts:
+            head_entries = list(node_to_event_ids.get(event.node_id, ()))
+            for uid, _ in head_entries:
+                for cn in _conts:
+                    _record(cn, uid, uid_first_start[uid])
+            if animation:
+                for cn in _conts:
+                    marker = {
+                        "type": "new",
+                        "id": fast_id(),
+                        "defName": "__rest__",
+                        "start": obj.nodes[cn].start - time_offset,
+                        "pfields": {},
+                    }
+                    cstep = node_to_step.get(cn)
+                    if cstep is not None:
+                        marker["_stepIndex"] = cstep
+                    events.append(marker)
+
         # End-of-slur: the most recent event for each still-active uid is the
         # terminal one. Mark releaseAfter=true; dur already reflects this leaf.
         if slur_id is not None and is_slur_end:
@@ -498,10 +720,15 @@ def lower_compositional_ir_to_sc_assembly(
     if stamp_nodes:
         # Done here rather than at each emission site: the node map is already
         # built, so one pass over it stamps every event the same way, whatever
-        # path emitted it (plain leaf, slur voice, poly voice).
-        node_of_event = {event_id: node
-                         for node, entries in node_to_event_ids.items()
-                         for event_id, _ in entries}
+        # path emitted it (plain leaf, slur voice, poly voice). First
+        # registration wins (setdefault): heads register before their slur/tie
+        # continuations, so a shared uid stamps the HEAD's node id (charter
+        # sect11) -- the old last-write-wins dict comprehension stamped the
+        # LAST continuation's node instead.
+        node_of_event = {}
+        for node, entries in node_to_event_ids.items():
+            for event_id, _ in entries:
+                node_of_event.setdefault(event_id, node)
         for event in events:
             node = node_of_event.get(event.get("id"))
             if node is None:

@@ -284,6 +284,31 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfi
         dur = abs(chronon.duration)
         step_idx = node_to_step.get(chronon.node_id, None) if animation else None
 
+        # Ties (07_TIES_CHARTER.md sect5): a bare UT has no instruments, so
+        # groups join on structure alone -- the merged event surface already
+        # hands us one chronon per group with the summed duration. What is
+        # left here: warn on a dangling leading tie (sect6), and reserve
+        # each continuation's animation step the way rests do.
+        tie_nodes = getattr(chronon, 'tie_group', (chronon.node_id,))
+        if not chronon.is_rest and obj._rt[tie_nodes[0]].get('tied', False):
+            import warnings
+            warnings.warn(
+                f"leading tie at leaf {tie_nodes[0]} has no predecessor "
+                f"here; rendering as an attack", UserWarning, stacklevel=2)
+        if animation and len(tie_nodes) > 1:
+            for cn in tie_nodes[1:]:
+                marker = {
+                    "type": "new",
+                    "id": _uid(),
+                    "defName": "__rest__",
+                    "start": obj.nodes[cn].start - time_offset,
+                    "pfields": {},
+                }
+                cstep = node_to_step.get(cn)
+                if cstep is not None:
+                    marker["_stepIndex"] = cstep
+                events.append(marker)
+
         if chronon.is_rest:
             if animation:
                 events.append({

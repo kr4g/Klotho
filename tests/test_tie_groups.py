@@ -201,3 +201,171 @@ class TestCompositionalUnitSurfaces:
     def test_uc_group_event_duration_is_the_sum(self):
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1.0, 1, 1), bpm=120)
         assert uc[0].duration == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Lowering (charter sect3-6): one merged event, upstream of voice expansion;
+# the precondition and divergence test run at lowering, where the facts
+# live; every failure is an attack plus ONE warning naming why.
+# ---------------------------------------------------------------------------
+
+import warnings as _warnings
+
+from klotho.utils.playback._sc_assembly import (
+    lower_compositional_ir_to_sc_assembly,
+    node_event_map,
+)
+
+
+def _tied_uc(inst='kl_tri', prolatio=(1, 1.0, 1, 1)):
+    uc = CompositionalUnit(tempus='4/4', prolatio=prolatio, bpm=120)
+    uc.set_instrument(uc.root, inst)
+    return uc
+
+
+def _new_events(events):
+    return [e for e in events if e.get('type') == 'new'
+            and e.get('defName') != '__rest__']
+
+
+class TestTieLowering:
+    def test_group_lowers_to_one_merged_event(self):
+        uc = _tied_uc()
+        events = lower_compositional_ir_to_sc_assembly(uc)
+        news = _new_events(events)
+        assert len(news) == 3
+        assert news[0]['dur'] == pytest.approx(1.0)
+        assert news[0]['releaseAfter'] is True
+
+    def test_continuations_register_in_the_node_map_at_head_start(self):
+        # charter sect11: many-nodes-to-one-event, at the head's start —
+        # or control envelopes anchored on continuation nodes drop silently
+        uc = _tied_uc()
+        mapping = node_event_map(uc)
+        leaves = uc._rt.leaf_nodes
+        head_ids = {e[0] for e in mapping[leaves[0]]}
+        cont_ids = {e[0] for e in mapping[leaves[1]]}
+        assert head_ids and head_ids == cont_ids
+        assert mapping[leaves[1]][0][1] == mapping[leaves[0]][0][1]
+
+    def test_effective_value_divergence_fails_the_tie_with_one_warning(self):
+        # charter sect4: the conflict rule is effective-value divergence,
+        # not authorship — would the continuation sound different?
+        uc = _tied_uc()
+        uc.set_pfields(uc._rt.leaf_nodes[1], freq=999.0)
+        with pytest.warns(UserWarning, match="divergence on 'freq'"):
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        assert len(_new_events(events)) == 4  # downgraded to attacks
+
+    def test_instrument_mismatch_fails_the_tie(self):
+        uc = _tied_uc()
+        uc.set_instrument(uc._rt.leaf_nodes[1], 'kl_saw')
+        with pytest.warns(UserWarning, match='instrument mismatch'):
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        assert len(_new_events(events)) == 4
+
+    def test_group_mismatch_fails_the_tie(self):
+        # group is track routing: a cross-group tie would silently move a
+        # note between tracks mid-sound (charter sect5)
+        uc = _tied_uc()
+        uc.set_mfields(uc._rt.leaf_nodes[1], group='solo')
+        with pytest.warns(UserWarning, match='group mismatch'):
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        assert len(_new_events(events)) == 4
+
+    def test_dangling_leading_tie_warns_and_attacks(self):
+        uc = _tied_uc(prolatio=(1.0, 1, 1))
+        with pytest.warns(UserWarning, match='no predecessor'):
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        assert len(_new_events(events)) == 3
+
+    def test_identical_tuple_pfields_tie_a_sustained_chord(self):
+        # charter sect13: v1 is event-level; identical tuples work today
+        uc = _tied_uc()
+        for leaf in (uc._rt.leaf_nodes[0], uc._rt.leaf_nodes[1]):
+            uc.set_pfields(leaf, freq=(330.0, 415.0))
+        with _warnings.catch_warnings():
+            _warnings.simplefilter('error')
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        news = _new_events(events)
+        # 2 voices for the merged chord event + 1 each for the two plain
+        assert len(news) == 4
+        merged = [e for e in news if e['dur'] == pytest.approx(1.0)]
+        assert len(merged) == 2
+
+    def test_control_envelope_across_the_tie_is_exempt(self):
+        # charter sect4: control envelopes ride through via the node map;
+        # their baked per-leaf values are NOT divergence
+        from klotho.dynatos.envelopes import Envelope
+        uc = _tied_uc()
+        uc.apply_envelope(Envelope([0.1, 0.9], times=[2.0]), 'amp',
+                          uc._rt.root, control=True)
+        with _warnings.catch_warnings():
+            _warnings.simplefilter('error')
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        assert len(_new_events(events)) == 3
+
+    def test_pure_bake_divergence_fails_loudly(self):
+        # DOCUMENTED DEVIATION from charter sect4's bake clause: a pure
+        # bake leaves no descriptor (one-shot write), so its per-leaf
+        # values are indistinguishable from authorship. The general
+        # divergence rule applies instead — attack + warning naming the
+        # key. Never silent. (Charter amendment 2026-08-29; flagged for
+        # Ryan.)
+        from klotho.dynatos.envelopes import Envelope
+        uc = _tied_uc()
+        uc.apply_envelope(Envelope([0.1, 0.9], times=[2.0]), 'amp',
+                          uc._rt.root, control=False)
+        with pytest.warns(UserWarning, match="divergence on 'amp'"):
+            events = lower_compositional_ir_to_sc_assembly(uc)
+        assert len(_new_events(events)) == 4
+
+    def test_animation_reserves_continuation_steps(self):
+        # charter sect3: continuations reserve their step index the way
+        # rests do, or every plot downstream of a tie shifts by one
+        uc = _tied_uc()
+        events = lower_compositional_ir_to_sc_assembly(uc, animation=True)
+        steps = {e.get('_stepIndex') for e in events if '_stepIndex' in e}
+        assert steps == {0, 1, 2, 3}
+
+    def test_ungated_sustain_control_gets_the_summed_span(self):
+        # charter sect3: the sustain poke widens past its slur guard so a
+        # tie head's sustain control covers the whole group
+        uc = _tied_uc(inst='fd_creep')
+        events = lower_compositional_ir_to_sc_assembly(uc)
+        news = _new_events(events)
+        merged = [e for e in news if e['dur'] == pytest.approx(1.0)]
+        assert merged and merged[0]['pfields']['releaseTime'] == pytest.approx(1.0)
+
+    def test_bare_ut_ties_join_on_structure_alone(self):
+        # charter sect5: chronos has no instruments
+        from klotho.utils.playback.supersonic.converters import (
+            temporal_unit_to_sc_events,
+        )
+        ut = TemporalUnit(tempus='4/4', prolatio=(1, 1.0, 1, 1), bpm=120)
+        with _warnings.catch_warnings():
+            _warnings.simplefilter('error')
+            events = temporal_unit_to_sc_events(ut)
+        news = [e for e in events if e.get('type') == 'new']
+        assert len(news) == 3
+
+
+class TestSlurOverTie:
+    """First coverage of slur x tie (charter sect8 names the gap)."""
+
+    def test_slur_selection_snaps_to_group_heads(self):
+        uc = _tied_uc()
+        slur_id = uc.apply_slur(uc._rt.leaf_nodes)
+        spec = uc._slur_specs[slur_id]
+        leaves = uc._rt.leaf_nodes
+        assert list(spec['leaf_nodes']) == [leaves[0], leaves[2], leaves[3]]
+
+    def test_tied_group_is_one_slur_member(self):
+        uc = _tied_uc()
+        uc.apply_slur(uc._rt.leaf_nodes)
+        events = lower_compositional_ir_to_sc_assembly(uc)
+        news = _new_events(events)
+        sets = [e for e in events if e.get('type') == 'set']
+        assert len(news) == 1  # one synth for the whole slur
+        assert len(sets) == 2  # two continuations of the slur
+        assert news[0]['dur'] == pytest.approx(1.0)  # merged head span
