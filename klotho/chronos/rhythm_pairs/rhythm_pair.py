@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Klotho/klotho/chronos/rhythm_pairs/rp.py
+# Klotho/klotho/chronos/rhythm_pairs/rhythm_pair.py
 # -----------------------------------------------------------------------------
 '''
 Rhythm pairs.

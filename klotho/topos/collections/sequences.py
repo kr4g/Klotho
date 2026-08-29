@@ -180,7 +180,17 @@ class Norg:
 
 
 class Pattern:
-    """Cyclical pattern iterator built from nested structure and delegates."""
+    """Cyclical pattern iterator built from nested structure and delegates.
+
+    A **list** is structure: its elements are cycled through one per step, and
+    a nested list is a sub-pattern that advances by one element each time the
+    enclosing pattern reaches it. A **tuple** is a single value: the whole
+    tuple is emitted on every step it occupies. That follows the convention
+    used throughout Klotho, where a tuple parameter value means a simultaneity
+    -- see :meth:`CompositionalUnit.set_pfields`. So ``Pattern([60, 64, 67])``
+    cycles three notes while ``Pattern((60, 64, 67))`` repeats one three-note
+    chord.
+    """
 
     def __init__(self, iterable, end=False):
         self._iterable = iterable

@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------
-# Klotho/klotho/chronos/rhythm_trees/algorithms/subdivs.py
+# Klotho/klotho/chronos/rhythm_trees/algorithms.py
 # ------------------------------------------------------------------------
 """
 Rhythm tree algorithms.
@@ -166,16 +166,22 @@ def auto_subdiv_matrix(matrix, rotation_offset=1):
     """
     Apply :func:`auto_subdiv` to every element in a matrix of tree specs.
 
-    Each element of the matrix is a ``(D, S)`` pair. The function applies
-    ``auto_subdiv`` to each element's subdivisions with a rotation offset
-    that varies with the element's row and column position.
+    Each element of the matrix is a ``(D, S)`` pair. For the element at row
+    *i*, column *j*, ``auto_subdiv`` is applied to its subdivisions with an
+    effective rotation offset of ``j - i + rotation_offset * i``.
+
+    At the default ``rotation_offset=1`` that reduces to ``j``: the row index
+    cancels, the offset depends on the column alone, and identical input rows
+    produce identical output rows. Pass a ``rotation_offset`` other than 1 for
+    the offset to vary by row as well as by column.
 
     Parameters
     ----------
     matrix : tuple of tuple
         A matrix where each element is a ``(D, S)`` pair.
     rotation_offset : int, optional
-        Base offset for rotation calculations. Default is 1.
+        Per-row multiplier in the effective offset ``j - i +
+        rotation_offset * i``. Default is 1, at which the row term cancels.
 
     Returns
     -------

@@ -17,7 +17,11 @@ class Lattice(GraphCore):
     dimensionality : int
         Number of dimensions.
     resolution : int or list of int
-        Number of points along each dimension, or list of resolutions per dimension.
+        Half-extent per dimension, both bounds inclusive -- one value for
+        every dimension, or one per dimension. This is a coordinate bound,
+        not a point count: ``resolution=n`` gives ``2n+1`` points per axis
+        when ``bipolar`` is True and ``n+1`` when it is False. A list must
+        match ``dimensionality``.
     bipolar : bool, optional
         If True, coordinates range from -resolution to +resolution. 
         If False, coordinates range from 0 to resolution (default is True).

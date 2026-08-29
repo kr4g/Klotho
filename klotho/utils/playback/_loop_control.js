@@ -1,6 +1,6 @@
 // Shared loop-button controller for Klotho playback widgets.
 // Installs globalThis.KlothoLoopControl once; every widget (animated
-// figures, SuperSonic engine, Tone.js engine) builds its loop state and
+// figures, SuperSonic engine) builds its loop state and
 // button behavior through this factory so the loop policy semantics
 // (off / infinite toggle / finite re-armed cycle count) stay identical.
 // KlothoGateToggle: the play button renders disabled/greyed (see

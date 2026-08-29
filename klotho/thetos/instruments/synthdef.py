@@ -158,6 +158,18 @@ class SynthDefInstrument(Instrument):
         Looks up the SynthDef's control names and defaults from the manifest
         and uses them as pfields.
 
+        This is the public way to read a SynthDef's defaults without
+        assigning it to anything: ``from_manifest(defName).pfields`` is the
+        ``{control: default}`` dict the engine would apply. The lookup covers
+        the bundled definitions and anything registered at runtime through
+        :func:`klotho.register_synthdef` or
+        :func:`klotho.register_compiled_file`.
+
+        A ``defName`` in neither source yields an instrument with **empty**
+        pfields rather than an error, because user-supplied and external
+        definitions are deliberately permitted. So empty pfields means "name
+        not found", not "this synth has no controls".
+
         Parameters
         ----------
         defName : str

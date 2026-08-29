@@ -312,14 +312,28 @@ class Score:
     def track(self, name: str, inserts: Optional[Iterable[Effect]] = None) -> "Score":
         """Register a named track with optional insert effects.
 
+        A track's chain is selected per *event*, not per unit: an event enters
+        this chain when its ``group`` mfield equals *name*. Granularity is
+        therefore whatever granularity the mfield was set at --
+        ``uc.set_mfields(uc.leaves[1], group='solo')`` sends exactly that one
+        leaf through the ``'solo'`` chain and leaves its siblings on
+        ``'default'``. Untagged events carry ``group='default'`` and bypass
+        every non-master chain.
+
+        Chains can also be declared per instrument family on an
+        :class:`~klotho.thetos.instruments.ensemble.Ensemble` and copied in
+        with :meth:`from_ensemble`, which creates one track per family.
+
         Parameters
         ----------
         name : str
-            Unique track name.  ``"main"`` is implicit and always
+            Unique track name, matched against the ``group`` mfield of each
+            lowered event.  ``"main"`` is implicit and always
             exists; calling ``track("main", inserts=[...])`` sets master
             inserts.
         inserts : list of Effect, Effect, or None
-            Insert FX instances to place in this track's chain.  A bare
+            Insert FX instances to place in this track's chain, applied in
+            list order (signal flows left to right).  A bare
             ``Effect`` is accepted as a one-element chain.
 
         Returns

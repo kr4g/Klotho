@@ -507,6 +507,14 @@ class Ensemble:
 
         Replaces any existing chain.  Order matters (signal flows left to right).
 
+        The chain is declarative here and takes effect at
+        :meth:`~klotho.thetos.composition.score.Score.from_ensemble`, which
+        turns each family into a Score track carrying a copy of that family's
+        chain with fresh ``uid`` values, so every Score gets independent FX
+        nodes. Events reach the chain through their ``group`` mfield, which
+        ``set_instrument`` fills in with the family name when the instrument
+        came from a family view (``ens.strings['lead']``).
+
         Parameters
         ----------
         family : str

@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------
-# Klotho/klotho/chronos/temporal_units/ut.py
+# Klotho/klotho/chronos/temporal_units/temporal.py
 # ------------------------------------------------------------------------
 """
 Temporal units.
@@ -1720,17 +1720,45 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         meas_denom : int, optional
             Denominator for measure fractions. Default is 1.
         subdiv : bool, optional
-            Whether to apply automatic subdivision. Default is False.
+            Whether to apply automatic subdivision. Default is False. That
+            path also reverses each cell's S -- see Notes.
         rotation_offset : int, optional
-            Offset for rotation calculations. Default is 1.
+            Base offset for the ``subdiv`` rotation; ignored when ``subdiv``
+            is False. Default is 1. See Notes for the formula.
         beat : Fraction, str, float, or None, optional
             Beat ratio specification. Default is None.
         bpm : int, float, or None, optional
             Beats per minute. Default is None.
+        axis : float, optional
+            Temporal alignment axis for the block: ``-1`` aligns rows at
+            their starts, ``1`` at their ends, ``0`` centers them. Default
+            is -1.
+        sort_rows : bool, optional
+            Passed through to the block. When True, rows are reordered by
+            duration (longest first), so row order no longer matches the
+            matrix. Leaving it unset warns, because the default is scheduled
+            to become False.
 
         Returns
         -------
         TemporalBlock
+
+        Notes
+        -----
+        A negative ``D`` produces a rest: the measure takes ``abs(D)`` as its
+        numerator and the cell's S is discarded in favour of ``'r'``. The sign
+        is a rest flag, not a duration.
+
+        With ``subdiv=True`` each cell's S is **reversed** before subdivision
+        -- ``auto_subdiv(S[::-1], rotation_offset*i - j - i)`` for the cell at
+        row *i*, column *j*. That formula is not the one
+        :func:`~klotho.chronos.rhythm_trees.algorithms.auto_subdiv_matrix`
+        uses (``j - i + rotation_offset*i``, no reversal); the two are easy to
+        assume identical and are not. At the default ``rotation_offset=1`` the
+        row index cancels here too -- ``1*i - j - i == -j`` -- so the effective
+        offset depends on the column alone and identical input rows give
+        identical output rows. Pass ``rotation_offset != 1`` for it to vary by
+        row.
         """
         tb = []
         for i, row in enumerate(matrix):

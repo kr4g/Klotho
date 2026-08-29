@@ -2162,11 +2162,20 @@ class CompositionalUnit(TemporalUnit):
             Target node(s). Single node: instrument set on that node, inherits
             to descendants. List of nodes: instrument evaluated once per node.
         instrument : Instrument, str, int, Pattern, or callable
-            - Instrument: set directly on node with pfield defaults.
+            - Instrument: set directly on node, and its pfield defaults are
+              materialized onto the node -- afterwards the node's ``pfields``
+              holds every control of the SynthDef, so each one can be read
+              and overridden individually.
               If the instrument carries an ``_ensemble_family`` tag (i.e. it
               was accessed through an Ensemble family view), the ``group``
               mfield is automatically set to the family name.
-            - str: raw synth reference (SynthDef name)
+            - str: raw synth reference (SynthDef name). The name is stored
+              as-is and defaults are **not** materialized -- the node's
+              ``pfields`` stays empty and the engine applies the SynthDef's
+              own defaults at play time. Pass the object form
+              (``SynthDefInstrument.from_manifest('kl_tri')``) to get them
+              onto the node, or read them without assigning via that
+              object's ``.pfields``.
             - Pattern: next() called once per target node
             - Callable: evaluated once per target node (0-arg or 1-arg with DistributionContext)
         include_rests : bool, default=False
