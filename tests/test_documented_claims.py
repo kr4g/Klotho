@@ -73,34 +73,11 @@ class TestFromManifestIsThePublicDefaultsAccessor:
         assert dict(SynthDefInstrument.from_manifest('definitely_not_a_synth').pfields) == {}
 
 
-class TestStaleFileHeaders:
-    """NEW-23. The headers named files that do not exist, which misdirects
-    exactly the file:line citations an audit produces."""
-
-    @pytest.mark.parametrize("rel", [
-        'klotho/topos/collections/patterns.py',
-        'klotho/chronos/rhythm_trees/algorithms.py',
-        'klotho/chronos/rhythm_pairs/rhythm_pair.py',
-        'klotho/chronos/temporal_units/temporal.py',
-    ])
-    def test_the_header_names_the_file_it_is_in(self, rel):
-        head = (REPO / rel).read_text().split('\n')[:12]
-        claimed = [line for line in head if 'klotho/' in line and line.lstrip().startswith('#')]
-        assert claimed, f"{rel} lost its header"
-        for line in claimed:
-            assert rel in line, f"{rel} header claims: {line.strip()}"
-
-    def test_no_file_in_the_package_claims_a_path_it_is_not(self):
-        for path in (REPO / 'klotho').rglob('*.py'):
-            rel = str(path.relative_to(REPO))
-            for line in path.read_text().split('\n')[:12]:
-                stripped = line.strip()
-                if not stripped.startswith('#') or 'klotho/' not in stripped:
-                    continue
-                for token in stripped.split():
-                    if token.endswith('.py') and 'klotho/' in token:
-                        assert token.removeprefix('Klotho/') == rel, \
-                            f"{rel} claims to be {token}"
+# NEW-23's TestStaleFileHeaders was deleted 2026-08-29 (Q3, Ryan): the
+# self-naming `# Klotho/klotho/...` file headers are gone, so there is
+# nothing left to pin. The convention duplicated what the filesystem
+# already knows and went stale on every file move -- exactly one file in
+# the package had a correct one when API-3 looked.
 
 
 class TestRemovedBackendsAreNotAdvertisedAsPresent:
