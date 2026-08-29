@@ -152,6 +152,11 @@ class UTNodeHandle:
         return self._rt_node().get("proportion")
 
     @property
+    def is_rest(self):
+        """bool : Whether this node is a rest (negative proportion)."""
+        return (self._rt_node().get("proportion", 1) or 0) < 0
+
+    @property
     def metric_onset(self):
         """Fraction : Onset as a fraction of a whole note."""
         return self._rt_node().get("metric_onset")
@@ -169,9 +174,32 @@ class UTNodeHandle:
 
     @property
     def real_duration(self):
-        """float : Duration in seconds (computes the timing cache on first access)."""
+        """float : Duration in seconds (computes the timing cache on first access).
+
+        Signed: a rest reads negative, which is how rests are marked. Use
+        :attr:`duration` for the unsigned value.
+        """
         self._owner._ensure_timing_cache()
         return self._owner._real_times[self._node_id]["real_duration"]
+
+    @property
+    def start(self):
+        """float : Absolute onset in seconds."""
+        return self.real_onset
+
+    @property
+    def duration(self):
+        """float : Duration in seconds, unsigned -- a rest reads positive.
+
+        Mirrors :attr:`Chronon.duration`. :attr:`real_duration` keeps the
+        negative sign that marks a rest; this is the length you would draw.
+        """
+        return abs(self.real_duration)
+
+    @property
+    def end(self):
+        """float : Absolute end time in seconds."""
+        return self.start + self.duration
 
     @property
     def leaves(self) -> "UTNodeSelector":
@@ -426,6 +454,20 @@ class UTNodeSelector:
     def last_child(self) -> 'UTNodeSelector':
         """UTNodeHandle : Last direct child of this single node."""
         return self.children[-1]
+
+    @property
+    def sounding(self) -> 'UTNodeSelector':
+        """Only the non-rest nodes of this selection.
+
+        The long form ``sel.filter(lambda c: not c.is_rest)`` does the same
+        thing; this exists because the loops that get rests wrong are the
+        hand-zipped ones outside the selector API, and those are the ones
+        that need a short spelling to reach for.
+        """
+        return type(self)(self._owner, tuple(
+            n for n in self._ids
+            if (self._owner._rt[n].get('proportion', 1) or 0) >= 0
+        ))
 
     # --- Composition (all preserve subclass) ---
     def filter(self, predicate: Callable[['NodeContext'], bool]) -> 'UTNodeSelector':

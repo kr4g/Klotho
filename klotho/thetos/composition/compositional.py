@@ -592,11 +592,6 @@ class UCNodeHandle(UTNodeHandle):
         )
 
     @property
-    def is_rest(self):
-        """bool : Whether this node is a rest (negative proportion)."""
-        return self._owner._rt[self.id].get('proportion', 1) < 0
-
-    @property
     def pfields(self):
         """dict : Effective pfield values at this node (inherited + overrides)."""
         return {
@@ -1544,7 +1539,7 @@ class CompositionalUnit(TemporalUnit):
         scaled_envelope = Envelope(
             values=envelope.values,
             times=envelope.times,
-            curve=envelope._curve,
+            curve=envelope.curve,
             warp=envelope.warp,
             time_scale=duration / raw_total if raw_total > 0 else 1.0
         )

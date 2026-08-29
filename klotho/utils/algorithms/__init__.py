@@ -17,6 +17,7 @@ from . import basis
 __all__ = [
     'normalize_sum',
     'invert',
+    'tile',
     'to_factors',
     'from_factors',
     'nth_prime',

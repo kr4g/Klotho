@@ -114,3 +114,55 @@ def invert(data):
         return unique_values[::-1][indices]
     else:
         raise TypeError("Input must be list, tuple, or numpy array")
+
+
+def tile(data, n):
+    """
+    Repeat a collection end to end n times.
+
+    Parameters
+    ----------
+    data : list, tuple, or numpy.ndarray
+        Collection to repeat.
+    n : int
+        Number of repetitions. Must be non-negative.
+
+    Returns
+    -------
+    list, tuple, or numpy.ndarray
+        Collection of the same type as the input, repeated n times.
+
+    Raises
+    ------
+    ValueError
+        If n is negative.
+    TypeError
+        If data is not a list, tuple, or numpy array.
+
+    Notes
+    -----
+    The return type matters when the result feeds a ``Pattern``. A list is
+    structure -- ``Pattern`` cycles through it one element per step -- while a
+    tuple is a single value emitted whole on every step (Klotho's convention
+    for a simultaneity). ``tile`` preserves the input type, so pass a list to
+    get a cycling pattern and a tuple to get one longer chord.
+
+    Examples
+    --------
+    >>> tile([1, 2, 3], 2)
+    [1, 2, 3, 1, 2, 3]
+
+    >>> tile((1, 2), 3)
+    (1, 2, 1, 2, 1, 2)
+
+    >>> tile([1, 2], 0)
+    []
+    """
+    if n < 0:
+        raise ValueError(f"n must be non-negative, got {n}")
+    if isinstance(data, (list, tuple)):
+        return type(data)(list(data) * n)
+    elif isinstance(data, np.ndarray):
+        return np.tile(data, n)
+    else:
+        raise TypeError("Input must be list, tuple, or numpy array")

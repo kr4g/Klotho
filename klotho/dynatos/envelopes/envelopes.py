@@ -221,6 +221,11 @@ class Envelope:
         return self._times
     
     @property
+    def curve(self):
+        """List of per-segment curve factors (0 = linear)."""
+        return self._curve
+
+    @property
     def warp(self):
         """Interpolation domain: ``'lin'`` or ``'exp'``."""
         return self._warp
