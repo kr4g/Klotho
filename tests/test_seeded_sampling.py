@@ -137,7 +137,7 @@ class TestDiverseSampleOptionalDependency:
         try:
             import diversipy  # noqa: F401
         except ImportError:
-            with pytest.raises(ImportError, match="sampling"):
+            with pytest.warns(FutureWarning), pytest.raises(ImportError, match="sampling"):
                 diverse_sample(list('ABCDEF'), 2, 2)
         else:
             pytest.skip("diversipy is installed; the error path cannot run")
@@ -146,10 +146,35 @@ class TestDiverseSampleOptionalDependency:
         try:
             import diversipy  # noqa: F401
         except ImportError:
-            with pytest.raises(ImportError, match="Nothing else in Klotho"):
+            with pytest.warns(FutureWarning), pytest.raises(ImportError, match="Nothing else in Klotho"):
                 diverse_sample(list('ABCDEF'), 2, 2)
         else:
             pytest.skip("diversipy is installed; the error path cannot run")
+
+    def test_it_warns_that_it_is_going_away(self):
+        """Deprecated in 10.18, removed at the next major -- the same shape
+        as the sort_rows deprecation, and for the same reason: it is a public
+        exported name, so removing it outright is a breaking change and
+        semver puts that at a major version."""
+        with pytest.warns(FutureWarning, match="deprecated"):
+            try:
+                diverse_sample(list('ABCDEF'), 2, 2)
+            except ImportError:
+                pass
+
+    def test_the_warning_says_what_to_use_instead(self):
+        with pytest.warns(FutureWarning, match="sample_with_replacement"):
+            try:
+                diverse_sample(list('ABCDEF'), 2, 2)
+            except ImportError:
+                pass
+
+    def test_the_warning_says_why_the_diversity_is_not_meaningful(self):
+        with pytest.warns(FutureWarning, match="list position"):
+            try:
+                diverse_sample(list('ABCDEF'), 2, 2)
+            except ImportError:
+                pass
 
     def test_it_takes_a_seed_now(self):
         import inspect

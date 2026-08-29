@@ -182,6 +182,7 @@ def lower_compositional_ir_to_sc_assembly(
     normalize_sc_pfields=True,
     sort_output=True,
     return_node_map=False,
+    stamp_nodes=False,
     include_ungated_release=None,  # deprecated no-op; lifecycle-release emission moved to schedulers
 ):
     events = []
@@ -488,6 +489,23 @@ def lower_compositional_ir_to_sc_assembly(
             if slur_id in slur_voice_uids:
                 del slur_voice_uids[slur_id]
 
+    if stamp_nodes:
+        # Done here rather than at each emission site: the node map is already
+        # built, so one pass over it stamps every event the same way, whatever
+        # path emitted it (plain leaf, slur voice, poly voice).
+        node_of_event = {event_id: node
+                         for node, entries in node_to_event_ids.items()
+                         for event_id, _ in entries}
+        for event in events:
+            node = node_of_event.get(event.get("id"))
+            if node is None:
+                continue
+            event["_nodeId"] = node
+            metric_onset = obj._rt[node].get("metric_onset")
+            if metric_onset is not None:
+                event["_metricOnset"] = [metric_onset.numerator,
+                                         metric_onset.denominator]
+
     result = sort_sc_assembly_events(events) if sort_output else events
     if return_node_map:
         return result, node_to_event_ids
@@ -510,6 +528,9 @@ def node_event_map(obj, **kwargs):
     **kwargs
         Forwarded to the lowering (``animation``, ``use_absolute_time``,
         ``default_synth``, ...). Defaults match ordinary playback lowering.
+        Pass ``stamp_nodes=True`` to the lowering instead when you want the
+        ids written onto the events themselves rather than returned as a
+        map -- see :func:`lower_compositional_ir_to_sc_assembly`.
 
     Returns
     -------

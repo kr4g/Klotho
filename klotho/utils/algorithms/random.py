@@ -1,4 +1,6 @@
 import random as _random
+import warnings
+
 import numpy as np
 from typing import Any, List, Optional, Sequence, Tuple, Union
 
@@ -79,7 +81,13 @@ def diverse_sample(elements: List[Any],
                    **kwargs) -> List[List[Any]]:
     """
     Generate diverse subsets from a master list using greedy algorithms.
-    
+
+    .. deprecated::
+       Scheduled for removal at the next major version. Use
+       :func:`sample_with_replacement` for a plain seeded draw, or write the
+       selection you actually want -- this function's notion of "diversity"
+       does not survive inspection (see Notes).
+
     Creates multiple subsets from a master list where each subset maximizes
     diversity relative to previously selected subsets. Uses diversipy's
     greedy maximin algorithm for optimal distribution.
@@ -113,6 +121,23 @@ def diverse_sample(elements: List[Any],
         If the optional ``diversipy`` dependency is not installed. It ships
         as the ``sampling`` extra: ``pip install klotho-cac[sampling]``.
 
+    Warns
+    -----
+    FutureWarning
+        Always. This function is scheduled for removal.
+
+    Notes
+    -----
+    Two things make this hard to defend, both found while auditing it in
+    2026-08. Only the **first** subset is drawn randomly; every later one is a
+    fully deterministic greedy maximin, so ``num_samples`` mostly asks for
+    repeatable arithmetic rather than samples. And the feature space it
+    measures distance in is ``[[0], [1], ..., [n-1]]`` -- the elements' **list
+    indices**. So "diverse" means "spread out in list position", which carries
+    no musical meaning and changes if the caller reorders ``elements``.
+    Seeding it (added at the same time as this warning) makes it reproducible,
+    not better.
+
     Examples
     --------
     Generate diverse subsets with fixed size:
@@ -128,6 +153,15 @@ def diverse_sample(elements: List[Any],
     >>> all(2 <= len(subset) <= 4 for subset in subsets)
     True
     """
+    warnings.warn(
+        "diverse_sample is deprecated and will be removed at the next major "
+        "version. Its 'diversity' is spread in list position, which changes "
+        "if you reorder the input and means nothing musically; and only the "
+        "first subset is actually random. Use sample_with_replacement for a "
+        "seeded draw, or write the selection rule you want.",
+        FutureWarning,
+        stacklevel=2,
+    )
     try:
         from diversipy import subset
     except ImportError:

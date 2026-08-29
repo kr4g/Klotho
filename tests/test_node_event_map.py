@@ -89,3 +89,61 @@ class TestNodeEventMap:
     def test_it_is_exported_from_the_playback_package(self):
         import klotho.utils.playback as pb
         assert pb.node_event_map is node_event_map
+
+
+class TestOptInNodeStamping:
+    """The other half of WL-33, behind a flag.
+
+    Stamping is opt-in for two measured reasons. It adds ~38 bytes an event to
+    a wire format the 10.x perf work spent real effort shrinking (``fast_id``
+    exists to save 48 bytes an event), and always-on would rewrite all eight
+    payload fixtures, which sits behind the project's fixture fence. Opt-in
+    costs nothing by default and forecloses nothing: flipping the default
+    later is a one-word change. ``animation=True`` gating ``_stepIndex`` is
+    the same pattern, already in the codebase.
+    """
+
+    @staticmethod
+    def _lower(**kw):
+        from klotho.utils.playback._sc_assembly import (
+            lower_compositional_ir_to_sc_assembly as lower)
+        return lower(_uc(), **kw)
+
+    def test_the_default_payload_is_untouched(self):
+        assert all('_nodeId' not in event for event in self._lower())
+        assert all('_metricOnset' not in event for event in self._lower())
+
+    def test_stamping_adds_the_node_id(self):
+        stamped = [e for e in self._lower(stamp_nodes=True) if '_nodeId' in e]
+        assert stamped
+        assert all(isinstance(e['_nodeId'], int) for e in stamped)
+
+    def test_the_stamped_id_matches_the_map(self):
+        uc = _uc()
+        from klotho.utils.playback._sc_assembly import (
+            lower_compositional_ir_to_sc_assembly as lower)
+        events = lower(uc, stamp_nodes=True)
+        mapping = node_event_map(uc)
+        for event in events:
+            if '_nodeId' in event:
+                assert event['_nodeId'] in mapping
+
+    def test_the_metric_onset_is_exact(self):
+        """A pair of ints, not a float -- the whole point is that the float
+        seconds are a tempo-dependent rendering and not the exact onset."""
+        for event in self._lower(stamp_nodes=True):
+            if '_metricOnset' not in event:
+                continue
+            num, den = event['_metricOnset']
+            assert isinstance(num, int) and isinstance(den, int)
+            assert Fraction(num, den) == Fraction(num, den)
+
+    def test_stamping_changes_nothing_else_about_the_events(self):
+        plain = self._lower()
+        stamped = self._lower(stamp_nodes=True)
+        assert len(plain) == len(stamped)
+        for before, after in zip(plain, stamped):
+            trimmed = {k: v for k, v in after.items()
+                       if k not in ('_nodeId', '_metricOnset', 'id',
+                                    '_polyGroupId', '_logicalStepId')}
+            assert all(before[k] == v for k, v in trimmed.items() if k in before)
