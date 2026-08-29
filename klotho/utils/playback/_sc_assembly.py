@@ -492,3 +492,56 @@ def lower_compositional_ir_to_sc_assembly(
     if return_node_map:
         return result, node_to_event_ids
     return result
+
+
+def node_event_map(obj, **kwargs):
+    """Map each node of *obj* to the events it lowered into.
+
+    Lowering has always built this map -- ``return_node_map=True`` -- but only
+    as a second return value of a private function, so joining a rendered
+    event back to the node that produced it meant reaching into an underscore
+    module and re-deriving the call. This is the public verb.
+
+    Parameters
+    ----------
+    obj : CompositionalUnit or TemporalUnit
+        The object to lower. Nothing is played or scheduled; the lowering
+        runs only to build the map.
+    **kwargs
+        Forwarded to the lowering (``animation``, ``use_absolute_time``,
+        ``default_synth``, ...). Defaults match ordinary playback lowering.
+
+    Returns
+    -------
+    dict
+        ``{node_id: [(event_id, start_seconds, metric_onset), ...]}``. A node
+        maps to more than one event when it expands to several voices (a
+        chord) and to none when it is a rest. ``metric_onset`` is the node's
+        exact onset as a ``Fraction`` of a whole note, or None if the node
+        carries none -- the float ``start_seconds`` is a tempo-dependent
+        rendering of it and is not exact.
+
+    Notes
+    -----
+    Event ids are stable only within the lowering that produced them: they
+    come from a process-local counter, so they are not a durable identity
+    across runs or processes. Join through the node id, which is.
+
+    Examples
+    --------
+    >>> mapping = node_event_map(uc)              # doctest: +SKIP
+    >>> mapping[uc.leaves[0].id]                  # doctest: +SKIP
+    [('a1b2c3d400000001', 0.0, Fraction(0, 1))]
+    """
+    kwargs.setdefault('normalize_sc_pfields', True)
+    kwargs.setdefault('sort_output', True)
+    _, node_to_event_ids = lower_compositional_ir_to_sc_assembly(
+        obj, return_node_map=True, **kwargs
+    )
+    rt = obj._rt
+    mapping = {}
+    for node, entries in node_to_event_ids.items():
+        metric_onset = rt[node].get('metric_onset') if node in rt else None
+        mapping[node] = [(event_id, start, metric_onset)
+                         for event_id, start in entries]
+    return mapping
