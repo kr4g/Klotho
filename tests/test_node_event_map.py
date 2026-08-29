@@ -34,6 +34,24 @@ class TestNodeEventMap:
         rest = [leaf.id for leaf in uc.leaves if leaf.is_rest]
         assert rest and all(node not in node_event_map(uc) for node in rest)
 
+    def test_attacks_biject_with_events_on_tied_input(self):
+        """The sounding-leaf pin, restated for ties (charter sect11): the
+        bijection is attacks <-> events. Every member of a tied group maps
+        to the HEAD's event ids (many-nodes-to-one-event, the documented
+        inverse of the chord case), so the distinct event-id sets number
+        exactly the attacks."""
+        uc = _uc(prolatio=(1, 1.0, -1, 1))
+        mapping = node_event_map(uc)
+        # every sounding leaf (continuations included) maps to something
+        assert [leaf.id for leaf in uc.leaves.sounding] == sorted(mapping)
+        distinct = {frozenset(e[0] for e in entries)
+                    for entries in mapping.values()}
+        assert len(distinct) == len(uc.attacks)
+        # and the continuation shares the head's ids at the head's start
+        leaves = uc._rt.leaf_nodes
+        assert ({e[0] for e in mapping[leaves[0]]}
+                == {e[0] for e in mapping[leaves[1]]})
+
     def test_each_entry_carries_id_seconds_and_metric_onset(self):
         for entries in node_event_map(_uc()).values():
             for event_id, start, metric_onset in entries:
