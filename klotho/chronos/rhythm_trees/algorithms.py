@@ -80,29 +80,49 @@ def reduced_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]
     return tuple(Fraction(f.numerator * meas.numerator, f.denominator * meas.denominator) for f in lst)
 
 # Algorithm 3: StrictDecomposition
-def strict_decomposition(lst:Tuple[Fraction], meas:Fraction) -> Tuple[Fraction]:
+def strict_decomposition(lst:Tuple[Fraction], meas) -> tuple:
     """
-    Decompose proportions into a common-denominator form.
+    Decompose proportions into a duration-preserving common-denominator form.
 
-    Algorithm 3 (StrictDecomposition) from Karim Haddad. Normalizes a list
-    of proportions so that they share a common denominator, making them
-    directly comparable as integer ratios.
+    Algorithm 3 (StrictDecomposition) from Karim Haddad, per the rule his
+    figs. 4.33/4.39 exhibit: each proportion ``p_i`` of a Tempus ``N/D``
+    becomes ``(p_i * N) / (sum|p| * D)`` — so the parts share one common
+    denominator and sum exactly to the Tempus. Strict decomposition exists
+    FOR concatenation (his sect4.4.6.2.1: it "preserves the integrity of the
+    Temporal Unit... and reserves it for other eventual operations such as
+    concatenation"), which is why the spelling must survive: the result is
+    a tuple of :class:`Meas`, never :class:`~fractions.Fraction`, because
+    Fraction auto-reduces the common-denominator form out of existence.
+
+    (The pre-2026-08-29 version divided by the numerator gcd and did not
+    preserve duration — 3/4 (2 1 1 1) came back summing to 3/5. ALG-6.)
 
     Parameters
     ----------
     lst : tuple of Fraction
         The list of proportions (typically from :func:`measure_ratios`).
-    meas : Fraction
-        The Tempus (time signature as a fraction).
+        Negative proportions (rests) keep their sign in the output.
+    meas : Meas or Fraction
+        The Tempus.
 
     Returns
     -------
-    tuple of Fraction
-        Proportions with a common denominator.
+    tuple of Meas
+        One part per proportion, on a shared unreduced denominator.
+
+    Examples
+    --------
+    >>> from klotho.chronos.rhythm_trees import Meas
+    >>> strict_decomposition(measure_ratios((2, 1, 1, 1)), Meas('3/4'))
+    (6/20, 3/20, 3/20, 3/20)
     """
-    pgcd = reduce(gcd, (ratio.numerator for ratio in lst))
-    pgcd_denom = reduce(lcm, (ratio.denominator for ratio in lst))
-    return tuple(Fraction((f / pgcd) * meas.numerator, pgcd_denom) for f in lst)
+    from .meas import Meas
+    meas = Meas(meas)
+    common = reduce(lcm, (abs(f.denominator) for f in lst), 1)
+    den = common * meas.denominator
+    return tuple(
+        Meas(int(f * common) * meas.numerator, den) for f in lst
+    )
 
 # ------------------------------------------------------------------------------------
 
