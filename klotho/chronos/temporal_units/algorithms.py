@@ -251,12 +251,35 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
 #         case _:
 #             raise ValueError(f"Unknown temporal structure type: {type(structure)}")
 
+def _exact_tempo_ratio(value) -> Fraction:
+    """Exact rational form of a tempo/beat quantity for reconciliation.
+
+    Floats are snapped by ``limit_denominator(10**6)``, which recovers the
+    intended rational for every musically plausible value (87.3 is exactly
+    873/10) rather than the exact-but-monstrous binary expansion; exact
+    types pass through untouched.
+    """
+    if isinstance(value, float):
+        return Fraction(value).limit_denominator(10**6)
+    return Fraction(value)
+
+
 def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fraction, str, float], bpm: Union[int, float]) -> Union[TemporalUnit, 'CompositionalUnit']:
     """
     Create a new unit with specified beat/bpm, preserving the original duration.
 
     The tempus is adjusted so that the resulting unit has the same duration
-    as *ut* under the new tempo parameters.
+    as *ut* under the new tempo parameters. This is Haddad's sect4.4.4
+    correlation-by-modulation: T2 = T1 x (bpm2/bpm1) x (beat2/beat1).
+
+    The new tempus is assembled from raw ints, UNREDUCED (TEMPO-5, ruling
+    R13-D): modulating a unit to its own beat/bpm is a true no-op -- 6/20
+    stays 6/20, never 3/10 -- because reducing a Tempus changes the unit's
+    nature (Haddad sect4.4.2/4.4.5).
+
+    Note the span collapse: the result always has ``span=1``, with the
+    source's span folded into the tempus numerator (span 2 of 6/20 comes
+    back as 12/20).
 
     Parameters
     ----------
@@ -265,7 +288,9 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
     beat : Fraction, str, or float
         The new beat value.
     bpm : int or float
-        The new beats per minute.
+        The new beats per minute. Floats are snapped to the intended
+        rational by ``limit_denominator(10**6)`` for the tempus
+        arithmetic; the value itself is stored as given.
 
     Returns
     -------
@@ -273,10 +298,16 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
         A new unit with adjusted tempus and the specified beat/bpm.
     """
     from klotho.thetos.composition.compositional import CompositionalUnit
-    
-    ratio = ut.duration / beat_duration((ut.tempus * ut.span).to_fraction(), bpm, beat)
-    new_tempus = Meas(ut.tempus * ut.span * ratio)
-    
+
+    new_beat = Fraction(beat)
+    # ratio x span as one exact Fraction, then applied to the tempus as
+    # raw ints -- Fraction reduces ratio*span internally, but the tempus'
+    # own numerator/denominator are never cancelled against each other
+    factor = ((_exact_tempo_ratio(bpm) / _exact_tempo_ratio(ut.bpm))
+              * (new_beat / ut.beat) * Fraction(ut.span))
+    new_tempus = Meas(ut.tempus.numerator * factor.numerator,
+                      ut.tempus.denominator * factor.denominator)
+
     if isinstance(ut, CompositionalUnit):
         new_cu = CompositionalUnit(
             span=1,
@@ -306,7 +337,9 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
     Create a new unit with specified tempus, preserving the original duration.
 
     The bpm is adjusted so that the resulting unit has the same duration
-    as *ut* under the new tempus and span.
+    as *ut* under the new tempus and span. Note the output bpm is computed
+    through float division, so chained modulations park float noise in the
+    bpm (e.g. 52.50000000000001) -- the tempus stays exactly as given.
 
     Parameters
     ----------
