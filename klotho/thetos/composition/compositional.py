@@ -57,7 +57,10 @@ class ParentDistributionView:
     effective ``pfields``/``mfields``, and resolved ``instrument``.
     Selection fields (``index``/``total``) are intentionally absent —
     parents are not part of the current distribution selection. ``parent``
-    chains upward lazily; unknown attributes forward to the handle.
+    chains upward lazily, so ``ctx.parent.parent.depth`` is valid up to the
+    root. Unknown attributes forward to the handle -- the same structural,
+    timing and navigation set as :class:`NodeContext`, minus
+    ``index``/``total``. ``dir()`` lists them.
     """
 
     ref: UTNodeHandle
@@ -80,13 +83,24 @@ class ParentDistributionView:
     def __getattr__(self, key):
         return getattr(self.ref, key)
 
+    def __dir__(self):
+        # __getattr__ forwards to the handle, so the forwarded names --
+        # depth, path, sibling_index, sibling_total, proportion,
+        # real_onset, leaves, children ... -- are invisible to plain dir()
+        # and to tab completion. That invisibility is how an audit once
+        # concluded they were missing. Advertise them.
+        return sorted(set(object.__dir__(self)) | set(dir(self.ref)))
+
 
 @dataclass(frozen=True)
 class DistributionContext(NodeContext):
     """Per-node context handed to callables during pfield/mfield distribution.
 
     Extends :class:`NodeContext` (``index``/``total`` within the selection,
-    plus all handle attributes) with the node's rest status, current
+    plus every forwarded handle attribute -- ``depth``, ``path``,
+    ``sibling_index``, ``sibling_total``, ``proportion``, ``real_onset``,
+    ``real_duration``, ``leaves``, ``children`` ...) with the node's rest
+    status, current
     effective ``pfields``/``mfields``, and resolved ``instrument``.
     ``ctx.parent`` returns a :class:`ParentDistributionView`.
     """

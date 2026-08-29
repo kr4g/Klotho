@@ -139,6 +139,19 @@ class UTNodeHandle:
         return len(siblings)
 
     @property
+    def path(self) -> tuple:
+        """tuple of int : Child indices from the root down to this node.
+
+        ``()`` at the root, ``len(path) == depth``, and ``path[-1] ==
+        sibling_index``. The same tuple you would get by walking ``parent``
+        upward collecting each ``sibling_index``, in one pass. Note it walks
+        the branch, so it costs the same as ``sibling_index`` and does not
+        belong in a hot per-leaf loop.
+        """
+        rt = self._owner._rt
+        return rt.path_signature(rt.root, self._node_id)
+
+    @property
     def parent(self) -> Optional["UTNodeHandle"]:
         """UTNodeHandle or None : A handle to the parent node (None at the root)."""
         parent_id = self._owner._rt.parent(self._node_id)
@@ -293,6 +306,14 @@ class NodeContext:
 
     def __getattr__(self, key):
         return getattr(self.ref, key)
+
+    def __dir__(self):
+        # __getattr__ forwards to the handle, so the forwarded names --
+        # depth, path, sibling_index, sibling_total, proportion,
+        # real_onset, leaves, children ... -- are invisible to plain dir()
+        # and to tab completion. That invisibility is how an audit once
+        # concluded they were missing. Advertise them.
+        return sorted(set(object.__dir__(self)) | set(dir(self.ref)))
 
 
 class UTNodeSelector:
@@ -592,6 +613,16 @@ class Chronon(metaclass=TemporalMeta):
         every outward-facing read adds ``self._ut._offset`` to onsets."""
         self._ut._ensure_timing_cache()
         return self._ut._real_times.get(self._node_id, {})
+
+    def __dir__(self):
+        # __getattr__ serves node-data keys plus the two real-time fields;
+        # without this they never reach dir() or tab completion.
+        try:
+            keys = set(self._rt_node().keys())
+        except Exception:
+            keys = set()
+        return sorted(set(object.__dir__(self)) | keys
+                      | {"real_onset", "real_duration"})
 
     def __getattr__(self, key):
         if key == 'real_onset':
