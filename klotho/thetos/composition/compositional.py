@@ -2086,6 +2086,21 @@ class CompositionalUnit(TemporalUnit):
         self._heal_slurs_after_subdivide(node, new_leaves)
         self._heal_envelopes_after_subdivide(node, new_leaves)
 
+    def graft_subtree(self, node: int, subtree, mode: str = 'replace'):
+        """Graft *subtree* at a leaf, healing slurs and control envelopes.
+
+        Same contract as :meth:`TemporalUnit.graft_subtree`; this override
+        exists so the graft heals the spans that reference the replaced leaf,
+        exactly as :meth:`subdivide` does. Without it the two ways of adding
+        structure agree about parameters but not about slurs.
+        """
+        result = self._rt.graft_subtree(node, subtree, mode)
+        self._invalidate_timing_cache()
+        new_leaves = list(self._rt.subtree_leaves(result))
+        self._heal_slurs_after_subdivide(result, new_leaves)
+        self._heal_envelopes_after_subdivide(result, new_leaves)
+        return result
+
     def add_child(self, parent, **attr):
         """Add a child node (``label`` is coerced to ``proportion``); see :meth:`Tree.add_child`."""
         if 'label' in attr and 'proportion' not in attr:

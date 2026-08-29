@@ -76,6 +76,25 @@ class _RepeatableTemporal:
         uts.extend([self] * n)
         return uts
 
+    def __setattr__(self, name, value):
+        """Refuse a public assignment that is not a settable property.
+
+        Every field on these classes is private and read back through a
+        property, so a public assignment was always a mistake -- and a silent
+        one: ``ut.offset = 0.1`` created a fresh instance attribute that read
+        back as 0.1 while every timing calculation went on using ``_offset``.
+        """
+        if not name.startswith('_'):
+            descriptor = getattr(type(self), name, None)
+            if not (isinstance(descriptor, property) and descriptor.fset is not None):
+                raise AttributeError(
+                    f"{type(self).__name__} has no settable attribute {name!r}. "
+                    f"Assigning to it used to create a dead attribute that read "
+                    f"back but changed nothing. Placement is edited through "
+                    f"Score/ScoreItem."
+                )
+        object.__setattr__(self, name, value)
+
 
 class UTNodeHandle:
     """Owner-bound handle to a single node in a :class:`TemporalUnit`.
@@ -1095,6 +1114,34 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         """
         self._rt.subdivide(node, S)
         self._invalidate_timing_cache()
+
+    def graft_subtree(self, node: int, subtree, mode: str = 'replace'):
+        """
+        Graft *subtree* at a leaf; see :meth:`RhythmTree.graft_subtree`.
+
+        Parameters
+        ----------
+        node : int
+            The leaf node to graft onto.
+        subtree : Tree
+            The tree to graft. A ParameterTree or CompositionalTree brings
+            its own pfield/mfield registries and instrument bindings with it.
+        mode : str, optional
+            ``'replace'`` (default) or ``'adopt'``.
+
+        Returns
+        -------
+        int
+            The node id the graft landed on.
+
+        Notes
+        -----
+        This is the public route. ``ut.rt`` returns a *copy*, so grafting on
+        it mutates a throwaway and silently does nothing.
+        """
+        result = self._rt.graft_subtree(node, subtree, mode)
+        self._invalidate_timing_cache()
+        return result
 
     def sparsify(self, probability, node=None, seed=None):
         """

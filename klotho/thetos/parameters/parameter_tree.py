@@ -247,6 +247,78 @@ class ParameterApiMixin:
     ``ParameterLayer`` (done in ``_init_layers``).
     """
 
+    def graft_subtree(self, target_node, subtree, mode='replace'):
+        """Graft a subtree (see :meth:`Tree.graft_subtree`), carrying over its
+        parameter overrides and instrument bindings.
+
+        In ``'replace'`` mode the target node's own overrides are preserved
+        for any key the donor's root does not itself define. Without that,
+        ``replace`` wiped them -- the graft writes the donor root's data over
+        the target with ``replace=True`` -- while ``subdivide`` and ``'adopt'``
+        mode both leave them in place, so the three ways of adding structure
+        disagreed about whether a node kept its voicing.
+
+        Living on the mixin rather than on :class:`ParameterTree` is what
+        makes it reachable from ``CompositionalTree``, which inherits the
+        mixin but not ``ParameterTree`` -- so this ran as
+        ``RhythmTree.graft_subtree`` there and silently dropped the donor's
+        field registries and instrument bindings.
+        """
+        if not isinstance(subtree, Tree):
+            raise TypeError("subtree must be a Tree instance")
+
+        kept = {}
+        if mode == 'replace':
+            owned = set(self._param_layer._pfields) | set(self._param_layer._mfields)
+            donor_root_keys = set(dict(subtree.nodes[subtree.root]))
+            kept = {k: v for k, v in dict(self.nodes[target_node]).items()
+                    if k in owned and k not in donor_root_keys}
+
+        graft_result = super().graft_subtree(target_node, subtree, mode)
+
+        donor_layer = getattr(subtree, '_param_layer', None)
+        if donor_layer is not None:
+            mapping = {}
+            if mode == 'replace':
+                mapping = subtree.map_parallel_nodes(
+                    self, self_root=subtree.root, other_root=graft_result
+                )
+            else:
+                target_children = list(self.successors(target_node))
+                subtree_root_children = list(subtree.successors(subtree.root))
+                grafted_children = target_children[-len(subtree_root_children):]
+                for o_child, t_child in zip(subtree_root_children, grafted_children):
+                    mapping.update(
+                        subtree.map_parallel_nodes(
+                            self, self_root=o_child, other_root=t_child
+                        )
+                    )
+
+            self._param_layer._pfields.update(donor_layer._pfields)
+            self._param_layer._mfields.update(donor_layer._mfields)
+
+            for old_node, instrument in donor_layer._node_instruments.items():
+                mapped = mapping.get(old_node)
+                if mapped is not None:
+                    self._param_layer._node_instruments[mapped] = copy.deepcopy(instrument)
+
+            self._param_layer._effective_cache = None
+
+        if kept:
+            # Must go back through the parameter API: on a CompositionalTree
+            # the rhythm layer owns the write path and rejects param keys
+            # handed to update_node_data.
+            pfields = {k: v for k, v in kept.items()
+                       if k in self._param_layer._pfields}
+            mfields = {k: v for k, v in kept.items()
+                       if k in self._param_layer._mfields}
+            if pfields:
+                self.set_pfields(graft_result, **pfields)
+            if mfields:
+                self.set_mfields(graft_result, **mfields)
+
+        return graft_result
+
     @property
     def pfields(self):
         """list of str : Registered parameter-field names, sorted."""
@@ -372,43 +444,6 @@ class ParameterTree(ParameterApiMixin, Tree):
     def subtree(self, node, renumber=True):
         """Extract *node*'s subtree as a new ParameterTree (see :meth:`Tree.subtree`)."""
         return super().subtree(node, renumber)
-
-    def graft_subtree(self, target_node, subtree, mode='replace'):
-        """Graft a subtree (see :meth:`Tree.graft_subtree`), carrying over its parameter
-        overrides and instrument bindings when it is a ParameterTree."""
-        if not isinstance(subtree, Tree):
-            raise TypeError("subtree must be a Tree instance")
-
-        graft_result = super().graft_subtree(target_node, subtree, mode)
-
-        if isinstance(subtree, ParameterTree):
-            mapping = {}
-            if mode == 'replace':
-                mapping = subtree.map_parallel_nodes(
-                    self, self_root=subtree.root, other_root=graft_result
-                )
-            else:
-                target_children = list(self.successors(target_node))
-                subtree_root_children = list(subtree.successors(subtree.root))
-                grafted_children = target_children[-len(subtree_root_children):]
-                for o_child, t_child in zip(subtree_root_children, grafted_children):
-                    mapping.update(
-                        subtree.map_parallel_nodes(
-                            self, self_root=o_child, other_root=t_child
-                        )
-                    )
-
-            self._param_layer._pfields.update(subtree._param_layer._pfields)
-            self._param_layer._mfields.update(subtree._param_layer._mfields)
-
-            for old_node, instrument in subtree._param_layer._node_instruments.items():
-                mapped = mapping.get(old_node)
-                if mapped is not None:
-                    self._param_layer._node_instruments[mapped] = copy.deepcopy(instrument)
-
-            self._param_layer._effective_cache = None
-
-        return graft_result
 
     def __getitem__(self, node):
         return ParameterNode(self, node)

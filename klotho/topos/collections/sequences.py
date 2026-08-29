@@ -224,7 +224,7 @@ class Pattern:
 
     def materialize_period(self) -> tuple[Any, ...]:
         """
-        Return one full cycle of values without disturbing iteration state.
+        Return one full cycle of values, always the cycle that starts at step 0.
 
         Returns
         -------
@@ -232,10 +232,22 @@ class Pattern:
             The ``length`` values of one complete period, computed from a
             snapshot so the live cursor and sub-pattern positions are
             unaffected.
+
+        Notes
+        -----
+        The period is taken from the start of the cycle regardless of where
+        the cursor currently sits, so the answer does not depend on when you
+        ask. It used to be computed from wherever the cursor happened to be
+        and then cached forever, which froze a rotated period; and no
+        cursor-keyed cache could have fixed that, because advancing a
+        *shared sub-pattern* changes this pattern's period while leaving its
+        own cursor untouched.
         """
         if self._period_cache is None:
             snap = self._snapshot()
             try:
+                self._current = 0
+                _reset_runtime(self._root)
                 self._period_cache = tuple(self._next_value() for _ in range(self._pattern_length))
             finally:
                 self._restore(snap)
