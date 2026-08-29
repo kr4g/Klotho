@@ -177,6 +177,63 @@ Handles:
 - **Kit member resolution** — per voice, from the selector pfield (see
   §5, including family round-robin).
 
+### Duration injection and its precedence (WL-36)
+
+A SynthDef control named exactly `duration` receives the event's real
+duration, gated or not. The legacy `dur` control receives it only on
+non-gated synths. This is what lets a one-shot self-free through an
+`Env.linen(0, duration, ...)` envelope that tracks the rhythmic value.
+
+**What happens when the user also authors a `duration` pfield is not the
+same in all three lowering paths.** As shipped:
+
+| # | Path | Code | On conflict |
+|---|---|---|---|
+| 1 | `CompositionalUnit`, **object** instrument | `_sc_assembly._duration_inject_key` | **Injection wins** — the authored value is replaced, silently |
+| 1b | `CompositionalUnit`, **string** instrument | same function, `from_manifest=True` | **Authored value wins** |
+| 2 | Simple objects (Pitch, Scale, Chord, …) | `supersonic/converters._inst_note` | **Injection wins** — see below |
+| 3 | `Score` events | `supersonic/converters.py`, voice loop | **Authored value wins** |
+
+Path 2 needs a word, because an earlier note in this project's record had
+it the other way round. `_inst_note` *does* carry a guard that stands down
+for a `duration` already present in `extra_pfields` — but nothing public
+can put one there. `_converter_base.KNOWN_KWARGS` reserves both `duration`
+and `dur`, and `extract_convert_kwargs` consumes them as the note **length**
+before building `extra_pfields` from the leftover kwargs. Every caller of
+`_inst_note` is fed that way, so the guard is unreachable from the public
+API. Measured 2026-08-29; the record has been corrected.
+
+So the split is not 1-against-2-and-3. It is: **paths 1 and 2 inject,
+paths 1b and 3 defer to the authored value.**
+
+Ryan ruled on 2026-08-28 that `duration` "is always overridden by the
+auto-filling mechanism" — true of paths 1 and 2, false of 1b and 3.
+**No behaviour was changed and no warning was added**, deliberately, for
+two reasons:
+
+- Making the paths agree would break a shipped, named test,
+  `tests/test_sampler_kit.py::test_explicit_duration_overrides_injection`,
+  which pins the path-3 behaviour on purpose.
+- A per-leaf conflict warning would be noise. The canonical corpus idiom
+  `set_pfields(duration=lambda c: c.real_duration)` authors a value equal
+  to the slot duration on every leaf, so the warning would fire on
+  material that is entirely correct.
+
+If you need an authored duration to survive on paths 1 or 2 today, the
+escape hatch is a control not named literally `duration` or `dur`.
+
+The intended long-term answer is duration *scaling* expressed at the
+`TemporalUnit`/`CompositionalUnit` level, rather than a precedence fight
+inside the lowering code. **Whoever builds that must resolve this
+three-path split first** — it cannot be papered over, because the paths
+disagree about which value is authoritative. The mechanism that work
+needs already exists: `obj._rt.get_pfield(node, key) is not None`
+distinguishes an authored value from an inherited one.
+
+Every conflict-precedence table above is pinned by
+`tests/test_duration_injection_precedence.py`, so a change to any path
+fails loudly rather than making this section quietly wrong.
+
 ### Amplitude Computation (`_amplitude.py`)
 
 | Function | Purpose |

@@ -132,9 +132,15 @@ def _duration_inject_key(controls, has_gate, from_manifest, event_pfields):
 
     - It holds for OBJECT instruments. When the instrument is a string,
       ``from_manifest`` is True and the guard below stands down, so an
-      authored ``duration`` survives instead. The two lowering paths for
-      simple objects and Score events behave like the string case as
-      well, so precedence is NOT uniform across the three paths.
+      authored ``duration`` survives instead.
+    - Precedence is NOT uniform across the three lowering paths. Measured
+      2026-08-29, correcting an earlier note that grouped paths 2 and 3
+      together: the simple-object path (``converters._inst_note``) also
+      lets injection win, because ``duration``/``dur`` are reserved
+      kwargs consumed as the note length and so never reach its guard;
+      only the Score path lets an authored value win. The split is
+      objects-inject / string-and-Score-defer, and
+      ``docs/architecture/07_PLAYBACK.md`` carries the full table.
     - The escape hatch, if you need an authored value to survive today,
       is a control not named literally ``duration``/``dur``.
 

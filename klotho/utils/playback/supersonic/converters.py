@@ -69,8 +69,26 @@ def _inst_note(uid, synth, start, dur, pfields, step_index=None,
 
     ``inst_ctx`` is ``(inst_pfields, has_gate, controls)`` from
     ``_resolve_synth``; ``None`` preserves the plain gated-note shape.
-    A declared ``duration`` control always receives the note's duration;
-    a ``dur`` control receives it only on non-gated synths.
+    A declared ``duration`` control receives the note's duration; a ``dur``
+    control receives it only on non-gated synths.
+
+    Precedence (WL-36, path 2 of 3): **injection always wins here in
+    practice.** The guard below does stand down for a ``duration``/``dur``
+    already in ``extra_pfields``, but nothing public can put one there:
+    ``_converter_base.KNOWN_KWARGS`` reserves both names, and
+    ``extract_convert_kwargs`` consumes them as the note LENGTH before
+    building ``extra_pfields`` from what is left over. Every caller of this
+    function is fed that way, so the guard is unreachable from the public
+    API and only a direct internal call can exercise it.
+
+    That measured behaviour, recorded 2026-08-29, corrects an earlier note
+    claiming this path let an authored value win. It does not; it agrees
+    with the ``CompositionalUnit`` object-instrument path. The Score path
+    below is the one that genuinely differs.
+
+    The three paths are not uniform.
+    ``_sc_assembly._duration_inject_key`` states the whole picture and is
+    the single place to read before changing any of it.
     """
     if inst_ctx is None:
         return _gated_note(uid, synth, start, dur, pfields,
@@ -788,6 +806,12 @@ def _lower_score_event(item):
             v_def_name, v_inst_pfields, v_has_gate = resolve_instrument(member)
         pf = coerce_sc_pfield_values(_combine_extras(v_inst_pfields, user_pf))
         if not is_hold:
+            # Precedence (WL-36, path 3 of 3): an explicitly authored
+            # duration/dur in user_pf WINS -- injection only fills a slot
+            # the user left empty. Same as path 2, opposite of the
+            # CompositionalUnit path for object instruments. Pinned by
+            # tests/test_sampler_kit.py::test_explicit_duration_overrides_injection;
+            # _sc_assembly._duration_inject_key states the whole picture.
             if 'duration' in v_inst_pfields and 'duration' not in user_pf:
                 pf['duration'] = voice["duration"]
             elif not v_has_gate and 'dur' in v_inst_pfields and 'dur' not in user_pf:
