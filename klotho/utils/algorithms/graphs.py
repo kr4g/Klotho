@@ -2,6 +2,7 @@ from typing import List, Callable, Optional
 import random
 from ...topos.graphs import Graph
 
+
 __all__ = [
     'minimum_cost_path',
     'greedy_random_walk',
@@ -12,6 +13,21 @@ __all__ = [
     'dijkstra_order_traversal',
     'weighted_dfs_traversal'
 ]
+
+
+def _coerce_rng(seed):
+    """Return a random source for ``seed``.
+
+    ``None`` draws from the global ``random`` stream, as these walks always
+    have. Any other seed value gets its own :class:`random.Random`, so a
+    reproducible walk does not reseed the caller's global stream; a
+    ``random.Random`` is passed through unchanged.
+    """
+    if seed is None or seed is random:
+        return random
+    if isinstance(seed, random.Random):
+        return seed
+    return random.Random(seed)
 
 def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
     """
@@ -48,7 +64,7 @@ def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
         min_weight = float('inf')
         next_node = None
         
-        for node in unvisited:
+        for node in sorted(unvisited):
             if G.has_edge(current, node):
                 try:
                     weight = G[current][node].get('weight', 1.0)
@@ -61,8 +77,11 @@ def greedy_tsp(G: Graph, source=None, **kwargs) -> List[int]:
                         next_node = node
         
         if next_node is None:
-            # No direct edge, find nearest unvisited node
-            next_node = unvisited.pop()
+            # No direct edge; jump to the lowest-numbered unvisited node.
+            # Sorted rather than set.pop() so the tour does not depend on
+            # set iteration order.
+            next_node = min(unvisited)
+            unvisited.remove(next_node)
         else:
             unvisited.remove(next_node)
         
@@ -139,7 +158,7 @@ def minimum_cost_path(
     return traversal_func(G, **kwargs)
 
 def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight', 
-                      target: Optional[int] = None, **kwargs) -> List[int]:
+                      target: Optional[int] = None, seed=None, **kwargs) -> List[int]:
     """
     Perform a greedy walk choosing minimum weight edges with random tie-breaking.
     
@@ -155,6 +174,10 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
         Edge attribute to use for decision making (default: 'weight')
     target : node, optional
         If provided, stop early when target is reached
+    seed : int, random.Random, or None, optional
+        Seed for the tie-breaking draw. A seed makes the walk reproducible
+        without reseeding the caller's global ``random`` stream; None draws
+        from that stream.
     **kwargs
         Additional parameters (ignored)
         
@@ -166,6 +189,7 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
     if source not in G:
         raise ValueError(f"Source node {source} not in graph")
     
+    rng = _coerce_rng(seed)
     path = [source]
     current = source
     
@@ -187,7 +211,7 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
         
         min_weight_neighbors = [neighbor for neighbor, w in neighbor_weights if w == min_weight]
         
-        next_node = random.choice(min_weight_neighbors)
+        next_node = rng.choice(min_weight_neighbors)
         path.append(next_node)
         current = next_node
         
@@ -198,8 +222,8 @@ def greedy_random_walk(G, source, steps: int = 10, weight: str = 'weight',
 
 
 def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight',
-                             target: Optional[int] = None, inverse_weights: bool = True, 
-                             **kwargs) -> List[int]:
+                             target: Optional[int] = None, inverse_weights: bool = True,
+                             seed=None, **kwargs) -> List[int]:
     """
     Perform a probabilistic walk where lower weights have higher probability.
     
@@ -217,6 +241,10 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
         If provided, stop early when target is reached
     inverse_weights : bool, optional
         If True, lower weights get higher probability (default: True)
+    seed : int, random.Random, or None, optional
+        Seed for the weighted draw. A seed makes the walk reproducible
+        without reseeding the caller's global ``random`` stream; None draws
+        from that stream.
     **kwargs
         Additional parameters (ignored)
         
@@ -228,6 +256,7 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
     if source not in G:
         raise ValueError(f"Source node {source} not in graph")
     
+    rng = _coerce_rng(seed)
     path = [source]
     current = source
     
@@ -253,7 +282,7 @@ def probabilistic_random_walk(G, source, steps: int = 10, weight: str = 'weight'
             total = sum(weights)
             probabilities = [w / total for w in weights] if total > 0 else [1.0/len(weights)] * len(weights)
         
-        next_node = random.choices(neighbors, weights=probabilities)[0]
+        next_node = rng.choices(neighbors, weights=probabilities)[0]
         path.append(next_node)
         current = next_node
         
@@ -363,7 +392,7 @@ def prim_order_traversal(G, source, weight: str = 'weight', **kwargs) -> List[in
         min_weight = float('inf')
         next_node = None
         
-        for node in visited:
+        for node in sorted(visited):
             for neighbor in G.neighbors(node):
                 if neighbor not in visited:
                     try:
@@ -446,8 +475,8 @@ def greedy_nearest_unvisited(G, source, weight: str = 'weight', **kwargs) -> Lis
             best_next = None
             best_path_node = None
             
-            for visited_node in visited:
-                for unvisited_node in unvisited:
+            for visited_node in sorted(visited):
+                for unvisited_node in sorted(unvisited):
                     if G.has_edge(visited_node, unvisited_node):
                         try:
                             edge_weight = G[visited_node][unvisited_node].get(weight, 1.0)
@@ -586,7 +615,7 @@ def weighted_dfs_traversal(G, source, weight: str = 'weight', **kwargs) -> List[
     weighted_dfs_visit(source)
     
     unvisited = set(G.nodes()) - visited
-    for remaining_node in unvisited:
+    for remaining_node in sorted(unvisited):
         weighted_dfs_visit(remaining_node)
     
     return path

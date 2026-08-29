@@ -4,6 +4,24 @@ import rustworkx as rx
 from .lattices import Lattice
 
 
+def _coerce_rng(seed):
+    """Return a random source for ``seed``.
+
+    ``None`` keeps the historical behaviour of drawing from the global
+    ``random`` stream. An int (or any other seed value) gets its own
+    :class:`random.Random`, so seeding a walk no longer reseeds the caller's
+    global stream as a side effect. A ``random.Random`` is passed through.
+    Seeded output is unchanged: the module-level ``random`` functions are
+    bound methods of one such instance.
+    """
+    if seed is None or seed is random:
+        return random
+    if isinstance(seed, random.Random):
+        return seed
+    return random.Random(seed)
+
+
+
 def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int, 
                 max_repeats: Optional[int] = None, seed: Optional[int] = None,
                 avoid_backtrack: bool = False,
@@ -21,8 +39,10 @@ def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int,
         Number of steps to take in the random walk.
     max_repeats : Optional[int]
         Maximum number of times any coordinate can be visited. If None, no limit.
-    seed : Optional[int]
-        Random seed for reproducible walks.
+    seed : int, random.Random, or None
+        Seed for reproducible walks. A seed gets its own generator, so it
+        does not disturb the caller's global ``random`` stream; None draws
+        from that stream as before.
     avoid_backtrack : bool
         If True, avoid immediately returning to the previous coordinate when possible.
     stuck_tolerance : int
@@ -48,8 +68,7 @@ def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int,
     if start_coord not in lattice:
         raise KeyError(f"Start coordinate {start_coord} not found in lattice")
     
-    if seed is not None:
-        random.seed(seed)
+    rng = _coerce_rng(seed)
     
     path = [start_coord]
     current_coord = start_coord
@@ -88,7 +107,7 @@ def random_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int,
         else:
             stuck_budget = stuck_tolerance
         
-        next_coord = random.choice(valid_neighbors)
+        next_coord = rng.choice(valid_neighbors)
         
         visit_counts[next_coord] = visit_counts.get(next_coord, 0) + 1
         path.append(next_coord)
@@ -117,8 +136,10 @@ def directed_walk(lattice: Lattice, start_coord: Tuple[int, ...], direction_weig
         Number of steps to take.
     max_repeats : Optional[int]
         Maximum visits per coordinate.
-    seed : Optional[int]
-        Random seed for reproducibility.
+    seed : int, random.Random, or None
+        Seed for reproducibility. A seed gets its own generator, so it does
+        not disturb the caller's global ``random`` stream; None draws from
+        that stream as before.
         
     Returns
     -------
@@ -132,8 +153,7 @@ def directed_walk(lattice: Lattice, start_coord: Tuple[int, ...], direction_weig
     if start_coord not in lattice:
         raise KeyError(f"Start coordinate {start_coord} not found in lattice")
     
-    if seed is not None:
-        random.seed(seed)
+    rng = _coerce_rng(seed)
     
     path = [start_coord]
     current_coord = start_coord
@@ -170,9 +190,9 @@ def directed_walk(lattice: Lattice, start_coord: Tuple[int, ...], direction_weig
             break
         
         if sum(neighbor_weights) == 0:
-            next_coord = random.choice(valid_neighbors)
+            next_coord = rng.choice(valid_neighbors)
         else:
-            next_coord = random.choices(valid_neighbors, weights=neighbor_weights)[0]
+            next_coord = rng.choices(valid_neighbors, weights=neighbor_weights)[0]
         
         visit_counts[next_coord] = visit_counts.get(next_coord, 0) + 1
         path.append(next_coord)
@@ -196,8 +216,10 @@ def boundary_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int
         Number of steps to take.
     boundary_preference : float
         Probability of choosing a boundary neighbor when available (0.0-1.0).
-    seed : Optional[int]
-        Random seed for reproducibility.
+    seed : int, random.Random, or None
+        Seed for reproducibility. A seed gets its own generator, so it does
+        not disturb the caller's global ``random`` stream; None draws from
+        that stream as before.
         
     Returns
     -------
@@ -210,8 +232,7 @@ def boundary_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int
     if start_coord not in lattice:
         raise KeyError(f"Start coordinate {start_coord} not found in lattice")
     
-    if seed is not None:
-        random.seed(seed)
+    rng = _coerce_rng(seed)
     
     def is_boundary_coord(coord):
         """Check if a coordinate is on the lattice boundary."""
@@ -233,12 +254,12 @@ def boundary_walk(lattice: Lattice, start_coord: Tuple[int, ...], num_steps: int
         boundary_neighbors = [n for n in neighbors if is_boundary_coord(n)]
         interior_neighbors = [n for n in neighbors if not is_boundary_coord(n)]
         
-        if boundary_neighbors and random.random() < boundary_preference:
-            next_coord = random.choice(boundary_neighbors)
+        if boundary_neighbors and rng.random() < boundary_preference:
+            next_coord = rng.choice(boundary_neighbors)
         elif interior_neighbors:
-            next_coord = random.choice(interior_neighbors)
+            next_coord = rng.choice(interior_neighbors)
         else:
-            next_coord = random.choice(neighbors)
+            next_coord = rng.choice(neighbors)
         
         path.append(next_coord)
         current_coord = next_coord

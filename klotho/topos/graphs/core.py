@@ -197,8 +197,15 @@ class GraphCore:
         return node
 
     def neighbors(self, node):
-        """Get neighbors of a node"""
-        return list(self._rx.neighbors(node))
+        """Neighbours of a node, in ascending node-index order.
+
+        Sorted for the same reason :meth:`successors` is: rustworkx returns
+        neighbours in internal adjacency order, which is stable within one
+        build but carries no meaning and changes with insertion order. Every
+        caller that iterates neighbours -- walks, weighted traversals,
+        tie-breaks -- would otherwise inherit that order as its answer.
+        """
+        return sorted(self._rx.neighbors(node))
 
     def predecessors(self, node):
         """Returns all predecessors of a node."""

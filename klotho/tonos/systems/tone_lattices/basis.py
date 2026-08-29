@@ -323,7 +323,8 @@ def find_generator_basis(
     random_samples : int, default 50000
         Number of random samples when mode="random".
     seed : int, default 0
-        Random seed for reproducibility.
+        Random seed for reproducibility. Used to build a private generator,
+        so a search does not reseed the caller's global ``random`` stream.
     top_k : int, default 20
         Number of top-scoring bases to return.
     
@@ -504,10 +505,10 @@ def find_generator_basis(
         for chosen in itertools.combinations(pool, need):
             emit(chosen)
     elif mode == "random":
-        random.seed(seed)
+        rng = random.Random(seed)
         for _ in range(random_samples):
             if len(pool) >= need:
-                chosen = random.sample(pool, need)
+                chosen = rng.sample(pool, need)
                 emit(chosen)
     else:
         raise ValueError("mode must be one of: auto, exhaustive, random")
