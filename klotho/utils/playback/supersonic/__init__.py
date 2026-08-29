@@ -3,8 +3,10 @@ from .converters import convert_to_sc_events
 from .registry import (
     register_synthdef,
     register_compiled,
+    register_compiled_file,
     runtime_assets,
     runtime_controls,
+    runtime_kinds,
     is_registered,
     clear_runtime,
 )
@@ -14,8 +16,10 @@ __all__ = [
     'convert_to_sc_events',
     'register_synthdef',
     'register_compiled',
+    'register_compiled_file',
     'runtime_assets',
     'runtime_controls',
+    'runtime_kinds',
     'is_registered',
     'clear_runtime',
 ]

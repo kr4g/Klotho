@@ -27,14 +27,14 @@ from .semeios.visualization import plot
 
 from .utils.playback.player import play
 from .utils.playback._config import set_audio_engine, get_audio_engine
-from .utils.playback.supersonic import register_synthdef
+from .utils.playback.supersonic import register_synthdef, register_compiled_file
 from .utils.playback.supersonic.samples import register_sample
 from .utils.fetch import fetch_samples, upload_samples
 
 __all__ = [
     'topos', 'chronos', 'tonos', 'dynatos', 'thetos', 'semeios', 'utils',
     'plot', 'play', 'set_audio_engine', 'get_audio_engine',
-    'register_synthdef', 'register_sample', 'fetch_samples', 'upload_samples',
+    'register_synthdef', 'register_compiled_file', 'register_sample', 'fetch_samples', 'upload_samples',
     'GraphCore', 'Graph', 'Tree', 'Lattice', 'Group',
 ]
 

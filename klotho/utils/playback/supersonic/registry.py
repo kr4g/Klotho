@@ -22,7 +22,25 @@ each call, so registrations take effect immediately (no reimport).
 import base64
 
 _RUNTIME: dict[str, dict] = {}
+
+#: Folder name -> taxonomy kind, mirroring the layout under ``synthdefs/``.
+_FOLDER_TO_KIND = {"instruments": "inst", "effects": "fx", "infra": "infra"}
 _REGISTRY_VERSION = 0
+
+
+def _round_default(v):
+    """Undo float32 round-off in a SynthDef control default.
+
+    A compiled ``.scsyndef`` stores defaults as float32, so ``0.08`` comes
+    back as ``0.07999999821186066``. The bundled manifest is built with this
+    applied (see ``scripts/regenerate_manifest.build_manifest``), so runtime
+    registration must apply it too or the same synth reports different
+    defaults depending on how it was loaded.
+    """
+    try:
+        return float(f"{v:.7g}")
+    except (TypeError, ValueError):
+        return v
 
 
 def registry_version() -> int:
@@ -109,7 +127,66 @@ def _controls_from_compiled(compiled_bytes: bytes, def_name: str) -> dict:
         synth = next(iter(synths.values()))
     if synth is None:
         return {}
-    return dict(synth.get("named_parameters", {}))
+    return {k: _round_default(v)
+            for k, v in synth.get("named_parameters", {}).items()}
+
+
+def register_compiled_file(path, kind: str = None):
+    """Register every SynthDef in a compiled ``.scsyndef`` file on disk.
+
+    The parsing and control extraction this does were previously reachable
+    only by re-deriving them from ``build_manifest``, which builds the whole
+    bundled manifest rather than registering one file.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        The ``.scsyndef`` file to read.
+    kind : str, optional
+        ``'inst'`` or ``'fx'``. When omitted it is inferred from the parent
+        directory name (``instruments`` -> ``'inst'``, ``effects`` -> ``'fx'``).
+
+    Returns
+    -------
+    str or list of str
+        The registered def name, or the list of them when the file holds
+        more than one synth.
+
+    Raises
+    ------
+    ValueError
+        If the file holds no SynthDef, or if *kind* resolves to ``'infra'`` --
+        infrastructure defs (bus routers, the chain limiter) are Klotho
+        internals and are bundled, not registered by callers.
+    """
+    from pathlib import Path
+
+    from klotho.utils.playback.supersonic._vendor.synthdef_parser import (
+        parse_synthdef_file,
+    )
+
+    p = Path(path)
+    if kind is None:
+        kind = _FOLDER_TO_KIND.get(p.parent.name, "inst")
+    if kind == "infra":
+        raise ValueError(
+            f"{p.name} resolves to kind 'infra'. Infrastructure SynthDefs are "
+            f"Klotho internals and ship with the package; pass kind='inst' or "
+            f"kind='fx' explicitly if you really mean to register this one."
+        )
+
+    blob = p.read_bytes()
+    synths = parse_synthdef_file(str(p)).get("synths", {})
+    if not synths:
+        raise ValueError(f"No SynthDef found in {p}")
+
+    names = []
+    for synth_name, synth in synths.items():
+        controls = {k: _round_default(v)
+                    for k, v in synth.get("named_parameters", {}).items()}
+        register_compiled(synth_name, blob, controls, kind=kind)
+        names.append(synth_name)
+    return names[0] if len(names) == 1 else names
 
 
 def register_synthdef(supriya_synthdef, name: str = None, pfields: dict = None,
