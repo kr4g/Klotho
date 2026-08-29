@@ -181,9 +181,11 @@ class TestGoldenPayload:
 
     def test_payload_ids_unique(self):
         """'new' events must carry process-unique ids; every other event
-        type ('set' for tie continuations, 'release') deliberately reuses
+        type ('set' for SLUR continuations, 'release') deliberately reuses
         the id of the synth it targets, so those must reference a known
-        spawn. Insert-FX uids must be unique and disjoint from event ids."""
+        spawn. (Tie continuations emit no event at all -- the group lowers
+        to one merged 'new'.) Insert-FX uids must be unique and disjoint
+        from event ids."""
         payload = lower(build_miniature_score())
         new_ids = [e['id'] for e in payload['events']
                    if e.get('type') == 'new' and 'id' in e]
@@ -191,7 +193,7 @@ class TestGoldenPayload:
         assert len(new_ids) == len(set(new_ids)), 'duplicate spawn ids'
         other_ids = {e['id'] for e in payload['events']
                      if e.get('type') != 'new' and 'id' in e}
-        assert other_ids, 'expected tie-continuation set events'
+        assert other_ids, 'expected slur-continuation set events'
         assert other_ids <= set(new_ids), \
             'non-new event referencing unknown spawn id'
         fx_uids = []
