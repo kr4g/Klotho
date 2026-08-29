@@ -303,6 +303,7 @@ class Pattern:
         max_inner_length: int = 3,
         weights: Optional[List[float]] = None,
         nesting_probability: float = 0.333,
+        seed=None,
     ) -> 'Pattern':
         """
         Build a Pattern with randomly generated nested structure.
@@ -324,6 +325,11 @@ class Pattern:
         nesting_probability : float, optional
             Chance that a slot becomes a nested sub-pattern instead of
             a single element. Default 0.333.
+        seed : int, numpy.random.Generator, or None, optional
+            Seed for reproducible structure (anything
+            ``numpy.random.default_rng`` accepts). When None (default), draws
+            from the global numpy stream, so ``np.random.seed`` still works as
+            it always has.
 
         Returns
         -------
@@ -345,15 +351,20 @@ class Pattern:
         else:
             normalized_weights = [1.0 / len(elements)] * len(elements)
 
+        rng = np.random if seed is None else np.random.default_rng(seed)
+        # np.random has randint and no integers; Generator has integers and no
+        # randint. random/choice are on both.
+        _randint = rng.randint if seed is None else rng.integers
+
         def _generate_structure(target_length: int, current_nesting_level: int) -> List[Union[T, List[Any]]]:
             structure = []
             for _ in range(target_length):
-                if max_inner_length > 0 and current_nesting_level > 0 and np.random.random() < nesting_probability:
-                    nested_length = np.random.randint(2, max_inner_length + 1)
+                if max_inner_length > 0 and current_nesting_level > 0 and rng.random() < nesting_probability:
+                    nested_length = int(_randint(2, max_inner_length + 1))
                     nested_structure = _generate_structure(nested_length, current_nesting_level - 1)
                     structure.append(nested_structure)
                 else:
-                    index = np.random.choice(len(elements), p=normalized_weights)
+                    index = rng.choice(len(elements), p=normalized_weights)
                     structure.append(elements[index])
             return structure
 

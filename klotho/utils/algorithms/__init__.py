@@ -27,6 +27,7 @@ __all__ = [
     'cost_matrix',
     'minimum_cost_path',
     'diverse_sample',
+    'sample_with_replacement',
     'is_superparticular',
     'superparticular_base',
     'validate_primes',
