@@ -8,6 +8,11 @@ recursive-include klotho *.json
 recursive-include klotho *.scsyndef
 recursive-include klotho *.scd
 recursive-include klotho *.wav
+# Dev-only SuperCollider harnesses: deliberately untracked, and MANIFEST
+# reads the working tree rather than git, so exclude them by name.
+recursive-exclude klotho/utils/playback/supersonic/assets synthdef_tester.scd
+recursive-exclude klotho/utils/playback/supersonic/assets foxdot_random_tester.scd
+
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .DS_Store

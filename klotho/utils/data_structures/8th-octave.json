@@ -1,0 +1,1028 @@
+{
+  "eighth_octave_overtone_tuning": [
+    {
+      "harmonic": 1,
+      "cents": 0,
+      "name": "unison",
+      "ratio": "1/1",
+      "first_octave": 0,
+      "prominence": 9
+    },
+    {
+      "harmonic": 129,
+      "cents": 13,
+      "name": "sixteenthtone",
+      "ratio": "129/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 65,
+      "cents": 27,
+      "name": "eighthtone",
+      "ratio": "65/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 131,
+      "cents": 40,
+      "name": "smaller quartertone",
+      "ratio": "131/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 33,
+      "cents": 53,
+      "name": "quartertone",
+      "ratio": "33/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 133,
+      "cents": 66,
+      "name": "large quartertone",
+      "ratio": "133/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 67,
+      "cents": 79,
+      "name": "small semitone / 3-eighthtones",
+      "ratio": "67/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 135,
+      "cents": 92,
+      "name": "minor semitone",
+      "ratio": "135/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 17,
+      "cents": 105,
+      "name": "Bb, major semitone",
+      "ratio": "17/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 137,
+      "cents": 118,
+      "name": "large semitone",
+      "ratio": "137/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 69,
+      "cents": 130,
+      "name": "big semitone",
+      "ratio": "69/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 139,
+      "cents": 143,
+      "name": "small three quarters of a tone",
+      "ratio": "139/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 35,
+      "cents": 155,
+      "name": "large three quarters of a tone",
+      "ratio": "35/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 141,
+      "cents": 167,
+      "name": "diminished whole tone",
+      "ratio": "141/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 71,
+      "cents": 180,
+      "name": "small whole tone",
+      "ratio": "71/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 143,
+      "cents": 192,
+      "name": "minor whole tone",
+      "ratio": "143/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 9,
+      "cents": 204,
+      "name": "B, major whole tone",
+      "ratio": "9/8",
+      "first_octave": 4,
+      "prominence": 5
+    },
+    {
+      "harmonic": 145,
+      "cents": 216,
+      "name": "large whole tone",
+      "ratio": "145/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 73,
+      "cents": 228,
+      "name": "whole plus eighthtone",
+      "ratio": "73/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 147,
+      "cents": 240,
+      "name": "5ET diesis",
+      "ratio": "147/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 37,
+      "cents": 251,
+      "name": "five quarters of a tone",
+      "ratio": "37/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 149,
+      "cents": 263,
+      "name": "diminished minor third",
+      "ratio": "149/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 75,
+      "cents": 275,
+      "name": "low minor third",
+      "ratio": "75/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 151,
+      "cents": 286,
+      "name": "small minor third",
+      "ratio": "151/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 19,
+      "cents": 298,
+      "name": "minor third",
+      "ratio": "19/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 153,
+      "cents": 309,
+      "name": "low just minor third (referencing 316)",
+      "ratio": "153/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 77,
+      "cents": 320,
+      "name": "high just minor third (referencing 316)",
+      "ratio": "77/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 155,
+      "cents": 331,
+      "name": "large minor third",
+      "ratio": "155/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 39,
+      "cents": 342,
+      "name": "big minor third",
+      "ratio": "39/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 157,
+      "cents": 354,
+      "name": "neutral third",
+      "ratio": "157/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 79,
+      "cents": 365,
+      "name": "tiny major third",
+      "ratio": "79/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 159,
+      "cents": 375,
+      "name": "eighthtone flat major third",
+      "ratio": "159/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 5,
+      "cents": 386,
+      "name": "C#, just major third",
+      "ratio": "5/4",
+      "first_octave": 3,
+      "prominence": 6
+    },
+    {
+      "harmonic": 161,
+      "cents": 397,
+      "name": "ET major third",
+      "ratio": "161/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 81,
+      "cents": 408,
+      "name": "Pythagorean ditone",
+      "ratio": "81/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 163,
+      "cents": 418,
+      "name": "large Pythagorean ditone",
+      "ratio": "163/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 41,
+      "cents": 429,
+      "name": "Db",
+      "ratio": "41/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 165,
+      "cents": 440,
+      "name": "small quartertone sharp major third",
+      "ratio": "165/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 83,
+      "cents": 450,
+      "name": "quartertone sharp major third",
+      "ratio": "83/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 167,
+      "cents": 460,
+      "name": "tiny fourth",
+      "ratio": "167/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 21,
+      "cents": 471,
+      "name": "low fourth",
+      "ratio": "21/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 169,
+      "cents": 481,
+      "name": "minor fourth",
+      "ratio": "169/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 85,
+      "cents": 491,
+      "name": "major fourth",
+      "ratio": "85/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 171,
+      "cents": 501,
+      "name": "ET perfect fourth",
+      "ratio": "171/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 43,
+      "cents": 512,
+      "name": "perfect fourth, D",
+      "ratio": "43/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 173,
+      "cents": 522,
+      "name": "fourth plus comma",
+      "ratio": "173/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 87,
+      "cents": 532,
+      "name": "fourth plus a fifthtone",
+      "ratio": "87/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 175,
+      "cents": 541,
+      "name": "fourth plus small quartertone",
+      "ratio": "175/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 11,
+      "cents": 551,
+      "name": "eleventh harmonic",
+      "ratio": "11/8",
+      "first_octave": 4,
+      "prominence": 5
+    },
+    {
+      "harmonic": 177,
+      "cents": 561,
+      "name": "tiny tritone",
+      "ratio": "177/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 89,
+      "cents": 571,
+      "name": "low tritone",
+      "ratio": "89/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 179,
+      "cents": 581,
+      "name": "minor tritone",
+      "ratio": "179/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 45,
+      "cents": 590,
+      "name": "D#",
+      "ratio": "45/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 181,
+      "cents": 600,
+      "name": "Eb, ET tritone",
+      "ratio": "181/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 91,
+      "cents": 609,
+      "name": "large tritone, Eb in tonal music",
+      "ratio": "91/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 183,
+      "cents": 619,
+      "name": "big tritone",
+      "ratio": "183/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 23,
+      "cents": 628,
+      "name": "eighthtone high tritone",
+      "ratio": "23/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 185,
+      "cents": 638,
+      "name": "quartertone and sixteenth flat dominant",
+      "ratio": "185/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 93,
+      "cents": 647,
+      "name": "quartertone flat dominant",
+      "ratio": "93/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 187,
+      "cents": 656,
+      "name": "tiny dominant",
+      "ratio": "187/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 47,
+      "cents": 666,
+      "name": "small dominant",
+      "ratio": "47/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 189,
+      "cents": 675,
+      "name": "eighthtone low dominant",
+      "ratio": "189/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 95,
+      "cents": 684,
+      "name": "irregular perfect fifth",
+      "ratio": "95/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 191,
+      "cents": 693,
+      "name": "sixth comma flat fifth",
+      "ratio": "191/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 3,
+      "cents": 702,
+      "name": "perfect fifth",
+      "ratio": "3/2",
+      "first_octave": 2,
+      "prominence": 7
+    },
+    {
+      "harmonic": 193,
+      "cents": 711,
+      "name": "poodle fifth",
+      "ratio": "193/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 97,
+      "cents": 720,
+      "name": "large fifth",
+      "ratio": "97/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 195,
+      "cents": 729,
+      "name": "howling dominant",
+      "ratio": "195/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 49,
+      "cents": 738,
+      "name": "sixthtone high dominant",
+      "ratio": "49/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 197,
+      "cents": 746,
+      "name": "three quartertones high perfect fifth",
+      "ratio": "197/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 99,
+      "cents": 755,
+      "name": "quartertone high perfect fifth",
+      "ratio": "99/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 199,
+      "cents": 764,
+      "name": "quartertone and 16th tone high fifth",
+      "ratio": "199/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 25,
+      "cents": 773,
+      "name": "quartertone and eighthtone high fifth",
+      "ratio": "25/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 201,
+      "cents": 781,
+      "name": "almost minor sixth",
+      "ratio": "201/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 101,
+      "cents": 790,
+      "name": "tiny minor sixth",
+      "ratio": "101/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 203,
+      "cents": 798,
+      "name": "ET minor sixth",
+      "ratio": "203/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 51,
+      "cents": 807,
+      "name": "minor sixth",
+      "ratio": "51/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 205,
+      "cents": 815,
+      "name": "just minor sixth",
+      "ratio": "205/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 103,
+      "cents": 824,
+      "name": "large minor sixth",
+      "ratio": "103/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 207,
+      "cents": 832,
+      "name": "big minor sixth",
+      "ratio": "207/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 13,
+      "cents": 841,
+      "name": "thirteenth harmonic",
+      "ratio": "13/8",
+      "first_octave": 4,
+      "prominence": 5
+    },
+    {
+      "harmonic": 209,
+      "cents": 849,
+      "name": "quartertone high minor sixth",
+      "ratio": "209/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 105,
+      "cents": 857,
+      "name": "quartertone plus minor sixth",
+      "ratio": "105/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 211,
+      "cents": 865,
+      "name": "almost major sixth",
+      "ratio": "211/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 53,
+      "cents": 874,
+      "name": "tiny major sixth",
+      "ratio": "53/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 213,
+      "cents": 882,
+      "name": "small major sixth",
+      "ratio": "213/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 107,
+      "cents": 890,
+      "name": "just major sixth",
+      "ratio": "107/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 215,
+      "cents": 898,
+      "name": "ET major sixth",
+      "ratio": "215/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 27,
+      "cents": 906,
+      "name": "major sixth",
+      "ratio": "27/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 217,
+      "cents": 914,
+      "name": "sixthtone high major sixth",
+      "ratio": "217/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 109,
+      "cents": 922,
+      "name": "eighthtone high major sixth",
+      "ratio": "109/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 219,
+      "cents": 930,
+      "name": "eighthtone and 16th tone high major sixth",
+      "ratio": "219/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 55,
+      "cents": 938,
+      "name": "large major sixth",
+      "ratio": "55/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 221,
+      "cents": 945,
+      "name": "big major sixth",
+      "ratio": "221/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 111,
+      "cents": 953,
+      "name": "three quartertone sharp major sixth",
+      "ratio": "111/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 223,
+      "cents": 961,
+      "name": "small harmonic seventh",
+      "ratio": "223/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 7,
+      "cents": 969,
+      "name": "harmonic seventh",
+      "ratio": "7/4",
+      "first_octave": 3,
+      "prominence": 6
+    },
+    {
+      "harmonic": 225,
+      "cents": 977,
+      "name": "large harmonic seventh",
+      "ratio": "225/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 113,
+      "cents": 984,
+      "name": "tiny minor seventh",
+      "ratio": "113/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 227,
+      "cents": 992,
+      "name": "small minor seventh",
+      "ratio": "227/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 57,
+      "cents": 999,
+      "name": "G, minor seventh",
+      "ratio": "57/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 229,
+      "cents": 1007,
+      "name": "large minor seventh",
+      "ratio": "229/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 115,
+      "cents": 1015,
+      "name": "big minor seventh",
+      "ratio": "115/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 231,
+      "cents": 1022,
+      "name": "double perfect fourth",
+      "ratio": "231/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 29,
+      "cents": 1030,
+      "name": "eighthtone high major seventh",
+      "ratio": "29/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 233,
+      "cents": 1037,
+      "name": "eighth- and 16th tone high minor seventh",
+      "ratio": "233/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 117,
+      "cents": 1044,
+      "name": "three-eighths flat major seventh",
+      "ratio": "117/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 235,
+      "cents": 1052,
+      "name": "quartertone flat minor seventh",
+      "ratio": "235/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 59,
+      "cents": 1059,
+      "name": "tiny major seventh",
+      "ratio": "59/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 237,
+      "cents": 1066,
+      "name": "diminished major seventh",
+      "ratio": "237/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 119,
+      "cents": 1074,
+      "name": "eighthtone flat major seventh",
+      "ratio": "119/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 239,
+      "cents": 1081,
+      "name": "small major seventh",
+      "ratio": "239/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 15,
+      "cents": 1088,
+      "name": "major seventh",
+      "ratio": "15/8",
+      "first_octave": 4,
+      "prominence": 5
+    },
+    {
+      "harmonic": 241,
+      "cents": 1095,
+      "name": "large major seventh",
+      "ratio": "241/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 121,
+      "cents": 1103,
+      "name": "ET major seventh",
+      "ratio": "121/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 243,
+      "cents": 1110,
+      "name": "big major seventh",
+      "ratio": "243/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 61,
+      "cents": 1117,
+      "name": "Ab, large minor seventh",
+      "ratio": "61/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 245,
+      "cents": 1124,
+      "name": "eighthtone plus major seventh",
+      "ratio": "245/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 123,
+      "cents": 1131,
+      "name": "leading tone major seventh",
+      "ratio": "123/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 247,
+      "cents": 1138,
+      "name": "sharp leading tone major seventh",
+      "ratio": "247/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 31,
+      "cents": 1145,
+      "name": "hyper leading tone major seventh",
+      "ratio": "31/16",
+      "first_octave": 5,
+      "prominence": 4
+    },
+    {
+      "harmonic": 249,
+      "cents": 1152,
+      "name": "quartertone flat octave",
+      "ratio": "249/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 125,
+      "cents": 1159,
+      "name": "three-eighths flat octave",
+      "ratio": "125/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 251,
+      "cents": 1166,
+      "name": "eighthtone flat octave",
+      "ratio": "251/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 63,
+      "cents": 1173,
+      "name": "small octave",
+      "ratio": "63/32",
+      "first_octave": 6,
+      "prominence": 3
+    },
+    {
+      "harmonic": 253,
+      "cents": 1180,
+      "name": "comma flat octave",
+      "ratio": "253/128",
+      "first_octave": 8,
+      "prominence": 1
+    },
+    {
+      "harmonic": 127,
+      "cents": 1186,
+      "name": "dipped octave",
+      "ratio": "127/64",
+      "first_octave": 7,
+      "prominence": 2
+    },
+    {
+      "harmonic": 255,
+      "cents": 1193,
+      "name": "preoctave",
+      "ratio": "255/128",
+      "first_octave": 8,
+      "prominence": 1
+    }
+  ]
+}

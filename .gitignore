@@ -164,6 +164,16 @@ klotho/utils/playback/supersonic/assets/synthdef_tester.scd
 !klotho/utils/playback/supersonic/assets/**/*.scsyndef
 !klotho/utils/playback/supersonic/assets/manifest.json
 !klotho/utils/playback/supersonic/assets/kinds.json
+!klotho/utils/playback/supersonic/assets/samples/samples.json
+
+# Package source swept up by the blanket rules above. These are shipped
+# modules and data, not local artifacts: `*.json` caught two data files and
+# the top-level `scripts/` rule matches at any depth, so it swallowed an
+# in-package module. Tracked so the tracked set matches the shipped set --
+# MANIFEST.in reads the working tree, not git.
+!klotho/utils/data_structures/8th-octave.json
+!klotho/utils/playback/supersonic/scripts/
+!klotho/utils/playback/supersonic/scripts/*.py
 
 # Graphify knowledge graph
 graphify-out/
