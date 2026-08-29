@@ -1,8 +1,19 @@
 Changelog
 =========
 
-Version 10.16.0 (Current)
--------------------------
+Unreleased
+----------
+
+* **Removed the dead TidalCycles SynthDef bank**
+  (``assets/tidal_synthdefs_add.scd``, 31 definitions). It had never been
+  compiled: zero ``.scsyndef`` files, zero manifest entries, and no
+  reference anywhere in the package, tests, examples or notebooks. It
+  shipped in the sdist and wheel without ever being loadable. It can come
+  back properly compiled later; the source is archived under
+  ``.archive/tidal-bank-removed-2026-08-28/``.
+
+Version 10.16.0
+---------------
 
 * **Recording**: ``play(..., record=True)`` and ``plot(score).play(record=True)``
   add a record button to the playback widget — playback is captured in the
