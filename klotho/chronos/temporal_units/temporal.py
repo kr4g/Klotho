@@ -1830,6 +1830,23 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
     class. Sequencing here is the opposite of fusing -- ``extend``/
     ``append`` lay units end to end and never fuse them.
 
+    Placement is validated **lazily**, like :class:`TemporalBlock`'s
+    alignment: every reader that hands out a live member (``seq``,
+    ``s[i]``, iteration, and the printed table) first calls
+    ``_ensure_offsets``, which re-runs ``_set_offsets`` when the member
+    durations differ from the geometry the last pass saw. That matters
+    because a *member* can be a container with mutators of its own --
+    ``s[0].append(...)`` lengthens member 0 without any sequence-level
+    mutator running, and without it the members would silently overlap.
+    Reading ``s._seq`` directly bypasses the check and can observe stale
+    offsets.
+
+    ``duration``, ``durations`` and ``onsets`` never needed that check:
+    they recompute from the live members every time. That is exactly why
+    the stale case was a *contradiction* rather than a uniformly wrong
+    answer -- ``onsets`` reported the new placement while the members'
+    own ``start`` still reported the old one.
+
     Parameters
     ----------
     ut_seq : list of TemporalUnit, optional
@@ -1861,15 +1878,58 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
         Members may be ``TemporalUnit``, ``CompositionalUnit``,
         ``TemporalUnitSequence``, or ``TemporalBlock``; ``_reoffset``
         dispatches the correct cascade for each.
+
+        Records the member durations it worked from, so ``_ensure_offsets``
+        can tell later whether they still hold.
         """
         running_offset = self._offset
+        geometry = []
         for ut in self._seq:
             _reoffset(ut, running_offset)
-            running_offset += ut.duration
+            duration = ut.duration
+            geometry.append(duration)
+            running_offset += duration
+        self._geometry = tuple(geometry)
+
+    def _read_geometry(self):
+        """The member durations, in sequence order -- the only input
+        ``_set_offsets`` reads besides ``_offset``.
+
+        Nested containers are asked through the public :attr:`duration`
+        reader so that they validate their own placement before answering.
+        """
+        return tuple(ut.duration for ut in self._seq)
+
+    def _ensure_offsets(self):
+        """Re-offset if a member's duration changed since the last pass.
+
+        A sequence hands out its **live** members, and a member may itself
+        be a container: ``s[0].append(...)`` or ``s[0].remove(...)``
+        changes the running sum ``_set_offsets`` was computed from without
+        any sequence-level mutator running. The sequence then reports
+        members that overlap -- member 0 ending past where member 1 starts
+        -- with no exception and no warning. Every reader that hands out a
+        live member goes through here, so the validation is lazy rather
+        than eager, exactly as ``TemporalBlock._ensure_aligned`` is for the
+        block's row alignment.
+
+        Cheap because it is the same read ``_set_offsets`` would do first
+        anyway, and a no-op for a sequence nobody mutated through a member
+        -- ``_set_offsets`` assigns offsets absolutely, so re-running it is
+        idempotent and never reorders or rebuilds the member list.
+        """
+        if self._read_geometry() != self._geometry:
+            self._set_offsets()
 
     @property
     def seq(self):
-        """The list of TemporalUnit objects in the sequence."""
+        """The list of TemporalUnit objects in the sequence.
+
+        The members are **live**, so their placement is validated on the way
+        out -- a member mutated through its own API since the last pass
+        re-offsets every member after it (see ``_ensure_offsets``).
+        """
+        self._ensure_offsets()
         return self._seq
 
     @property
@@ -2014,32 +2074,46 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
         """
         Extend the sequence by appending all units from another iterable.
 
+        The operand is read once, up front, before anything is appended. So a
+        sequence can extend by itself -- ``seq.extend(seq)`` doubles it, the
+        same as ``list.extend`` -- and a one-shot iterable such as a generator
+        is repeated ``repeat`` times rather than being exhausted by the first
+        pass. Each unit is copied on entry, so the appended units are never the
+        operand's own objects.
+
         Parameters
         ----------
         other_seq : TemporalUnitSequence or iterable of TemporalUnit
             The source of units to append.
         repeat : int, optional
-            Number of times to repeat the extension. Default is 1.
+            Number of times to repeat the extension. Default is 1. Every
+            repetition appends the operand's *pre-call* contents, so
+            ``seq.extend(seq, repeat=n)`` grows the sequence by a factor of
+            ``n + 1``, not ``2 ** n``.
         """
+        snapshot = list(other_seq)
         for _ in range(repeat):
-            for ut in other_seq:
+            for ut in snapshot:
                 self._seq.append(ut.copy())
         self._set_offsets()
 
     def __getitem__(self, idx: int) -> TemporalUnit:
+        self._ensure_offsets()
         return self._seq[idx]
-    
+
     def __setitem__(self, idx: int, ut: TemporalUnit) -> None:
         self._seq[idx] = ut.copy()
         self._set_offsets()
 
     def __iter__(self):
+        self._ensure_offsets()
         return iter(self._seq)
-    
+
     def __len__(self):
         return len(self._seq)
 
     def __str__(self):
+        self._ensure_offsets()
         rows = []
         for ut in self._seq:
             if hasattr(ut, 'tempus'):
@@ -2655,12 +2729,20 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         """
         Extend the block by appending all rows from another block.
 
+        The operand is read once, up front, before anything is appended, so a
+        block can extend by itself -- ``blk.extend(blk)`` doubles its rows, the
+        same as ``list.extend``. Each row is copied on entry, so the appended
+        rows are never the operand's own objects.
+
+        Note that under the default ``sort_rows=True`` the block re-sorts after
+        the extension, so the appended rows do not stay at the end.
+
         Parameters
         ----------
         other_block : TemporalBlock
             The block whose rows will be appended.
         """
-        for row in other_block:
+        for row in list(other_block):
             self._rows.append(row.copy())
         self._align_rows()
 
@@ -2734,7 +2816,12 @@ def _walk_block_events(obj, voice: str):
         for i, row in enumerate(obj._rows):
             yield from _walk_block_events(row, f'{voice}.{i}')
     elif isinstance(obj, TemporalUnitSequence):
-        for member in obj._seq:
+        # Iterated publicly, not through ``_seq``: the sequence validates its
+        # own member placement on the way out. The block's realign does not
+        # cover this, because it fires on row *durations* -- a row whose
+        # members shifted internally while its total stayed the same leaves
+        # the block's geometry unmoved and the row's offsets stale.
+        for member in obj:
             yield from _walk_block_events(member, voice)
     else:
         for chronon in obj._materialize_events():
