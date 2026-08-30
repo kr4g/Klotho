@@ -223,6 +223,38 @@ class TestGoldenPayload:
             'insert uid collides with event id'
 
 
+class TestHandComputedAnchor:
+    """One number here is NOT read off the pipeline.
+
+    Everything else in this module is either characterization (the golden) or
+    self-consistency (``f(x) == f(x)``, byte-identical copy paths, id
+    uniqueness), so ``--regen`` silences all of it: a golden regenerated over a
+    behaviour change pins the code to itself. This value is derived by hand
+    from ``build_miniature_score`` and cannot be regenerated away.
+
+    The derivation: ``loose_hit`` is added at score time ``2.25`` with
+    ``dur=0.5``. The earliest thing in the score is ``block_right`` at
+    ``-1.5``, and a timeline that begins below zero is pulled up to start at 0
+    during lowering (the documented ``start_time=None`` rule on
+    ``Score.export``). So the hit lands at ``2.25 - (-1.5) == 3.75``, and the
+    whole payload starts at 0.
+
+    It is ONE anchor on absolute placement, not a second oracle. It says
+    nothing about pitch, amplitude, envelopes, ties, slurs, or ordering -- the
+    golden is still the only thing watching those, with the weakness the module
+    docstring describes.
+    """
+
+    def test_the_loose_events_absolute_time_is_hand_derivable(self):
+        payload = lower(build_miniature_score())
+        hits = [e for e in payload['events']
+                if (e.get('pfields') or {}).get('freq') == 880.0]
+        assert len(hits) == 1, 'the 880 Hz one-shot identifies loose_hit'
+        assert hits[0]['start'] == pytest.approx(3.75)
+        assert hits[0]['dur'] == pytest.approx(0.5)
+        assert min(e['start'] for e in payload['events']) == pytest.approx(0.0)
+
+
 class TestFastIdGenerator:
     def test_ids_unique_across_concurrent_conversions(self):
         """Two conversions running interleaved (threads) must never mint
