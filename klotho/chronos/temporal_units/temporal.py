@@ -1785,6 +1785,15 @@ def _validate_axis(axis):
     return float(axis)
 
 
+# Column order of TemporalBlock.events. The tail is exactly
+# TemporalUnit.events' columns, so a block table and a unit table can be
+# read the same way; ``row`` and ``voice`` are the two identity columns the
+# merge adds. See TemporalBlock.events.
+_BLOCK_EVENT_COLUMNS = ('row', 'voice', 'node_id', 'start', 'duration',
+                        'end', 'is_rest', 's', 'metric_onset',
+                        'metric_duration')
+
+
 class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     """
     A collection of parallel temporal structures representing simultaneous events.
@@ -2003,6 +2012,114 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         return self._offset + self.duration
 
     @property
+    def principal_row(self):
+        """The row whose end is latest -- ``None`` for an empty block.
+
+        Ties charter §7 defines "the last leaf of a ``TemporalBlock``" as
+        the last leaf of this row. The definition is deliberately
+        **axis- and sort-independent**: it reads the geometry that the
+        current axis produced instead of assuming ``rows[-1]``, which under
+        the ``sort_rows=True`` default is the *shortest* row and need not
+        end at the block's end at all.
+
+        Tie-break: the **bottom-most** (highest-index) row among those that
+        end latest. Ties are the normal case at ``axis=1``, where every row
+        is aligned on its end. Because a shifted row's end is computed as
+        ``offset + (max - d) + d``, it can miss the longest row's end by a
+        float ulp, so the comparison is made with a small relative
+        tolerance rather than by exact equality.
+
+        Returns
+        -------
+        TemporalUnit, TemporalUnitSequence, TemporalBlock, or None
+            The live row object, not a copy.
+        """
+        if not self._rows:
+            return None
+        ends = [row.end for row in self._rows]
+        latest = max(ends)
+        tolerance = 1e-9 * max(1.0, abs(latest))
+        for i in range(len(ends) - 1, -1, -1):
+            if abs(ends[i] - latest) <= tolerance:
+                return self._rows[i]
+        return self._rows[-1]
+
+    @property
+    def events(self):
+        """A :class:`~pandas.DataFrame` of every event in the block, by date.
+
+        One row per event, flattened across all voices and ordered by
+        ``start``. Nesting is flattened too: a row may itself be a
+        :class:`TemporalUnitSequence` or a nested ``TemporalBlock``.
+
+        Columns
+        -------
+        ``row``
+            Index of the **top-level** block row the event came from --
+            "voice", in Haddad's sense that row order is voice assignment.
+            Needed because ``node_id`` is *not* unique across rows: two
+            structurally identical rows both number their leaves ``1, 2,
+            3``, so ``(row, node_id)`` is the identifying pair.
+        ``voice``
+            Dotted path to the *innermost* block row, as a string: ``'1'``
+            for a plain row, ``'0.1'`` for the second row of a block nested
+            in row 0. A ``TemporalUnitSequence`` does not extend the path,
+            because its members are successive, not simultaneous. Without
+            this column the parallel sub-rows of a nested block would merge
+            indistinguishably into one ``row`` value, and the
+            synchronic/diachronic reading below would be uncomputable
+            there.
+        ``node_id``, ``start``, ``duration``, ``end``, ``is_rest``, ``s``, ``metric_onset``, ``metric_duration``
+            Exactly the columns of :attr:`TemporalUnit.events`.
+
+        ``start`` and ``end`` are **absolute** seconds: they include the
+        block's own offset and every row's alignment offset, so the table
+        is directly comparable across voices under any ``axis``.
+
+        Ordering is by ``start``, then by ``row``; events that share both
+        keep their discovery order (the sort is stable).
+
+        Notes
+        -----
+        Events are **tie groups**, not leaves (``07_TIES_CHARTER.md`` §2):
+        a tied group contributes one event, anchored at its head, whose
+        duration is the sum over its members. Rests are present, with
+        ``is_rest`` true and a positive ``duration``.
+
+        The table is **computed on every read, not cached**. A correct
+        cache key would have to recurse over every leaf unit's structure
+        version, tempo, beat and offset, mirroring three container types
+        plus ``CompositionalUnit``'s parameter version -- and
+        :attr:`rows` hands out the *live* row list, so a row swapped in
+        place would defeat any identity-based key without going through
+        ``_align_rows``. Correctness is worth more here than the saving.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        data = []
+        for i, row in enumerate(self._rows):
+            for voice, c in _walk_block_events(row, str(i)):
+                data.append({
+                    'row': i,
+                    'voice': voice,
+                    'node_id': c.node_id,
+                    'start': c.start,
+                    'duration': c.duration,
+                    'end': c.end,
+                    'is_rest': c.is_rest,
+                    's': c.proportion,
+                    'metric_onset': c.metric_onset,
+                    'metric_duration': c.metric_duration,
+                })
+        df = pd.DataFrame(data, columns=list(_BLOCK_EVENT_COLUMNS))
+        if len(df):
+            df = df.sort_values(['start', 'row'], kind='stable',
+                                ignore_index=True)
+        return df
+
+    @property
     def sort_rows(self):
         """Whether to sort rows by duration (longest at index 0)."""
         return self._sort_rows
@@ -2193,6 +2310,44 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
             sort_rows=self._sort_rows,
             offset=self._offset,
         )
+
+
+def _walk_block_events(obj, voice: str):
+    """Yield ``(voice, Chronon)`` for every event under *obj*, in order.
+
+    Recursion is over containers only. A nested :class:`TemporalBlock`
+    extends the voice path (``'0'`` becomes ``'0.0'``, ``'0.1'``) because
+    its rows sound at the same time; a :class:`TemporalUnitSequence` leaves
+    the path alone, because its members are successive and are the same
+    voice.
+
+    The walk is built from each unit's ``_materialize_events()`` rather
+    than from any container's onset tuple, for two reasons:
+
+    * ``TemporalUnitSequence.onsets`` ignores the sequence's own
+      ``_offset``, so a sequence placed at a non-zero time reports onsets
+      relative to itself while its member units correctly report absolute
+      ones. Reading it here would put a whole shifted row at the wrong
+      absolute time. (That inconsistency is a separate defect; this walk
+      routes around it rather than depending on it.)
+    * :class:`~klotho.thetos.composition.compositional.CompositionalUnit`
+      overrides ``events`` with a different schema (``dur``,
+      ``metric_dur``, ``instrument``), so composing the units' DataFrames
+      would give ragged columns. Its events are ``Chronon`` subclasses, so
+      the Chronon path stays uniform across both kinds of unit.
+
+    Tie-awareness comes for free: ``_materialize_events`` already yields
+    one event per tie group (``07_TIES_CHARTER.md`` §2).
+    """
+    if isinstance(obj, TemporalBlock):
+        for i, row in enumerate(obj._rows):
+            yield from _walk_block_events(row, f'{voice}.{i}')
+    elif isinstance(obj, TemporalUnitSequence):
+        for member in obj._seq:
+            yield from _walk_block_events(member, voice)
+    else:
+        for chronon in obj._materialize_events():
+            yield voice, chronon
 
 
 def _reoffset(unit, t: float) -> None:
