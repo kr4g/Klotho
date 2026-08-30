@@ -40,6 +40,7 @@ class Tree(GraphCore):
     def __init__(self, root, children: tuple):
         super().__init__(directed=True)
         self._layers = []
+        self._id_state_observer = None
         self._group_dirty = False
         self._root = self._build_tree(root, children)
         self._list = Group((root, children))
@@ -63,6 +64,37 @@ class Tree(GraphCore):
     def layers(self):
         """tuple of TreeLayer : The domain layers attached to this tree."""
         return tuple(getattr(self, '_layers', ()))
+
+    def set_id_state_observer(self, callback):
+        """Register the owner of id-keyed state that lives OUTSIDE this tree.
+
+        Attached layers already hear about relocations through
+        :meth:`~klotho.topos.graphs.trees.layers.TreeLayer.on_nodes_remapped`,
+        but an owner can hold id-keyed state of its own -- a
+        ``CompositionalUnit`` keeps slur specs, the Bind memo and control
+        envelope targets on itself -- and the tree's own verbs are reachable
+        without going through it (``uc._rt.insert(...)``). ``callback(mapping)``
+        receives exactly what the layers receive.
+
+        A clone gets NO observer: it belongs to a different owner, which
+        rebinds itself.
+        """
+        self._id_state_observer = callback
+
+    def _notify_nodes_relocated(self, mapping):
+        """Announce that content moved between node ids.
+
+        ``mapping`` is TOTAL over the ids that survived: old id -> the id now
+        holding that content. An id absent from it was DESTROYED and every
+        id-keyed map must drop it -- rustworkx reuses freed indices, so an
+        entry left behind does not merely leak, it re-attaches to whatever
+        lands in the slot.
+        """
+        for layer in self._layers:
+            layer.on_nodes_remapped(self, mapping)
+        observer = getattr(self, '_id_state_observer', None)
+        if observer is not None:
+            observer(mapping)
 
     @property
     def root(self):
@@ -89,6 +121,7 @@ class Tree(GraphCore):
         inst._meta = {}
         inst._structure_version = 0
         inst._layers = []
+        inst._id_state_observer = None
         inst._group_dirty = False
         inst._init_layers()
         inst._post_structure_clone()
@@ -478,6 +511,7 @@ class Tree(GraphCore):
         new_tree._meta = self._meta.copy()
         new_tree._structure_version = 0
         new_tree._layers = []
+        new_tree._id_state_observer = None
         new_tree._group_dirty = False
 
         node_mapping = {}
@@ -661,6 +695,9 @@ class Tree(GraphCore):
         sibling now denotes a different node than it did before the call.
         This is inherent to rank == index rank, and is exactly why no
         renumbering machinery is needed (``renumber_nodes`` is a stub).
+        The tree's OWN id-keyed state is not an external handle: instrument
+        bindings, slurs and the Bind memo are moved with the content they
+        describe (see :meth:`_notify_nodes_relocated`).
 
         **A composed operand needs no second primitive.** ``insert_child``
         inserts a leaf; subdividing the returned id afterwards builds the
@@ -708,6 +745,17 @@ class Tree(GraphCore):
             self._write_node_data(s, payload, replace=True)
             for c in kids:
                 self._add_edge_raw(s, c)
+
+        # Content is the pair (node data, child list) -- but state keyed BY id
+        # and held outside the graph (instrument bindings, slurs, the Bind
+        # memo) is content too, and does not ride along on its own. Without
+        # this the shifted sibling kept its data and lost its instrument.
+        shifted = {old: merged[i if i < index else i + 1]
+                   for i, old in enumerate(slots)}
+        if any(old != new for old, new in shifted.items()):
+            relocation = {n: n for n in self.nodes if n not in shifted}
+            relocation.update(shifted)
+            self._notify_nodes_relocated(relocation)
 
         self._post_mutation(scope_node=parent, op='insert_child')
         return merged[index]
@@ -968,6 +1016,8 @@ class Tree(GraphCore):
         new_tree._list = self._list  # Group is an immutable tuple subclass
         new_tree._group_dirty = getattr(self, '_group_dirty', False)
         new_tree._layers = []
+        # a clone belongs to a different owner: it rebinds its own observer
+        new_tree._id_state_observer = None
         new_tree._init_layers()
         for old_layer, new_layer in zip(getattr(self, '_layers', ()), new_tree._layers):
             new_layer.adopt_state(old_layer, new_tree)
@@ -975,10 +1025,24 @@ class Tree(GraphCore):
         return new_tree
 
     def __deepcopy__(self, memo):
-        """Create a deep copy of the tree including Tree-specific attributes."""
+        """Create a deep copy of the tree including Tree-specific attributes.
+
+        Payload dicts are freshened exactly as in :meth:`structural_clone`, and
+        for the same reason: ``self._rx.copy()`` duplicates the node table but
+        keeps the payloads by REFERENCE, and ``_evaluate`` and other internal
+        writers mutate those dicts in place -- so recomputing one twin would
+        rewrite the other's cached durations and onsets. Values stay shared
+        (the writers replace entries, never mutate a value in place), which
+        keeps Instrument/Envelope/Bind objects identical across the copy.
+        """
         new_tree = self.__class__.__new__(self.__class__)
 
-        new_tree._rx = self._rx.copy()
+        new_rx = self._rx.copy()
+        for idx in new_rx.node_indices():
+            payload = new_rx.get_node_data(idx)
+            if isinstance(payload, dict):
+                new_rx[idx] = dict(payload)
+        new_tree._rx = new_rx
         new_tree._meta = copy.deepcopy(self._meta, memo)
         new_tree._structure_version = 0
 
@@ -986,6 +1050,8 @@ class Tree(GraphCore):
         new_tree._list = copy.deepcopy(self._list, memo)
         new_tree._group_dirty = getattr(self, '_group_dirty', False)
         new_tree._layers = []
+        # a clone belongs to a different owner: it rebinds its own observer
+        new_tree._id_state_observer = None
         new_tree._init_layers()
         for old_layer, new_layer in zip(getattr(self, '_layers', ()), new_tree._layers):
             new_layer.clone_state(old_layer, new_tree, memo)

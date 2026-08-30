@@ -217,3 +217,85 @@ class TestAddChildAppendIsNotGuaranteedAfterADeletion:
         rt.remove_subtree(4)
         rt.insert_child(rt.root, 3, proportion=9)
         assert rt.group.S == (1, (2, (1,)), 3, 9)
+
+
+class TestInsertChildIntoATiedLeafMigratesTheTie:
+    """Inserting into a tied LEAF turns it interior, and ``tied`` has no
+    meaning there -- ``tie_groups`` reads the leaf surface, so a flag left on
+    the new parent is invisible and the tie is silently destroyed, adding an
+    attack that was not there. ``subdivide`` already resolved this
+    (07_TIES_CHARTER.md sect1, the OpenMusic resolution): the tie moves to the
+    group's first leaf. ``insert_child`` is the same event and takes the same
+    answer."""
+
+    def test_the_tie_survives_and_moves_onto_the_inserted_leaf(self):
+        rt = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        tied = rt.leaf_nodes[1]
+        assert rt.tie_groups == ((1, 2), (3,))
+        new = rt.insert_child(tied, 0, proportion=1)
+        assert rt[new]['tied'] is True
+        assert rt.tie_groups == ((1, new), (3,))
+
+    def test_the_new_interior_node_sheds_the_tie(self):
+        rt = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        tied = rt.leaf_nodes[1]
+        rt.insert_child(tied, 0, proportion=1)
+        assert rt[tied]['tied'] is False
+        assert isinstance(rt[tied]['proportion'], int)
+        assert rt.group.S == (1, (1, (1.0,)), 1)
+
+    def test_the_attack_count_is_unchanged(self):
+        """The whole point: an inserted subdivision must not re-articulate a
+        note that was tied over."""
+        rt = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        before = len(rt.tie_groups)
+        rt.insert_child(rt.leaf_nodes[1], 0, proportion=1)
+        assert len(rt.tie_groups) == before
+
+    def test_insert_child_and_subdivide_agree_on_the_tie_structure(self):
+        """Two inserts build what one ``subdivide`` builds -- so they must
+        leave the same tie, on the same leaf. (``subdivide`` declines a
+        one-part S, which is why this compares a two-part group.)"""
+        inserted = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        target = inserted.leaf_nodes[1]
+        inserted.insert_child(target, 0, proportion=1)
+        inserted.insert_child(target, 1, proportion=1)
+        divided = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        divided.subdivide(divided.leaf_nodes[1], (1, 1))
+        assert inserted.group.S == divided.group.S
+        assert inserted.tie_groups == divided.tie_groups
+        assert inserted[target]['tied'] is False
+        assert [inserted[n].get('tied') for n in inserted.leaf_nodes] == \
+               [divided[n].get('tied') for n in divided.leaf_nodes]
+
+    def test_they_agree_when_the_new_first_leaf_is_a_REST(self):
+        """A tie cannot land on a rest (charter sect1), so it dies. Both verbs
+        must kill it the same way rather than one leaving a tied rest."""
+        inserted = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        target = inserted.leaf_nodes[1]
+        inserted.insert_child(target, 0, proportion=-1)
+        inserted.insert_child(target, 1, proportion=1)
+        divided = RT(meas='4/4', subdivisions=(1, 1.0, 1))
+        divided.subdivide(divided.leaf_nodes[1], (-1, 1))
+        assert inserted.group.S == divided.group.S
+        assert inserted.tie_groups == divided.tie_groups
+        # the tie is gone from BOTH ends, not merely invisible: a flag left on
+        # the new interior node still reaches `Group` as a float D.
+        assert inserted[target]['tied'] is False
+        assert isinstance(inserted[target]['proportion'], int)
+        assert [inserted[n].get('tied') for n in inserted.leaf_nodes] == \
+               [divided[n].get('tied') for n in divided.leaf_nodes]
+
+    def test_an_untied_leaf_is_untouched(self):
+        rt = RT(meas='4/4', subdivisions=(1, 1, 1))
+        new = rt.insert_child(rt.leaf_nodes[1], 0, proportion=1)
+        assert rt[new].get('tied') is False
+        assert rt.group.S == (1, (1, (1,)), 1)
+
+    def test_the_tie_reaches_the_event_surface(self):
+        """End to end: the defect was audible -- two attacks became three,
+        with nothing warning about it."""
+        uc = UC(span=1, tempus='4/4', prolatio=(1, 1.0, 1))
+        assert len(uc.events) == 2
+        uc._rt.insert_child(uc._rt.leaf_nodes[1], 0, proportion=1)
+        assert len(uc.events) == 2

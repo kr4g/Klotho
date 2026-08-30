@@ -62,7 +62,21 @@ class ParameterLayer(TreeLayer):
         return cached
 
     def on_structure_changed(self, tree, scope, op):
-        """Drop the effective-value cache after any structural mutation."""
+        """Drop the effective-value cache, and any binding whose node is gone.
+
+        A binding left on a destroyed node does not merely leak: rustworkx
+        reuses freed indices, so the next insert re-attaches it to a
+        brand-new note (docket RT-28). Purging here covers every deleter --
+        ``prune``, ``remove_subtree``, ``graft_subtree(mode='replace')``,
+        ``prune_leaves`` -- rather than one hand-rolled loop per call site.
+        """
+        bindings = self._node_instruments
+        if bindings:
+            dead = [n for n in bindings if n not in tree]
+            for n in dead:
+                del bindings[n]
+            if dead:
+                self._instruments_version = getattr(self, '_instruments_version', 0) + 1
         self._effective_cache = None
 
     def on_clone(self, tree):
@@ -90,7 +104,19 @@ class ParameterLayer(TreeLayer):
         self._effective_cache = None
 
     def on_nodes_remapped(self, tree, mapping):
-        """Drop the effective-value cache after node ids are renumbered."""
+        """Move instrument bindings to the ids now holding their content.
+
+        ``mapping`` is total over surviving ids, so a binding whose node is
+        absent from it dies with that node. Rebuilt IN PLACE because callers
+        hold the dict itself (``node_instruments``, ``RhythmTree._respell``).
+        """
+        bindings = self._node_instruments
+        if bindings:
+            moved = {mapping[n]: inst for n, inst in bindings.items()
+                     if n in mapping}
+            bindings.clear()
+            bindings.update(moved)
+            self._instruments_version = getattr(self, '_instruments_version', 0) + 1
         self._effective_cache = None
 
     # ------------------------------------------------------------------

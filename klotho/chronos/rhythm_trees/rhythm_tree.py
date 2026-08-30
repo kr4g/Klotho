@@ -904,9 +904,24 @@ class RhythmTree(Tree):
             node = parent
         return True
 
+    def _migrate_tie_to_first_child(self, node, first_child):
+        """Move a tie off ``node`` onto ``first_child``.
+
+        Raw: pokes ``_rx`` and leaves the post-mutation sweep to the caller,
+        which is also what reconciles a tie migrated onto a REST --
+        ``_evaluate`` clears one, because a tied rest is illegal
+        (07_TIES_CHARTER.md sect1).
+        """
+        self._rx[node]['tied'] = False
+        self._rx[node]['proportion'] = int(self._rx[node]['proportion'])
+        self._rx[first_child]['tied'] = True
+        self._rx[first_child]['proportion'] = float(
+            self._rx[first_child].get('proportion', 1))
+
     def insert_child(self, parent, index, **attr):
         """Insert a child at a given rank (see :meth:`Tree.insert_child`),
-        refusing a tie that would have nothing to continue.
+        refusing a tie that would have nothing to continue and carrying the
+        parent's own tie down onto the new leaf.
 
         Positional insertion is the position-dependent write the layer
         validator could never make: ``validate_attrs`` is handed the PARENT,
@@ -938,7 +953,22 @@ class RhythmTree(Tree):
                     "nothing -- there is no leaf before it. Insert it "
                     "untied, or insert at a later rank."
                 )
-        return super().insert_child(parent, index, **attr)
+        # Inserting into a TIED leaf makes it interior, and `tied` has no
+        # meaning there: `tie_groups` reads the leaf surface, so the flag goes
+        # invisible and the tie is destroyed -- the note re-articulates. Same
+        # event `subdivide` already resolved, so it takes the same answer. The
+        # leaf-surface guard above deliberately does not apply: a tie already
+        # in the tree is being CARRIED, not authored, so a dangling one stays
+        # exactly as dangling as it was.
+        was_tied = (self.out_degree(parent) == 0
+                    and bool(self._rx[parent].get('tied', False)))
+        new_id = super().insert_child(parent, index, **attr)
+        if was_tied:
+            # a leaf's only legal rank is 0, so the inserted node IS the
+            # group's first leaf
+            self._migrate_tie_to_first_child(parent, new_id)
+            self._post_mutation(scope_node=parent, op='insert_child')
+        return new_id
 
     def subdivide(self, node, S):
         """
@@ -998,14 +1028,9 @@ class RhythmTree(Tree):
             # resolution). "Continues my predecessor" has exactly one
             # lossless landing spot: the group's first leaf.
             was_tied = bool(self._rx[n].get('tied', False))
-            if was_tied:
-                self._rx[n]['tied'] = False
-                self._rx[n]['proportion'] = int(self._rx[n]['proportion'])
             first_child = add_children(n, S)
             if was_tied and first_child is not None:
-                self._rx[first_child]['tied'] = True
-                self._rx[first_child]['proportion'] = float(
-                    self._rx[first_child].get('proportion', 1))
+                self._migrate_tie_to_first_child(n, first_child)
         scope = self.parent(nodes[0]) if len(nodes) == 1 else None
         self._post_mutation(scope_node=scope, op='subdivide')
         return self
@@ -1204,11 +1229,21 @@ class RhythmTree(Tree):
             Parallel to *durations*: the index each new event had in the
             OLD decomposed sequence, or ``None`` for an event this operation
             created. This map is what carries pfields, mfields and
-            instrument bindings across the rebuild; it is explicit because
-            an incidental one (same position, same payload) is wrong for
-            every verb that inserts or removes.
+            instrument bindings across the rebuild -- and, through
+            :meth:`~klotho.topos.graphs.trees.Tree._notify_nodes_relocated`,
+            everything else keyed by node id (slurs, memoized Bind draws,
+            control-envelope targets). It is explicit because an incidental
+            one (same position, same payload) is wrong for every verb that
+            inserts or removes.
         """
         payloads = self._capture_payloads()
+        # the node id each decomposed event is addressed by TODAY, captured
+        # before the rebuild frees it -- this is what lets state keyed by id
+        # follow its content instead of re-attaching to whatever lands in the
+        # slot. A tie group fuses into ONE event carrying the HEAD's payload,
+        # so the head is the id its state follows; a continuation's state dies
+        # with the continuation, exactly as its node data does.
+        old_heads = [g[0] for g in self.tie_groups]
         den = self._grid_denominator(durations)
         S = tuple(int(d * den) for d in durations)
 
@@ -1217,22 +1252,32 @@ class RhythmTree(Tree):
         bindings = layer._node_instruments if layer is not None else None
         for n in [x for x in self.nodes if x != root]:
             self._remove_node_raw(n)
-        if bindings is not None:
-            # freed node indices are REUSED, so a binding left on a deleted
-            # node does not merely leak -- it re-attaches to whatever event
-            # lands in that slot
-            for n in [x for x in bindings if x != root and x not in self]:
-                del bindings[n]
         # Freed node indices are reused in no guaranteed order, so the
         # proportions are written by SLOT RANK after the fact rather than
         # trusted to arrive in insertion order.
-        new_ids = [self._add_child_raw(root, proportion=1) for _ in S]
-        for slot, p, src in zip(sorted(new_ids), S, sources):
+        new_ids = sorted(self._add_child_raw(root, proportion=1) for _ in S)
+        # Every non-root id was freed and rebuilt, so instruments, slurs,
+        # memoized Bind draws and envelope targets all have to be told where
+        # their event went. The map is total over survivors: an old id absent
+        # from it was destroyed and its state dies with it.
+        relocation = {root: root}
+        for slot, src in zip(new_ids, sources):
+            if src is not None:
+                relocation[old_heads[src]] = slot
+        self._notify_nodes_relocated(relocation)
+        for slot, p, src in zip(new_ids, S, sources):
             payload, instrument = payloads[src] if src is not None else ({}, None)
             self._write_node_data(slot, {'proportion': p, **payload},
                                   replace=True)
-            if instrument is not None and bindings is not None:
-                bindings[slot] = instrument
+            if bindings is not None:
+                # The captured payload is authoritative for instruments, not
+                # the id remap: it already resolved what the event inherits
+                # from the group nodes the flatten destroys, which a per-id
+                # remap cannot see. An event that captured none has none.
+                if instrument is not None:
+                    bindings[slot] = instrument
+                else:
+                    bindings.pop(slot, None)
         self._post_mutation(scope_node=root, op=op)
         return self
 

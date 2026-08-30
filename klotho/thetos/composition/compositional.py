@@ -819,6 +819,8 @@ class CompositionalUnit(TemporalUnit):
         self._next_slur_id = 0
         self._control_envelopes: dict[int, dict] = {}
         self._next_envelope_id = 0
+        self._mirror_id_map = None
+        self._rt.set_id_state_observer(self._relocate_id_keyed_state)
 
     @classmethod
     def from_rt(cls, rt: RhythmTree, beat: Union[None, Fraction, int, float, str] = None, bpm: Union[None, int, float] = None, pfields: Union[dict, list, None] = None, mfields: Union[dict, list, None] = None, inst: Union[Instrument, None] = None):
@@ -1070,28 +1072,46 @@ class CompositionalUnit(TemporalUnit):
                 target_cu._rt.set_instrument(new_node, inst)
 
     def _mirror_param_state(self, source_uc: 'CompositionalUnit') -> None:
-        """Copy raw parameter-layer state from a same-topology source UC.
+        """Copy raw parameter-layer state from a same-SHAPE source UC.
 
         Preserves per-node override placement (inheritance structure), the
-        pfield/mfield registries, and instrument bindings. Node ids must match
-        between the two trees (guaranteed when both are built from the same
-        prolatio).
+        pfield/mfield registries, and instrument bindings.
+
+        Node ids are NOT assumed to match. This is called by the three
+        rebuild-from-prolatio recipes (``_scaled``'s CompositionalUnit arm,
+        ``modulate_tempo``, ``modulate_tempus``), and a source that has been
+        mutated since construction no longer numbers depth-first -- a
+        ``subdivide``d 4/4 carries leaves (5, 6, 2, 3, 4) while its rebuild
+        numbers them (2, 3, 4, 5, 6). Copying by raw id therefore ROTATED the
+        music, and after a ``remove_subtree`` it dropped a value and let the
+        pfield default resurface as real music. The two trees always have the
+        same shape, so the correspondence is positional:
+        :meth:`~klotho.topos.graphs.trees.Tree.map_parallel_nodes` walks both
+        in lockstep and raises on a shape mismatch rather than guessing.
+
+        The same recipe then copies the slur specs and envelope anchors, which
+        are keyed by node id too -- so the correspondence is published on the
+        source for :meth:`_copy_slur_specs` and
+        :meth:`_copy_control_envelopes` to follow.
         """
         src = source_uc._rt
         dst = self._rt
+        mapping = src.map_parallel_nodes(dst)
         dst.register_pfields(src.pfield_names)
         dst.register_mfields(src.mfield_names)
         keys = src.pfield_names | src.mfield_names
-        for node in src.nodes:
-            raw = src._rx[node]
+        for src_node, dst_node in mapping.items():
+            raw = src._rx[src_node]
             if isinstance(raw, dict):
                 own = {k: v for k, v in raw.items() if k in keys}
-                if node in dst and own:
-                    dst._rx[node].update(own)
-        for node, inst in src.node_instruments.items():
-            if node in dst:
-                dst.set_instrument(node, inst)
+                if own:
+                    dst._rx[dst_node].update(own)
+        for src_node, inst in src.node_instruments.items():
+            dst_node = mapping.get(src_node)
+            if dst_node is not None:
+                dst.set_instrument(dst_node, inst)
         dst._param_layer._effective_cache = None
+        source_uc._mirror_id_map = mapping
 
     def _resolve_governing_instrument_node(self, node: int):
         return self._rt._resolve_governing_instrument_node(node)
@@ -2171,6 +2191,85 @@ class CompositionalUnit(TemporalUnit):
                 else:
                     self._rebake_control_envelope(desc)
 
+    def _relocate_id_keyed_state(self, mapping):
+        """Follow the content when the fused tree reassigns node ids.
+
+        Registered as the tree's id-state observer, so a verb reached
+        THROUGH ``uc._rt`` -- the preserved family's ``insert``/``extract``/
+        ``scale``, or a positional ``insert_child`` -- heals the same
+        overlays this unit's own deleters heal. ``mapping`` is total over
+        surviving ids: an id absent from it was destroyed.
+
+        Overlays are moved, not rebaked. The baked values themselves live in
+        node data and travel with the payload; re-resolving them here would
+        read a timing cache the mutation has not finished invalidating.
+        """
+        self._remap_bind_memo(mapping)
+        self._remap_slur_specs(mapping)
+        self._remap_control_envelopes(mapping)
+        # a correspondence published to a mirror target is keyed by the ids
+        # that just moved, so it no longer describes this unit
+        self._mirror_id_map = None
+
+    def _remap_bind_memo(self, mapping):
+        if not self._bind_memo:
+            return
+        self._bind_memo = {
+            (mapping[node], key): value
+            for (node, key), value in self._bind_memo.items()
+            if node in mapping
+        }
+
+    def _remap_slur_specs(self, mapping):
+        if not self._slur_specs:
+            return
+        current_leaves = set(self._rt.leaf_nodes)
+        for slur_id, spec in list(self._slur_specs.items()):
+            moved, seen = [], set()
+            for leaf in spec['leaf_nodes']:
+                target = mapping.get(leaf)
+                # a note that stopped being a leaf is no longer slurrable;
+                # `seen` guards a mapping that fuses two old ids into one
+                if target in current_leaves and target not in seen:
+                    seen.add(target)
+                    moved.append(target)
+            if len(moved) < 2:
+                # a slur needs two notes and the rest of it is gone
+                del self._slur_specs[slur_id]
+                continue
+            self._slur_specs[slur_id] = {
+                'leaf_nodes': tuple(moved),
+                'leaf_set': set(moved),
+                'index_range': tuple(self._selection_index_range(moved)),
+            }
+
+    def _remap_control_envelopes(self, mapping):
+        if not self._control_envelopes:
+            return
+        for env_id, desc in list(self._control_envelopes.items()):
+            anchor = mapping.get(desc["anchor_node"])
+            if anchor is None:
+                warnings.warn(
+                    "Control envelope removed: anchor node was destroyed",
+                    RuntimeWarning, stacklevel=3
+                )
+                del self._control_envelopes[env_id]
+                continue
+            desc["anchor_node"] = anchor
+            if desc["leaf_subset"] is None:
+                continue
+            moved = tuple(dict.fromkeys(
+                mapping[n] for n in desc["leaf_subset"] if n in mapping
+            ))
+            if not moved:
+                warnings.warn(
+                    "Control envelope removed: all target leaves were destroyed",
+                    RuntimeWarning, stacklevel=3
+                )
+                del self._control_envelopes[env_id]
+                continue
+            desc["leaf_subset"] = moved
+
     def make_rest(self, node) -> None:
         """
         Make one or more nodes (and their subtrees) rests, splitting
@@ -2675,37 +2774,79 @@ class CompositionalUnit(TemporalUnit):
         c._attributed = self._attributed
         c._offset = self._offset
         c._timing_dirty = True
-        c._slur_specs = self._copy_slur_specs()
+        # a structural clone preserves node ids, so the overlays come across
+        # verbatim -- a correspondence published by an earlier mirror belongs
+        # to a different tree entirely and must not be followed here
+        c._slur_specs = self._copy_slur_specs(follow_mirror=False)
         c._next_slur_id = self._next_slur_id
-        c._control_envelopes = self._copy_control_envelopes()
+        c._control_envelopes = self._copy_control_envelopes(follow_mirror=False)
         c._next_envelope_id = self._next_envelope_id
+        c._mirror_id_map = None
+        c._rt.set_id_state_observer(c._relocate_id_keyed_state)
         return c
 
-    def _copy_slur_specs(self):
-        """Fresh containers for slur specs (node ids carried verbatim)."""
-        return {
-            slur_id: {
-                'leaf_nodes': tuple(spec['leaf_nodes']),
-                'leaf_set': set(spec['leaf_set']),
+    def _mirror_target_map(self, follow_mirror: bool):
+        """The node-id correspondence published by the last mirror, if any.
+
+        ``None`` means "carry ids verbatim", which is right for a structural
+        clone (ids preserved) and wrong for a rebuild from prolatio.
+        """
+        return self._mirror_id_map if follow_mirror else None
+
+    def _copy_slur_specs(self, follow_mirror: bool = True):
+        """Fresh containers for slur specs, in the mirror target's ids.
+
+        Node ids are carried verbatim unless a :meth:`_mirror_param_state`
+        has just published a correspondence for the unit being rebuilt --
+        the three rebuild-from-prolatio recipes call this immediately after
+        mirroring, and their destination numbers its nodes differently.
+        ``index_range`` needs no recomputation: the mapping is positional, so
+        a mapped leaf sits at the same index in the destination.
+        """
+        mapping = self._mirror_target_map(follow_mirror)
+        specs = {}
+        for slur_id, spec in self._slur_specs.items():
+            leaves = tuple(spec['leaf_nodes']) if mapping is None else tuple(
+                mapping[leaf] for leaf in spec['leaf_nodes'] if leaf in mapping
+            )
+            if not leaves:
+                continue
+            specs[slur_id] = {
+                'leaf_nodes': leaves,
+                'leaf_set': set(leaves),
                 'index_range': tuple(spec['index_range']),
             }
-            for slur_id, spec in self._slur_specs.items()
-        }
+        return specs
 
-    def _copy_control_envelopes(self):
-        """Fresh descriptor containers; Envelope objects are shared (the
-        production copy semantics — envelopes are treated as immutable)."""
-        return {
-            env_id: {
+    def _copy_control_envelopes(self, follow_mirror: bool = True):
+        """Fresh descriptor containers, in the mirror target's ids.
+
+        Same id contract as :meth:`_copy_slur_specs`. Envelope objects are
+        shared (the production copy semantics — envelopes are treated as
+        immutable)."""
+        mapping = self._mirror_target_map(follow_mirror)
+        descs = {}
+        for env_id, desc in self._control_envelopes.items():
+            anchor = desc["anchor_node"]
+            subset = desc["leaf_subset"]
+            if mapping is not None:
+                if anchor not in mapping:
+                    continue
+                anchor = mapping[anchor]
+                if subset is not None:
+                    subset = tuple(mapping[n] for n in subset if n in mapping)
+                    if not subset:
+                        continue
+            elif subset is not None:
+                subset = tuple(subset)
+            descs[env_id] = {
                 "envelope": desc["envelope"],
                 "pfields": list(desc["pfields"]),
                 "endpoint": desc["endpoint"],
-                "anchor_node": desc["anchor_node"],
-                "leaf_subset": (tuple(desc["leaf_subset"])
-                                if desc["leaf_subset"] is not None else None),
+                "anchor_node": anchor,
+                "leaf_subset": subset,
             }
-            for env_id, desc in self._control_envelopes.items()
-        }
+        return descs
 
     def _copy_rebuild(self):
         """Legacy copy path: reconstruct from prolatio and remap node data.
