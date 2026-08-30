@@ -151,8 +151,63 @@ class TestDepthFrontier:
         units = decompose(ut, prolatio=(1, 1, 1), depth=1)
         assert [u.prolationis for u in units] == [(1, 1, 1), (1, 1, 1)]
 
+    def test_frontier_rest_group_with_prolatio_stays_rest(self):
+        # RT-11/NEW-02 in the depth branch: the rest test only looked at
+        # nodes in the leaf set, so a rest GROUP -- an interior node with a
+        # negative proportion, a shape the grammar accepts and pins -- fell
+        # through to the requested prolatio and was rebuilt as sound.
+        # Silence became audio at whole-unit granularity.
+        ut = TemporalUnit(tempus='1/1', prolatio=((-1, (1, 1)), 1), bpm=60)
+        units = decompose(ut, prolatio=(1, 2), depth=1)
+        assert [[c.is_rest for c in u] for u in units] == [[True], [False, False]]
+        assert sum(abs(float(u.duration)) for u in units) == pytest.approx(
+            float(ut.duration))
+
+    def test_frontier_rest_group_without_prolatio_keeps_its_subdivisions(self):
+        # guard on the fix above: the DEFAULT arm must keep riding the
+        # node's own signed subdivisions, so a rest group comes back with
+        # its internal rhythm intact rather than collapsed to one rest.
+        ut = TemporalUnit(tempus='1/1', prolatio=((-1, (1, 1)), 1), bpm=60)
+        units = decompose(ut, depth=1)
+        assert [u.prolationis for u in units] == [(-1, -1), (1,)]
+        assert _all_leaf_durations(units) == pytest.approx(list(ut.durations))
+
 
 class TestSlurRegression:
+    # A slur spanning a frontier that mixes deep subtrees with a bare leaf
+    # backfilled from above the frontier depth. `_snip_slur_into_sub_uc`
+    # would mis-map if it ever received a bare leaf as `depth_node`
+    # (`_path_sig` returns (), and the wrapper root comes back instead of a
+    # leaf) -- unreachable today, because a bare leaf's subtree_leaves is
+    # itself, so the `len(sounding) < 2` guard short-circuits first. The
+    # code is safe by construction, not by luck; these pin the construction.
+    SNIP_P = ((1, ((1, (1, 1)), 1)), 1, (1, (1, 1)))   # leaf depths 3,3,2,1,2,2
+
+    @staticmethod
+    def _slurred_uc():
+        uc = UC(tempus='3/4', prolatio=TestSlurRegression.SNIP_P, bpm=120,
+                pfields=['freq'])
+        uc.apply_slur(node=list(uc._rt.leaf_nodes))
+        return uc
+
+    @pytest.mark.parametrize('depth,n_units', [(1, 3), (2, 5), (3, 6)])
+    def test_slur_across_mixed_depth_frontier_conserves_material(self, depth, n_units):
+        uc = self._slurred_uc()
+        units = decompose(uc, depth=depth)
+        assert len(units) == n_units
+        assert sum(float(u.duration) for u in units) == pytest.approx(
+            float(uc.duration))
+        assert _all_leaf_durations(units) == pytest.approx(list(uc.durations))
+
+    def test_slur_across_mixed_depth_frontier_snips_per_unit(self):
+        # one source slur becomes two partial slurs in two units; the bare
+        # leaf backfilled from above the frontier gets none, and stays in
+        # its ordinal position between them
+        uc = self._slurred_uc()
+        assert [len(u._slur_specs) for u in decompose(uc, depth=1)] == [1, 0, 1]
+        assert [len(u._slur_specs) for u in decompose(uc, depth=2)] == [1, 0, 0, 0, 0]
+        assert [len(u._slur_specs) for u in decompose(uc, depth=3)] == [0] * 6
+
     def test_slur_mixed_size_group_max_expansion(self):
         # RUL-01: mixed single/chord/single under one slur expands to the
         # group max at the slur head (unison duplicates), then pure sets —

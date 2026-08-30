@@ -126,7 +126,7 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     from klotho.thetos.composition.compositional import CompositionalUnit
     
     prolatio_cycle = []
-    
+
     if isinstance(prolatio, tuple):
         prolatio_cycle = [prolatio]
     elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
@@ -135,7 +135,7 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
         prolatio_cycle = ['d']
     else:
         prolatio_cycle = [prolatio]
-        
+
     prolatio_cycle = cycle(prolatio_cycle)
     
     if depth is not None:
@@ -161,21 +161,27 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
         units = []
 
         for node in nodes_at_depth:
-            subtree = ut._rt.subtree(node)
-
             if isinstance(ut, CompositionalUnit):
                 cu_subtree = ut.from_subtree(node)
                 units.append(cu_subtree)
             else:
                 metric_duration = ut._rt[node]['metric_duration']
-                is_rest_leaf = (node in leaf_set
-                                and ut._rt[node].get('proportion', 1) < 0)
-                if is_rest_leaf:
-                    node_prolatio = 'r'
-                elif not prolatio:
-                    node_prolatio = subtree.group.S
+                is_rest = ut._rt[node].get('proportion', 1) < 0
+                if prolatio is None:
+                    # The node's own subdivisions ride along verbatim,
+                    # signs included -- but a bare leaf has no
+                    # subdivisions, and group.S's (1,) wrapper fallback
+                    # would turn a rest leaf into an attack.
+                    node_prolatio = (
+                        'r' if (is_rest and node in leaf_set)
+                        else ut._rt.subtree(node).group.S
+                    )
                 else:
-                    node_prolatio = next(prolatio_cycle)
+                    # Silence stays silence at every granularity: a rest
+                    # GROUP -- an interior node with a negative proportion
+                    # -- is as much a rest as a rest leaf, and re-prolating
+                    # it would turn a whole unit of silence into audio.
+                    node_prolatio = 'r' if is_rest else next(prolatio_cycle)
                 unit = TemporalUnit(
                     span     = 1,
                     tempus   = abs(metric_duration),
