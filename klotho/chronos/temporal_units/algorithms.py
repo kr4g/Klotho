@@ -1004,7 +1004,8 @@ def interleave(a, b):
     eroded from, which is why fig. 4.81 has ten bars where fig. 4.82's
     formalism suggests eight. ``interleave`` stays a pure zip and takes
     no ``include_source`` flag -- such a flag would double-count when
-    both operands already carry their seed.
+    both operands already carry their seed. It lives on the generator
+    instead: :func:`iterate`, where it defaults ``True``.
 
     UNEQUAL LENGTHS -- append-tail, and it is not symmetric. The zip runs
     to ``min(len(a), len(b))``; the longer operand's remaining units are

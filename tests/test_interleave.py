@@ -20,14 +20,19 @@ source unit. The tuilage of fig. 4.81 therefore has TEN bars, not eight.
 **Source-inclusion is a property of the OPERANDS, not of interleave** --
 each erosion sequence carries its own seed -- so ``interleave`` is a pure
 strict alternating zip with no ``include_source`` flag. Such a flag would
-double-count whenever both operands already carry their seed; it belongs
-on OPS-7's erosion generator, which is not built yet.
+double-count whenever both operands already carry their seed. It belongs
+on the generator instead, and that is where it shipped: OPS-7's
+``iterate``, whose ``include_source`` defaults ``True``.
 
 The A and B literals below are therefore hand-written from fig. 4.82 with
 fig. 4.80's source prepended, which keeps this pin independent of OPS-3
-(diminution) and OPS-7 (the erosion generator). When OPS-7 lands, add a
-generated round-trip beside these literals: ``erode(...)`` should produce
-exactly ``A`` and ``B``.
+(diminution) and OPS-7. ``TestGeneratedRoundTrip`` at the foot of this
+file closes the loop the other way: ``iterate`` (OPS-7, shipped) builds
+A and B from fig. 4.62's single source unit, and the tuilage of those two
+generated sequences still reproduces fig. 4.81's ten bars. That is the
+proof the two rows agree, and it is where ``include_source`` earns its
+default -- turn it off and the tuilage has eight bars and matches
+nothing.
 
 Assertions are on the tempus VALUE and the real duration, never on
 printed ``Meas`` spelling -- see ``test_segment.py`` for why that
@@ -282,3 +287,68 @@ class TestCompositionalUnitsPassThrough:
         c = interleave(cu, b)
         assert isinstance(c.seq[0], CompositionalUnit)
         assert _val(c.seq[0].tempus) == Fraction(1, 1)
+
+
+class TestGeneratedRoundTrip:
+    """The deferral this file opened, now closed: OPS-7's ``iterate``
+    generates A and B, and their tuilage is still fig. 4.81.
+
+    VALUES, not spellings. ``iterate`` builds Tempi raw (TEMPO-5) and
+    does not chase his editorial reductions, so it prints A's first bar
+    as ``14/18`` where he prints ``7/9`` and A's second as ``4/6`` where
+    he prints ``2/3``. Same durations; that is the claim the whole
+    operator family makes. B's four bars happen to print exactly as he
+    does.
+    """
+
+    # fig. 4.62, the single source both sequences erode.
+    SOURCE = ('1/1', ((2, (2, 1)), 1, 2, 1))
+
+    def _source(self):
+        return TemporalUnit(tempus=self.SOURCE[0], prolatio=self.SOURCE[1])
+
+    def _generated_a(self):
+        """Delete the FIRST prolatio each step."""
+        from klotho.chronos.temporal_units.algorithms import iterate, diminish
+        return iterate(self._source(), diminish)
+
+    def _generated_b(self):
+        """Delete the LAST prolatio each step -- his ``4 - i``."""
+        from klotho.chronos.temporal_units.algorithms import iterate, diminish
+        return iterate(self._source(), diminish, index=lambda i: 4 - i)
+
+    def test_generated_a_matches_the_hand_written_literal(self):
+        assert _tempi(self._generated_a()) == _tempi(_seq(A_SPEC))
+
+    def test_generated_b_matches_the_hand_written_literal(self):
+        assert _tempi(self._generated_b()) == _tempi(_seq(B_SPEC))
+
+    def test_the_generated_tuilage_is_still_figure_4_81(self):
+        c = interleave(self._generated_a(), self._generated_b())
+        assert len(c.seq) == 10
+        assert _tempi(c) == [Fraction(t) for t in FIG_4_81]
+
+    def test_generated_and_literal_tuilages_agree(self):
+        generated = interleave(self._generated_a(), self._generated_b())
+        literal = interleave(_seq(A_SPEC), _seq(B_SPEC))
+        assert _tempi(generated) == _tempi(literal)
+
+    def test_without_source_inclusion_it_is_eight_bars_and_matches_nothing(self):
+        """Why ``include_source`` defaults True, demonstrated.
+
+        This is fig. 4.82's condensed formalism taken literally, and it
+        is what the engravings contradict.
+        """
+        from klotho.chronos.temporal_units.algorithms import iterate, diminish
+        a = iterate(self._source(), diminish, include_source=False)
+        b = iterate(self._source(), diminish, include_source=False,
+                    index=lambda i: 4 - i)
+        c = interleave(a, b)
+        assert len(c.seq) == 8
+        assert _tempi(c) != [Fraction(t) for t in FIG_4_81]
+
+    def test_the_seed_still_frames_the_generated_tuilage(self):
+        """The "false symmetry": the source heads C and also ends it."""
+        c = interleave(self._generated_a(), self._generated_b())
+        assert _val(c.seq[0].tempus) == Fraction(1, 1)
+        assert _val(c.seq[-1].tempus) == Fraction(1, 1)
