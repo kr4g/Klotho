@@ -9,6 +9,7 @@ __all__ = [
     'permute_list',
     'autoref',
     'autoref_rotmat',
+    'autoref_rotmat_all',
     'iso_pairs',
     'pair_adjacent',
     'substitute',
@@ -52,6 +53,20 @@ def _parse_autoref_args(args, mode_hint:bool):
         raise ValueError('The tuples must be of equal length.')
 
     return lst1, lst2
+
+def _autoref_row(lst1, lst2, p:int, q:int, preserve_signs:bool):
+    '''
+    One row of the autoreference family: heads rotated by ``p``, tails taken
+    from ``autoref`` of ``lst2`` rotated by ``q``.
+
+    Every named rotation mode is a line through this two-parameter family,
+    and :func:`autoref_rotmat_all` is the whole of it.
+    '''
+    heads = permute_list(lst1, p, preserve_signs)
+    tails = autoref(permute_list(lst2, q, preserve_signs),
+                    preserve_signs=preserve_signs)
+    return tuple((heads[j], tails[j][1]) for j in range(len(heads)))
+
 
 # Algorithm 4: PermutList
 def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
@@ -215,6 +230,10 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     Universite, 2020, HAL tel-03258984. Mode names follow the thesis: Group,
     S, D, and circulaire (circular).
 
+    They are four of the *cinq processus* ("five processes") that section
+    counts. The fifth -- the full matrix these four are lines through -- is
+    :func:`autoref_rotmat_all`.
+
     Returns
     -------
     tuple
@@ -227,20 +246,22 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     '''
     lst1, lst2 = _parse_autoref_args(args, mode_hint=True)
 
+    n = len(lst1)
+
+    # Every mode is a LINE through the (p, q) family -- p the head offset,
+    # q the tail offset -- which is Haddad's own structural claim in section
+    # 2.3.8.5: the modes "donnent lieu a une matrice de toutes les
+    # transformations possibles" ("give rise to a matrix of all the possible
+    # transformations"). See autoref_rotmat_all. Output is byte-identical to
+    # the four hand-written arms this replaced; that is pinned by
+    # tests/test_autoref_rotmat.py::TestTheRefactorIsByteIdentical.
     match mode.upper():
         case 'G':
-            return tuple(autoref(permute_list(lst1, i, preserve_signs), 
-                               permute_list(lst2, i, preserve_signs), 
-                               preserve_signs=preserve_signs) 
-                        for i in range(len(lst1)))
+            line = ((i, i) for i in range(n))
         case 'S':
-            return tuple(tuple((lst1[j], permute_list(lst2, i + j + 1, preserve_signs)) 
-                             for j in range(len(lst1))) 
-                        for i in range(len(lst1)))
+            line = ((0, i) for i in range(n))
         case 'D':
-            return tuple(tuple((elem, autoref(lst2, preserve_signs=preserve_signs)[j][1]) 
-                             for j, elem in enumerate(permute_list(lst1, i, preserve_signs))) 
-                        for i in range(len(lst1)))
+            line = ((i, 0) for i in range(n))
         case 'C':
             # Haddad 2020, sec 2.3.8.4, "La rotation en mode circulaire"
             # ("Rotation in circular mode"): "une rotation circulaire pour
@@ -257,12 +278,72 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
             # tail tables, while 2i keeps permuting circularly through all
             # of them -- which is what the text actually describes, and what
             # modes G and S already do at rate 1. n=4 output is unchanged.
-            return tuple(tuple((elem, autoref(permute_list(lst2, 2 * i, preserve_signs),
-                                              preserve_signs=preserve_signs)[j][1])
-                             for j, elem in enumerate(permute_list(lst1, i, preserve_signs)))
-                        for i in range(len(lst1)))
+            line = ((i, 2 * i) for i in range(n))
         case _:
             raise ValueError('Invalid mode. Choose from G, S, D, or C.')
+
+    return tuple(_autoref_row(lst1, lst2, p, q, preserve_signs) for p, q in line)
+
+# The fifth process.
+def autoref_rotmat_all(*args, preserve_signs:bool=False):
+    '''
+    The full autoreference matrix: every head rotation against every tail
+    rotation.
+
+    For a list of length n this is all n**2 rows, in row-major order
+    ``k = n * p + q`` where ``p`` is the head (D) offset and ``q`` is the
+    tail (S) offset. The four named modes of :func:`autoref_rotmat` are
+    lines through it: ``'S'`` is ``p = 0`` (rows 0..n-1), ``'D'`` is
+    ``q = 0`` (every nth row), ``'G'`` is ``q = p`` (the diagonal), and
+    ``'C'`` is ``q = 2p``.
+
+    Parameters
+    ----------
+    *args
+        One list, or two lists of equal length -- see :func:`autoref_rotmat`
+        for the two-list Klotho extension.
+    preserve_signs : bool, optional
+        If True, preserves signs while rotating absolute values (default is
+        False).
+
+    Returns
+    -------
+    tuple
+        ``n**2`` rows, each a tuple of n ``(D, S)`` pairs.
+
+    Notes
+    -----
+    This is the fifth of the *cinq processus* ("five processes") Haddad
+    counts at the head of section 2.3.8. Section 2.3.8.5, "Matrice
+    autoreferentielle" ("Self-referential matrix"), states it in one line:
+    "Tout ces modes donnent lieu a une matrice de toutes les transformations
+    possibles" -- "All these modes give rise to a matrix of all the possible
+    transformations." His figure 2.26 is titled "Matrice de toutes les
+    permutations" -- "Matrix of all the permutations" -- and shows sixteen
+    rows numbered 0 to 15 for the proportions (3 4 5 7).
+
+    The row ORDER is not read off that figure. Figure 2.26 is
+    engraving-only -- unlike figures 2.18 to 2.25 it prints no s-expression
+    -- and reading durations off rotated notation is guesswork. The
+    convention was settled mechanically instead, by generating both
+    candidate orderings and asking which one puts each already-verified mode
+    on the rows it predicts. Row-major ``n * p + q`` matches; its transpose
+    does not. Modes S and D are the discriminating pair (G is symmetric
+    under transposition and proves nothing). Evidence and the full check:
+    ``projects/klotho-evolution/evidence/haddad-fig-2.26/``.
+
+    Examples
+    --------
+    >>> len(autoref_rotmat_all((3, 4, 5, 7)))
+    16
+    >>> autoref_rotmat_all((3, 4, 5, 7))[0] == autoref((3, 4, 5, 7))
+    True
+    '''
+    lst1, lst2 = _parse_autoref_args(args, mode_hint=False)
+    n = len(lst1)
+
+    return tuple(_autoref_row(lst1, lst2, p, q, preserve_signs)
+                 for p in range(n) for q in range(n))
 
 # ------------------------------------------------------------------------------------
 
