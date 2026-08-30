@@ -1166,19 +1166,24 @@ class RhythmTree(Tree):
     def _respell(self, durations, sources, op):
         """Rewrite the leaf surface from a decomposed duration sequence.
 
-        The Tempus VALUE is never changed by a preserved-family operator.
-        Its SPELLING follows the grid only when the authored spelling WAS
-        the grid -- that is, when ``meas.denominator`` already equals the
-        finest common unit of the current decomposed sequence. An authored
-        spelling that says something else about the bar (``2/2`` over a
-        five-part prolatio) is left exactly as written.
+        The Tempus is NEVER moved -- neither its value nor its spelling.
 
-        That single rule reproduces Haddad's printed figures on both sides:
-        ``2/2 (2 1 2)`` keeps ``2/2`` through an insertion (fig. 4.60),
-        while the canonical ``18/18 (4 2 3 6 3)`` is re-spelled ``54/54``
-        when a compression refines the grid to fifty-fourths (fig. 4.68).
-        Both are the same Tempus value; only the unit it is counted in
-        moves.
+        Re-spelling is never FORCED. A tree's timing is ``meas * span``
+        distributed over integer proportions, so the denominator is a free
+        display choice: the same durations are expressible under the
+        authored Tempus and under any refinement of it. What re-spelling
+        onto the refined grid DOES do is rewrite ordinary meters, because
+        an equal-beat bar's denominator equals its grid by arithmetic
+        accident -- ``3/4`` would become ``6/8``, the one pair a musician
+        must not have interchanged, and ``3/4`` compressed by ``1/5`` would
+        become ``15/20``, which is not a time signature at all. Nothing in
+        the arithmetic distinguishes ``3/4``, a METER, from Haddad's
+        ``18/18``, a normalized GRID nobody engraves.
+
+        The divergence this creates from his printed figures is recorded in
+        :meth:`scale`'s Notes, and is the same one the Tempus-FOLLOWING
+        family already carries: assert on the duration, not on the printed
+        spelling.
 
         Parameters
         ----------
@@ -1193,25 +1198,14 @@ class RhythmTree(Tree):
             every verb that inserts or removes.
         """
         payloads = self._capture_payloads()
-        old_grid = self._grid_denominator(self._decomposed_durations())
         den = self._grid_denominator(durations)
         S = tuple(int(d * den) for d in durations)
-
-        meas = None
-        if self.meas.denominator == old_grid and den != old_grid:
-            num = self.meas.to_fraction() * den
-            if num.denominator == 1:
-                meas = Meas(int(num), den)
 
         root = self.root
         layer = getattr(self, '_param_layer', None)
         bindings = layer._node_instruments if layer is not None else None
         for n in [x for x in self.nodes if x != root]:
             self._remove_node_raw(n)
-        if meas is not None:
-            self._meta['meas'] = str(meas)
-            self._meas_cache = None
-            self._rx[root]['proportion'] = meas.numerator * self.span
         if bindings is not None:
             # freed node indices are REUSED, so a binding left on a deleted
             # node does not merely leak -- it re-attaches to whatever event
@@ -1246,6 +1240,25 @@ class RhythmTree(Tree):
                              f"{value!r}") from exc
 
     @staticmethod
+    def _as_index(value, verb):
+        """Coerce a decomposed-sequence position to a plain ``int``.
+
+        Every verb in this family addresses the DECOMPOSED sequence, so an
+        index is always a whole number. Without this check a Fraction index
+        -- which is what a reversed argument pair looks like -- passed the
+        range test and then matched no position, and the operation was
+        dropped in silence.
+        """
+        if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+            raise TypeError(
+                f"{verb} index must be a whole-number position in the "
+                f"decomposed sequence; got {type(value).__name__}: "
+                f"{value!r}. The argument order is (index, value), which "
+                f"REVERSES Haddad's printed order."
+            )
+        return int(value)
+
+    @staticmethod
     def _pair_up(indices, values, what):
         """Normalize scalar-or-sequence argument pairs to a list of pairs."""
         idx_seq = isinstance(indices, (list, tuple))
@@ -1272,10 +1285,19 @@ class RhythmTree(Tree):
 
         The tree is decomposed, the duration spliced into the sequence, and
         the whole re-concatenated -- so the result is ONE level and the
-        Tempus is untouched. The inserted value only fixes the new event's
-        relative weight: everything compresses to keep the bar the length it
-        was. ``2/2 (2 1 2)`` with ``3/10`` at position 2 gives
-        ``2/2 (4 2 3 4)`` (fig. 4.60).
+        Tempus is untouched, value and spelling both. The inserted value
+        only fixes the new event's relative weight: everything compresses to
+        keep the bar the length it was. ``2/2 (2 1 2)`` with ``3/10`` at
+        position 2 gives ``2/2 (4 2 3 4)`` (fig. 4.60).
+
+        **The argument order REVERSES Haddad's.** He prints the operation as
+        ``⊕((durations), (positions))`` -- values first, positions second.
+        Klotho takes ``(index, duration)``, matching ``list.insert``,
+        ``TemporalUnitSequence.insert`` and ``TemporalBlock.insert``. A
+        reversed pair raises whenever the duration is not itself a whole
+        number, but ``insert(2, 3)`` and ``insert(3, 2)`` are both legal and
+        mean different things -- so a figure copied argument-for-argument
+        off the page is silently wrong.
 
         Parameters
         ----------
@@ -1303,6 +1325,11 @@ class RhythmTree(Tree):
         Ties do not survive: a tie group decomposes to one event, exactly as
         in :func:`~klotho.chronos.rhythm_trees.algorithms.flatten`.
 
+        Parameter overrides DO survive: a surviving event keeps its pfields,
+        mfields and instrument binding, and the inserted event takes the
+        tree's inherited defaults. Control envelopes do not -- see
+        :meth:`scale`.
+
         **Thesis erratum.** Figure 4.60 prints the source subscript as
         ``(2 1 1)``. The correct input is ``(2 1 2)``, proven three ways --
         the prose says *« trois prolationis de (2 1 2) »* ("three prolationis
@@ -1316,6 +1343,7 @@ class RhythmTree(Tree):
 
         buckets = {}
         for raw_index, raw_duration in pairs:
+            raw_index = self._as_index(raw_index, 'insert')
             k = raw_index + n if raw_index < 0 else raw_index
             if not (0 <= k <= n):
                 raise IndexError(
@@ -1387,6 +1415,14 @@ class RhythmTree(Tree):
         of it and its neighbours take less. ``18/18 (4 2 3 6 3)`` scaled by
         3 at position 2 gives ``18/18 (4 2 9 6 3)`` (fig. 4.65).
 
+        **The argument order REVERSES Haddad's.** He prints the operation as
+        ``⊗((ratios), (positions))`` -- values first, positions second.
+        Klotho takes ``(index, ratio)``, matching ``list.insert`` and the
+        rest of the family. Both are integers in fig. 4.65, so both orders
+        run and neither complains: ``scale(2, 3)`` is the published answer
+        ``(4 2 9 6 3)`` and ``scale(3, 2)`` is the plausible, wrong
+        ``(4 2 3 12 3)``.
+
         Parameters
         ----------
         index : int or sequence of int
@@ -1406,10 +1442,30 @@ class RhythmTree(Tree):
 
         Notes
         -----
+        Ties do not survive, exactly as in :meth:`insert`: a tie group
+        decomposes to one event and comes back as one leaf, so
+        ``4/4 (1, 1.0, 1, 1)`` scales to a three-event surface. The attack
+        count is unchanged -- a tie group was never more than one attack.
+
         When the ratios do not clear against the current grid, the grid is
-        refined and the Tempus is re-spelled on it -- same value, finer unit.
+        refined and the PROPORTIONS are rewritten on it. The Tempus is not:
+        the authored spelling stands, because moving it rewrites ordinary
+        meters (``3/4`` compressed by ``1/5`` would print ``15/20``). So
         ``18/18 (4 2 3 6 3)`` compressed by ``1/3`` and ``1/9`` at positions
-        2 and 3 gives ``54/54 (12 6 3 2 9)`` (fig. 4.68).
+        2 and 3 gives ``18/18 (12 6 3 2 9)`` where Haddad prints
+        ``54/54 (12 6 3 2 9)`` (fig. 4.68) -- the SAME Tempus value and the
+        same durations, counted in eighteenths instead of fifty-fourths.
+        This is the divergence the Tempus-following family already carries:
+        his spellings are not rule-generated (he prints one duration as
+        ``3/6`` in one sequence and ``9/18`` in another, and reduces
+        ``14/18`` to ``7/9`` while leaving ``15/18`` alone), so Klotho
+        asserts on the VALUE.
+
+        Parameter overrides survive the rebuild: a scaled event keeps the
+        pfields, mfields and instrument binding it had. Control envelopes do
+        NOT -- they live on the
+        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`,
+        not on the tree, and hold node ids the rebuild frees.
 
         **Thesis erratum.** Never use the prolationis printed in figures 4.68
         and 4.69: both reprint the preceding expansion result
@@ -1419,6 +1475,7 @@ class RhythmTree(Tree):
         out = self._decomposed_durations()
         n = len(out)
         for raw_index, raw_ratio in self._pair_up(index, ratio, 'ratio'):
+            raw_index = self._as_index(raw_index, 'scale')
             k = raw_index + n if raw_index < 0 else raw_index
             if not (0 <= k < n):
                 raise IndexError(

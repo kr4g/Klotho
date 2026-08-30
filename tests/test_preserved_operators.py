@@ -238,18 +238,50 @@ class TestScaleFigure465:
 class TestScaleFigure468:
     """fig. 4.68, CORRECTED. Never use figs. 4.68/4.69's printed prolationis:
     both reprint the expansion result ``(4 2 9 6 3)``. Fig. 4.69's Tempus
-    ``16/27`` is correct and forces the true answer."""
+    ``16/27`` is correct and forces the true answer.
+
+    **Spelling divergence, deliberate.** Haddad prints
+    ``54/54 (12 6 3 2 9)``; Klotho gives ``18/18 (12 6 3 2 9)``. Same Tempus
+    VALUE, same durations, same proportions -- counted in eighteenths rather
+    than fifty-fourths, because the preserved family never moves the
+    authored spelling. Three reasons:
+
+    1. Re-spelling is never forced. Timing is ``meas * span`` distributed
+       over integer proportions, so the denominator is a display choice
+       (pinned in ``test_a_finer_grid_needs_no_finer_denominator``).
+    2. The rest of this operator work already asserts on DURATION, not on
+       printed spelling, because his spellings are demonstrably not
+       rule-generated: the same duration is ``3/6`` in one sequence and
+       ``9/18`` in another, and ``14/18`` is reduced to ``7/9`` while
+       ``15/18`` is left alone. ``test_following_operators.py`` pins his
+       reduced spellings as values for the same reason.
+    3. The rule that produced ``54/54`` cannot tell a GRID from a METER.
+       ``18/18`` is a normalized ratio nobody engraves; ``3/4`` is a meter,
+       and it has the same arithmetic shape -- so the rule rewrote ``3/4``
+       to ``6/8``. See ``TestTheAuthoredSpellingIsNeverMoved``.
+
+    Flagged to Ryan as a reversible ruling: his printed spelling can return
+    as an opt-in argument."""
 
     def test_the_corrected_result(self):
         rt = RT(meas='18/18', subdivisions=(4, 2, 3, 6, 3))
         rt.scale([2, 3], [Fraction(1, 3), Fraction(1, 9)])
         assert rt.group.S == (12, 6, 3, 2, 9)
 
-    def test_the_tempus_is_respelled_on_the_refined_grid(self):
+    def test_the_tempus_VALUE_matches_the_figure_and_the_spelling_stands(self):
         rt = RT(meas='18/18', subdivisions=(4, 2, 3, 6, 3))
         rt.scale([2, 3], [Fraction(1, 3), Fraction(1, 9)])
-        assert str(rt.meas) == '54/54'
-        assert rt.meas.to_fraction() == Fraction(1)
+        assert rt.meas.to_fraction() == Fraction(1)          # his 54/54
+        assert str(rt.meas) == '18/18'                       # as authored
+
+    def test_the_durations_are_the_figures_durations(self):
+        """The assertion that would catch a real error, since the spelling
+        no longer can: proportions on a Tempus of value 1."""
+        rt = RT(meas='18/18', subdivisions=(4, 2, 3, 6, 3))
+        rt.scale([2, 3], [Fraction(1, 3), Fraction(1, 9)])
+        assert rt.durations == (Fraction(12, 32), Fraction(6, 32),
+                                Fraction(3, 32), Fraction(2, 32),
+                                Fraction(9, 32))
 
 
 class TestScaleSemantics:
@@ -322,21 +354,43 @@ class TestScaleSemantics:
 
 
 class TestSpanIsAlwaysPreserved:
+    """``span`` multiplies the Tempus, so every duration here is out of TWO
+    whole notes, not one -- which is what makes these worth asserting
+    separately. The exact per-event durations are pinned, not just their
+    sum: a total of 2 survives any redistribution, so on its own it cannot
+    tell a correct result from a scrambled one."""
+
     def test_a_multi_measure_tree_keeps_its_span_and_length(self):
         rt = RT(span=2, meas='4/4', subdivisions=(1, 1, 1, 1))
         rt.scale(1, Fraction(1, 3))
         assert rt.span == 2
         assert str(rt.meas) == '4/4'
         assert rt.group.S == (3, 1, 3, 3)
+        assert rt.durations == (Fraction(3, 5), Fraction(1, 5),
+                                Fraction(3, 5), Fraction(3, 5))
         assert sum(abs(d) for d in rt.durations) == Fraction(2)
 
     def test_insertion_into_a_multi_measure_tree(self):
+        """The inserted ``1/2`` equals what each event already weighed, so
+        the five come out equal -- a result that pins the compression but
+        says nothing about POSITION. See the asymmetric case below."""
         rt = RT(span=2, meas='4/4', subdivisions=(1, 1, 1, 1))
         rt.insert(0, Fraction(1, 2))
         assert rt.span == 2
         assert str(rt.meas) == '4/4'
         assert rt.group.S == (1, 1, 1, 1, 1)
+        assert rt.durations == (Fraction(2, 5),) * 5
         assert sum(abs(d) for d in rt.durations) == Fraction(2)
+
+    def test_an_asymmetric_insertion_lands_where_it_was_asked_to(self):
+        rt = RT(span=2, meas='4/4', subdivisions=(1, 1, 1, 1))
+        rt.insert(1, Fraction(1, 4))
+        assert rt.group.S == (2, 1, 2, 2, 2)
+        assert rt.durations == (Fraction(4, 9), Fraction(2, 9),
+                                Fraction(4, 9), Fraction(4, 9),
+                                Fraction(4, 9))
+        assert rt.span == 2
+        assert str(rt.meas) == '4/4'
 
 
 class TestPreservedFamilyChains:
@@ -449,3 +503,146 @@ class TestPayloadsSurviveTheRebuild:
         rt.scale(0, 2)
         assert rt.group.S == (2, 2, 3, 4)
         assert all('proportion' in rt[n] for n in rt.nodes)
+
+
+# ----------------------------------------------------------------------
+# the authored Tempus spelling
+# ----------------------------------------------------------------------
+class TestTheAuthoredSpellingIsNeverMoved:
+    """A preserved-family verb never moves the Tempus -- not its value and
+    not its spelling.
+
+    The earlier rule re-spelled onto the refined grid whenever the authored
+    denominator happened to equal the old grid. That is an arithmetic
+    accident of every EQUAL-BEAT bar, so it rewrote ordinary meters:
+    ``3/4`` became ``6/8`` (the one pair a musician must not have
+    interchanged), ``4/4`` became ``8/8``, and ``3/4`` compressed by ``1/5``
+    became ``15/20``, which is not a time signature at all. It also moved
+    the beat: ``TemporalUnit`` derives its default beat from the Tempus
+    denominator.
+
+    Re-spelling is never FORCED -- see
+    ``test_a_finer_grid_needs_no_finer_denominator``. ``18/18`` is a GRID,
+    a normalized ratio nobody engraves; ``3/4`` is a METER. No rule can tell
+    them apart from the arithmetic, and the misfire class is the common
+    case, so the authored spelling stands.
+
+    RULING flagged to Ryan as reversible: if Haddad's printed spelling is
+    wanted, it returns as an opt-in argument, not as the default."""
+
+    def test_a_finer_grid_needs_no_finer_denominator(self):
+        """The claim the ruling rests on. A tree's timing is ``meas * span``
+        distributed over integer proportions, so the denominator is a free
+        display choice: the SAME durations are expressible under the
+        authored Tempus and under the refined one. If this ever failed, the
+        ruling would be overturned -- re-spelling would be forced."""
+        authored = RT(meas='3/4', subdivisions=(1, 1, 1))
+        authored.insert(1, Fraction(1, 8))
+        refined = RT(meas='6/8', subdivisions=(2, 1, 2, 2))
+        assert authored.durations == refined.durations
+        assert authored.meas.to_fraction() == refined.meas.to_fraction()
+        assert all(isinstance(p, int) for p in authored.group.S)
+
+    @pytest.mark.parametrize('meas,subdivisions,index,duration,expected', [
+        ('3/4', (1, 1, 1), 1, '1/8', (2, 1, 2, 2)),
+        ('4/4', (1, 1, 1, 1), 2, '1/8', (2, 2, 1, 2, 2)),
+        ('6/8', (1,) * 6, 1, '1/16', (2, 1, 2, 2, 2, 2, 2)),
+        ('12/8', (1,) * 12, 1, '1/16', (2, 1) + (2,) * 11),
+        ('7/8', (1,) * 7, 1, '1/16', (2, 1, 2, 2, 2, 2, 2, 2)),
+    ])
+    def test_insert_keeps_the_meter(self, meas, subdivisions, index,
+                                    duration, expected):
+        rt = RT(meas=meas, subdivisions=subdivisions)
+        total = sum(abs(d) for d in rt.durations)
+        rt.insert(index, duration)
+        assert str(rt.meas) == meas
+        assert rt.group.S == expected
+        assert sum(abs(d) for d in rt.durations) == total
+
+    @pytest.mark.parametrize('meas,subdivisions,index,ratio,expected', [
+        ('3/4', (1, 1, 1), 0, '1/5', (1, 5, 5)),
+        ('4/4', (1, 1, 1, 1), 0, '1/3', (1, 3, 3, 3)),
+        ('6/8', (1,) * 6, 0, '1/4', (1, 4, 4, 4, 4, 4)),
+        ('7/8', (1,) * 7, 0, '1/3', (1, 3, 3, 3, 3, 3, 3)),
+    ])
+    def test_scale_keeps_the_meter(self, meas, subdivisions, index, ratio,
+                                   expected):
+        rt = RT(meas=meas, subdivisions=subdivisions)
+        total = sum(abs(d) for d in rt.durations)
+        rt.scale(index, ratio)
+        assert str(rt.meas) == meas
+        assert rt.group.S == expected
+        assert sum(abs(d) for d in rt.durations) == total
+
+    def test_a_span_2_tree_whose_denominator_IS_the_grid(self):
+        """The case ``TestSpanIsAlwaysPreserved`` could not reach: with
+        ``span=2, meas='4/4'`` the grid is 2 and the denominator is 4, so
+        the re-spell branch never ran. Here they coincide."""
+        rt = RT(span=2, meas='2/4', subdivisions=(1, 1, 1, 1))
+        rt.scale(0, Fraction(1, 3))
+        assert str(rt.meas) == '2/4'
+        assert rt.span == 2
+        assert rt.group.S == (1, 3, 3, 3)
+        assert sum(abs(d) for d in rt.durations) == Fraction(1)
+
+    def test_the_beat_does_not_move_under_the_operator(self):
+        """The live consequence: ``TemporalUnit`` derives its default beat
+        from the Tempus denominator, so re-spelling ``3/4`` as ``6/8``
+        turned a quarter-note beat into an eighth-note beat."""
+        from klotho.chronos import TemporalUnit
+        rt = RT(meas='3/4', subdivisions=(1, 1, 1))
+        assert TemporalUnit.from_rt(rt).beat == Fraction(1, 4)
+        rt.insert(1, Fraction(1, 8))
+        assert TemporalUnit.from_rt(rt).beat == Fraction(1, 4)
+
+
+class TestTheArgumentOrderHazard:
+    """``(index, value)`` REVERSES Haddad's printed ``⊗((ratios),
+    (positions))``. The order is deliberate -- it matches ``list.insert``,
+    ``TemporalUnitSequence.insert`` and ``TemporalBlock.insert`` -- but a
+    reversed pair of two integers is indistinguishable and runs silently."""
+
+    def test_haddads_printed_order_gives_a_different_answer(self):
+        published = RT(meas='18/18', subdivisions=(4, 2, 3, 6, 3))
+        published.scale(2, 3)
+        reversed_pair = RT(meas='18/18', subdivisions=(4, 2, 3, 6, 3))
+        reversed_pair.scale(3, 2)
+        assert published.group.S == (4, 2, 9, 6, 3)     # fig. 4.65
+        assert reversed_pair.group.S == (4, 2, 3, 12, 3)
+        assert published.group.S != reversed_pair.group.S
+
+    @pytest.mark.parametrize('index', [Fraction(3, 10), '1/8', 1.0, None])
+    def test_a_non_integer_index_raises_instead_of_being_dropped(self, index):
+        """A Fraction index used to pass the range test and then match no
+        position, so the operation was dropped in silence."""
+        rt = RT(meas='2/2', subdivisions=(2, 1, 2))
+        with pytest.raises(TypeError):
+            rt.insert(index, 2)
+        with pytest.raises(TypeError):
+            rt.scale(index, 2)
+
+    def test_the_message_names_the_argument_order(self):
+        rt = RT(meas='2/2', subdivisions=(2, 1, 2))
+        with pytest.raises(TypeError, match='index, value'):
+            rt.insert(Fraction(3, 10), 2)
+
+
+class TestScaleFlattensTiesToo:
+    """``insert``'s docstring said so and ``scale``'s did not, though they
+    destroy ties identically: both decompose first, and a tie group
+    decomposes to ONE event."""
+
+    def test_a_tie_group_comes_back_as_one_leaf(self):
+        rt = RT(meas='4/4', subdivisions=(1, 1.0, 1, 1))
+        assert rt.tie_groups == ((1, 2), (3,), (4,))
+        rt.scale(0, 2)
+        assert rt.group.S == (4, 1, 1)
+        assert not any(rt[n].get('tied') for n in rt.nodes)
+
+    def test_the_attack_count_is_unchanged(self):
+        """A tie group was never more than one attack, so flattening it
+        loses notation, not events."""
+        rt = RT(meas='4/4', subdivisions=(1, 1.0, 1, 1))
+        before = len(rt.tie_groups)
+        rt.scale(0, 2)
+        assert len(rt.tie_groups) == before == 3
