@@ -6,11 +6,11 @@ from math import lcm as _lcm
 import copy
 from .temporal import TemporalMeta, TemporalUnit, TemporalUnitSequence, TemporalBlock, RhythmTree, Meas
 from klotho.chronos.utils import beat_duration
-from klotho.chronos.rhythm_trees.algorithms import segment
 from klotho.chronos.rhythm_trees.algorithms import (
     decompose as _rt_decompose,
     fuse as _rt_fuse,
     flatten as _rt_flatten,
+    segment as _rt_segment,
     _fuse_parts,
 )
 
@@ -81,19 +81,124 @@ def _snip_slur_into_sub_uc(original_uc, sub_uc, depth_node, sounding_leaves):
             pass
 
 
-# def segment_ut(ut: TemporalUnit, ratio: Union[Fraction, float, str]) -> TemporalUnit:
-#     """
-#     Segments a temporal unit into a new unit with the given ratio. eg, a ratio of 1/3 means
-#     the new unit will have a prolatio of (1, 2).
-    
-#     Args:
-#     ut (TemporalUnit): The temporal unit to segment.
-#     ratio (Union[Fraction, float, str]): The ratio to segment the unit by.
-    
-#     Returns:
-#     TemporalUnit: A new temporal unit with the given ratio.
-#     """
-#     return TemporalUnit(span=ut.span, tempus=ut.tempus, prolatio=segment(ratio), beat=ut.beat, bpm=ut.bpm)
+def _coerce_segment_factor(factor):
+    """Lower a UT-level factor to the RT core's vocabulary.
+
+    Adds one convenience the RT layer cannot have: the members of a list
+    factor may be ``TemporalUnit``s, which is literally his fig. 4.73(b)-(c)
+    workflow — decompose a composed unit, then use the resulting
+    fundamental units as segmentation proportions. Their spans fold in.
+    """
+    if isinstance(factor, (list, tuple)):
+        out = []
+        for m in factor:
+            if isinstance(m, TemporalUnit):
+                value = (Fraction(m.tempus.numerator, m.tempus.denominator)
+                         * Fraction(m.span))
+                out.append(Meas(value.numerator, value.denominator))
+            else:
+                out.append(m)
+        return out
+    if isinstance(factor, TemporalUnit):
+        value = (Fraction(factor.tempus.numerator, factor.tempus.denominator)
+                 * Fraction(factor.span))
+        return Meas(value.numerator, value.denominator)
+    return factor
+
+
+def segment(obj, factor, tie: bool = False):
+    """
+    Divide a temporal unit in two — Haddad's segmentation operator (⊥).
+
+    ``T ⊥ f => [T·f | T·(1−f)]``, returning a
+    :class:`TemporalUnitSequence` of **exactly two units**. The symbolic
+    core is :func:`klotho.chronos.rhythm_trees.algorithms.segment`
+    (sect4.5.3.1, pp. 129–131, figs. 4.71–4.74). Span, beat and bpm carry
+    over unchanged, so the two halves together sound for exactly as long
+    as the source.
+
+    TWO CALLING CONVENTIONS, and they are not interchangeable spellings:
+
+        « La segmentation est l'operation qui divise une Unite Temporelle
+        en deux par un facteur proportionnel pouvant etre une fraction
+        quelconque entre 0 et 1, ou aussi, par un Tempus donne, relatif a
+        celui de l'Unite Temporelle en question. »
+        -- "Segmentation is the operation that divides a Temporal Unit in
+        two by a proportional factor, which may be any fraction between 0
+        and 1, *or else by a given Tempus, relative to that of the
+        Temporal Unit in question*."
+
+    ``segment(ut, '5/12')`` uses 5/12 as the factor. ``segment(ut,
+    Meas('25/24'))`` reads 25/24 as a Tempus and converts it against the
+    source's, ``25/24 x 2/5 = 5/12`` (fig. 4.73). A list is summed first,
+    his n-th-unit form: ``(15/24 + 20/24) x 2/5 = 7/12`` (fig. 4.74), and
+    its members may be ``TemporalUnit``s straight out of
+    :func:`decompose`.
+
+    Tempi are built raw (TEMPO-5): ``5/2 ⊥ 2/3`` gives ``10/6 | 5/6``
+    where he prints ``5/3 | 5/6``. Same duration; he reduced.
+
+    Only his variant (b) — « scinder » ("to split") — ships. The leaf the
+    cut falls inside becomes two independent attacks; a group becomes a
+    group on each side, so nesting survives. Variant (c) preserves the
+    straddled prolatio « par une liaison rythmique » ("by a rhythmic
+    tie") and needs a tie between the two RESULTING units, which is ties
+    charter §7 (cross-container resolution) and is not implemented.
+
+    Parameters
+    ----------
+    obj : TemporalUnit or RhythmTree
+        A ``RhythmTree`` returns the symbolic pair (two trees) instead. A
+        ``CompositionalUnit`` raises ``NotImplementedError``: splitting a
+        leaf in two forces a decision about its parameter state, which is
+        a staged surface (R13-E). Segmentation is unary on a unit — for a
+        sequence or a block, segment the member.
+    factor : Fraction, int, float, str, Meas, TemporalUnit, or list
+        See above.
+    tie : bool, optional
+        Variant (c). Raises ``NotImplementedError``. Default False.
+
+    Returns
+    -------
+    TemporalUnitSequence
+        Exactly two units, in temporal order.
+
+    Examples
+    --------
+    >>> ut = TemporalUnit(tempus='5/2', prolatio=(1,))
+    >>> [str(u.tempus) for u in segment(ut, '1/8').seq]
+    ['5/16', '35/16']
+    """
+    from klotho.thetos.composition.compositional import CompositionalUnit
+
+    if isinstance(obj, CompositionalUnit):
+        raise NotImplementedError(
+            "segment for CompositionalUnits is a staged surface (R13-E): "
+            "the cut splits a leaf in two, and what its pfields, "
+            "envelopes and slurs become is a decision no default can "
+            "make. Segment `uc.rt` for the rhythm alone."
+        )
+    if isinstance(obj, TemporalUnit):
+        left, right = _rt_segment(obj._rt,
+                                  _coerce_segment_factor(factor),
+                                  tie=tie)
+        units = []
+        for part in (left, right):
+            unit = TemporalUnit(span=part.span, tempus=part.meas,
+                                prolatio=part.subdivisions,
+                                beat=obj.beat, bpm=obj.bpm)
+            unit._attributed = frozenset(
+                {'tempus'} | (obj.attributed & {'beat', 'bpm'}))
+            units.append(unit)
+        return TemporalUnitSequence(units)
+    if isinstance(obj, RhythmTree):
+        return _rt_segment(obj, factor, tie=tie)
+    raise TypeError(
+        f"segment is unary on a TemporalUnit or a RhythmTree; got "
+        f"{type(obj).__name__}. A TemporalUnitSequence or TemporalBlock "
+        f"holds several units, and there is no single Tempus to divide -- "
+        f"segment the member you mean."
+    )
 
 def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tuple, str, None] = None, depth: Union[int, None] = None) -> TemporalUnitSequence:
     """

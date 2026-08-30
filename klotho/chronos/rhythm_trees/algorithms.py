@@ -635,18 +635,37 @@ def rhythm_pair(lst:Tuple, MM:bool=True) -> Tuple:
     deltas = np.diff(combined_sequence)
     return tuple(int(x) for x in deltas)
 
-def segment(ratio: Union[Fraction, float, str]) -> tuple[int]:
+def _exact_ratio(value) -> Fraction:
+    """Exact rational form of a user-supplied ratio.
+
+    Floats are snapped by ``limit_denominator(10**6)``. Without it
+    ``Fraction(1/3)`` is ``6004799503160661/18014398509481984`` and every
+    downstream proportion is astronomical — the documented float path was
+    unusable.
+    """
+    if isinstance(value, float):
+        return Fraction(value).limit_denominator(10 ** 6)
+    return Fraction(value)
+
+
+def segment_proportions(ratio: Union[Fraction, float, str]) -> tuple[int]:
     """
     Segment a ratio into a pair of complementary integers.
 
     Converts the ratio to a :class:`~fractions.Fraction` and returns
-    ``(numerator, denominator - numerator)``. The ratio must be less
-    than 1.
+    ``(numerator, denominator - numerator)`` — the two-term subdivision
+    that realises the ratio. ``2/5 => (2, 3)``.
+
+    Renamed from ``segment`` (2026-08-29, docket OPS-5): Haddad's
+    segmentation operator ⊥ took that name, because the operator is what
+    he defines and this is its proportion arithmetic, not the operation.
+    See :func:`segment`.
 
     Parameters
     ----------
     ratio : Fraction, float, or str
-        The ratio to segment (must be < 1).
+        The ratio to segment. Must lie strictly between 0 and 1. Floats
+        are snapped to their intended rational.
 
     Returns
     -------
@@ -656,12 +675,241 @@ def segment(ratio: Union[Fraction, float, str]) -> tuple[int]:
     Raises
     ------
     ValueError
-        If the ratio is >= 1.
+        If the ratio is not strictly between 0 and 1.
     """
-    ratio = Fraction(ratio)
+    ratio = _exact_ratio(ratio)
+    if ratio <= 0:
+        raise ValueError(
+            "ratio must be greater than 0; a zero or negative ratio has "
+            "no proportion pair, and 0 would yield the pair (0, 1) whose "
+            "leading zero the rhythm tree grammar rejects."
+        )
     if ratio >= 1:
         raise ValueError("Ratio must be less than 1")
     return (ratio.numerator, ratio.denominator - ratio.numerator)
+
+
+def _S_to_split_nodes(S):
+    """Lower a subdivision tuple into the mutable form the splitter uses.
+
+    ``['group', signed magnitude, children]`` or
+    ``['leaf', signed magnitude, tied]``. A tie is carried as the flag it
+    is rather than as the float spelling, so magnitude arithmetic stays
+    exact and the float is re-emitted only at the end.
+    """
+    out = []
+    for e in S:
+        if isinstance(e, tuple):
+            out.append(['group', Fraction(e[0]), _S_to_split_nodes(e[1])])
+        else:
+            out.append(['leaf', Fraction(e), isinstance(e, float)])
+    return out
+
+
+def _split_nodes(nodes, t):
+    """Split *nodes* at proportion position *t*, descending into groups.
+
+    Everything ending at or before *t* goes left, everything starting at
+    or after it goes right, and the one element the cut falls inside is
+    divided — recursively, so a group straddling the cut becomes a group
+    on each side rather than being flattened. This is Haddad's variant
+    (b), « scinder » ("to split"): the two pieces of a divided leaf are
+    independent attacks, so only the left piece inherits the leaf's tie.
+    """
+    left, right = [], []
+    acc = Fraction(0)
+    for nd in nodes:
+        mag = abs(nd[1])
+        sign = -1 if nd[1] < 0 else 1
+        if acc + mag <= t:
+            left.append(nd)
+        elif acc >= t:
+            right.append(nd)
+        else:
+            head = t - acc
+            tail = mag - head
+            if nd[0] == 'group':
+                sub_total = sum(abs(c[1]) for c in nd[2])
+                sub_left, sub_right = _split_nodes(nd[2],
+                                                   head / mag * sub_total)
+                left.append(['group', sign * head, sub_left])
+                right.append(['group', sign * tail, sub_right])
+            else:
+                left.append(['leaf', sign * head, nd[2]])
+                right.append(['leaf', sign * tail, False])
+        acc += mag
+    return left, right
+
+
+def _integerise_nodes(nodes):
+    """Scale each subdivision level by the lcm of its denominators.
+
+    A cut at an arbitrary factor lands between the grid points, so the
+    split produces fractional proportions. Each level is scaled
+    independently: a group's proportions are relative to its own sum, so
+    multiplying one level by a positive integer changes no duration.
+    """
+    out = []
+    for nd in nodes:
+        if nd[0] == 'group':
+            out.append(['group', nd[1], _integerise_nodes(nd[2])])
+        else:
+            out.append(list(nd))
+    den = reduce(lcm, (abs(nd[1]).denominator for nd in out), 1)
+    for nd in out:
+        nd[1] = nd[1] * den
+    return out
+
+
+def _split_nodes_to_S(nodes):
+    """Raise the splitter's form back to a subdivision tuple.
+
+    A tied leaf is re-spelled as a whole-valued float, the encoding the
+    grammar uses. Group Ds stay ``int``: a float D on an interior node is
+    refused (it has no tie meaning in OpenMusic either), and groups carry
+    no ties.
+    """
+    out = []
+    for nd in nodes:
+        if nd[0] == 'group':
+            out.append((int(nd[1]), _split_nodes_to_S(nd[2])))
+        else:
+            value = int(nd[1])
+            out.append(float(value) if nd[2] else value)
+    return tuple(out)
+
+
+def _resolve_segment_factor(meas, factor) -> Fraction:
+    """Resolve either of Haddad's two segmentation conventions to a factor.
+
+    A rational (``Fraction``, ``int``, ``float``, ``str``) is the factor
+    itself. A :class:`Meas` is a *Tempus read relative to the source's*,
+    his second convention (sect4.5.3.1 p. 129): fig. 4.73 converts it by
+    multiplying by the inverse of the source Tempus, ``25/24 x 2/5 =
+    5/12``. A list of ``Meas`` is summed first — fig. 4.74's n-th-unit
+    form, ``(15/24 + 20/24) x 2/5 = 7/12``.
+    """
+    from .meas import Meas
+
+    def _value(m):
+        return Fraction(m.numerator, m.denominator)
+
+    if isinstance(factor, Meas):
+        f = _value(factor) / _value(meas)
+    elif isinstance(factor, (list, tuple)):
+        if not factor:
+            raise ValueError(
+                "an empty list of tempi gives no segmentation factor"
+            )
+        for m in factor:
+            if not isinstance(m, Meas):
+                raise TypeError(
+                    f"a list factor is his fig. 4.74 form and holds Meas "
+                    f"tempi to be summed; got {type(m).__name__}."
+                )
+        f = sum(_value(m) for m in factor) / _value(meas)
+    else:
+        f = _exact_ratio(factor)
+
+    if not 0 < f < 1:
+        raise ValueError(
+            f"the segmentation factor must lie strictly between 0 and 1; "
+            f"got {f}. Haddad: « un facteur proportionnel pouvant etre "
+            f"une fraction quelconque entre 0 et 1 » -- \"a proportional "
+            f"factor, which may be any fraction between 0 and 1\"."
+        )
+    return f
+
+
+def segment(rt, factor, tie: bool = False) -> tuple:
+    """
+    Divide a rhythm tree in two — Haddad's segmentation operator (⊥).
+
+    ``T ⊥ f => [T·f | T·(1−f)]``. The RT-level sibling of
+    :func:`klotho.chronos.temporal_units.algorithms.segment` (sect4.5.3.1,
+    pp. 129–131, figs. 4.71–4.74), on the untimed layer.
+
+    Both his calling conventions are accepted, and they are NOT
+    interchangeable spellings of the same text:
+
+        « La segmentation est l'operation qui divise une Unite Temporelle
+        en deux par un facteur proportionnel pouvant etre une fraction
+        quelconque entre 0 et 1, ou aussi, par un Tempus donne, relatif a
+        celui de l'Unite Temporelle en question. »
+        -- "Segmentation is the operation that divides a Temporal Unit in
+        two by a proportional factor, which may be any fraction between 0
+        and 1, *or else by a given Tempus, relative to that of the
+        Temporal Unit in question*."
+
+    So ``'5/12'`` is the factor itself, while ``Meas('5/12')`` is a
+    Tempus and gets multiplied by the inverse of the source's.
+
+    The two Tempi are built raw (TEMPO-5): ``5/2 ⊥ 2/3`` gives
+    ``10/6 | 5/6`` where he prints ``5/3 | 5/6``. Same duration, his
+    reduction, not a divergence.
+
+    Only Haddad's variant (b) — « scinder » ("to split") — ships. A leaf
+    the cut falls inside becomes two independent attacks; a group becomes
+    a group on each side. Variant (c), which preserves the straddled
+    prolatio « par une liaison rythmique » ("by a rhythmic tie"), needs a
+    tie ACROSS the two results, which is ties charter §7 (cross-container
+    resolution) and is not implemented — ties today are unit-local. A tie
+    group already in the source that straddles the cut therefore becomes
+    two unit-local groups, the second one headed by a dangling tie.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to divide.
+    factor : Fraction, int, float, str, Meas, or list of Meas
+        See above. A rational must lie strictly between 0 and 1.
+    tie : bool, optional
+        Variant (c). Raises ``NotImplementedError``. Default False.
+
+    Returns
+    -------
+    tuple of RhythmTree
+        Exactly two trees, in temporal order.
+    """
+    from .rhythm_tree import RhythmTree
+    from .meas import Meas
+
+    if tie:
+        raise NotImplementedError(
+            "the tie variant of segmentation (his variant (c), preserving "
+            "the straddled prolatio « par une liaison rythmique » -- \"by "
+            "a rhythmic tie\") needs a tie ACROSS the two results. That is "
+            "ties charter §7, cross-container resolution, which is not "
+            "implemented: ties resolve unit-locally only. Use the shipped "
+            "split variant (tie=False)."
+        )
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"segment at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. For TemporalUnits use "
+            f"klotho.chronos.temporal_units.algorithms.segment, which "
+            f"returns a two-unit TemporalUnitSequence."
+        )
+
+    f = _resolve_segment_factor(rt.meas, factor)
+    g = 1 - f
+
+    S = rt.subdivisions
+    nodes = _S_to_split_nodes(S)
+    total = sum(abs(nd[1]) for nd in nodes)
+    left_nodes, right_nodes = _split_nodes(nodes, f * total)
+
+    num, den = rt.meas.numerator, rt.meas.denominator
+    return (
+        RhythmTree(span=rt.span,
+                   meas=Meas(num * f.numerator, den * f.denominator),
+                   subdivisions=_split_nodes_to_S(
+                       _integerise_nodes(left_nodes))),
+        RhythmTree(span=rt.span,
+                   meas=Meas(num * g.numerator, den * g.denominator),
+                   subdivisions=_split_nodes_to_S(
+                       _integerise_nodes(right_nodes))),
+    )
 
 # ------------------------------------------------------------------------------------
 
