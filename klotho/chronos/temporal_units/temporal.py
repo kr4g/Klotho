@@ -1467,6 +1467,10 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         beat_factor = beat.denominator / beat.numerator
         rt = self._rt
         rx = rt._rx
+        # Read the version BEFORE the loop: stamping an older version can
+        # only cost a redundant recompute, stamping a newer one would hide
+        # a mutation that landed mid-computation.
+        version = rt._structure_version
         for node in rt.nodes:
             data = rx.get_node_data(node)
             md = data['metric_duration']
@@ -1474,13 +1478,30 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
             real_duration = tempo_factor * (md.numerator / md.denominator) * beat_factor
             real_onset = tempo_factor * (mo.numerator / mo.denominator) * beat_factor
             self._real_times[node] = {'real_duration': real_duration, 'real_onset': real_onset}
+        self._timing_cache_version = version
         self._timing_dirty = False
 
+    # Class-level default so every construction path starts consistent
+    # without help — __init__, and the __new__ + manual-setup fast copies in
+    # TemporalUnit.copy and CompositionalUnit.copy (same idiom as
+    # Graph._trav_cache_version). None never equals a real version, so a
+    # freshly built unit always computes.
+    _timing_cache_version = None
+
     def _ensure_timing_cache(self):
-        # Compare against the graph's node count: _real_times is keyed by
-        # ALL nodes, while len(self._rt) is RhythmTree.__len__ = leaf count
-        # — comparing those would recompute on every read forever.
-        if self._timing_dirty or len(self._real_times) != self._rt._rx.num_nodes():
+        # Keyed on the TREE'S STRUCTURE VERSION, not on the node count.
+        # A count is blind to every mutation that keeps the node count:
+        # rt.scale, rt.replace_node and rt.move_subtree all rewrite the
+        # rhythm in place, so a unit whose events had been read once kept
+        # serving its pre-mutation onsets and durations forever (RT-27).
+        # _structure_version is bumped by _post_mutation, which every
+        # structural mutator and every node-data write already runs, so it
+        # moves whenever the timings it feeds can have moved.
+        #
+        # bpm/beat changes touch no node and no version: _timing_dirty is
+        # still the signal for those, and both halves are required.
+        if (self._timing_dirty
+                or self._timing_cache_version != self._rt._structure_version):
             self._compute_timing_cache()
 
     def _make_node_proxy(self, node_id: int):

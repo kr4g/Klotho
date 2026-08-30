@@ -569,14 +569,21 @@ def _iter_ucs(unit):
     Bare :class:`TemporalUnit` nodes are not expected inside a
     :class:`~klotho.thetos.composition.score.Score` — they are promoted
     on ``Score.add``.
+
+    Containers are walked through their **public** iterators, exactly as
+    :func:`temporal_block_to_sc_events` does. ``TemporalBlock.__iter__``
+    validates the block's alignment on the way out (``_ensure_aligned``);
+    reaching into ``_rows`` skips that, so a block whose row was grown or
+    shrunk through the row's own API would be played at its stale offsets
+    while every other reader of the same object reported the new ones.
     """
     if isinstance(unit, CompositionalUnit):
         yield unit
     elif isinstance(unit, TemporalUnitSequence):
-        for member in unit._seq:
+        for member in unit:
             yield from _iter_ucs(member)
     elif isinstance(unit, TemporalBlock):
-        for row in unit._rows:
+        for row in unit:
             yield from _iter_ucs(row)
 
 

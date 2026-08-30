@@ -110,6 +110,42 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
 
         new_tree._param_layer._effective_cache = None
 
+    def _announce_leaf_surface_change(self):
+        """The THIRD id-state event: a leaf that STOPPED BEING A LEAF.
+
+        ``subdivide``/``graft_subtree`` destroy no ids and move none -- the
+        edited node keeps its id in place -- but it is interior now, and the
+        id-keyed overlays that name it (slur members, control-envelope
+        subsets) would inherit their markers onto every note of the subtree
+        it grew. The relocation handlers already re-derive leaf-ness from
+        the tree, so the event is announced as the identity relocation over
+        the (unmoved, undestroyed) survivors.
+
+        The owning unit's verbs suppress this: they follow the edit with a
+        richer heal that ABSORBS the new leaves into the spans the ex-leaf
+        anchored (``_heal_slurs_after_subdivide``), and that heal has to see
+        the specs un-stripped.
+        """
+        if getattr(self, '_owner_absorbs_leaf_growth', False):
+            return
+        self._notify_nodes_relocated({n: n for n in self.nodes})
+
+    def subdivide(self, node, S):
+        """Subdivide leaf node(s) (see :meth:`RhythmTree.subdivide`),
+        announcing the leaf-surface change so overlays drop the
+        now-interior node."""
+        result = super().subdivide(node, S)
+        self._announce_leaf_surface_change()
+        return result
+
+    def graft_subtree(self, target_node, subtree, mode='replace'):
+        """Graft at a leaf (see :meth:`RhythmTree.graft_subtree`),
+        announcing the leaf-surface change so overlays drop the
+        now-interior node."""
+        result = super().graft_subtree(target_node, subtree, mode)
+        self._announce_leaf_surface_change()
+        return result
+
 
 @dataclass(frozen=True)
 class ParentDistributionView:
@@ -1084,10 +1120,19 @@ class CompositionalUnit(TemporalUnit):
         ``subdivide``d 4/4 carries leaves (5, 6, 2, 3, 4) while its rebuild
         numbers them (2, 3, 4, 5, 6). Copying by raw id therefore ROTATED the
         music, and after a ``remove_subtree`` it dropped a value and let the
-        pfield default resurface as real music. The two trees always have the
-        same shape, so the correspondence is positional:
+        pfield default resurface as real music. The two trees share their
+        shape (same prolationis), so the correspondence is positional:
         :meth:`~klotho.topos.graphs.trees.Tree.map_parallel_nodes` walks both
         in lockstep and raises on a shape mismatch rather than guessing.
+
+        The one shape the rebuild does NOT mirror is a source stripped to
+        its bare root (``prune``/``remove_subtree`` can do that; docket
+        RT-26): ``prolationis`` reports ``(1,)`` there, and rebuilding from
+        ``(1,)`` gives root + one child -- 2 nodes against the source's 1.
+        That divergence is exact and known, so it is mapped, not fatal:
+        root to root, as ``from_tree``/``from_subtree`` already map the
+        degenerate shape, with the root's raw overrides reaching the
+        rebuilt leaf by inheritance.
 
         The same recipe then copies the slur specs and envelope anchors, which
         are keyed by node id too -- so the correspondence is published on the
@@ -1096,7 +1141,10 @@ class CompositionalUnit(TemporalUnit):
         """
         src = source_uc._rt
         dst = self._rt
-        mapping = src.map_parallel_nodes(dst)
+        if list(src.successors(src.root)):
+            mapping = src.map_parallel_nodes(dst)
+        else:
+            mapping = {src.root: dst.root}
         dst.register_pfields(src.pfield_names)
         dst.register_mfields(src.mfield_names)
         keys = src.pfield_names | src.mfield_names
@@ -2233,19 +2281,66 @@ class CompositionalUnit(TemporalUnit):
                 if target in current_leaves and target not in seen:
                     seen.add(target)
                     moved.append(target)
-            if len(moved) < 2:
-                # a slur needs two notes and the rest of it is gone
-                del self._slur_specs[slur_id]
-                continue
-            self._slur_specs[slur_id] = {
-                'leaf_nodes': tuple(moved),
-                'leaf_set': set(moved),
-                'index_range': tuple(self._selection_index_range(moved)),
-            }
+            # members were relocated INDEPENDENTLY, so their span can now
+            # hold a leaf that was never slurred (an `insert_child` landing
+            # mid-slur). Contiguity is the property that DEFINED the slur
+            # (`apply_slur` refuses anything else), so the remap must not
+            # store its absence: split at every intruder, exactly as
+            # `make_rest` splits at a rest, and let fragments below two
+            # notes dissolve. The intruder is never swallowed -- a slur is
+            # authored by explicit selection, not by an edit landing nearby.
+            segments = self._contiguous_slur_segments(moved)
+            del self._slur_specs[slur_id]
+            for i, segment in enumerate(segments):
+                if i == 0:
+                    new_id = slur_id  # an unsplit slur keeps its identity
+                else:
+                    new_id = self._next_slur_id
+                    self._next_slur_id += 1
+                self._slur_specs[new_id] = {
+                    'leaf_nodes': tuple(segment),
+                    'leaf_set': set(segment),
+                    'index_range': tuple(self._selection_index_range(segment)),
+                }
+
+    def _contiguous_slur_segments(self, moved):
+        """Partition relocated slur members into spans ``apply_slur`` could
+        have authored.
+
+        A stored slur is consecutive in leaf order except for tie
+        continuations, which ``_snap_to_tie_heads`` folded onto their heads
+        -- those stay legal gaps as long as the head owning them is the
+        member just before. Any other leaf inside the span is an intruder,
+        and the run splits there. Fragments below two notes are not slurs
+        and are dropped.
+        """
+        if len(moved) < 2:
+            return []
+        leaf_order = list(self._rt.leaf_nodes)
+        leaf_index = {leaf: i for i, leaf in enumerate(leaf_order)}
+        head_of = {}
+        for g in self._rt.tie_groups:
+            for n in g[1:]:
+                head_of[n] = g[0]
+        ordered = sorted(moved, key=leaf_index.__getitem__)
+        segments, current = [], [ordered[0]]
+        for prev, nxt in zip(ordered, ordered[1:]):
+            gap_ok = all(
+                head_of.get(leaf_order[i]) == prev
+                for i in range(leaf_index[prev] + 1, leaf_index[nxt])
+            )
+            if gap_ok:
+                current.append(nxt)
+            else:
+                segments.append(current)
+                current = [nxt]
+        segments.append(current)
+        return [seg for seg in segments if len(seg) >= 2]
 
     def _remap_control_envelopes(self, mapping):
         if not self._control_envelopes:
             return
+        current_leaves = set(self._rt.leaf_nodes)
         for env_id, desc in list(self._control_envelopes.items()):
             anchor = mapping.get(desc["anchor_node"])
             if anchor is None:
@@ -2258,8 +2353,13 @@ class CompositionalUnit(TemporalUnit):
             desc["anchor_node"] = anchor
             if desc["leaf_subset"] is None:
                 continue
+            # a subset member that stopped being a leaf is no longer a
+            # target (resolution would filter it, but the descriptor must
+            # not keep naming an id the public API could never select --
+            # left behind, it re-attaches when the id is freed and reused)
             moved = tuple(dict.fromkeys(
-                mapping[n] for n in desc["leaf_subset"] if n in mapping
+                mapping[n] for n in desc["leaf_subset"]
+                if n in mapping and mapping[n] in current_leaves
             ))
             if not moved:
                 warnings.warn(
@@ -2351,7 +2451,13 @@ class CompositionalUnit(TemporalUnit):
         mfields = {k: v for k, v in parent_data.items()
                    if k in self._rt.mfield_names and not isinstance(v, Bind)}
 
-        self._rt.subdivide(node, S)
+        # this verb absorbs the new leaves into the spans below, so the
+        # tree's own leaf-surface seam must not strip them first
+        self._rt._owner_absorbs_leaf_growth = True
+        try:
+            self._rt.subdivide(node, S)
+        finally:
+            self._rt._owner_absorbs_leaf_growth = False
         self._invalidate_timing_cache()
         new_children = list(self._rt.successors(node))
         for child in new_children:
@@ -2372,7 +2478,13 @@ class CompositionalUnit(TemporalUnit):
         exactly as :meth:`subdivide` does. Without it the two ways of adding
         structure agree about parameters but not about slurs.
         """
-        result = self._rt.graft_subtree(node, subtree, mode)
+        # this verb absorbs the new leaves into the spans below, so the
+        # tree's own leaf-surface seam must not strip them first
+        self._rt._owner_absorbs_leaf_growth = True
+        try:
+            result = self._rt.graft_subtree(node, subtree, mode)
+        finally:
+            self._rt._owner_absorbs_leaf_growth = False
         self._invalidate_timing_cache()
         new_leaves = list(self._rt.subtree_leaves(result))
         self._heal_slurs_after_subdivide(result, new_leaves)
