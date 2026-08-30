@@ -1620,8 +1620,18 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         different page, so no listening test separates the two; the
         notation is what the composer wrote, so the tempus is what moves.
         (The complementary operation -- hold the Tempus and rescale the
-        contents -- is Haddad's *preserved* half of the same axis and is
-        not this operator.)
+        contents -- is the *preserved* half of the same axis and is not
+        this operator.)
+
+        VOCABULARY. **Haddad never writes "Tempus-preserving" or
+        "Tempus-following."** The axis is his -- he states it outright on
+        p. 128 -- but his labels for the two halves are « prolationnelle
+        stricte » ("strictly prolational") for the preserving family and
+        « relative » ("relative") for this one. The English pair is
+        **Klotho's coinage**, kept because it names the mechanism rather
+        than the grammar. His notation is systematic and worth knowing:
+        a BOX means the Tempus follows (⊞ ⊟ ⊠), a CIRCLE means the Tempus
+        is preserved (⊕ ⊖ ⊗).
 
         The result always has ``span=1``, with the source's span folded
         into the tempus numerator (span 2 of 6/20 scaled by 1 comes back as

@@ -1188,6 +1188,14 @@ class RhythmTree(Tree):
         family already carries: assert on the duration, not on the printed
         spelling.
 
+        **This ruling is REVERSIBLE and is pending the client's word.** It
+        replaced a rule that re-spelled onto the refined grid, and that
+        rule's failure mode is what settles the argument for now: it
+        silently rewrote ``3/4`` into ``6/8``. If Haddad's printed spelling
+        is wanted after all, it comes back as an OPT-IN argument, never as
+        the default -- the class of bar the old rule broke is the common
+        one.
+
         Parameters
         ----------
         durations : list of Fraction
@@ -1515,7 +1523,9 @@ class RhythmTree(Tree):
         his spellings are not rule-generated (he prints one duration as
         ``3/6`` in one sequence and ``9/18`` in another, and reduces
         ``14/18`` to ``7/9`` while leaving ``15/18`` alone), so Klotho
-        asserts on the VALUE.
+        asserts on the VALUE. **Reversible ruling, pending the client:** if
+        his spelling is wanted it returns as an opt-in argument, not as the
+        default. See :meth:`_respell` for why the default falls this way.
 
         Parameter overrides survive the rebuild: a scaled event keeps the
         pfields, mfields and instrument binding it had. Control envelopes do
