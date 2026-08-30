@@ -81,10 +81,13 @@ import pytest
 from klotho.chronos import (RhythmTree, TemporalUnit, TemporalUnitSequence,
                             TemporalBlock, Meas)
 from klotho.chronos.rhythm_trees.algorithms import (
+    augment as rt_augment,
     diminish as rt_diminish,
     scale_tempus as rt_scale_tempus,
 )
-from klotho.chronos.temporal_units.algorithms import diminish, scale_tempus
+from klotho.chronos.temporal_units.algorithms import (
+    augment, diminish, scale_tempus,
+)
 
 
 def _val(m):
@@ -108,6 +111,113 @@ def _spelling(rt):
 # reproduces it character for character.
 def _B():
     return RhythmTree(meas='18/18', subdivisions=(4, 2, 3, 6, 3))
+
+
+class TestAugmentation:
+    """Augmentation -- + in a box, sect4.5.2.1, pp. 125-126, figs. 4.58-4.60.
+
+    The refinement case: an inserted operand is generally NOT
+    commensurable with the existing prolationis, and the whole result
+    depends on finding the grid on which they all are.
+    """
+
+    def test_fig_4_58(self):
+        # ``2/2 (2 1 2) [+] (3/10, 2) => 13/10 (4 2 3 4)``.
+        # NB the figure prints the source subscript as ``(2 1 1)``; see the
+        # module docstring -- it is corrupt, the source is (2 1 2). The
+        # refinement is visible here: the source's own grid is 5ths and
+        # the operand's is 10ths, so everything is re-spelled on 10.
+        src = RhythmTree(meas='2/2', subdivisions=(2, 1, 2))
+        out = rt_augment(src, '3/10', 2)
+        assert _spelling(out) == (13, 10, (4, 2, 3, 4))
+
+    def test_primary_regression_p131(self):
+        # His iterated form, p. 131 -- head insertion, interior insertion
+        # and multi-insertion ordering at once, over four distinct source
+        # denominators. ``4/3 (4 3 2 1) [+] {(1/4,0) || (3/10,2) || (1/2,3)}``
+        src = RhythmTree(meas='4/3', subdivisions=(4, 3, 2, 1))
+        out = rt_augment(src, ('1/4', '3/10', '1/2'), (0, 2, 3))
+        assert _spelling(out) == (143, 60, (15, 32, 24, 18, 16, 30, 8))
+
+    def test_tempus_is_the_sum_of_the_transformed_prolationis(self):
+        # p. 128 literally: « le Tempus est la somme des prolationis une
+        # fois transformes » -- "the Tempus is the sum of the prolationis
+        # once transformed".
+        src = RhythmTree(meas='4/3', subdivisions=(4, 3, 2, 1))
+        out = rt_augment(src, ('1/4', '3/10', '1/2'), (0, 2, 3))
+        assert sum(abs(s) for s in out.subdivisions) == out.meas.numerator
+
+    def test_duration_grows_by_exactly_the_additions(self):
+        src = RhythmTree(meas='4/3', subdivisions=(4, 3, 2, 1))
+        out = rt_augment(src, ('1/4', '3/10', '1/2'), (0, 2, 3))
+        assert _val(out.meas) == (Fraction(4, 3) + Fraction(1, 4)
+                                  + Fraction(3, 10) + Fraction(1, 2))
+
+    def test_position_zero_is_the_head(self):
+        # p. 125: « 0 etant la position de tete de sequence » -- "0 being
+        # the head-of-sequence position".
+        out = rt_augment(_B(), '1/18', 0)
+        assert _spelling(out) == (19, 18, (1, 4, 2, 3, 6, 3))
+
+    def test_position_len_appends_past_the_tail(self):
+        out = rt_augment(_B(), '1/18', 5)
+        assert _spelling(out) == (19, 18, (4, 2, 3, 6, 3, 1))
+
+    def test_indices_name_the_original_sequence(self):
+        # Two insertions at ascending positions must not shift each
+        # other: 2 and 3 are indices into B, not into the growing result.
+        out = rt_augment(_B(), ('1/18', '1/18'), (2, 3))
+        assert out.subdivisions == (4, 2, 1, 3, 1, 6, 3)
+
+    def test_two_additions_at_one_position_keep_the_given_order(self):
+        out = rt_augment(_B(), ('1/18', '2/18'), (2, 2))
+        assert out.subdivisions == (4, 2, 1, 2, 3, 6, 3)
+
+    def test_a_rhythm_tree_may_be_inserted(self):
+        # sect4.5.2's preamble makes the operand a PROLATIO, not merely a
+        # number, so any tree may be concatenated in and keeps its shape.
+        src = RhythmTree(meas='2/2', subdivisions=(2, 1, 2))
+        add = RhythmTree(meas='3/10', subdivisions=(1,))
+        assert _spelling(rt_augment(src, add, 2)) == (13, 10, (4, 2, 3, 4))
+
+    def test_a_composed_operand_keeps_its_internal_structure(self):
+        src = RhythmTree(meas='2/2', subdivisions=(2, 1, 2))
+        add = RhythmTree(meas='3/10', subdivisions=(1, 1))
+        out = rt_augment(src, add, 2)
+        assert _spelling(out) == (13, 10, (4, 2, (3, (1, 1)), 4))
+
+    def test_a_negative_operand_inserts_a_rest(self):
+        out = rt_augment(_B(), '-1/18', 0)
+        assert _spelling(out) == (19, 18, (-1, 4, 2, 3, 6, 3))
+
+    def test_rests_in_the_source_survive(self):
+        src = RhythmTree(meas='4/4', subdivisions=(1, -1, 1, 1))
+        out = rt_augment(src, '1/4', 2)
+        assert out.subdivisions == (1, -1, 1, 1, 1)
+
+    def test_a_meas_operand_keeps_its_raw_spelling(self):
+        # 6/20 is 3/10 in value but a different Tempus in nature
+        # (sect4.4.2/4.4.5), so it refines the grid differently.
+        assert rt_augment(_B(), Meas(6, 20), 0).meas.denominator == 180
+        assert rt_augment(_B(), '3/10', 0).meas.denominator == 90
+
+    def test_out_of_range_position_raises(self):
+        with pytest.raises(ValueError):
+            rt_augment(_B(), '1/18', 6)
+        with pytest.raises(ValueError):
+            rt_augment(_B(), '1/18', -1)
+
+    def test_length_mismatch_raises(self):
+        with pytest.raises(ValueError):
+            rt_augment(_B(), ('1/18', '1/18'), (0,))
+
+    def test_zero_operand_raises(self):
+        with pytest.raises(ValueError):
+            rt_augment(_B(), 0, 0)
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError):
+            rt_augment(_B(), (), ())
 
 
 class TestDiminution:
@@ -320,3 +430,48 @@ class TestCompositionalUnitRefused:
         ut = TemporalUnit(tempus='1/4', prolatio=(1, 1))
         with pytest.raises(TypeError):
             scale_tempus(TemporalUnitSequence([ut]), 2, 0)
+
+    def test_augment_holds_bpm_and_grows_the_duration(self):
+        ut = TemporalUnit(tempus='2/2', prolatio=(2, 1, 2), beat='1/4', bpm=60)
+        out = augment(ut, '3/10', 2)
+        assert out.bpm == 60 and out.beat == ut.beat
+        assert _val(out.tempus) == Fraction(13, 10)
+        assert out.duration == pytest.approx(ut.duration * (13 / 10) / 1)
+
+    def test_augment_span_folds_in(self):
+        ut = TemporalUnit(span=2, tempus='2/2', prolatio=(2, 1, 2),
+                          beat='1/4', bpm=60)
+        out = augment(ut, '3/10', 2)
+        assert out.span == 1
+        assert _val(out.tempus) == Fraction(2, 1) + Fraction(3, 10)
+
+    def test_a_temporal_unit_operand_is_reconciled(self):
+        # An operand carrying its own tempo is re-expressed at the host's
+        # reference by sect4.4.4 before it is concatenated -- half the bpm
+        # is twice the notated value for the same REAL duration. Without
+        # the reconciliation the insertion would silently change how long
+        # the operand sounds.
+        host = TemporalUnit(tempus='1/4', prolatio=(1,), beat='1/4', bpm=60)
+        add = TemporalUnit(tempus='1/4', prolatio=(1,), beat='1/4', bpm=30)
+        out = augment(host, add, 1)
+        assert _val(out.tempus) == Fraction(3, 4)
+        assert out.duration == pytest.approx(host.duration + add.duration)
+
+    def test_augment_refuses_a_compositional_unit(self):
+        from klotho.thetos.composition.compositional import CompositionalUnit
+        cu = CompositionalUnit(tempus='2/2', prolatio=(2, 1, 2))
+        with pytest.raises(NotImplementedError):
+            augment(cu, '3/10', 2)
+
+    def test_augment_refuses_a_compositional_unit_as_operand(self):
+        from klotho.thetos.composition.compositional import CompositionalUnit
+        host = TemporalUnit(tempus='1/4', prolatio=(1,))
+        cu = CompositionalUnit(tempus='1/4', prolatio=(1,))
+        with pytest.raises(NotImplementedError):
+            augment(host, cu, 1)
+
+    def test_augment_refuses_a_sequence_operand(self):
+        host = TemporalUnit(tempus='1/4', prolatio=(1,))
+        seq = TemporalUnitSequence([TemporalUnit(tempus='1/4', prolatio=(1,))])
+        with pytest.raises(TypeError):
+            augment(host, seq, 1)

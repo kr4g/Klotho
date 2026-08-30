@@ -464,6 +464,145 @@ def diminish(rt, positions):
     return fuse(survivors)
 
 
+def _as_prolatio(value, verb):
+    """Lift an augmentation operand to a :class:`RhythmTree`.
+
+    His §4.5.2 preamble makes the operand a PROLATIO, not merely a number
+    — the operation is « la concaténation de l'ensemble des prolationis »
+    ("the concatenation of the whole set of prolationis") — so a
+    ``RhythmTree`` passes through with its internal structure intact and
+    a bare rational becomes a fundamental one.
+
+    A ``Meas`` keeps its raw spelling (TEMPO-5), and the spelling matters
+    here: 6/20 and 3/10 are the same duration but refine the shared grid
+    differently, which is exactly the distinction of nature his §4.4.2 and
+    §4.4.5 insist on. Other rationals go through ``Fraction`` and
+    normalise. A NEGATIVE operand inserts a rest — the sign convention
+    ``decompose`` already uses, so a silence is insertable without a
+    second verb.
+    """
+    from .rhythm_tree import RhythmTree
+    from .meas import Meas
+    if isinstance(value, RhythmTree):
+        return value
+    if isinstance(value, Meas):
+        num, den = value.numerator, value.denominator
+    else:
+        try:
+            f = _exact_ratio(value)
+        except (TypeError, ValueError):
+            raise TypeError(
+                f"{verb} operands are prolationes: a RhythmTree, a Meas, "
+                f"or any rational; got {type(value).__name__}."
+            ) from None
+        num, den = f.numerator, f.denominator
+    if num == 0:
+        raise ValueError(
+            f"{verb} cannot add a zero-length prolatio -- it would occupy "
+            f"no time, and the rhythm tree grammar rejects a zero "
+            f"proportion. To add a silence, pass a NEGATIVE value."
+        )
+    negative = (num < 0) != (den < 0)
+    return RhythmTree(span=1, meas=Meas(abs(num), abs(den)),
+                      subdivisions=(-1,) if negative else (1,))
+
+
+def augment(rt, additions, positions):
+    """
+    Add prolationes and let the Tempus follow — Haddad's augmentation (⊞).
+
+    sect4.5.2.1, pp. 125–126, figs. 4.58–4.60. The Tempus-FOLLOWING half
+    of the add pair; the preserving sibling is insertion (⊕), which holds
+    the Tempus and re-spells the whole bar as a longer tuplet.
+
+    The Tempus grows by exactly what was added — p. 128, on this family:
+    « le Tempus est la somme des prolationis une fois transformés » ("the
+    Tempus is the sum of the prolationis once transformed") — so at held
+    bpm the bar really gets longer.
+
+    Published examples::
+
+        2/2 (2 1 2) ⊞ (3/10, 2)                     =>  13/10 (4 2 3 4)
+        4/3 (4 3 2 1) ⊞ {(1/4,0) ‖ (3/10,2) ‖ (1/2,3)}
+                                    =>  143/60 (15 32 24 18 16 30 8)
+
+    **Figures 4.58 and 4.60 print the source subscript as ``(2 1 1)``.**
+    It is ``(2 1 2)``, proven three ways: his prose says « trois
+    prolationis de (2 1 2) » ("three prolationis of (2 1 2)"), the
+    engraving is a 5:4 tuplet (5 = 2+1+2), and only ``(2 1 2)`` yields his
+    own printed ``(4 2 3 4)``.
+
+    **This is the refinement case.** An added prolatio is generally not
+    commensurable with the existing ones — in fig. 4.58 the source lives
+    on 5ths and the operand on 10ths — and the whole result is the grid on
+    which they all become integers. That grid is ``_fuse_parts``' lcm
+    fold, so the arithmetic is the shipped one and no new rule is
+    introduced here.
+
+    Positions index the DECOMPOSED sequence and are **insert-before**,
+    0-based (p. 125: « 0 étant la position de tête de séquence » — "0
+    being the head-of-sequence position"). ``len(parts)`` appends past the
+    tail. Indices name the ORIGINAL sequence, so several insertions do not
+    shift one another; two operands at one position go in the order given.
+    One entry per tie GROUP (ALG-2), and, like :func:`flatten`, the result
+    carries no ties.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to augment. Not modified.
+    additions : RhythmTree, Meas, rational, or sequence of them
+        The prolationes to add. A ``RhythmTree`` keeps its internal
+        structure and nests; a negative rational inserts a rest. A scalar
+        broadcasts to a one-element tuple.
+    positions : int or sequence of int
+        Parallel to *additions*, in ``0..len(decomposed)``.
+
+    Returns
+    -------
+    RhythmTree
+        A new tree whose ``meas`` is the sum of everything, source and
+        additions alike, on their common grid.
+
+    Raises
+    ------
+    ValueError
+        On an empty call, a length mismatch, an out-of-range position, or
+        a zero-length operand.
+    """
+    from .rhythm_tree import RhythmTree
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"augment at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. For TemporalUnits use "
+            f"klotho.chronos.temporal_units.algorithms.augment."
+        )
+    adds = _as_operand_tuple(additions)
+    ps = _as_operand_tuple(positions)
+    if not adds and not ps:
+        raise ValueError(
+            "augment needs at least one (prolatio, position) pair -- "
+            "adding nothing is not an augmentation. For the canonical "
+            "re-spelling alone, use flatten."
+        )
+    _check_pairing(adds, ps, 'augment', 'additions')
+    parts = list(decompose(rt))
+    # upper bound is len(parts), not len(parts) - 1: inserting BEFORE the
+    # one-past-the-end index is how the tail is appended.
+    idx = _check_positions(ps, len(parts), 'augment')
+
+    pending = {}
+    for value, p in zip(adds, idx):
+        pending.setdefault(p, []).append(_as_prolatio(value, 'augment'))
+
+    out = []
+    for i in range(len(parts) + 1):
+        out.extend(pending.get(i, ()))
+        if i < len(parts):
+            out.append(parts[i])
+    return fuse(out)
+
+
 def _scaling_ratio(value, verb):
     """Exact positive rational form of a scaling ratio.
 

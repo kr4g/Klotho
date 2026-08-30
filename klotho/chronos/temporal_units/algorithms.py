@@ -11,6 +11,7 @@ from klotho.chronos.rhythm_trees.algorithms import (
     fuse as _rt_fuse,
     flatten as _rt_flatten,
     segment as _rt_segment,
+    augment as _rt_augment,
     diminish as _rt_diminish,
     scale_tempus as _rt_scale_tempus,
     _fuse_parts,
@@ -832,6 +833,110 @@ def scale_tempus(obj, ratios, positions):
         return _rt_scale_tempus(obj, ratios, positions)
     return _following_result(
         obj, _rt_scale_tempus(obj._rt, ratios, positions))
+
+
+def _coerce_addition(value, ref_beat, ref_bpm):
+    """Lower one augmentation operand to the RT core's vocabulary.
+
+    A temporalised operand carries its own (beat, bpm), so before it can
+    be concatenated it is re-expressed at the HOST's reference by
+    sect4.4.4 — the same reconciliation rule ``fuse`` uses (R13-B/C/D),
+    with the ratio and the span folded into ONE exact ``Fraction`` and
+    applied to the tempus as raw ints, so no spelling is cancelled away
+    (TEMPO-5). Without this an inserted unit would silently change how
+    long it sounds.
+
+    Everything else (a ``RhythmTree``, a ``Meas``, a bare rational) is
+    untimed and passes through to be read at the host's reference — his
+    p. 97 convention, the one ``fuse`` already follows.
+    """
+    from klotho.thetos.composition.compositional import CompositionalUnit
+
+    if isinstance(value, CompositionalUnit):
+        raise NotImplementedError(
+            "a CompositionalUnit cannot be inserted by augment: its "
+            "pfields, envelopes and slurs would have to merge into the "
+            "host, which is the staged parameter-state surface (R13-E). "
+            "Insert `uc.rt` for the rhythm alone."
+        )
+    if isinstance(value, TemporalUnitSequence):
+        raise TypeError(
+            "augment adds ONE prolatio per position; a "
+            "TemporalUnitSequence is several. Fuse it into a single unit "
+            "first (fuse(seq)) and insert that, so the reconciliation is "
+            "yours to see rather than implied."
+        )
+    if isinstance(value, TemporalBlock):
+        raise TypeError(
+            "a TemporalBlock cannot be inserted: a polyphonic stack is "
+            "not a prolatio, and flattening it into one voice has no "
+            "unique answer."
+        )
+    if isinstance(value, TemporalUnit):
+        factor = ((_exact_tempo_ratio(ref_bpm) / _exact_tempo_ratio(value.bpm))
+                  * (ref_beat / value.beat) * Fraction(value.span))
+        return RhythmTree(span=1,
+                          meas=Meas(value.tempus.numerator * factor.numerator,
+                                    value.tempus.denominator * factor.denominator),
+                          subdivisions=value.prolationis)
+    return value
+
+
+def augment(obj, additions, positions):
+    """
+    Add prolationes and let the Tempus follow — Haddad's augmentation (⊞).
+
+    The symbolic core is
+    :func:`klotho.chronos.rhythm_trees.algorithms.augment` (sect4.5.2.1,
+    pp. 125–126, figs. 4.58–4.60). Its preserving sibling is
+    ``RhythmTree.insert`` (⊕), which holds the Tempus and re-spells the
+    bar as a longer tuplet — "add a note without changing the bar's
+    duration". This verb does the opposite: **beat and bpm are held**, the
+    Tempus grows by exactly what was added, and the bar gets longer.
+
+    ``2/2 (2 1 2) ⊞ (3/10, 2)`` gives ``13/10 (4 2 3 4)``, and that
+    re-spelling of the source from 5ths onto 10ths is the operation's real
+    content — the added prolatio is not commensurable with the existing
+    ones until the grid is refined.
+
+    A ``TemporalUnit`` operand is RECONCILED before it is concatenated:
+    re-expressed at this unit's (beat, bpm) by sect4.4.4, exactly as
+    :func:`fuse` does, so the inserted material keeps its real duration
+    rather than silently adopting the host's tempo. An untimed operand (a
+    ``RhythmTree``, a ``Meas``, a rational) is read at the host's
+    reference, his p. 97 convention.
+
+    Positions are insert-before, 0-based, into the DECOMPOSED sequence,
+    and name the ORIGINAL sequence, so several insertions do not shift
+    one another. ``len(decomposed)`` appends past the tail.
+
+    Parameters
+    ----------
+    obj : TemporalUnit or RhythmTree
+        A ``RhythmTree`` returns a ``RhythmTree``. A ``CompositionalUnit``
+        raises ``NotImplementedError`` (R13-E).
+    additions : TemporalUnit, RhythmTree, Meas, rational, or sequence
+        A ``TemporalUnitSequence`` is refused — fuse it first, so the
+        reconciliation is visible rather than implied.
+    positions : int or sequence of int
+
+    Returns
+    -------
+    TemporalUnit or RhythmTree
+
+    Examples
+    --------
+    >>> ut = TemporalUnit(tempus='2/2', prolatio=(2, 1, 2))
+    >>> str(augment(ut, '3/10', 2).tempus)
+    '13/10'
+    """
+    if _following_target(obj, 'augment') == 'rt':
+        return _rt_augment(obj, additions, positions)
+    adds = additions if isinstance(additions, (list, tuple)) else [additions]
+    coerced = [_coerce_addition(a, obj.beat, obj.bpm) for a in adds]
+    if not isinstance(additions, (list, tuple)):
+        coerced = coerced[0]
+    return _following_result(obj, _rt_augment(obj._rt, coerced, positions))
 
 
 def _interleave_operand(obj, position):
