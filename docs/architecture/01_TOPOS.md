@@ -229,6 +229,7 @@ classDiagram
         +node_from_signature(root, signature) int
         +map_parallel_nodes(other_tree) dict
         +attach_layer(layer)
+        +set_id_state_observer(callback)
         +set_node_data(node, **attr)
         +update_node_data(node, attrs)
         +replace_node_data(node, attrs)
@@ -266,6 +267,10 @@ classDiagram
     Tree o-- TreeLayer : notifies
     Tree *-- Group
 ```
+
+`set_id_state_observer` registers the owner of id-keyed state that lives
+*outside* the tree; the callback gets exactly what an attached layer gets
+from `on_nodes_remapped`.  See **Id-Keyed State Follows Content** below.
 
 ### Construction from Nested Tuples
 
@@ -309,7 +314,10 @@ Two consequences follow directly:
   `list.insert`; out of range raises `IndexError` instead of clamping.
 - **Node identity follows position, not content.**  Slot `k` keeps its id
   and receives the *new* content, so an external handle to a shifted
-  sibling now denotes a different node than it did before the call.
+  sibling now denotes a different node than it did before the call.  The
+  tree's **own** id-keyed state is not an external handle: instrument
+  bindings, slurs and the `Bind` memo move with the content they
+  describe.  See *Id-Keyed State Follows Content* below.
 
 This is also why no renumbering machinery exists:
 **`GraphCore.renumber_nodes` is a no-op stub** — it validates the `method`
@@ -325,10 +333,56 @@ rt.subdivide(new_id, (1, 2))
 
 There is deliberately no `insert_subtree`.  Note also that `add_child`
 cannot promise a last position: rustworkx **reuses freed node indices**,
-so a new node can land anywhere in the sorted order.  Any code that
-caches per-node state keyed by node id must clear the entry when the node
-is removed, or a stale binding will silently re-attach itself to whatever
-lands in that slot.
+so a new node can land anywhere in the sorted order — including a slot
+that a removed node used to occupy.
+
+### Id-Keyed State Follows Content
+
+Because freed indices are reused, state keyed by node id does not merely
+leak when its node dies: it **re-attaches** to whatever lands in the
+freed slot.  A node id is therefore an address, not an identity, and any
+map keyed by one has to be told when the tree moves things around.
+There are two seams for this, and neither is the caller's job.
+
+- **Death is generic and belongs to the layer.**  Every structural
+  mutator ends in `_post_mutation`, which calls
+  `TreeLayer.on_structure_changed`, so a layer drops the entries whose
+  nodes are gone there — one place covering `prune`, `remove_subtree`,
+  `prune_leaves` and `prune_to_depth` at once.  `ParameterLayer` does
+  exactly this for instrument bindings.
+- **Relocation is raised by whoever moves content.**
+  `Tree._notify_nodes_relocated(mapping)` announces that content moved
+  between ids.  It is raised today by `Tree.insert_child`,
+  `RhythmTree._respell`, and `CompositionalTree`'s leaf-surface
+  announcement after `subdivide`/`graft_subtree` (a node that stopped
+  being a leaf keeps its id but must not keep leaf-level overlays).
+
+The mapping is **total over the ids that survived** — old id → the id
+now holding that content — so a receiver never has to ask whether an id
+still exists.  Mid-`_respell` it could not answer: every new slot is "in
+the tree" and half of them are recycled indices, so the question returns
+a lie.  An id absent from the mapping was **destroyed**, and every
+id-keyed map must drop it.
+
+`_notify_nodes_relocated` reaches every attached layer through
+`TreeLayer.on_nodes_remapped`, and one further receiver:
+`Tree.set_id_state_observer(callback)` registers the owner of id-keyed
+state that lives **outside** the tree.  A `CompositionalUnit` keeps slur
+specs, the `Bind` memo and control-envelope targets on itself, and the
+tree's verbs are reachable without going through it (`uc._rt.insert(…)`),
+so the unit registers an observer rather than wrapping every verb.
+
+Two limits are the useful half:
+
+- **A pure deletion raises no relocation.**  `prune` and
+  `remove_subtree` notify layers only; an owner outside the tree is not
+  told, and purges in its own deleter — which is what
+  `CompositionalUnit.prune` and `.remove_subtree` do.
+- **A clone gets no observer.**  `subtree`, `from_tree_structure`,
+  `structural_clone` and `__deepcopy__` all set it back to `None`: the
+  clone belongs to a different owner, which rebinds itself.  If it
+  inherited the observer, editing the copy would rewrite the original's
+  overlays.
 
 ### Tree Layers
 

@@ -388,3 +388,568 @@ class TestTheTempusSpellingRulingIsMarkedReversible:
         rt = RhythmTree(meas='3/4', subdivisions=(1, 1, 1))
         rt.insert(1, Fraction(1, 8))
         assert str(rt.meas) == '3/4'
+
+
+def _chronos_section(number):
+    """The body of one numbered section of ``docs/architecture/02_CHRONOS.md``,
+    heading excluded. Scoping the text pins below to a section keeps them from
+    passing on a sentence that happens to appear somewhere else in the file."""
+    text = (REPO / 'docs' / 'architecture' / '02_CHRONOS.md').read_text()
+    parts = text.split('\n## ')
+    body = [p for p in parts if p.startswith(f'{number}. ')]
+    assert len(body) == 1, f'section {number} not found exactly once'
+    return body[0]
+
+
+class TestOnlyTheStartIsFixedAfterConstruction:
+    """Two class docstrings and 02_CHRONOS.md sect5 all said a container's
+    duration was "fixed after construction". It never was. A sequence's
+    duration is the SUM of its members' and a block's is its LONGEST row's,
+    so anything that changes membership changes the duration -- and
+    ``TemporalBlock.rows`` hands out the live rows, so a row's own mutator
+    moves the block's duration with no block-level mutator running at all.
+
+    What is fixed outside a Score is the START. ``TemporalUnit`` and
+    ``CompositionalUnit`` are the genuine cases and keep the claim; the
+    tests below pin both halves, so a later correction cannot overshoot in
+    either direction.
+
+    Durations here are derived from the notation, not read off the code: at
+    ``bpm=60`` with a quarter-note beat, a ``4/4`` measure is 4.0 s and a
+    ``2/4`` measure is 2.0 s.
+    """
+
+    @staticmethod
+    def _u(tempus='4/4'):
+        from klotho.chronos import TemporalUnit
+        return TemporalUnit(tempus=tempus, prolatio=(1, 1), bpm=60)
+
+    def _seq(self):
+        from klotho.chronos import TemporalUnitSequence
+        return TemporalUnitSequence([self._u()])          # 4.0 s
+
+    @pytest.mark.parametrize('name, mutate, expected', [
+        ('append',      lambda s, u: s.append(u('2/4')),            6.0),
+        ('append x2',   lambda s, u: s.append(u('2/4'), repeat=2),  8.0),
+        ('prepend',     lambda s, u: s.prepend(u('2/4')),           6.0),
+        ('insert',      lambda s, u: s.insert(0, u('2/4')),         6.0),
+        ('remove',      lambda s, u: s.remove(0),                   0.0),
+        ('replace',     lambda s, u: s.replace(0, u('2/4')),        2.0),
+        ('__setitem__', lambda s, u: s.__setitem__(0, u('2/4')),    2.0),
+        ('extend',      lambda s, u: s.extend(
+            type(s)([u('2/4')])),                                   6.0),
+    ])
+    def test_every_sequence_mutator_moves_the_duration(self, name, mutate,
+                                                       expected):
+        seq = self._seq()
+        assert seq.duration == pytest.approx(4.0)
+        mutate(seq, self._u)
+        assert seq.duration == pytest.approx(expected), name
+
+    def test_the_sequence_start_is_what_stays_put(self):
+        seq = self._seq()
+        assert seq.start == pytest.approx(0.0)
+        seq.prepend(self._u('2/4'))       # the mutator most likely to move it
+        assert seq.start == pytest.approx(0.0)
+        assert seq.end == pytest.approx(seq.duration)
+
+    def test_a_live_row_mutation_moves_the_block_duration(self):
+        """No block-level mutator runs here -- the sequence in row 0 is
+        lengthened through its own API."""
+        from klotho.chronos import TemporalBlock, TemporalUnitSequence
+        blk = TemporalBlock([TemporalUnitSequence([self._u('2/4')]),
+                             self._u()], axis=1, sort_rows=False)
+        assert blk.duration == pytest.approx(4.0)
+
+        blk.rows[0].append(self._u())     # row 0: 2.0 s -> 6.0 s
+
+        assert blk.duration == pytest.approx(6.0)
+        assert blk.events['end'].max() == pytest.approx(6.0)
+
+    def test_the_block_start_is_what_stays_put(self):
+        from klotho.chronos import TemporalBlock, TemporalUnitSequence
+        blk = TemporalBlock([TemporalUnitSequence([self._u('2/4')]),
+                             self._u()], axis=1, sort_rows=False)
+        assert blk.start == pytest.approx(0.0)
+        blk.rows[0].append(self._u())
+        assert blk.start == pytest.approx(0.0)
+        assert blk.events['start'].min() == pytest.approx(0.0)
+
+    def test_a_unit_really_is_fixed_and_says_so(self):
+        """The claim is true for exactly one of the three, which is why the
+        correction had to be class by class rather than global."""
+        from klotho.chronos import TemporalUnit
+        unit = self._u()
+        assert unit.duration == pytest.approx(4.0)
+        for attr, value in (('bpm', 120), ('beat', '1/8'),
+                            ('tempus', '2/4'), ('span', 2), ('duration', 1.0)):
+            with pytest.raises(AttributeError):
+                setattr(unit, attr, value)
+        assert unit.duration == pytest.approx(4.0)
+        assert 'duration is fixed after construction' in _squash(
+            TemporalUnit.__doc__)
+
+    def test_a_compositional_unit_really_is_fixed_and_says_so(self):
+        from klotho.thetos import CompositionalUnit
+        uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1), bpm=60,
+                               pfields=['amp'])
+        assert uc.duration == pytest.approx(4.0)
+        uc.set_pfields(1, amp=0.5)
+        assert uc.duration == pytest.approx(4.0)
+        assert 'duration is fixed after construction' in _squash(
+            CompositionalUnit.__doc__)
+
+    def test_the_sequence_docstring_no_longer_claims_a_fixed_duration(self):
+        from klotho.chronos import TemporalUnitSequence
+        doc = _squash(TemporalUnitSequence.__doc__)
+        assert 'fixed after construction' not in doc
+        assert 'always starts at time 0' in doc
+        for mutator in ('append', 'prepend', 'insert', 'remove', 'replace',
+                        'extend'):
+            assert mutator in doc
+
+    def test_the_block_docstring_no_longer_claims_a_fixed_duration(self):
+        from klotho.chronos import TemporalBlock
+        doc = _squash(TemporalBlock.__doc__)
+        assert 'fixed after construction' not in doc
+        assert 'always starts at time 0' in doc
+
+    def test_the_block_docstring_says_alignment_is_lazy(self):
+        """The reader list is the load-bearing part: a reader added later
+        that forgets ``_ensure_aligned`` is the whole defect coming back."""
+        from klotho.chronos import TemporalBlock
+        doc = _squash(TemporalBlock.__doc__)
+        assert '_ensure_aligned' in doc
+        for reader in ('rows', 'duration', 'end', 'principal_row', 'events',
+                       '__getitem__', '__iter__'):
+            assert reader in doc
+
+    def test_chronos_section_5_agrees_with_its_own_mutator_table(self):
+        """The retracted sentence sat 11 lines below a table listing the six
+        mutators that disprove it."""
+        section = _chronos_section(5)
+        assert '`append(ut, repeat=1)`' in section      # the table is still there
+        assert 'is fixed after construction' not in section
+        assert "sum of its members' durations" in section
+
+    def test_chronos_section_6_documents_the_lazy_alignment(self):
+        section = _chronos_section(6)
+        assert '_ensure_aligned' in section
+        assert 'idempotent' in section
+
+
+# ----------------------------------------------------------------------------
+# 12_LIFECYCLE.md section 8, the timing-cache table and state diagram.
+#
+# Both went stale silently. The table's `set_pfields` and `apply_envelope`
+# rows flipped when d5a1b20 re-keyed `_ensure_timing_cache` from a node count
+# to `_rt._structure_version`; the Score-placement and container-re-alignment
+# rows flipped earlier, when 261fa4d made stored onsets offset-free. Nothing
+# read the table against the code, so nothing noticed.
+#
+# The oracle here is the code, not the prose: every row below is MEASURED and
+# the doc's verdict is asserted to match. A behaviour change therefore fails
+# this file rather than quietly rotting the table again.
+# ----------------------------------------------------------------------------
+
+
+def _lifecycle_section(number):
+    """The body of one numbered section of ``docs/architecture/12_LIFECYCLE.md``,
+    heading excluded."""
+    text = (REPO / 'docs' / 'architecture' / '12_LIFECYCLE.md').read_text()
+    parts = text.split('\n## ')
+    body = [p for p in parts if p.startswith(f'{number}. ')]
+    assert len(body) == 1, f'section {number} not found exactly once'
+    return body[0]
+
+
+def _invalidation_table():
+    """``{first cell: second cell}`` for the section-8 verdict table."""
+    rows = {}
+    for line in _lifecycle_section(8).split('\n'):
+        if not line.startswith('|'):
+            continue
+        cells = [c.strip() for c in line.strip('|').split('|')]
+        if len(cells) < 2 or set(cells[0]) <= set('- :'):
+            continue
+        if cells[0] == 'Operation':
+            continue
+        # `…` and `...` are the same row to a reader; make them the same
+        # row to the matcher too, so a spelling change is not a silent miss.
+        rows[cells[0].replace('…', '...')] = cells[1]
+    assert rows, 'no table found in section 8'
+    return rows
+
+
+class TestTheTimingCacheTableMatchesMeasuredBehaviour:
+    """Every row of "What Triggers Invalidation", re-derived from the code.
+
+    ``_ensure_timing_cache`` recomputes when ``_timing_dirty`` is set OR when
+    ``_timing_cache_version`` no longer equals ``_rt._structure_version``.
+    That disjunction is the thing each row reports, so it is what the probes
+    below evaluate -- after the operation and before any read, because a read
+    clears the very state being measured.
+    """
+
+    @staticmethod
+    def _uc(prolatio=(1, 1, 2, 2)):
+        from klotho.chronos import TemporalUnit
+        from klotho.thetos import CompositionalUnit
+        return CompositionalUnit.from_ut(
+            TemporalUnit(span=1, tempus='4/4', prolatio=prolatio,
+                         beat='1/4', bpm=60))
+
+    @staticmethod
+    def _would_recompute(unit):
+        return bool(unit._timing_dirty
+                    or unit._timing_cache_version != unit._rt._structure_version)
+
+    @classmethod
+    def _measure(cls, build, operate):
+        """Warm the cache, run *operate*, report whether the next read
+        recomputes."""
+        subject, target = build()
+        target.onsets                       # warm: Dirty -> Clean
+        operate(subject)
+        return cls._would_recompute(target)
+
+    # -- probes ---------------------------------------------------------
+    # (row key in the doc table, builder, operation)
+
+    @classmethod
+    def _plain(cls):
+        u = cls._uc()
+        return u, u
+
+    @classmethod
+    def _placed(cls):
+        from klotho.thetos import Score
+        score = Score()
+        item = score.add(cls._uc(), name='a')
+        return (score, item), item.unit
+
+    @classmethod
+    def _sequence(cls):
+        from klotho.chronos import TemporalUnitSequence
+        seq = TemporalUnitSequence([cls._uc(), cls._uc()])
+        return seq, seq._seq[1]
+
+    @classmethod
+    def _block(cls):
+        from klotho.chronos import TemporalBlock
+        blk = TemporalBlock([cls._uc(), cls._uc()])
+        return blk, blk._rows[1]
+
+    @staticmethod
+    def _reoffset(container):
+        from klotho.chronos.temporal_units.temporal import _reoffset
+        _reoffset(container, 10.0)
+
+    PROBES = [
+        ('`ScoreItem.set_duration(dur)`', '_placed',
+         lambda s: s[1].set_duration(16.0)),
+        ('`ScoreItem.stretch(factor)`', '_placed',
+         lambda s: s[1].stretch(2.0)),
+        ('`make_rest(node)`', '_plain', lambda u: u.make_rest(2)),
+        ('`make_sounding(node)`', '_plain',
+         lambda u: (u.make_rest(2), u.make_sounding(2))),
+        ('`subdivide(node, S)`', '_plain', lambda u: u.subdivide(2, (1, 1))),
+        ('`graft_subtree(node, subtree)`', '_plain',
+         lambda u: u.graft_subtree(
+             2, __import__('klotho.chronos', fromlist=['RhythmTree'])
+             .RhythmTree(span=1, meas='1/4', subdivisions=(1, 1)))),
+        ('`add_child(parent, ...)`', '_plain',
+         lambda u: u.add_child(0, proportion=1)),
+        ('`prune(node)`', '_plain', lambda u: u.prune(3)),
+        ('`remove_subtree(node)`', '_plain', lambda u: u.remove_subtree(3)),
+        ('`_rt.replace_node(...)`', '_plain',
+         lambda u: u._rt.replace_node(2, proportion=5)),
+        ('`_rt.move_subtree(...)`', '_plain',
+         lambda u: u._rt.move_subtree(2, 1)),
+        ('`_rt.scale(...)`', '_plain', lambda u: u._rt.scale(1, 3)),
+        ('`set_pfields(...)`', '_plain',
+         lambda u: u.set_pfields(u.root, amp=0.5)),
+        ('`set_mfields(...)`', '_plain',
+         lambda u: u.set_mfields(u.root, group='g')),
+        ('`apply_envelope(...)`', '_plain',
+         lambda u: u.apply_envelope(
+             __import__('klotho.dynatos', fromlist=['Envelope'])
+             .Envelope.perc(), 'amp', node=u.root)),
+        ('`set_instrument(...)`', '_plain',
+         lambda u: u.set_instrument(
+             u.root, __import__('klotho.thetos', fromlist=['Instrument'])
+             .Instrument('default'))),
+        ('`apply_slur(...)`', '_plain', lambda u: u.apply_slur(node=0)),
+        ('Score placement', '_placed',
+         lambda s: s[0].prepend(
+             TestTheTimingCacheTableMatchesMeasuredBehaviour._uc(), name='b')),
+        ('Container re-alignment', '_sequence', _reoffset.__func__),
+        ('Container re-alignment', '_block', _reoffset.__func__),
+    ]
+
+    @pytest.mark.parametrize('key, builder, operate',
+                             PROBES, ids=[p[0] for p in PROBES])
+    def test_the_doc_verdict_matches_the_measurement(self, key, builder,
+                                                     operate):
+        recomputes = self._measure(getattr(self, builder), operate)
+        table = _invalidation_table()
+        matches = [(k, v) for k, v in table.items() if key in k]
+        assert len(matches) == 1, (
+            f'{key!r} should name exactly one table row; got {matches}')
+        verdict = matches[0][1]
+        expected = 'Yes' if recomputes else 'No'
+        assert verdict.startswith(expected), (
+            f'{key}: measured recompute={recomputes}, '
+            f'table says {verdict!r}')
+
+    def test_every_table_row_is_probed(self):
+        """A row nobody measures is a row free to go stale."""
+        keys = {k for k, _, _ in self.PROBES}
+        unprobed = [row for row in _invalidation_table()
+                    if not any(k in row for k in keys)]
+        assert unprobed == []
+
+
+class TestTheStateDiagramShowsBothStalenessSignals:
+    """``_timing_dirty`` stopped being the whole story at d5a1b20.
+
+    A reader debugging a stale cache who checks only the flag will conclude
+    the cache is fresh in every case the version half catches -- which is
+    every count-preserving mutation, the exact class of bug (RT-27) the
+    version half was added for. The two tests below show each half catching
+    something the other misses, so neither can be dropped from the diagram
+    as redundant.
+    """
+
+    @staticmethod
+    def _would_recompute(unit):
+        return bool(unit._timing_dirty
+                    or unit._timing_cache_version != unit._rt._structure_version)
+
+    def test_a_count_preserving_mutation_moves_the_version_but_not_the_flag(self):
+        from klotho.chronos import TemporalUnit
+        unit = TemporalUnit(span=1, tempus='4/4', prolatio=(1, 1, 2),
+                            beat='1/4', bpm=60)
+        assert unit.durations == pytest.approx((1.0, 1.0, 2.0))
+        before = unit._rt._structure_version
+        unit._rt.replace_node(2, proportion=5)
+
+        assert unit._timing_dirty is False          # the flag says "clean"
+        assert unit._rt._structure_version != before
+        assert self._would_recompute(unit)
+        assert unit.durations == pytest.approx((0.5, 2.5, 1.0))
+
+    def test_a_tempo_change_moves_the_flag_but_not_the_version(self):
+        from klotho.thetos import Score
+        from klotho.chronos import TemporalUnit
+        from klotho.thetos import CompositionalUnit
+        item = Score().add(CompositionalUnit.from_ut(
+            TemporalUnit(span=1, tempus='4/4', prolatio=(1, 1, 2),
+                         beat='1/4', bpm=60)), name='a')
+        unit = item.unit
+        assert unit.durations == pytest.approx((1.0, 1.0, 2.0))
+        before = unit._rt._structure_version
+        item.stretch(2.0)
+
+        assert unit._rt._structure_version == before   # no node was touched
+        assert unit._timing_dirty is True
+        assert self._would_recompute(unit)
+        assert unit.durations == pytest.approx((2.0, 2.0, 4.0))
+
+    def test_the_diagram_draws_two_routes_from_clean_to_dirty(self):
+        section = _lifecycle_section(8)
+        diagram = section.split('```mermaid')[1].split('```')[0]
+        assert diagram.count('Clean --> Dirty') == 2, (
+            'one transition cannot show two independent staleness signals')
+        assert '_timing_dirty' in diagram
+        assert '_structure_version' in diagram
+
+    def test_the_prose_names_both_halves_and_says_neither_suffices(self):
+        section = _lifecycle_section(8)
+        for token in ('_timing_dirty', '_timing_cache_version',
+                      '_rt._structure_version', 'replace_node'):
+            assert token in section, token
+        squashed = _squash(section)
+        assert 'either' in squashed.lower()
+        assert 'offset-free' in squashed
+
+
+# ---------------------------------------------------------------------------
+# The relocation contract (b5be431). The tree stack gained a rule -- id-keyed
+# state follows its content across a node-id change -- plus a public hook for
+# registering an owner of such state. The architecture docs still described
+# only the old half.
+# ---------------------------------------------------------------------------
+
+def _arch(name):
+    """The full text of one file under ``docs/architecture/``."""
+    return (REPO / 'docs' / 'architecture' / name).read_text()
+
+
+def _arch_section(name, heading):
+    """The body of one section of an architecture doc, heading excluded and
+    whitespace collapsed. ``heading`` is the whole heading line
+    (``'### Storage Model'``); the section ends at the next heading of the
+    same or higher level. Scoping a text pin to its section keeps it from
+    passing on a sentence that happens to sit somewhere else in the file;
+    squashing keeps it from breaking when someone reflows a paragraph."""
+    lines = _arch(name).split('\n')
+    level = len(heading) - len(heading.lstrip('#'))
+    starts = [i for i, line in enumerate(lines) if line.strip() == heading]
+    assert len(starts) == 1, f'{heading!r} not found exactly once in {name}'
+    body = []
+    for line in lines[starts[0] + 1:]:
+        if line.startswith('#') and len(line) - len(line.lstrip('#')) <= level:
+            break
+        body.append(line)
+    return _squash('\n'.join(body))
+
+
+def _mermaid_class_block(name, class_name):
+    """The member lines of one ``class X { ... }`` block of a mermaid class
+    diagram. Matched line-wise: ``class Tree {`` is a prefix of the
+    inheritance-summary stub ``class Tree { topos }`` in the same file."""
+    lines = _arch(name).split('\n')
+    opener = f'class {class_name} {{'
+    starts = [i for i, line in enumerate(lines) if line.strip() == opener]
+    assert len(starts) == 1, f'{opener!r} not found exactly once in {name}'
+    body = []
+    for line in lines[starts[0] + 1:]:
+        if line.strip() == '}':
+            break
+        body.append(line.strip())
+    return body
+
+
+class TestTheRelocationContractReachesTheArchitectureDocs:
+    """Before this, 01_TOPOS.md told a reader that everything attached to a
+    shifted sibling now names the wrong node -- which is the defect b5be431
+    fixed -- and left clearing id-keyed state as an unowned obligation on
+    "any code" that keeps some, so an agent following the doc hand-rolls a
+    purge the layer already does. The docstrings had gained the missing half
+    and the docs had not."""
+
+    def test_topos_says_the_trees_own_state_is_not_an_external_handle(self):
+        section = _arch_section('01_TOPOS.md', '### Child Order Is Node Index')
+        assert 'is not an external handle' in section
+        assert 'instrument bindings' in section
+
+    def test_topos_names_both_seams_and_every_verb_that_removes_a_node(self):
+        section = _arch_section('01_TOPOS.md',
+                                '### Id-Keyed State Follows Content')
+        assert 'on_structure_changed' in section        # the DEATH seam
+        assert '_notify_nodes_relocated' in section     # the RELOCATION seam
+        # backticked, so `prune` is not satisfied by `prune_leaves`
+        for deleter in ('`prune`', '`remove_subtree`', '`prune_leaves`',
+                        '`prune_to_depth`'):
+            assert deleter in section, deleter
+        for raiser in ('`Tree.insert_child`', '`RhythmTree._respell`',
+                       '`subdivide`'):
+            assert raiser in section, raiser
+
+    def test_topos_states_the_totality_rule(self):
+        """The mapping being total over survivors is the whole reason a
+        receiver never has to ask whether an id still exists -- mid-respell
+        it would get a lie."""
+        section = _arch_section('01_TOPOS.md',
+                                '### Id-Keyed State Follows Content')
+        assert 'total over' in section
+        assert 'destroyed' in section
+
+    def test_the_tree_class_diagram_lists_the_public_observer_hook(self):
+        assert '+set_id_state_observer(callback)' in _mermaid_class_block(
+            '01_TOPOS.md', 'Tree')
+        from klotho.topos.graphs.trees import Tree
+        assert callable(getattr(Tree, 'set_id_state_observer', None))
+
+    def test_topos_states_what_the_observer_does_not_cover(self):
+        """The useful half is the negative one: a pure deletion raises no
+        relocation, and a clone is not given the observer."""
+        section = _arch_section('01_TOPOS.md',
+                                '### Id-Keyed State Follows Content')
+        assert 'A pure deletion' in section
+        assert 'A clone gets no observer' in section
+
+    def test_chronos_repeats_the_caveat_where_it_repeats_the_invariant(self):
+        section = _arch_section('02_CHRONOS.md', '## Two Structural Invariants')
+        assert 'is not an external handle' in section
+        assert '_migrate_tie_to_first_child' in section
+
+    def test_the_chronos_ties_section_states_the_fourth_rule(self):
+        """Three rules were listed; the fourth is user-visible and was
+        nowhere. Inserting into a tied leaf used to turn two attacks into
+        three with nothing raised."""
+        section = _arch_section('02_CHRONOS.md', '### 1.1 Ties')
+        assert 'A fourth rule' in section
+        assert '_migrate_tie_to_first_child' in section
+        assert 'insert_child' in section and 'subdivide' in section
+
+    def test_the_thetos_diagram_lists_the_relocation_handler(self):
+        assert '+on_nodes_remapped(tree, mapping)' in _mermaid_class_block(
+            '05_THETOS.md', 'ParameterLayer')
+        from klotho.thetos.parameters.parameter_tree import ParameterLayer
+        assert callable(getattr(ParameterLayer, 'on_nodes_remapped', None))
+
+    def test_the_thetos_storage_model_says_bindings_are_purged_and_moved(self):
+        section = _arch_section('05_THETOS.md', '### Storage Model')
+        assert 'RT-28' in section
+        assert 'on_nodes_remapped' in section
+        assert 'in place' in section
+
+
+class TestTheIdStateObserverContract:
+    """``Tree.set_id_state_observer`` is public, is what an owner of
+    id-keyed state living OUTSIDE the tree registers, and had no test of its
+    own. These pin the three statements the architecture doc now makes about
+    it -- including the two limits, which are the half a reader needs."""
+
+    @staticmethod
+    def _tree():
+        """A base ``Tree``: the contract belongs to ``Tree``, and
+        ``RhythmTree.subtree`` rebuilds from the S-form rather than copying,
+        so it could not inherit an observer even if the copy paths leaked
+        one."""
+        from klotho.topos.graphs.trees import Tree
+        return Tree(1, (1, 1, 1))
+
+    def test_a_relocation_reaches_the_observer(self):
+        """Rank-0 insert: each old child's content moves one slot right, so
+        the mapping sends each old id to its right-hand neighbour."""
+        tree = self._tree()
+        seen = []
+        tree.set_id_state_observer(seen.append)
+        first, second, third = tree.leaf_nodes
+        tree.insert_child(tree.root, 0, label=1)
+        assert len(seen) == 1
+        mapping = seen[0]
+        assert mapping[first] == second
+        assert mapping[second] == third
+        assert mapping[tree.root] == tree.root
+
+    def test_a_pure_deletion_raises_no_relocation(self):
+        """Only layers get the DEATH seam. An owner outside the tree hears
+        nothing from ``prune``/``remove_subtree`` and purges in its own
+        deleter -- which is what ``CompositionalUnit.prune`` does."""
+        for verb in ('prune', 'remove_subtree'):
+            tree = self._tree()
+            seen = []
+            tree.set_id_state_observer(seen.append)
+            getattr(tree, verb)(tree.leaf_nodes[-1])
+            assert seen == [], verb
+
+    @pytest.mark.parametrize('name, clone', [
+        ('deepcopy', lambda t: __import__('copy').deepcopy(t)),
+        ('structural_clone', lambda t: t.structural_clone()),
+        ('subtree', lambda t: t.subtree(t.root)),
+        ('from_tree_structure', lambda t: type(t).from_tree_structure(t)),
+    ])
+    def test_a_clone_carries_no_observer(self, name, clone):
+        """A clone belongs to a different owner, which rebinds itself. If it
+        inherited the observer, mutating the copy would heal the original's
+        overlays against ids that never moved there."""
+        tree = self._tree()
+        seen = []
+        tree.set_id_state_observer(seen.append)
+        copied = clone(tree)
+        copied.insert_child(copied.root, 0, label=1)
+        assert seen == [], name

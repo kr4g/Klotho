@@ -173,11 +173,25 @@ Three rules are enforced at every write path:
 - **Zero is illegal** as a proportion, tied or not: a zero-duration leaf
   breaks strictly-increasing onsets.
 
+A fourth rule is a **repair** rather than a refusal:
+
+- **A tie migrates when its leaf stops being a leaf.**  `tied` has
+  meaning only on the leaf surface, so a verb that makes a tied leaf
+  interior — `subdivide`, `insert_child` — moves the flag onto the
+  group's **first child**, the one lossless landing spot for "continues
+  my predecessor".  Both verbs call the same helper,
+  `_migrate_tie_to_first_child`, so they cannot drift apart.  Until
+  `insert_child` was given the rule, inserting into a tied leaf turned
+  two attacks into three with nothing raised.  A tie that lands on a
+  rest is then cleared by `_evaluate`, because a tied rest is illegal.
+
 `RhythmTree.tie_groups` derives the groups on every read — nothing is
-stored, so a structural edit can never orphan a group.  A group is a
-maximal run, in **leaf order**, whose members after the first are tied;
-the first member is the *head*.  Groups legitimately span branch
-boundaries: leaf order, not subtree containment, is what joins them.
+stored, so a structural edit can never orphan a group; the migration
+rule above is what makes that true for the two verbs that could
+otherwise.  A group is a maximal run, in **leaf order**, whose members
+after the first are tied; the first member is the *head*.  Groups
+legitimately span branch boundaries: leaf order, not subtree
+containment, is what joins them.
 Rests are always singleton groups and break runs.  A tied leaf whose
 predecessor is a rest, or which starts the tree, heads its own group — a
 *dangling continuation*, which renders as an attack.  On a tie-free tree
@@ -523,10 +537,14 @@ flowchart LR
 in `_RepeatableTemporal` (10.7.0), so `.repeat(n)` is available on
 each — on a UT it returns a `TemporalUnitSequence` of *n* copies.
 
-A sequence's total duration is determined by the sum of its members'
-durations and is fixed after construction.  To change the duration of a
-sequence that lives inside a
-:class:`~klotho.thetos.composition.score.Score`, use
+A sequence's total duration is the sum of its members' durations, so
+every mutator in the table above changes it — `append` on a one-member
+sequence doubles it — and the members after the edit are re-offset.
+What is fixed outside a
+:class:`~klotho.thetos.composition.score.Score` is the sequence's
+**start**: it is time 0, and there is no public offset setter.  There is
+no duration setter on the sequence either; to place or re-time a sequence
+on a timeline, add it to a Score and use
 :meth:`~klotho.thetos.composition.score.ScoreItem.set_duration` on the
 owning :class:`~klotho.thetos.composition.score.ScoreItem`.
 
@@ -549,7 +567,7 @@ flowchart TD
 | Property | Description |
 |---|---|
 | `axis` | Alignment axis — a float in `[-1, 1]` (`-1` left/start, `0` center, `1` right/end) |
-| `rows` | List of temporal objects (the **live** list, not a copy) |
+| `rows` | List of temporal objects (the **live** list, not a copy) — placement is re-validated on the way out |
 | `duration` | Maximum row duration |
 | `height` | Number of rows |
 | `principal_row` | The row whose end is **latest** |
@@ -568,6 +586,27 @@ all.  Ties break toward the **bottom-most** (highest-index) row, which
 is the normal case at `axis=1` where every row ends together; the
 comparison uses a small relative tolerance, because a shifted row's end
 is computed as `offset + (max − d) + d` and can miss by a float ulp.
+
+#### Alignment is lazy
+
+Rows are live objects, so a row mutated through **its own** mutator
+(`blk.rows[0].append(...)`) changes the geometry `_align_rows` was
+computed from with no block-level mutator running — and it changes the
+block's duration, which is therefore not fixed after construction either.
+Every reader whose answer depends on alignment — `rows`, `duration`,
+`end`, `principal_row`, `events`, `__getitem__`, `__iter__` — first calls
+`_ensure_aligned`, which compares the current row durations against the
+geometry of the last alignment and re-runs `_align_rows` if they differ.
+Alignment is therefore as lazy as `events` already was, and for the same
+reason.  Before this was added, a two-row block at `axis=1` whose row 0
+had grown reported `end = 6.0` while its events ran to `8.0`, with
+nothing raised.  `_align_rows` is idempotent — offsets are assigned
+absolutely and the duration sort is stable — so a block nobody mutated
+never moves, however many times it is read.
+
+Reading `blk._rows` directly bypasses `_ensure_aligned` and can return
+stale offsets.  Outside a `Score` the block's **start** is still fixed at
+time 0; only the duration and the rows' internal offsets move.
 
 #### `TemporalBlock.events`
 
@@ -689,9 +728,18 @@ tree stack.  Rank therefore means index rank, and
 `Tree.insert_child(parent, k, …)` shifts the **content** of ranks
 `k…n−1` one slot right and writes the new content into the vacated slot.
 A consequence: **node identity follows position, not content** — an
-external handle to a shifted sibling now denotes a different node.  This
-is also why no renumbering machinery is needed;
-`GraphCore.renumber_nodes` is a no-op stub.
+external handle to a shifted sibling now denotes a different node.  The
+tree's own id-keyed state is not an external handle: instrument
+bindings, slurs and the `Bind` memo move with the content they describe,
+announced by `Tree._notify_nodes_relocated` (01_TOPOS.md, *Id-Keyed
+State Follows Content*).  This is also why no renumbering machinery is
+needed; `GraphCore.renumber_nodes` is a no-op stub.
+
+A `RhythmTree` insert carries a **tie** as well.  Inserting into a tied
+leaf makes that leaf interior, where `tied` has no meaning, so the flag
+migrates onto the new first child (`_migrate_tie_to_first_child`)
+instead of being silently dropped — see §1.1.  `insert_child` and
+`subdivide` share the one helper so the two verbs cannot drift apart.
 
 **`meas` and `span` have no setters, by design.**  A `RhythmTree`'s
 measure is fixed at construction, and so is a `TemporalUnit`'s `tempus`

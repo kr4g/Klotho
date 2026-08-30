@@ -160,6 +160,7 @@ classDiagram
         -_effective_cache : dict | None
         +invalidate(tree)
         +on_structure_changed(tree, scope, op)
+        +on_nodes_remapped(tree, mapping)
         -_build_effective(tree)
     }
 
@@ -191,6 +192,20 @@ classDiagram
   values with node overrides.
 - Any write or structural mutation sets `_effective_cache = None`
   (via `layer.invalidate` / `layer.on_structure_changed`).
+- `on_structure_changed` additionally **drops any instrument binding
+  whose node no longer exists**.  rustworkx reuses freed indices, so a
+  binding left behind does not leak quietly — it re-attaches to the next
+  note that lands in the slot (docket RT-28).  Purging in the layer
+  covers every verb that removes a node — `prune`, `remove_subtree`,
+  `prune_leaves`, `prune_to_depth` — instead of one hand-rolled loop per
+  call site.
+- `on_nodes_remapped(tree, mapping)` is the counterpart for content that
+  **moved** rather than died: it re-keys the bindings onto the ids now
+  holding their content.  It rebuilds `_node_instruments` **in place**,
+  because callers hold that dict itself (`node_instruments`,
+  `RhythmTree._respell`).  The mapping is total over survivors, so a
+  binding whose id is absent from it dies with its node.  See 01_TOPOS.md,
+  *Id-Keyed State Follows Content*, for the contract both halves obey.
 
 ### PFields vs MFields
 

@@ -1814,8 +1814,14 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
 
     Units are automatically offset so that each begins where the previous
     one ends.  Outside a :class:`~klotho.thetos.composition.score.Score`,
-    a sequence always starts at time 0 and its duration is fixed after
-    construction.
+    a sequence always starts at time 0. What is fixed is the **start**,
+    not the duration: ``duration`` is the sum of the members' durations,
+    so every mutator that changes the membership (``append``,
+    ``prepend``, ``insert``, ``remove``, ``replace``, ``extend``,
+    ``__setitem__``) changes it, and re-offsets the members after the
+    edit. There is no duration setter on the sequence itself; to re-time
+    one on a timeline, add it to a ``Score`` and use
+    :meth:`~klotho.thetos.composition.score.ScoreItem.set_duration`.
 
     Like :class:`TemporalBlock`, this container is **Klotho's own**: Haddad
     lays time-blocks end to end as an *operation* (his ``||``, which
@@ -2148,8 +2154,21 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     Notes
     -----
     Outside a :class:`~klotho.thetos.composition.score.Score`, a block
-    always starts at time 0 and its total duration is fixed after
-    construction.
+    always starts at time 0. What is fixed is the **start**, not the
+    duration: ``duration`` is the longest row's duration, so the block's
+    own mutators change it, and so does mutating a row *through the row's
+    own API* -- ``rows`` hands out the live row objects, and
+    ``blk.rows[0].append(...)`` lengthens the block and re-offsets every
+    other row. There is no duration setter on the block itself; to re-time
+    one on a timeline, add it to a ``Score`` and use
+    :meth:`~klotho.thetos.composition.score.ScoreItem.set_duration`.
+
+    Alignment is validated **lazily**, like ``events``: every reader whose
+    answer depends on it (``rows``, ``duration``, ``end``,
+    ``principal_row``, ``events``, ``__getitem__``, ``__iter__``) first
+    calls ``_ensure_aligned``, which re-runs ``_align_rows`` when the row
+    durations differ from the geometry the last alignment saw. Reading
+    ``blk._rows`` directly bypasses that and can observe stale offsets.
 
     The sort is **destructive**: the pre-sort order is not retained, so
     setting ``sort_rows = False`` afterwards realigns but cannot restore

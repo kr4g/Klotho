@@ -381,31 +381,100 @@ same `CompositionalTree` (`uc._rt`).
 The timing cache within `TemporalUnit` (and `CompositionalUnit`) has
 its own mini-lifecycle:
 
+Line breaks below are `<br/>`, not `\n`: mermaid renders a literal `\n`
+inside a state-diagram label as the two characters, which is what the
+rest of this file's diagrams currently do.
+
 ```mermaid
 stateDiagram-v2
-    [*] --> Dirty : __init__() → _timing_dirty = True
+    [*] --> Dirty : \_\_init\_\_()<br/>_timing_dirty = True,<br/>_timing_cache_version = None
 
-    Dirty --> Computing : _ensure_timing_cache() called\n(on .onsets, .durations, .events, etc.)
-    Computing --> Clean : _compute_timing_cache()\n→ real_onset, real_duration for all nodes
+    Dirty --> Computing : _ensure_timing_cache() called<br/>(on .onsets, .durations, .events, etc.)
+    Computing --> Clean : _compute_timing_cache()<br/>→ real_onset, real_duration for all nodes,<br/>then stamp _timing_cache_version = _rt._structure_version
 
-    Clean --> Dirty : _invalidate_timing_cache()\n(triggered by subdivide,\nmake_rest, container re-alignment,\nor Score placement / ScoreItem.set_duration)
+    Clean --> Dirty : SIGNAL 1 — _invalidate_timing_cache()<br/>sets _timing_dirty = True<br/>(ScoreItem.set_duration / stretch,<br/>make_rest, make_sounding, subdivide,<br/>graft_subtree, add_child, prune,<br/>remove_subtree, copy)
 
-    Clean --> Clean : read operations\n(.onsets, .durations, .events)
+    Clean --> Dirty : SIGNAL 2 — _rt._structure_version moves<br/>past the stamped _timing_cache_version<br/>(ANY structural mutation or node-data write<br/>on _rt, including the count-preserving<br/>replace_node, move_subtree and scale)
+
+    Clean --> Clean : read operations<br/>(.onsets, .durations, .events)
 ```
+
+### Two staleness signals, not one
+
+`_timing_dirty` is **not** the whole story, and checking it alone is the
+wrong first move when debugging a stale cache. `_ensure_timing_cache`
+recomputes when *either* signal fires:
+
+```python
+if (self._timing_dirty
+        or self._timing_cache_version != self._rt._structure_version):
+    self._compute_timing_cache()
+```
+
+Neither half subsumes the other:
+
+- **The version half** (`_timing_cache_version` vs
+  `_rt._structure_version`) catches every mutation that touches a node.
+  `_structure_version` is bumped by `_post_mutation`, which every
+  structural mutator and every node-data write already runs. This half
+  is what fixed docket RT-27 (d5a1b20): the guard used to compare node
+  *counts*, which is blind to the count-preserving mutators
+  `_rt.replace_node`, `_rt.move_subtree` and `_rt.scale`, so a unit
+  whose events had been read once served its pre-mutation onsets
+  forever. None of those three calls `_invalidate_timing_cache`, so
+  without this half nothing marks them at all.
+- **The dirty flag** catches bpm and beat changes, which touch no node
+  and move no version. The only live route is `_scale_bpm`
+  (`ScoreItem.set_duration` / `stretch`), which sets the flag directly.
+  Delete this half and a stretched unit keeps reporting its old
+  durations.
+
+What the version half does *not* buy is precision: it fires on node-data
+writes that have nothing to do with timing (`set_pfields`,
+`apply_envelope`), so the recompute after one of those is redundant
+work, not a correctness dependency.
+
+Onsets are stored **offset-free** — `_compute_timing_cache` never adds
+`self._offset`, and the read sites add it. Moving a unit in time
+therefore invalidates nothing, which is why the placement and
+re-alignment rows below read "No".
 
 ### What Triggers Invalidation
 
-| Operation | Invalidates timing? |
-|---|---|
-| `ScoreItem.set_duration(dur)` | Yes (scales owned unit's bpm) |
-| `ScoreItem.stretch(factor)` | Yes (scales owned unit's bpm) |
-| `make_rest(node)` | Yes |
-| `subdivide(node, S)` | Yes |
-| Score placement (``add(at=)`` / ``after=`` / ``before=``) | Yes |
-| Container re-alignment (``_set_offsets``, ``_align_rows``) | Yes |
-| `set_pfields(…)` | No |
-| `set_instrument(…)` | No |
-| `apply_envelope(…)` | No (reads timing, doesn't change it) |
+Measured against the code, not inferred from it. The test class
+`TestTheTimingCacheTableMatchesMeasuredBehaviour` in
+`tests/test_documented_claims.py` re-derives every row below and fails
+if the behaviour and this table disagree.
+
+| Operation | Invalidates timing? | Signal |
+|---|---|---|
+| `ScoreItem.set_duration(dur)` | Yes — scales the owned unit's bpm | dirty flag only |
+| `ScoreItem.stretch(factor)` | Yes — same route | dirty flag only |
+| `make_rest(node)` | Yes | both |
+| `make_sounding(node)` | Yes | both |
+| `subdivide(node, S)` | Yes | both |
+| `graft_subtree(node, subtree)` | Yes | both |
+| `add_child(parent, ...)` | Yes | both |
+| `prune(node)` | Yes | both |
+| `remove_subtree(node)` | Yes | both |
+| `_rt.replace_node(...)` | Yes | version only — no `_invalidate_timing_cache` call site |
+| `_rt.move_subtree(...)` | Yes | version only — same |
+| `_rt.scale(...)` | Yes | version only — same |
+| `set_pfields(...)` | Yes, incidentally — the timings do not change | version only |
+| `set_mfields(...)` | Yes, incidentally — the timings do not change | version only |
+| `apply_envelope(...)` | Yes, incidentally — writes node data; it reads timing and does not change it | version only |
+| `set_instrument(...)` | No — the binding lives on the parameter layer, not in node data | — |
+| `apply_slur(...)` | No — the spec lives on the unit | — |
+| Score placement (`add(at=)` / `after=` / `before=`) | No — onsets are stored offset-free | — |
+| Container re-alignment (`_set_offsets`, `_align_rows`) | No — same reason | — |
+
+Two footnotes on the "No" rows. `Score.add` stores a **copy** of the
+unit, and a fresh copy starts dirty, so a newly placed unit does compute
+on its first read — that is the copy being new, not the placement
+invalidating anything, and the source unit's cache is left alone. And a
+`TemporalBlock`'s own row-alignment state is a *different* cache with a
+*different* guard (`_ensure_aligned`, see 02_CHRONOS.md section 6); this
+table is only about `_real_times`.
 
 Outside a :class:`~klotho.thetos.composition.score.Score`, a temporal
 unit's time is immutable: there is no public offset setter and no
