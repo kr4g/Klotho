@@ -150,14 +150,28 @@ class TestRelocationCannotAuthorANonContiguousSlur:
         assert _marked(uc, '_slur_end') == [300.0]
 
     def test_every_stored_spec_stays_contiguous_after_insertion(self):
-        uc = _tagged()
-        L = list(uc._rt.leaf_nodes)
-        uc.apply_slur([L[1], L[2]])
+        """The invariant over ALL surviving specs, not only the one its
+        siblings name.
 
-        uc._rt.insert_child(uc._rt.root, 2, proportion=1)
+        The fixture has to be chosen so that specs survive. On the four-note
+        fixture the siblings use, the slur dissolves entirely,
+        ``_slur_specs`` is ``{}``, and the loop below runs zero times and
+        asserts nothing. Here two slurs are drawn and the insertion lands
+        inside the first: the fragment after the intruder survives, and the
+        untouched second slur relocates whole, so the loop has two specs to
+        check.
+        """
+        uc = _tagged(prolatio=(1, 1, 1, 1, 1, 1))
+        L = list(uc._rt.leaf_nodes)
+        uc.apply_slur([L[0], L[1], L[2]])
+        uc.apply_slur([L[3], L[4], L[5]])
+
+        uc._rt.insert_child(uc._rt.root, 1, proportion=1)
 
         # the invariant apply_slur enforces: members occupy consecutive
         # leaf positions (no tie groups in play here)
+        assert len(uc._slur_specs) == 2, \
+            'the fixture must leave specs behind, or the loop checks nothing'
         leaf_order = list(uc._rt.leaf_nodes)
         for spec in uc._slur_specs.values():
             indices = sorted(leaf_order.index(n) for n in spec['leaf_nodes'])

@@ -21,6 +21,15 @@ The oracle here is the tree itself: real duration is
 cache stands in front of -- says what the unit must report. The
 warm/cold pairs say the same thing a second way: reading a cache is not a
 mutation, so read-then-mutate and mutate-then-read must agree.
+
+That oracle is independent of the cache, and of nothing else.
+``rt.durations`` reads ``metric_duration`` straight off the graph with no
+memo in front of it, so a stale ``_real_times`` cannot poison it -- but the
+seconds CONVERSION in ``_expected_seconds`` is copied from the
+implementation, so it would follow the implementation into a wrong formula.
+What pins the formula is ``TestFreshUnitsStillCacheAndStillAgree``, whose
+values (``[1.0] * 4`` at 4/4, bpm 60, beat 1/4, and ``[2.0] * 4`` after
+halving the bpm) are hand-computed. Do not delete that class as redundant.
 """
 
 from fractions import Fraction

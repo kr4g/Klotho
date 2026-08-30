@@ -52,7 +52,13 @@ class TestBindingsDieWithTheirNode:
 
 class TestRespellCarriesOverlays:
     """``insert``/``extract``/``scale`` rebuild every non-root id; the
-    overlays keyed by those ids have to travel with the content."""
+    overlays keyed by those ids have to travel with the content.
+
+    Not every test here pins the fix: a rebuild whose freed indices happen to
+    be reused in the same order lands the old ids back on the right notes, and
+    a test built on that shape is green before and after. The one such test in
+    this class is named for what it is.
+    """
 
     def test_insert_carries_the_slur_with_its_own_notes(self):
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=60,
@@ -109,6 +115,40 @@ class TestRespellCarriesOverlays:
             assert set(spec['leaf_nodes']).issubset(set(uc._rt.leaf_nodes))
 
     def test_extract_carries_a_surviving_slur_with_its_notes(self):
+        """The extracted event sits AFTER the slur, so every survivor shifts
+        one id to the right and the slur has to be carried to the new ids.
+
+        The direction is what makes this test bite. Extracting event 0
+        instead leaves the surviving slur on the very ids it started on --
+        the freed indices happen to be reused so that the old ids still name
+        the right notes -- and that version passes with the whole relocation
+        fix removed. It is kept, as a guard, in the test below.
+        """
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=60,
+                pfields={'freq': 440})
+        for i, node in enumerate(uc._rt.leaf_nodes):
+            uc.set_pfields(node, freq=100 * (i + 1))
+        slurred = list(uc._rt.leaf_nodes)[1:3]
+        uc.apply_slur(node=slurred)
+
+        uc._rt.extract(3)
+
+        rows = _rows_by_freq(uc)
+        assert rows[200.0]['_slur_start'] == 1
+        assert rows[300.0]['_slur_end'] == 1
+        assert rows[100.0]['_slur_start'] != 1
+        assert rows[100.0]['_slur_end'] != 1
+        # ... and the ids really did move. Without this the fixture could
+        # drift back to the id-preserving shape and stop testing anything,
+        # which is exactly what happened to the version above.
+        (spec,) = uc._slur_specs.values()
+        assert set(spec['leaf_nodes']) != set(slurred)
+
+    def test_extract_before_the_slur_is_a_regression_guard_only(self):
+        """Extracting event 0 leaves the surviving slur on the SAME ids, so
+        this passes with or without the relocation fix. It is a real guard on
+        ``extract``; it is not coverage of b5be431's relocation contract.
+        """
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=60,
                 pfields={'freq': 440})
         for i, node in enumerate(uc._rt.leaf_nodes):

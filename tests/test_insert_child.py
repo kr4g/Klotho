@@ -226,7 +226,13 @@ class TestInsertChildIntoATiedLeafMigratesTheTie:
     attack that was not there. ``subdivide`` already resolved this
     (07_TIES_CHARTER.md sect1, the OpenMusic resolution): the tie moves to the
     group's first leaf. ``insert_child`` is the same event and takes the same
-    answer."""
+    answer.
+
+    Both verbs call ONE helper, ``RhythmTree._migrate_tie_to_first_child``, and
+    both inherit ``_evaluate``'s tied-rest rule. So the two ``agree`` tests
+    below cannot see a defect that lives in either: sabotage the helper and
+    they stay green together. Each of them therefore also asserts the absolute
+    post-condition, and that is the half that fails."""
 
     def test_the_tie_survives_and_moves_onto_the_inserted_leaf(self):
         rt = RT(meas='4/4', subdivisions=(1, 1.0, 1))
@@ -267,6 +273,15 @@ class TestInsertChildIntoATiedLeafMigratesTheTie:
         assert inserted[target]['tied'] is False
         assert [inserted[n].get('tied') for n in inserted.leaf_nodes] == \
                [divided[n].get('tied') for n in divided.leaf_nodes]
+        # The absolute half. Agreement is blind to the shared helper, so say
+        # what the shape IS: four leaves, three tie groups, and the tie binds
+        # the second leaf back to the first. ``group.S`` alone would not do
+        # it -- ``1.0 == 1``, so a tuple comparison cannot see a tie at all.
+        assert inserted.group.S == (1, (1, (1.0, 1)), 1)
+        assert len(inserted.tie_groups) == 3
+        assert inserted.tie_groups[0] == inserted.leaf_nodes[:2]
+        assert [inserted[n].get('tied') for n in inserted.leaf_nodes] == \
+               [False, True, False, False]
 
     def test_they_agree_when_the_new_first_leaf_is_a_REST(self):
         """A tie cannot land on a rest (charter sect1), so it dies. Both verbs
@@ -285,6 +300,17 @@ class TestInsertChildIntoATiedLeafMigratesTheTie:
         assert isinstance(inserted[target]['proportion'], int)
         assert [inserted[n].get('tied') for n in inserted.leaf_nodes] == \
                [divided[n].get('tied') for n in divided.leaf_nodes]
+        # The absolute half. Both verbs inherit `_evaluate`'s tied-rest rule,
+        # so they would agree on a tied rest too; say instead that no tie is
+        # left anywhere -- four leaves, four single-leaf groups, no flag.
+        # The flag list is the assertion that bites: `tie_groups` already
+        # refuses to open a group on a rest, so it stays four groups even
+        # when the flag survives, and `group.S` cannot see a tie (1.0 == 1).
+        assert inserted.group.S == (1, (1, (-1, 1)), 1)
+        assert len(inserted.tie_groups) == 4
+        assert all(len(g) == 1 for g in inserted.tie_groups)
+        assert [inserted[n].get('tied') for n in inserted.leaf_nodes] == \
+               [False, False, False, False]
 
     def test_an_untied_leaf_is_untouched(self):
         rt = RT(meas='4/4', subdivisions=(1, 1, 1))

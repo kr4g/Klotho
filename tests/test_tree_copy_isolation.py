@@ -112,7 +112,13 @@ class TestFreshDictsShareTheirValues:
     """Deliberate shallowness -- guards against over-correcting to a recursive
     deepcopy, which would clone shared Instrument/Envelope/Bind objects.
 
-    Green before and after the payload fix: it pins the choice, not the bug.
+    Only ``test_payload_values_stay_shared`` is green before and after the
+    payload fix: it pins the choice, not the bug.
+    ``test_copy_matches_structural_clone_aliasing`` DOES go red pre-fix --
+    ``structural_clone`` already handed out fresh payload dicts and
+    ``__deepcopy__`` did not, so the two sides of its ``is`` comparison
+    disagreed. A red result there means the aliasing is back, not that the
+    shallowness convention changed.
     """
 
     def test_payload_values_stay_shared(self):

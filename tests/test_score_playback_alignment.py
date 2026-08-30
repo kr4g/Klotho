@@ -8,6 +8,11 @@ Score converters use, reached past that by iterating ``unit._rows`` /
 ``unit._seq`` directly, so the audible rendering of a Score depended on
 whether some *other* reader had happened to run first.
 
+Only the ``_rows`` half of that was behavioural. ``TemporalUnitSequence``
+has no alignment cache and its ``__iter__`` is ``iter(self._seq)``, so the
+sequence branch was changed for consistency, not to fix anything; nothing
+in this file can tell the two spellings apart, and nothing here claims to.
+
 That is the worst shape a bug can take here: the same Score played twice
 sounds different, and the difference is invisible from the notebook because
 plotting the block (an aligned read) silently repairs it.
@@ -142,8 +147,21 @@ class TestScoreConversionSeesTheAlignedBlock:
         assert straight == pytest.approx(after_read)
 
     def test_a_block_nested_in_a_sequence_renders_the_same_either_way(self):
-        # ``_iter_ucs`` reached past the public iterator on BOTH container
-        # types; this one arrives at the stale block through the UTS branch.
+        # A stale block one level down inside a sequence.
+        #
+        # This does NOT pin the UTS half of ``_iter_ucs``. That branch was
+        # changed from ``unit._seq`` to ``unit`` for consistency with its
+        # sibling, and the change is behaviour-neutral today:
+        # ``TemporalUnitSequence.__iter__`` is ``iter(self._seq)`` and there
+        # is no alignment cache on a sequence to go stale. Reverting that one
+        # line leaves the whole suite green (measured). The block below still
+        # reaches its stale inner block through the TemporalBlock branch,
+        # which is the half that is load-bearing -- reverting *that* line
+        # fails ten tests in this file, this one included.
+        #
+        # Kept as written because a block nested inside a sequence is a real
+        # shape worth covering; only the claim about which branch it exercises
+        # was wrong.
         def build():
             inner = TemporalBlock([TemporalUnitSequence([_uc()]), _uc()],
                                   axis=1, sort_rows=False)
@@ -165,10 +183,23 @@ class TestScoreConversionSeesTheAlignedBlock:
     def test_playback_agrees_with_the_block_events_surface(self):
         # ``blk.events`` is the surface the fix wave already trusted; the
         # played rendering must land on the same onsets.
+        #
+        # Two things here are load-bearing, and both were wrong once:
+        #
+        # 1. The conversion must run BEFORE ``blk.events`` is touched.
+        #    Reading ``events`` is an aligned read and repairs the block, so
+        #    reading it first would make the comparison vacuous.
+        # 2. The two sides are compared as ordered MULTISETS, not as sets.
+        #    Multiplicity is the whole signal: on this fixture the stale
+        #    rendering is [0, 0, 2, 2, 4, 6] and the aligned one is
+        #    [0, 2, 4, 4, 6, 6]. Those are different renderings but the same
+        #    four distinct values, so collapsing either side to a set --
+        #    which this test used to do -- destroys exactly the difference
+        #    it exists to detect, and the test cannot go red at all.
         blk, score = _block_score()
         blk.rows[0].append(_uc())
-        played = sorted({round(s, 9) for s in _starts(convert_score_to_sc_events(score))})
-        surfaced = sorted({round(float(s), 9) for s in blk.events['start']})
+        played = sorted(round(s, 9) for s in _starts(convert_score_to_sc_events(score)))
+        surfaced = sorted(round(float(s), 9) for s in blk.events['start'])
         assert played == pytest.approx(surfaced)
 
 
