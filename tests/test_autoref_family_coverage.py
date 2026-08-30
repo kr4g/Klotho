@@ -19,7 +19,11 @@ import pytest
 
 from klotho.chronos.rhythm_trees.algorithms import auto_subdiv, auto_subdiv_matrix
 from klotho.chronos.temporal_units.temporal import ProlatioTypes, TemporalBlock
-from klotho.topos.collections.patterns import autoref, autoref_rotmat, permute_list
+from klotho.topos.collections.patterns import (
+    autoref,
+    autoref_rotmat,
+    permute_list,
+)
 
 
 class TestPermuteList:
@@ -79,6 +83,165 @@ class TestAutoref:
     def test_three_arguments_raise(self):
         with pytest.raises(ValueError, match="one or two"):
             autoref((1,), (2,), (3,))
+
+
+class TestIteratedAutoreference:
+    """RT-6 -- ``autoref(..., depth=n)``, Haddad's figures 2.17-2.20.
+
+    Section 2.3.7, "De l'autoreference" ("On self-reference"), states the
+    rule in prose: "Il s'agit de substituer en subdivisant tout le rythme par
+    lui-meme en operant une rotation circulaire a chaque iteration" -- "It
+    consists of substituting by subdividing the whole rhythm by itself,
+    performing a circular rotation at each iteration."
+
+    The expected values below are TRANSCRIBED from the thesis's own printed
+    OpenMusic s-expressions, which sit as machine-readable text above each
+    engraving (recovered with ``pdftotext``; see
+    ``projects/klotho-evolution/evidence/haddad-fig-2.19-2.20/``). They are
+    a real oracle, not a snapshot of Klotho's output.
+    """
+
+    # Figure 2.17, "Mesure initiale" ("Initial measure"): (? (((4 4) ((4 (2 3))))))
+    # He calls it "la graine" -- "the seed".
+    SEED = (2, 3)
+
+    # Figure 2.18, "Premiere iteration" ("First iteration"):
+    #   (((4 4) ((2 (3 2)) (3 (2 3)))))
+    ITER_1 = ((2, (3, 2)), (3, (2, 3)))
+
+    # Figure 2.19, "Deuxieme iteration" ("Second iteration"):
+    #   (((4 4) ((2 ((3 (2 3)) (2 (3 2)))) (3 ((2 (3 2)) (3 (2 3)))))))
+    ITER_2 = (
+        (2, ((3, (2, 3)), (2, (3, 2)))),
+        (3, ((2, (3, 2)), (3, (2, 3)))),
+    )
+
+    # Figure 2.20, "Troisieme iteration" ("Third iteration"):
+    #   (((4 4) ((2 ((3 ((2 (3 2)) (3 (2 3)))) (2 ((3 (2 3)) (2 (3 2))))))
+    #            (3 ((2 ((3 (2 3)) (2 (3 2)))) (3 ((2 (3 2)) (3 (2 3)))))))))
+    ITER_3 = (
+        (2, ((3, ((2, (3, 2)), (3, (2, 3)))),
+             (2, ((3, (2, 3)), (2, (3, 2)))))),
+        (3, ((2, ((3, (2, 3)), (2, (3, 2)))),
+             (3, ((2, (3, 2)), (3, (2, 3)))))),
+    )
+
+    def test_depth_one_reproduces_figure_2_18(self):
+        assert autoref(self.SEED, depth=1) == self.ITER_1
+
+    def test_depth_two_reproduces_figure_2_19(self):
+        assert autoref(self.SEED, depth=2) == self.ITER_2
+
+    def test_depth_three_reproduces_figure_2_20(self):
+        assert autoref(self.SEED, depth=3) == self.ITER_3
+
+    def test_depth_one_is_the_default_and_is_unchanged(self):
+        """Backward compatibility: the new keyword must not move depth 1."""
+        for lst in ((3, 4, 5, 7), (2, 3), (1, 1, 1), (5,)):
+            assert autoref(lst, depth=1) == autoref(lst)
+
+    def test_each_head_keeps_its_integer_at_every_depth(self):
+        """The head slot stays a D. Applying ``autoref`` to its own output
+        instead puts the whole ``(D, S)`` pair in the head slot, which is not
+        a rhythm-tree spec at all -- that is the bug ``depth`` exists to fix.
+        """
+        for depth in (1, 2, 3):
+            assert tuple(h for h, _ in autoref((3, 4, 5, 7), depth=depth)) == (3, 4, 5, 7)
+
+    def test_the_recursion_is_on_the_tail(self):
+        for depth in (2, 3, 4):
+            rows = autoref((3, 4, 5, 7), depth=depth)
+            for (head, tail), (shallow_head, shallow_tail) in zip(rows, autoref((3, 4, 5, 7))):
+                assert head == shallow_head
+                assert tail == autoref(shallow_tail, depth=depth - 1)
+
+    def test_leaf_count_grows_as_n_to_the_depth_plus_one(self):
+        def leaves(spec):
+            """Leaves of a subdivision spec: a node is an int, or (D, S)."""
+            total = 0
+            for node in spec:
+                if isinstance(node, tuple):
+                    total += leaves(node[1]) if node[1] else 1
+                else:
+                    total += 1
+            return total
+
+        for depth in (1, 2, 3):
+            assert leaves(autoref((3, 4, 5, 7), depth=depth)) == 4 ** (depth + 1)
+        for depth in (1, 2, 3):
+            assert leaves(autoref((2, 3), depth=depth)) == 2 ** (depth + 1)
+
+    def test_the_result_builds_a_rhythm_tree(self):
+        from klotho.chronos import RhythmTree
+
+        nested = autoref((3, 4, 5, 7), depth=2)
+        rt = RhythmTree(meas='19/16', subdivisions=nested)
+        assert rt.subdivisions == nested
+
+    @pytest.mark.parametrize('bad', [0, -1, -5])
+    def test_a_depth_below_one_raises(self, bad):
+        with pytest.raises(ValueError, match='depth'):
+            autoref((3, 4, 5), depth=bad)
+
+    @pytest.mark.parametrize('bad', [1.5, '2', None])
+    def test_a_non_integer_depth_raises(self, bad):
+        with pytest.raises(ValueError, match='depth'):
+            autoref((3, 4, 5), depth=bad)
+
+    def test_preserve_signs_is_refused_beyond_depth_one(self):
+        """``permute_list`` tests ``x >= 0`` on every element, and at depth 2
+        the elements are nested tuples. Rather than invent sign semantics for
+        a nested structure -- Haddad publishes no signed iterated example --
+        the combination is refused outright.
+        """
+        with pytest.raises(ValueError, match='preserve_signs'):
+            autoref((3, -4, 5), preserve_signs=True, depth=2)
+
+    def test_preserve_signs_still_works_at_depth_one(self):
+        assert autoref((3, -4, 5), preserve_signs=True, depth=1) == autoref(
+            (3, -4, 5), preserve_signs=True
+        )
+
+
+class TestSecondPositionalArgumentIsGuarded:
+    """A stray positional second argument was silently taken as ``lst2``.
+
+    ``mode`` is keyword-only in the signature, so ``autoref_rotmat(lst, 'G')``
+    does not select a mode -- it makes ``('G',)`` the tail list. That happened
+    to raise "equal length" for a one-letter mode, but ``'GSDC'`` has four
+    letters, so for a four-element list it was ACCEPTED and returned a matrix
+    of letters. Silent corruption; the codebase's doctrine is loud failure.
+    """
+
+    def test_a_mode_string_is_rejected_by_autoref_rotmat(self):
+        with pytest.raises(ValueError, match='mode'):
+            autoref_rotmat((3, 4, 5, 7), 'GSDC')
+
+    def test_a_short_mode_string_is_also_rejected_as_a_mode_mistake(self):
+        with pytest.raises(ValueError, match='mode'):
+            autoref_rotmat((3, 4, 5, 7), 'G')
+
+    def test_a_mode_string_is_rejected_by_autoref(self):
+        with pytest.raises(ValueError, match='number'):
+            autoref((3, 4, 5, 7), 'GSDC')
+
+    def test_the_message_names_the_offending_element(self):
+        with pytest.raises(ValueError, match="'G'"):
+            autoref_rotmat((3, 4, 5, 7), 'GSDC')
+
+    def test_a_genuine_numeric_second_list_still_works(self):
+        assert autoref((1, 2, 3), (10, 20, 30)) == (
+            (1, (20, 30, 10)),
+            (2, (30, 10, 20)),
+            (3, (10, 20, 30)),
+        )
+
+    def test_floats_are_accepted(self):
+        assert autoref((1, 2), (1.5, 2.5))[0][1] == (2.5, 1.5)
+
+    @pytest.mark.parametrize('mode', ['G', 'S', 'D', 'C'])
+    def test_the_keyword_form_is_untouched(self, mode):
+        assert autoref_rotmat((3, 4, 5, 7), mode=mode) is not None
 
 
 class TestAutoSubdiv:

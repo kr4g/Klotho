@@ -4,12 +4,28 @@ This family had ZERO test coverage before 10.18 (charter NEW-07), which is
 how mode 'C' could sit dead for four months while both the docstring and the
 error message advertised it (WL-28).
 
-The expected matrices below are transcribed from the PRIMARY SOURCE: Karim
-Haddad, *Vers une temporalite musicale repensee* ("Toward a Rethought
-Musical Temporality", 2020), section 2.3.8, "Les modes de rotation sur un
-rythme autoreferentiel" ("Rotation modes on a self-referential rhythm"),
-figures 2.22-2.25, for the proportions (3 4 5 7). They are NOT captured from Klotho's own output, so
-they are a real oracle rather than a snapshot of whatever the code does.
+The expected matrices below are transcribed from Karim Haddad, *L'Unite
+Temporelle : Une approche pour l'ecriture de la duree et de sa
+quantification* ("The Temporal Unit: An approach to the writing of duration
+and its quantification"), doctoral thesis, Sorbonne Universite, 2020, HAL
+tel-03258984; section 2.3.8, "Les modes de rotation sur un rythme
+autoreferentiel" ("Rotation modes on a self-referential rhythm"), figures
+2.22-2.25, for the proportions (3 4 5 7). They are NOT captured from Klotho's
+own output, so they are a real oracle rather than a snapshot of whatever the
+code does.
+
+Two citation corrections, made 2026-08-29 (chunk HAD-RT):
+
+* The title *Vers une temporalite musicale repensee* ("Toward a Rethought
+  Musical Temporality"), used here before, names a work that does not exist;
+  the phrase appears nowhere in the document. See
+  ``projects/klotho-evolution/evidence/haddad-sources/README.md``.
+* The 2020 thesis was called "the PRIMARY SOURCE" for this material. It is
+  the late synthesis, not the primary source: Haddad's 2008 chapter in *The
+  OM Composer's Book 2* states the same construction twelve years earlier and
+  its Figure 27 uses the very same (3 4 5 7) proportions for the same
+  purpose. The thesis is still the source the matrices below are transcribed
+  from; it is simply not the earliest one.
 """
 
 import pytest

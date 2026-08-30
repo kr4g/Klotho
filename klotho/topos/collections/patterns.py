@@ -15,6 +15,43 @@ __all__ = [
     'alternate_sequence',
 ]
 
+
+def _parse_autoref_args(args, mode_hint:bool):
+    '''
+    Shared argument handling for :func:`autoref` and :func:`autoref_rotmat`.
+
+    Returns ``(lst1, lst2)``. A single argument is used for both, which is
+    the ``lst1 is lst2`` case Haddad always works in; two arguments are the
+    Klotho extension documented on both public functions.
+
+    A second positional argument whose elements are not numbers is rejected
+    loudly. It used to be taken as ``lst2`` in silence: because ``mode`` is
+    keyword-only, ``autoref_rotmat(lst, 'GSDC')`` made ``('G','S','D','C')``
+    the tail list and returned a matrix of letters.
+    '''
+    if len(args) == 1:
+        lst1 = lst2 = tuple(args[0])
+    elif len(args) == 2:
+        lst1, lst2 = map(tuple, args)
+        for i, x in enumerate(lst2):
+            if not isinstance(x, (int, float)):
+                hint = (" If you meant to choose a rotation mode, note that "
+                        "'mode' is keyword-only: write "
+                        f"mode={args[1]!r}, not a bare second argument."
+                        ) if mode_hint else ''
+                raise ValueError(
+                    'The second positional argument is the tail list and must '
+                    f'contain only numbers, but element {i} is {x!r} '
+                    f'({type(x).__name__}).' + hint
+                )
+    else:
+        raise ValueError('Function expects either one or two iterable arguments.')
+
+    if len(lst1) != len(lst2):
+        raise ValueError('The tuples must be of equal length.')
+
+    return lst1, lst2
+
 # Algorithm 4: PermutList
 def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     '''
@@ -47,34 +84,93 @@ def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     return tuple(val * sign for val, sign in zip(rotated, signs))
 
 # Algorithm 5: AutoRef
-def autoref(*args, preserve_signs:bool=False):    
+def autoref(*args, preserve_signs:bool=False, depth:int=1):
     '''
-    Algorithm 5: AutoRef with optional sign preservation.
+    Algorithm 5: AutoRef with optional sign preservation and iteration.
+
+    Each element of ``lst1`` becomes the D (head) of a ``(D, S)`` pair whose
+    S (tail) is ``lst2`` rotated one step further than the last. The result
+    is a rhythm-tree subdivision spec.
 
     Parameters
     ----------
     *args
-        One or two lists to be doubly circularly permuted.
+        One list, or two lists of equal length.
+
+        The one-list form is Haddad's; his section 2.3.8 is single-list
+        throughout. The ``(lst1, lst2)`` form is a deliberate **Klotho
+        extension with no basis in the thesis**. Its invariant is that
+        **heads come from ``lst1``, tails from ``lst2``, and the two never
+        mix**; the one-list form is exactly the ``lst1 is lst2`` case.
     preserve_signs : bool, optional
-        If True, preserves signs while rotating absolute values (default is False).
+        If True, preserves signs while rotating absolute values (default is
+        False). Not available with ``depth`` above 1 -- see below.
+    depth : int, optional
+        Number of iterations (default 1, which is Haddad's plain AutoRef).
+        Each further iteration replaces every tail with the AutoRef of that
+        tail, so the proportions are preserved all the way down; a list of
+        length n yields ``n ** (depth + 1)`` leaves.
+
+        This is *not* the same as calling ``autoref`` on its own output,
+        which puts the whole ``(D, S)`` pair in the head slot and does not
+        produce a rhythm-tree spec at all.
 
     Returns
     -------
     tuple
         Tuple containing each original element paired with a permutation.
+
+    Raises
+    ------
+    ValueError
+        If ``depth`` is not an integer of at least 1, or if
+        ``preserve_signs`` is combined with a ``depth`` above 1.
+
+    Notes
+    -----
+    Iteration is Haddad's section 2.3.7, "De l'autoreference" ("On
+    self-reference"): "Il s'agit de substituer en subdivisant tout le rythme
+    par lui-meme en operant une rotation circulaire a chaque iteration" --
+    "It consists of substituting by subdividing the whole rhythm by itself,
+    performing a circular rotation at each iteration." Verified against his
+    figures 2.18-2.20 (evidence and transcriptions in
+    ``projects/klotho-evolution/evidence/haddad-fig-2.19-2.20/``).
+
+    Examples
+    --------
+    >>> autoref((2, 3))
+    ((2, (3, 2)), (3, (2, 3)))
+    >>> autoref((2, 3), depth=2)
+    ((2, ((3, (2, 3)), (2, (3, 2)))), (3, ((2, (3, 2)), (3, (2, 3)))))
     '''
-    if len(args) == 1:
-        lst1 = lst2 = tuple(args[0])
-    elif len(args) == 2:
-        lst1, lst2 = map(tuple, args)
-    else:
-        raise ValueError('Function expects either one or two iterable arguments.')
+    if isinstance(depth, bool) or not isinstance(depth, int):
+        raise ValueError(f'depth must be an integer of at least 1; got {depth!r}.')
+    if depth < 1:
+        raise ValueError(f'depth must be an integer of at least 1; got {depth}.')
 
-    if len(lst1) != len(lst2):
-        raise ValueError('The tuples must be of equal length.')
+    if depth > 1 and preserve_signs:
+        # permute_list tests ``x >= 0`` on every element, and from depth 2
+        # the elements are nested tuples. Haddad publishes no signed
+        # iterated example, so rather than invent sign semantics for a
+        # nested structure the combination is refused.
+        raise ValueError(
+            'preserve_signs=True is not defined for depth > 1: from the second '
+            'iteration the tails hold nested (D, S) pairs rather than numbers, '
+            'and a sign has no meaning on a subtree. Use depth=1, or apply '
+            'signs to the result yourself.'
+        )
 
-    return tuple((elt, permute_list(lst2, n + 1, preserve_signs)) 
+    lst1, lst2 = _parse_autoref_args(args, mode_hint=False)
+
+    rows = tuple((elt, permute_list(lst2, n + 1, preserve_signs))
                  for n, elt in enumerate(lst1))
+
+    if depth == 1:
+        return rows
+
+    # Recur on the TAIL only; the head keeps its integer D so the result
+    # stays a legal rhythm-tree spec at every level.
+    return tuple((head, autoref(tail, depth=depth - 1)) for head, tail in rows)
 
 # AutoRef Matrices
 def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
@@ -84,7 +180,18 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     Parameters
     ----------
     *args
-        One or two lists to generate rotation matrices from.
+        One list, or two lists of equal length, to generate rotation
+        matrices from.
+
+        As with :func:`autoref`, the two-list form is a **Klotho extension
+        with no basis in the thesis** -- Haddad's section 2.3.8 works from a
+        single list of proportions throughout. ``lst1`` supplies the head
+        (D) column, ``lst2`` supplies the tail (S) table, and the two never
+        mix; one list is the ``lst1 is lst2`` case. Per mode: every mode's
+        row 0 attaches ``autoref(lst2)``'s tails to ``lst1`` in order. Mode
+        ``'D'`` then freezes that tail table and rotates only the heads,
+        which is where ``lst2``'s role is most visible; mode ``'S'`` freezes
+        ``lst1`` and shears only the tails.
     mode : str, optional
         Rotation mode. Default is ``'G'``.
 
@@ -101,9 +208,11 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
 
     The four modes are Haddad's, from section 2.3.8, "Les modes de rotation
     sur un rythme autoreferentiel" ("Rotation modes on a self-referential
-    rhythm"), of *Vers une temporalite musicale repensee* ("Toward a
-    Rethought Musical Temporality", 2020). Mode names follow the thesis:
-    Group, S, D, and circulaire (circular).
+    rhythm"), of *L'Unite Temporelle : Une approche pour l'ecriture de la
+    duree et de sa quantification* ("The Temporal Unit: An approach to the
+    writing of duration and its quantification"), doctoral thesis, Sorbonne
+    Universite, 2020, HAL tel-03258984. Mode names follow the thesis: Group,
+    S, D, and circulaire (circular).
 
     Returns
     -------
@@ -115,15 +224,7 @@ def autoref_rotmat(*args, mode='G', preserve_signs:bool=False):
     >>> autoref_rotmat((3, 4, 5, 7), mode='C')[1]
     ((4, (7, 3, 4, 5)), (5, (3, 4, 5, 7)), (7, (4, 5, 7, 3)), (3, (5, 7, 3, 4)))
     '''
-    if len(args) == 1:
-        lst1 = lst2 = tuple(args[0])
-    elif len(args) == 2:
-        lst1, lst2 = map(tuple, args)
-    else:
-        raise ValueError('Function expects either one or two iterable arguments.')
-
-    if len(lst1) != len(lst2):
-        raise ValueError('The tuples must be of equal length.')
+    lst1, lst2 = _parse_autoref_args(args, mode_hint=True)
 
     match mode.upper():
         case 'G':
