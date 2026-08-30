@@ -166,12 +166,28 @@ class TestInsertionSemantics:
 # extraction -- (- in a circle)
 # ----------------------------------------------------------------------
 class TestExtraction:
-    """``prune`` was already extraction for LEAVES; ``extract`` is the named
-    verb and delegates to ``remove_subtree``, which is correct in general."""
+    """``extract`` takes a DECOMPOSED INDEX, like ``insert`` and ``scale``.
 
-    def test_extracting_a_leaf_holds_the_tempus(self):
+    It used to address NODES. On a flat tree the root is node 0 and
+    decomposed event *i* is node *i+1*, so a user reading the family's own
+    convention off ``insert``/``scale`` removed the event one to the LEFT of
+    the one they named, every time, with no error -- and on a nested tree
+    the divergence was categorical: the same argument removed a whole group.
+    The node-addressed operation still exists and is called
+    ``remove_subtree``.
+
+    ``prune`` is extraction too, but only for LEAVES."""
+
+    def test_the_index_is_a_DECOMPOSED_position_not_a_NODE(self):
+        """The regression. Node-addressed, ``extract(1)`` removed the ``1``
+        (node 1 is the FIRST event); index-addressed it removes the ``2``."""
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        rt.extract(1)
+        assert rt.group.S == (1, 3, 4)
+
+    def test_the_bar_does_not_shrink(self):
         rt = RT(meas='2/2', subdivisions=(2, 1, 2))
-        rt.extract(2)
+        rt.extract(1)
         assert str(rt.meas) == '2/2'
         assert rt.group.S == (2, 2)
         assert sum(abs(d) for d in rt.durations) == Fraction(1)
@@ -179,33 +195,115 @@ class TestExtraction:
     def test_survivors_dilate_to_fill_the_bar(self):
         rt = RT(meas='2/2', subdivisions=(2, 1, 2))
         assert rt.durations == (Fraction(2, 5), Fraction(1, 5), Fraction(2, 5))
-        rt.extract(2)
+        rt.extract(1)
         assert rt.durations == (Fraction(1, 2), Fraction(1, 2))
 
-    def test_extracting_a_whole_group(self):
+    def test_head_position_is_zero(self):
+        """0 is the head of the sequence, exactly as for ``insert``. It was
+        the ROOT under node addressing, and the only accidental guard."""
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        rt.extract(0)
+        assert rt.group.S == (2, 3, 4)
+
+    def test_negative_index_counts_from_the_end(self):
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        rt.extract(-1)
+        assert rt.group.S == (1, 2, 3)
+
+    @pytest.mark.parametrize('index', [4, -5])
+    def test_out_of_range_raises_IndexError(self, index):
+        """``4`` is out of range for four events -- but node 4 exists, so
+        node addressing accepted it and removed the last event. ``-5`` came
+        back as a raw rustworkx ``OverflowError``."""
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        with pytest.raises(IndexError):
+            rt.extract(index)
+
+    def test_several_at_once_refer_to_the_ORIGINAL_sequence(self):
+        """``(2, 4)`` comes back as ``(1, 2)``: re-concatenation writes the
+        survivors on the finest grid they share, which is the whole family's
+        normalization and the same music."""
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        rt.extract([0, 2])
+        assert rt.group.S == (1, 2)
+        assert rt.durations == (Fraction(1, 3), Fraction(2, 3))
+
+    def test_the_same_index_twice_removes_one_event(self):
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        rt.extract([1, 1, -3])
+        assert rt.group.S == (1, 3, 4)
+
+    def test_the_last_remaining_event_cannot_be_extracted(self):
+        """An empty tree has no meaning, so this raises rather than
+        producing one. (``remove_subtree``/``prune`` can still strip a tree
+        to a bare root, which is pre-existing and separate.)"""
+        rt = RT(meas='4/4', subdivisions=(1, 1))
+        with pytest.raises(ValueError):
+            rt.extract([0, 1])
+
+    def test_a_nested_group_is_addressed_by_its_EVENTS(self):
+        """Its two events are indices 1 and 2. Under node addressing the
+        single argument ``2`` took the whole group; now it takes one event
+        of it, and the group leaves only when both do."""
+        rt = RT(meas='4/4', subdivisions=(1, (5, (1, 1)), 3))
+        rt.extract(1)
+        assert rt.group.S == (2, 5, 6)
+
+    def test_the_node_addressed_verb_is_remove_subtree(self):
         rt = RT(meas='4/4', subdivisions=(1, (5, (1, 1)), 3))
         group = rt.successors(rt.root)[1]
-        rt.extract(group)
+        rt.remove_subtree(group)
         assert rt.group.S == (1, 3)
 
-    def test_several_nodes_at_once(self):
-        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
-        succ = rt.successors(rt.root)
-        rt.extract([succ[0], succ[2]])
-        assert rt.group.S == (2, 4)
+    def test_extracting_both_events_of_a_group_matches_removing_it(self):
+        by_index = RT(meas='4/4', subdivisions=(1, (5, (1, 1)), 3))
+        by_index.extract([1, 2])
+        by_node = RT(meas='4/4', subdivisions=(1, (5, (1, 1)), 3))
+        by_node.remove_subtree(by_node.successors(by_node.root)[1])
+        assert by_index.group.S == by_node.group.S == (1, 3)
+        assert by_index.durations == by_node.durations
 
-    def test_extracting_the_root_raises(self):
-        rt = RT(meas='2/2', subdivisions=(2, 1, 2))
-        with pytest.raises(ValueError):
-            rt.extract(rt.root)
+    def test_a_tie_group_is_ONE_event(self):
+        rt = RT(meas='4/4', subdivisions=(1, 1.0, 1, 1))
+        assert rt.tie_groups == ((1, 2), (3,), (4,))
+        rt.extract(0)
+        assert rt.group.S == (1, 1)
+
+    def test_a_surviving_rest_keeps_its_sign(self):
+        rt = RT(meas='4/4', subdivisions=(1, -1, 2))
+        rt.extract(0)
+        assert rt.group.S == (-1, 2)
+
+    def test_the_authored_spelling_stands(self):
+        rt = RT(meas='3/4', subdivisions=(1, 1, 1))
+        rt.extract(1)
+        assert str(rt.meas) == '3/4'
+        assert rt.group.S == (1, 1)
+
+    @pytest.mark.parametrize('index', [Fraction(1, 2), '1', 1.0, None])
+    def test_a_non_integer_index_raises_TypeError(self, index):
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        with pytest.raises(TypeError):
+            rt.extract(index)
+
+    def test_payloads_survive_the_extraction(self):
+        from klotho.thetos.composition.compositional import CompositionalTree
+        ct = CompositionalTree(meas='4/4', subdivisions=(1, 1, 1, 1))
+        for n, amp in zip(ct.leaf_nodes, (0.125, 0.25, 0.5, 0.75)):
+            ct.set_pfields(n, amp=amp)
+        ct.extract(1)
+        assert [ct.get_pfield(n, 'amp') for n in ct.leaf_nodes] == \
+            [0.125, 0.5, 0.75]
 
     def test_returns_self_for_chaining(self):
         rt = RT(meas='2/2', subdivisions=(2, 1, 2))
-        assert rt.extract(2) is rt
+        assert rt.extract(1) is rt
 
     def test_prune_and_extract_agree_on_a_leaf(self):
+        """``prune``'s argument is a NODE and ``extract``'s is an index, so
+        the same event is node 2 and index 1."""
         a = RT(meas='2/2', subdivisions=(2, 1, 2)).prune(2)
-        b = RT(meas='2/2', subdivisions=(2, 1, 2)).extract(2)
+        b = RT(meas='2/2', subdivisions=(2, 1, 2)).extract(1)
         assert a.group == b.group
         assert a.durations == b.durations
 

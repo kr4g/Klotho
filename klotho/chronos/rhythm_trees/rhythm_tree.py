@@ -1029,12 +1029,15 @@ class RhythmTree(Tree):
             rt.prune(2)           # (4 (1 1 1 3))
             rt.durations          # 1/6, 1/6, 1/6, 1/2
 
-        For whole-group extraction use :meth:`extract` (or
-        :meth:`remove_subtree`, which it delegates to).
+        For whole-group extraction use :meth:`remove_subtree`, which takes
+        a NODE and takes the group with it.
 
         See Also
         --------
-        extract : The named extraction verb, correct on interior nodes too.
+        extract : The named extraction verb. It addresses the DECOMPOSED
+            sequence by index, not nodes, so it is not a drop-in for this
+            method's argument.
+        remove_subtree : The node-addressed removal.
         """
         super().prune(node)
         return self
@@ -1368,12 +1371,21 @@ class RhythmTree(Tree):
                 sources.append(i)
         return self._respell(out, sources, 'insert')
 
-    def extract(self, node):
+    def extract(self, index):
         """Extraction (- in a circle) -- delete without shortening the bar.
 
-        The named extraction verb. It delegates to :meth:`remove_subtree`,
-        which is correct in general: the survivors dilate to fill the Tempus,
-        and a named group leaves as a whole.
+        The tree is decomposed, the named events dropped, and the whole
+        re-concatenated -- the same decompose -> operate -> concatenate
+        shape as :meth:`insert` and :meth:`scale`, so the result is ONE
+        level, the Tempus is untouched, and the survivors dilate to fill it.
+
+        **The argument is a DECOMPOSED INDEX, not a node.** It used to be a
+        node, alone in a family that indexes the decomposed sequence: on a
+        flat tree the root is node 0 and event *i* is node *i+1*, so an
+        index passed here removed the event one to the LEFT, silently and
+        every time; on a nested tree the same argument took a whole group.
+        The node-addressed operation is :meth:`remove_subtree`, which is
+        what to call when a named group should leave as a whole.
 
         ``prune`` is extraction too, but only for LEAVES -- on an interior
         node it promotes the children one level and changes durations unless
@@ -1381,25 +1393,69 @@ class RhythmTree(Tree):
 
         Parameters
         ----------
-        node : int or sequence of int
-            The node(s) to remove. A node already removed as another's
-            descendant is skipped rather than raising.
+        index : int or sequence of int
+            Which event(s) to remove, 0-based into the DECOMPOSED sequence,
+            the same convention as :meth:`insert` and :meth:`scale` (p. 125:
+            *« 0 étant la position de tête de séquence »* -- "0 being the
+            head-of-sequence position"). Indices refer to the ORIGINAL
+            sequence; negative indices count from the end as in a list; out
+            of range raises ``IndexError``. Naming one event twice removes
+            it once.
 
         Returns
         -------
         RhythmTree
             self, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If every event is named. An empty tree has no meaning, so the
+            last event cannot be extracted. (``remove_subtree`` and
+            ``prune`` can still strip a tree to a bare root; that is
+            pre-existing and separate.)
+
+        See Also
+        --------
+        remove_subtree : Removal by NODE -- what this method used to be.
+        klotho.chronos.rhythm_trees.algorithms.diminish : The
+            Tempus-FOLLOWING remove verb (- in a box). It already took
+            0-based decomposed positions, harmless repeats, and refused to
+            empty the tree; this method now matches it. The one difference
+            is the out-of-range error type: ``IndexError`` here, to match
+            ``insert`` and ``scale`` on the same class.
+
+        Notes
+        -----
+        Ties do not survive and parameter overrides do -- see :meth:`insert`.
         """
-        nodes = list(node) if isinstance(node, (list, tuple, set)) else [node]
-        for n in nodes:
-            if n not in self:
-                raise ValueError(f"Node {n} not found in tree")
-            if n == self.root:
-                raise ValueError("Cannot extract the root node")
-        for n in nodes:
-            if n in self:
-                self.remove_subtree(n)
-        return self
+        current = self._decomposed_durations()
+        n = len(current)
+        raw = list(index) if isinstance(index, (list, tuple, set)) else [index]
+
+        drop = set()
+        for raw_index in raw:
+            k = self._as_index(raw_index, 'extract')
+            k = k + n if k < 0 else k
+            if not (0 <= k < n):
+                raise IndexError(
+                    f"extract index {raw_index} out of range for a "
+                    f"decomposed sequence of {n} events"
+                )
+            drop.add(k)
+        if len(drop) == n:
+            raise ValueError(
+                "extracting every event would leave a tree with nothing in "
+                "it, which is not a rhythm -- keep at least one event, or "
+                "discard the tree"
+            )
+
+        out, sources = [], []
+        for i, duration in enumerate(current):
+            if i not in drop:
+                out.append(duration)
+                sources.append(i)
+        return self._respell(out, sources, 'extract')
 
     def scale(self, index, ratio):
         """Expansion/compression (x in a circle) -- reweight events in place.
