@@ -18,6 +18,37 @@ if TYPE_CHECKING:
     from klotho.thetos.composition.compositional import CompositionalUnit
 
 
+def _reanchor_contained_envelopes(original_uc, sub_uc, group):
+    """Carry every control envelope living inside one tie group into the
+    unit that group became.
+
+    The explicit-prolatio arm hand-builds each unit instead of extracting
+    a subtree, so it has to redo by hand what ``from_subtree`` does. An
+    envelope whose resolved leaves all fall inside this group has exactly
+    one home; re-anchoring it at the new unit's root with no leaf subset
+    spreads it over the re-prolated leaves, the same cascade the head's
+    pfields get. An envelope crossing several groups has no single home
+    and is dropped -- the documented loss for spanning overlays.
+    """
+    descriptors = getattr(original_uc, '_control_envelopes', None)
+    if not descriptors:
+        return
+    group_leaves = set(group)
+    for desc in descriptors.values():
+        env_leaves = set(original_uc._resolve_control_envelope_leaves(desc))
+        if not env_leaves or not env_leaves.issubset(group_leaves):
+            continue
+        new_env_id = sub_uc._next_envelope_id
+        sub_uc._next_envelope_id += 1
+        sub_uc._control_envelopes[new_env_id] = {
+            "envelope": desc["envelope"],
+            "pfields": list(desc["pfields"]),
+            "endpoint": desc["endpoint"],
+            "anchor_node": sub_uc._rt.root,
+            "leaf_subset": None,
+        }
+
+
 def _snip_slur_into_sub_uc(original_uc, sub_uc, depth_node, sounding_leaves):
     def _path_sig(tree, root, target):
         branch = list(tree.branch(target))
@@ -75,34 +106,68 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     equal to the whole structure. Otherwise, each leaf becomes an
     independent unit with the specified *prolatio*.
 
-    Rests are preserved in both branches: a rest leaf decomposes to a rest
-    unit regardless of *prolatio*. For a CompositionalUnit without an
-    explicit *prolatio*, per-leaf parameters, instruments, and contained
-    overlays are preserved; slurs or envelopes spanning multiple resulting
-    units cannot survive and are discarded. With an explicit *prolatio* on
-    a CompositionalUnit, only the effective pfields and the governing
-    instrument survive: authored mfields and contained control envelopes
-    are dropped (that arm hand-builds each unit rather than extracting the
-    subtree).
+    Rests are preserved in both branches, at every granularity: a rest
+    leaf decomposes to a rest unit regardless of *prolatio*, and in the
+    depth branch a rest GROUP — an interior node with a negative
+    proportion — becomes a whole rest unit rather than being re-prolated
+    into sound. One rest does NOT survive: a rest child inside a
+    *sounding* interior node is lost when an explicit *prolatio* replaces
+    that node's subdivisions, which is inherent to re-prolation — the
+    requested shape is the one that is built.
+
+    For a CompositionalUnit without an explicit *prolatio*, per-leaf
+    parameters, instruments, and contained overlays are preserved; an
+    overlay spanning multiple resulting units cannot survive and is
+    discarded. With an explicit *prolatio* on a CompositionalUnit, the
+    effective pfields, the effective mfields, the governing instrument,
+    and any control envelope contained in a single source event survive;
+    slurs and spanning envelopes are dropped (each unit is one event, so
+    a slur has nothing left to join).
+
+    In the *depth* branch a slur spanning several frontier units is NOT
+    discarded — it is snipped into per-unit partial slurs, one per unit
+    that holds two or more of its sounding leaves.
 
     Ties (07_TIES_CHARTER.md sect9): the leaf branch decomposes one unit
     per tie GROUP — a tied group is one sound, so it comes back as one
     fundamental unit whose tempus is the unreduced sum of the members'
     durations (16/21 + 32/35 = 176/105). The group's parameters are the
-    head's. In the *depth* branch, ties internal to a frontier subtree
-    ride along verbatim; a group crossing a frontier boundary is split
-    and its continuation dangles (renders as an attack with a warning)
-    until sequence-level resolution exists.
+    head's. A leading dangler (the head itself tied) keeps its ``(1.0,)``
+    marker on a TemporalUnit but loses it on a CompositionalUnit, whose
+    subtree extraction does not carry it — the NEW-40 residue class.
+
+    In the *depth* branch, ties internal to a frontier subtree ride along
+    verbatim. A group crossing a frontier boundary is split and its
+    continuation dangles: at a cut ABOVE the tied leaf the dangler
+    survives and renders as an attack with a warning, but when the
+    frontier lands ON the tied leaf itself the marker is dropped
+    silently, because a bare frontier leaf takes ``group.S``'s ``(1,)``
+    wrapper fallback and the depth branch has no equivalent of the leaf
+    branch's re-marking. Also NEW-40 residue.
 
     Parameters
     ----------
     ut : TemporalUnit or CompositionalUnit
         The temporal structure to decompose.
     prolatio : tuple, str, or None, optional
-        The subdivision specification for the resulting units. When None,
-        defaults to ``'d'`` (duration). On a CompositionalUnit an explicit
-        *prolatio* re-prolates each leaf, with the source leaf's effective
-        pfields cascading from the new unit's root. Default is None.
+        The subdivision specification for the resulting units.
+
+        - ``None`` (default) means the default shape: ``'d'`` in the leaf
+          branch, and in the depth branch each node's own subdivisions,
+          carried across verbatim.
+        - A tuple is used as the subdivision of every resulting unit.
+        - ``'s'`` means the SOURCE TREE'S ROOT subdivisions — the whole
+          tree's ``S``, stamped onto every resulting unit at any depth,
+          not the per-node subdivisions that ``None`` gives.
+        - Any other string is passed to the TemporalUnit constructor.
+
+        A falsy value that is not None (``''``, ``()``, ``0``, ``False``,
+        ``[]``) raises: these used to be coerced to ``'d'``, masking an
+        error the constructor would otherwise have raised.
+
+        On a CompositionalUnit an explicit *prolatio* re-prolates each
+        leaf, with the source leaf's effective pfields cascading from the
+        new unit's root. Default is None.
     depth : int or None, optional
         If given, decompose at the specified frontier depth rather than at
         the leaf level. Must be within ``[0, tree depth]``. Cannot be
@@ -118,8 +183,9 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     Raises
     ------
     ValueError
-        If *depth* is outside ``[0, tree depth]``, or if *prolatio* and
-        *depth* are combined on a CompositionalUnit.
+        If *depth* is outside ``[0, tree depth]``, if *prolatio* is falsy
+        but not None, or if *prolatio* and *depth* are combined on a
+        CompositionalUnit.
     """
     
     # Import here to avoid circular imports
@@ -277,10 +343,18 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
                         prolatio = 'r' if is_rest else next(prolatio_cycle),
                         beat     = ut._beat,
                         bpm      = ut._bpm,
-                        pfields  = ut.pfields
+                        pfields  = ut.pfields,
+                        # mfield NAMES too, not just values: without the
+                        # registry the schema is gone, and a later
+                        # set_mfields on the new unit has nothing to write
+                        # into. (ut.mfields is a sorted name list that
+                        # always contains 'group' -- see the constructor.)
+                        mfields  = ut.mfields
                     )
                     if not is_rest:
                         unit.set_pfields(unit._rt.root, **ut[ordinal].pfields)
+                        unit.set_mfields(unit._rt.root, **ut[ordinal].mfields)
+                        _reanchor_contained_envelopes(ut, unit, group)
                     governing = ut._rt._resolve_governing_instrument_node(head)
                     if governing is not None and governing in ut._rt.node_instruments:
                         unit.set_instrument(unit._rt.root, ut._rt.node_instruments[governing])

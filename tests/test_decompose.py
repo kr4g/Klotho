@@ -9,6 +9,7 @@ out-of-range depth (NEW-01), and depth=0 means the root, not the leaves
 import pytest
 
 from klotho.chronos.temporal_units import TemporalUnit, decompose
+from klotho.dynatos import Envelope
 from klotho.thetos import CompositionalUnit as UC
 
 
@@ -212,6 +213,59 @@ class TestFalsyProlatio:
         nested = TemporalUnit(tempus='1/2', prolatio=((1, (1, 1)), 1), bpm=120)
         assert [u.prolationis for u in decompose(nested, prolatio=None, depth=1)] == [
             (1, 1), (1,)]
+
+
+class TestExplicitProlatioCUArm:
+    """RT-12(b): the explicit-prolatio CU arm hand-builds each unit, so
+    everything ``from_subtree`` copies has to be carried across by hand."""
+
+    def test_ut_mfields_always_contains_group(self):
+        # LOAD-BEARING for the fix below. The arm passes ut.mfields -- a
+        # sorted NAME LIST -- into CompositionalUnit(mfields=...), whose
+        # constructor does `if 'group' not in mfields: mfields['group']=...`.
+        # Membership works on a list; the item assignment behind it does
+        # not. The pass-through is only safe because 'group' is always
+        # already registered. If this ever fails, the arm raises TypeError.
+        assert 'group' in UC(tempus='3/4', prolatio=(1, 1, 1)).mfields
+        assert 'group' in UC(tempus='3/4', prolatio=(1, 1, 1),
+                             mfields={'articulation': 'legato'}).mfields
+        assert 'group' in UC(tempus='3/4', prolatio=(1, 1, 1),
+                             pfields=['amp']).mfields
+
+    def test_explicit_prolatio_carries_mfield_names_and_values(self):
+        # the NAME was never registered on the new unit, so the schema was
+        # gone, not merely the value
+        uc = UC(tempus='3/4', prolatio=(1, 1, 1), pfields=['amp'],
+                mfields={'articulation': 'legato'})
+        for leaf, art in zip(uc.leaves, ('a', 'b', 'c')):
+            uc.set_mfields(leaf, articulation=art)
+        units = decompose(uc, prolatio=(1, 1))
+        assert [u.mfields for u in units] == [['articulation', 'group']] * 3
+        assert [c.mfields['articulation'] for u in units for c in u] == [
+            'a', 'a', 'b', 'b', 'c', 'c']
+
+    def test_explicit_prolatio_carries_contained_control_envelope(self):
+        # a control envelope living entirely inside one source event has a
+        # well-defined home in that event's unit; it used to be dropped
+        uc = UC(tempus='3/4', prolatio=(1, 1, 1), pfields=['amp'], bpm=120)
+        uc.apply_envelope(Envelope([0.1, 0.8]), pfields='amp',
+                          node=uc.leaves[0], control=True)
+        assert [len(u.resolved_control_envelopes())
+                for u in decompose(uc)] == [1, 0, 0]
+        units = decompose(uc, prolatio=(1, 1))
+        assert [len(u.resolved_control_envelopes()) for u in units] == [1, 0, 0]
+        desc = units[0].resolved_control_envelopes()[0]
+        assert desc['pfields'] == ['amp']
+        assert len(desc['target_nodes']) == 2
+
+    def test_explicit_prolatio_drops_a_spanning_control_envelope(self):
+        # an envelope crossing several source events cannot be re-anchored
+        # into any single resulting unit -- the documented loss
+        uc = UC(tempus='3/4', prolatio=(1, 1, 1), pfields=['amp'], bpm=120)
+        uc.apply_envelope(Envelope([0.1, 0.8]), pfields='amp',
+                          node=uc.leaves, control=True)
+        units = decompose(uc, prolatio=(1, 1))
+        assert [len(u.resolved_control_envelopes()) for u in units] == [0, 0, 0]
 
 
 class TestSlurRegression:
