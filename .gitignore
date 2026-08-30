@@ -128,8 +128,15 @@ examples/mat111mc_notebooks/mat_kit/
 .archive/
 projects/
 .worktree-remote/
-scripts/
 gui/
+
+# `scripts/` used to be blanket-ignored here. Removed 2026-08-30: it is
+# developer tooling that belongs with the code -- notably the oracle-capture
+# scripts, whose whole value is that a reader can see how a fixture was made.
+# The rule was also a footgun: with no leading slash it matched at ANY depth
+# and had already swallowed package source under klotho/ once (hence the
+# klotho/**/scripts/ negations below, which it made necessary).
+# (Caches there are already covered by the **/__pycache__/ rule at the top.)
 ut_plotter/
 .taskmaster/
 benchmarks/
