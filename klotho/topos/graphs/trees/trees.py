@@ -598,10 +598,119 @@ class Tree(GraphCore):
         names them (``proportion`` on a RhythmTree, ``factor`` on a
         HarmonicTree, arbitrary fields on a ParameterTree). A positional
         second argument raises TypeError rather than being discarded.
+
+        Notes
+        -----
+        **This is not a guaranteed append.** Child order is ascending node
+        index (see :meth:`insert_child`), and rustworkx reuses the indices
+        freed by a deletion -- so on a tree that has had a node removed, the
+        new child lands in whatever slot the free list hands back, which may
+        be in the middle::
+
+            rt = RhythmTree(meas='4/4', subdivisions=(1, (2, (1, 1)), 3))
+            rt.remove_subtree(4)              # (4 (1 (2 (1)) 3))
+            rt.add_child(rt.root, proportion=9)
+            rt.group                          # (4 (1 (2 (1)) 9 3))  -- not last
+
+        This is long-standing behaviour, not a consequence of positional
+        insertion. Use :meth:`insert_child` when the position matters.
         """
         child_id = self._add_child_raw(parent, **attr)
         self._post_mutation(scope_node=parent, op='add_child')
         return child_id
+
+    def insert_child(self, parent, index, **attr):
+        """Insert a child at a given rank among ``parent``'s children.
+
+        Returns the id of the node that now holds the inserted content.
+
+        Child order is ascending node index and nothing else --
+        :meth:`~klotho.topos.graphs.core.GraphCore.successors` returns
+        ``tuple(sorted(...))``, so the sort IS the ordering model. Rank is
+        therefore index rank, and "insert at rank k" means exactly: shift the
+        CONTENT of ranks k..n-1 one slot right, then write the new content
+        into the vacated slot k. Content is the pair (node data, child list),
+        so a shifted sibling carries its whole subtree with it. Nothing about
+        ``successors``, the ``Group`` rebuild or the layer pipeline changes.
+
+        Parameters
+        ----------
+        parent : int
+            The node to insert under. It need not already have children.
+        index : int
+            The rank to insert BEFORE, 0-based. ``index == len(children)``
+            puts the new child last. Negative indices count from the end
+            exactly as ``list.insert`` does (``-1`` inserts before the last
+            child), but out-of-range raises ``IndexError`` instead of
+            clamping.
+        **attr
+            Node data for the new child, named by the owning layer -- the same
+            keywords :meth:`add_child` takes.
+
+        Raises
+        ------
+        ValueError
+            If ``parent`` is not in the tree.
+        IndexError
+            If ``index`` is out of range.
+
+        Notes
+        -----
+        **Node identity follows POSITION, not content.** Slot k keeps its id
+        and receives the new content, so an external handle to a shifted
+        sibling now denotes a different node than it did before the call.
+        This is inherent to rank == index rank, and is exactly why no
+        renumbering machinery is needed (``renumber_nodes`` is a stub).
+
+        **A composed operand needs no second primitive.** ``insert_child``
+        inserts a leaf; subdividing the returned id afterwards builds the
+        nested operand::
+
+            new_id = rt.insert_child(parent, 1, proportion=3)
+            rt.subdivide(new_id, (1, 2))
+
+        There is deliberately no ``insert_subtree``.
+
+        See Also
+        --------
+        add_child : Append-ish; see its note on freed-index reuse.
+        """
+        if parent not in self:
+            raise ValueError(f"Node {parent} not found in tree")
+
+        slots = list(self.successors(parent))
+        n = len(slots)
+        if index < 0:
+            index += n
+        if not (0 <= index <= n):
+            raise IndexError(
+                f"insert index {index} out of range for {n} children of "
+                f"node {parent}"
+            )
+
+        # No append fast path: `add_child` cannot promise a last position
+        # (freed indices are reused), so even index == n goes through the
+        # content shift, which places the new content by slot rank.
+        # Capture the content BEFORE any edge surgery. `contents` is in slot
+        # order; the new node's own slot is not yet known because
+        # _add_node_raw may return a REUSED index that lands anywhere in the
+        # sorted order -- so the destination is computed from the merged
+        # sorted list rather than assumed to be the maximum.
+        contents = [(dict(self[s]), list(self.successors(s))) for s in slots]
+        new_id = self._add_child_raw(parent, **attr)
+        merged = sorted(slots + [new_id])
+        desired = contents[:index] + [(dict(self[new_id]), [])] + contents[index:]
+
+        for s in merged:
+            for c in list(self.successors(s)):
+                self._remove_edge_raw(s, c)
+        for s, (payload, kids) in zip(merged, desired):
+            self._write_node_data(s, payload, replace=True)
+            for c in kids:
+                self._add_edge_raw(s, c)
+
+        self._post_mutation(scope_node=parent, op='insert_child')
+        return merged[index]
 
     def add_subtree(self, parent, subtree):
         """Add a subtree as a child of a parent node. Returns the attached subtree root id."""
@@ -762,7 +871,12 @@ class Tree(GraphCore):
         return target_node
 
     def move_subtree(self, node, new_parent):
-        """Move a subtree to a new parent (appended after its existing children)."""
+        """Move a subtree to a new parent.
+
+        The moved node keeps its id, and child order is ascending node index
+        (see :meth:`insert_child`), so it lands wherever its id ranks among
+        the new parent's children -- NOT necessarily last.
+        """
         if node == self.root:
             raise ValueError("Cannot move the root node")
 

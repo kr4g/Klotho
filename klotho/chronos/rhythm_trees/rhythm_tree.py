@@ -880,6 +880,55 @@ class RhythmTree(Tree):
         """
         return super().graft_subtree(target_node, subtree, mode)
 
+    def _heads_the_leaf_surface(self, node):
+        """True when ``node`` is the first leaf of the whole tree, or would be
+        if a child were inserted at its rank 0 -- i.e. every ancestor up to the
+        root is itself a first child."""
+        while node != self.root:
+            parent = self.parent(node)
+            if parent is None:
+                return False
+            if self.successors(parent)[0] != node:
+                return False
+            node = parent
+        return True
+
+    def insert_child(self, parent, index, **attr):
+        """Insert a child at a given rank (see :meth:`Tree.insert_child`),
+        refusing a tie that would have nothing to continue.
+
+        Positional insertion is the position-dependent write the layer
+        validator could never make: ``validate_attrs`` is handed the PARENT,
+        so it cannot see where among the siblings the new node lands. A tie
+        inserted at the head of the leaf surface has no predecessor, and used
+        to be accepted in silence and then ignored by ``tie_groups``.
+
+        Rank 0 is NOT the test -- having no predecessor is. A tie at rank 0 of
+        a group that is not itself leftmost binds to the leaf before the group
+        (tie groups follow leaf ORDER, not subtree containment;
+        07_TIES_CHARTER.md sect1-2), and is legal. At rank k > 0 the tie
+        re-binds to the inserted note, which is the point of inserting it.
+
+        Returns
+        -------
+        int
+            The id of the node that now holds the inserted content.
+        """
+        if parent not in self:
+            raise ValueError(f"Node {parent} not found in tree")
+        tie_requested = (bool(attr.get('tied', False))
+                         or isinstance(attr.get('proportion'), float))
+        if tie_requested:
+            n = len(self.successors(parent))
+            rank = index + n if index < 0 else index
+            if rank == 0 and self._heads_the_leaf_surface(parent):
+                raise ValueError(
+                    "a tie inserted at the head of the leaf surface continues "
+                    "nothing -- there is no leaf before it. Insert it "
+                    "untied, or insert at a later rank."
+                )
+        return super().insert_child(parent, index, **attr)
+
     def subdivide(self, node, S):
         """
         Subdivide leaf node(s) with structure S.
