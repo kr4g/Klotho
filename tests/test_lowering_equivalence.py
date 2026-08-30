@@ -342,6 +342,9 @@ class TestAliasing:
 if __name__ == '__main__':
     import sys
     if '--regen' in sys.argv:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _oracle_lock import require_regen_authorization
+        require_regen_authorization(GOLDEN_PATH)
         GOLDEN_PATH.parent.mkdir(parents=True, exist_ok=True)
         GOLDEN_PATH.write_text(normalize_payload(lower(build_miniature_score())))
         print(f'golden regenerated: {GOLDEN_PATH}')

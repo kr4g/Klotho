@@ -51,9 +51,11 @@ Deliberately narrow. Self-comparison (``f(x) == f(x)``) is NOT flagged: it is
 how determinism and purity are tested, it fools nobody, and flagging it buries
 the real signal under false positives until someone deletes the check.
 """
+import os
 import re
 import subprocess
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -322,3 +324,79 @@ def test_the_regeneration_warning_check_reaches_capture_scripts(tmp_path):
     offenders = _regen_offenders(_regen_scan_paths(repo=repo, tests=tests), repo=repo)
 
     assert offenders == ["scripts/silent_probe.py", "tests/test_silent_probe.py"]
+
+
+# ---------------------------------------------------------------------------
+# The regeneration lock.
+#
+# Filed after a hostile pass proved the hole was open: sabotage the lowering
+# pipeline, run the documented ``--regen``, re-run the suite, and everything is
+# green with the sabotage still in the file. The oracle had been laundered out
+# of the code it was supposed to be independent of.
+#
+# The capture scripts already SAY the right thing -- "capture from REMOTE
+# klotho", "Do NOT run in main workspace". Nothing enforced it. These tests are
+# the enforcement: every path that can overwrite an oracle must route through
+# ``tests/_oracle_lock.require_regen_authorization``, which refuses unless a
+# human set KLOTHO_ALLOW_REGEN=1.
+# ---------------------------------------------------------------------------
+
+_ORACLE_WRITERS = (
+    TESTS / 'test_lowering_equivalence.py',
+    REPO / 'scripts' / 'capture_expected_trees.py',
+    REPO / 'scripts' / 'capture_expected_uc_pt.py',
+    REPO / 'scripts' / 'capture_parity_fixtures.py',
+)
+
+
+def _regen_paths():
+    """Every file in the repo that can overwrite a checked-in oracle.
+
+    Found by scanning rather than listed, so a NEW capture script cannot slip
+    in unguarded -- which is the failure mode this whole module exists for.
+    """
+    found = []
+    for d in (TESTS, REPO / 'scripts'):
+        if not d.is_dir():
+            continue
+        for p in sorted(d.glob('*.py')):
+            text = p.read_text(encoding='utf-8', errors='replace')
+            writes_oracle = (
+                '--regen' in text
+                or ('json.dump' in text and 'capture' in p.name)
+            )
+            if writes_oracle:
+                found.append(p)
+    return found
+
+
+def test_every_oracle_regeneration_path_is_locked():
+    """A path that can overwrite an oracle must ask the lock first.
+
+    This is the guard the project did not have. Without it, an agent that
+    implements a feature can regenerate the oracle that feature is tested
+    against, from the feature's own output, and the suite goes green.
+    """
+    unguarded = [
+        str(p.relative_to(REPO))
+        for p in _regen_paths()
+        if 'require_regen_authorization' not in p.read_text(encoding='utf-8', errors='replace')
+    ]
+    assert unguarded == [], (
+        'these can overwrite a checked-in oracle without human authorization:\n  '
+        + '\n  '.join(unguarded)
+        + '\nEach must call tests/_oracle_lock.require_regen_authorization().'
+    )
+
+
+def test_the_lock_actually_refuses_when_unauthorized():
+    """The lock must go red in both directions, or it is decoration."""
+    import importlib
+    lock = importlib.import_module('_oracle_lock')
+    env = dict(os.environ)
+    env.pop('KLOTHO_ALLOW_REGEN', None)
+    with mock.patch.dict(os.environ, env, clear=True):
+        with pytest.raises(SystemExit):
+            lock.require_regen_authorization('tests/fixtures/whatever.json')
+    with mock.patch.dict(os.environ, {**env, 'KLOTHO_ALLOW_REGEN': '1'}, clear=True):
+        lock.require_regen_authorization('tests/fixtures/whatever.json')  # must not raise
