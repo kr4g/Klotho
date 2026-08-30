@@ -1,0 +1,70 @@
+{
+  "source": "Karim Haddad, Le Temps et la Forme (thesis, 2020)",
+  "provenance": "pdftotext -layout, one page at a time; PDF page = thesis page + 9. Values are Haddad's printed OpenMusic s-expressions, not Klotho output.",
+  "extracted_by": "scripts/capture_haddad_figures.py",
+  "figures": {
+    "2.12": {
+      "figure": "2.12",
+      "thesis_page": 279,
+      "pdf_page": 288,
+      "sexpr": "(? (((8 2) ((1 ((8 ((4 (1 1 1 1 1)) (2 (1 1 1)) (1 (1 1 1 1)) (5 (1 1)) (5 (1)) (3 (1 1 1 1 1))))))))))",
+      "printed_unbalanced": false
+    },
+    "2.13": {
+      "figure": "2.13",
+      "thesis_page": 280,
+      "pdf_page": 289,
+      "sexpr": "(? (((8 2) ((8 ((4 (-1 1 1 1 1)) (2 (-1 1 1)) (1 (-1 1 1 1)) (5 (-1 1)) (5 (-4 -1)) (3 (-1 1 1 1 1))))))))",
+      "printed_unbalanced": false
+    },
+    "2.14": {
+      "figure": "2.14",
+      "thesis_page": 280,
+      "pdf_page": 289,
+      "sexpr": "(? (((8 2) ((8 ((4 (1 -1 -1 -1 -1)) (2 (1 -1 -1)) (1 (1 -1 -1 -1)) (5 (1 -1)) (5 (4 1.0)) (3 (1.0 -1 -1 -1 -1))))))))",
+      "printed_unbalanced": false
+    },
+    "2.15": {
+      "figure": "2.15",
+      "thesis_page": 280,
+      "pdf_page": 289,
+      "sexpr": "(? (((8 2) ((8 ((4 (1 -4)) (2 (1 -2)) (1 (1 -3)) (5 (1 -1)) (5 (5)) (3 (1.0 -4))))))))",
+      "printed_unbalanced": false
+    },
+    "2.16": {
+      "figure": "2.16",
+      "thesis_page": 281,
+      "pdf_page": 290,
+      "sexpr": "(? (((8 2) ((8 ((4 (1 -4)) (2 (1 -2)) (1 (1 -3)) (5 (1 -1)) (5 (5)) (3 (1.0 -4))))))))",
+      "printed_unbalanced": false
+    },
+    "2.17": {
+      "figure": "2.17",
+      "thesis_page": 281,
+      "pdf_page": 290,
+      "sexpr": "(? (((4 4) ((4 (2 3))))))",
+      "printed_unbalanced": false
+    },
+    "2.18": {
+      "figure": "2.18",
+      "thesis_page": 281,
+      "pdf_page": 290,
+      "sexpr": "(1 (((4 4) ((2 (3 2)) (3 (2 3))))))",
+      "printed_unbalanced": true
+    },
+    "2.19": {
+      "figure": "2.19",
+      "thesis_page": 281,
+      "pdf_page": 290,
+      "sexpr": "(1 (((4 4) ((2 ((3 (2 3)) (2 (3 2)))) (3 ((2 (3 2)) (3 (2 3))))))))",
+      "printed_unbalanced": false
+    },
+    "2.20": {
+      "figure": "2.20",
+      "thesis_page": 282,
+      "pdf_page": 291,
+      "sexpr": "(1 (((4 4) ((2 ((3 ((2 (3 2)) (3 (2 3)))) (2 ((3 (2 3)) (2 (3 2)))))) (3 ((2 ((3 (2 3)) (2 (3 2)))) (3 ((2 (3 2)) (3 (2 3))))))))))",
+      "printed_unbalanced": true
+    }
+  }
+}
