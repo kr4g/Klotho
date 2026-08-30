@@ -2,9 +2,18 @@
 Compositional units combining temporal structure with parameterized events.
 
 This module provides ``CompositionalUnit``, which extends ``TemporalUnit``
-with a synchronized ``ParameterTree`` for hierarchical parameter management,
-envelope application, slur marking, and instrument assignment. The ``Parametron``
-class extends ``Chronon`` with parameter field access.
+by replacing its rhythm tree with a single **fused** ``CompositionalTree``
+carrying rhythm and parameters on one topology -- for hierarchical parameter
+management, envelope application, slur marking, and instrument assignment.
+The ``Parametron`` class extends ``Chronon`` with parameter field access.
+
+**There is no synchronized ``ParameterTree``, and there never was one to
+synchronize** (docket DOC-8). This header used to claim a shadow tree that
+the class docstring and :class:`CompositionalTree` both explicitly deny;
+the header was simply wrong. The one tree is ``uc._rt``; ``uc.rt`` returns
+a *copy* of it and ``uc.pt`` builds an *effective* ``ParameterTree``
+snapshot on demand. Neither is stored, and mutating either does not reach
+the unit.
 """
 
 from typing import Union, Optional, Any, Literal
@@ -704,6 +713,35 @@ class CompositionalUnit(TemporalUnit):
     and parameter data (via a parameter layer) on one topology. Parameter
     values can be set at any node and automatically propagate to descendant
     events through hierarchical inheritance.
+
+    Attribution -- two separate claims (docket DOC-5, ruling R10)
+    -------------------------------------------------------------
+    **1. Envelope application follows Haddad.** :meth:`apply_envelope`
+    realises what thesis sect8.2.2 calls the Temporal Unit as a
+    « reservoir de donnees quelconques » -- "a reservoir of arbitrary
+    data": the unit is a carrier for material that is not itself rhythmic.
+    That reading is his.
+
+    **2. The fused hierarchical parameter tree is Klotho's OWN.** This is
+    verified as an *absence*, not merely unfound: *heritage / herite /
+    heriter* ("inheritance / inherits / to inherit") occur **zero times**
+    in the thesis, and no occurrence of *parametre* ("parameter") binds a
+    parameter to a tree node. Haddad has no notion of a parameter
+    inherited down a rhythm tree. Claim it as Klotho's; do not read the
+    shared vocabulary as inherited design.
+
+    On the NAME (kept per ruling R10, a rename to ``ParametricUnit`` was
+    considered and declined). Haddad's own *unite compositionnelle*
+    ("compositional unit") names « l'ensemble des divisions temporelles »
+    -- "the set of temporal divisions" -- so on *his* usage Klotho's
+    analogue of the term would be :class:`~klotho.thetos.composition.score.Score`,
+    not this class. But the term is **Emmanuel Nunes's**, and in Nunes's
+    sense -- « restreinte, discrete, composee... d'une gestualite locale et
+    localement accomplie », "restricted, discrete, composed... of a local
+    gesturality locally accomplished" -- it is a bounded local gesture,
+    which is exactly what a ``CompositionalUnit`` is. The tension lives
+    inside Haddad, who borrows a local term for an aggregate; Klotho
+    matches Nunes.
 
     Parameters
     ----------
@@ -1826,7 +1864,14 @@ class CompositionalUnit(TemporalUnit):
                        endpoint: bool = True) -> Union[int, list[int]]:
         """
         Apply an envelope to a contiguous leaf span within this UC.
-        
+
+        Haddad's, in kind (docket DOC-5): thesis sect8.2.2 treats the
+        Temporal Unit as a « reservoir de donnees quelconques » -- "a
+        reservoir of arbitrary data" -- and applying a curve across a span
+        of its leaves is that idea made concrete. The *hierarchical* half
+        of the machinery this writes into is Klotho's own; see the class
+        docstring for why the two claims are kept apart.
+
         Parameters
         ----------
         envelope : Envelope
