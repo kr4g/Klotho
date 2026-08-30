@@ -13,6 +13,7 @@ Pseudocode for numbered algorithms by Karim Haddad unless otherwise noted.
 """
 from typing import Tuple
 from fractions import Fraction
+import numbers
 from math import gcd, lcm, prod
 from functools import reduce
 import numpy as np
@@ -276,6 +277,118 @@ def flatten(rt) -> 'object':
     return fuse(decompose(rt))
 
 
+def filtrage(rt, series):
+    """
+    Rest the leaves a series walks onto -- Haddad's *filtrage* ("filtering").
+
+    Named ``filtrage`` (R13-G): his own term is accurate here -- this really
+    does filter a subdivided surface through a series -- and ``filter``
+    shadows the builtin, so the French is kept. Haddad sect2.3.4, thesis
+    p. 279, figure 2.13:
+
+        *"Nous filtrons le rythme subdivise (2.12) par la meme serie
+        originelle (5 3 4 2 1 (5)) qui donnera par extension des silences
+        aux positions (0 5 8 12 14 15 20) qui se trouvent etre la premiere
+        note de chaque groupe d'irrationnel"*
+
+        "We filter the subdivided rhythm (2.12) by the same original series
+        (5 3 4 2 1 (5)) which will by extension give rests at positions
+        (0 5 8 12 14 15 20), which happen to be the first note of each
+        irrational group."
+
+    His footnote 5 settles the indexing so we do not have to guess:
+    *"0 etant la premiere position comme il est souvent l'usage dans les
+    langages informatiques."* -- "0 being the first position, as is often
+    the usage in computing languages." So the positions are ``[0]`` plus
+    the inclusive prefix sums of the series, which for ``(5 3 4 2 1 5)``
+    gives ``[0, 5, 8, 12, 14, 15, 20]`` -- character for character his
+    printed list.
+
+    Published example (RT-4). Filtering figure 2.12 by ``(5 3 4 2 1 5)``::
+
+        (8 ((4 (1 1 1 1 1)) (2 (1 1 1)) (1 (1 1 1 1))
+            (5 (1 1)) (5 (1)) (3 (1 1 1 1 1))))
+        =>
+        (8 ((4 (-1 1 1 1 1)) (2 (-1 1 1)) (1 (-1 1 1 1))
+            (5 (-1 1)) (5 (-1)) (3 (-1 1 1 1 1))))
+
+    **What is Haddad's and what is Klotho's** (DOC-3). The rule, the
+    series, the position list and the 0-based convention are all his. Three
+    decisions are ours, because his single worked example cannot settle
+    them:
+
+    - **Group 5 diverges, deliberately.** He prints ``(5 (-4 -1))`` where
+      the mechanical filtering gives ``(5 (-1))``. Both are one 5-unit rest;
+      his has an extra leaf, which he carries through figures 2.14 and 2.15
+      so the *evide* has a tie to demonstrate there. It is a re-spelling
+      applied after the filtering, not the filtering's output -- his own
+      printed positions are the prefix sums of a TWENTY-leaf surface (a
+      21-leaf tree would have to read ``... 15 16``), and his gloss "the
+      first note of each irrational group" holds for six positions over six
+      groups only on the 20-leaf reading. Klotho emits the 20-leaf form.
+    - **Out-of-range positions are CLIPPED, not wrapped.** On his example
+      the two are indistinguishable (``20 % 20 == 0``, and leaf 0 is
+      already a target). The position list is a prefix-sum *walk* over the
+      leaf surface, so running off the end means the series overshot.
+    - **The trailing total is KEPT** -- ``[0] + accumulate(series)``, giving
+      n+1 positions, not ``[0] + accumulate(series[:-1])`` giving n. They
+      coincide only when ``sum(series) == len(leaf_nodes)``, which is his
+      case; they differ on, say, a 30-leaf tree filtered by the same
+      series. Keeping it is literally what he printed, and clipping
+      degrades it to the other form in his case anyway.
+
+    Rests are made through :meth:`RhythmTree.make_rest`, so a filtered leaf
+    sheds any tie it carried (charter sect1: a tied rest is illegal) and a
+    filtered branch rests everything under it.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to filter. Not modified; a copy is returned.
+    series : sequence of int
+        The step series. Every step must be a positive integer -- a zero or
+        negative step makes the prefix-sum walk stall or run backwards,
+        which is not a filtering of anything.
+
+    Returns
+    -------
+    RhythmTree
+        A new tree with the walked-onto leaves rested.
+
+    Raises
+    ------
+    ValueError
+        If ``series`` is empty or contains a non-positive step.
+    """
+    steps = tuple(series)
+    if not steps:
+        raise ValueError(
+            "filtrage needs a non-empty series -- the series IS the filter"
+        )
+    for s in steps:
+        if isinstance(s, bool) or not isinstance(s, numbers.Integral):
+            raise TypeError(
+                f"filtrage series takes integer steps; got {s!r}"
+            )
+        if s <= 0:
+            raise ValueError(
+                f"filtrage series steps must be positive; got {s!r}. A "
+                f"zero step stalls the prefix-sum walk and a negative one "
+                f"runs it backwards."
+            )
+    positions = [0]
+    for s in steps:
+        positions.append(positions[-1] + int(s))
+    out = rt.copy()
+    leaves = list(out.leaf_nodes)
+    # dict.fromkeys de-duplicates while keeping order; make_rest is
+    # idempotent anyway, this just avoids the redundant re-evaluations.
+    for p in dict.fromkeys(positions):
+        if p < len(leaves):          # CLIP (see above), never wrap
+            out.make_rest(leaves[p])
+    return out
+
+
 # ------------------------------------------------------------------------------------
 
 def ratios_to_subdivs(ratios:tuple[Fraction]) -> tuple[int]:
@@ -499,3 +612,128 @@ def clean_subdivs(subdivs:tuple) -> tuple:
 
 # def rotate(self, n:int = 1):
 #     return RhythmTree.from_tree(rotate_tree(self, n), self._span, self._decomp)
+
+
+def evide(rt):
+    """
+    Interchange sounds and rests -- Haddad's *rythme evide*, after Boulez.
+
+    Named ``evide`` (R13-G, an ASCII transliteration of *evide*): an English
+    name wins only when Haddad's own term is WRONG for the operation --
+    ``fuse`` because his "concatenation" is a fold, ``flatten`` because his
+    *reduction* un-reduces. Here his term is accurate, so it is kept.
+    ``hollow`` was the alternative and is a cheap rename if preferred.
+
+    Haddad sect2.3.5, thesis p. 280, figure 2.14:
+
+        *"Nous emprunterons a Pierre Boulez le principe du << rythme evide >>
+        [...] comme on peut aussi representer comme un rythme << negatif >>
+        d'un autre qui lui est pendant. Il s'agit d'intervertir les silences
+        par des notes exprimees et vice et versa"*
+
+        "We will borrow from Pierre Boulez the principle of the
+        'hollowed-out rhythm' [...] which can also be represented as a
+        'negative' rhythm of another that is its counterpart. It is a matter
+        of interchanging the rests with expressed notes and vice versa."
+
+    Boulez source as he cites it: Pierre Boulez and Paule Thevenin,
+    *Releves d'apprenti* ("Apprentice's Notes"), Editions du Seuil, 1966.
+    His footnote 7: *"Nous avons eu le privilege de montrer au compositeur
+    ces exemples les illustrant par une piece breve."* -- "We had the
+    privilege of showing the composer these examples, illustrating them with
+    a short piece." Boulez himself saw these figures.
+
+    Published example (RT-3). Hollowing out figure 2.13 gives figure 2.14
+    character for character, his ``1.0`` tie markers included -- they are
+    identical to Klotho's own storage convention::
+
+        (8 ((4 (-1 1 1 1 1)) (2 (-1 1 1)) (1 (-1 1 1 1))
+            (5 (-1 1)) (5 (-4 -1)) (3 (-1 1 1 1 1))))
+        =>
+        (8 ((4 (1 -1 -1 -1 -1)) (2 (1 -1 -1)) (1 (1 -1 -1 -1))
+            (5 (1 -1)) (5 (4 1.0)) (3 (1.0 -1 -1 -1 -1))))
+
+    **The re-tie rule is the charter's, not Haddad's** (07_TIES_CHARTER.md
+    sect10): for each maximal run of newly-sounding leaves, the head keeps
+    ``tied=False`` and the rest get ``tied=True``. Runs are computed AFTER
+    the flip, which is what guarantees the charter's second condition -- a
+    run head can never come out a dangling continuation of a preceding
+    still-resting region. Sign flips clear ``tied`` (charter sect1), so the
+    operation cannot manufacture a tied rest. Figure 2.14's own tie group
+    crosses a branch boundary (the last leaf of group 5 and the first of
+    group 6), which is exactly the case ``tie_groups`` derives by leaf
+    ORDER rather than subtree containment.
+
+    **Three behaviours are Klotho's, and are choices, not accidents**
+    (DOC-3):
+
+    - **Negative interior nodes are normalised to positive first.**
+      ``_evaluate`` re-negates a positive child of a negative parent, so
+      flipping a leaf sounding under a RESTING BRANCH is silently undone --
+      ``(1, (-2 (1 1)), 1)`` would hollow out to ``(-1, (-2 (-1 -1)), -1)``,
+      the group still a rest and nothing sounding at all. Normalising the
+      branch first (top-down, so a nested one cannot re-negate under its
+      own parent) gives ``(-1, (2 (1 1.0)), -1)``, which is the music the
+      operation means. The alternative was refusing such trees loudly; the
+      normalisation is chosen because a resting branch is a legal spelling
+      of a resting region, and hollowing it out has an obvious answer.
+    - **Every flip is written with an explicit ``tied=False``.** Writing an
+      int ``proportion`` does NOT clear the flag: ``_evaluate`` reads
+      ``isinstance(s, float) or data['tied']``, and only a NEGATIVE value
+      forces it off. A silent flag would survive the flip and re-float the
+      proportion, and charter sect10's run rule must be the only thing that
+      sets a tie here.
+    - **Input ties are destroyed, by design.** Every leaf flips, so every
+      input tie clears. ``evide(evide(x))`` restores x's SIGN PATTERN
+      exactly, but not its ties -- an involution on the signs only.
+
+    Figure 2.15, his "optimised" spelling (successive rests merged within a
+    group, ``(4 (1 -4))``), is deliberately NOT built. He presents it as an
+    alternative spelling of the same structure, not as a further operation;
+    it is close to a within-group :func:`flatten`, and it needs the form
+    ``(5 (5))``, which ``_validate_s_form`` currently rejects.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to hollow out. Not modified; a copy is returned.
+
+    Returns
+    -------
+    RhythmTree
+        A new tree: every sound a rest, every rest a sound, re-tied per
+        charter sect10.
+    """
+    out = rt.copy()
+
+    # Pass 1 -- normalise resting BRANCHES to sounding, top-down.
+    # ``descendants`` is depth-first pre-order, so a parent is always
+    # positive by the time its children are reached; bottom-up would let a
+    # still-negative parent re-negate a child that had just been flipped.
+    for n in out.descendants(out.root):
+        if out.out_degree(n) == 0:
+            continue
+        p = out[n]['proportion']
+        if p < 0 or isinstance(p, float) or out[n].get('tied', False):
+            out.set_node_data(n, proportion=int(abs(p)), tied=False)
+
+    leaves = list(out.leaf_nodes)
+
+    # Pass 2 -- interchange sounds and rests. ``tied=False`` is explicit on
+    # every write (see the docstring: an int write does not clear it).
+    for n in leaves:
+        p = out[n]['proportion']
+        flipped = -int(abs(p)) if p > 0 else int(abs(p))
+        out.set_node_data(n, proportion=flipped, tied=False)
+
+    # Pass 3 -- charter sect10: re-tie each maximal run of newly-sounding
+    # leaves, head untied. Computed after the flip, so no head can be a
+    # dangling continuation.
+    previous_sounds = False
+    for n in leaves:
+        sounds = out[n]['proportion'] > 0
+        if sounds and previous_sounds:
+            out.set_node_data(n, tied=True)
+        previous_sounds = sounds
+
+    return out
