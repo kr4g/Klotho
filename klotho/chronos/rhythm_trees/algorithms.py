@@ -464,6 +464,130 @@ def diminish(rt, positions):
     return fuse(survivors)
 
 
+def _scaling_ratio(value, verb):
+    """Exact positive rational form of a scaling ratio.
+
+    A :class:`Meas` is read RAW (TEMPO-5) — its spelling is a Tempus and
+    survives into the result's grid. Everything else goes through
+    ``Fraction``, which normalises; that is Fraction's contract, not a
+    policy of the verb. Pass a ``Meas`` when the spelling matters.
+    """
+    from .meas import Meas
+    if isinstance(value, Meas):
+        num, den = value.numerator, value.denominator
+    else:
+        f = _exact_ratio(value)
+        num, den = f.numerator, f.denominator
+    if num == 0:
+        raise ValueError(
+            f"{verb} ratios must be positive; 0 would delete the prolatio, "
+            f"which is diminution's job (⊟), not this operator's."
+        )
+    if (num < 0) != (den < 0):
+        raise ValueError(
+            f"{verb} ratios must be positive; got {value!r}. A prolatio's "
+            f"SIGN says whether it sounds or rests and belongs to the "
+            f"prolatio, never to the ratio -- a negative ratio would make "
+            f"a rest out of a scaling, which is not what the operator "
+            f"means. Use make_rest for that."
+        )
+    return abs(num), abs(den)
+
+
+def scale_tempus(rt, ratios, positions):
+    """
+    Scale prolationes and let the Tempus follow — Haddad's
+    dilatation/contraction (⊠).
+
+    sect4.5.2.3, pp. 127–128, figs. 4.66–4.69. The Tempus-FOLLOWING half
+    of the scale pair; the preserving sibling is expansion/compression
+    (⊗), which holds the Tempus and re-spells everything against it.
+
+    **One operator, not two.** His §4.5.3 heading reads
+    « Dilatation/Contraction (⊠), Expansion/Compression (⊗) »: each policy
+    is a single operator whose ratio decides the direction — above 1 it
+    dilates, below 1 it contracts. That is why the verb is ``scale_tempus``
+    and not ``dilate``, which would be accurate above 1 and actively
+    misleading below it. Both members of the pair are named for the
+    POLICY (``scale_tempus`` / ``scale``), which is the point of the axis.
+
+    Published examples on his running source ``B = 18/18 (4 2 3 6 3)``::
+
+        B ⊠ ((3), (2))          =>  24/18 (4 2 9 6 3)      fig. 4.66
+        B ⊠ ((1/3 1/9), (2 3))  =>  32/54 (12 6 3 2 9)     fig. 4.69
+
+    **Figures 4.68 and 4.69 are corrupt and must not be copied.** Both
+    reprint the preceding *expansion* result ``(4 2 9 6 3)`` as the
+    contraction's prolationis. Fig. 4.69's Tempus ``16/27`` is right, and
+    it forces the true answer; ``32/54`` is its raw spelling on the grid
+    the contraction refines to.
+
+    Positions index the DECOMPOSED sequence — one entry per tie GROUP
+    (ALG-2), 0-based, p. 127: "0 being the first prolatio". Like
+    :func:`flatten`, whose machinery this is, the result carries one term
+    per sounding event and no ties.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to scale. Not modified.
+    ratios : rational or sequence of rational
+        One positive ratio per position. A ``Meas`` keeps its raw
+        spelling; a ``Fraction``/``str``/``int`` normalises. A scalar
+        broadcasts to a one-element tuple.
+    positions : int or sequence of int
+        Parallel to *ratios*, as his own ``⊠((1/3 1/9),(2 3))`` notation
+        pairs them.
+
+    Returns
+    -------
+    RhythmTree
+        A new tree whose ``meas`` is the sum of the transformed
+        prolationes.
+
+    Raises
+    ------
+    ValueError
+        On an empty call, a length mismatch, a repeated position (two
+        ratios on one prolatio has no defined answer), a non-positive
+        ratio, or an out-of-range position.
+    """
+    from .rhythm_tree import RhythmTree
+    from .meas import Meas
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"scale_tempus at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. For TemporalUnits use "
+            f"klotho.chronos.temporal_units.algorithms.scale_tempus."
+        )
+    rs = _as_operand_tuple(ratios)
+    ps = _as_operand_tuple(positions)
+    if not rs and not ps:
+        raise ValueError(
+            "scale_tempus needs at least one (ratio, position) pair -- "
+            "scaling nothing is not a dilatation. For the canonical "
+            "re-spelling alone, use flatten."
+        )
+    _check_pairing(rs, ps, 'scale_tempus', 'ratios')
+    parts = list(decompose(rt))
+    idx = _check_positions(ps, len(parts) - 1, 'scale_tempus', unique=True)
+
+    for ratio, p in zip(rs, idx):
+        num, den = _scaling_ratio(ratio, 'scale_tempus')
+        part = parts[p]
+        # Raw ints, folded as ONE factor (TEMPO-5): Meas.__mul__ would
+        # gcd-reduce and destroy the spelling even at the identity, and
+        # applying the two factors separately can cancel against the
+        # part's own terms. Decomposed parts always have span 1, so
+        # there is no span left to fold in here.
+        parts[p] = RhythmTree(
+            span=1,
+            meas=Meas(part.meas.numerator * num,
+                      part.meas.denominator * den),
+            subdivisions=part.subdivisions)
+    return fuse(parts)
+
+
 def filtrage(rt, series):
     """
     Rest the leaves a series walks onto -- Haddad's *filtrage* ("filtering").

@@ -12,6 +12,7 @@ from klotho.chronos.rhythm_trees.algorithms import (
     flatten as _rt_flatten,
     segment as _rt_segment,
     diminish as _rt_diminish,
+    scale_tempus as _rt_scale_tempus,
     _fuse_parts,
 )
 
@@ -784,6 +785,53 @@ def diminish(obj, positions):
     if _following_target(obj, 'diminish') == 'rt':
         return _rt_diminish(obj, positions)
     return _following_result(obj, _rt_diminish(obj._rt, positions))
+
+
+def scale_tempus(obj, ratios, positions):
+    """
+    Scale prolationes and let the Tempus follow — Haddad's
+    dilatation/contraction (⊠).
+
+    The symbolic core is
+    :func:`klotho.chronos.rhythm_trees.algorithms.scale_tempus`
+    (sect4.5.2.3, pp. 127–128, figs. 4.66–4.69). ONE operator: the ratio's
+    size decides the direction, which is why the verb is not ``dilate``.
+    Its preserving sibling is ``RhythmTree.scale`` (⊗), which holds the
+    Tempus and re-spells the contents against it.
+
+    On a ``TemporalUnit``, **beat and bpm are held**, so the Tempus change
+    is a real change of duration: ``18/18 (4 2 3 6 3) ⊠ ((3),(2))`` gives
+    ``24/18``, 24/18ths of the source's duration, notated as a longer bar
+    at the same tempo.
+
+    Positions index the DECOMPOSED sequence — one entry per tie group
+    (ALG-2) — 0-based, p. 127: "0 being the first prolatio".
+
+    Parameters
+    ----------
+    obj : TemporalUnit or RhythmTree
+        A ``RhythmTree`` returns a ``RhythmTree``. A ``CompositionalUnit``
+        raises ``NotImplementedError`` (R13-E).
+    ratios : rational or sequence of rational
+        Positive. A ``Meas`` keeps its raw spelling; other rationals
+        normalise.
+    positions : int or sequence of int
+        Parallel to *ratios*.
+
+    Returns
+    -------
+    TemporalUnit or RhythmTree
+
+    Examples
+    --------
+    >>> ut = TemporalUnit(tempus='18/18', prolatio=(4, 2, 3, 6, 3))
+    >>> str(scale_tempus(ut, 3, 2).tempus)
+    '24/18'
+    """
+    if _following_target(obj, 'scale_tempus') == 'rt':
+        return _rt_scale_tempus(obj, ratios, positions)
+    return _following_result(
+        obj, _rt_scale_tempus(obj._rt, ratios, positions))
 
 
 def _interleave_operand(obj, position):

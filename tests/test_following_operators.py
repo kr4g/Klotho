@@ -80,8 +80,11 @@ import pytest
 
 from klotho.chronos import (RhythmTree, TemporalUnit, TemporalUnitSequence,
                             TemporalBlock, Meas)
-from klotho.chronos.rhythm_trees.algorithms import diminish as rt_diminish
-from klotho.chronos.temporal_units.algorithms import diminish
+from klotho.chronos.rhythm_trees.algorithms import (
+    diminish as rt_diminish,
+    scale_tempus as rt_scale_tempus,
+)
+from klotho.chronos.temporal_units.algorithms import diminish, scale_tempus
 
 
 def _val(m):
@@ -156,6 +159,83 @@ class TestDiminution:
             rt_diminish(_B(), ())
 
 
+class TestDilatationContraction:
+    """Dilatation/Contraction -- x in a box (U+22A0), sect4.5.2.3,
+    pp. 127-128, figs. 4.66-4.69.
+
+    ONE operator: the ratio's size decides the direction, which is
+    exactly why the Klotho verb is not called ``dilate`` -- that name is
+    accurate above 1 and actively misleading below it. The pair is named
+    for the POLICY (``scale_tempus`` here, ``scale`` for the preserved
+    sibling), which is the point of the axis.
+    """
+
+    def test_fig_4_66_dilatation(self):
+        assert _spelling(rt_scale_tempus(_B(), 3, 2)) == (24, 18, (4, 2, 9, 6, 3))
+
+    def test_fig_4_69_contraction(self):
+        # NEVER use figs. 4.68/4.69's printed prolationis -- both reprint
+        # the preceding EXPANSION result ``(4 2 9 6 3)``. His Tempus
+        # 16/27 is correct and forces the true answer; 32/54 is its raw
+        # spelling on the grid the contraction actually refines to.
+        out = rt_scale_tempus(_B(), ('1/3', '1/9'), (2, 3))
+        assert _spelling(out) == (32, 54, (12, 6, 3, 2, 9))
+        assert _val(out.meas) == Fraction(16, 27)
+
+    def test_tempus_is_the_sum_of_the_transformed_prolationis(self):
+        out = rt_scale_tempus(_B(), 3, 2)
+        assert sum(abs(s) for s in out.subdivisions) == out.meas.numerator
+
+    def test_duration_changes_by_exactly_the_scaled_prolatio(self):
+        # B's index 2 is 3/18 = 1/6; tripling it adds 2/6.
+        assert (_val(rt_scale_tempus(_B(), 3, 2).meas)
+                == Fraction(1, 1) + Fraction(2, 6))
+
+    def test_ratio_one_is_a_no_op_in_value(self):
+        out = rt_scale_tempus(_B(), 1, 2)
+        assert _val(out.meas) == Fraction(1, 1)
+        assert out.subdivisions == (4, 2, 3, 6, 3)
+
+    def test_a_rest_keeps_its_sign_under_scaling(self):
+        src = RhythmTree(meas='4/4', subdivisions=(1, -1, 1, 1))
+        out = rt_scale_tempus(src, 2, 1)
+        assert out.subdivisions == (1, -2, 1, 1)
+
+    def test_scalars_broadcast(self):
+        assert (_spelling(rt_scale_tempus(_B(), (3,), (2,)))
+                == _spelling(rt_scale_tempus(_B(), 3, 2)))
+
+    def test_a_meas_ratio_keeps_its_raw_spelling(self):
+        # A Meas ratio is read raw (TEMPO-5); a Fraction/str normalises,
+        # which is Fraction's contract, not a policy of this verb.
+        assert (rt_scale_tempus(_B(), Meas(2, 6), 2).meas.denominator
+                != rt_scale_tempus(_B(), '1/3', 2).meas.denominator)
+
+    def test_zero_ratio_raises(self):
+        with pytest.raises(ValueError):
+            rt_scale_tempus(_B(), 0, 2)
+
+    def test_negative_ratio_raises(self):
+        with pytest.raises(ValueError):
+            rt_scale_tempus(_B(), '-1/3', 2)
+
+    def test_duplicate_position_raises(self):
+        with pytest.raises(ValueError):
+            rt_scale_tempus(_B(), (2, 3), (1, 1))
+
+    def test_length_mismatch_raises(self):
+        with pytest.raises(ValueError):
+            rt_scale_tempus(_B(), (2, 3), (1,))
+
+    def test_out_of_range_position_raises(self):
+        with pytest.raises(ValueError):
+            rt_scale_tempus(_B(), 2, 5)
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError):
+            rt_scale_tempus(_B(), (), ())
+
+
 class TestTiesCollapse:
     """A tie group decomposes to ONE fundamental unit (ALG-2), so the
     follows family indexes tie GROUPS, not leaves -- and, like
@@ -221,3 +301,22 @@ class TestCompositionalUnitRefused:
         cu = CompositionalUnit(tempus='18/18', prolatio=(4, 2, 3, 6, 3))
         with pytest.raises(NotImplementedError):
             diminish(cu, 0)
+
+    def test_scale_tempus_holds_bpm(self):
+        ut = TemporalUnit(tempus='18/18', prolatio=(4, 2, 3, 6, 3),
+                          beat='1/4', bpm=60)
+        out = scale_tempus(ut, 3, 2)
+        assert out.bpm == 60 and out.beat == ut.beat
+        assert _val(out.tempus) == Fraction(4, 3)
+        assert out.duration == pytest.approx(ut.duration * 24 / 18)
+
+    def test_scale_tempus_refuses_a_compositional_unit(self):
+        from klotho.thetos.composition.compositional import CompositionalUnit
+        cu = CompositionalUnit(tempus='18/18', prolatio=(4, 2, 3, 6, 3))
+        with pytest.raises(NotImplementedError):
+            scale_tempus(cu, 3, 2)
+
+    def test_scale_tempus_refuses_a_sequence(self):
+        ut = TemporalUnit(tempus='1/4', prolatio=(1, 1))
+        with pytest.raises(TypeError):
+            scale_tempus(TemporalUnitSequence([ut]), 2, 0)
