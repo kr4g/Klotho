@@ -573,6 +573,125 @@ def flatten(obj):
     )
 
 
+def _interleave_operand(obj, position):
+    """Normalise one ``interleave`` operand to a list of whole units.
+
+    Refuses a ``TemporalBlock`` in the same three-part shape ``fuse``
+    uses: what cannot happen, why it has no unique answer, and the named
+    alternative.
+    """
+    if isinstance(obj, TemporalBlock):
+        raise ValueError(
+            "a TemporalBlock cannot be interleaved: zipping a polyphonic "
+            "stack into one voice has no unique answer, and choosing one "
+            "would choose music for the composer. The block-shaped "
+            "sibling is `weave` -- the vertical rotation-weave of his "
+            "fig. 7.10 (docket WL-28) -- which is not built yet. "
+            "Interleave the block's rows as sequences instead."
+        )
+    if isinstance(obj, TemporalUnitSequence):
+        return list(obj.seq)
+    if isinstance(obj, TemporalUnit):
+        return [obj]
+    if isinstance(obj, (list, tuple)):
+        out = []
+        for member in obj:
+            out.extend(_interleave_operand(member, position))
+        return out
+    raise TypeError(
+        f"interleave takes a TemporalUnit, a TemporalUnitSequence, or a "
+        f"list of them; operand {position} is {type(obj).__name__}."
+    )
+
+
+def interleave(a, b):
+    """
+    Zip a sequence against another's retrograde -- Haddad's *tuilage*
+    (docket OPS-8).
+
+    ``C = [i || j]`` for ``i`` in *a* and ``j`` in ``reverse(b)``: a
+    strict alternating zip of WHOLE units. Nothing is merged, scaled or
+    re-metered -- every unit passes through untouched (as a copy),
+    keeping its own tempus, prolationis, beat and bpm -- so the result is
+    one single-voice :class:`TemporalUnitSequence` whose duration is
+    exactly ``a.duration + b.duration``. No arithmetic crosses an operand
+    boundary, so there is no tempo to reconcile.
+
+    Source: sect4.6.2 pp. 133-134, figs. 4.80-4.83 (2008 English original
+    pp. 30-32). Haddad glosses his own term on p. 133 --
+    « un tuilage (« interlocking ») », "a *tuilage* ('interlocking')" --
+    and says on p. 134 why it interests him:
+
+        « l'engendrement par son contraire utilisant le procede de
+        diminution genere une fausse symetrie qui nous parait
+        interessante »
+        -- "generation by its opposite, using the diminution process,
+        produces a *false symmetry* that seems interesting to us."
+
+    The English name wins over *tuilage*: the French word means tiling,
+    overlapping entries, and this operation has **no overlap at all** --
+    one voice, units end to end. (Same call as ``fuse`` over
+    "concatenation".)
+
+    Source-inclusion is a property of the OPERANDS, not of this verb.
+    In his own example each erosion sequence begins with the unit it was
+    eroded from, which is why fig. 4.81 has ten bars where fig. 4.82's
+    formalism suggests eight. ``interleave`` stays a pure zip and takes
+    no ``include_source`` flag -- such a flag would double-count when
+    both operands already carry their seed.
+
+    UNEQUAL LENGTHS -- append-tail, and it is not symmetric. The zip runs
+    to ``min(len(a), len(b))``; the longer operand's remaining units are
+    then appended **in their own traversal order**. *a*'s tail is
+    appended forward, *b*'s tail in ``reverse(b)`` order, so
+    ``interleave(x, y)`` and ``interleave(y, x)`` are not reverses of
+    each other. Both are lossless.
+
+    Parameters
+    ----------
+    a : TemporalUnit, TemporalUnitSequence, or list of them
+        Traversed forward. A ``CompositionalUnit`` is an ordinary member:
+        unlike ``fuse``, this verb merges no parameter state, so there is
+        nothing to reconcile.
+    b : TemporalUnit, TemporalUnitSequence, or list of them
+        Traversed in retrograde.
+
+    Returns
+    -------
+    TemporalUnitSequence
+        One single-voice sequence, ``len(a) + len(b)`` units long.
+
+    Raises
+    ------
+    ValueError
+        If either operand is a ``TemporalBlock``; the block-shaped
+        sibling is ``weave`` (WL-28), not built.
+
+    Examples
+    --------
+    >>> a = TemporalUnitSequence([TemporalUnit(tempus='1/4', prolatio=(1,)),
+    ...                           TemporalUnit(tempus='2/4', prolatio=(1,))])
+    >>> b = TemporalUnitSequence([TemporalUnit(tempus='3/4', prolatio=(1,)),
+    ...                           TemporalUnit(tempus='5/4', prolatio=(1,))])
+    >>> [str(u.tempus) for u in interleave(a, b).seq]
+    ['1/4', '5/4', '2/4', '3/4']
+    """
+    forward = _interleave_operand(a, 'a')
+    retrograde = list(reversed(_interleave_operand(b, 'b')))
+
+    n = min(len(forward), len(retrograde))
+    out = []
+    for i in range(n):
+        out.append(forward[i])
+        out.append(retrograde[i])
+    out.extend(forward[n:])
+    out.extend(retrograde[n:])
+
+    # The constructor copies every member, which is what keeps the
+    # output's units independent of the operands'.
+    return TemporalUnitSequence(out)
+
+
 def _exact_tempo_ratio(value) -> Fraction:
     """Exact rational form of a tempo/beat quantity for reconciliation.
 
