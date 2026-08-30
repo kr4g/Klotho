@@ -19,7 +19,7 @@ topos/
 ├── types.py               # abstract structural types
 ├── collections/
 │   ├── _pattern.py        # Pattern runtime internals (NodeSpec, delegates)
-│   ├── patterns.py        # permutations, autoref, chaining
+│   ├── patterns.py        # permutations, autoref family, Haddad chaining
 │   ├── sequences.py       # Nørgård infinity series, Pattern iterator
 │   └── sets.py            # Operations, Sieve, GenCol, CombinationSet, PartitionSet
 ├── formal_grammars/
@@ -196,9 +196,9 @@ notation, where `D` is a value and `S` is a tuple of children.
 
 `Tree` does **not** inherit `Graph`, so it never exposes free-form
 `add_node`/`add_edge`.  Structural changes go exclusively through its
-sanctioned mutators (`add_child`, `add_subtree`, `prune`,
-`graft_subtree`, `move_subtree`, …), and node-data writes are routed
-through attached **layers** (see below).
+sanctioned mutators (`add_child`, `insert_child`, `add_subtree`,
+`prune`, `graft_subtree`, `move_subtree`, …), and node-data writes are
+routed through attached **layers** (see below).
 
 ### Class Diagram
 
@@ -233,6 +233,7 @@ classDiagram
         +update_node_data(node, attrs)
         +replace_node_data(node, attrs)
         +add_child(parent, **attr) int
+        +insert_child(parent, index, **attr) int
         +add_subtree(parent, subtree)
         +prune(node)
         +remove_subtree(node)
@@ -290,6 +291,44 @@ from `GraphCore`.  There is no public `add_node`/`add_edge` on `Tree`
 at any point — post-construction structural changes must go through
 `add_child`, `add_subtree`, `prune`, etc., which always end in
 `_post_mutation`.
+
+### Child Order Is Node Index
+
+**Child order is ascending rustworkx node index, and nothing else.**
+`GraphCore.successors` returns `tuple(sorted(...))`, so *the sort is the
+ordering model*.  There is no separate edge-order concept anywhere in the
+tree stack — nothing stores a rank, and no edge attribute carries one.
+
+Two consequences follow directly:
+
+- **Rank means index rank.**  `insert_child(parent, k, **attr)` therefore
+  cannot renumber; it shifts the **content** of ranks `k…n−1` one slot
+  right and writes the new content into the vacated slot `k`.  Content is
+  the pair (node data, child list), so a shifted sibling carries its whole
+  subtree with it.  Negative indices count from the end as in
+  `list.insert`; out of range raises `IndexError` instead of clamping.
+- **Node identity follows position, not content.**  Slot `k` keeps its id
+  and receives the *new* content, so an external handle to a shifted
+  sibling now denotes a different node than it did before the call.
+
+This is also why no renumbering machinery exists:
+**`GraphCore.renumber_nodes` is a no-op stub** — it validates the `method`
+argument and returns `self` unchanged.
+
+`insert_child` inserts a **leaf**.  A composed operand needs no second
+primitive — subdivide the returned id afterwards:
+
+```python
+new_id = rt.insert_child(parent, 1, proportion=3)
+rt.subdivide(new_id, (1, 2))
+```
+
+There is deliberately no `insert_subtree`.  Note also that `add_child`
+cannot promise a last position: rustworkx **reuses freed node indices**,
+so a new node can land anywhere in the sorted order.  Any code that
+caches per-node state keyed by node id must clear the entry when the node
+is removed, or a stale binding will silently re-attach itself to whatever
+lands in that slot.
 
 ### Tree Layers
 
@@ -506,7 +545,30 @@ returns one full period without disturbing iteration state;
 `position` and `reset()` manage the cursor.  The compiled structure
 is available as `spec` (a `NodeSpec` from `_pattern.py`).
 
-### 5.7 `Norg` (Nørgård infinity series)
+### 5.7 `patterns.py` — permutation and autoreference
+
+**File:** `topos/collections/patterns.py`
+
+The combinatorial generators most of `chronos` builds subdivision specs
+from.  All return plain nested tuples, ready to pass as `subdivisions`.
+
+| Function | Purpose |
+|---|---|
+| `permute_list(lst, pt, preserve_signs=False)` | Haddad's Algorithm 4 — permute a list by a permutation index |
+| `autoref(*args, preserve_signs=False, depth=1)` | Algorithm 5 — pair each rotation of the list with the list itself.  `depth > 1` recurses: a list of length *n* yields `n ** (depth + 1)` leaves.  `preserve_signs=True` is **refused above depth 1**, because from the second level a member is a subtree and a sign has no meaning on one |
+| `autoref_rotmat(*args, mode='G', preserve_signs=False)` | The four named rotation matrices.  Modes `G`, `S`, `D`, `C` |
+| `autoref_rotmat_all(*args, preserve_signs=False)` | **The fifth process** — the full `n²` matrix, every head rotation against every tail rotation, row-major as `k = n·p + q`.  The four named modes are **lines through it**: `S` is `p = 0`, `D` is `q = 0`, `G` is the diagonal `q = p`, and `C` is `q = 2p` |
+| `iso_pairs(*lists)` | Cyclic tuples across any number of lists |
+| `substitute(elements)` | Haddad's rhythmic substitution (§2.3.6, *« De la substitution »* — "On substitution"): each element becomes the head of a `(D, S)` pair whose tail holds the **single** next element, circularly.  Every resulting group has exactly one child |
+| `pair_adjacent(elements)` | **Not Haddad's** — Klotho's own width-2 variant of the same idea.  Kept distinct on purpose; do not read it as the thesis operation |
+| `nested_chain(elements)` | Nested chain structure |
+| `alternate_sequence(elements)` | Elements alternate between head and tail |
+
+Both `autoref` and `autoref_rotmat` accept **one** list, or **two lists
+of equal length** — the two-list form is a Klotho extension, not in the
+thesis.
+
+### 5.8 `Norg` (Nørgård infinity series)
 
 Per Nørgård's self-similar integer sequence, used as a pitch or
 rhythm generator.  Static methods: `inf(start=0, size=128, step=1)`,
