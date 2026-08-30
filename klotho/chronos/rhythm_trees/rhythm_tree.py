@@ -10,6 +10,7 @@ See: https://support.ircam.fr/docs/om/om6-manual/co/RT.html
 """
 import numbers
 from fractions import Fraction
+from math import lcm
 from typing import Union, Tuple
 from tabulate import tabulate
 
@@ -1000,7 +1001,31 @@ class RhythmTree(Tree):
         return self
 
     def prune(self, node):
-        """Remove a node and promote its children (see :meth:`Tree.prune`); returns self for chaining."""
+        """Remove a node and promote its children (see :meth:`Tree.prune`); returns self for chaining.
+
+        Notes
+        -----
+        **``prune`` preserves the Tempus.** Deleting a beat with ``prune``
+        does not shorten the bar -- the surviving beats dilate to fill it. In
+        Haddad's algebra this is **extraction** (- in a circle), not
+        diminution (- in a box). To shorten the bar, use the diminution verb,
+        which builds a new tree with a recomputed Tempus.
+
+        On an INTERIOR node ``prune`` additionally promotes the children one
+        level, which changes durations unless ``D == sum(S)``::
+
+            rt = RhythmTree(meas='4/4', subdivisions=(1, (5, (1, 1)), 3))
+            rt.durations          # 1/9, 5/18, 5/18, 1/3
+            rt.prune(2)           # (4 (1 1 1 3))
+            rt.durations          # 1/6, 1/6, 1/6, 1/2
+
+        For whole-group extraction use :meth:`extract` (or
+        :meth:`remove_subtree`, which it delegates to).
+
+        See Also
+        --------
+        extract : The named extraction verb, correct on interior nodes too.
+        """
         super().prune(node)
         return self
 
@@ -1008,6 +1033,326 @@ class RhythmTree(Tree):
         """Remove a node and all its descendants (see :meth:`Tree.remove_subtree`); returns self for chaining."""
         super().remove_subtree(node)
         return self
+
+    # ------------------------------------------------------------------
+    # Haddad's Tempus-PRESERVING operator family (sect4.5)
+    #
+    # His notation is systematic: a BOX means the Tempus FOLLOWS the
+    # operation, a CIRCLE means the Tempus is PRESERVED.
+    #
+    #     add     augmentation  (+ in a box)   insertion   (+ in a circle)
+    #     remove  diminution    (- in a box)   extraction  (- in a circle)
+    #     scale   dilatation    (x in a box)   expansion/  (x in a circle)
+    #                                          compression
+    #
+    # He states the axis outright on p. 128:
+    #
+    #     « Les prolationis qui en résultent sont identiques. C'est le
+    #     Tempus qui diffère. Dans le cas de la « prolation » stricte, le
+    #     Tempus est identique. Dans le deuxième cas, le Tempus est la
+    #     somme des prolationis une fois transformés. »
+    #
+    #     "The resulting prolationis are identical. It is the Tempus that
+    #     differs. In the case of strict 'prolation', the Tempus is
+    #     identical. In the second case, the Tempus is the sum of the
+    #     prolationis once transformed."
+    #
+    # He never writes "Tempus-preserving" or "Tempus-following": his own
+    # terms are « prolationnelle stricte » ("strictly prolational") for the
+    # circle family and « relative » ("relative") for the box family. The
+    # English pair is Klotho's coinage.
+    #
+    # This block implements the CIRCLE family only, as methods that mutate
+    # and return self -- `meas` and `span` have no setters, so a
+    # Tempus-following operator cannot be spelled this way at all and lives
+    # elsewhere as a builder of new trees.
+    #
+    # Every operator is decompose -> operate -> concatenate (sect4.5.2,
+    # p. 124):
+    #
+    #     « Ces opérations utilisent l'ajout équivalent à l'addition, le
+    #     retrait à la soustraction, et la substitution (sous forme de
+    #     multiplication) après décomposition de l'Unité temporelle
+    #     composée suivi de la concaténation de l'ensemble des
+    #     prolationis. »
+    #
+    #     "These operations use addition for adding, subtraction for
+    #     removal, and substitution (in the form of multiplication) --
+    #     after decomposition of the composite Temporal Unit, followed by
+    #     the concatenation of the whole set of prolationis."
+    #
+    # So `insert` and `scale` FLATTEN: the result is one level, by
+    # construction, and nesting is not preserved.
+    # ------------------------------------------------------------------
+    def _decomposed_durations(self):
+        """The decomposed sequence -- one signed Fraction per sounding event.
+
+        The same decomposition :func:`~klotho.chronos.rhythm_trees.algorithms.decompose`
+        performs, returned as bare durations: one term per tie GROUP (a tie
+        group is one event, charter sect9), signed for rests (ALG-1).
+        """
+        rx = self._rx
+        out = []
+        for group in self.tie_groups:
+            total = sum(abs(Fraction(rx.get_node_data(n)['metric_duration']))
+                        for n in group)
+            if rx.get_node_data(group[0])['metric_duration'] < 0:
+                total = -total
+            out.append(total)
+        return out
+
+    @staticmethod
+    def _grid_denominator(durations):
+        """The finest common unit the sequence can be written on."""
+        den = 1
+        for d in durations:
+            den = lcm(den, d.denominator)
+        return den
+
+    def _respell(self, durations, op):
+        """Rewrite the leaf surface from a decomposed duration sequence.
+
+        The Tempus VALUE is never changed by a preserved-family operator.
+        Its SPELLING follows the grid only when the authored spelling WAS
+        the grid -- that is, when ``meas.denominator`` already equals the
+        finest common unit of the current decomposed sequence. An authored
+        spelling that says something else about the bar (``2/2`` over a
+        five-part prolatio) is left exactly as written.
+
+        That single rule reproduces Haddad's printed figures on both sides:
+        ``2/2 (2 1 2)`` keeps ``2/2`` through an insertion (fig. 4.60),
+        while the canonical ``18/18 (4 2 3 6 3)`` is re-spelled ``54/54``
+        when a compression refines the grid to fifty-fourths (fig. 4.68).
+        Both are the same Tempus value; only the unit it is counted in
+        moves.
+        """
+        old_grid = self._grid_denominator(self._decomposed_durations())
+        den = self._grid_denominator(durations)
+        S = tuple(int(d * den) for d in durations)
+
+        meas = None
+        if self.meas.denominator == old_grid and den != old_grid:
+            num = self.meas.to_fraction() * den
+            if num.denominator == 1:
+                meas = Meas(int(num), den)
+
+        root = self.root
+        for n in [x for x in self.nodes if x != root]:
+            self._remove_node_raw(n)
+        if meas is not None:
+            self._meta['meas'] = str(meas)
+            self._meas_cache = None
+            self._rx[root]['proportion'] = meas.numerator * self.span
+        # Freed node indices are reused in no guaranteed order, so the
+        # proportions are written by SLOT RANK after the fact rather than
+        # trusted to arrive in insertion order.
+        new_ids = [self._add_child_raw(root, proportion=1) for _ in S]
+        for slot, p in zip(sorted(new_ids), S):
+            self._write_node_data(slot, {'proportion': p}, replace=True)
+        self._list = Group((self.meas.numerator * self.span, S))
+        self._post_mutation(scope_node=root, op=op)
+        return self
+
+    @staticmethod
+    def _as_fraction(value, what):
+        """Coerce a duration/ratio argument to an exact Fraction."""
+        if isinstance(value, Meas):
+            return value.to_fraction()
+        if isinstance(value, float):
+            # decimal-exact, not the binary expansion of the float
+            return Fraction(str(value))
+        try:
+            return Fraction(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{what} must be a rational value; got "
+                             f"{value!r}") from exc
+
+    @staticmethod
+    def _pair_up(indices, values, what):
+        """Normalize scalar-or-sequence argument pairs to a list of pairs."""
+        idx_seq = isinstance(indices, (list, tuple))
+        val_seq = isinstance(values, (list, tuple))
+        if idx_seq != val_seq:
+            raise ValueError(
+                f"index and {what} must both be scalars or both be "
+                f"sequences"
+            )
+        if not idx_seq:
+            return [(indices, values)]
+        if len(indices) != len(values):
+            raise ValueError(
+                f"{len(indices)} indices but {len(values)} {what} values"
+            )
+        return list(zip(indices, values))
+
+    def insert(self, index, duration):
+        """Insertion (+ in a circle) -- add a duration without lengthening the bar.
+
+        Haddad's own term; the English is his. It is also already the family
+        verb one structural level down (``TemporalUnitSequence.insert``,
+        ``TemporalBlock.insert``), with the same ``(index, thing)`` shape.
+
+        The tree is decomposed, the duration spliced into the sequence, and
+        the whole re-concatenated -- so the result is ONE level and the
+        Tempus is untouched. The inserted value only fixes the new event's
+        relative weight: everything compresses to keep the bar the length it
+        was. ``2/2 (2 1 2)`` with ``3/10`` at position 2 gives
+        ``2/2 (4 2 3 4)`` (fig. 4.60).
+
+        Parameters
+        ----------
+        index : int or sequence of int
+            Where to insert, 0-based into the DECOMPOSED sequence, inserting
+            BEFORE that position. Haddad settles the convention on p. 125:
+            *« …et position la position de l'ajout par rapport à l'ensemble
+            de la séquence décomposée (0 étant la position de tête de
+            séquence). »* -- "…and position is the position of the addition
+            relative to the whole decomposed sequence (0 being the
+            head-of-sequence position)." Indices always refer to the
+            ORIGINAL, pre-insertion sequence. Negative indices count from the
+            end as in ``list.insert``; out of range raises ``IndexError``.
+        duration : Fraction, int, str, float, Meas, or sequence
+            The duration(s) to insert, as a fraction of the whole note. A
+            NEGATIVE duration inserts a rest. Zero is refused.
+
+        Returns
+        -------
+        RhythmTree
+            self, for chaining.
+
+        Notes
+        -----
+        Ties do not survive: a tie group decomposes to one event, exactly as
+        in :func:`~klotho.chronos.rhythm_trees.algorithms.flatten`.
+
+        **Thesis erratum.** Figure 4.60 prints the source subscript as
+        ``(2 1 1)``. The correct input is ``(2 1 2)``, proven three ways --
+        the prose says *« trois prolationis de (2 1 2) »* ("three prolationis
+        of (2 1 2)"), the engraving is a 5:4 tuplet (5 = 2+1+2), and only
+        ``(2 1 2)`` yields ``(4 2 3 4)``. The same broken macro repeats from
+        figure 4.58.
+        """
+        current = self._decomposed_durations()
+        n = len(current)
+        pairs = self._pair_up(index, duration, 'duration')
+
+        buckets = {}
+        for raw_index, raw_duration in pairs:
+            k = raw_index + n if raw_index < 0 else raw_index
+            if not (0 <= k <= n):
+                raise IndexError(
+                    f"insert index {raw_index} out of range for a decomposed "
+                    f"sequence of {n} events"
+                )
+            value = self._as_fraction(raw_duration, 'duration')
+            if value == 0:
+                raise ValueError(
+                    "a zero duration is neither a sound nor a rest; insert a "
+                    "non-zero duration, or nothing"
+                )
+            buckets.setdefault(k, []).append(value)
+
+        out = []
+        for i in range(n + 1):
+            out.extend(buckets.get(i, ()))
+            if i < n:
+                out.append(current[i])
+        return self._respell(out, 'insert')
+
+    def extract(self, node):
+        """Extraction (- in a circle) -- delete without shortening the bar.
+
+        The named extraction verb. It delegates to :meth:`remove_subtree`,
+        which is correct in general: the survivors dilate to fill the Tempus,
+        and a named group leaves as a whole.
+
+        ``prune`` is extraction too, but only for LEAVES -- on an interior
+        node it promotes the children one level and changes durations unless
+        ``D == sum(S)``. See :meth:`prune`.
+
+        Parameters
+        ----------
+        node : int or sequence of int
+            The node(s) to remove. A node already removed as another's
+            descendant is skipped rather than raising.
+
+        Returns
+        -------
+        RhythmTree
+            self, for chaining.
+        """
+        nodes = list(node) if isinstance(node, (list, tuple, set)) else [node]
+        for n in nodes:
+            if n not in self:
+                raise ValueError(f"Node {n} not found in tree")
+            if n == self.root:
+                raise ValueError("Cannot extract the root node")
+        for n in nodes:
+            if n in self:
+                self.remove_subtree(n)
+        return self
+
+    def scale(self, index, ratio):
+        """Expansion/compression (x in a circle) -- reweight events in place.
+
+        Haddad's own term is *expansion/compression*: ONE operator whose
+        ratio decides the direction. ``scale`` is Klotho's coinage, chosen
+        because ``expand`` is accurate above 1 and actively misleading below
+        it.
+
+        The tree is decomposed, the named events multiplied by their ratios,
+        and the whole re-concatenated. The Tempus is preserved, so an
+        expanded event does not lengthen the bar -- it takes a larger share
+        of it and its neighbours take less. ``18/18 (4 2 3 6 3)`` scaled by
+        3 at position 2 gives ``18/18 (4 2 9 6 3)`` (fig. 4.65).
+
+        Parameters
+        ----------
+        index : int or sequence of int
+            Which event(s) to scale, 0-based into the DECOMPOSED sequence
+            (p. 127: the position or positions, where 0 is the first
+            prolatio). Negative indices count from the end; out of range
+            raises ``IndexError``.
+        ratio : Fraction, int, str, float, or sequence
+            The multiplier(s). Must be positive: a sign flip is
+            :meth:`make_rest`'s job, not an expansion's, and zero would
+            delete the event (that is :meth:`extract`).
+
+        Returns
+        -------
+        RhythmTree
+            self, for chaining.
+
+        Notes
+        -----
+        When the ratios do not clear against the current grid, the grid is
+        refined and the Tempus is re-spelled on it -- same value, finer unit.
+        ``18/18 (4 2 3 6 3)`` compressed by ``1/3`` and ``1/9`` at positions
+        2 and 3 gives ``54/54 (12 6 3 2 9)`` (fig. 4.68).
+
+        **Thesis erratum.** Never use the prolationis printed in figures 4.68
+        and 4.69: both reprint the preceding expansion result
+        ``(4 2 9 6 3)``. Figure 4.69's Tempus ``16/27`` is correct, and it is
+        what forces the true answer above.
+        """
+        out = self._decomposed_durations()
+        n = len(out)
+        for raw_index, raw_ratio in self._pair_up(index, ratio, 'ratio'):
+            k = raw_index + n if raw_index < 0 else raw_index
+            if not (0 <= k < n):
+                raise IndexError(
+                    f"scale index {raw_index} out of range for a decomposed "
+                    f"sequence of {n} events"
+                )
+            value = self._as_fraction(raw_ratio, 'ratio')
+            if value <= 0:
+                raise ValueError(
+                    "a scale ratio must be positive -- zero would delete the "
+                    "event (use extract) and a negative would rest it (use "
+                    "make_rest)"
+                )
+            out[k] = out[k] * value
+        return self._respell(out, 'scale')
 
     def make_rest(self, node):
         """
