@@ -277,6 +277,193 @@ def flatten(rt) -> 'object':
     return fuse(decompose(rt))
 
 
+# ------------------------------------------------------------------------------------
+# The Tempus-FOLLOWING operator family (docket OPS-2/3/4, box half).
+#
+# Haddad states the axis outright, p. 128:
+#
+#     « Les prolationis qui en résultent sont identiques. C'est le Tempus
+#     qui diffère. Dans le cas de la « prolation » stricte, le Tempus est
+#     identique. Dans le deuxième cas, le Tempus est la somme des
+#     prolationis une fois transformés. »
+#     -- "The resulting prolationis are identical. It is the Tempus that
+#     differs. In the case of strict 'prolation', the Tempus is identical.
+#     In the second case, *the Tempus is the sum of the prolationis once
+#     transformed*."
+#
+# That last clause is this family's implementation, literally. The
+# Tempus-PRESERVING siblings (insertion, extraction, expansion/compression)
+# hold the Tempus and rescale the contents instead.
+#
+# His own labels are « prolationnelle stricte » ("strictly prolational")
+# for the preserved half and « relative » for this one; the English pair
+# "Tempus-preserving"/"Tempus-following" is Klotho's coinage.
+#
+# Every one of them is decompose -> operate -> concatenate, sect4.5.2
+# preamble, p. 124:
+#
+#     « Ces opérations utilisent l'ajout équivalent à l'addition, le
+#     retrait à la soustraction, et la substitution (sous forme de
+#     multiplication) après décomposition de l'Unité temporelle composée
+#     suivi de la concaténation de l'ensemble des prolationis. »
+#     -- "These operations use addition for adding, subtraction for
+#     removal, and substitution (in the form of multiplication) -- after
+#     decomposition of the composite Temporal Unit, followed by
+#     concatenation of the whole set of prolationis."
+#
+# so all three are ``decompose`` + a list edit + ``fuse``, and the common
+# denominator that makes an inserted or scaled operand commensurable with
+# the survivors is ``_fuse_parts``' lcm fold.
+# ------------------------------------------------------------------------------------
+
+
+def _as_operand_tuple(value):
+    """Broadcast a scalar operand to a one-element tuple.
+
+    ``diminish(rt, 0)`` and ``diminish(rt, (0,))`` are the same call. A
+    :class:`Meas`, a :class:`RhythmTree` and a ``Fraction`` are scalars
+    here even though the first two are containers in other senses, so the
+    test is on ``list``/``tuple`` alone.
+    """
+    return tuple(value) if isinstance(value, (list, tuple)) else (value,)
+
+
+def _check_positions(positions, upper, verb, *, unique=False):
+    """Validate 0-based positions into the decomposed sequence.
+
+    His indexing convention, p. 125:
+
+        « ...et position la position de l'ajout par rapport à l'ensemble
+        de la séquence décomposée (0 étant la position de tête de
+        séquence). »
+        -- "...and position is the position of the addition relative to
+        the whole decomposed sequence (0 being the head-of-sequence
+        position)."
+
+    p. 127 repeats it for the scaling operator ("0 being the first
+    prolatio"). *upper* is inclusive: ``len(parts)`` for an insertion
+    (appending past the tail is legal), ``len(parts) - 1`` for an edit of
+    an existing prolatio.
+    """
+    out = []
+    for p in positions:
+        if isinstance(p, bool) or not isinstance(p, numbers.Integral):
+            raise TypeError(
+                f"{verb} positions are integer indices into the decomposed "
+                f"sequence; got {p!r}"
+            )
+        p = int(p)
+        if not 0 <= p <= upper:
+            raise ValueError(
+                f"{verb} position {p} is out of range: the decomposed "
+                f"sequence admits 0..{upper} (0 is the head of sequence, "
+                f"his « position de tête de séquence »)."
+            )
+        out.append(p)
+    if unique and len(set(out)) != len(out):
+        raise ValueError(
+            f"{verb} was given the same position twice. Two ratios on one "
+            f"prolatio has no defined answer -- compose them into a single "
+            f"ratio, or apply the operator twice."
+        )
+    return tuple(out)
+
+
+def _check_pairing(left, right, verb, left_name):
+    """Refuse unequal parallel sequences.
+
+    His notation is two parallel tuples -- ``⊠((1/3 1/9),(2 3))`` -- so a
+    length mismatch is a mis-typed call, never a broadcast.
+    """
+    if len(left) != len(right):
+        raise ValueError(
+            f"{verb} takes parallel sequences: {len(left)} {left_name} "
+            f"against {len(right)} positions. His notation pairs them one "
+            f"to one."
+        )
+
+
+def diminish(rt, positions):
+    """
+    Delete prolationes and let the Tempus follow — Haddad's diminution (⊟).
+
+    sect4.5.2.2, p. 126, figs. 4.62–4.63. The Tempus-FOLLOWING half of the
+    remove pair; the preserving sibling is extraction (⊖), which keeps the
+    Tempus and dilates the survivors to fill it.
+
+        « Le tempus sera par conséquent recalculé à partir de la somme des
+        prolationis restants. »
+        -- "The tempus will consequently be recomputed from the sum of the
+        remaining prolationis."
+
+    So the bar shrinks: at held bpm the real duration drops by exactly the
+    removed prolationes, and the notation changes.
+
+    Published example (his running source ``B``, the *réduction* of
+    ``1/1 ((2 (2 1)) 1 2 1)`` at fig. 4.62)::
+
+        B = 18/18 (4 2 3 6 3)
+        B ⊟ (0)    =>  14/18 (2 3 6 3)
+        B ⊟ (4)    =>  15/18 (4 2 3 6)
+        B ⊟ (1 3)  =>  10/18 (4 3 3)
+
+    **His printed Tempi are inconsistent, and Klotho does not chase them**
+    (TEMPO-5). He prints 14/18 as ``7/9`` and 10/18 as ``5/9`` but leaves
+    15/18 alone — the reductions are editorial, not rule-generated. Same
+    durations either way, and the duration is the claim.
+
+    Positions index the DECOMPOSED sequence, which is one entry per tie
+    GROUP (ALG-2), not one per leaf. Like :func:`flatten`, whose machinery
+    this is, the result carries one term per sounding event and no ties.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to erode. Not modified.
+    positions : int or sequence of int
+        0-based indices into the decomposed sequence. Repeats are
+        harmless (a prolatio can only be removed once).
+
+    Returns
+    -------
+    RhythmTree
+        A new tree whose ``meas`` is the sum of the survivors.
+
+    Raises
+    ------
+    ValueError
+        If *positions* is empty, names an index out of range, or would
+        remove every prolatio — an empty Temporal Unit is not a rest, it
+        is nothing, and it has no Tempus to compute.
+    """
+    from .rhythm_tree import RhythmTree
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"diminish at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. For TemporalUnits use "
+            f"klotho.chronos.temporal_units.algorithms.diminish."
+        )
+    parts = list(decompose(rt))
+    idx = _as_operand_tuple(positions)
+    if not idx:
+        raise ValueError(
+            "diminish needs at least one position -- removing nothing is "
+            "not a diminution. For the canonical re-spelling alone, use "
+            "flatten."
+        )
+    drop = set(_check_positions(idx, len(parts) - 1, 'diminish'))
+    survivors = [p for i, p in enumerate(parts) if i not in drop]
+    if not survivors:
+        raise ValueError(
+            f"diminish would remove all {len(parts)} prolationes, leaving "
+            f"no Tempus to recompute from -- his rule is « recalculé à "
+            f"partir de la somme des prolationis restants » (\"recomputed "
+            f"from the sum of the remaining prolationis\"), and an empty "
+            f"sum is not a Temporal Unit."
+        )
+    return fuse(survivors)
+
+
 def filtrage(rt, series):
     """
     Rest the leaves a series walks onto -- Haddad's *filtrage* ("filtering").

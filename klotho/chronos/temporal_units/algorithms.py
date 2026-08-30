@@ -11,6 +11,7 @@ from klotho.chronos.rhythm_trees.algorithms import (
     fuse as _rt_fuse,
     flatten as _rt_flatten,
     segment as _rt_segment,
+    diminish as _rt_diminish,
     _fuse_parts,
 )
 
@@ -676,6 +677,113 @@ def flatten(obj):
         f"flatten is unary on a RhythmTree or TemporalUnit; got "
         f"{type(obj).__name__}. For a sequence, use fuse(...)."
     )
+
+
+# ------------------------------------------------------------------------------------
+# The Tempus-FOLLOWING operator family, lifted (docket OPS-2/3/4).
+#
+# *Follows* means the Tempus is recomputed and **bpm is held**, so the
+# real duration changes and the notation changes with it. Haddad has no
+# tempo at all — for him the axis is two-valued (« prolationnelle
+# stricte » / « relative », "strictly prolational" / "relative") — so the
+# bpm-holding half of the policy is Klotho's, and it is the reading that
+# makes his sentence true here: « le Tempus est la somme des prolationis
+# une fois transformés » ("the Tempus is the sum of the prolationis once
+# transformed") is a claim about notation, and only a held tempo lets the
+# notation carry it.
+# ------------------------------------------------------------------------------------
+
+
+def _following_target(obj, verb):
+    """Resolve what a following-family verb was called on.
+
+    Returns ``'ut'`` or ``'rt'``. A ``CompositionalUnit`` is refused
+    FIRST — it subclasses ``TemporalUnit``, so an isinstance chain that
+    checked the base first would silently drop its parameter state.
+    """
+    from klotho.thetos.composition.compositional import CompositionalUnit
+
+    if isinstance(obj, CompositionalUnit):
+        raise NotImplementedError(
+            f"{verb} for CompositionalUnits is a staged surface (R13-E). "
+            f"The whole following family rebuilds the tree from its "
+            f"decomposition, so no output leaf is any input leaf and the "
+            f"pfields, envelopes and slurs have nowhere to land -- the "
+            f"same ground on which flatten and segment refuse. Apply it "
+            f"to `uc.rt` for the rhythm alone."
+        )
+    if isinstance(obj, TemporalUnit):
+        return 'ut'
+    if isinstance(obj, RhythmTree):
+        return 'rt'
+    raise TypeError(
+        f"{verb} is unary on a TemporalUnit or a RhythmTree; got "
+        f"{type(obj).__name__}. A TemporalUnitSequence or TemporalBlock "
+        f"holds several units and so several Tempi, and this family "
+        f"recomputes exactly one -- apply it to the member you mean."
+    )
+
+
+def _following_result(obj, tree):
+    """Re-temporalise a following-family result at the source's tempo.
+
+    bpm and beat pass through untouched; the tempus is new by definition,
+    so it is attributed, and beat/bpm keep whatever attribution the
+    source carried (NEW-39's lift rule, as ``flatten`` and ``segment``
+    already do it).
+    """
+    out = TemporalUnit(span=1, tempus=tree.meas, prolatio=tree.subdivisions,
+                       beat=obj.beat, bpm=obj.bpm)
+    out._attributed = frozenset(
+        {'tempus'} | (obj.attributed & {'beat', 'bpm'}))
+    return out
+
+
+def diminish(obj, positions):
+    """
+    Delete prolationes and let the Tempus follow — Haddad's diminution (⊟).
+
+    The symbolic core is
+    :func:`klotho.chronos.rhythm_trees.algorithms.diminish` (sect4.5.2.2,
+    p. 126, figs. 4.62–4.63):
+
+        « Le tempus sera par conséquent recalculé à partir de la somme des
+        prolationis restants. »
+        -- "The tempus will consequently be recomputed from the sum of the
+        remaining prolationis."
+
+    On a ``TemporalUnit``, **beat and bpm are held** and the Tempus
+    shrinks, so the unit really does get shorter — that is what
+    distinguishes this from extraction (⊖), which holds the Tempus and
+    dilates the survivors to fill the same bar. ``18/18 (4 2 3 6 3) ⊟ (0)``
+    gives ``14/18 (2 3 6 3)``, 14/18ths of the source's duration.
+
+    Tempi are built raw (TEMPO-5): he prints that 14/18 as ``7/9``. Same
+    duration; he reduced.
+
+    Positions index the DECOMPOSED sequence — one entry per tie group
+    (ALG-2), not per leaf — 0-based, ``0`` the head.
+
+    Parameters
+    ----------
+    obj : TemporalUnit or RhythmTree
+        A ``RhythmTree`` returns a ``RhythmTree``. A ``CompositionalUnit``
+        raises ``NotImplementedError`` (R13-E).
+    positions : int or sequence of int
+
+    Returns
+    -------
+    TemporalUnit or RhythmTree
+
+    Examples
+    --------
+    >>> ut = TemporalUnit(tempus='18/18', prolatio=(4, 2, 3, 6, 3))
+    >>> str(diminish(ut, 0).tempus)
+    '14/18'
+    """
+    if _following_target(obj, 'diminish') == 'rt':
+        return _rt_diminish(obj, positions)
+    return _following_result(obj, _rt_diminish(obj._rt, positions))
 
 
 def _interleave_operand(obj, position):
