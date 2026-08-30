@@ -1000,8 +1000,9 @@ def interleave(a, b):
     "concatenation".)
 
     Source-inclusion is a property of the OPERANDS, not of this verb.
-    In his own example each erosion sequence begins with the unit it was
-    eroded from, which is why fig. 4.81 has ten bars where fig. 4.82's
+    In his own example each iteration sequence begins with the unit it
+    was diminished from, which is why fig. 4.81 has ten bars where fig.
+    4.82's
     formalism suggests eight. ``interleave`` stays a pure zip and takes
     no ``include_source`` flag -- such a flag would double-count when
     both operands already carry their seed. It lives on the generator
@@ -1127,6 +1128,12 @@ def iterate(ut, op, start=0, stop=None, *, mode='recursive',
                     already shipped -- the OTHER thing his notation
                     offers, and the reason this verb does not fold)
 
+    NAMING. "Erosion" was the docket's coinage and is **not Haddad's**.
+    His own two terms -- *iteration simple* ("simple iteration") and
+    *iteration recursive cumulative* ("cumulative recursive iteration") --
+    are accurate, so the English name follows them and "erosion" is kept
+    out of the code entirely.
+
     His worked case is ``p := (p |-|(i)) &`` on ``1/1 (4 3 2 1)`` with
     ``i = 0, 2`` (figs. 4.78-4.79), which gives three bars of
     ``3/5 (3 2 1) | 3/10 (2 1) | 1/10 (1)``.
@@ -1149,7 +1156,7 @@ def iterate(ut, op, start=0, stop=None, *, mode='recursive',
     STOPPING. ``start`` and ``stop`` are his ``i = d, f`` -- an INCLUSIVE
     counter range, and ``start`` shifts only the value handed to *index*.
     On top of that there is a STRUCTURAL FLOOR: iteration halts once one
-    prolatio is left, because there is nothing further to erode and his
+    prolatio is left, because there is nothing further to remove and his
     published A and B both stop there. An over-long ``stop`` therefore
     truncates rather than raising. ``stop=None`` means "run to that
     floor" in recursive mode, and "one pass over the source's surface" in
@@ -1160,7 +1167,7 @@ def iterate(ut, op, start=0, stop=None, *, mode='recursive',
     ``include_source`` -- **read this before comparing against the
     book.** Fig. 4.82's condensed formalism gives FOUR units per
     sequence; the engravings of fig. 4.80 show FIVE, because each
-    sequence begins with the unit it was eroded from, and the tuilage of
+    sequence begins with the unit it was diminished from, and the tuilage of
     fig. 4.81 accordingly has TEN bars rather than eight. The default is
     ``True`` on the strength of the engravings, and because a diminution
     development states its theme first. The head passes through
@@ -1247,20 +1254,20 @@ def iterate(ut, op, start=0, stop=None, *, mode='recursive',
     i = start
     while stop is None or i <= stop:
         if surface <= 1:
-            break  # the structural floor: nothing left to erode
+            break  # the structural floor: nothing left to remove
         step = op(current if mode == 'recursive' else ut, position_of(i))
         if mode == 'recursive':
-            eroded = _prolatio_count(step)
-            if stop is None and eroded >= surface:
+            new_surface = _prolatio_count(step)
+            if stop is None and new_surface >= surface:
                 raise ValueError(
                     f"iterate was given no stop, so it runs to the "
                     f"structural floor of one prolatio -- but this "
-                    f"operator left the surface at {eroded} prolationes "
+                    f"operator left the surface at {new_surface} prolationes "
                     f"from {surface}, so the floor is never reached and "
                     f"the iteration would not terminate. Pass an "
                     f"explicit stop."
                 )
-            surface = eroded
+            surface = new_surface
             current = step
         results.append(step)
         i += 1

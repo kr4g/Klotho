@@ -435,7 +435,7 @@ def diminish(rt, positions):
     Parameters
     ----------
     rt : RhythmTree
-        The tree to erode. Not modified.
+        The tree to remove prolationes from. Not modified.
     positions : int or sequence of int
         0-based indices into the decomposed sequence. Repeats are
         harmless (a prolatio can only be removed once).
