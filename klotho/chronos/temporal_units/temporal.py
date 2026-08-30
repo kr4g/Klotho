@@ -277,6 +277,10 @@ class UTNodeHandle:
         """Turn this node (and its subtree) into a rest; see :meth:`TemporalUnit.make_rest`."""
         return self._owner.make_rest(self._node_id)
 
+    def make_sounding(self):
+        """Bring this node (and its subtree) back out of rest; see :meth:`TemporalUnit.make_sounding`."""
+        return self._owner.make_sounding(self._node_id)
+
     def subdivide(self, S):
         """Subdivide this node by proportions ``S``; see :meth:`TemporalUnit.subdivide`. Returns the owner."""
         self._owner.subdivide(self._node_id, S)
@@ -557,6 +561,10 @@ class UTNodeSelector:
     def make_rest(self):
         """Rest every node in the selection (and its subtree)."""
         return self._owner.make_rest(self)
+
+    def make_sounding(self):
+        """Bring every node in the selection (and its subtree) back out of rest."""
+        return self._owner.make_sounding(self)
 
     def subdivide(self, S):
         """Subdivide every node in the selection with structure ``S``."""
@@ -1213,6 +1221,38 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         nodes = self._coerce_node_targets(node)
         for n in nodes:
             self._rt.make_rest(n)
+        self._invalidate_timing_cache()
+
+    def make_sounding(self, node) -> None:
+        """
+        Bring a node (or each node in an iterable), and all its descendants,
+        back out of rest.
+
+        Delegates to :meth:`RhythmTree.make_sounding` and re-evaluates
+        timing once at the end (batched across all provided nodes).
+
+        Parameters
+        ----------
+        node : int or iterable of int
+            A single node ID, or an iterable of node IDs, to bring back.
+
+        Raises
+        ------
+        ValueError
+            If any node is not found in the rhythm tree.
+
+        Notes
+        -----
+        This restores the RHYTHM only. :meth:`make_rest` is lossy -- it
+        clears ``tied`` and records nothing about what it cleared -- so a
+        leaf that was tied before it was rested comes back untied. It also
+        un-rests the target's ancestor chain, because a rest on an
+        enclosing group would otherwise re-assert itself on the next
+        recompute and the call would silently do nothing.
+        """
+        nodes = self._coerce_node_targets(node)
+        for n in nodes:
+            self._rt.make_sounding(n)
         self._invalidate_timing_cache()
 
     def subdivide(self, node: int, S) -> None:

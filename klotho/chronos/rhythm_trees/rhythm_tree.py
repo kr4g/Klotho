@@ -661,7 +661,7 @@ class RhythmTree(Tree):
 
         - re-negates a positive child of a negative parent, so resting a
           branch rests everything under it (this is why un-resting a leaf
-          is not a per-node sign flip);
+          is not a per-node sign flip -- see :meth:`make_sounding`);
         - clears ``tied`` on anything negative, because a tied rest is
           illegal (07_TIES_CHARTER.md sect1);
         - truncates a float proportion with ``int()``.
@@ -987,6 +987,10 @@ class RhythmTree(Tree):
         and ``tied`` is forced ``False``). Any new write added here must
         keep that property by hand; the grammar will not catch a mistake.
 
+        See Also
+        --------
+        make_sounding : The reverse operation, and why it cannot be a plain
+            per-node sign flip.
         """
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
@@ -1001,6 +1005,82 @@ class RhythmTree(Tree):
                 self._write_node_data(n, {
                     'proportion': -abs(int(node_data['proportion'])),
                     'metric_duration': -abs(node_data['metric_duration']),
+                    'tied': False,
+                })
+        self._invalidate_caches()
+
+    def make_sounding(self, node):
+        """
+        Bring a node and all its descendants back out of rest.
+
+        The reverse of :meth:`make_rest`: every negative proportion in the
+        node's subtree becomes positive again, so the leaves sound.
+
+        Parameters
+        ----------
+        node : int
+            The node ID to make sounding, along with all its descendants.
+
+        Raises
+        ------
+        ValueError
+            If the node is not found in the tree.
+
+        Notes
+        -----
+        **It also un-rests the ANCESTOR chain, and it has to.** A rest set
+        on a group propagates downward: ``_evaluate`` re-negates any
+        positive child of a negative parent. So flipping only the target
+        node is a silent no-op -- the write lands, the call reports
+        success, and the next recompute puts the rest straight back. Every
+        negative ancestor up to the nearest positive one is therefore
+        flipped as well. Sibling subtrees are untouched: they carry their
+        own negative proportions and stay resting, so un-resting one leaf
+        does not un-rest the group around it.
+
+        **This is NOT a strict inverse.** :meth:`make_rest` is lossy. It
+        clears ``tied`` on the way down and records nothing about what it
+        cleared, so a leaf that was tied before being rested comes back
+        untied. (Restoring it would be wrong as often as right: a tied
+        rest is illegal, so the tie had to go, and nothing says the author
+        still wants it.) At the
+        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`
+        level ``make_rest`` also splits intersecting slurs and drops
+        control envelopes, neither of which is stitched back either. What
+        this method restores is the RHYTHM, and only the rhythm.
+
+        Like :meth:`make_rest`, this writes through ``_write_node_data``
+        and so bypasses the layer validators; every value it writes is
+        constructed here to satisfy the grammar (``abs(int(...))`` is a
+        non-zero positive int).
+
+        See Also
+        --------
+        make_rest : The forward operation.
+        """
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+
+        # Ancestors FIRST, outermost first: a rest on a group overrides
+        # anything positive beneath it, so clearing the leaf without
+        # clearing what encloses it changes nothing at all.
+        chain = []
+        ancestor = self.parent(node)
+        while ancestor is not None:
+            chain.append(ancestor)
+            ancestor = self.parent(ancestor)
+        chain.reverse()
+
+        nodes_to_modify = chain + [node] + list(self.descendants(node))
+
+        for n in nodes_to_modify:
+            node_data = self[n]
+            if 'proportion' in node_data and node_data['proportion'] < 0:
+                # `tied` stays False: the tie was destroyed by make_rest and
+                # nothing recorded it, so there is nothing honest to restore.
+                self._write_node_data(n, {
+                    'proportion': abs(int(node_data['proportion'])),
+                    'metric_duration': abs(node_data['metric_duration']),
                     'tied': False,
                 })
         self._invalidate_caches()

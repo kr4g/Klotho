@@ -2150,6 +2150,35 @@ class CompositionalUnit(TemporalUnit):
         super().make_rest(nodes)
         self._filter_envelopes_for_rests(affected_leaves)
 
+    def make_sounding(self, node) -> None:
+        """
+        Bring one or more nodes (and their subtrees) back out of rest.
+
+        Parameters
+        ----------
+        node : int or iterable of int
+            The node ID (or iterable of node IDs) to bring back.
+
+        Notes
+        -----
+        This override adds nothing to
+        :meth:`~klotho.chronos.temporal_units.TemporalUnit.make_sounding`,
+        and that absence is the point worth recording here.
+        :meth:`make_rest` does two CompositionalUnit-specific things on the
+        way down: it SPLITS any slur that crosses the newly rested leaves
+        into surviving segments, and it DROPS control envelopes whose
+        target leaves all became rests. Neither writes down what it
+        destroyed, so neither can be undone. A split slur stays split and a
+        dropped envelope stays dropped; re-apply them if you want them
+        back.
+
+        What comes back is the rhythm: the leaves sound again, and the
+        ancestor chain is un-rested with them so the change survives the
+        next recompute. Ties are not restored either -- see
+        :meth:`~klotho.chronos.rhythm_trees.RhythmTree.make_sounding`.
+        """
+        super().make_sounding(node)
+
     def subdivide(self, node: int, S) -> None:
         """
         Subdivide a leaf node with structure (D, S), syncing PT, cascading
