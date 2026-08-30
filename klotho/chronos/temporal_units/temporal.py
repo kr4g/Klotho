@@ -5,6 +5,45 @@ A temporal unit binds a rhythm tree to a tempo and beat reference, producing
 concrete onset times and durations in seconds. Temporal units can be
 collected into sequences and blocks for polyphonic or multi-layered timing
 structures.
+
+Sources and attribution (docket DOC-1/2/3/4)
+--------------------------------------------
+``tempus``, ``prolatio`` and the object this module calls a
+:class:`TemporalUnit` are **Karim Haddad's**, and were unattributed here
+until 2026-08-29. He defines both Latin terms verbatim on p. 30 of the 2008
+chapter cited below, where the object itself is called a *time-block*.
+
+The three sources, correctly cited:
+
+1. Haddad, Karim. "*Livre Premier de Motets* ("First Book of Motets"): The
+   Time-Block Concept in OpenMusic." In *The OM Composer's Book 2*, ed.
+   Jean Bresson, Carlos Agon and Gerard Assayag, 21-53. Paris: Editions
+   Delatour France / IRCAM-Centre Pompidou, 2008. **Written in English.**
+   This is the PRIMARY source for time-block material.
+2. Haddad, Karim. "TimeSculpt in OpenMusic." In *The OM Composer's Book 1*,
+   ed. Carlos Agon, Gerard Assayag and Jean Bresson. Paris: Editions
+   Delatour France / IRCAM-Centre Pompidou, 2006. **Written in English.**
+   *The printed page range is not recoverable from the author's preprint
+   and is deliberately left blank here rather than invented; it needs the
+   printed volume.* Note also that "TimeSculpt" names an article and
+   nothing else -- no system, no library, no class.
+3. Haddad, Karim. *L'Unite Temporelle : Une approche pour l'ecriture de la
+   duree et de sa quantification* ("The Temporal Unit: An approach to the
+   writing of duration and its quantification"), doctoral thesis, Sorbonne
+   Universite, 2020, HAL ``tel-03258984``.
+
+**The papers PREDATE the thesis by 12-14 years.** 2006 and 2008 against
+2020: they are the original statements and the thesis is the late
+synthesis. Anything attributing time-block material to "Haddad 2020" is
+citing the derivative source.
+
+**The attribution used to run backwards.** ``autoref``, ``decompose`` and
+the rotation modes -- the three things that genuinely reproduce his
+published figures -- all cited him, while ``tempus``, ``prolatio``,
+``TemporalUnit`` and ``TemporalBlock``, which wear his vocabulary, cited
+nobody. Both halves are fixed here: :class:`TemporalUnit` claims the
+lineage it has, and :class:`TemporalBlock` disclaims the lineage it does
+not.
 """
 from dataclasses import dataclass
 from fractions import Fraction
@@ -787,6 +826,21 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     *tempus* and *prolatio*) with a tempo specification (*beat*, *bpm*)
     to produce concrete onset times and durations in seconds.
 
+    **This class is Karim Haddad's time-block** (docket DOC-3/DOC-4). His
+    time-block is one measure: a *tempus* -- the fraction, what is commonly
+    called a time signature -- plus a *prolatio*, its subdivisions, each of
+    which may itself become a time-block. That is exactly the object below,
+    and both Latin words are his, defined verbatim on p. 30 of "The
+    Time-Block Concept in OpenMusic" (2008; full citation in the module
+    docstring). The 2008 chapter is the primary source; the 2020 thesis
+    restates the same material twelve years later.
+
+    What Klotho adds on top of his time-block is the *tempo* half --
+    ``beat`` and ``bpm``, and therefore real seconds. **Haddad has no tempo
+    at all**: for him the Tempus fraction IS the duration, and the only
+    rule on the subject is thesis sect4.4.4. The seconds-producing layer is
+    Klotho's own.
+
     Outside a :class:`~klotho.thetos.composition.score.Score`, a temporal
     unit always starts at time 0 and its duration is fixed after
     construction.  Placement within a timeline and duration adjustment are
@@ -1038,12 +1092,26 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
 
     @property
     def tempus(self):
-        """The time signature of the TemporalUnit."""
+        """The time signature of the TemporalUnit.
+
+        *Tempus* is **Haddad's term**, not Klotho's (docket DOC-3): p. 30
+        of the 2008 chapter, where it names the fraction of a time-block.
+        It is not merely a synonym for "time signature" -- ``3/4`` as a
+        Tempus is a *quantity* that reduces, which is why the arithmetic
+        elsewhere in ``chronos`` distinguishes it from ``3/4`` as a meter.
+        """
         return self._rt.meas
-    
+
     @property
-    def prolationis(self):        
-        """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit."""
+    def prolationis(self):
+        """The S-part of a RhythmTree which describes the subdivisions of the TemporalUnit.
+
+        *Prolatio* is **Haddad's term** too (docket DOC-3), defined
+        alongside *tempus* on p. 30 of the 2008 chapter: the subdivisions
+        of a time-block, each of which may itself be a time-block. The
+        property name is the genitive ``prolationis``; the constructor
+        argument is the nominative ``prolatio``, which is his spelling.
+        """
         return self._rt.subdivisions
     
     # @prolationis.setter
@@ -1718,6 +1786,13 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
     a sequence always starts at time 0 and its duration is fixed after
     construction.
 
+    Like :class:`TemporalBlock`, this container is **Klotho's own**: Haddad
+    lays time-blocks end to end as an *operation* (his ``||``, which
+    :func:`~klotho.chronos.temporal_units.algorithms.fuse` implements and
+    which really does merge two units into one), never as a container
+    class. Sequencing here is the opposite of fusing -- ``extend``/
+    ``append`` lay units end to end and never fuse them.
+
     Parameters
     ----------
     ut_seq : list of TemporalUnit, optional
@@ -1999,6 +2074,19 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     or another ``TemporalBlock``. Rows are aligned according to the *axis*
     parameter and optionally sorted by duration.
 
+    **This is NOT Haddad's time-block** (docket DOC-4). His *time-block* is
+    one measure -- a tempus plus its prolatio -- which is Klotho's
+    :class:`TemporalUnit`, not this class. A parallel stack of rows on a
+    shared clock with an alignment axis **has no counterpart in Haddad at
+    all**: he has no such object and no such term. His polyphony arises
+    from *operations on* time-blocks -- canon, homothety, substitution --
+    never from a container class.
+
+    So ``TemporalBlock`` is a **Klotho-original polyphonic container**
+    wearing a label borrowed from him. The name is kept because renaming is
+    a breaking change and is not obviously worth it; this paragraph is the
+    cheap fix, and it exists so that nobody reads the name as a citation.
+
     Parameters
     ----------
     rows : list, optional
@@ -2212,7 +2300,11 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     def principal_row(self):
         """The row whose end is latest -- ``None`` for an empty block.
 
-        Ties charter §7 defines "the last leaf of a ``TemporalBlock``" as
+        A **Klotho-original** notion, like the block it belongs to: Haddad
+        has no polyphonic container and therefore no "principal row" (see
+        the class docstring, docket DOC-4).
+
+        Ties charter sect7 defines "the last leaf of a ``TemporalBlock``" as
         the last leaf of this row. The definition is deliberately
         **axis- and sort-independent**: it reads the geometry that the
         current axis produced instead of assuming ``rows[-1]``, which under
@@ -2249,11 +2341,16 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         ``start``. Nesting is flattened too: a row may itself be a
         :class:`TemporalUnitSequence` or a nested ``TemporalBlock``.
 
+        Like the block itself, this surface is **Klotho's own** and has no
+        Haddad counterpart (docket DOC-4). The row-is-a-voice reading below
+        is Klotho's convention, not a citation.
+
         Columns
         -------
         ``row``
             Index of the **top-level** block row the event came from --
-            "voice", in Haddad's sense that row order is voice assignment.
+            its "voice", since in this container row order is voice
+            assignment.
             Needed because ``node_id`` is *not* unique across rows: two
             structurally identical rows both number their leaves ``1, 2,
             3``, so ``(row, node_id)`` is the identifying pair.
