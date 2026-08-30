@@ -2258,6 +2258,7 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         shortest at the top. If two rows have the same duration, their original order is preserved.
         """
         if not self._rows:
+            self._geometry = ()
             return
 
         row_duration_pairs = [(row, row.duration) for row in self._rows]
@@ -2276,6 +2277,41 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
             adjustment = duration_diff * (self._axis + 1) / 2
             _reoffset(row, self._offset + adjustment)
 
+        self._geometry = tuple(duration for _, duration in row_duration_pairs)
+
+    def _read_geometry(self):
+        """The row durations, in row order -- the only input ``_align_rows``
+        reads besides ``axis``/``offset``.
+
+        Nested blocks are asked through the public :attr:`duration` reader so
+        that they validate their own alignment before answering.
+        """
+        return tuple(row.duration for row in self._rows)
+
+    def _ensure_aligned(self):
+        """Realign if a row's duration changed since the last alignment, and
+        return the current row durations.
+
+        BT-4 declined to cache :attr:`events` precisely because :attr:`rows`
+        hands out the **live** row objects. The alignment offsets are the
+        cache that decision missed: a row mutated through its own API
+        (``uts.append(...)``, ``uts.remove(...)``) changes the geometry
+        ``_align_rows`` was computed from without any block-level mutator
+        running, and the block then reports absolute times outside its own
+        ``start``..``end``. Every reader whose answer depends on alignment
+        goes through here, so validation is as lazy as ``events`` already is.
+
+        Cheap because it is exactly the read ``_align_rows`` would do first
+        anyway, and a no-op for a block nobody mutated through a live row --
+        ``_align_rows`` is idempotent (offsets are assigned absolutely and
+        the duration sort is stable).
+        """
+        geometry = self._read_geometry()
+        if geometry != self._geometry:
+            self._align_rows()
+            geometry = self._geometry
+        return geometry
+
     @property
     def height(self):
         """The number of rows in the block."""
@@ -2283,13 +2319,20 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
     
     @property
     def rows(self):
-        """The list of temporal structures in the block."""
+        """The list of temporal structures in the block.
+
+        The rows are **live**, so their placement is validated on the way out
+        -- a row mutated through its own API since the last alignment moves
+        every row's offset (see ``_ensure_aligned``).
+        """
+        self._ensure_aligned()
         return self._rows
 
     @property
     def duration(self):
         """The total duration (in seconds) of the longest row in the block."""
-        return max(row.duration for row in self._rows) if self._rows else 0.0
+        geometry = self._ensure_aligned()
+        return max(geometry) if geometry else 0.0
 
     @property
     def axis(self):
@@ -2335,6 +2378,7 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         """
         if not self._rows:
             return None
+        self._ensure_aligned()
         ends = [row.end for row in self._rows]
         latest = max(ends)
         tolerance = 1e-9 * max(1.0, abs(latest))
@@ -2402,6 +2446,7 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         -------
         pandas.DataFrame
         """
+        self._ensure_aligned()
         data = []
         for i, row in enumerate(self._rows):
             for voice, c in _walk_block_events(row, str(i)):
@@ -2580,9 +2625,11 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         self._align_rows()
 
     def __getitem__(self, idx: int) -> Union[TemporalUnit, TemporalUnitSequence, 'TemporalBlock']:
+        self._ensure_aligned()
         return self._rows[idx]
 
     def __iter__(self):
+        self._ensure_aligned()
         return iter(self._rows)
     
     def __len__(self):
