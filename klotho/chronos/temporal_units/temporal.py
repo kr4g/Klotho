@@ -1457,7 +1457,204 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         # sounding events, not leaves: n_events <= n_leaves, equal exactly
         # when no ties (charter sect2). The leaf count is len(self.leaves).
         return len(self._rt.tie_groups)
-        
+
+    # ------------------------------------------------------------------
+    # Magnitude scaling (OPS-6)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _exact_scale_factor(value) -> Fraction:
+        """Exact rational form of a magnitude-scaling factor.
+
+        Mirrors ``_exact_tempo_ratio`` in
+        :mod:`klotho.chronos.temporal_units.algorithms` (kept local so the
+        operator surface owns its own coercion): floats are snapped by
+        ``limit_denominator(10**6)``, which recovers the intended rational
+        for every musically plausible value (1.5 is exactly 3/2, 0.3 is
+        exactly 3/10) rather than the exact-but-monstrous binary expansion.
+        """
+        if isinstance(value, float):
+            return Fraction(value).limit_denominator(10**6)
+        return Fraction(value.numerator, value.denominator)
+
+    def _scaled(self, k: Fraction):
+        """Build the unit *k* times as long, by rewriting the tempus.
+
+        The tempus is assembled from RAW INTS -- never through
+        ``Meas.__mul__``, which gcd-reduces even at identity (``Meas(6, 20)
+        * 1`` is 3/10). This is the TEMPO-5 / R13-D discipline shared with
+        ``modulate_tempo`` and ``fuse``; reducing a Tempus changes the
+        unit's nature (Haddad sect4.4.2/4.4.5).
+        """
+        if k == 0:
+            raise ValueError(
+                "cannot scale a TemporalUnit by zero -- a zero tempus has "
+                "no duration and no notation, and nothing is inferred from "
+                "it (the same contract as beat=0/bpm=0)."
+            )
+        if k < 0:
+            raise ValueError(
+                f"cannot scale a TemporalUnit by a negative factor ({k}) -- "
+                "a negative measure has no meaning, and the constructor "
+                "absolutizes the tempus, so the sign would silently vanish "
+                "and `ut * -1` would read back as `ut * 1`."
+            )
+
+        # factor = k x span as one exact Fraction, then applied to the
+        # tempus as raw ints -- Fraction reduces k*span internally, but the
+        # tempus' own numerator/denominator are never cancelled against
+        # each other. Identical shape to `modulate_tempo`/`fuse`.
+        factor = k * Fraction(self.span)
+        new_tempus = Meas(self.tempus.numerator * factor.numerator,
+                          self.tempus.denominator * factor.denominator)
+
+        from klotho.thetos.composition.compositional import CompositionalUnit
+        if isinstance(self, CompositionalUnit):
+            out = CompositionalUnit(
+                span=1,
+                tempus=new_tempus,
+                prolatio=self.prolationis,
+                beat=self.beat,
+                bpm=self.bpm,
+                pfields=self.pfields,
+            )
+            out._mirror_param_state(self)
+            out._slur_specs = self._copy_slur_specs()
+            out._next_slur_id = self._next_slur_id
+            out._control_envelopes = self._copy_control_envelopes()
+            out._next_envelope_id = self._next_envelope_id
+        else:
+            out = TemporalUnit(
+                span=1,
+                tempus=new_tempus,
+                prolatio=self.prolationis,
+                beat=self.beat,
+                bpm=self.bpm,
+            )
+        # Attribution (NEW-39's lift rule, as in `flatten`): the computed
+        # tempus is attributed by definition; beat/bpm are carried verbatim
+        # and so keep the source's attribution.
+        out._attributed = frozenset(
+            {'tempus'} | (self._attributed & {'beat', 'bpm'}))
+        return out
+
+    def __mul__(self, other):
+        """Scale the unit's magnitude by a rational factor.
+
+        ``ut * Fraction(3, 2)`` makes the unit half again as long by
+        REWRITING THE TEMPUS -- 4/4 becomes 12/8 -- and leaves *beat* and
+        *bpm* exactly as they were. This is TEMPO-1's *follows* policy:
+        the Tempus changes, the tempo is fixed, and both the real duration
+        and the notation move with it.
+
+        This is the homothetia trap, and the fence around it. Rescaling the
+        bpm instead (60 -> 40) reaches a byte-identical sound from a
+        different page, so no listening test separates the two; the
+        notation is what the composer wrote, so the tempus is what moves.
+        (The complementary operation -- hold the Tempus and rescale the
+        contents -- is Haddad's *preserved* half of the same axis and is
+        not this operator.)
+
+        The result always has ``span=1``, with the source's span folded
+        into the tempus numerator (span 2 of 6/20 scaled by 1 comes back as
+        12/20), the same span collapse `modulate_tempo` and `fuse` apply.
+        Prolationes are carried verbatim, so the event count never changes.
+        Scaling by 1 is a true no-op on the spelling: 6/20 stays 6/20.
+
+        Parameters
+        ----------
+        other : Fraction, Meas, str, or float
+            The scaling factor. Must be strictly positive. A ``str`` is
+            read as a fraction (``'3/2'``); a ``float`` is snapped by
+            ``limit_denominator(10**6)``. A bare ``int`` is REFUSED -- see
+            Raises.
+
+        Returns
+        -------
+        TemporalUnit or CompositionalUnit
+            A new unit; the source is untouched.
+
+        Raises
+        ------
+        TypeError
+            If *other* is a bare ``int``. ``ut * 3`` has two honest
+            readings -- three copies (Python's sequence convention, and
+            :meth:`repeat` ships it) or three times as long (arithmetic) --
+            so Klotho refuses to guess and names both.
+        ValueError
+            If *other* is zero or negative.
+
+        Examples
+        --------
+        >>> ut = TemporalUnit(tempus='4/4', prolatio=(2, 1, 2), beat='1/4', bpm=60)
+        >>> (ut * Fraction(3, 2)).tempus
+        12/8
+        >>> (ut * Fraction(3, 2)).bpm
+        60
+        """
+        if isinstance(other, int):  # bool included, deliberately
+            raise TypeError(
+                f"TemporalUnit * {other!r} is ambiguous and Klotho will not "
+                f"guess: it could mean {other} copies of the unit -- write "
+                f"ut.repeat({other}) -- or {other} times as long -- write "
+                f"ut * Fraction({other}). Pick the one you meant."
+            )
+        if isinstance(other, (Meas, Fraction, float)):
+            return self._scaled(self._exact_scale_factor(other))
+        if isinstance(other, str):
+            try:
+                return self._scaled(Fraction(other))
+            except (ValueError, ZeroDivisionError):
+                return NotImplemented
+        return NotImplemented
+
+    def __rmul__(self, other):
+        """Scalar scaling reads as commutative: ``Fraction(3, 2) * ut``."""
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        """Scale the unit's magnitude down: ``ut / k == ut * (1/k)``.
+
+        The same tempus rewrite as :meth:`__mul__`, so ``4/4`` divided by
+        3/2 is written ``8/12`` and the bpm never moves.
+
+        A bare ``int`` IS accepted here, unlike in :meth:`__mul__`: the
+        refusal there exists only because :meth:`repeat` gives ``*`` a
+        second reading, and division has no such reading. ``ut / 2`` can
+        only mean "half as long".
+
+        Parameters
+        ----------
+        other : Fraction, Meas, int, str, or float
+            The divisor. Must be strictly positive.
+
+        Returns
+        -------
+        TemporalUnit or CompositionalUnit
+
+        Raises
+        ------
+        ZeroDivisionError
+            If *other* is zero.
+        ValueError
+            If *other* is negative.
+        """
+        if isinstance(other, (Meas, Fraction, float, int)):
+            divisor = self._exact_scale_factor(
+                other if not isinstance(other, int) else Fraction(other))
+            if divisor == 0:
+                raise ZeroDivisionError("division by zero")
+            return self._scaled(1 / divisor)
+        if isinstance(other, str):
+            try:
+                divisor = Fraction(other)
+            except ValueError:
+                return NotImplemented
+            if divisor == 0:
+                raise ZeroDivisionError("division by zero")
+            return self._scaled(1 / divisor)
+        return NotImplemented
+
     def __str__(self):
         result = (
             f'Tempus:   {self._rt.meas}' + (f' (x{self._rt.span})' if self._rt.span > 1 else '') + '\n' +
