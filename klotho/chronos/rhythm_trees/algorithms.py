@@ -10,6 +10,22 @@ Pseudocode for numbered algorithms by Karim Haddad unless otherwise noted.
     rhythmic tree composed of (DS), that is its part constituting the
     proportions which can also encompass other tree structures."
     -- Karim Haddad
+
+Sources (docket DOC-1/DOC-2/DOC-7)
+----------------------------------
+The numbered algorithms and the figures cited throughout this module come
+from Haddad, Karim, *L'Unite Temporelle : Une approche pour l'ecriture de
+la duree et de sa quantification* ("The Temporal Unit: An approach to the
+writing of duration and its quantification"), doctoral thesis, Sorbonne
+Universite, 2020, HAL ``tel-03258984``. Algorithms 1-3 are here; 4
+(``PermutList``) and 5 (``AutoRef``) are in
+:mod:`klotho.topos.collections.patterns`.
+
+For time-block material specifically -- ``tempus``, ``prolatio``, the
+Temporal Unit itself -- the EARLIER and primary source is his 2008 chapter
+"The Time-Block Concept in OpenMusic", twelve years before the thesis and
+written in English. See :mod:`klotho.chronos.temporal_units.temporal` for
+the full citations of all three sources.
 """
 from typing import Tuple
 from fractions import Fraction
@@ -1010,6 +1026,18 @@ def auto_subdiv(subdivs:tuple[int], n:int=1) -> tuple[tuple[int]]:
     -------
     tuple of tuple
         Nested ``(D, S)`` pairs for each element.
+
+    Notes
+    -----
+    **Haddad's, and verified against him** (docket DOC-7). This reproduces
+    his figure 2.12 exactly and said so nowhere until 2026-08-29 -- one of
+    the inverted-attribution cases, where the faithful reproductions went
+    uncited while borrowed vocabulary went unmarked. It belongs with
+    :func:`~klotho.topos.collections.patterns.autoref` in section 2.3 of
+    the thesis, not with the numbered algorithms above.
+
+    The default ``n=1`` is what fig. 2.12 shows: each element takes its
+    successor's value as its subdivision count, wrapping at the end.
     """
     def _recurse(idx:int) -> tuple:
         if idx == len(subdivs):

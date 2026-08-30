@@ -86,6 +86,22 @@ def permute_list(lst:tuple, pt:int, preserve_signs:bool=False) -> tuple:
     -------
     tuple
         Circularly permuted list.
+
+    Notes
+    -----
+    **The off-by-one against his Algorithm 4 is DELIBERATE** (docket
+    DOC-6). His printed pseudocode rotates ``pt + 1`` times; this rotates
+    ``pt``, so ``permute_list(lst, 0)`` is the identity. **Klotho is the
+    correct one:** his own figure 2.11 lists the identity as the first row
+    of the matrix, which his pseudocode as printed would never produce.
+    The comment here used to claim a fidelity the code deliberately lacks.
+    Do not "fix" this back to ``pt + 1`` -- doing so drops row 0 from every
+    rotation matrix in :func:`autoref_rotmat`.
+
+    (His Algorithm 5, :func:`autoref` below, is also broken as printed:
+    it returns from inside a nested loop, so it would emit a single row
+    rather than the full table. Same treatment -- the figures are the
+    oracle, not the pseudocode.)
     '''
     if not preserve_signs:
         pt = pt % len(lst)
