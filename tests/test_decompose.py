@@ -173,6 +173,47 @@ class TestDepthFrontier:
         assert _all_leaf_durations(units) == pytest.approx(list(ut.durations))
 
 
+class TestFalsyProlatio:
+    """RT-12(a): a falsy prolatio must raise, not silently become 'd'.
+
+    ``''``, ``0``, ``False`` and ``[]`` are each rejected by the
+    TemporalUnit constructor, and ``()`` is a degenerate empty subdivision
+    that the grammar deliberately round-trips. Routed through decompose all
+    five used to be swallowed -- the falsy test masked an error the
+    constructor would otherwise have raised. ``None`` keeps its documented
+    meaning and must NOT raise.
+    """
+
+    FALSY = ['', (), 0, False, []]
+
+    @pytest.mark.parametrize('bad', FALSY)
+    def test_leaf_branch_rejects_falsy_prolatio(self, bad):
+        ut = TemporalUnit(tempus='1/2', prolatio=(1, 1), bpm=120)
+        with pytest.raises(ValueError, match='prolatio'):
+            decompose(ut, prolatio=bad)
+
+    @pytest.mark.parametrize('bad', FALSY)
+    def test_depth_branch_rejects_falsy_prolatio(self, bad):
+        # the second, unfiled falsy test lived in the depth branch and had
+        # the same coercion semantics
+        ut = TemporalUnit(tempus='1/2', prolatio=((1, (1, 1)), 1), bpm=120)
+        with pytest.raises(ValueError, match='prolatio'):
+            decompose(ut, prolatio=bad, depth=1)
+
+    @pytest.mark.parametrize('bad', FALSY)
+    def test_cu_leaf_branch_rejects_falsy_prolatio(self, bad):
+        uc = UC(tempus='1/2', prolatio=(1, 1), pfields=['amp'])
+        with pytest.raises(ValueError, match='prolatio'):
+            decompose(uc, prolatio=bad)
+
+    def test_none_still_means_the_documented_default(self):
+        ut = TemporalUnit(tempus='1/2', prolatio=(1, 1), bpm=120)
+        assert [u.prolationis for u in decompose(ut, prolatio=None)] == [(1,), (1,)]
+        nested = TemporalUnit(tempus='1/2', prolatio=((1, (1, 1)), 1), bpm=120)
+        assert [u.prolationis for u in decompose(nested, prolatio=None, depth=1)] == [
+            (1, 1), (1,)]
+
+
 class TestSlurRegression:
     # A slur spanning a frontier that mixes deep subtrees with a bare leaf
     # backfilled from above the frontier depth. `_snip_slur_into_sub_uc`

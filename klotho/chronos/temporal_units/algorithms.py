@@ -125,13 +125,25 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
     # Import here to avoid circular imports
     from klotho.thetos.composition.compositional import CompositionalUnit
     
+    # A falsy prolatio is an error, not a request for the default. '',
+    # 0, False and [] are each rejected by the TemporalUnit constructor,
+    # and () is a degenerate empty subdivision the grammar deliberately
+    # round-trips; routed through here they used to be swallowed and
+    # silently rebuilt as 'd'. Only None means "the default".
+    if prolatio is not None and not prolatio:
+        raise ValueError(
+            f"prolatio must be a non-empty subdivision tuple or prolatio "
+            f"string, got {prolatio!r}. Pass prolatio=None for the default "
+            f"('d' at the leaf level, the source subdivisions at depth)."
+        )
+
     prolatio_cycle = []
 
     if isinstance(prolatio, tuple):
         prolatio_cycle = [prolatio]
     elif isinstance(prolatio, str) and prolatio.lower() in {'s'}:
         prolatio_cycle = [ut._rt.subdivisions]
-    elif not prolatio:
+    elif prolatio is None:
         prolatio_cycle = ['d']
     else:
         prolatio_cycle = [prolatio]
