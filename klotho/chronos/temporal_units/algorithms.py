@@ -1058,6 +1058,217 @@ def interleave(a, b):
     return TemporalUnitSequence(out)
 
 
+def _prolatio_count(unit):
+    """Size of the surface the operator family takes its positions in.
+
+    One entry per tie GROUP (ALG-2), not one per leaf -- the decomposed
+    sequence is what ``diminish``, ``augment`` and ``scale_tempus`` all
+    index into, so it is what the stopping condition has to count.
+    """
+    return len(_rt_decompose(unit._rt))
+
+
+def _iterate_position(index, mode):
+    """Resolve ``iterate``'s position selector to a callable of the counter.
+
+    ``None`` is mode-sensitive on purpose, because the two modes have
+    different published idioms and neither default is usable in the
+    other's mode:
+
+    * ``'recursive'`` -> ``0``. His sequence A deletes the head over and
+      over; the surface shrinks under it, so a constant is a moving
+      target and does real work.
+    * ``'simple'`` -> the counter itself. His (a) is iteration "sur tout
+      ou partie des elements" ("over all or part of the elements"), and
+      the source never shrinks, so a constant would return the same unit
+      every step.
+    """
+    if index is None:
+        return (lambda i: 0) if mode == 'recursive' else (lambda i: i)
+    if callable(index):
+        return index
+    if isinstance(index, int) and not isinstance(index, bool):
+        return lambda i, _fixed=index: _fixed
+    raise TypeError(
+        f"iterate's index selects the position operated on at each step: "
+        f"an int for a fixed position, or a callable of the iteration "
+        f"counter for a moving one (his sequence B is `4 - i`). Got "
+        f"{type(index).__name__}."
+    )
+
+
+def iterate(ut, op, start=0, stop=None, *, mode='recursive',
+            include_source=True, index=None) -> TemporalUnitSequence:
+    """
+    Build a whole form by repeated application of one operator --
+    Haddad's iteration (docket OPS-7).
+
+    Source: sect4.6, p. 131, figs. 4.76-4.82. He names two kinds, and
+    both ship here as one verb under ``mode``:
+
+        a) « Iteration simple sur tout ou partie des elements. »
+           -- "Simple iteration over all or part of the elements."
+
+        b) « Iteration recursive cumulative sur tout ou partie des
+           elements, le resultat etant l'accumulation des resultats de la
+           recursion. »
+           -- "Cumulative recursive iteration over all or part of the
+           elements, the result being the accumulation of the results of
+           the recursion."
+
+    Three of his operator glosses fix the shape of what comes back:
+
+        « p := » -- "at each iteration the operation is performed on the
+                    result of the previous one"  (``mode='recursive'``)
+        « & »    -- "create a sequence from all the iteration results"
+                    (hence a ``TemporalUnitSequence``)
+        « || »   -- "concatenation of all results" (that is :func:`fuse`,
+                    already shipped -- the OTHER thing his notation
+                    offers, and the reason this verb does not fold)
+
+    His worked case is ``p := (p |-|(i)) &`` on ``1/1 (4 3 2 1)`` with
+    ``i = 0, 2`` (figs. 4.78-4.79), which gives three bars of
+    ``3/5 (3 2 1) | 3/10 (2 1) | 1/10 (1)``.
+
+    NOT ``autoref``. :func:`klotho.topos.collections.patterns.autoref` is
+    self-referential SUBDIVISION and GROWS a tree -- ``autoref((2, 3))``
+    is ``((2, (3, 2)), (3, (2, 3)))``, and ``depth=n`` gives
+    ``len ** (depth + 1)`` leaves. Iteration here runs the other way: each
+    step deletes a prolatio and lets the Tempus follow, so the units get
+    shorter, and the return is a sequence of units rather than one tree.
+
+    THE OPERATOR IS A PARAMETER. ``diminish`` is his example, not the
+    definition, so ``op`` is called as ``op(unit, position)`` and any
+    unary member of the family fits. An operator that needs more operands
+    is bound first::
+
+        from functools import partial
+        iterate(ut, partial(lambda r, u, p: scale_tempus(u, r, p), 2), 0, 3)
+
+    STOPPING. ``start`` and ``stop`` are his ``i = d, f`` -- an INCLUSIVE
+    counter range, and ``start`` shifts only the value handed to *index*.
+    On top of that there is a STRUCTURAL FLOOR: iteration halts once one
+    prolatio is left, because there is nothing further to erode and his
+    published A and B both stop there. An over-long ``stop`` therefore
+    truncates rather than raising. ``stop=None`` means "run to that
+    floor" in recursive mode, and "one pass over the source's surface" in
+    simple mode. A recursive ``stop=None`` under an operator that does
+    NOT shrink the surface would never terminate, so that raises and asks
+    for an explicit ``stop``.
+
+    ``include_source`` -- **read this before comparing against the
+    book.** Fig. 4.82's condensed formalism gives FOUR units per
+    sequence; the engravings of fig. 4.80 show FIVE, because each
+    sequence begins with the unit it was eroded from, and the tuilage of
+    fig. 4.81 accordingly has TEN bars rather than eight. The default is
+    ``True`` on the strength of the engravings, and because a diminution
+    development states its theme first. The head passes through
+    UNFLATTENED -- it is his bar 1, nesting and all, not the surface the
+    operator indexes into. This flag lives here and not on
+    :func:`interleave`, which stays a pure zip: source-inclusion is a
+    property of the operands.
+
+    Parameters
+    ----------
+    ut : TemporalUnit
+        The seed. Not modified. A ``CompositionalUnit`` is not screened
+        here -- ``iterate`` delegates, so *op*'s own refusal fires (R13-E
+        for the following family) rather than a second, possibly
+        contradictory check.
+    op : callable
+        ``op(unit, position) -> TemporalUnit``.
+    start, stop : int
+        His ``i = d, f``, inclusive. ``stop=None`` is described above.
+        ``stop < start`` is zero iterations, not an error.
+    mode : {'recursive', 'simple'}
+        ``'recursive'`` is his ``p :=`` -- operate on the previous
+        result. ``'simple'`` operates on the SOURCE every step, so
+        nothing accumulates.
+    include_source : bool
+        Prepend the seed. Default ``True``; see above.
+    index : int, callable, or None
+        The position operated on at step ``i``. A callable receives the
+        counter, which is how his sequence B's ``4 - i`` is expressed --
+        an int cannot say it. ``None`` is ``0`` in recursive mode and the
+        counter in simple mode.
+
+    Returns
+    -------
+    TemporalUnitSequence
+        His ``&``. To get his ``||`` instead, pass the result to
+        :func:`fuse`.
+
+    Raises
+    ------
+    ValueError
+        Unknown *mode*; or a recursive ``stop=None`` under an operator
+        that does not shrink the surface.
+    TypeError
+        *ut* is not a ``TemporalUnit`` (a sequence or a block holds
+        several, and this verb iterates exactly one); *op* is not
+        callable; *index* is neither an int nor a callable.
+
+    Examples
+    --------
+    >>> src = TemporalUnit(tempus='1/1', prolatio=(4, 3, 2, 1))
+    >>> [str(u.tempus) for u in
+    ...  iterate(src, diminish, 0, 2, include_source=False).seq]
+    ['6/10', '3/10', '1/10']
+    """
+    if mode not in ('recursive', 'simple'):
+        raise ValueError(
+            f"iterate's mode is 'recursive' (his `p :=`, operate on the "
+            f"previous result) or 'simple' (operate on the source every "
+            f"step); got {mode!r}."
+        )
+    if not isinstance(ut, TemporalUnit):
+        raise TypeError(
+            f"iterate seeds from one TemporalUnit; got "
+            f"{type(ut).__name__}. A TemporalUnitSequence or a "
+            f"TemporalBlock already holds several units, and this verb "
+            f"MAKES a sequence out of one -- iterate the member you mean."
+        )
+    if not callable(op):
+        raise TypeError(
+            f"iterate's op is the operator applied at each step, called "
+            f"as op(unit, position); got {type(op).__name__}. Bind any "
+            f"extra operands first (functools.partial)."
+        )
+    position_of = _iterate_position(index, mode)
+
+    surface = _prolatio_count(ut)
+    if mode == 'simple' and stop is None:
+        # His (a), "over all the elements": one application per prolatio.
+        stop = start + surface - 1
+
+    results = []
+    current = ut
+    i = start
+    while stop is None or i <= stop:
+        if surface <= 1:
+            break  # the structural floor: nothing left to erode
+        step = op(current if mode == 'recursive' else ut, position_of(i))
+        if mode == 'recursive':
+            eroded = _prolatio_count(step)
+            if stop is None and eroded >= surface:
+                raise ValueError(
+                    f"iterate was given no stop, so it runs to the "
+                    f"structural floor of one prolatio -- but this "
+                    f"operator left the surface at {eroded} prolationes "
+                    f"from {surface}, so the floor is never reached and "
+                    f"the iteration would not terminate. Pass an "
+                    f"explicit stop."
+                )
+            surface = eroded
+            current = step
+        results.append(step)
+        i += 1
+
+    # The constructor copies every member, so the seed and the caller's
+    # unit stay independent of the output.
+    return TemporalUnitSequence(([ut] if include_source else []) + results)
+
+
 def _exact_tempo_ratio(value) -> Fraction:
     """Exact rational form of a tempo/beat quantity for reconciliation.
 
