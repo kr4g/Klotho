@@ -389,6 +389,131 @@ def filtrage(rt, series):
     return out
 
 
+def evide(rt):
+    """
+    Interchange sounds and rests -- Haddad's *rythme evide*, after Boulez.
+
+    Named ``evide`` (R13-G, an ASCII transliteration of *evide*): an English
+    name wins only when Haddad's own term is WRONG for the operation --
+    ``fuse`` because his "concatenation" is a fold, ``flatten`` because his
+    *reduction* un-reduces. Here his term is accurate, so it is kept.
+    ``hollow`` was the alternative and is a cheap rename if preferred.
+
+    Haddad sect2.3.5, thesis p. 280, figure 2.14:
+
+        *"Nous emprunterons a Pierre Boulez le principe du << rythme evide >>
+        [...] comme on peut aussi representer comme un rythme << negatif >>
+        d'un autre qui lui est pendant. Il s'agit d'intervertir les silences
+        par des notes exprimees et vice et versa"*
+
+        "We will borrow from Pierre Boulez the principle of the
+        'hollowed-out rhythm' [...] which can also be represented as a
+        'negative' rhythm of another that is its counterpart. It is a matter
+        of interchanging the rests with expressed notes and vice versa."
+
+    Boulez source as he cites it: Pierre Boulez and Paule Thevenin,
+    *Releves d'apprenti* ("Apprentice's Notes"), Editions du Seuil, 1966.
+    His footnote 7: *"Nous avons eu le privilege de montrer au compositeur
+    ces exemples les illustrant par une piece breve."* -- "We had the
+    privilege of showing the composer these examples, illustrating them with
+    a short piece." Boulez himself saw these figures.
+
+    Published example (RT-3). Hollowing out figure 2.13 gives figure 2.14
+    character for character, his ``1.0`` tie markers included -- they are
+    identical to Klotho's own storage convention::
+
+        (8 ((4 (-1 1 1 1 1)) (2 (-1 1 1)) (1 (-1 1 1 1))
+            (5 (-1 1)) (5 (-4 -1)) (3 (-1 1 1 1 1))))
+        =>
+        (8 ((4 (1 -1 -1 -1 -1)) (2 (1 -1 -1)) (1 (1 -1 -1 -1))
+            (5 (1 -1)) (5 (4 1.0)) (3 (1.0 -1 -1 -1 -1))))
+
+    **The re-tie rule is the charter's, not Haddad's** (07_TIES_CHARTER.md
+    sect10): for each maximal run of newly-sounding leaves, the head keeps
+    ``tied=False`` and the rest get ``tied=True``. Runs are computed AFTER
+    the flip, which is what guarantees the charter's second condition -- a
+    run head can never come out a dangling continuation of a preceding
+    still-resting region. Sign flips clear ``tied`` (charter sect1), so the
+    operation cannot manufacture a tied rest. Figure 2.14's own tie group
+    crosses a branch boundary (the last leaf of group 5 and the first of
+    group 6), which is exactly the case ``tie_groups`` derives by leaf
+    ORDER rather than subtree containment.
+
+    **Three behaviours are Klotho's, and are choices, not accidents**
+    (DOC-3):
+
+    - **Negative interior nodes are normalised to positive first.**
+      ``_evaluate`` re-negates a positive child of a negative parent, so
+      flipping a leaf sounding under a RESTING BRANCH is silently undone --
+      ``(1, (-2 (1 1)), 1)`` would hollow out to ``(-1, (-2 (-1 -1)), -1)``,
+      the group still a rest and nothing sounding at all. Normalising the
+      branch first (top-down, so a nested one cannot re-negate under its
+      own parent) gives ``(-1, (2 (1 1.0)), -1)``, which is the music the
+      operation means. The alternative was refusing such trees loudly; the
+      normalisation is chosen because a resting branch is a legal spelling
+      of a resting region, and hollowing it out has an obvious answer.
+    - **Every flip is written with an explicit ``tied=False``.** Writing an
+      int ``proportion`` does NOT clear the flag: ``_evaluate`` reads
+      ``isinstance(s, float) or data['tied']``, and only a NEGATIVE value
+      forces it off. A silent flag would survive the flip and re-float the
+      proportion, and charter sect10's run rule must be the only thing that
+      sets a tie here.
+    - **Input ties are destroyed, by design.** Every leaf flips, so every
+      input tie clears. ``evide(evide(x))`` restores x's SIGN PATTERN
+      exactly, but not its ties -- an involution on the signs only.
+
+    Figure 2.15, his "optimised" spelling (successive rests merged within a
+    group, ``(4 (1 -4))``), is deliberately NOT built. He presents it as an
+    alternative spelling of the same structure, not as a further operation;
+    it is close to a within-group :func:`flatten`, and it needs the form
+    ``(5 (5))``, which ``_validate_s_form`` currently rejects.
+
+    Parameters
+    ----------
+    rt : RhythmTree
+        The tree to hollow out. Not modified; a copy is returned.
+
+    Returns
+    -------
+    RhythmTree
+        A new tree: every sound a rest, every rest a sound, re-tied per
+        charter sect10.
+    """
+    out = rt.copy()
+
+    # Pass 1 -- normalise resting BRANCHES to sounding, top-down.
+    # ``descendants`` is depth-first pre-order, so a parent is always
+    # positive by the time its children are reached; bottom-up would let a
+    # still-negative parent re-negate a child that had just been flipped.
+    for n in out.descendants(out.root):
+        if out.out_degree(n) == 0:
+            continue
+        p = out[n]['proportion']
+        if p < 0 or isinstance(p, float) or out[n].get('tied', False):
+            out.set_node_data(n, proportion=int(abs(p)), tied=False)
+
+    leaves = list(out.leaf_nodes)
+
+    # Pass 2 -- interchange sounds and rests. ``tied=False`` is explicit on
+    # every write (see the docstring: an int write does not clear it).
+    for n in leaves:
+        p = out[n]['proportion']
+        flipped = -int(abs(p)) if p > 0 else int(abs(p))
+        out.set_node_data(n, proportion=flipped, tied=False)
+
+    # Pass 3 -- charter sect10: re-tie each maximal run of newly-sounding
+    # leaves, head untied. Computed after the flip, so no head can be a
+    # dangling continuation.
+    previous_sounds = False
+    for n in leaves:
+        sounds = out[n]['proportion'] > 0
+        if sounds and previous_sounds:
+            out.set_node_data(n, tied=True)
+        previous_sounds = sounds
+
+    return out
+
+
 # ------------------------------------------------------------------------------------
 
 def ratios_to_subdivs(ratios:tuple[Fraction]) -> tuple[int]:
@@ -612,128 +737,3 @@ def clean_subdivs(subdivs:tuple) -> tuple:
 
 # def rotate(self, n:int = 1):
 #     return RhythmTree.from_tree(rotate_tree(self, n), self._span, self._decomp)
-
-
-def evide(rt):
-    """
-    Interchange sounds and rests -- Haddad's *rythme evide*, after Boulez.
-
-    Named ``evide`` (R13-G, an ASCII transliteration of *evide*): an English
-    name wins only when Haddad's own term is WRONG for the operation --
-    ``fuse`` because his "concatenation" is a fold, ``flatten`` because his
-    *reduction* un-reduces. Here his term is accurate, so it is kept.
-    ``hollow`` was the alternative and is a cheap rename if preferred.
-
-    Haddad sect2.3.5, thesis p. 280, figure 2.14:
-
-        *"Nous emprunterons a Pierre Boulez le principe du << rythme evide >>
-        [...] comme on peut aussi representer comme un rythme << negatif >>
-        d'un autre qui lui est pendant. Il s'agit d'intervertir les silences
-        par des notes exprimees et vice et versa"*
-
-        "We will borrow from Pierre Boulez the principle of the
-        'hollowed-out rhythm' [...] which can also be represented as a
-        'negative' rhythm of another that is its counterpart. It is a matter
-        of interchanging the rests with expressed notes and vice versa."
-
-    Boulez source as he cites it: Pierre Boulez and Paule Thevenin,
-    *Releves d'apprenti* ("Apprentice's Notes"), Editions du Seuil, 1966.
-    His footnote 7: *"Nous avons eu le privilege de montrer au compositeur
-    ces exemples les illustrant par une piece breve."* -- "We had the
-    privilege of showing the composer these examples, illustrating them with
-    a short piece." Boulez himself saw these figures.
-
-    Published example (RT-3). Hollowing out figure 2.13 gives figure 2.14
-    character for character, his ``1.0`` tie markers included -- they are
-    identical to Klotho's own storage convention::
-
-        (8 ((4 (-1 1 1 1 1)) (2 (-1 1 1)) (1 (-1 1 1 1))
-            (5 (-1 1)) (5 (-4 -1)) (3 (-1 1 1 1 1))))
-        =>
-        (8 ((4 (1 -1 -1 -1 -1)) (2 (1 -1 -1)) (1 (1 -1 -1 -1))
-            (5 (1 -1)) (5 (4 1.0)) (3 (1.0 -1 -1 -1 -1))))
-
-    **The re-tie rule is the charter's, not Haddad's** (07_TIES_CHARTER.md
-    sect10): for each maximal run of newly-sounding leaves, the head keeps
-    ``tied=False`` and the rest get ``tied=True``. Runs are computed AFTER
-    the flip, which is what guarantees the charter's second condition -- a
-    run head can never come out a dangling continuation of a preceding
-    still-resting region. Sign flips clear ``tied`` (charter sect1), so the
-    operation cannot manufacture a tied rest. Figure 2.14's own tie group
-    crosses a branch boundary (the last leaf of group 5 and the first of
-    group 6), which is exactly the case ``tie_groups`` derives by leaf
-    ORDER rather than subtree containment.
-
-    **Three behaviours are Klotho's, and are choices, not accidents**
-    (DOC-3):
-
-    - **Negative interior nodes are normalised to positive first.**
-      ``_evaluate`` re-negates a positive child of a negative parent, so
-      flipping a leaf sounding under a RESTING BRANCH is silently undone --
-      ``(1, (-2 (1 1)), 1)`` would hollow out to ``(-1, (-2 (-1 -1)), -1)``,
-      the group still a rest and nothing sounding at all. Normalising the
-      branch first (top-down, so a nested one cannot re-negate under its
-      own parent) gives ``(-1, (2 (1 1.0)), -1)``, which is the music the
-      operation means. The alternative was refusing such trees loudly; the
-      normalisation is chosen because a resting branch is a legal spelling
-      of a resting region, and hollowing it out has an obvious answer.
-    - **Every flip is written with an explicit ``tied=False``.** Writing an
-      int ``proportion`` does NOT clear the flag: ``_evaluate`` reads
-      ``isinstance(s, float) or data['tied']``, and only a NEGATIVE value
-      forces it off. A silent flag would survive the flip and re-float the
-      proportion, and charter sect10's run rule must be the only thing that
-      sets a tie here.
-    - **Input ties are destroyed, by design.** Every leaf flips, so every
-      input tie clears. ``evide(evide(x))`` restores x's SIGN PATTERN
-      exactly, but not its ties -- an involution on the signs only.
-
-    Figure 2.15, his "optimised" spelling (successive rests merged within a
-    group, ``(4 (1 -4))``), is deliberately NOT built. He presents it as an
-    alternative spelling of the same structure, not as a further operation;
-    it is close to a within-group :func:`flatten`, and it needs the form
-    ``(5 (5))``, which ``_validate_s_form`` currently rejects.
-
-    Parameters
-    ----------
-    rt : RhythmTree
-        The tree to hollow out. Not modified; a copy is returned.
-
-    Returns
-    -------
-    RhythmTree
-        A new tree: every sound a rest, every rest a sound, re-tied per
-        charter sect10.
-    """
-    out = rt.copy()
-
-    # Pass 1 -- normalise resting BRANCHES to sounding, top-down.
-    # ``descendants`` is depth-first pre-order, so a parent is always
-    # positive by the time its children are reached; bottom-up would let a
-    # still-negative parent re-negate a child that had just been flipped.
-    for n in out.descendants(out.root):
-        if out.out_degree(n) == 0:
-            continue
-        p = out[n]['proportion']
-        if p < 0 or isinstance(p, float) or out[n].get('tied', False):
-            out.set_node_data(n, proportion=int(abs(p)), tied=False)
-
-    leaves = list(out.leaf_nodes)
-
-    # Pass 2 -- interchange sounds and rests. ``tied=False`` is explicit on
-    # every write (see the docstring: an int write does not clear it).
-    for n in leaves:
-        p = out[n]['proportion']
-        flipped = -int(abs(p)) if p > 0 else int(abs(p))
-        out.set_node_data(n, proportion=flipped, tied=False)
-
-    # Pass 3 -- charter sect10: re-tie each maximal run of newly-sounding
-    # leaves, head untied. Computed after the flip, so no head can be a
-    # dangling continuation.
-    previous_sounds = False
-    for n in leaves:
-        sounds = out[n]['proportion'] > 0
-        if sounds and previous_sounds:
-            out.set_node_data(n, tied=True)
-        previous_sounds = sounds
-
-    return out
