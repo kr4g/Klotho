@@ -20,6 +20,101 @@ from .algorithms import ratios_to_subdivs
 from ..utils.beat import calc_onsets
 
 
+def _check_proportion_scalar(v, path='proportion', what='proportion'):
+    """The ONE scalar rule for a rhythm-tree proportion. (RT-2)
+
+    A proportion is a non-zero integer plus a tie flag. The float encoding
+    is exactly that pair -- ``2.0`` means "the integer 2, tied" -- and NOT
+    a separate value type with its own arithmetic. Everything downstream
+    reads it that way, so a fractional float is not a finer proportion; it
+    is a proportion that will be truncated behind the author's back.
+
+    Three surfaces enforce this rule and they used to state it three
+    different ways, which is how ``set_node_data(leaf, proportion=1.5)``
+    came to be accepted in silence while the constructor refused the same
+    value. They now all delegate here and add only their OWN extra rule:
+
+    - the constructor (:meth:`RhythmTree._validate_s_grammar`) adds the
+      nested ``(D, S)`` shape;
+    - ``subdivide`` (:meth:`RhythmTree._validate_s_form`) adds
+      ``len(S) >= 2``, because dividing into one part is a no-op;
+    - the write path (:meth:`RhythmLayer.validate_attrs`) adds leaf-only
+      ties, since only a leaf sounds and only a sound can be continued.
+
+    Parameters
+    ----------
+    v : object
+        The candidate proportion.
+    path : str, optional
+        Where ``v`` sits, quoted back in the error so the author can find
+        it in a nested structure.
+    what : {'proportion', 'D'}, optional
+        ``'D'`` marks an interior-node duration, which additionally
+        cannot be a float -- ties are leaf-only.
+
+    Returns
+    -------
+    (int, bool)
+        The integer proportion, and whether it carries a tie.
+
+    Raises
+    ------
+    ValueError
+        On a bool, a non-whole float, a float ``D``, a negative float (a
+        tied rest), a zero, or any other type.
+    """
+    if isinstance(v, bool):
+        # bool is a subclass of int, so every ``isinstance(x, int)`` test
+        # took True for the proportion 1. A boolean is a type confusion,
+        # not a duration.
+        raise ValueError(
+            f"{what} at {path} must be an int or a whole-valued float; "
+            f"got bool: {v!r}. A boolean is not a duration."
+        )
+    if isinstance(v, numbers.Integral):
+        value, tied = int(v), False
+    elif isinstance(v, float):
+        if not v.is_integer():
+            raise ValueError(
+                f"{what} at {path} must be a whole number "
+                f"(an int, or a float marking a tie); got {v!r}. "
+                f"Fractional proportions are truncated, not honoured -- "
+                f"scale the whole S instead, e.g. (2, 3, 2) for (1, 1.5, 1)."
+            )
+        if what == 'D':
+            # Ties are leaf-only (07_TIES_CHARTER.md sect1, resolved
+            # against OpenMusic 2026-08-29: OM6 and om-sharp both give
+            # a float group value NO tie meaning -- fullratio and
+            # tree2ratio silently round it). Refusing beats silently
+            # corrupting.
+            raise ValueError(
+                f"D at {path} cannot be a float -- ties are leaf-only. "
+                f"A tie continues a sound, and only leaves sound; tie "
+                f"the group's first leaf instead, e.g. "
+                f"({int(v)}, (1.0, ...))."
+            )
+        if v < 0:
+            raise ValueError(
+                f"{what} at {path} is a tied rest ({v!r}), which is "
+                f"illegal -- a rest continues nothing and nothing "
+                f"sounds through it. Use a plain negative int for the "
+                f"rest, or a positive float for the tie."
+            )
+        value, tied = int(v), True
+    else:
+        raise ValueError(
+            f"{what} at {path} must be an int or a whole-valued float; "
+            f"got {type(v).__name__}: {v!r}."
+        )
+    if value == 0:
+        raise ValueError(
+            f"{what} at {path} cannot be zero -- a zero proportion "
+            f"builds a 0-duration leaf and breaks strictly-increasing "
+            f"onsets. Use a negative value for a rest."
+        )
+    return value, tied
+
+
 class RhythmLayer(TreeLayer):
     """Layer that owns rhythmic proportion data and derives metric timing.
 
@@ -47,10 +142,16 @@ class RhythmLayer(TreeLayer):
             normalized['proportion'] = float(current) if normalized['tied'] else int(current)
 
         if 'proportion' in normalized and 'tied' in normalized:
-            if normalized['tied']:
-                normalized['proportion'] = float(normalized['proportion'])
-            else:
-                normalized['proportion'] = int(normalized['proportion'])
+            # NEW-32: coerce ONLY a value the scalar rule already accepts.
+            # This used to be a bare ``int(proportion)``/``float(proportion)``,
+            # which truncated 1.5 to 1 BEFORE validate_attrs ever saw it --
+            # so the guard against silent truncation could never fire,
+            # because normalization had already done the truncating.
+            p = normalized['proportion']
+            if (isinstance(p, float) and p.is_integer()) or \
+                    (isinstance(p, numbers.Integral) and not isinstance(p, bool)):
+                normalized['proportion'] = float(p) if normalized['tied'] else int(p)
+            # else: leave it untouched so validate_attrs refuses it by name.
 
         return normalized
 
@@ -62,19 +163,19 @@ class RhythmLayer(TreeLayer):
             raise ValueError(f"Illegal RhythmTree node attribute update: {illegal}")
         if 'metric_duration' in attrs or 'metric_onset' in attrs:
             raise ValueError("metric_duration and metric_onset are derived and cannot be set directly")
-        # NEW-05: a zero proportion has no representable rest form
-        # (``-abs(0) == 0``), so make_rest silently no-ops on it and the
-        # node stays neither sounding nor resting. Zero is rejected at
-        # construction; reject it on the write path too, or mutation
-        # reopens the same hole.
-        if 'proportion' in attrs and attrs['proportion'] == 0:
-            raise ValueError(
-                "proportion cannot be zero -- a zero-duration leaf breaks "
-                "strictly-increasing onsets and cannot be made a rest. "
-                "Use a negative proportion for a rest."
-            )
-        # Ties are leaf-only and never on rests (07_TIES_CHARTER.md sect1);
-        # the same rules run at construction in _validate_s_grammar.
+        # The shared scalar rule (RT-2): non-zero int, or a whole float
+        # meaning "that int, tied". This is the SAME check the constructor
+        # runs, delegated rather than restated -- it closes NEW-05 (zero
+        # cannot arrive by mutation, because ``-abs(0) == 0`` leaves a node
+        # neither sounding nor resting) and NEW-32 (a fractional float
+        # cannot arrive by mutation, because it was stored truncated and
+        # tied, silently merging two sounds into one).
+        if 'proportion' in attrs:
+            _check_proportion_scalar(attrs['proportion'], 'proportion',
+                                     'proportion')
+        # The write path's OWN addition: ties are leaf-only and never on
+        # rests (07_TIES_CHARTER.md sect1). Position is not visible to the
+        # scalar rule, so it cannot live there.
         tie_requested = (bool(attrs.get('tied', False))
                          or isinstance(attrs.get('proportion'), float))
         if tie_requested:
@@ -291,6 +392,16 @@ class RhythmTree(Tree):
 
         Deliberately more lenient than :meth:`_validate_s_form`, which
         guards ``subdivide`` and legitimately demands at least two parts.
+        The divergence is deliberate, not drift: this validator describes a
+        STRUCTURE, in which a one-part group is a real shape Klotho emits;
+        ``subdivide`` describes an ACTION, and "divide this into one part"
+        is a no-op it declines on purpose.
+
+        The scalar rule itself is NOT restated here -- it lives once in
+        :func:`_check_proportion_scalar`, shared with ``subdivide`` and
+        with the write path. What this method adds is the nested
+        ``(D, S)`` shape.
+
         This one guards the CONSTRUCTOR, so it must accept every shape
         Klotho itself round-trips:
 
@@ -308,49 +419,6 @@ class RhythmTree(Tree):
         malformed pair (previously a bare ``abs()`` TypeError with no
         indication of WHERE).
         """
-        def _check_scalar(v, path, what):
-            if isinstance(v, bool) or isinstance(v, numbers.Integral):
-                value = int(v)
-            elif isinstance(v, float):
-                if not v.is_integer():
-                    raise ValueError(
-                        f"{what} at {path} must be a whole number "
-                        f"(an int, or a float marking a tie); got {v!r}. "
-                        f"Fractional proportions are truncated, not honoured -- "
-                        f"scale the whole S instead, e.g. (2, 3, 2) for (1, 1.5, 1)."
-                    )
-                if what == 'D':
-                    # Ties are leaf-only (07_TIES_CHARTER.md sect1, resolved
-                    # against OpenMusic 2026-08-29: OM6 and om-sharp both give
-                    # a float group value NO tie meaning -- fullratio and
-                    # tree2ratio silently round it). Refusing beats silently
-                    # corrupting.
-                    raise ValueError(
-                        f"D at {path} cannot be a float -- ties are leaf-only. "
-                        f"A tie continues a sound, and only leaves sound; tie "
-                        f"the group's first leaf instead, e.g. "
-                        f"({int(v)}, (1.0, ...))."
-                    )
-                if v < 0:
-                    raise ValueError(
-                        f"{what} at {path} is a tied rest ({v!r}), which is "
-                        f"illegal -- a rest continues nothing and nothing "
-                        f"sounds through it. Use a plain negative int for the "
-                        f"rest, or a positive float for the tie."
-                    )
-                value = int(v)
-            else:
-                raise ValueError(
-                    f"{what} at {path} must be an int or a whole-valued float; "
-                    f"got {type(v).__name__}: {v!r}."
-                )
-            if value == 0:
-                raise ValueError(
-                    f"{what} at {path} cannot be zero -- a zero proportion "
-                    f"builds a 0-duration leaf and breaks strictly-increasing "
-                    f"onsets. Use a negative value for a rest."
-                )
-
         if not isinstance(s, (tuple, list)):
             raise ValueError(
                 f"subdivisions at {_path} must be a tuple or list; "
@@ -365,41 +433,54 @@ class RhythmTree(Tree):
                         f"exactly 2 items; got {len(elem)}: {elem!r}."
                     )
                 d, sub = elem
-                _check_scalar(d, f"{path}[0]", 'D')
+                _check_proportion_scalar(d, f"{path}[0]", 'D')
                 RhythmTree._validate_s_grammar(sub, f"{path}[1]")
             else:
-                _check_scalar(elem, path, 'proportion')
+                _check_proportion_scalar(elem, path, 'proportion')
 
-    def _validate_s_form(self, s):
-        """Validate S is in valid S-form. Each element is non-zero int or (D, S) tuple.
-        S must have at least 2 elements (e.g. (1,) is invalid)."""
-        if isinstance(s, int):
-            if s == 0:
-                raise ValueError(f"S element cannot be zero: {s}")
+    def _validate_s_form(self, s, _path='S'):
+        """Validate the S handed to :meth:`subdivide`.
+
+        The scalar rule is NOT restated here -- it lives once in
+        :func:`_check_proportion_scalar`, shared with the constructor's
+        :meth:`_validate_s_grammar` and with the write path. So
+        ``subdivide`` now authors exactly what the constructor authors: a
+        whole-valued float is a TIE, not a typo, and numpy integers pass.
+        Non-whole floats, zeros, tied rests (negative floats), float ``D``
+        on an interior node, and bools are refused identically.
+
+        The one rule this surface ADDS is ``len(S) >= 2``. That divergence
+        from the constructor is deliberate, not drift: the constructor
+        describes a STRUCTURE, in which a one-part group is a real shape
+        Klotho emits 218 times internally, while ``subdivide`` describes an
+        ACTION, and "divide this into one part" is a no-op the API declines
+        rather than performs.
+        """
+        if not isinstance(s, (tuple, list)):
+            # a bare scalar in nested position: same rule, no length rule
+            _check_proportion_scalar(s, _path, 'proportion')
             return
-        if isinstance(s, (tuple, list)):
-            if len(s) < 2:
-                raise ValueError(f"S must have at least 2 elements, got {s}")
-            for elem in s:
-                if isinstance(elem, int):
-                    if elem == 0:
-                        raise ValueError(f"S element cannot be zero: {elem}")
-                elif isinstance(elem, (tuple, list)):
-                    if len(elem) != 2:
-                        raise ValueError(f"(D S) must have exactly 2 elements, got {len(elem)}: {elem}")
-                    d, sub = elem
-                    if not isinstance(d, int) or d == 0:
-                        raise ValueError(f"(D S): D must be non-zero integer, got D={d}")
-                    self._validate_s_form(sub)
-                else:
-                    raise ValueError(f"S element must be non-zero int or (D S) tuple, got {type(elem).__name__}: {elem}")
-            return
-        raise ValueError(f"S must be tuple or int, got {type(s).__name__}: {s}")
+        if len(s) < 2:
+            raise ValueError(f"S must have at least 2 elements, got {s}")
+        for i, elem in enumerate(s):
+            path = f"{_path}[{i}]"
+            if isinstance(elem, (tuple, list)):
+                if len(elem) != 2:
+                    raise ValueError(
+                        f"(D S) at {path} must have exactly 2 elements, "
+                        f"got {len(elem)}: {elem}"
+                    )
+                d, sub = elem
+                _check_proportion_scalar(d, f"{path}[0]", 'D')
+                self._validate_s_form(sub, f"{path}[1]")
+            else:
+                _check_proportion_scalar(elem, path, 'proportion')
 
     def _normalize_s_for_subdivide(self, S):
         """Normalize S for subdivide: int -> (1,)*S; tuple -> validate and return.
         S must represent at least 2 subdivisions (e.g. S>1 for int, len(S)>=2 for tuple)."""
-        if isinstance(S, int):
+        if isinstance(S, numbers.Integral) and not isinstance(S, bool):
+            S = int(S)
             if S <= 1:
                 raise ValueError(f"S must be > 1 when int, got {S}")
             return (1,) * S
@@ -568,6 +649,32 @@ class RhythmTree(Tree):
         ----------
         root_node : int, optional
             Subtree root to evaluate from. If None, evaluates from tree root.
+
+        Notes
+        -----
+        **This is a FIXPOINT, not a validator, and it repairs in silence.**
+        The grammar is enforced at the three entry surfaces (see
+        :func:`_check_proportion_scalar`); the rules below run again here
+        because ``_evaluate`` must return a coherent tree from whatever
+        state the graph is in, including states no entry surface can
+        produce. It does not report what it changed. Specifically it:
+
+        - re-negates a positive child of a negative parent, so resting a
+          branch rests everything under it (this is why un-resting a leaf
+          is not a per-node sign flip);
+        - clears ``tied`` on anything negative, because a tied rest is
+          illegal (07_TIES_CHARTER.md sect1);
+        - truncates a float proportion with ``int()``.
+
+        That last one is now UNREACHABLE from any authoring path: since
+        RT-2 the constructor, ``subdivide`` and the write path all refuse a
+        non-whole float, so every float arriving here is a whole-valued tie
+        marker and ``int()`` loses nothing. Two paths still bypass the
+        validators, and neither can ORIGINATE a fractional value:
+        ``Tree.add_subtree``/``graft_subtree`` copy donor node data
+        verbatim via ``_add_node_raw`` (so they can only propagate what a
+        donor already holds, and no public API can put it there), and
+        direct ``self._rx[n]['proportion'] = ...`` pokes inside this module.
         """
         if root_node is None:
             root_node = self.root
@@ -866,12 +973,26 @@ class RhythmTree(Tree):
         ------
         ValueError
             If the node is not found in the tree.
+
+        Notes
+        -----
+        **This is a validator BYPASS.** It writes through
+        ``_write_node_data`` directly, so ``normalize_attrs`` and
+        ``validate_attrs`` never run, and it sets the derived key
+        ``metric_duration`` -- which the write path refuses outright. That
+        is deliberate: the sign flip is exactly the operation whose result
+        is known in advance, so recomputing it would be wasted work. It
+        stays safe only because everything it writes is constructed here to
+        satisfy the grammar (``-abs(int(...))`` is a non-zero negative int,
+        and ``tied`` is forced ``False``). Any new write added here must
+        keep that property by hand; the grammar will not catch a mistake.
+
         """
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
-        
+
         descendants_to_modify = [node] + list(self.descendants(node))
-        
+
         for n in descendants_to_modify:
             node_data = self[n]
             if 'proportion' in node_data and node_data['proportion'] > 0:
