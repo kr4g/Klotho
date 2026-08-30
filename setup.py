@@ -12,7 +12,12 @@ setup(
     version=version,
     author='Ryan Millett',
     author_email='rmillett@mat.ucsb.edu',
-    packages=find_packages(),
+    # Scoped deliberately. A bare find_packages() picks up ANY directory with
+    # an __init__.py, and it was picking up `benchmarks/` -- which is
+    # gitignored, tracked nowhere, and shipped in klotho-cac 10.18.0 as a
+    # TOP-LEVEL package in every user's site-packages (verified against the
+    # published wheel, 2026-08-30). Seven files reproducible from no clone.
+    packages=find_packages(include=['klotho', 'klotho.*']),
     include_package_data=True,
     install_requires=[
         'numpy',
