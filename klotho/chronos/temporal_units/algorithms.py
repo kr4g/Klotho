@@ -290,15 +290,24 @@ def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tupl
 
     Raises
     ------
+    TypeError
+        If *ut* is not a TemporalUnit (a CompositionalUnit is one).
     ValueError
         If *depth* is outside ``[0, tree depth]``, if *prolatio* is falsy
         but not None, or if *prolatio* and *depth* are combined on a
         CompositionalUnit.
     """
-    
+
     # Import here to avoid circular imports
     from klotho.thetos.composition.compositional import CompositionalUnit
-    
+
+    if not isinstance(ut, TemporalUnit):
+        raise TypeError(
+            f"decompose is unary on a TemporalUnit or CompositionalUnit; "
+            f"got {type(ut).__name__}. For a RhythmTree use "
+            f"klotho.chronos.rhythm_trees.algorithms.decompose."
+        )
+
     # A falsy prolatio is an error, not a request for the default. '',
     # 0, False and [] are each rejected by the TemporalUnit constructor,
     # and () is a degenerate empty subdivision the grammar deliberately

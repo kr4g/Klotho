@@ -942,6 +942,12 @@ class RhythmTree(Tree):
         """
         if parent not in self:
             raise ValueError(f"Node {parent} not found in tree")
+        # This override reads `index` itself, below, to decide whether a
+        # requested tie sits at rank 0 -- so the guard has to be reached from
+        # here too, or a non-int index leaks a bare comparison TypeError from
+        # the tie path instead of the shaped refusal `Tree` gives everywhere
+        # else. Validating twice is free; the second call is a no-op on an int.
+        index = self._require_int_index(index)
         tie_requested = (bool(attr.get('tied', False))
                          or isinstance(attr.get('proportion'), float))
         if tie_requested:
@@ -1542,7 +1548,17 @@ class RhythmTree(Tree):
         ratio : Fraction, int, str, float, or sequence
             The multiplier(s). Must be positive: a sign flip is
             :meth:`make_rest`'s job, not an expansion's, and zero would
-            delete the event (that is :meth:`extract`).
+            delete the event (that is :meth:`extract`). **Those two
+            remedies are not addressed alike, and the refusal message says
+            so.** :meth:`extract` takes the same DECOMPOSED INDEX this
+            method takes, so an index carries straight across.
+            :meth:`make_rest` takes a NODE id: handing it an index rests a
+            different event, silently and with no exception -- on a flat
+            tree the root is node 0 and event *i* is node *i+1*, and on a
+            nested tree the same number can name a whole group. The node
+            ids of decomposed event *i* are ``tie_groups[i]``; rest every
+            one of them, since a tie group is one event with more than one
+            leaf.
 
         Returns
         -------
@@ -1596,9 +1612,19 @@ class RhythmTree(Tree):
             value = self._as_fraction(raw_ratio, 'ratio')
             if value <= 0:
                 raise ValueError(
-                    "a scale ratio must be positive -- zero would delete the "
-                    "event (use extract) and a negative would rest it (use "
-                    "make_rest)"
+                    f"a scale ratio must be positive; got {raw_ratio!r}. "
+                    f"Zero would delete the event and a negative would rest "
+                    f"it -- but the two remedies are ADDRESSED DIFFERENTLY, "
+                    f"so this number does not mean the same thing to both. "
+                    f"To delete it: extract takes the same DECOMPOSED INDEX "
+                    f"scale takes, so extract({raw_index!r}) removes the "
+                    f"event you just named. To rest it: make_rest is "
+                    f"NODE-addressed, and handing it an index rests a "
+                    f"different event silently (on a flat tree the root is "
+                    f"node 0 and event i is node i+1; on a nested tree the "
+                    f"same number can name a whole group). The node ids of "
+                    f"decomposed event {k} are tie_groups[{k}] -- rest every "
+                    f"one of them."
                 )
             out[k] = out[k] * value
         # scale never adds or removes an event, so the map is the identity

@@ -201,9 +201,20 @@ def decompose(rt) -> tuple:
         sound, ``(-1,)`` for a rest). Singleton parts keep the reduced
         per-leaf spelling (his fig. 4.108 form); only group sums stay
         unreduced, because only there is a spelling being *constructed*.
+
+    Raises
+    ------
+    TypeError
+        If *rt* is not a RhythmTree.
     """
     from .rhythm_tree import RhythmTree
     from .meas import Meas
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"decompose at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. For TemporalUnits use "
+            f"klotho.chronos.temporal_units.algorithms.decompose."
+        )
     parts = []
     rx = rt._rx
     for group in rt.tie_groups:
@@ -289,7 +300,21 @@ def flatten(rt) -> 'object':
     Returns
     -------
     RhythmTree
+
+    Raises
+    ------
+    TypeError
+        If *rt* is not a RhythmTree. The guard is here rather than left
+        to :func:`decompose`, which this delegates to, so the message
+        names the verb the caller actually wrote.
     """
+    from .rhythm_tree import RhythmTree
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"flatten at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. For TemporalUnits use "
+            f"klotho.chronos.temporal_units.algorithms.flatten."
+        )
     return fuse(decompose(rt))
 
 
@@ -373,7 +398,8 @@ def _check_positions(positions, upper, verb, *, unique=False):
             raise ValueError(
                 f"{verb} position {p} is out of range: the decomposed "
                 f"sequence admits 0..{upper} (0 is the head of sequence, "
-                f"his « position de tête de séquence »)."
+                f"his « position de tête de séquence » -- "
+                f"\"head-of-sequence position\")."
             )
         out.append(p)
     if unique and len(set(out)) != len(out):
@@ -823,9 +849,19 @@ def filtrage(rt, series):
 
     Raises
     ------
+    TypeError
+        If *rt* is not a RhythmTree, or if a step is not an integer.
     ValueError
         If ``series`` is empty or contains a non-positive step.
     """
+    from .rhythm_tree import RhythmTree
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"filtrage at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. There is no TemporalUnit surface for "
+            f"filtrage -- pass the unit's tree, ut.rt, and rebuild a unit "
+            f"from the result if you need one."
+        )
     steps = tuple(series)
     if not steps:
         raise ValueError(
@@ -944,7 +980,20 @@ def evide(rt):
     RhythmTree
         A new tree: every sound a rest, every rest a sound, re-tied per
         charter sect10.
+
+    Raises
+    ------
+    TypeError
+        If *rt* is not a RhythmTree.
     """
+    from .rhythm_tree import RhythmTree
+    if not isinstance(rt, RhythmTree):
+        raise TypeError(
+            f"evide at RT level takes a RhythmTree; got "
+            f"{type(rt).__name__}. There is no TemporalUnit surface for "
+            f"evide -- pass the unit's tree, ut.rt, and rebuild a unit "
+            f"from the result if you need one."
+        )
     out = rt.copy()
 
     # Pass 1 -- normalise resting BRANCHES to sounding, top-down.
