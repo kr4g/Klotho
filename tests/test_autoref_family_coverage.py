@@ -22,7 +22,9 @@ from klotho.chronos.temporal_units.temporal import ProlatioTypes, TemporalBlock
 from klotho.topos.collections.patterns import (
     autoref,
     autoref_rotmat,
+    pair_adjacent,
     permute_list,
+    substitute,
 )
 
 
@@ -361,6 +363,110 @@ class TestFromTreeMat:
             blk = TemporalBlock.from_tree_mat(same, subdiv=True, sort_rows=False)
         pro = [[u.prolationis for u in row] for row in blk.rows]
         assert pro[0] == pro[1] == pro[2]
+
+
+class TestSubstitute:
+    """RT-7 -- Haddad's section 2.3.6, "De la substitution" ("On substitution").
+
+    Oracle: the pair list printed in the prose. From the source list
+    (5 3 4 2 1 5) he writes ``((5 3) (3 4) (4 2) (2 1) (1 5) (5 5))``,
+    glossed as "renvoyant ainsi la proportion en cours avec celle qui lui
+    succede" -- "thus returning the current proportion together with the one
+    that succeeds it."
+
+    That pair list is the ONLY published oracle: figure 2.16, which should
+    show the resulting rhythm tree, prints figure 2.15's tree verbatim -- a
+    copy-paste error in the thesis (recorded at
+    ``projects/klotho-evolution/evidence/haddad-sources/FINDINGS.md:245-247``).
+    """
+
+    HADDAD_SOURCE = (5, 3, 4, 2, 1, 5)
+    HADDAD_PAIRS = ((5, 3), (3, 4), (4, 2), (2, 1), (1, 5), (5, 5))
+
+    def test_it_reproduces_haddads_published_pair_list(self):
+        flat = tuple((head, tail[0]) for head, tail in substitute(self.HADDAD_SOURCE))
+        assert flat == self.HADDAD_PAIRS
+
+    def test_each_tail_holds_exactly_the_successor(self):
+        lst = (3, 4, 5, 7)
+        assert substitute(lst) == ((3, (4,)), (4, (5,)), (5, (7,)), (7, (3,)))
+
+    def test_the_last_element_wraps_to_the_first(self):
+        assert substitute((3, 4, 5))[-1] == (5, (3,))
+
+    def test_every_tail_has_width_one(self):
+        assert all(len(tail) == 1 for _, tail in substitute((3, 4, 5, 7, 11)))
+
+    def test_heads_are_the_source_list_in_order(self):
+        lst = (5, 3, 4, 2, 1, 5)
+        assert tuple(h for h, _ in substitute(lst)) == lst
+
+    def test_it_differs_from_pair_adjacent(self):
+        assert substitute((3, 4, 5, 7)) != pair_adjacent((3, 4, 5, 7))
+
+    def test_empty(self):
+        assert substitute(()) == ()
+
+    def test_a_singleton_gets_an_empty_tail(self):
+        """Matches ``pair_adjacent``, ``nested_chain`` and
+        ``alternate_sequence``, which all return ``(e, ())`` for one element:
+        a lone proportion has no distinct successor to substitute in.
+        """
+        assert substitute((7,)) == ((7, ()),)
+
+    def test_two_elements(self):
+        assert substitute((3, 4)) == ((3, (4,)), (4, (3,)))
+
+    def test_two_elements_agrees_with_pair_adjacent(self):
+        assert substitute((3, 4)) == pair_adjacent((3, 4))
+
+    def test_the_result_builds_a_rhythm_tree(self):
+        from klotho.chronos import RhythmTree
+
+        spec = substitute((5, 3, 4, 2, 1, 5))
+        assert RhythmTree(meas='20/16', subdivisions=spec).subdivisions == spec
+
+
+class TestPairAdjacent:
+    """``pair_adjacent`` had zero tests and zero call sites. Pinned here
+    because RT-7 documents it as NOT Haddad's substitution: its adjacency
+    width is two where his is one.
+    """
+
+    def test_each_element_pairs_with_the_next_two(self):
+        assert pair_adjacent((3, 4, 5, 7)) == (
+            (3, (4, 5)),
+            (4, (5, 7)),
+            (5, (7, 3)),
+            (7, (3, 4)),
+        )
+
+    def test_it_wraps_circularly(self):
+        assert pair_adjacent((1, 2, 3))[-1] == (3, (1, 2))
+
+    def test_every_tail_has_width_two(self):
+        assert all(len(tail) == 2 for _, tail in pair_adjacent((1, 2, 3, 4, 5)))
+
+    def test_the_docstring_example_holds(self):
+        assert pair_adjacent((1, 2, 3, 4, 5)) == (
+            (1, (2, 3)),
+            (2, (3, 4)),
+            (3, (4, 5)),
+            (4, (5, 1)),
+            (5, (1, 2)),
+        )
+
+    def test_empty(self):
+        assert pair_adjacent(()) == ()
+
+    def test_a_singleton_gets_an_empty_tail(self):
+        assert pair_adjacent((7,)) == ((7, ()),)
+
+    def test_two_elements_collapse_to_width_one(self):
+        """With only two elements the next-two rule would repeat the head, so
+        it degrades to the successor -- the one case where it coincides with
+        Haddad's substitution."""
+        assert pair_adjacent((3, 4)) == ((3, (4,)), (4, (3,)))
 
 
 def blk_shape(blk):

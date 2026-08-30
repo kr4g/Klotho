@@ -11,6 +11,7 @@ __all__ = [
     'autoref_rotmat',
     'iso_pairs',
     'pair_adjacent',
+    'substitute',
     'nested_chain',
     'alternate_sequence',
 ]
@@ -308,10 +309,24 @@ def iso_pairs(*lists):
 
 # ------------------------------------------------------------------------------------
 
+# Not Haddad's. Klotho's own width-2 variant -- see the warning below.
 def pair_adjacent(elements):
     '''
     Creates groups where elements are paired with their adjacent elements.
-    
+
+    Each element becomes the head of a ``(D, S)`` pair whose tail is the
+    **next two** elements, circularly.
+
+    .. warning::
+
+       This is **not** Haddad's substitution. His section 2.3.6, "De la
+       substitution" ("On substitution"), pairs each proportion with its
+       **successor only** -- "la proportion en cours avec celle qui lui
+       succede", "the current proportion with the one that succeeds it" --
+       so his tails have width one where these have width two. The
+       difference is structural, not a parameter. For his operation use
+       :func:`substitute`.
+
     Parameters
     ----------
     elements : tuple
@@ -344,6 +359,77 @@ def pair_adjacent(elements):
         result.append((elements[i], (elements[next_idx], elements[next_next_idx])))
     
     return tuple(result)
+
+# Section 2.3.6: rhythmic substitution.
+def substitute(elements):
+    '''
+    Haddad's rhythmic substitution: pair each proportion with its successor.
+
+    Each element becomes the head of a ``(D, S)`` pair whose tail holds the
+    **single** next element, circularly. The result is a rhythm-tree
+    subdivision spec in which every group has exactly one child.
+
+    Parameters
+    ----------
+    elements : tuple
+        A tuple of proportions to substitute.
+
+    Returns
+    -------
+    tuple
+        A tuple of ``(D, S)`` pairs, one per element.
+
+    Notes
+    -----
+    From section 2.3.6, "De la substitution" ("On substitution"): "on lui
+    substitue ses propres proportions couples deux a deux ... renvoyant ainsi
+    la proportion en cours avec celle qui lui succede" -- "one substitutes
+    for it its own proportions coupled two by two ... thus returning the
+    current proportion together with the one that succeeds it."
+
+    His own worked example, from the proportions ``(5 3 4 2 1 5)``, is the
+    pair list ``((5 3) (3 4) (4 2) (2 1) (1 5) (5 5))``. Klotho wraps each
+    tail in a one-element tuple so the pair is a legal ``(D, S)`` node; the
+    content is his list unchanged.
+
+    .. warning::
+
+       **That pair list is the only published oracle for this function.**
+       Figure 2.16, which should show the resulting rhythm tree, prints
+       figure 2.15's tree verbatim -- a copy-paste error in the thesis,
+       recorded at
+       ``projects/klotho-evolution/evidence/haddad-sources/FINDINGS.md``.
+       Do not "correct" this implementation against that printed tree.
+
+    A footnote to the same section notes the obvious variants: "l'on peut
+    imaginer le contraire, c'est-a-dire, la proportion qui precede avec celle
+    en cours, ou toutes autres combinaisons de proportions" -- "one can
+    imagine the opposite, that is, the proportion that precedes together with
+    the current one, or any other combinations of proportions." Klotho
+    implements only the successor form he actually uses; the predecessor form
+    is ``substitute(elements[::-1])`` reversed.
+
+    See Also
+    --------
+    pair_adjacent : Klotho's width-two variant, which is NOT this.
+
+    Examples
+    --------
+    >>> substitute((5, 3, 4, 2, 1, 5))
+    ((5, (3,)), (3, (4,)), (4, (2,)), (2, (1,)), (1, (5,)), (5, (5,)))
+    '''
+    if not elements:
+        return ()
+
+    n = len(elements)
+    if n == 1:
+        # A lone proportion has no distinct successor to substitute in.
+        # Matching pair_adjacent, nested_chain and alternate_sequence, which
+        # all return ``(e, ())`` for a singleton, rather than the bare
+        # formula's self-referential ``(e, (e,))``.
+        return ((elements[0], ()),)
+
+    return tuple((elt, (elements[(i + 1) % n],)) for i, elt in enumerate(elements))
 
 def nested_chain(elements):
     '''
