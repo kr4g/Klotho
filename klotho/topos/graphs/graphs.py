@@ -194,7 +194,7 @@ class Graph(GraphCore):
             for node_data in nodes:
                 if isinstance(node_data, tuple) and len(node_data) == 2:
                     node, attrs = node_data
-                    if not self._rx.has_node(node):
+                    if not self._has_node(node):
                         raise KeyError(f"Node {node} not found in graph")
                     self.set_node_data(node, **attrs)
                 else:

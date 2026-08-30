@@ -5,6 +5,7 @@ import rustworkx as rx
 from functools import cached_property
 from .group import Group
 import copy
+import operator
 from fractions import Fraction
 
 _IMMUTABLE_META_TYPES = (str, int, float, bool, type(None), Fraction)
@@ -653,6 +654,32 @@ class Tree(GraphCore):
         self._post_mutation(scope_node=parent, op='add_child')
         return child_id
 
+    @staticmethod
+    def _require_int_index(index):
+        """Return ``index`` as an ``int``, or refuse the call by name.
+
+        Positional insertion has to refuse a non-int BEFORE it writes.
+        ``index < 0`` and ``0 <= index <= n`` are both legal comparisons for a
+        float, a ``Fraction`` and a ``Decimal``, so those three passed every
+        guard, the node was added, and the failure landed later on
+        ``contents[:index]`` -- after the mutation, with ``_post_mutation``
+        skipped. That left the layer pipeline un-run, so ``durations`` raised
+        ``KeyError: 'metric_duration'`` from then on while ``group.S`` still
+        reported a plausible shape. A refused call announced nothing and
+        returned an unreadable tree.
+
+        ``bool`` stays acceptable: it IS an ``int``, and ``True`` meant rank 1
+        before this guard existed.
+        """
+        try:
+            return operator.index(index)
+        except TypeError:
+            raise TypeError(
+                f"insert_child index must be an integer rank, not "
+                f"{type(index).__name__} ({index!r}) -- it is a position "
+                f"among the siblings, taken exactly as list.insert takes one."
+            ) from None
+
     def insert_child(self, parent, index, **attr):
         """Insert a child at a given rank among ``parent``'s children.
 
@@ -685,8 +712,14 @@ class Tree(GraphCore):
         ------
         ValueError
             If ``parent`` is not in the tree.
+        TypeError
+            If ``index`` is not an integer. A float, ``Fraction`` or
+            ``Decimal`` rank is refused, not rounded.
         IndexError
             If ``index`` is out of range.
+
+        Every one of those refusals happens BEFORE the first write, so a
+        refused call leaves the tree exactly as it found it.
 
         Notes
         -----
@@ -714,6 +747,7 @@ class Tree(GraphCore):
         """
         if parent not in self:
             raise ValueError(f"Node {parent} not found in tree")
+        index = self._require_int_index(index)
 
         slots = list(self.successors(parent))
         n = len(slots)
@@ -733,10 +767,19 @@ class Tree(GraphCore):
         # _add_node_raw may return a REUSED index that lands anywhere in the
         # sorted order -- so the destination is computed from the merged
         # sorted list rather than assumed to be the maximum.
-        contents = [(dict(self[s]), list(self.successors(s))) for s in slots]
+        # Read payloads through `self.nodes[...]`, never `self[...]`:
+        # `ParameterTree.__getitem__` returns a ParameterNode PROXY that takes
+        # string keys only, and `dict()` on a proxy with no `keys()` falls back
+        # to the sequence protocol and asks it for key 0. That made
+        # `insert_child` the one Tree mutator that could not run on a
+        # ParameterTree at all. `self.nodes[...]` is the raw payload view --
+        # the same read `add_subtree` below already uses.
+        contents = [(dict(self.nodes[s]), list(self.successors(s)))
+                    for s in slots]
         new_id = self._add_child_raw(parent, **attr)
         merged = sorted(slots + [new_id])
-        desired = contents[:index] + [(dict(self[new_id]), [])] + contents[index:]
+        desired = (contents[:index] + [(dict(self.nodes[new_id]), [])]
+                   + contents[index:])
 
         for s in merged:
             for c in list(self.successors(s)):
@@ -999,12 +1042,7 @@ class Tree(GraphCore):
         cls = self.__class__
         new_tree = cls.__new__(cls)
 
-        new_rx = self._rx.copy()
-        for idx in new_rx.node_indices():
-            payload = new_rx.get_node_data(idx)
-            if isinstance(payload, dict):
-                new_rx[idx] = dict(payload)
-        new_tree._rx = new_rx
+        new_tree._rx = self._copy_rx(self._rx)
         meta = self._meta
         if all(isinstance(v, _IMMUTABLE_META_TYPES) for v in meta.values()):
             new_tree._meta = dict(meta)
@@ -1027,24 +1065,15 @@ class Tree(GraphCore):
     def __deepcopy__(self, memo):
         """Create a deep copy of the tree including Tree-specific attributes.
 
-        Payload dicts are freshened exactly as in :meth:`structural_clone`, and
-        for the same reason: ``self._rx.copy()`` duplicates the node table but
-        keeps the payloads by REFERENCE, and ``_evaluate`` and other internal
-        writers mutate those dicts in place -- so recomputing one twin would
-        rewrite the other's cached durations and onsets. Values stay shared
-        (the writers replace entries, never mutate a value in place), which
-        keeps Instrument/Envelope/Bind objects identical across the copy.
+        Topology, payloads and ``_meta`` are the base class's job:
+        ``GraphCore.__deepcopy__`` freshens the payload dicts and says why
+        (``_rx.copy()`` keeps them by reference, and ``_evaluate`` and other
+        internal writers mutate them in place, so recomputing one twin would
+        rewrite the other's cached durations and onsets). Values stay shared,
+        which keeps Instrument/Envelope/Bind objects identical across the copy.
+        This method adds only what a tree owns on top of that.
         """
-        new_tree = self.__class__.__new__(self.__class__)
-
-        new_rx = self._rx.copy()
-        for idx in new_rx.node_indices():
-            payload = new_rx.get_node_data(idx)
-            if isinstance(payload, dict):
-                new_rx[idx] = dict(payload)
-        new_tree._rx = new_rx
-        new_tree._meta = copy.deepcopy(self._meta, memo)
-        new_tree._structure_version = 0
+        new_tree = super().__deepcopy__(memo)
 
         new_tree._root = self._root
         new_tree._list = copy.deepcopy(self._list, memo)
