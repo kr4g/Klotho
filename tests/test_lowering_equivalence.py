@@ -16,11 +16,29 @@ Events — lowers it, and checks:
    stay private), and parent-level ``set()`` propagation keeps working
    on copies (override *placement* is preserved, not flattened).
 
-Regenerate the golden after an intentional behavior change:
+PROVENANCE OF THE GOLDEN -- read before regenerating it.
+
+This is a CHARACTERIZATION oracle, not a correctness oracle. Its values were
+captured from this package's own output at a moment when that output was
+believed correct, and its job is to detect DRIFT: it answers "did behaviour
+change", never "is behaviour right". Nothing in it is derived from an external
+reference, so it cannot testify that the pipeline is correct -- only that it
+still does what it did.
+
+That makes regeneration the one move that destroys it. A golden regenerated
+from the working tree pins the code to itself and will then pass for any
+behaviour, including the behaviour it was written to catch.
 
     python tests/test_lowering_equivalence.py --regen
 
-and eyeball the fixture diff before committing it.
+Regenerate ONLY when a behaviour change was intended, and then:
+  - eyeball and review the fixture diff line by line before committing it,
+    with the intended change in hand -- every altered line must be one you
+    can explain;
+  - commit the regenerated golden ALONE, never in the same commit as the
+    source change it pins, so the diff stays reviewable in isolation.
+
+If a red run here was not expected, the golden is doing its job. Fix the code.
 """
 import json
 import re
