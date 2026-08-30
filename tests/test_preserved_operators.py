@@ -346,3 +346,106 @@ class TestPreservedFamilyChains:
               .scale(0, 2))
         assert rt.group.S == (8, 2, 3, 4)
         assert str(rt.meas) == '2/2'
+
+
+# ----------------------------------------------------------------------
+# what a rebuilt leaf carries
+# ----------------------------------------------------------------------
+class TestPayloadsSurviveTheRebuild:
+    """A preserved-family verb re-spells the leaf surface. What it must NOT
+    do is throw away everything the surviving events were carrying.
+
+    ``CompositionalTree(ParameterApiMixin, RhythmTree)`` inherits this whole
+    family, and its pfields, mfields and instrument bindings live in NODE
+    DATA -- so a rebuild that deletes every non-root node deletes them too,
+    silently. ``extract`` is the oracle: it never rebuilt, and survivors kept
+    their payloads. All three verbs must now agree with it."""
+
+    @staticmethod
+    def _tree(subdivisions=(1, 1, 1, 1)):
+        from klotho.thetos.composition.compositional import CompositionalTree
+        ct = CompositionalTree(meas='4/4', subdivisions=subdivisions)
+        return ct
+
+    def test_scale_keeps_per_event_pfields(self):
+        ct = self._tree()
+        for n, amp in zip(ct.leaf_nodes, (0.125, 0.25, 0.5, 0.75)):
+            ct.set_pfields(n, amp=amp)
+        ct.scale(0, 3)
+        assert [ct.get_pfield(n, 'amp') for n in ct.leaf_nodes] == \
+            [0.125, 0.25, 0.5, 0.75]
+
+    def test_scale_keeps_per_event_mfields(self):
+        ct = self._tree()
+        for n, name in zip(ct.leaf_nodes, ('m0', 'm1', 'm2', 'm3')):
+            ct.set_mfields(n, articulation=name)
+        ct.scale(0, 3)
+        assert [ct.get_mfield(n, 'articulation') for n in ct.leaf_nodes] == \
+            ['m0', 'm1', 'm2', 'm3']
+
+    def test_insert_keeps_pfields_and_the_new_event_takes_the_default(self):
+        ct = self._tree()
+        ct.set_pfields(ct.root, amp=0.5)
+        for n, amp in zip(ct.leaf_nodes, (0.125, 0.25, 0.5, 0.75)):
+            ct.set_pfields(n, amp=amp)
+        ct.insert(2, Fraction(1, 8))
+        assert [ct.get_pfield(n, 'amp') for n in ct.leaf_nodes] == \
+            [0.125, 0.25, 0.5, 0.5, 0.75]
+
+    def test_a_pfield_on_a_DELETED_interior_node_survives_the_flatten(self):
+        """The rebuild deletes the group node, so an override that only ever
+        lived there has to be pushed down onto the events that inherited it
+        -- otherwise flattening silently un-sets it."""
+        ct = self._tree((1, (2, (1, 1)), 1))
+        group = ct.successors(ct.root)[1]
+        ct.set_pfields(group, amp=0.9)
+        ct.scale(0, 2)
+        assert [ct.get_pfield(n, 'amp') for n in ct.leaf_nodes] == \
+            [None, 0.9, 0.9, None]
+
+    def test_the_root_keeps_inheriting_after_the_rebuild(self):
+        """Only the ancestors that were DELETED are pushed down. The root
+        survives, so a value set there still cascades -- and still cascades
+        to events written later."""
+        ct = self._tree()
+        ct.scale(0, 3)
+        ct.set_pfields(ct.root, amp=0.4)
+        assert [ct.get_pfield(n, 'amp') for n in ct.leaf_nodes] == \
+            [0.4, 0.4, 0.4, 0.4]
+
+    def test_an_instrument_bound_on_a_leaf_follows_its_event(self):
+        ct = self._tree()
+        ct.set_instrument(ct.leaf_nodes[2], 'marimba')
+        ct.scale(0, 3)
+        assert [ct.get_instrument(n) for n in ct.leaf_nodes] == \
+            [None, None, 'marimba', None]
+
+    def test_no_binding_is_left_on_a_node_that_no_longer_exists(self):
+        """Freed node indices are REUSED, so a binding left behind on a
+        deleted node does not merely leak -- it re-attaches itself to
+        whatever event lands in that slot."""
+        ct = self._tree((1, (2, (1, 1)), 1))
+        group = ct.successors(ct.root)[1]
+        ct.set_instrument(group, 'marimba')
+        ct.scale(0, 2)
+        assert set(ct.node_instruments) <= set(ct.nodes)
+        assert [ct.get_instrument(n) for n in ct.leaf_nodes] == \
+            [None, 'marimba', 'marimba', None]
+
+    def test_a_tie_group_carries_its_HEADs_payload(self):
+        """A tie group decomposes to ONE event, so it has one payload: the
+        head's. The continuation's own overrides go with the continuation."""
+        ct = self._tree((1, 1.0, 1, 1))
+        heads = [g[0] for g in ct.tie_groups]
+        for n, amp in zip(heads, (0.125, 0.25, 0.5)):
+            ct.set_pfields(n, amp=amp)
+        ct.set_pfields(ct.tie_groups[0][1], amp=0.99)
+        ct.scale(0, 2)
+        assert [ct.get_pfield(n, 'amp') for n in ct.leaf_nodes] == \
+            [0.125, 0.25, 0.5]
+
+    def test_a_plain_RhythmTree_is_unaffected(self):
+        rt = RT(meas='4/4', subdivisions=(1, 2, 3, 4))
+        rt.scale(0, 2)
+        assert rt.group.S == (2, 2, 3, 4)
+        assert all('proportion' in rt[n] for n in rt.nodes)

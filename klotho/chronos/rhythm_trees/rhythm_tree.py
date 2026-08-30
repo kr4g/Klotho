@@ -21,6 +21,16 @@ from .algorithms import ratios_to_subdivs
 from ..utils.beat import calc_onsets
 
 
+# Node-data keys a rebuilt leaf must NOT inherit from the leaf it replaces:
+# the rhythm layer recomputes the first four, and `label`/`meta` are
+# bookkeeping. Everything else is payload -- pfields, mfields, anything a
+# later layer adds -- and travels with its event. The same split is drawn in
+# `CompositionalUnit.from_tree`.
+_NON_PAYLOAD_KEYS = frozenset({
+    'proportion', 'tied', 'metric_duration', 'metric_onset', 'label', 'meta',
+})
+
+
 def _check_proportion_scalar(v, path='proportion', what='proportion'):
     """The ONE scalar rule for a rhythm-tree proportion. (RT-2)
 
@@ -1109,7 +1119,51 @@ class RhythmTree(Tree):
             den = lcm(den, d.denominator)
         return den
 
-    def _respell(self, durations, op):
+    def _capture_payloads(self):
+        """One payload per decomposed event: everything that is NOT rhythm.
+
+        A preserved-family verb deletes every non-root node and rebuilds the
+        leaf surface, so anything the old nodes carried is destroyed unless
+        it is captured first. On a plain :class:`RhythmTree` there is nothing
+        to carry; on a
+        :class:`~klotho.thetos.composition.compositional.CompositionalTree`
+        the pfields, mfields and instrument bindings all live in node data
+        and would vanish in silence.
+
+        An event's payload is its tie-group HEAD's own overrides, merged over
+        those of every ancestor that is about to be DELETED -- an override
+        set on a group node is inherited by the leaves under it, and the
+        group node does not survive the flatten, so the value has to come
+        down with them. The ROOT is deliberately excluded: it survives, keeps
+        its own overrides, and goes on cascading to the rebuilt leaves. So a
+        value set at the root stays a root value and can still be changed
+        once, at the root, afterwards.
+
+        Returns
+        -------
+        list of (dict, object)
+            One ``(node data, instrument or None)`` pair per decomposed
+            event, in decomposed order.
+        """
+        layer = getattr(self, '_param_layer', None)
+        bindings = layer._node_instruments if layer is not None else {}
+        captured = []
+        for group in self.tie_groups:
+            merged = {}
+            instrument = None
+            # root first, head last: the nearer ancestor wins, which is the
+            # same precedence the effective-value cache resolves by.
+            for n in self.branch(group[0])[1:]:
+                data = self._rx[n]
+                if isinstance(data, dict):
+                    merged.update({k: v for k, v in data.items()
+                                   if k not in _NON_PAYLOAD_KEYS})
+                if n in bindings:
+                    instrument = bindings[n]
+            captured.append((merged, instrument))
+        return captured
+
+    def _respell(self, durations, sources, op):
         """Rewrite the leaf surface from a decomposed duration sequence.
 
         The Tempus VALUE is never changed by a preserved-family operator.
@@ -1125,7 +1179,20 @@ class RhythmTree(Tree):
         when a compression refines the grid to fifty-fourths (fig. 4.68).
         Both are the same Tempus value; only the unit it is counted in
         moves.
+
+        Parameters
+        ----------
+        durations : list of Fraction
+            The new decomposed sequence, one signed duration per event.
+        sources : list of (int or None)
+            Parallel to *durations*: the index each new event had in the
+            OLD decomposed sequence, or ``None`` for an event this operation
+            created. This map is what carries pfields, mfields and
+            instrument bindings across the rebuild; it is explicit because
+            an incidental one (same position, same payload) is wrong for
+            every verb that inserts or removes.
         """
+        payloads = self._capture_payloads()
         old_grid = self._grid_denominator(self._decomposed_durations())
         den = self._grid_denominator(durations)
         S = tuple(int(d * den) for d in durations)
@@ -1137,19 +1204,30 @@ class RhythmTree(Tree):
                 meas = Meas(int(num), den)
 
         root = self.root
+        layer = getattr(self, '_param_layer', None)
+        bindings = layer._node_instruments if layer is not None else None
         for n in [x for x in self.nodes if x != root]:
             self._remove_node_raw(n)
         if meas is not None:
             self._meta['meas'] = str(meas)
             self._meas_cache = None
             self._rx[root]['proportion'] = meas.numerator * self.span
+        if bindings is not None:
+            # freed node indices are REUSED, so a binding left on a deleted
+            # node does not merely leak -- it re-attaches to whatever event
+            # lands in that slot
+            for n in [x for x in bindings if x != root and x not in self]:
+                del bindings[n]
         # Freed node indices are reused in no guaranteed order, so the
         # proportions are written by SLOT RANK after the fact rather than
         # trusted to arrive in insertion order.
         new_ids = [self._add_child_raw(root, proportion=1) for _ in S]
-        for slot, p in zip(sorted(new_ids), S):
-            self._write_node_data(slot, {'proportion': p}, replace=True)
-        self._list = Group((self.meas.numerator * self.span, S))
+        for slot, p, src in zip(sorted(new_ids), S, sources):
+            payload, instrument = payloads[src] if src is not None else ({}, None)
+            self._write_node_data(slot, {'proportion': p, **payload},
+                                  replace=True)
+            if instrument is not None and bindings is not None:
+                bindings[slot] = instrument
         self._post_mutation(scope_node=root, op=op)
         return self
 
@@ -1252,12 +1330,15 @@ class RhythmTree(Tree):
                 )
             buckets.setdefault(k, []).append(value)
 
-        out = []
+        out, sources = [], []
         for i in range(n + 1):
-            out.extend(buckets.get(i, ()))
+            for value in buckets.get(i, ()):
+                out.append(value)
+                sources.append(None)   # a new event: no payload to inherit
             if i < n:
                 out.append(current[i])
-        return self._respell(out, 'insert')
+                sources.append(i)
+        return self._respell(out, sources, 'insert')
 
     def extract(self, node):
         """Extraction (- in a circle) -- delete without shortening the bar.
@@ -1352,7 +1433,8 @@ class RhythmTree(Tree):
                     "make_rest)"
                 )
             out[k] = out[k] * value
-        return self._respell(out, 'scale')
+        # scale never adds or removes an event, so the map is the identity
+        return self._respell(out, list(range(n)), 'scale')
 
     def make_rest(self, node):
         """
