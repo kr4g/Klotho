@@ -622,13 +622,43 @@ class TestCompositionalUnitArticulations:
         uc.make_rest(uc.rt.subtree_leaves(inner_nodes[0])[0])
         assert slur_id not in uc._slur_specs
 
+    def _amps(self, uc, node):
+        return [uc.get_pfield(n, 'amp') for n in uc.rt.subtree_leaves(node)]
+
     def test_apply_envelope_same_pfield_overwrite(self):
-        uc = self._make_uc()
-        env = Envelope([0.0, 1.0], times=[1.0])
-        inner_nodes = uc.rt.at_depth(1)
-        uc.apply_envelope(envelope=env, pfields='amp', node=inner_nodes[0])
-        uc.apply_envelope(envelope=env, pfields='amp', node=inner_nodes[0])
-        _ = uc.events
+        """"Overwrite" means the second application leaves no residue of the
+        first: the pfield values are exactly what the second envelope alone
+        would have produced. The expected value is not a literal -- it is
+        computed by applying the second envelope to a fresh, untouched UC.
+
+        NOTE (TEST-4): whether a same-pfield re-application should overwrite
+        at all is a documented ambiguity -- ``apply_envelope``'s docstring
+        says same-field overlap is "rejected", but that check
+        (``_check_envelope_overlap``) runs only on the ``control=True`` path.
+        This test pins the ``control=False`` reading its own name asserts.
+        """
+        first = Envelope([0.0, 1.0], times=[1.0])
+        second = Envelope([0.5, 0.25], times=[1.0])
+
+        alone = self._make_uc()
+        node_alone = alone.rt.at_depth(1)[0]
+        alone.apply_envelope(envelope=second, pfields='amp', node=node_alone)
+        expected = self._amps(alone, node_alone)
+
+        over = self._make_uc()
+        node_over = over.rt.at_depth(1)[0]
+        over.apply_envelope(envelope=first, pfields='amp', node=node_over)
+        over.apply_envelope(envelope=second, pfields='amp', node=node_over)
+        assert self._amps(over, node_over) == expected, \
+            "second application did not overwrite the first"
+
+        same = self._make_uc()
+        node_same = same.rt.at_depth(1)[0]
+        same.apply_envelope(envelope=first, pfields='amp', node=node_same)
+        once = self._amps(same, node_same)
+        same.apply_envelope(envelope=first, pfields='amp', node=node_same)
+        assert self._amps(same, node_same) == once
+        _ = same.events
 
     def test_apply_envelope_different_pfields_can_overlap(self):
         uc = self._make_uc()

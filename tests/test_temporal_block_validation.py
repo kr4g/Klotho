@@ -108,6 +108,55 @@ class TestSortRowsDeprecation:
             warnings.simplefilter('error', FutureWarning)
             blk.copy()
 
+    @pytest.mark.parametrize('beats', [
+        [], [1], [1, 4], [4, 1], [2, 2], [1, 4, 2], [4, 2, 1], [4, 4, 1], [1, 1, 4],
+    ])
+    @pytest.mark.parametrize('explicit', [None, True, False])
+    def test_the_warning_fires_exactly_on_real_exposure(self, beats, explicit):
+        """The WL-32 contract as an iff, over a matrix with no literals in it.
+
+        Derived from prose, not from a run. The ``sort_rows`` docstring says
+        the flag decides "whether to sort rows by duration, longest first",
+        that ``BT([short, long])`` comes back ``[long, short]``, and that
+        passing it explicitly silences the FutureWarning. The constructor
+        comment adds: warn "only when the default actually reordered
+        somebody's rows ... so the warning marks real exposure to the coming
+        flip, not merely constructing a block."
+
+            warned  <=>  sort_rows was omitted  AND  sorting moved a row.
+
+        "Sorting moved a row" is measured without touching the warning: the
+        same rows are built twice with the flag passed explicitly -- False
+        keeps the order passed, True sorts longest-first -- and the two row
+        orders compared. Both of those builds are silent under the same
+        contract, so the right-hand side is not read off the left.
+
+        Single-row, empty, and already-ordered blocks need no special case
+        here: sorting cannot move a row in any of them, so the iff already
+        says they must be silent.
+        """
+        def durations(block):
+            return tuple(row.duration for row in block)
+
+        kept = durations(TemporalBlock([_u(b) for b in beats], sort_rows=False))
+        moved = durations(TemporalBlock([_u(b) for b in beats], sort_rows=True))
+        sorting_moved_a_row = kept != moved
+
+        kwargs = {} if explicit is None else {'sort_rows': explicit}
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            TemporalBlock([_u(b) for b in beats], **kwargs)
+        future = [w for w in caught if issubclass(w.category, FutureWarning)]
+
+        should_warn = (explicit is None) and sorting_moved_a_row
+        assert bool(future) == should_warn, (
+            f"beats={beats} explicit={explicit}: "
+            f"sorting_moved_a_row={sorting_moved_a_row}, "
+            f"warnings={[str(w.message) for w in future]}"
+        )
+        if should_warn:
+            assert 'sort_rows' in str(future[0].message)
+
     def test_behavior_is_unchanged_the_flip_is_deferred(self):
         """R4: warn in 10.18, flip at the next major -- not now."""
         with pytest.warns(FutureWarning):
