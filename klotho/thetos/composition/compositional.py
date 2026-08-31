@@ -19,6 +19,7 @@ the unit.
 from typing import Union, Optional, Any, Literal
 from fractions import Fraction
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 import copy
 import inspect
 import warnings
@@ -122,14 +123,30 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         the tree, so the event is announced as the identity relocation over
         the (unmoved, undestroyed) survivors.
 
-        The owning unit's verbs suppress this: they follow the edit with a
-        richer heal that ABSORBS the new leaves into the spans the ex-leaf
-        anchored (``_heal_slurs_after_subdivide``), and that heal has to see
-        the specs un-stripped.
+        The overlays ABSORB it: the new leaves take the ex-leaf's place in
+        every span it anchored, which is the single policy for every path
+        (Ryan, 2026-08-30 for slurs, 2026-08-31 for control envelopes).
+        There used to be an ``_owner_absorbs_leaf_growth`` flag here, set by
+        ``UC.subdivide``/``UC.graft_subtree`` to SUPPRESS this seam so their
+        own richer heal could absorb instead. That flag existed only because
+        the seam dropped while those two verbs absorbed -- one musical
+        question answered two ways depending on the handle the caller held.
+        With one policy there is nothing left to suppress and the flag is
+        gone.
+
+        The marker is read by ``_relocate_id_keyed_state``: only an
+        announcement from HERE may rebake a control envelope. The same
+        observer is also reached mid-mutation from ``Tree.insert_child``,
+        which announces its relocation BEFORE ``_post_mutation`` runs -- at
+        that moment the new node has no ``metric_duration`` at all and a
+        rebake dies inside ``_compute_timing_cache``. Here, ``super()`` has
+        returned and the metric layer is complete.
         """
-        if getattr(self, '_owner_absorbs_leaf_growth', False):
-            return
-        self._notify_nodes_relocated({n: n for n in self.nodes})
+        self._announcing_leaf_surface = True
+        try:
+            self._notify_nodes_relocated({n: n for n in self.nodes})
+        finally:
+            self._announcing_leaf_surface = False
 
     def subdivide(self, node, S):
         """Subdivide leaf node(s) (see :meth:`RhythmTree.subdivide`),
@@ -161,20 +178,25 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         every child it grew: measured, three slur heads for one slur, and a
         slur left with a head and no tail.
 
-        The guard is on ``was_leaf`` alone. An insert under a node that
-        already had children moves siblings, which the relocation seam
-        already reports, and re-announcing it would cost a full overlay
-        re-derivation per insert for no change.
+        The guard used to be ``was_leaf`` alone, on the reasoning that an
+        insert under a node that already had children moves siblings and the
+        relocation seam reports that. MEASURED FALSE for an APPEND:
+        :meth:`Tree.insert_child` announces a relocation only when a sibling
+        actually shifts, and appending at ``index == len(children)`` shifts
+        nothing. So the second and third of three sequential inserts under
+        one node announced NOTHING, and under the absorb policy that left a
+        stored slur straddling leaves no seam had ever seen -- a spec
+        violating the contiguity ``apply_slur`` enforces, which is the one
+        state this whole mechanism exists to prevent. Every insert announces
+        now; adding a leaf anywhere changes the leaf surface.
 
         ``_has_node``, not ``parent in self``: ``__contains__`` is
         re-definable over a different address space by a subclass, and this
         must address nodes by index. The rule is stated on
         :meth:`~klotho.topos.graphs.core.GraphCore._has_node`.
         """
-        was_leaf = self._has_node(parent) and self.out_degree(parent) == 0
         result = super().insert_child(parent, index, **attr)
-        if was_leaf:
-            self._announce_leaf_surface_change()
+        self._announce_leaf_surface_change()
         return result
 
     def move_subtree(self, node, new_parent):
@@ -194,9 +216,11 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
     # publishes the identity relocation over the SURVIVORS, and
     # ``_notify_nodes_relocated`` reads absence from that mapping as destroyed --
     # so the one seam serves both events and no third mechanism is introduced.
-    # The owning unit's own deleters suppress it via ``_owner_absorbs_leaf_growth``
-    # and run their richer heal instead; these overrides exist for the raw
-    # ``uc._rt.*`` path, which nothing intercepted.
+    # These overrides exist for the raw ``uc._rt.*`` path, which nothing
+    # intercepted. (An earlier comment here said the unit's own deleters
+    # suppressed the seam via ``_owner_absorbs_leaf_growth``; they never set
+    # that flag -- only ``UC.subdivide`` and ``UC.graft_subtree`` did -- and
+    # the flag no longer exists.)
 
     def prune(self, node):
         """Prune a leaf (see :meth:`Tree.prune`), announcing the death so
@@ -2254,32 +2278,13 @@ class CompositionalUnit(TemporalUnit):
                 for segment in segments:
                     self._register_slur(segment)
 
-    def _heal_slurs_after_subdivide(self, old_leaf, new_leaves):
-        for slur_id, spec in list(self._slur_specs.items()):
-            if old_leaf not in spec['leaf_set']:
-                continue
-            old_nodes = list(spec['leaf_nodes'])
-            idx = old_nodes.index(old_leaf)
-            new_nodes = old_nodes[:idx] + list(new_leaves) + old_nodes[idx + 1:]
-            del self._slur_specs[slur_id]
-            rest_set = {n for n in new_nodes if self._rt[n].get('proportion', 1) < 0}
-            segments = self._partition_non_rest_segments(new_nodes, rest_set)
-            for segment in segments:
-                self._register_slur(segment)
-
-    def _heal_envelopes_after_subdivide(self, old_leaf, new_leaves):
-        for desc in self._control_envelopes.values():
-            needs_rebake = False
-            if desc["leaf_subset"] is not None and old_leaf in desc["leaf_subset"]:
-                without_old = self._leaf_subset_subtract(desc["leaf_subset"], {old_leaf})
-                desc["leaf_subset"] = self._leaf_subset_union(without_old, new_leaves)
-                needs_rebake = True
-            elif desc["leaf_subset"] is None:
-                ancestor_set = set(self._rt.descendants(desc["anchor_node"])) | {desc["anchor_node"]}
-                if old_leaf in ancestor_set:
-                    needs_rebake = True
-            if needs_rebake:
-                self._rebake_control_envelope(desc)
+    # ``_heal_slurs_after_subdivide`` and ``_heal_envelopes_after_subdivide``
+    # lived here. They were the ABSORB implementation, reachable from exactly
+    # two verbs; the seam now absorbs on every path, so they became dead the
+    # moment ``_owner_absorbs_leaf_growth`` went. Their logic is not lost --
+    # it is in ``_remap_slur_specs`` and ``_remap_control_envelopes``, with
+    # the five amendments the originals lacked (tie-head snapping, a
+    # foreign-slur split point, dedupe, time ordering, and an atomic rewrite).
 
     def _filter_envelopes_for_rests(self, affected_leaves):
         for env_id, desc in list(self._control_envelopes.items()):
@@ -2358,39 +2363,106 @@ class CompositionalUnit(TemporalUnit):
         }
 
     def _remap_slur_specs(self, mapping):
+        """Follow every slur through a structural edit, ABSORBING growth.
+
+        Ryan's ruling, 2026-08-30: *"if I subdivide a leaf inside a slur
+        group, the subdivisions also participate in the slur. If those
+        subdivs include a rest, we split the slur. Slurs must connect at
+        least two adjacent leaves."* So a member that survived the edit but
+        stopped being a leaf hands its place to the leaves it grew, rather
+        than being dropped -- which is what this function used to do, and
+        what made the raw tree and the owning unit answer one musical
+        question two different ways.
+
+        The whole rewrite is computed into a fresh dict and installed at the
+        end. That is not tidiness: the old code deleted a spec before
+        re-registering its segments, so a mid-heal refusal left the slur
+        simply gone, or half-rewritten under an id the caller never saw
+        (SLUR-A1). Nothing here can raise, and nothing is visible until all
+        of it is.
+        """
         if not self._slur_specs:
             return
-        current_leaves = set(self._rt.leaf_nodes)
-        for slur_id, spec in list(self._slur_specs.items()):
-            moved, seen = [], set()
+        leaf_order = list(self._rt.leaf_nodes)
+        leaf_index = {leaf: i for i, leaf in enumerate(leaf_order)}
+        current_leaves = set(leaf_order)
+
+        # PASS 1 -- resolve members. Absence from the mapping is death;
+        # a survivor that is no longer a leaf is absorbed into what it grew.
+        resolved = {}
+        held = {}
+        for slur_id, spec in self._slur_specs.items():
+            members = []
             for leaf in spec['leaf_nodes']:
                 target = mapping.get(leaf)
-                # a note that stopped being a leaf is no longer slurrable;
-                # `seen` guards a mapping that fuses two old ids into one
-                if target in current_leaves and target not in seen:
-                    seen.add(target)
-                    moved.append(target)
-            # members were relocated INDEPENDENTLY, so their span can now
-            # hold a leaf that was never slurred (an `insert_child` landing
-            # mid-slur). Contiguity is the property that DEFINED the slur
-            # (`apply_slur` refuses anything else), so the remap must not
-            # store its absence: split at every intruder, exactly as
-            # `make_rest` splits at a rest, and let fragments below two
-            # notes dissolve. The intruder is never swallowed -- a slur is
-            # authored by explicit selection, not by an edit landing nearby.
-            segments = self._contiguous_slur_segments(moved)
-            del self._slur_specs[slur_id]
+                if target is None:
+                    continue
+                if target in current_leaves:
+                    members.append(target)
+                    held[target] = slur_id
+                else:
+                    members.extend(self._rt.subtree_leaves(target))
+            resolved[slur_id] = members
+
+        # PASS 2 -- shape each member list into spans ``apply_slur`` could
+        # have authored, then install. ``held`` is complete before any of
+        # this runs, which is what lets a foreign claim act as a split point.
+        rebuilt = {}
+        dissolved = 0
+        next_id = self._next_slur_id
+        for slur_id, members in resolved.items():
+            # a leaf another slur still holds DIRECTLY is a split point, not
+            # a member and not an error (SLUR-A1). Absorbing an ancestor's
+            # span must never swallow a slur drawn inside it: the deeper,
+            # more specific arc keeps its notes.
+            kept, seen = [], set()
+            for node in members:
+                if held.get(node, slur_id) != slur_id or node in seen:
+                    continue
+                seen.add(node)
+                kept.append(node)
+            # tie groups are atomic for slur membership (07_TIES_CHARTER
+            # sect 8): a continuation is part of the head's sound and can
+            # never be a member. ``apply_slur`` snaps; this heal never did,
+            # so a graft could register a continuation and even land
+            # ``_slur_end`` on it (SLUR-A4).
+            kept = [n for n in self._snap_to_tie_heads(kept)
+                    if n in leaf_index and held.get(n, slur_id) == slur_id]
+            # TIME order, not splice order: the effective-PT build marks
+            # ``leaf_nodes[0]`` and ``leaf_nodes[-1]``, so a spec stored out
+            # of order puts the arc's markers on the wrong notes (SLUR-A3).
+            kept.sort(key=leaf_index.__getitem__)
+
+            rest_set = {n for n in kept
+                        if self._rt[n].get('proportion', 1) < 0}
+            segments = []
+            for run in self._partition_non_rest_segments(kept, rest_set):
+                segments.extend(self._contiguous_slur_segments(list(run)))
+
             for i, segment in enumerate(segments):
                 if i == 0:
-                    new_id = slur_id  # an unsplit slur keeps its identity
+                    new_id = slur_id      # an unsplit slur keeps its identity
                 else:
-                    new_id = self._next_slur_id
-                    self._next_slur_id += 1
-                self._slur_specs[new_id] = {
+                    new_id = next_id
+                    next_id += 1
+                rebuilt[new_id] = {
                     'leaf_nodes': tuple(segment),
                     'leaf_set': set(segment),
                     'index_range': tuple(self._selection_index_range(segment)),
                 }
+            if not segments:
+                dissolved += 1
+
+        self._slur_specs = rebuilt
+        self._next_slur_id = next_id
+        if dissolved:
+            # the envelope half has warned on the identical death since it
+            # was written; the slur half died silently (SLUR-B1)
+            warnings.warn(
+                f"Slur removed: fewer than two adjacent sounding leaves "
+                f"remain ({dissolved} slur{'s' if dissolved > 1 else ''})",
+                RuntimeWarning, stacklevel=3
+            )
 
     def _contiguous_slur_segments(self, moved):
         """Partition relocated slur members into spans ``apply_slur`` could
@@ -2427,9 +2499,25 @@ class CompositionalUnit(TemporalUnit):
         return [seg for seg in segments if len(seg) >= 2]
 
     def _remap_control_envelopes(self, mapping):
+        """Follow every control envelope through a structural edit.
+
+        Ryan, 2026-08-31, asked whether control envelopes should absorb the
+        way slurs now do: *"Yes. The overall theme here is 'common sense'
+        and 'reasonable expectations'."* So a target that stopped being a
+        leaf hands its place to the leaves it grew, exactly as a slur member
+        does.
+
+        Absorption is the ONLY rule shared with slurs. An envelope is a
+        curve over a SPAN, not an arc over sounding notes: it does not split
+        at a rest, and one surviving target does not dissolve it. Those are
+        properties of a slur, derived from what a slur IS, and copying them
+        across by symmetry would be a different feature wearing this one's
+        clothes.
+        """
         if not self._control_envelopes:
             return
-        current_leaves = set(self._rt.leaf_nodes)
+        leaf_index = {leaf: i for i, leaf in enumerate(self._rt.leaf_nodes)}
+        touched = []
         for env_id, desc in list(self._control_envelopes.items()):
             anchor = mapping.get(desc["anchor_node"])
             if anchor is None:
@@ -2441,15 +2529,22 @@ class CompositionalUnit(TemporalUnit):
                 continue
             desc["anchor_node"] = anchor
             if desc["leaf_subset"] is None:
+                # anchor-based: targets are re-derived from the subtree on
+                # every resolve, so membership needs no repair -- but the
+                # BAKED values do, and only the UC verbs used to rebake them
+                touched.append(desc)
                 continue
-            # a subset member that stopped being a leaf is no longer a
-            # target (resolution would filter it, but the descriptor must
-            # not keep naming an id the public API could never select --
-            # left behind, it re-attaches when the id is freed and reused)
-            moved = tuple(dict.fromkeys(
-                mapping[n] for n in desc["leaf_subset"]
-                if n in mapping and mapping[n] in current_leaves
-            ))
+            moved, seen = [], set()
+            for n in desc["leaf_subset"]:
+                target = mapping.get(n)
+                if target is None:
+                    continue
+                grown = ((target,) if target in leaf_index
+                         else tuple(self._rt.subtree_leaves(target)))
+                for g in grown:
+                    if g in leaf_index and g not in seen:
+                        seen.add(g)
+                        moved.append(g)
             if not moved:
                 warnings.warn(
                     "Control envelope removed: all target leaves were destroyed",
@@ -2457,7 +2552,74 @@ class CompositionalUnit(TemporalUnit):
                 )
                 del self._control_envelopes[env_id]
                 continue
-            desc["leaf_subset"] = moved
+            # time order, so the stored subset reads as the span it is
+            moved.sort(key=leaf_index.__getitem__)
+            desc["leaf_subset"] = tuple(moved)
+            touched.append(desc)
+        if touched:
+            self._queue_envelope_rebakes(touched)
+
+    def _queue_envelope_rebakes(self, descriptors):
+        """Rebake now, or after the caller's last node-data write.
+
+        A rebake WRITES pfields. ``UC.subdivide`` copies the ex-leaf's
+        pfields onto every new child AFTER the structural edit -- i.e. after
+        this seam has already run -- so a rebake here would be overwritten
+        by that copy and the envelope would silently flatten. The unit's own
+        verbs therefore hold the rebake open until they have finished
+        writing; a raw ``uc._rt.*`` edit has no such tail and rebakes at
+        once.
+
+        Rebaking is gated on the leaf-surface announcement. The same
+        observer is reached mid-mutation from :meth:`Tree.insert_child`,
+        which announces BEFORE ``_post_mutation`` has written
+        ``metric_duration`` for the new node -- a rebake there dies inside
+        ``_compute_timing_cache``. (``_relocate_id_keyed_state`` used to
+        blame a stale timing cache for this; measured, the cache keying is
+        correct -- it tests ``_timing_cache_version != _structure_version``
+        -- and the real hazard is the missing metric layer at that other
+        seam.)
+        """
+        if not getattr(self._rt, '_announcing_leaf_surface', False):
+            return
+        pending = getattr(self, '_pending_envelope_rebakes', None)
+        if pending is None:
+            pending = []
+            self._pending_envelope_rebakes = pending
+        for desc in descriptors:
+            if not any(desc is held for held in pending):
+                pending.append(desc)
+        if not getattr(self, '_rebake_deferral_depth', 0):
+            self._flush_envelope_rebakes()
+
+    def _flush_envelope_rebakes(self):
+        """Rebake every queued envelope once, after all splicing is done.
+
+        Once, and at the end: a rebake bumps ``_structure_version``, which
+        invalidates the timing cache it just read. Timings are provably
+        unchanged across that bump, so interleaving rebakes with splices is
+        a cost rather than a correctness bug -- one full timing recompute
+        per envelope instead of one for all of them.
+        """
+        pending = getattr(self, '_pending_envelope_rebakes', None)
+        if not pending:
+            return
+        self._pending_envelope_rebakes = []
+        live = list(self._control_envelopes.values())
+        for desc in pending:
+            if any(desc is held for held in live):
+                self._rebake_control_envelope(desc)
+
+    @contextmanager
+    def _deferred_envelope_rebakes(self):
+        """Hold rebakes open across a verb that still has node writes to make."""
+        self._rebake_deferral_depth = getattr(self, '_rebake_deferral_depth', 0) + 1
+        try:
+            yield
+        finally:
+            self._rebake_deferral_depth -= 1
+            if not self._rebake_deferral_depth:
+                self._flush_envelope_rebakes()
 
     def make_rest(self, node) -> None:
         """
@@ -2540,24 +2702,20 @@ class CompositionalUnit(TemporalUnit):
         mfields = {k: v for k, v in parent_data.items()
                    if k in self._rt.mfield_names and not isinstance(v, Bind)}
 
-        # this verb absorbs the new leaves into the spans below, so the
-        # tree's own leaf-surface seam must not strip them first
-        self._rt._owner_absorbs_leaf_growth = True
-        try:
+        # The tree's own leaf-surface seam absorbs the new leaves into every
+        # span the ex-leaf anchored, so this verb no longer heals anything
+        # itself -- it only has to hold the envelope REBAKE open until the
+        # pfield copy below is done, or the copy would overwrite the values
+        # the rebake just wrote.
+        with self._deferred_envelope_rebakes():
             self._rt.subdivide(node, S)
-        finally:
-            self._rt._owner_absorbs_leaf_growth = False
-        self._invalidate_timing_cache()
-        new_children = list(self._rt.successors(node))
-        for child in new_children:
-            if pfields:
-                self._rt.set_pfields(child, **pfields)
-            if mfields:
-                self._rt.set_mfields(child, **mfields)
-
-        new_leaves = list(self._rt.subtree_leaves(node))
-        self._heal_slurs_after_subdivide(node, new_leaves)
-        self._heal_envelopes_after_subdivide(node, new_leaves)
+            self._invalidate_timing_cache()
+            new_children = list(self._rt.successors(node))
+            for child in new_children:
+                if pfields:
+                    self._rt.set_pfields(child, **pfields)
+                if mfields:
+                    self._rt.set_mfields(child, **mfields)
 
     def graft_subtree(self, node: int, subtree, mode: str = 'replace'):
         """Graft *subtree* at a leaf, healing slurs and control envelopes.
@@ -2567,17 +2725,9 @@ class CompositionalUnit(TemporalUnit):
         exactly as :meth:`subdivide` does. Without it the two ways of adding
         structure agree about parameters but not about slurs.
         """
-        # this verb absorbs the new leaves into the spans below, so the
-        # tree's own leaf-surface seam must not strip them first
-        self._rt._owner_absorbs_leaf_growth = True
-        try:
+        with self._deferred_envelope_rebakes():
             result = self._rt.graft_subtree(node, subtree, mode)
-        finally:
-            self._rt._owner_absorbs_leaf_growth = False
-        self._invalidate_timing_cache()
-        new_leaves = list(self._rt.subtree_leaves(result))
-        self._heal_slurs_after_subdivide(result, new_leaves)
-        self._heal_envelopes_after_subdivide(result, new_leaves)
+            self._invalidate_timing_cache()
         return result
 
     def add_child(self, parent, **attr):

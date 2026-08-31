@@ -163,53 +163,75 @@ class TestAFreedIdIsNotInheritedByItsSuccessor:
             'the new note re-used the destroyed note\'s memoized draw')
 
 
-class TestALeafThatStoppedBeingALeafDropsItsOverlays:
+class TestALeafThatStoppedBeingALeafAbsorbsItsOverlays:
     """The THIRD event, through ``move_subtree``.
 
-    ``CompositionalTree`` announces this for ``subdivide`` and
-    ``graft_subtree``. ``move_subtree`` produces the same state -- the
-    target keeps its id and stops being a leaf -- and is a supported path
-    (``tests/test_timing_cache_staleness.py`` exercises it).
+    ``move_subtree`` produces the same state as ``subdivide`` -- the target
+    keeps its id and stops being a leaf -- and Ryan ruled on it by name on
+    2026-08-30: **moved-in music JOINS the slur**, same policy as
+    ``graft_subtree``, with no special case for where the content came
+    from. The slurred note's time span is occupied by that music and the arc
+    covers what sounds there.
+
+    So the class was renamed and two of its three tests inverted. What
+    HAD-QA-3 recorded as the corruption -- "a slur ending on the note that
+    moved in" -- is the correct OUTCOME under the ruling. What was genuinely
+    wrong was the mechanism: a stale spec naming an interior node, markers
+    inheriting onto every child, three heads for one slur, and the overlap
+    check defeated. Absorb gives that same membership with one head and one
+    tail, which is what the first test below now checks.
     """
 
-    def test_move_subtree_drops_the_ex_leaf_from_the_slur(self):
+    def test_move_subtree_absorbs_the_ex_leaf_into_the_slur(self):
+        """The ex-leaf is replaced by its new leaf surface, not dropped."""
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         uc.apply_slur(node=[L[0], L[1]])
         uc._rt.move_subtree(L[4], L[1])    # L[1] gains a child
         leaves = set(uc._rt.leaf_nodes)
-        for slur_id, spec in uc._slur_specs.items():
-            interior = [n for n in spec['leaf_nodes'] if n not in leaves]
-            assert interior == [], (
-                f'slur {slur_id} still names {interior}, which is interior now')
+        (spec,) = uc._slur_specs.values()
+        interior = [n for n in spec['leaf_nodes'] if n not in leaves]
+        assert interior == [], f'the slur still names {interior}, interior now'
+        assert spec['leaf_nodes'] == (L[0],) + tuple(uc._rt.subtree_leaves(L[1]))
 
-    def test_move_subtree_does_not_slur_the_note_that_moved_in(self):
+    def test_move_subtree_absorbs_the_note_that_moved_in(self):
+        """INVERTED by the ruling, and it is the sharpest case of it.
+
+        The note that moved in IS the ex-leaf's new leaf surface. Under DROP
+        the whole slur dissolved, which is why this test used to pass
+        vacuously through its ``return`` guard -- there was no ``_slur_id``
+        column at all. Now the arc survives with exactly one head and one
+        tail, and the tail is on the note that moved in.
+        """
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         uc.apply_slur(node=[L[0], L[1]])
-        moved = L[4]
-        uc._rt.move_subtree(moved, L[1])
+        uc._rt.move_subtree(L[4], L[1])
         events = uc.events
-        if '_slur_id' not in events.columns:
-            return                          # the slur dissolved entirely
+        assert '_slur_id' in events.columns, 'the slur must survive absorption'
         marked = {row['tag'] for _, row in events.iterrows()
                   if row['_slur_id'] == row['_slur_id']}   # not NaN
-        assert 'e4' not in marked, (
-            'the note that moved under the ex-leaf is inside a slur it was '
-            'never part of')
+        assert marked == {'e0', 'e4'}
+        heads = [r['tag'] for _, r in events.iterrows() if r['_slur_start'] == 1.0]
+        tails = [r['tag'] for _, r in events.iterrows() if r['_slur_end'] == 1.0]
+        assert heads == ['e0'] and tails == ['e4']
 
-    def test_move_subtree_drops_the_ex_leaf_from_envelope_subsets(self):
+    def test_move_subtree_absorbs_the_ex_leaf_into_envelope_subsets(self):
+        """Strengthened: the old form passed under BOTH policies.
+
+        ``interior == []`` is satisfied by dropping the ex-leaf and by
+        substituting its new leaves for it, so it never tested the policy.
+        """
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         _envelope_on(uc, L[0:2])
         uc._rt.move_subtree(L[4], L[1])
         leaves = set(uc._rt.leaf_nodes)
-        for env_id, desc in uc._control_envelopes.items():
-            if desc['leaf_subset'] is None:
-                continue
-            interior = [n for n in desc['leaf_subset'] if n not in leaves]
-            assert interior == [], (
-                f'envelope {env_id} still targets {interior}, interior now')
+        (desc,) = uc._control_envelopes.values()
+        assert desc['leaf_subset'] is not None
+        interior = [n for n in desc['leaf_subset'] if n not in leaves]
+        assert interior == [], f'the envelope still targets {interior}'
+        assert desc['leaf_subset'] == (L[0],) + tuple(uc._rt.subtree_leaves(L[1]))
 
 
 REBUILD_CASES = [

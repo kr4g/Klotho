@@ -52,44 +52,67 @@ def _marked(uc, column):
 class TestLeafStopsBeingALeaf:
     """C-1: raw-tree subdivide/graft must announce the leaf-surface change."""
 
-    def test_raw_subdivide_does_not_inherit_the_slur_onto_the_new_subtree(self):
+    def test_raw_subdivide_absorbs_the_new_leaves_into_the_slur(self):
+        """FLIPPED by Ryan's ruling of 2026-08-30: the policy is ABSORB.
+
+        This test asserted DROP, which is the choice `eb03bd4` shipped and
+        the ruling overrules. The subdivided note is interior and so cannot
+        itself be a member -- that part never changed -- but the three
+        children it grew take its place rather than the slur dissolving.
+        """
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         uc.apply_slur([L[1], L[2]])
 
         uc._rt.subdivide(L[1], (1, 1, 1))
 
-        # the subdivided note is interior now: it cannot be slurred, and its
-        # marker must not fan out over the three children it grew
-        assert _marked(uc, '_slur_start') == []
-        # ...and with one member gone the slur is below two notes: it dissolves
-        assert uc._slur_specs == {}
+        (spec,) = uc._slur_specs.values()
+        assert L[1] not in spec['leaf_nodes'], 'a non-leaf is never a member'
+        assert spec['leaf_nodes'] == tuple(uc._rt.subtree_leaves(L[1])) + (L[2],)
+        # the children inherit the ex-leaf's freq, so the head reads as 200
+        assert _marked(uc, '_slur_start') == [200.0]
+        assert _marked(uc, '_slur_end') == [300.0]
 
-    def test_raw_subdivide_at_the_slur_edge_keeps_the_still_leaf_members(self):
+    def test_raw_subdivide_at_the_slur_edge_extends_the_arc_onto_the_new_leaves(self):
+        """FLIPPED with the one above. The tail EXTENDS, it does not retreat.
+
+        Growing children under the slur's LAST member used to shorten the
+        arc to the survivors; under ABSORB the arc reaches the last child of
+        what the member grew.
+        """
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         uc.apply_slur([L[1], L[2], L[3]])
 
         uc._rt.subdivide(L[3], (1, 1))
 
-        # the two members still on the leaf surface stay slurred; nothing
-        # else does
-        assert _marked(uc, '_slur_start') == [200.0]
-        assert _marked(uc, '_slur_end') == [300.0]
         (spec,) = uc._slur_specs.values()
-        assert spec['leaf_nodes'] == (L[1], L[2])
+        assert spec['leaf_nodes'] == (L[1], L[2]) + tuple(uc._rt.subtree_leaves(L[3]))
+        assert _marked(uc, '_slur_start') == [200.0]
+        # the tail is now the LAST child of the ex-leaf, which inherited 400
+        assert _marked(uc, '_slur_end') == [400.0]
 
-    def test_raw_graft_does_not_inherit_the_slur_onto_the_new_subtree(self):
+    def test_raw_graft_absorbs_the_grafted_leaves_into_the_slur(self):
+        """FLIPPED with the two above -- graft and subdivide are one policy."""
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         uc.apply_slur([L[1], L[2]])
 
         uc._rt.graft_subtree(L[1], RhythmTree(meas='1/4', subdivisions=(1, 1)))
 
-        assert _marked(uc, '_slur_start') == []
-        assert uc._slur_specs == {}
+        (spec,) = uc._slur_specs.values()
+        assert spec['leaf_nodes'] == tuple(uc._rt.subtree_leaves(L[1])) + (L[2],)
+        assert _marked(uc, '_slur_start') == [200.0]
+        assert _marked(uc, '_slur_end') == [300.0]
 
-    def test_raw_subdivide_drops_the_ex_leaf_from_envelope_subsets(self):
+    def test_raw_subdivide_absorbs_the_new_leaves_into_envelope_subsets(self):
+        """Strengthened, not merely renamed.
+
+        The old assertion was ``L[1] not in desc['leaf_subset']``, which
+        DROP and ABSORB both satisfy -- absorption substitutes the new
+        leaves for the ex-leaf, so the ex-leaf is absent either way. It
+        proved nothing about the policy. The positive form does.
+        """
         uc = _tagged()
         L = list(uc._rt.leaf_nodes)
         uc.apply_envelope(Envelope([0.0, 1.0], times=[2.0]), 'freq',
@@ -97,10 +120,9 @@ class TestLeafStopsBeingALeaf:
 
         uc._rt.subdivide(L[1], (1, 1, 1))
 
-        # the descriptor must not keep naming an id the public API could
-        # never have selected as a target
         (desc,) = uc._control_envelopes.values()
-        assert L[1] not in desc['leaf_subset']
+        assert L[1] not in desc['leaf_subset'], 'a non-leaf is never a target'
+        assert desc['leaf_subset'] == (L[0],) + tuple(uc._rt.subtree_leaves(L[1]))
 
     def test_uc_verb_still_absorbs_the_new_leaves(self):
         """The owning verb's richer heal must be untouched by the seam."""
