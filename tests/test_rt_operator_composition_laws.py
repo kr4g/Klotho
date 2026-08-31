@@ -105,8 +105,7 @@ anyone auditing these tests later.
       drops the tie marker)
 """
 
-# FILE PREAMBLE shared by PROP-RT-01..14 (one file). Complete staged file:
-# /private/tmp/claude-501/-Users-ryanmillett-Klotho/4ac9fcbe-cdc9-42ca-a15e-b71c843ac732/scratchpad/test_rt_operator_composition_laws.py
+# FILE PREAMBLE shared by PROP-RT-01..14 (one file).
 from fractions import Fraction
 import pytest
 from klotho.chronos.rhythm_trees import Meas, RhythmTree
