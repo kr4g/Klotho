@@ -599,3 +599,67 @@ class TestBothOverlaysHealOneEditTheSameWay:
 
         (desc,) = uc._control_envelopes.values()
         uc._resolve_leaf_selection(list(desc['leaf_subset']))   # raises if not
+
+
+class TestTheGrownInsideRuleIsDecidedByMusicNotByShape:
+    """Two defects the adversarial pass found in the grown-inside rule.
+
+    Both are the same failure in different clothes: an answer decided by
+    something the composer cannot see. That is the failure SLUR-1 exists to
+    remove, so finding it INSIDE SLUR-1's own new rule is worth pinning
+    rather than merely fixing.
+    """
+
+    def test_a_rest_outside_the_arc_does_not_destroy_it(self):
+        """A rest can never be a member, so requiring it to be covered was a
+        test nothing could pass.
+
+        The cost was not a missed absorption. The newcomer then read as an
+        intruder, the arc split into two one-note runs, and both were
+        discarded -- so a rest sitting outside the arc entirely destroyed a
+        slur the composer had authored.
+        """
+        uc = UC(tempus='4/4', prolatio=(1, (3, (1, 1, -1))), bpm=60)
+        L = list(uc._rt.leaf_nodes)
+        sounding = [n for n in L if uc._rt[n].get('proportion', 1) >= 0][1:]
+        assert len(sounding) == 2, 'fixture must slur both sounding leaves'
+        uc.apply_slur(sounding)
+        parent = uc._rt.parent(sounding[0])
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            uc._rt.insert_child(parent, 1, proportion=1)
+
+        assert uc._slur_specs, (
+            'a rest outside the arc destroyed it: '
+            f'{[str(w.message) for w in caught]}')
+        (spec,) = uc._slur_specs.values()
+        assert len(spec['leaf_nodes']) == 3, (
+            'the new note is inside music the arc covers, so it joins')
+
+    def test_the_same_music_answers_the_same_whether_or_not_it_is_wrapped(self):
+        """``(1,1,1,1)`` and ``((4,(1,1,1,1)),)`` are the same four beats.
+
+        They have identical onsets, durations and proportions; the only
+        difference is a wrapper node. An earlier version of the rule skipped
+        absorption when the newcomer's parent was the root, so the flat tree
+        split one authored arc into two and the wrapped tree kept it whole --
+        one musical question, two answers, decided by where the brackets
+        happened to fall.
+        """
+        shapes = {}
+        for label, prolatio in (('flat', (1, 1, 1, 1)),
+                                ('wrapped', ((4, (1, 1, 1, 1)),))):
+            uc = UC(tempus='4/4', prolatio=prolatio, bpm=60)
+            L = list(uc._rt.leaf_nodes)
+            uc.apply_slur(list(L))
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                uc._rt.insert_child(uc._rt.parent(L[1]), 1, proportion=1)
+            shapes[label] = sorted(len(s['leaf_nodes'])
+                                   for s in uc._slur_specs.values())
+
+        assert shapes['flat'] == shapes['wrapped'], (
+            f'the same music answered differently: {shapes}')
+        assert shapes['flat'] == [5], (
+            'the arc covered every beat, so a beat added among them joins it')
