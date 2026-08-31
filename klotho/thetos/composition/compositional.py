@@ -2328,27 +2328,63 @@ class CompositionalUnit(TemporalUnit):
                 out.append(h)
         return type(selected)(out) if isinstance(selected, tuple) else out
 
+    def _reshape_slur(self, slur_id, segments):
+        """Install the segments one arc became, under ONE identity rule.
+
+        The first surviving segment keeps the id ``apply_slur`` returned;
+        only genuine fragments mint. That is the rule ``_remap_slur_specs``
+        applies, and these two pre-heals used to contradict it -- they
+        deleted the spec and re-registered every segment, so an arc that
+        merely lost a member came back under a NEW id through
+        ``uc.prune``/``uc.remove_subtree`` while the identical edit through
+        ``uc._rt.prune`` preserved it. ``_slur_id`` is not internal:
+        ``apply_slur`` returns it, it is a column of ``uc.events``, and the
+        lowering keys voice pooling and slur teardown on it, so a caller
+        holding the documented handle simply lost the arc.
+
+        Computed whole, installed at the end, for the same reason the seam
+        is: a refusal partway through must not leave a half-rewritten spec
+        under an id the caller never saw (SLUR-A1).
+        """
+        rebuilt = {}
+        next_id = self._next_slur_id
+        for i, segment in enumerate(segments):
+            if i == 0:
+                new_id = slur_id
+            else:
+                new_id = next_id
+                next_id += 1
+            rebuilt[new_id] = {
+                'leaf_nodes': tuple(segment),
+                'leaf_set': set(segment),
+                'index_range': tuple(self._selection_index_range(segment)),
+            }
+        del self._slur_specs[slur_id]
+        self._slur_specs.update(rebuilt)
+        self._next_slur_id = next_id
+        if not segments:
+            warnings.warn(
+                "Slur removed: fewer than two adjacent sounding leaves remain",
+                RuntimeWarning, stacklevel=4
+            )
+
     def _split_slurs_for_rests(self, nodes_to_rest: set[int]):
         for slur_id, spec in list(self._slur_specs.items()):
             if not spec['leaf_set'].intersection(nodes_to_rest):
                 continue
-            leaves = list(spec['leaf_nodes'])
-            segments = self._partition_non_rest_segments(leaves, nodes_to_rest)
-            del self._slur_specs[slur_id]
-            for segment in segments:
-                self._register_slur(segment)
+            segments = self._partition_non_rest_segments(
+                list(spec['leaf_nodes']), nodes_to_rest)
+            self._reshape_slur(slur_id, segments)
 
     def _invalidate_slurs_for_removed_nodes(self, removed_set):
         for slur_id, spec in list(self._slur_specs.items()):
             if not spec['leaf_set'].intersection(removed_set):
                 continue
             remaining = [n for n in spec['leaf_nodes'] if n not in removed_set]
-            del self._slur_specs[slur_id]
-            if len(remaining) >= 2:
-                rest_set = {n for n in remaining if self._rt[n].get('proportion', 1) < 0}
-                segments = self._partition_non_rest_segments(remaining, rest_set)
-                for segment in segments:
-                    self._register_slur(segment)
+            rest_set = {n for n in remaining
+                        if self._rt[n].get('proportion', 1) < 0}
+            segments = self._partition_non_rest_segments(remaining, rest_set)
+            self._reshape_slur(slur_id, segments)
 
     # ``_heal_slurs_after_subdivide`` and ``_heal_envelopes_after_subdivide``
     # lived here. They were the ABSORB implementation, reachable from exactly
@@ -2427,7 +2463,7 @@ class CompositionalUnit(TemporalUnit):
         ``_timing_cache_version != _rt._structure_version`` -- and the real
         hazard is that this same observer is ALSO reached mid-mutation, from
         ``Tree.insert_child`` before ``_post_mutation`` runs and from
-        ``RhythmTree._rebuild_from_decomposed`` before it writes node data.
+        ``RhythmTree._respell`` before it writes node data.
         At those two moments the new nodes have no metric layer at all and a
         rebake dies inside ``_compute_timing_cache``. That is what the
         announcement gate is for.)

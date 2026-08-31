@@ -330,6 +330,34 @@ class TestSlurIdentityHasOneRule:
             f'{door}: the arc neither split nor dissolved, so the id the '
             f'caller was handed must still name it')
 
+    @pytest.mark.parametrize('door, kill', [
+        ('uc._rt.prune', lambda uc, L: uc._rt.prune(L[2])),
+        ('uc.prune', lambda uc, L: uc.prune(L[2])),
+        ('uc._rt.remove_subtree', lambda uc, L: uc._rt.remove_subtree(L[2])),
+        ('uc.remove_subtree', lambda uc, L: uc.remove_subtree(L[2])),
+    ])
+    def test_losing_a_member_keeps_the_id_on_every_death_door(self, door, kill):
+        """The identity rule has to hold on the DEATH paths too.
+
+        SLUR-1 first declared this closed after unifying the seam, and it
+        was not: ``UC.prune``/``UC.remove_subtree`` never reach that seam --
+        they pre-heal through ``_invalidate_slurs_for_removed_nodes``, which
+        still deleted and re-registered. Measured, the identical edit gave
+        id 0 through the raw door and id 1 through the UC door, so a caller
+        holding the id ``apply_slur`` returned lost the arc.
+        """
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=60)
+        L = list(uc._rt.leaf_nodes)
+        slur_id = uc.apply_slur([L[1], L[2], L[3]])
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            kill(uc, L)
+
+        assert list(uc._slur_specs) == [slur_id], (
+            f'{door}: the arc lost one member and came back as ONE arc, so '
+            f'the id the caller was handed must still name it')
+
     def test_a_split_mints_only_the_later_fragments(self):
         uc = UC(tempus='4/4', prolatio=(1,) * 6, bpm=60)
         L = list(uc._rt.leaf_nodes)
