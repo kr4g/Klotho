@@ -358,3 +358,39 @@ class TestTheStructuralHealSplitsToo:
             instruments = [uc.get_instrument(n) for n in resolved]
             assert len(set(map(repr, instruments))) <= 1, (
                 f'envelope {env_id} spans {instruments}')
+
+
+class TestTheDocumentedRoundTripSurvivesASplit:
+    """``eid = uc.apply_envelope(..., control=True)`` then later
+    ``uc.remove_envelope(eid)`` is the documented idiom. The split made
+    ``apply_envelope`` return a LIST whenever the span happened to cross an
+    instrument change, and ``remove_envelope`` raised
+    ``TypeError: unhashable type: 'list'`` on the handle it had just been
+    given.
+
+    A caller cannot be expected to know in advance whether their span crosses
+    a change, so the round trip has to work either way.
+    """
+
+    def test_a_split_handle_can_be_removed(self):
+        uc, leaves = _four_beats({'amp': 0.1})
+        _bind(uc, leaves, 'kl_saw', 'kl_saw', 'kl_tri', 'kl_tri')
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            handle = uc.apply_envelope(Envelope([0., 1.], times=[2.]), 'amp',
+                                       node=leaves, control=True)
+            uc.remove_envelope(handle)
+
+        assert uc._control_envelopes == {}
+        assert list(uc.events['amp']) == [0.1] * 4
+
+    def test_an_unsplit_handle_is_still_a_bare_id(self):
+        """The common case must not grow a list wrapper."""
+        uc, leaves = _four_beats({'amp': 0.1})
+        _bind(uc, leaves, 'kl_saw', 'kl_saw', 'kl_saw', 'kl_saw')
+        handle = uc.apply_envelope(Envelope([0., 1.], times=[2.]), 'amp',
+                                   node=leaves, control=True)
+
+        assert isinstance(handle, int)
+        uc.remove_envelope(handle)
+        assert uc._control_envelopes == {}

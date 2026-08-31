@@ -2317,7 +2317,7 @@ class CompositionalUnit(TemporalUnit):
             })
         return result
 
-    def remove_envelope(self, env_id: int) -> None:
+    def remove_envelope(self, env_id) -> None:
         """
         Remove a previously-applied control envelope by handle.
 
@@ -2328,14 +2328,24 @@ class CompositionalUnit(TemporalUnit):
 
         Parameters
         ----------
-        env_id : int
+        env_id : int or iterable of int
             The identifier returned by ``apply_envelope(..., control=True)``.
+            A LIST is accepted because ``apply_envelope`` returns one when the
+            selection crosses an instrument change and the envelope splits:
+            the documented round trip -- keep the handle, remove it later --
+            has to keep working when the split happens, and a caller cannot
+            be expected to know in advance whether their span crosses a
+            change. Removing a list removes every part of that one gesture.
 
         Raises
         ------
         KeyError
             If ``env_id`` is not a live envelope handle on this UC.
         """
+        if isinstance(env_id, (list, tuple, set, frozenset)):
+            for one in list(env_id):
+                self.remove_envelope(one)
+            return
         if env_id not in self._control_envelopes:
             raise KeyError(f"No control envelope with id {env_id}")
         desc = self._control_envelopes.pop(env_id)
