@@ -2025,8 +2025,14 @@ class CompositionalUnit(TemporalUnit):
         envelope : Envelope
             Envelope specification to apply.
         pfields : Union[str, list]
-            Target parameter field(s). Overlap is allowed across different fields
-            but rejected for overlapping spans on the same field.
+            Target parameter field(s). Overlap is allowed across different
+            fields. Two overlapping spans on the SAME field are rejected only
+            when ``control=True``; with ``control=False`` the later
+            application simply overwrites the earlier one. That asymmetry is
+            deliberate: a baked envelope writes its values once and is done,
+            so two of them resolve last-write-wins, which is well defined.
+            Two CONTROL envelopes on one field and span are two live signals
+            driving one parameter, which is not.
         node : int | list | tuple | set
             Node selector. A single node resolves to subtree leaves. An iterable
             can be treated either as one combined span (``scope="span"``) or as
@@ -2051,16 +2057,19 @@ class CompositionalUnit(TemporalUnit):
             
         Returns
         -------
-        int | list[int]
-            Envelope identifier, or list of identifiers when
-            ``scope="per_node"``. In per-node scope, the return value is
-            always a list.
+        int | list[int] | None
+            With ``control=True``: the envelope identifier, or a list of them
+            when ``scope="per_node"`` (per-node scope always returns a list).
+            With ``control=False`` (the default) the envelope is baked into
+            the pfield values and there is no identifier to hand back, so the
+            return is ``None``.
 
         Raises
         ------
         ValueError
-            If selection is invalid/non-contiguous, offset/take overflows
-            bounds, a same-pfield overlap is detected, or scope is invalid.
+            If the selection is invalid or non-contiguous, ``offset``/``take``
+            overflows the bounds, ``scope`` is invalid, or -- **only when
+            ``control=True``** -- a same-pfield overlap is detected.
         """
         pfields_list = pfields if isinstance(pfields, list) else [pfields]
         apply_fn = self._record_control_envelope if control else self._bake_envelope

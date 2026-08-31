@@ -33,6 +33,26 @@ means something. There are two kinds available:
 When you report the suite, report both. *"7,362 green"* is a statement about
 regression only.
 
+### How to say it, in plain English
+
+Earlier versions of this file asked for a close line reading *"correctness
+coverage is F figures and P invariants"*. That was jargon, and the project
+owner said so: the letters meant nothing to the person the report is for, and
+`P` was quoted with three different values in one document because nobody had
+written down how to count it. **Do not use the letters.** Say it plainly, and
+name the files so the numbers can be checked:
+
+> 7,661 tests pass. 34 of those check correctness against something outside
+> Klotho -- 5 against Haddad's printed figures
+> (`test_haddad_figure_conformance.py`), 29 against rules that hold by
+> definition (`test_rt_operator_composition_laws.py`,
+> `test_container_algebra_properties.py`). The rest check that behaviour has
+> not changed.
+
+Both numbers are countable from named files, which is the whole point: a
+figure you can `grep` cannot drift, and a classifier over test source can --
+one was wrong five times running before it was abandoned.
+
 ## The four provenance tiers
 
 Every expected value should be traceable to one of these. Prefer the top.
