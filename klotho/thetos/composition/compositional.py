@@ -19,6 +19,7 @@ the unit.
 from typing import Union, Optional, Any, Literal
 from fractions import Fraction
 from dataclasses import dataclass, field
+import copy
 import inspect
 import warnings
 import weakref
@@ -144,6 +145,36 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         now-interior node."""
         result = super().graft_subtree(target_node, subtree, mode)
         self._announce_leaf_surface_change()
+        return result
+
+    def insert_child(self, parent, index, **attr):
+        """Insert a child (see :meth:`Tree.insert_child`), announcing the
+        leaf-surface change when *parent* was a LEAF.
+
+        The third door, and the one that had none. Neither shipped seam
+        fires for an insert into a childless leaf: the node is still in the
+        tree, so DEATH's ``n not in tree`` test is false, and
+        :meth:`Tree.insert_child` announces a relocation only when a sibling
+        actually shifted -- an insert into a node with no children shifts
+        nothing, so nothing at all was announced. The overlays went on
+        naming a node that is interior now, and their markers inherited onto
+        every child it grew: measured, three slur heads for one slur, and a
+        slur left with a head and no tail.
+
+        The guard is on ``was_leaf`` alone. An insert under a node that
+        already had children moves siblings, which the relocation seam
+        already reports, and re-announcing it would cost a full overlay
+        re-derivation per insert for no change.
+
+        ``_has_node``, not ``parent in self``: ``__contains__`` is
+        re-definable over a different address space by a subclass, and this
+        must address nodes by index. The rule is stated on
+        :meth:`~klotho.topos.graphs.core.GraphCore._has_node`.
+        """
+        was_leaf = self._has_node(parent) and self.out_degree(parent) == 0
+        result = super().insert_child(parent, index, **attr)
+        if was_leaf:
+            self._announce_leaf_surface_change()
         return result
 
     def move_subtree(self, node, new_parent):
@@ -2899,6 +2930,39 @@ class CompositionalUnit(TemporalUnit):
 
         return new_cu
     
+    def __deepcopy__(self, memo):
+        """Deep-copy the unit, then REBIND its id-state observer.
+
+        :meth:`~klotho.topos.graphs.trees.Tree.__deepcopy__` clears the
+        observer deliberately, and the rule is written on
+        :meth:`~klotho.topos.graphs.trees.Tree.set_id_state_observer`:
+        "A clone gets NO observer: it belongs to a different owner, which
+        rebinds itself." This unit IS that owner. Three routes already
+        rebind -- the constructor, :meth:`copy` and :meth:`_copy_rebuild`,
+        which also backs :meth:`from_subtree` -- and ``copy.deepcopy`` was
+        the fourth with no rebinder, so the clone's ``_slur_specs``,
+        ``_bind_memo`` and ``_control_envelopes`` stopped following their
+        content. rustworkx reuses freed node ids, so a stale entry does not
+        leak: it re-attaches to whatever later lands in the slot, and a slur
+        reaches playback on a note that did not exist when it was drawn.
+
+        The copy itself is the default one -- every attribute deep-copied
+        into a blank instance, with *memo* seeded first so cycles and shared
+        references resolve exactly as they did before. Only the rebinding is
+        added.
+
+        Written at the UNIT level, not on ``Tree``: carrying the observer
+        through ``Tree.__deepcopy__`` would break the bare-tree contract that
+        ``test_a_clone_carries_no_observer`` pins.
+        """
+        cls = self.__class__
+        clone = cls.__new__(cls)
+        memo[id(self)] = clone
+        for key, value in self.__dict__.items():
+            clone.__dict__[key] = copy.deepcopy(value, memo)
+        clone._rt.set_id_state_observer(clone._relocate_id_keyed_state)
+        return clone
+
     def copy(self):
         """
         Create a deep copy of this CompositionalUnit.
