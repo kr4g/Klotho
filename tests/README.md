@@ -42,7 +42,7 @@ owner said so: the letters meant nothing to the person the report is for, and
 written down how to count it. **Do not use the letters.** Say it plainly, and
 name the files so the numbers can be checked:
 
-> 7,661 tests pass. 34 of those check correctness against something outside
+> 7,694 tests pass. 34 of those check correctness against something outside
 > Klotho -- 5 against Haddad's printed figures
 > (`test_haddad_figure_conformance.py`), 29 against rules that hold by
 > definition (`test_rt_operator_composition_laws.py`,
@@ -52,6 +52,29 @@ name the files so the numbers can be checked:
 Both numbers are countable from named files, which is the whole point: a
 figure you can `grep` cannot drift, and a classifier over test source can --
 one was wrong five times running before it was abandoned.
+
+### A third kind, when a test is written AFTER its fix
+
+Sometimes the fix lands first -- a client ruling reverses a shipped choice, and
+the pins for it can only be written afterwards. A test written that way passes
+on its first run whatever it asserts, so it carries no evidence at all until
+someone shows it can fail.
+
+The answer is a **mutation table in the test module's own docstring**: for each
+test, the single edit to the source that turns it red, and what the red says.
+Every line of such a table must be RUN, not reasoned -- `test_overlay_absorb_
+amendments.py` is the worked example, and writing it changed the code twice.
+Two mutations in its first draft left their test GREEN, because the property
+each guarded was enforced at two independent places and removing one left the
+other doing the work. One of those was accidental duplication and was
+collapsed to a single definition; the other was two genuinely different
+enforcers, and the table now names both and says why. A third entry turned out
+to prove nothing because its fixture did not contain the feature under test.
+
+None of that would have been visible from a green run.
+
+The table lives in the module, never in a session handoff: `projects/` is
+gitignored, so a tracked test pointing there is a dead reference.
 
 ## The four provenance tiers
 
