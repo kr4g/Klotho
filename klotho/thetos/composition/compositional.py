@@ -3110,32 +3110,41 @@ class CompositionalUnit(TemporalUnit):
         covered = set(current)
         positions = [leaf_index[n] for n in current]
         low, high = min(positions), max(positions)
-        # Nodes the arc reaches INTO without lying wholly within: they hold
-        # some of its members and not all of them. That is exactly the shape
-        # a grown member leaves behind -- pass 1 replaced the ex-leaf with
-        # the first of its children, so the node now holds one member and
-        # the rest of the growth, while the arc continues outside it.
+        # STRICTLY INSIDE THE SPAN, and the attempt to widen this is worth
+        # recording because it produced a worse defect than the one it fixed.
         #
-        # Being outside ``low..high`` is why edge growth needs this: growth
-        # under the FIRST member lands before ``low`` and under the LAST
-        # after ``high``, so a purely positional window could never see it,
-        # and the arc silently kept only the first child of what its edge
-        # member grew.
+        # The window is genuinely wrong at the EDGES: growth under the first
+        # member lands before ``low`` and under the last after ``high``, so
+        # stepwise edge growth keeps only the first child of what the member
+        # grew and the legato releases early. That is a real defect and it is
+        # filed (ABSORB-1), with its pins marked xfail rather than deleted.
         #
-        # The condition is deliberately NOT "the parent holds a member".
-        # The root always holds one. Requiring the arc to extend BEYOND the
-        # parent is what keeps an outsider out: a leaf whose parent contains
-        # the whole arc is beside the music, not inside it, however much of
-        # the rest of the bar the arc happens to cover.
-        reach = set()
-        for member in current:
-            parent = self._rt.parent(member)
-            if parent is None or parent in reach:
-                continue
-            held = sum(1 for n in self._rt.subtree_leaves(parent)
-                       if n in covered)
-            if 0 < held < len(covered):
-                reach.add(parent)
+        # It was fixed here by also admitting a candidate whose parent was
+        # "a node the arc reaches into without lying wholly within"
+        # (``0 < held < len(covered)``). MEASURED, that predicate does not
+        # mean what it says: it is true of the parent of ANY edge member of
+        # ANY arc in a nested tree. Combined with the sibling test -- vacuous
+        # whenever that parent has exactly one uncovered sounding leaf -- an
+        # arc whose edge sits inside an eighth-note pair swallowed the other
+        # eighth, triggered by a structural edit ANYWHERE in the unit,
+        # including at the far end of the bar. A fuzz over disjoint edits gave
+        # 645 over-admissions in 2296 cases where the shipped code gave none,
+        # and the envelope half made it audible: a note the composer never
+        # named driven to amp 0.0, i.e. silent.
+        #
+        # The two defects are NOT symmetrical. Refusing growth loses an
+        # extension a composer can re-apply; admitting an outsider silently
+        # rewrites music they did select, and no oracle here catches it --
+        # ``slur_contract_violations`` returns clean for a widened arc,
+        # because a widened arc is still contiguous, ordered and authorable.
+        #
+        # And the discriminator is genuinely NEWNESS, not shape: in the
+        # append case the admitted leaf is new, in the failing case it is a
+        # leaf the composer looked at and did not select, and the two are
+        # structurally identical. Newness is not derivable here -- the
+        # announcement passes an identity mapping over the post-edit nodes --
+        # so closing ABSORB-1 means giving the seam the pre-edit leaf
+        # surface, which is a contract change and belongs to its own chunk.
         newcomers = []
         # ``subtree_leaves`` memoized per parent: the scan is over every
         # leaf, but a parent's leaves are walked once, which is what the
@@ -3147,7 +3156,7 @@ class CompositionalUnit(TemporalUnit):
             parent = self._rt.parent(leaf)
             if parent is None:
                 continue
-            if not (low < i < high or parent in reach):
+            if not low < i < high:
                 continue
             siblings = sounding_under.get(parent)
             if siblings is None:
