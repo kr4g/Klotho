@@ -21,6 +21,7 @@ import re
 
 import pytest
 
+import klotho
 from klotho.chronos import RhythmTree, TemporalUnit
 import klotho.chronos.rhythm_trees.algorithms as ra
 import klotho.chronos.temporal_units.algorithms as ta
@@ -36,8 +37,25 @@ import klotho.chronos.temporal_units.algorithms as ta
 _GLOSS_FOLLOWS = re.compile(r'»[\s(\-–—]*"')
 
 
-def _raise_messages(module):
-    """Every literal message text a ``raise`` in *module* can print.
+#: The installed package root. The standing rule -- the project owner reads
+#: English only -- binds the whole package, not the one module in it that
+#: happens to quote Haddad today, so the sweep below is package-wide (OPS-19).
+_PACKAGE_ROOT = pathlib.Path(klotho.__file__).parent
+
+#: Every subpackage the project brief names. Coverage is asserted against
+#: this list rather than a file count, so the check cannot go green by
+#: quietly narrowing to one directory.
+_SUBPACKAGES = ('chronos', 'tonos', 'topos', 'thetos', 'dynatos',
+                'semeios', 'utils')
+
+
+def _package_sources():
+    """Every shipped ``.py`` in the package, sorted."""
+    return sorted(_PACKAGE_ROOT.rglob('*.py'))
+
+
+def _raise_messages(source_path):
+    """Every literal message text a ``raise`` in *source_path* can print.
 
     f-string placeholders come back as ``{}``: the interpolated value is
     never the part carrying a citation, and collapsing it lets the check
@@ -45,7 +63,7 @@ def _raise_messages(module):
     already one AST node, so a message split over six source lines is
     returned whole.
     """
-    source = pathlib.Path(module.__file__).read_text(encoding='utf-8')
+    source = pathlib.Path(source_path).read_text(encoding='utf-8')
     tree = ast.parse(source)
     out = []
     for node in ast.walk(tree):
@@ -77,14 +95,36 @@ class TestEveryRuntimeFrenchQuotationIsTranslated:
 
     def test_no_shipped_message_leaves_a_french_quotation_bare(self):
         offenders = [
-            (line, text) for line, text in _raise_messages(ra)
+            (path, line) for path in _package_sources()
+            for line, text in _raise_messages(path)
             if '»' in text and not _GLOSS_FOLLOWS.search(text)
         ]
         assert offenders == [], (
-            "these raise messages quote Haddad in French with no English "
+            "these raise messages quote in French with no English "
             "translation immediately after the closing guillemet: "
-            + '; '.join(f'{ra.__file__}:{line}' for line, _ in offenders)
+            + '; '.join(f'{path}:{line}' for path, line in offenders)
         )
+
+    def test_the_sweep_reaches_every_subpackage(self):
+        """The check above is a search, and a search that looked at nothing
+        also finds nothing. This is what makes its green mean something:
+        the rule binds the package, so every subpackage must be swept."""
+        covered = {path.relative_to(_PACKAGE_ROOT).parts[0]
+                   for path in _package_sources()
+                   if path.parent != _PACKAGE_ROOT}
+        missing = [sub for sub in _SUBPACKAGES if sub not in covered]
+        assert missing == [], f'not swept: {missing}'
+
+    def test_the_package_sweep_strictly_contains_the_module_it_replaced(self):
+        """OPS-19 -- this check used to read one module. Widening it is only
+        real if the wide sweep still contains the narrow one; an ``rglob``
+        that silently matched nothing would pass by reading no code."""
+        narrow = set(_raise_messages(ra.__file__))
+        wide = {msg for path in _package_sources()
+                for msg in _raise_messages(path)}
+        assert narrow, 'the module sweep itself must not be empty'
+        assert narrow <= wide
+        assert len(wide) > len(narrow)
 
     def test_the_out_of_range_message_glosses_its_quotation(self):
         rt = RhythmTree(meas='4/4', subdivisions=(1, 1, 1, 1))
