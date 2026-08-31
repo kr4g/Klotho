@@ -199,6 +199,45 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_leaf_surface_change()
         return result
 
+    def insert(self, index, duration):
+        """Insert events into the decomposed surface (see
+        :meth:`RhythmTree.insert`), announcing the leaf-surface change.
+
+        ENV-9 part A. The preserved-family verbs rewrite the WHOLE leaf
+        surface through ``_respell``, so every real onset moves -- and a
+        control envelope's stored values were computed against those onsets.
+        ``_respell`` does announce its id relocation, but it announces it
+        mid-mutation, before the new nodes have a metric layer, and the
+        rebake gate is closed there for exactly that reason: forcing a rebake
+        at that moment dies inside ``_compute_timing_cache``. So the envelope
+        kept values describing durations that no longer existed.
+
+        Announcing again HERE, after ``super()`` has returned and the metric
+        layer is complete, is the same three lines every other door in this
+        class carries. Measured before it: a 0->1 ramp over four beats became
+        ``[0.1, 0.0, 0.25, 0.5, 0.75]`` -- the inserted leaf with no envelope
+        value at all, and the ramp starting after it.
+
+        This was already incoherent with its own neighbour: subdividing a
+        leaf the envelope never named rebakes correctly, while ``insert``,
+        which moves every onset the envelope depends on, did not.
+        """
+        result = super().insert(index, duration)
+        self._announce_leaf_surface_change()
+        return result
+
+    def extract(self, index):
+        """Remove events from the decomposed surface (see
+        :meth:`RhythmTree.extract`), announcing the leaf-surface change.
+
+        ENV-9 part A, the other half; see :meth:`insert`. Measured before
+        this: extracting the first of four beats left the ramp starting at
+        ``0.25``, so the envelope never reached its own start.
+        """
+        result = super().extract(index)
+        self._announce_leaf_surface_change()
+        return result
+
     def make_rest(self, node):
         """Rest a node and its subtree (see :meth:`RhythmTree.make_rest`),
         announcing the change to the TIE and REST surface.
@@ -3202,12 +3241,22 @@ class CompositionalUnit(TemporalUnit):
             #
             # Ids ONLY, never expanded through growth: a baked leaf that grew
             # children SHOULD read as changed, because the values genuinely no
-            # longer cover what the envelope now spans. A destroyed one drops
-            # out and reads as changed for the same reason. The remap removes
-            # the FALSE positives and keeps every true one.
-            desc["baked_leaves"] = tuple(
-                mapping[n] for n in (desc.get("baked_leaves") or ())
-                if n in mapping
+            # longer cover what the envelope now spans. The remap removes the
+            # FALSE positives and keeps every true one.
+            #
+            # A DEATH is a true positive and needs saying explicitly. Simply
+            # dropping the dead id was the first version here, and measured,
+            # it made the gate MATCH: ``extract`` killed a leaf, the survivors
+            # remapped one-to-one, and baked equalled resolved -- so an
+            # envelope whose span had just lost a note read as untouched and
+            # kept every value it had computed for the longer span. The
+            # values were computed for a set that no longer exists, so the
+            # descriptor reads as stale, and ``None`` is the one thing no
+            # resolved tuple can equal.
+            baked = desc.get("baked_leaves") or ()
+            desc["baked_leaves"] = (
+                None if any(n not in mapping for n in baked)
+                else tuple(mapping[n] for n in baked)
             )
             if desc["leaf_subset"] is None:
                 # anchor-based: targets are re-derived from the subtree on

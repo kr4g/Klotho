@@ -448,8 +448,16 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
             'leaf starts or stops being one. Measured: a slurred leaf keeps '
             'its membership, no stale member, one head and one tail.',
         'scale':
-            'rebuilds through the preserved family, which announces a '
-            'RELOCATION from inside Tree.insert_child. Measured clean.',
+            'KNOWN GAP, not a clean case -- ENV-9 part B. Its id relocation '
+            'is the IDENTITY, so the baked_leaves gate (which compares '
+            'resolved leaf id sequences, never timings) correctly reports '
+            '"nothing changed" while every onset moves. Measured: onsets '
+            '1.333 -> 0.571 with the envelope values untouched. An override '
+            'would announce and still not rebake, so adding one would make '
+            'this guard read WIRED over a live defect. Closing it means '
+            're-keying the gate on timing, which is a ruling (the gate holds '
+            'ENV-6 last-write-wins) and not a measurement. Pinned red-side-up '
+            'in tests/test_env9_respell_rebake.py.',
         'tie_groups':
             'a pure READ -- it DERIVES the groups from the tied flags rather '
             'than writing them, and the charter says tie-group identity is '
@@ -458,7 +466,10 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
     }
 
     #: A body naming any of these runs the structural machinery.
-    STRUCTURAL = ('_post_mutation', '_notify_nodes_relocated')
+    #: ``_respell`` is the preserved family's shared exit -- ``insert``,
+    #: ``extract`` and ``scale`` all return through it -- and it rewrites the
+    #: WHOLE leaf surface, which is the largest leaf-surface change there is.
+    STRUCTURAL = ('_post_mutation', '_notify_nodes_relocated', '_respell')
 
     #: A body naming any of these touches the SOUNDING/TIE surface an overlay
     #: is defined against, without necessarily moving or destroying an id.
@@ -478,7 +489,25 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
         for node in class_def.body:
             if not isinstance(node, ast.FunctionDef) or node.name.startswith('_'):
                 continue
-            body = ast.dump(node)
+            # CODE only. ``ast.dump`` includes the docstring, and matching
+            # it made this detector lie: ``scale`` was "detected" purely
+            # because its prose mentions ``_notify_nodes_relocated``, and it
+            # then sat on the allowlist carrying a reason nothing had ever
+            # checked. A guard whose evidence is the comment beside the code
+            # is not a guard.
+            #
+            # Honest note: with ``_respell`` in STRUCTURAL, ``scale`` is now
+            # detected by its real code too, so restoring docstring matching
+            # does NOT redden anything today -- measured. This is
+            # defence-in-depth against a class of false evidence, not a
+            # currently load-bearing line, and saying so is cheaper than
+            # letting a later reader assume a mutation test stands behind
+            # it.
+            statements = node.body
+            if (statements and isinstance(statements[0], ast.Expr)
+                    and isinstance(statements[0].value, ast.Constant)):
+                statements = statements[1:]
+            body = ''.join(ast.dump(st) for st in statements)
             if any(n in body for n in cls_.STRUCTURAL + cls_.SURFACE):
                 found.add(node.name)
         return found
