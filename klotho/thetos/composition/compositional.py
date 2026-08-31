@@ -2415,22 +2415,42 @@ class CompositionalUnit(TemporalUnit):
             # a member and not an error (SLUR-A1). Absorbing an ancestor's
             # span must never swallow a slur drawn inside it: the deeper,
             # more specific arc keeps its notes.
+            def mine(node):
+                """False for a leaf another slur still holds directly.
+
+                One definition, used at both points where a node can enter
+                this arc: the member expansion below, and again after tie
+                snapping, which can fold a member onto a head a different
+                slur owns. Two hand-written copies of this test would let a
+                later reader delete one and measure no change.
+                """
+                return held.get(node, slur_id) == slur_id
+
             kept, seen = [], set()
             for node in members:
-                if held.get(node, slur_id) != slur_id or node in seen:
+                if not mine(node) or node in seen:
                     continue
                 seen.add(node)
                 kept.append(node)
-            # tie groups are atomic for slur membership (07_TIES_CHARTER
+            # TIME order, not splice order: the effective-PT build marks
+            # ``leaf_nodes[0]`` and ``leaf_nodes[-1]``, so a spec stored out
+            # of order puts the arc's markers on the wrong notes (SLUR-A3).
+            kept = self._absorb_leaves_grown_inside(
+                [n for n in kept if n in leaf_index], leaf_index)
+            # Tie groups are atomic for slur membership (07_TIES_CHARTER
             # sect 8): a continuation is part of the head's sound and can
             # never be a member. ``apply_slur`` snaps; this heal never did,
             # so a graft could register a continuation and even land
             # ``_slur_end`` on it (SLUR-A4).
+            #
+            # This runs AFTER the grown-inside pass, not before. Subdividing
+            # a tie continuation MAKES a new continuation -- the first child
+            # inherits the tie -- so snapping first leaves a fresh
+            # continuation to be absorbed as an ordinary member by the very
+            # next step. Measured while writing this: the arc came back as
+            # (2, 7, 8, 4) with 7 a continuation of member 2.
             kept = [n for n in self._snap_to_tie_heads(kept)
-                    if n in leaf_index and held.get(n, slur_id) == slur_id]
-            # TIME order, not splice order: the effective-PT build marks
-            # ``leaf_nodes[0]`` and ``leaf_nodes[-1]``, so a spec stored out
-            # of order puts the arc's markers on the wrong notes (SLUR-A3).
+                    if n in leaf_index and mine(n)]
             kept.sort(key=leaf_index.__getitem__)
 
             rest_set = {n for n in kept
@@ -2463,6 +2483,71 @@ class CompositionalUnit(TemporalUnit):
                 f"remain ({dissolved} slur{'s' if dissolved > 1 else ''})",
                 RuntimeWarning, stacklevel=3
             )
+
+    def _absorb_leaves_grown_inside(self, members, leaf_index):
+        """Take in a leaf that appeared INSIDE music this arc already covers.
+
+        Ryan made R12 the tie-breaker for the remaining edge cases on
+        2026-08-31: where two readings are defensible, take the one a
+        composer would guess. Two cases need it, and one rule answers both.
+
+        A tie CONTINUATION is not a note, it is the tail of the head's
+        sound, so it is never a member (charter sect 8) and growth under it
+        is invisible to a rule keyed on membership. Subdivide a tied-over
+        half note inside a slur and every player reads the first half as
+        still tied and the second as a new note UNDER THE SAME SLUR -- a
+        slur breaks at a rest or where the composer lifts it, not because
+        someone shortened a note underneath it. Without this the arc
+        dissolved (SLUR-B4).
+
+        The second case is sequential growth: after the first of three
+        inserts under a slurred note, the ex-leaf is no longer a member, so
+        inserts two and three would land as intruders and split the arc that
+        one ``subdivide`` keeps whole (SLUR-A5). Ryan ruled that sequential
+        and one-shot growth MAY diverge and must not be hidden by batching
+        edits -- this is not batching. Each edit still heals against what
+        exists at that moment; the rule simply reads what the new leaf IS.
+
+        The test is provenance, not proximity: every OTHER leaf under the
+        newcomer's parent must already belong to this arc, as a member or as
+        a tie continuation of one, and the newcomer must fall strictly
+        INSIDE the span. So a note inserted among the piece's own top-level
+        beats is still an intruder and still splits, which is the property
+        ``_remap_slur_specs`` has always defended -- a slur is authored by
+        explicit selection, never by an edit landing nearby.
+        """
+        if len(members) < 2:
+            return members
+        head_of = {}
+        for group in self._rt.tie_groups:
+            for continuation in group[1:]:
+                head_of[continuation] = group[0]
+        # min/max, not first/last: the caller has not normalised order yet,
+        # and this must not become a second place that guarantees it. Time
+        # ordering is settled at ONE point, after tie snapping.
+        positions = [leaf_index[n] for n in members]
+        low, high = min(positions), max(positions)
+        root = self._rt.root
+        current = list(members)
+        while True:
+            covered = set(current)
+            newcomers = []
+            for leaf, i in leaf_index.items():
+                if leaf in covered or not low < i < high:
+                    continue
+                parent = self._rt.parent(leaf)
+                if parent is None or parent == root:
+                    continue
+                siblings = [n for n in self._rt.subtree_leaves(parent)
+                            if n != leaf]
+                if not siblings:
+                    continue
+                if all(n in covered or head_of.get(n) in covered
+                       for n in siblings):
+                    newcomers.append(leaf)
+            if not newcomers:
+                return current
+            current = current + newcomers
 
     def _contiguous_slur_segments(self, moved):
         """Partition relocated slur members into spans ``apply_slur`` could

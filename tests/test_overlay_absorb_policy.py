@@ -26,6 +26,31 @@ member of a three-note slur:
                       never changed and never stopped being leaves
 
 The parametrisation is the point: every door asserts the SAME expectation.
+
+RED BEFORE GREEN. Every test here was written and run BEFORE the fix existed;
+22 of the 34 failed, and the four raw doors all failed the same way:
+
+    AssertionError: raw.subdivide: the slur did not survive at all
+    assert {}
+
+Two failed on the ``uc.`` path as well -- the reference path stored its
+envelope subset out of time order, appending absorbed leaves at the end
+rather than in the grown target's place. That was not on anyone's list; the
+pin found it.
+
+MUTATION TABLE for the two policy rules, break-tested after the fix:
+
+    TestAbsorbIsTheSinglePolicyForSlurs
+        mutation: in ``_remap_slur_specs`` pass 1, replace
+        ``members.extend(self._rt.subtree_leaves(target))`` with ``pass``
+        -- i.e. restore DROP.
+        red: the slur does not survive.
+
+    TestAbsorbIsTheSinglePolicyForControlEnvelopes
+        mutation: in ``_remap_control_envelopes``, replace the ``grown``
+        expression with ``((target,) if target in leaf_index else ())``
+        -- i.e. restore DROP.
+        red: the envelope loses the grown target.
 """
 
 import warnings
