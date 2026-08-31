@@ -82,6 +82,26 @@ will delete one and measure no change.
         no mutation in this file: it guards an invariant of ``apply_slur``
         that the id-preservation change above now DEPENDS on. See the test's
         own docstring.
+
+    test_an_edit_outside_the_span_leaves_the_values_alone
+        mutation: delete the ``baked_leaves`` filter at the top of
+        ``_queue_envelope_rebakes``, so every surviving descriptor is queued
+        again.
+        red: an unrelated subdivide overwrites a later control=False value
+        and replaces a stored Bind with a scalar.
+
+    test_an_edit_inside_the_span_still_rebakes
+        mutation: the OPPOSITE -- ``descriptors = []``, a gate so tight it
+        never rebakes.
+        red: absorbed leaves carry no value. Both directions are tested
+        because this fix is a gate, and a gate can fail either way.
+
+    test_the_slur_and_the_envelope_absorb_the_same_leaves
+    test_the_stored_subset_is_one_apply_envelope_could_author
+        mutation: remove the ``_absorb_leaves_grown_inside`` call from
+        ``_remap_control_envelopes``.
+        red: the two overlays disagree, and the stored subset has a
+        positional gap ``apply_envelope`` refuses to author.
 """
 
 import warnings
@@ -465,3 +485,117 @@ class TestAMidSlurInstrumentChangeIsAnnounced:
     def test_a_uniform_slur_does_not_warn(self):
         """The other direction: a warning that always fires is noise."""
         assert self._lower(self._slurred(instrument_on_member=False)) == []
+
+
+class TestARebakeTouchesOnlyWhatTheEditChanged:
+    """Found by the adversarial pass against the first SLUR-1 commit.
+
+    Making the seam rebake was necessary -- an absorbed leaf must get its
+    value. But the first version queued EVERY surviving descriptor, so any
+    structural edit anywhere in the unit re-asserted every control envelope
+    over its whole span. That silently destroyed user data twice over: a
+    later ``control=False`` envelope on the same pfield (Ryan's ENV-6 ruling
+    promises those resolve last-write-wins) and a ``Bind`` stored inside the
+    span, replaced by a scalar so the callable never ran again.
+
+    Before the seam rebaked at all, an edit outside an envelope's span could
+    not touch its values. That property is restored by gating on
+    ``baked_leaves`` rather than traded away for the absorb.
+    """
+
+    @staticmethod
+    def _enveloped():
+        from klotho.dynatos import Envelope
+        from klotho.thetos import Bind
+        uc = UC(tempus='6/4', prolatio=(1,) * 6, beat='1/4', bpm=60,
+                pfields={'freq': 0})
+        L = list(uc._rt.leaf_nodes)
+        uc.apply_envelope(Envelope([0.0, 100.0], times=[2.0]), 'freq',
+                          node=[L[0], L[1], L[2]], control=True)
+        uc.set_pfields(L[0], freq=1000.0)
+        uc.set_pfields(L[1], freq=Bind.index(map=lambda i, n: 7777.0))
+        return uc, L
+
+    def test_an_edit_outside_the_span_leaves_the_values_alone(self):
+        uc, L = self._enveloped()
+        before = [repr(uc._rt[n].get('freq')) for n in L[:3]]
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            uc._rt.subdivide(L[5], (1, 1))       # nowhere near the envelope
+
+        after = [repr(uc._rt[n].get('freq')) for n in L[:3]]
+        assert after == before, (
+            'an edit outside the span re-asserted the envelope over values '
+            'the user wrote afterwards')
+
+    def test_an_edit_inside_the_span_still_rebakes(self):
+        """The other direction -- a gate too tight is a hole in the ramp."""
+        uc, L = self._enveloped()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            uc._rt.subdivide(L[2], (1, 1))
+
+        grown = list(uc._rt.subtree_leaves(L[2]))
+        values = [uc._rt[n].get('freq') for n in grown]
+        assert all(v is not None for v in values), (
+            f'absorbed leaves {grown} carry no value: {values}')
+
+
+class TestBothOverlaysHealOneEditTheSameWay:
+    """Also from the adversarial pass.
+
+    The slur half got ``_absorb_leaves_grown_inside``; the envelope half did
+    not. Measured on two sequential inserts under a target both overlays
+    covered, the slur read ``(1, 2, 6, 7, 4)`` and the subset read
+    ``(1, 2, 6, 4)`` -- leaf 7, a SOUNDING leaf strictly inside the
+    envelope's span, carried no value at all. A hole in the ramp, and a
+    stored subset with a positional gap that ``apply_envelope`` refuses to
+    author.
+
+    Ryan ruled that sequential and one-shot growth may diverge. He did not
+    rule that two overlays may heal the same edit differently.
+    """
+
+    def test_the_slur_and_the_envelope_absorb_the_same_leaves(self):
+        from klotho.dynatos import Envelope
+        uc = UC(tempus='6/4', prolatio=(1,) * 5, beat='1/4', bpm=60,
+                pfields={'freq': 0})
+        L = list(uc._rt.leaf_nodes)
+        span = [L[0], L[1], L[2], L[3]]
+        uc.apply_slur(span)
+        uc.apply_envelope(Envelope([0.0, 100.0], times=[2.0]), 'freq',
+                          node=span, control=True)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            for k in range(2):
+                uc._rt.insert_child(L[2], k, proportion=1)
+
+        (slur,) = uc._slur_specs.values()
+        (desc,) = uc._control_envelopes.values()
+        assert tuple(desc['leaf_subset']) == tuple(slur['leaf_nodes']), (
+            'the two overlays healed one edit differently')
+
+        order = list(uc._rt.leaf_nodes)
+        subset = list(desc['leaf_subset'])
+        assert subset == sorted(subset, key=order.index), 'not in time order'
+        holes = [n for n in subset if uc._rt[n].get('freq') is None]
+        assert holes == [], f'sounding leaves inside the span with no value: {holes}'
+
+    def test_the_stored_subset_is_one_apply_envelope_could_author(self):
+        """The oracle: a positional gap is a spec the public API refuses."""
+        from klotho.dynatos import Envelope
+        uc = UC(tempus='6/4', prolatio=(1,) * 5, beat='1/4', bpm=60,
+                pfields={'freq': 0})
+        L = list(uc._rt.leaf_nodes)
+        uc.apply_envelope(Envelope([0.0, 100.0], times=[2.0]), 'freq',
+                          node=[L[0], L[1], L[2], L[3]], control=True)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            for k in range(2):
+                uc._rt.insert_child(L[2], k, proportion=1)
+
+        (desc,) = uc._control_envelopes.values()
+        uc._resolve_leaf_selection(list(desc['leaf_subset']))   # raises if not

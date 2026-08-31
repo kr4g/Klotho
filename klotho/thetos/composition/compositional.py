@@ -1969,6 +1969,7 @@ class CompositionalUnit(TemporalUnit):
         sounding = self._resolve_control_envelope_leaves(desc)
         if sounding:
             self._bake_envelope(sounding, desc["envelope"], desc["pfields"], desc["endpoint"])
+        desc["baked_leaves"] = tuple(sounding)
 
     def _record_control_envelope(self, selected, envelope, pfields_list, endpoint):
         self._ensure_timing_cache()
@@ -1998,6 +1999,10 @@ class CompositionalUnit(TemporalUnit):
             "endpoint": endpoint,
             "anchor_node": anchor_node,
             "leaf_subset": leaf_subset,
+            # what the baked values were computed against. A structural edit
+            # rebakes ONLY when this no longer matches -- see
+            # ``_queue_envelope_rebakes``.
+            "baked_leaves": tuple(sounding),
         }
         return env_id
 
@@ -2409,9 +2414,23 @@ class CompositionalUnit(TemporalUnit):
         overlays this unit's own deleters heal. ``mapping`` is total over
         surviving ids: an id absent from it was destroyed.
 
-        Overlays are moved, not rebaked. The baked values themselves live in
-        node data and travel with the payload; re-resolving them here would
-        read a timing cache the mutation has not finished invalidating.
+        Overlays are MOVED here, and a control envelope is additionally
+        REBAKED -- but only when the leaf-surface announcement is what
+        reached this function, and only when the edit actually changed the
+        leaves that envelope resolves to. ``_queue_envelope_rebakes`` holds
+        both gates and explains them.
+
+        (This docstring used to say overlays are never rebaked, "because
+        re-resolving them here would read a timing cache the mutation has
+        not finished invalidating". Both halves were wrong. The cache keying
+        is correct -- ``_ensure_timing_cache`` tests
+        ``_timing_cache_version != _rt._structure_version`` -- and the real
+        hazard is that this same observer is ALSO reached mid-mutation, from
+        ``Tree.insert_child`` before ``_post_mutation`` runs and from
+        ``RhythmTree._rebuild_from_decomposed`` before it writes node data.
+        At those two moments the new nodes have no metric layer at all and a
+        rebake dies inside ``_compute_timing_cache``. That is what the
+        announcement gate is for.)
         """
         self._remap_bind_memo(mapping)
         self._remap_slur_specs(mapping)
@@ -2552,7 +2571,13 @@ class CompositionalUnit(TemporalUnit):
             )
 
     def _absorb_leaves_grown_inside(self, members, leaf_index):
-        """Take in a leaf that appeared INSIDE music this arc already covers.
+        """Take in a leaf that appeared INSIDE music this overlay covers.
+
+        Used by BOTH overlays. The arc language below is written for slurs
+        because that is where the rule was derived, but a control envelope
+        needs exactly the same thing and for the same reason: without it the
+        two heal one edit differently and the envelope is left with a hole
+        in its ramp.
 
         Ryan made R12 the tie-breaker for the remaining edge cases on
         2026-08-31: where two readings are defensible, take the one a
@@ -2706,6 +2731,23 @@ class CompositionalUnit(TemporalUnit):
                 continue
             # time order, so the stored subset reads as the span it is
             moved.sort(key=leaf_index.__getitem__)
+            # ...and the SAME grown-inside rule the slur half uses. Without
+            # it the two overlays heal one edit differently: measured, after
+            # two sequential inserts under a shared target the slur read
+            # (1, 2, 6, 7, 4) and the subset read (1, 2, 6, 4), leaving leaf
+            # 7 -- a sounding leaf strictly inside the envelope's span --
+            # with NO value for the pfield the envelope controls. A hole in
+            # the ramp, and a stored subset with a positional gap that
+            # ``apply_envelope`` refuses to author ("Selection must be
+            # contiguous in left-to-right tree order").
+            #
+            # Ryan ruled that sequential and one-shot growth may diverge. He
+            # did not rule that two overlays may heal the same edit
+            # differently, and neither reading licenses an unauthorable spec.
+            moved = self._absorb_leaves_grown_inside(moved, leaf_index)
+            # the helper appends newcomers, so time order is settled HERE,
+            # after it -- exactly as the slur half settles it after snapping
+            moved.sort(key=leaf_index.__getitem__)
             desc["leaf_subset"] = tuple(moved)
             touched.append(desc)
         if touched:
@@ -2733,6 +2775,20 @@ class CompositionalUnit(TemporalUnit):
         seam.)
         """
         if not getattr(self._rt, '_announcing_leaf_surface', False):
+            return
+        # ONLY the envelopes this edit actually changed. Queueing every
+        # surviving descriptor was measured to re-assert every envelope in
+        # the unit on ANY structural edit anywhere -- which silently
+        # overwrote a later ``control=False`` envelope on the same pfield
+        # (Ryan's ENV-6 ruling promises those resolve last-write-wins) and
+        # replaced a ``Bind`` stored inside the span with a scalar, so the
+        # callable never ran again. Before this seam rebaked at all, an edit
+        # outside an envelope's span could not touch its values; that
+        # property is restored here rather than traded away.
+        descriptors = [d for d in descriptors
+                       if tuple(self._resolve_control_envelope_leaves(d))
+                       != tuple(d.get("baked_leaves") or ())]
+        if not descriptors:
             return
         pending = getattr(self, '_pending_envelope_rebakes', None)
         if pending is None:
