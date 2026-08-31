@@ -401,10 +401,17 @@ class TestTemporalUnitSurface:
 
 
 class TestCompositionalUnitRefused:
-    """The follows family rebuilds the tree from a decomposition, so leaf
-    identity is destroyed and parameter state has nowhere to land -- the
-    same ground on which ``flatten`` and ``segment`` refuse (R13-E).
-    ``interleave`` accepts a CU because it merges nothing at all."""
+    """The follows family rebuilds the tree from a decomposition, and
+    carrying the parameter state across that rebuild is STAGED work rather
+    than an impossibility -- ``RhythmTree._respell`` already carries
+    pfields, mfields, slurs and envelope targets through a rebuild that
+    destroys leaf identity, which is how ``CompositionalTree.extract``
+    keeps its pfields (R13-E). ``interleave`` accepts a CU because it
+    merges nothing at all.
+
+    Corrected with OPS-17: this docstring used to repeat the refusal's own
+    claim that the state "has nowhere to land", which the package next door
+    refutes. A shipped test that restates a wrong ground keeps it alive."""
 
     def test_diminish_refuses(self):
         from klotho.thetos.composition.compositional import CompositionalUnit

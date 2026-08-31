@@ -718,10 +718,12 @@ def _following_target(obj, verb):
         raise NotImplementedError(
             f"{verb} for CompositionalUnits is a staged surface (R13-E). "
             f"The whole following family rebuilds the tree from its "
-            f"decomposition, so no output leaf is any input leaf and the "
-            f"pfields, envelopes and slurs have nowhere to land -- the "
-            f"same ground on which flatten and segment refuse. Apply it "
-            f"to `uc.rt` for the rhythm alone."
+            f"decomposition, and carrying the pfields, mfields, envelopes "
+            f"and slurs across that rebuild is the staged work -- not an "
+            f"impossibility: `RhythmTree._respell` already carries them "
+            f"through a rebuild that destroys leaf identity, which is how "
+            f"`CompositionalTree.extract` keeps its pfields. Apply it to "
+            f"`uc.rt` for the rhythm alone."
         )
     if isinstance(obj, TemporalUnit):
         return 'ut'
