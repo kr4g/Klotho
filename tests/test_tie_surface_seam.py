@@ -328,3 +328,73 @@ class TestOneMusicalQuestionOneAnswer:
             via_raw._rt.make_sounding(leaves[0])
 
         assert self._answer(via_uc) == self._answer(via_raw)
+
+
+class TestAuthoringATieAnnouncesToo:
+    """The door a composer actually uses.
+
+    ``uc._rt.set_node_data(leaf, tied=True)`` is the ONLY way to author a tie
+    in this codebase -- there is no ``.tie()`` verb yet -- and it reproduced
+    TIE-4 byte for byte after TIE-4 was closed through ``make_rest`` and
+    ``make_sounding``. Tying a slurred note back to its predecessor swallows
+    the arc's first member into the tie group, the ``_slur_start`` goes with
+    it, and the arc reaches playback with an end marker and no start.
+
+    The node-data writers announce only when the write touches ``tied`` or
+    ``proportion``. Every pfield and mfield write goes through the same
+    writers and ``_bake_envelope`` writes through them in a loop, so
+    announcing unconditionally would run the whole overlay heal on the
+    hottest path in the library.
+    """
+
+    def test_tying_the_arcs_first_member_re_heads_the_arc(self):
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=60,
+                pfields={'freq': 440})
+        leaves = list(uc._rt.leaf_nodes)
+        slur_id = uc.apply_slur([leaves[1], leaves[2]])
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            uc._rt.set_node_data(leaves[1], tied=True)
+
+        heads, tails = _slur_flags(uc)
+        assert (heads, tails) == (1, 1), (
+            f'{heads} heads / {tails} tails -- an arc no note opens')
+        assert tuple(uc._slur_specs[slur_id]['leaf_nodes']) == (leaves[0],
+                                                                leaves[2])
+
+    def test_parameter_writes_stay_off_this_path(self):
+        """The other direction, and the reason the gate is a key test rather
+        than an unconditional announce.
+
+        ``set_pfields`` -- which ``_bake_envelope`` calls in a loop, the
+        hottest write in the library -- must not run the overlay heal, and
+        neither must a ``set_node_data`` write carrying no surface key.
+
+        Honest note: mutating the gate to announce UNCONDITIONALLY leaves
+        this green, measured. ``set_pfields`` does not route through
+        ``set_node_data`` at all -- the RhythmTree layer's validator refuses
+        a pfield there -- so the gate is not load-bearing today. It is kept
+        because ``_SURFACE_KEYS`` is what the announcement actually means,
+        and because the day someone routes a parameter write through these
+        writers the gate is the only thing between them and running the whole
+        overlay heal per note. Saying so is cheaper than letting a later
+        reader assume a mutation stands behind it.
+        """
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=60,
+                pfields={'freq': 440})
+        leaves = list(uc._rt.leaf_nodes)
+        uc.apply_slur([leaves[1], leaves[2]])
+
+        calls = []
+        tree_type = type(uc._rt)
+        original = tree_type._announce_leaf_surface_change
+        tree_type._announce_leaf_surface_change = lambda self: calls.append(1)
+        try:
+            uc._rt.set_pfields(leaves[1], freq=880)
+        finally:
+            tree_type._announce_leaf_surface_change = original
+
+        assert calls == [], (
+            'a parameter write ran the whole overlay heal -- this gate sits '
+            'on the hottest write path in the library')

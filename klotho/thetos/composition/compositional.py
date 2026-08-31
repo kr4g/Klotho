@@ -238,6 +238,60 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_leaf_surface_change()
         return result
 
+    #: Node-data keys that define the SOUNDING and TIE surface an overlay is
+    #: drawn against. A write touching one of these changes what the overlay
+    #: means without moving a single id.
+    _SURFACE_KEYS = frozenset({'tied', 'proportion'})
+
+    def _announce_if_surface_write(self, keys):
+        """Announce only when the write touched the sounding/tie surface.
+
+        Every pfield and mfield write goes through the same node-data
+        writers, and ``_bake_envelope`` writes through them in a loop, so
+        announcing unconditionally would run the whole overlay heal on the
+        hottest path in the library. Announcing on ``tied``/``proportion``
+        alone costs one set intersection per write.
+        """
+        if self._SURFACE_KEYS.intersection(keys):
+            self._announce_leaf_surface_change()
+
+    def set_node_data(self, node, **attr):
+        """Write node data (see :meth:`Tree.set_node_data`), announcing when
+        the write changes the sounding or tie surface.
+
+        ``uc._rt.set_node_data(leaf, tied=True)`` is the ONLY way to author a
+        tie in this codebase, and it reproduced TIE-4 byte for byte after
+        TIE-4 was closed: tying a slurred note back to its predecessor
+        swallows the arc's first member into the tie group, the
+        ``_slur_start`` disappears with it, and the arc reaches playback with
+        an end marker and no start. ``make_rest`` and ``make_sounding`` were
+        wired and this -- the door a composer actually uses -- was not.
+        """
+        result = super().set_node_data(node, **attr)
+        self._announce_if_surface_write(attr)
+        return result
+
+    def update_node_data(self, node, attrs: dict):
+        """Merge node data (see :meth:`Tree.update_node_data`), announcing a
+        sounding/tie surface change. See :meth:`set_node_data`."""
+        result = super().update_node_data(node, attrs)
+        self._announce_if_surface_write(attrs or {})
+        return result
+
+    def replace_node_data(self, node, attrs: dict):
+        """Replace node data (see :meth:`Tree.replace_node_data`), announcing
+        a sounding/tie surface change.
+
+        A REPLACE can change the surface by OMISSION -- dropping ``tied``
+        where it used to be set -- so this announces whenever the surface
+        keys appear on either side of the write, not only in the incoming
+        dict.
+        """
+        before = set(self[node]) if self._has_node(node) else set()
+        result = super().replace_node_data(node, attrs)
+        self._announce_if_surface_write(set(attrs or {}) | before)
+        return result
+
     def make_rest(self, node):
         """Rest a node and its subtree (see :meth:`RhythmTree.make_rest`),
         announcing the change to the TIE and REST surface.
@@ -3456,7 +3510,25 @@ class CompositionalUnit(TemporalUnit):
             affected.add(n)
             affected.update(self._rt.descendants(n))
         affected_leaves = {n for n in affected if n in self._rt.leaf_nodes}
-        self._split_slurs_for_rests(affected_leaves)
+        # The slur pre-heal that used to run HERE is gone. Since the verb was
+        # wired to the seam (TIE-3/TIE-4), the seam heals this edit anyway --
+        # from inside the write, against the tree as it actually ends up --
+        # so the pre-heal was a second mechanism answering the same question
+        # a moment too early.
+        #
+        # And it answered WRONG. ``make_rest`` clears ``tied`` on every leaf
+        # it silences (a tied rest is illegal, charter sect1), so a leaf that
+        # was a continuation of a rested note is an ordinary NOTE once the
+        # write lands -- but the pre-heal, running first, still saw a
+        # continuation and dropped it out of the arc. Measured over 2430
+        # cases across four tree shapes: 46 disagreements between
+        # ``uc.make_rest`` and ``uc._rt.make_rest``, and in every one the
+        # seam-only answer kept music the pre-heal discarded. Removing it
+        # takes the count to zero and changes no other test in the suite.
+        #
+        # R12 lens 2 is what it broke: one musical question, two answers
+        # depending on the handle -- and here the PUBLIC handle was the wrong
+        # one.
         super().make_rest(nodes)
         self._filter_envelopes_for_rests(affected_leaves)
 
