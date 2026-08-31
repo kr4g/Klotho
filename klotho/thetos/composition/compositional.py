@@ -1568,6 +1568,32 @@ class CompositionalUnit(TemporalUnit):
                     resolved = self._resolve_bound_value(node, key, value)
                     pt_snapshot.set_mfields(node, **{key: resolved})
 
+    def _slur_state_key(self):
+        """A digest of slur MEMBERSHIP, shared by the two snapshot memos.
+
+        DERIVED, never maintained -- and that is the whole point. The
+        effective-PT snapshot used to key on
+        ``(_next_slur_id, len(_slur_specs))``, which notices a membership
+        change only when an id is minted or an arc appears or dies.
+        SLUR-1's identity rule (an unsplit arc keeps the id ``apply_slur``
+        returned) deliberately stopped minting on the commonest reshape,
+        so one of those two signals went quiet -- NEW-42 filed that as a
+        caution and it is load-bearing now. ``uc.events`` had NEITHER
+        term, so a DataFrame read once before a slur was drawn was served
+        forever afterwards and the slur columns never appeared: playback
+        stayed correct while the inspection surface lied, which is the
+        worse way round for a composer checking their work (EVENTS-1).
+
+        Reading the membership itself cannot go stale. There is no counter
+        for a future writer to forget to bump -- the failure mode behind
+        this defect and behind PLUMB-1 alike -- and the cost is a tuple
+        over the arcs, against a materialization of every event.
+        """
+        return tuple(sorted(
+            (slur_id, tuple(spec['leaf_nodes']))
+            for slur_id, spec in self._slur_specs.items()
+        ))
+
     def _build_effective_parameter_tree(self, _fresh=False):
         """Effective PT snapshot (binds materialized, slur markers set).
 
@@ -1577,8 +1603,7 @@ class CompositionalUnit(TemporalUnit):
         ``.pt`` property) always builds a new object, preserving its
         documented copy semantics for user mutation.
         """
-        key = (self._rt._structure_version, self._next_slur_id,
-               len(self._slur_specs),
+        key = (self._rt._structure_version, self._slur_state_key(),
                getattr(self._rt._param_layer, '_instruments_version', 0))
         if not _fresh and not self._rt._write_batch_depth:
             cached = self.__dict__.get('_eff_pt_cache')
@@ -1680,7 +1705,8 @@ class CompositionalUnit(TemporalUnit):
         """
         key = (self._rt._structure_version, self._bpm, self._beat,
                self._offset,
-               getattr(self._rt._param_layer, '_instruments_version', 0))
+               getattr(self._rt._param_layer, '_instruments_version', 0),
+               self._slur_state_key())
         cached = self.__dict__.get('_events_df_cache')
         in_batch = self._rt._write_batch_depth
         if cached is not None and cached[0] == key and not in_batch:
