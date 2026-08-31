@@ -2855,6 +2855,28 @@ class CompositionalUnit(TemporalUnit):
                 del self._control_envelopes[env_id]
                 continue
             desc["anchor_node"] = anchor
+            # ``baked_leaves`` records which leaves the STORED VALUES were
+            # computed for, and the gate in ``_queue_envelope_rebakes``
+            # compares it against the leaves the envelope resolves to now.
+            # It has to move with the ids or the gate is comparing two
+            # different address spaces and can only ever answer "changed" --
+            # measured: an ``insert_child`` at the top of the bar re-asserted
+            # an envelope over a span it never touched, reverting the user's
+            # own later ``set_pfields`` and flattening a stored ``Bind`` to
+            # the float it happened to evaluate to. That is both halves of
+            # the regression ``784a3b5`` fixed, alive through the relocation
+            # door that commit never covered, and it breaks ENV-6's promise
+            # that a later write wins.
+            #
+            # Ids ONLY, never expanded through growth: a baked leaf that grew
+            # children SHOULD read as changed, because the values genuinely no
+            # longer cover what the envelope now spans. A destroyed one drops
+            # out and reads as changed for the same reason. The remap removes
+            # the FALSE positives and keeps every true one.
+            desc["baked_leaves"] = tuple(
+                mapping[n] for n in (desc.get("baked_leaves") or ())
+                if n in mapping
+            )
             if desc["leaf_subset"] is None:
                 # anchor-based: targets are re-derived from the subtree on
                 # every resolve, so membership needs no repair -- but the
