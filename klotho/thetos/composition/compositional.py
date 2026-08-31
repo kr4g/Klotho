@@ -1954,6 +1954,21 @@ class CompositionalUnit(TemporalUnit):
 
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
+        if 'group' in kwargs:
+            # ``group`` is half of the overlay identity (ruling six: the
+            # scheduler re-points the out bus by group), so changing it is an
+            # instrument change for an overlay's purposes and gets the same
+            # treatment ``set_instrument`` gets.
+            #
+            # This is ``Score.track``'s own documented per-leaf routing
+            # idiom, so it is not an exotic door. Measured before this line:
+            # re-routing one slurred leaf to another track left ONE arc
+            # spanning both, and the lowering silently played that leaf
+            # through the slur head's synth on the head's track -- the
+            # routing the caller asked for did not happen and nothing said
+            # so, while ``_same_overlay_instrument`` already answered False
+            # for the pair.
+            self._resplit_overlays_at_instrument_changes()
 
     def _bake_envelope(self, selected, envelope, pfields_list, endpoint,
                        curve_window=None):
@@ -2611,7 +2626,21 @@ class CompositionalUnit(TemporalUnit):
             return slur_ids[0] if len(slur_ids) == 1 else slur_ids
         if mode == "per_node":
             groups = self._resolve_per_node_leaf_groups(node)
-            slur_ids = []
+            # PLANNED WHOLE, INSTALLED AT THE END, for the reason
+            # ``_reshape_slur`` states and this branch used to ignore: a
+            # refusal partway through must not leave arcs registered under
+            # ids the caller never received. Measured before this: a
+            # per-node call over two groups, the second crossing an
+            # instrument change, raised -- and left ``{0: (2, 3)}`` behind
+            # with ``_next_slur_id`` advanced. The composer's call failed, so
+            # they reasonably believe nothing happened, while those notes are
+            # silently pooled into a legato they cannot name to remove.
+            #
+            # ``_validate_slur_segment`` already checks each candidate
+            # against both the live specs and the segments reserved earlier
+            # in this same call, so planning changes nothing about which
+            # selections are legal -- only about what survives a refusal.
+            planned = []
             reserved_sets = []
             for group in groups:
                 selected = self._apply_offset_take(group, offset=offset, take=take)
@@ -2623,10 +2652,9 @@ class CompositionalUnit(TemporalUnit):
                     self._refuse_slur_with_no_run(selected, rest_set)
                 for segment in segments:
                     self._validate_slur_segment(segment, reserved_sets)
-                    slur_id = self._register_slur(segment)
                     reserved_sets.append(set(segment))
-                    slur_ids.append(slur_id)
-            return slur_ids
+                    planned.append(segment)
+            return [self._register_slur(segment) for segment in planned]
         raise ValueError(f"Unknown mode: {mode}")
 
     def _snap_to_tie_heads(self, selected):
