@@ -49,6 +49,12 @@ def _reanchor_contained_envelopes(original_uc, sub_uc, group):
             "endpoint": desc["endpoint"],
             "anchor_node": sub_uc._rt.root,
             "leaf_subset": None,
+            # The sub-unit is a different SPAN, so it re-anchors and
+            # re-resolves -- but the slice of the curve this descriptor
+            # carries is a property of the DESCRIPTOR, not of the span, and
+            # dropping it restarts each half of a split envelope the first
+            # time the sub-unit is edited.
+            "curve_window": desc.get("curve_window") or (0.0, 1.0),
         }
 
 

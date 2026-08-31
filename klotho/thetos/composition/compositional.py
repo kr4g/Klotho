@@ -2003,7 +2003,13 @@ class CompositionalUnit(TemporalUnit):
         window_start, window_end = curve_window or (0.0, 1.0)
         window = window_end - window_start
         if window <= 0:
-            window_start, window = 0.0, 1.0
+            # A run one leaf wide has zero width -- ``endpoint=False`` makes
+            # this ordinary. Falling back to the WHOLE curve threw away the
+            # window's position as well as its width, so every such run baked
+            # at the curve's first value: measured, a four-note crescendo
+            # split across four instruments came out [0.0, 0.0, 0.0, 0.0],
+            # entirely silent. Keep the position; borrow only the width.
+            window = 1.0
         full_duration = duration / window
         raw_total = sum(envelope.times)
         scaled_envelope = Envelope(
@@ -2112,7 +2118,12 @@ class CompositionalUnit(TemporalUnit):
     def _rebake_control_envelope(self, desc):
         sounding = self._resolve_control_envelope_leaves(desc)
         if sounding:
-            self._bake_envelope(sounding, desc["envelope"], desc["pfields"], desc["endpoint"])
+            # ``curve_window`` must ride through, or the first structural
+            # edit after a split undoes the split's own value preservation
+            # and each half restarts the gesture.
+            self._bake_envelope(sounding, desc["envelope"], desc["pfields"],
+                                desc["endpoint"],
+                                curve_window=desc.get("curve_window"))
         desc["baked_leaves"] = tuple(sounding)
 
     def _record_control_envelope(self, selected, envelope, pfields_list, endpoint):
@@ -2228,6 +2239,12 @@ class CompositionalUnit(TemporalUnit):
                 "pfields": desc["pfields"],
                 "target_nodes": list(leaves),
                 "time_span": (start, end),
+                # The slice of the curve THIS descriptor carries. Without it
+                # the runtime sampled the whole curve per descriptor, so a
+                # split envelope played one hairpin per half -- ruling seven
+                # violated in the only path that makes a sound, while the
+                # baked pfields (what ``uc.events`` shows) looked correct.
+                "curve_window": desc.get("curve_window") or (0.0, 1.0),
             })
         return result
 
@@ -3861,6 +3878,15 @@ class CompositionalUnit(TemporalUnit):
                 "endpoint": desc["endpoint"],
                 "anchor_node": new_anchor,
                 "leaf_subset": new_leaf_subset,
+                # ``curve_window`` and ``baked_leaves`` travel with the
+                # descriptor or the copy silently differs from its source:
+                # a dropped window restarts each half of a split envelope on
+                # the copy's first structural edit, and a dropped
+                # ``baked_leaves`` makes the rebake gate false-positive on
+                # that edit -- the exact pair 784a3b5 and this session both
+                # paid for once already.
+                "curve_window": desc.get("curve_window") or (0.0, 1.0),
+                "baked_leaves": desc.get("baked_leaves"),
             }
 
         return new_cu
@@ -4005,6 +4031,8 @@ class CompositionalUnit(TemporalUnit):
                 "endpoint": desc["endpoint"],
                 "anchor_node": anchor,
                 "leaf_subset": subset,
+                "curve_window": desc.get("curve_window") or (0.0, 1.0),
+                "baked_leaves": desc.get("baked_leaves"),
             }
         return descs
 
@@ -4069,6 +4097,8 @@ class CompositionalUnit(TemporalUnit):
                 "endpoint": desc["endpoint"],
                 "anchor_node": old_to_new_mapping[desc["anchor_node"]],
                 "leaf_subset": mapped_leaf_subset,
+                "curve_window": desc.get("curve_window") or (0.0, 1.0),
+                "baked_leaves": desc.get("baked_leaves"),
             }
         c._next_envelope_id = self._next_envelope_id
 

@@ -347,6 +347,17 @@
       "control_envelopes": {
         "0": {
           "anchor_node": 0,
+          "baked_leaves": [
+            2,
+            3,
+            4,
+            6,
+            7
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -372,6 +383,15 @@
         },
         "1": {
           "anchor_node": 1,
+          "baked_leaves": [
+            2,
+            3,
+            4
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -397,6 +417,14 @@
         },
         "2": {
           "anchor_node": 5,
+          "baked_leaves": [
+            6,
+            7
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -422,6 +450,13 @@
         },
         "3": {
           "anchor_node": 2,
+          "baked_leaves": [
+            2
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -447,6 +482,13 @@
         },
         "4": {
           "anchor_node": 3,
+          "baked_leaves": [
+            3
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -472,6 +514,13 @@
         },
         "5": {
           "anchor_node": 4,
+          "baked_leaves": [
+            4
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -497,6 +546,13 @@
         },
         "6": {
           "anchor_node": 6,
+          "baked_leaves": [
+            6
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -522,6 +578,13 @@
         },
         "7": {
           "anchor_node": 7,
+          "baked_leaves": [
+            7
+          ],
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "endpoint": true,
           "envelope": {
             "__type__": "Envelope",
@@ -680,6 +743,10 @@
       ],
       "resolved_control_envelopes": [
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -713,6 +780,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -744,6 +815,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -774,6 +849,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -803,6 +882,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -832,6 +915,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -861,6 +948,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [
@@ -890,6 +981,10 @@
           ]
         },
         {
+          "curve_window": [
+            0.0,
+            1.0
+          ],
           "envelope": {
             "__type__": "Envelope",
             "curve": [

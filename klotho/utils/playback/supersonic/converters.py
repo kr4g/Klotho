@@ -620,10 +620,17 @@ def _build_score_control_data(control_descriptors, block_size):
     for i, desc in enumerate(control_descriptors):
         env = desc["envelope"]
         total = env.total_time
+        # ``curve_window`` is the slice of the curve this descriptor carries.
+        # An unsplit envelope carries all of it; a descriptor produced by an
+        # instrument split carries only its own part, and sampling the WHOLE
+        # curve for each half is what made a split envelope play one full
+        # hairpin per half instead of the single gesture the composer drew.
+        window_start, window_end = desc.get("curve_window") or (0.0, 1.0)
         if total <= 0:
             samples = np.full(block_size, float(env.values[0]), dtype=np.float32)
         else:
-            sample_times = np.linspace(0.0, total, block_size, dtype=np.float64)
+            sample_times = np.linspace(window_start * total, window_end * total,
+                                       block_size, dtype=np.float64)
             samples = np.array(env.sample(sample_times), dtype=np.float32)
         blocks.append(samples)
 
@@ -679,6 +686,7 @@ def _collect_control_descriptors(uc, node_to_event_ids, id_map=None):
             "start": env_start,
             "duration": env_end - env_start,
             "targets": targets,
+            "curve_window": desc.get("curve_window") or (0.0, 1.0),
         })
     return control_descriptors
 
