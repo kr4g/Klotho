@@ -1916,7 +1916,8 @@ class CompositionalUnit(TemporalUnit):
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
 
-    def _bake_envelope(self, selected, envelope, pfields_list, endpoint):
+    def _bake_envelope(self, selected, envelope, pfields_list, endpoint,
+                       curve_window=None):
         # timing reads go straight to the (offset-free) cache with the
         # offset added exactly as the Chronon accessors do — each
         # self.nodes[n][...] read used to allocate a proxy and re-check
@@ -1947,19 +1948,39 @@ class CompositionalUnit(TemporalUnit):
         else:
             end_time = max(times[n]['real_onset'] + offset for n in sounding)
         duration = end_time - start_time
+        # ``curve_window`` is the slice of the WHOLE curve these leaves
+        # carry, as fractions of its normalised time. It is what makes a
+        # split envelope keep its values (Ryan's ruling): each half stretches
+        # the FULL curve so that its own window lands on its own leaves, then
+        # samples only inside that window -- so a crescendo drawn under a
+        # phrase still ramps continuously across a split, and only the
+        # bookkeeping changed. Without it each half re-runs the whole curve
+        # over its own sub-span, which measured [0.1, 0.3, 0.5, 0.7] turning
+        # into [0.1, 0.5, 0.1, 0.5]: two hairpins where the composer drew
+        # one.
+        #
+        # ``None`` means the whole curve, and then every line below is
+        # arithmetically what it was before this parameter existed.
+        window_start, window_end = curve_window or (0.0, 1.0)
+        window = window_end - window_start
+        if window <= 0:
+            window_start, window = 0.0, 1.0
+        full_duration = duration / window
         raw_total = sum(envelope.times)
         scaled_envelope = Envelope(
             values=envelope.values,
             times=envelope.times,
             curve=envelope.curve,
             warp=envelope.warp,
-            time_scale=duration / raw_total if raw_total > 0 else 1.0
+            time_scale=full_duration / raw_total if raw_total > 0 else 1.0
         )
+        window_offset = window_start * scaled_envelope.total_time
         self._invalidate_bind_memo_subtree(sounding, pfields_list)
         with self._rt.batch_writes():
             for node in sounding:
                 event_time = times[node]['real_onset'] + offset
-                relative_time = max(0, min(event_time - start_time, scaled_envelope.total_time))
+                relative_time = max(0, min(window_offset + event_time - start_time,
+                                           scaled_envelope.total_time))
                 try:
                     env_value = scaled_envelope.at_time(relative_time)
                 except ValueError:
@@ -2073,22 +2094,77 @@ class CompositionalUnit(TemporalUnit):
         leaf_subset = None if set(selected) == all_anchor_leaves else tuple(selected)
 
         self._check_envelope_overlap(pfields_list, sounding)
-        self._bake_envelope(sounding, envelope, pfields_list, endpoint)
 
-        env_id = self._next_envelope_id
-        self._next_envelope_id += 1
-        self._control_envelopes[env_id] = {
-            "envelope": envelope,
-            "pfields": list(pfields_list),
-            "endpoint": endpoint,
-            "anchor_node": anchor_node,
-            "leaf_subset": leaf_subset,
-            # what the baked values were computed against. A structural edit
-            # rebakes ONLY when this no longer matches -- see
-            # ``_queue_envelope_rebakes``.
-            "baked_leaves": tuple(sounding),
-        }
-        return env_id
+        # An envelope splits at an instrument change, exactly as a slur does
+        # (Ryan, 2026-08-31) -- but it keeps its OWN constraints. There is no
+        # ">= 2 targets" rule here and no split at a rest: a slur is an arc
+        # over sounding notes, an envelope is a curve over a span, so a
+        # one-leaf run is still a legitimate envelope.
+        runs = self._partition_by_instrument(sounding)
+        env_ids = []
+        for run, window in zip(runs, self._curve_windows(runs, endpoint)):
+            self._bake_envelope(run, envelope, pfields_list, endpoint,
+                                curve_window=window)
+            env_id = self._next_envelope_id
+            self._next_envelope_id += 1
+            run_set = set(run)
+            self._control_envelopes[env_id] = {
+                "envelope": envelope,
+                "pfields": list(pfields_list),
+                "endpoint": endpoint,
+                "anchor_node": anchor_node,
+                "leaf_subset": (leaf_subset if len(runs) == 1
+                                else tuple(n for n in selected if n in run_set)),
+                # what the baked values were computed against. A structural
+                # edit rebakes ONLY when this no longer matches -- see
+                # ``_queue_envelope_rebakes``.
+                "baked_leaves": tuple(run),
+                # the slice of the whole curve this descriptor carries, so a
+                # later rebake reproduces its VALUES rather than restarting
+                # the gesture. ``(0.0, 1.0)`` for an unsplit envelope.
+                "curve_window": window,
+            }
+            env_ids.append(env_id)
+        if not env_ids:
+            return None
+        return env_ids[0] if len(env_ids) == 1 else env_ids
+
+    def _curve_windows(self, runs, endpoint):
+        """The slice of the whole curve each run carries, in normalised time.
+
+        Computed from the runs' real onsets, so a split reproduces exactly
+        the values the unsplit envelope had: run *k* stretches the full curve
+        so that its own window lands on its own leaves, and samples only
+        inside it. That is what Ryan's ruling asks for -- a crescendo drawn
+        under a phrase keeps ramping across the split, because splitting is
+        about not sending control messages across an instrument boundary,
+        not about restarting the gesture.
+        """
+        if len(runs) <= 1:
+            return [(0.0, 1.0)] * len(runs)
+        self._ensure_timing_cache()
+        times = self._real_times
+        offset = self._offset
+
+        def bounds(leaves):
+            start = min(times[n]['real_onset'] + offset for n in leaves)
+            if endpoint:
+                end = max(times[n]['real_onset'] + offset
+                          + abs(times[n]['real_duration']) for n in leaves)
+            else:
+                end = max(times[n]['real_onset'] + offset for n in leaves)
+            return start, end
+
+        whole_start, whole_end = bounds([n for run in runs for n in run])
+        total = whole_end - whole_start
+        if total <= 0:
+            return [(0.0, 1.0)] * len(runs)
+        windows = []
+        for run in runs:
+            start, end = bounds(run)
+            windows.append(((start - whole_start) / total,
+                            (end - whole_start) / total))
+        return windows
 
     def resolved_control_envelopes(self):
         """Resolve recorded control-envelope descriptors to concrete leaf spans.
@@ -2245,6 +2321,108 @@ class CompositionalUnit(TemporalUnit):
             segments.append(tuple(current))
         return segments
 
+    def _same_overlay_instrument(self, a, b):
+        """Whether two leaves count as the same instrument for an OVERLAY.
+
+        Ryan, 2026-08-31: *"Slurs only make sense across the same
+        instrument. Same with control envs."* This is the predicate that
+        sentence needs, and it reuses the ties charter's own rather than
+        inventing a second definition of "same instrument":
+        ``_tie_instruments_join`` is §5's ``instrument_key`` component,
+        already implemented for tie joining, with all of its normalisation
+        (UNBOUND is its own kind and never silently the default synth;
+        strings by canonical def name; instances by identity, else equality
+        AND equal ``defName``, because bare ``==`` is defName-blind).
+
+        Plus ``group``, and only plus ``group``. The rest of §5's composite
+        key is deliberately out, measured rather than assumed:
+
+        * ``kit_voice_key`` differs between consecutive leaves of a rotating
+          family BY CONSTRUCTION -- §5 says so -- so reusing it would
+          shatter every slur over a kit passage into single-note runs, and a
+          run under two members dissolves. Measured, the lowering already
+          sounds that same passage as ONE synth with no warning.
+        * ``voice_count`` would split a slur running from a single note into
+          a double stop, which is ordinary notation. A tie needs matching
+          arity because it MERGES two notes into one sound; a slur merges
+          nothing, and the lowering already expands every event in an arc to
+          the group maximum so the voice count never changes mid-slur.
+
+        ``group`` stays in for the reason §5 puts it there: the scheduler
+        re-points the out bus by group, and a slur additionally pools voices
+        at lowering, so a cross-track slur carries the hazard a cross-track
+        tie carries.
+
+        Comparison is always on the RESOLVED walk, never on binding
+        presence -- adjacent leaves routinely agree purely by inheritance.
+        """
+        # deferred, matching this package's idiom for reaching into
+        # utils.playback: _sc_assembly imports thetos.instruments at module
+        # scope, so a top-level import here would close the cycle.
+        from klotho.utils.playback._sc_assembly import _tie_instruments_join
+        if not _tie_instruments_join(self.get_instrument(a),
+                                     self.get_instrument(b)):
+            return False
+        return self.get_mfield(a, 'group') == self.get_mfield(b, 'group')
+
+    def _partition_by_instrument(self, leaves):
+        """Split a run of leaves wherever the instrument or the track changes.
+
+        Each leaf is compared against its RUN'S HEAD rather than its
+        neighbour, matching the shape ``_tie_join_reason`` uses for a tie
+        group: the head is what the run is, so it is what a candidate has to
+        match.
+        """
+        runs = []
+        current = []
+        for leaf in leaves:
+            if current and not self._same_overlay_instrument(current[0], leaf):
+                runs.append(current)
+                current = [leaf]
+            else:
+                current.append(leaf)
+        if current:
+            runs.append(current)
+        return runs
+
+    def _split_segments_at_instrument_changes(self, segments):
+        """Apply the instrument split to already-rest-partitioned runs.
+
+        A slur needs at least two adjacent sounding leaves, so a run left
+        alone on one instrument is not a slur and is dropped here -- exactly
+        as ``_partition_non_rest_segments`` drops a run of one beside a rest.
+        """
+        out = []
+        for segment in segments:
+            for run in self._partition_by_instrument(list(segment)):
+                if len(run) >= 2:
+                    out.append(tuple(run))
+        return out
+
+    def _refuse_slur_with_no_run(self, selected, rest_set):
+        """Say why, when the reason is an instrument change.
+
+        Ryan, 2026-08-31: *"we can certainly have 'sorry, you can't do that'
+        warnings/errors where appropriate. We don't need to accommodate
+        every application, especially when it doesnt make sense."* A caller
+        who asked for a slur and got no slur is owed the reason, and the
+        instrument case is the one where the reason is NOT guessable from
+        the selection: every note is sounding, they are adjacent, and the
+        thing that refused them is invisible in the argument list.
+
+        The all-rest case keeps its shipped contract and returns an empty
+        list. That silence is arguably wrong too -- the caller is equally
+        empty-handed -- but it is a shipped, tested behaviour on a different
+        question, and widening a ruling about instruments into a contract
+        change about rests is how scope creeps. Filed rather than fixed.
+        """
+        sounding = [n for n in selected if n not in rest_set]
+        if len(self._partition_by_instrument(sounding)) > 1:
+            raise ValueError(
+                "Slur selection crosses an instrument change and leaves no "
+                "run of two or more adjacent notes on one instrument. A slur "
+                "only means something within one instrument on one track.")
+
     def _validate_slur_segment(self, segment, reserved_sets=None):
         proposed_set = set(segment)
         for spec in self._slur_specs.values():
@@ -2363,7 +2541,10 @@ class CompositionalUnit(TemporalUnit):
             if len(selected) < 2:
                 raise ValueError("Slur requires at least two leaves")
             rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
-            segments = self._partition_non_rest_segments(selected, rest_set)
+            segments = self._split_segments_at_instrument_changes(
+                self._partition_non_rest_segments(selected, rest_set))
+            if not segments:
+                self._refuse_slur_with_no_run(selected, rest_set)
             slur_ids = []
             reserved_sets = []
             for segment in segments:
@@ -2380,7 +2561,10 @@ class CompositionalUnit(TemporalUnit):
                 selected = self._apply_offset_take(group, offset=offset, take=take)
                 selected = self._snap_to_tie_heads(selected)
                 rest_set = {n for n in selected if self._rt[n].get('proportion', 1) < 0}
-                segments = self._partition_non_rest_segments(selected, rest_set)
+                segments = self._split_segments_at_instrument_changes(
+                    self._partition_non_rest_segments(selected, rest_set))
+                if not segments:
+                    self._refuse_slur_with_no_run(selected, rest_set)
                 for segment in segments:
                     self._validate_slur_segment(segment, reserved_sets)
                     slur_id = self._register_slur(segment)
@@ -2451,6 +2635,65 @@ class CompositionalUnit(TemporalUnit):
                 "Slur removed: fewer than two adjacent sounding leaves remain",
                 RuntimeWarning, stacklevel=4
             )
+
+    def _resplit_overlays_at_instrument_changes(self):
+        """Re-apply the instrument split to every live overlay.
+
+        The THIRD enforcement site, and the one that is not optional. Ryan's
+        ruling says an overlay splits at an instrument change; authoring and
+        the structural heal between them do not deliver that, because
+        ``set_instrument`` changes the instrument without touching the
+        structure. Measured before this existed: binding a mid-arc leaf to a
+        different synth bumped ``_instruments_version``, ran no heal, and
+        left the arc spanning two instruments -- so an arc drawn before the
+        binding quietly kept a shape the ruling forbids, and the mid-slur
+        warning at lowering stayed reachable.
+
+        The accepted cost, stated plainly because a caller meets it:
+        ``set_instrument`` can now rewrite a slur the caller is holding, and
+        mint an id they never saw. That is the trade Ryan took over leaving
+        the hole open.
+
+        An envelope's halves are NOT rebaked. Their values are already on
+        the leaves and each half inherits its own slice of the parent's
+        curve window, so the split changes bookkeeping and nothing audible
+        -- which is the ruling for envelopes.
+        """
+        # ``set_instrument`` runs during ``__init__``, before either overlay
+        # store exists, and it is hot enough that the common case -- a unit
+        # with no overlays at all -- should cost one attribute lookup.
+        slur_specs = getattr(self, '_slur_specs', None)
+        control_envelopes = getattr(self, '_control_envelopes', None)
+        if not slur_specs and not control_envelopes:
+            return
+        for slur_id, spec in list((slur_specs or {}).items()):
+            members = list(spec['leaf_nodes'])
+            runs = self._partition_by_instrument(members)
+            if len(runs) <= 1:
+                continue
+            self._reshape_slur(slur_id, [tuple(run) for run in runs
+                                         if len(run) >= 2])
+
+        for env_id, desc in list((control_envelopes or {}).items()):
+            resolved = self._resolve_control_envelope_leaves(desc)
+            runs = self._partition_by_instrument(resolved)
+            if len(runs) <= 1:
+                continue
+            start, end = desc.get("curve_window") or (0.0, 1.0)
+            width = end - start
+            del self._control_envelopes[env_id]
+            for run, (inner_start, inner_end) in zip(
+                    runs, self._curve_windows(runs, desc["endpoint"])):
+                new_id = env_id if run is runs[0] else self._next_envelope_id
+                if run is not runs[0]:
+                    self._next_envelope_id += 1
+                self._control_envelopes[new_id] = {
+                    **desc,
+                    "leaf_subset": tuple(run),
+                    "baked_leaves": tuple(run),
+                    "curve_window": (start + inner_start * width,
+                                     start + inner_end * width),
+                }
 
     def _split_slurs_for_rests(self, nodes_to_rest: set[int]):
         for slur_id, spec in list(self._slur_specs.items()):
@@ -3286,6 +3529,12 @@ class CompositionalUnit(TemporalUnit):
                             self._rt.set_mfields(n, group=family)
         else:
             raise TypeError(_instrument_shape_error(instrument))
+        # An overlay splits at an instrument change (Ryan, 2026-08-31), and
+        # this is where a change actually happens. Authoring and the
+        # structural heal cannot cover it between them: binding a leaf moves
+        # no ids and grows no leaves, so neither seam fires, and an arc drawn
+        # before the binding kept a shape the ruling forbids.
+        self._resplit_overlays_at_instrument_changes()
 
     def set(self, node, *, inst=None, include_rests=False,
             pfields=None, mfields=None, **fields):

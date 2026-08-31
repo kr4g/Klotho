@@ -477,11 +477,19 @@ class TestAMidSlurInstrumentChangeIsAnnounced:
     same code goes silent. Measured: on one edit, slur membership goes from
     2 of 6 leaves to 6 of 6.
 
-    The policy question -- break the arc at the change, warn and continue, or
-    release and restrike -- is Ryan's, and is filed. What is fixed here is
-    only that it stops being SILENT, which is the standard the envelope side
-    and the tie side already meet (``_tie_join_reason`` refuses to join on an
-    instrument mismatch and says so).
+    **The policy question is ANSWERED, and this class now tests the answer
+    rather than the mitigation.** Ryan ruled on 2026-08-31: an overlay
+    SPLITS at an instrument change -- *"Slurs only make sense across the
+    same instrument"* -- enforced at authoring, in the structural heal, and
+    at ``set_instrument`` itself. So the state this warning announces can no
+    longer be constructed: a continuation can never carry an instrument
+    different from its head, because the arc broke where the instrument did.
+
+    The warning stays, and a firing is now a BUG rather than a disclosure.
+    That is why the test below asserts silence and then checks the arc
+    actually split: an unreachable warning that is unreachable because the
+    feature silently stopped working would also be silent, and only the
+    second assertion can tell those apart.
     """
 
     @staticmethod
@@ -504,11 +512,23 @@ class TestAMidSlurInstrumentChangeIsAnnounced:
             return [str(w.message) for w in caught
                     if 'Instrument change inside a slur' in str(w.message)]
 
-    def test_a_mid_slur_instrument_change_warns(self):
-        messages = self._lower(self._slurred(instrument_on_member=True))
-        assert messages, 'a note that will not sound as written said nothing'
-        assert 'kl_saw' in messages[0] and 'kl_tri' in messages[0], (
-            'the warning must name both what was asked for and what sounds')
+    def test_a_mid_slur_instrument_change_can_no_longer_be_constructed(self):
+        uc = self._slurred(instrument_on_member=True)
+
+        assert self._lower(uc) == [], (
+            'the arc still spans two instruments at lowering, so the ruling '
+            'is not being enforced somewhere')
+
+        arcs = sorted(tuple(spec['leaf_nodes'])
+                      for spec in uc._slur_specs.values())
+        instruments = {leaf: uc.get_instrument(leaf)
+                       for arc in arcs for leaf in arc}
+        for arc in arcs:
+            assert len({instruments[leaf] for leaf in arc}) == 1, (
+                f'arc {arc} spans {[instruments[l] for l in arc]}')
+        assert len(uc._slur_specs) < 1 or arcs, (
+            'the warning went quiet because the slur vanished, not because '
+            'the arc split -- those are not the same thing')
 
     def test_a_uniform_slur_does_not_warn(self):
         """The other direction: a warning that always fires is noise."""
