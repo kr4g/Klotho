@@ -235,12 +235,31 @@ class ParameterLayer(TreeLayer):
         return dict(self._effective_cache[node])
 
     def remove_fields(self, tree, node, keys):
-        """Delete the given override keys at *node* (descendants revert to inherited values)."""
+        """Delete the given override keys at *node* (descendants revert to inherited values).
+
+        This was the ONE field path in this layer that reached into
+        ``tree._rx[node]`` without announcing anything to the tree. Every
+        field WRITE goes through ``_write_node_data`` and moves the structure
+        version on the way past; a field DELETE moved nothing, so every
+        consumer memoized on that version went on serving a value that no
+        longer existed. Measured: ``remove_envelope`` left the removed
+        envelope's baked amps ``[0.0, 0.25, 0.5, 0.75]`` in place of
+        ``[0.1, 0.1, 0.1, 0.1]``, and not only on the inspection surface --
+        the effective-parameter-tree snapshot that feeds LOWERING carried
+        them too, so the envelope kept sounding after it was removed.
+
+        ``_invalidate_caches`` rather than ``_post_mutation``: deleting an
+        override is a data write, and ``_post_mutation`` would additionally
+        purge instrument bindings, which a pfield delete has no business
+        doing. A write and a delete should be equally visible -- no more
+        than that.
+        """
         raw = tree._rx[node]
         if isinstance(raw, dict):
             for k in keys:
                 raw.pop(k, None)
         self._effective_cache = None
+        tree._invalidate_caches()
 
     def clear_fields(self, tree, node=None):
         """Remove all overrides and instrument bindings — whole tree, or *node*'s subtree."""
