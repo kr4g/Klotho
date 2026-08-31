@@ -212,3 +212,88 @@ class TestInsertChildShiftsLayerState:
         assert rows[100.0]['_slur_start'] == 1
         assert rows[200.0]['_slur_end'] == 1
         assert rows[440.0]['_slur_start'] != 1
+
+
+class TestEveryCloneRouteOwnsItsHealing:
+    """LAYER-11 -- the observer obligation, asserted over EVERY route.
+
+    Derivation, from the contract written on the seam rather than from
+    behaviour. ``Tree.set_id_state_observer``'s docstring states the rule
+    in two halves: "A clone gets NO observer: it belongs to a different
+    owner, WHICH REBINDS ITSELF." The first half is the tree's job and the
+    tree does it. The second half is an obligation on the owner, and it
+    binds every route that produces a ``CompositionalUnit`` -- not the
+    three that happened to have a rebinder written into them.
+
+    The consequence is not a leak. rustworkx reuses freed node ids, so an
+    overlay that stops following its content re-attaches to whatever later
+    lands in the slot: a slur reaches playback on a note that did not
+    exist when it was drawn.
+
+    ``copy()`` alone was pinned (``test_a_copied_unit_heals_its_own
+    _overlays`` above). Pinning the property over the routes is what
+    catches the route nobody wrote a test for.
+    """
+
+    ROUTES = [
+        ('copy', lambda uc: uc.copy()),
+        ('deepcopy', lambda uc: __import__('copy').deepcopy(uc)),
+        ('copy_rebuild', lambda uc: uc._copy_rebuild()),
+        ('from_subtree_at_root', lambda uc: uc.from_subtree(uc._rt.root)),
+    ]
+
+    @staticmethod
+    def _tagged():
+        """Three notes tagged 100/200/300, slurred over the first two."""
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1), beat='1/4', bpm=60,
+                pfields={'freq': 440})
+        leaves = list(uc._rt.leaf_nodes)
+        for i, node in enumerate(leaves):
+            uc.set_pfields(node, freq=100 * (i + 1))
+        uc.apply_slur(node=leaves[0:2])
+        return uc
+
+    @pytest.mark.parametrize('name, clone', ROUTES, ids=[r[0] for r in ROUTES])
+    def test_the_clones_tree_reports_to_the_clone(self, name, clone):
+        """The structural half: the seam exists and points at the new owner.
+
+        Bound to the CLONE, not merely non-``None`` -- an observer left
+        bound to the source would heal the source's overlays against ids
+        that never moved there."""
+        twin = clone(self._tagged())
+        observer = twin._rt._id_state_observer
+        assert observer is not None, f'{name} left the tree unobserved'
+        assert getattr(observer, '__self__', None) is twin, name
+
+    @pytest.mark.parametrize('name, clone', ROUTES, ids=[r[0] for r in ROUTES])
+    def test_a_note_created_after_the_clone_is_not_swallowed_by_the_slur(self, name, clone):
+        """The behavioural half, and the one that says why it matters.
+
+        A slur names the notes it was drawn over. The note inserted below
+        did not exist when the slur was drawn, so by the definition of a
+        slur it cannot be a member -- and the two notes that ARE members
+        are still there, so the slur must still run from 100 to 200."""
+        twin = clone(self._tagged())
+
+        twin._rt.insert_child(twin._rt.root, 0, proportion=1)
+
+        rows = _rows_by_freq(twin)
+        assert rows[100.0]['_slur_start'] == 1, name
+        assert rows[200.0]['_slur_end'] == 1, name
+        assert rows[440.0]['_slur_start'] != 1, name
+
+    def test_the_source_is_not_healed_by_its_clone(self):
+        """The other direction of the same rule: rebinding must move the
+        seam to the clone, never leave the source wired to a tree it does
+        not own."""
+        import copy as _copy
+        source = self._tagged()
+        twin = _copy.deepcopy(source)
+
+        twin._rt.insert_child(twin._rt.root, 0, proportion=1)
+
+        assert source._rt._id_state_observer.__self__ is source
+        assert list(source._rt.leaf_nodes) == [1, 2, 3]
+        rows = _rows_by_freq(source)
+        assert rows[100.0]['_slur_start'] == 1
+        assert rows[200.0]['_slur_end'] == 1

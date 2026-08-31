@@ -202,3 +202,177 @@ class TestBareRootUnitSurvivesTheRebuildRecipes:
     def test_modulate_tempus_keeps_the_root_values(self):
         out = modulate_tempus(self._bare(), 1, '2/4')
         assert out.events['amp'].tolist() == [0.3]
+
+
+def _slur_shape(uc):
+    """Per slur id on the lowering surface: heads, tails, and positions.
+
+    ``positions`` are indices into the events table, i.e. places in
+    left-to-right performance order.
+    """
+    events = uc.events
+    if '_slur_id' not in events.columns:
+        return {}
+    shape = {}
+    for position, (_, row) in enumerate(events.iterrows()):
+        slur_id = row['_slur_id']
+        if slur_id != slur_id:          # NaN: this event carries no slur
+            continue
+        entry = shape.setdefault(int(slur_id),
+                                 {'heads': 0, 'tails': 0, 'positions': []})
+        entry['positions'].append(position)
+        if row['_slur_start'] == 1.0:
+            entry['heads'] += 1
+        if row['_slur_end'] == 1.0:
+            entry['tails'] += 1
+    return shape
+
+
+def _non_leaf_members(uc):
+    """Overlay members naming a node that is not on the leaf surface."""
+    leaves = set(uc._rt.leaf_nodes)
+    slurs = {slur_id: [n for n in spec['leaf_nodes'] if n not in leaves]
+             for slur_id, spec in uc._slur_specs.items()}
+    envelopes = {env_id: [n for n in desc['leaf_subset'] if n not in leaves]
+                 for env_id, desc in uc._control_envelopes.items()}
+    return ({k: v for k, v in slurs.items() if v},
+            {k: v for k, v in envelopes.items() if v})
+
+
+#: The three doors through which a leaf can stop being a leaf. The first
+#: two announce the event (``d5a1b20``); the third had no override at all.
+LEAF_GROWTH_DOORS = [
+    ('subdivide', lambda uc, node: uc._rt.subdivide(node, (1, 1, 1))),
+    ('graft_subtree',
+     lambda uc, node: uc._rt.graft_subtree(
+         node, RhythmTree(meas='1/4', subdivisions=(1, 1)))),
+    ('insert_child',
+     lambda uc, node: [uc._rt.insert_child(node, k, proportion=1)
+                       for k in range(3)]),
+]
+
+
+class TestNoOverlayNamesANodeThatStoppedBeingALeaf:
+    """LAYER-12 -- the rule the code already states, enforced at every door.
+
+    Derivation, from a rule written in this package rather than from what
+    the code does. ``_remap_slur_specs`` states it as a comment on the
+    line that applies it: "a note that stopped being a leaf is no longer
+    slurrable", and ``_remap_control_envelopes`` repeats it for envelope
+    subsets. It follows from what a slur IS: ``apply_slur`` selects among
+    ``leaf_nodes``, and only leaves become events, so an overlay member
+    that is not a leaf denotes no note at all.
+
+    The rule holds at ``subdivide`` and ``graft_subtree`` because
+    ``d5a1b20`` gave each an override. ``insert_child`` never got one, and
+    neither shipped seam fires for it -- the node is still in the tree, so
+    DEATH's test is false, and ``Tree.insert_child`` announces a
+    relocation only when a sibling actually shifted, which an insert into
+    a CHILDLESS node never does.
+    """
+
+    @pytest.mark.parametrize('door, grow', LEAF_GROWTH_DOORS,
+                             ids=[d for d, _ in LEAF_GROWTH_DOORS])
+    def test_a_slur_member_that_grows_children_leaves_the_spec(self, door, grow):
+        uc = _tagged()
+        leaves = list(uc._rt.leaf_nodes)
+        uc.apply_slur([leaves[1], leaves[2]])
+        assert uc._slur_specs, 'the fixture must draw a slur, or this checks nothing'
+
+        grow(uc, leaves[1])
+
+        stale_slurs, _ = _non_leaf_members(uc)
+        assert stale_slurs == {}, f'{door} left a slur naming a non-leaf'
+
+    @pytest.mark.parametrize('door, grow', LEAF_GROWTH_DOORS,
+                             ids=[d for d, _ in LEAF_GROWTH_DOORS])
+    def test_an_envelope_target_that_grows_children_leaves_the_subset(self, door, grow):
+        uc = _tagged()
+        leaves = list(uc._rt.leaf_nodes)
+        uc.apply_envelope(Envelope([0.0, 1.0], times=[2.0]), 'freq',
+                          node=[leaves[0], leaves[1], leaves[2]], control=True)
+        assert uc._control_envelopes, 'the fixture must draw an envelope'
+
+        grow(uc, leaves[1])
+
+        _, stale_envelopes = _non_leaf_members(uc)
+        assert stale_envelopes == {}, f'{door} left an envelope naming a non-leaf'
+
+
+class TestEverySlurOnTheSurfaceIsOneArc:
+    """LAYER-12 -- what ``apply_slur`` refuses to author, no edit may create.
+
+    Derivation, from the authoring contract rather than from behaviour. A
+    slur is one arc from one note to one note: ``apply_slur`` enforces
+    contiguity (``_validate_slur_selection`` raises "Selection must be
+    contiguous in left-to-right tree order") and dissolves fragments below
+    two notes, and ``_remap_slur_specs``' own comment names contiguity as
+    "the property that DEFINED the slur". So on the lowering surface every
+    slur id must carry exactly ONE ``_slur_start``, exactly ONE
+    ``_slur_end``, and a contiguous run of events between them.
+
+    This invariant is POLICY-AGNOSTIC. Whether a leaf that grows children
+    has its slur DROPPED (what ``subdivide`` chose) or ABSORBED onto the
+    new leaves (what ``uc.subdivide`` chose), the result is one arc either
+    way. It fails only on the third state -- an overlay left naming a node
+    the surface no longer has.
+    """
+
+    @staticmethod
+    def _two_slurs():
+        """Six notes, two slurs: 0-1 untouched, 3-4 the one that is edited.
+
+        The untouched slur is what keeps the check non-vacuous: under a
+        DROP policy the edited slur dissolves, and a fixture with only
+        that slur would assert nothing at all.
+        """
+        uc = UC(tempus='6/4', prolatio=(1,) * 6, beat='1/4', bpm=60,
+                pfields={'freq': 0})
+        leaves = list(uc._rt.leaf_nodes)
+        for i, node in enumerate(leaves):
+            uc.set_pfields(node, freq=100 * (i + 1))
+        uc.apply_slur([leaves[0], leaves[1]])
+        uc.apply_slur([leaves[3], leaves[4]])
+        return uc, leaves
+
+    @pytest.mark.parametrize('door, grow', LEAF_GROWTH_DOORS,
+                             ids=[d for d, _ in LEAF_GROWTH_DOORS])
+    def test_growing_children_under_a_slurred_note_leaves_one_arc(self, door, grow):
+        uc, leaves = self._two_slurs()
+
+        grow(uc, leaves[3])
+
+        shape = _slur_shape(uc)
+        assert shape, 'the untouched slur must survive, or this checks nothing'
+        for slur_id, entry in shape.items():
+            assert entry['heads'] == 1, f'{door}: slur {slur_id} has {entry["heads"]} heads'
+            assert entry['tails'] == 1, f'{door}: slur {slur_id} has {entry["tails"]} tails'
+            positions = entry['positions']
+            assert positions == list(range(positions[0], positions[-1] + 1)), \
+                f'{door}: slur {slur_id} is not contiguous: {positions}'
+
+    def test_an_insert_cannot_author_a_slur_apply_slur_would_refuse(self):
+        """Consequence (b): the stale spec defeated the overlap check.
+
+        ``_validate_slur_selection`` tests intersection against the stored
+        ``leaf_set``. While that set named a node the surface no longer
+        had, a second ``apply_slur`` over the hidden children was accepted
+        -- and the first slur was left with a head and no tail anywhere on
+        the surface.
+        """
+        uc = _tagged()
+        leaves = list(uc._rt.leaf_nodes)
+        uc.apply_slur([leaves[0], leaves[1]])
+
+        uc._rt.insert_child(leaves[1], 0, proportion=1)
+        uc._rt.insert_child(leaves[1], 1, proportion=1)
+
+        current = list(uc._rt.leaf_nodes)
+        try:
+            uc.apply_slur([current[1], current[2]])
+        except ValueError:
+            pass                        # refusing is a correct answer too
+
+        for slur_id, entry in _slur_shape(uc).items():
+            assert entry['heads'] == 1, f'slur {slur_id}: {entry}'
+            assert entry['tails'] == 1, f'slur {slur_id}: {entry}'

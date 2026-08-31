@@ -475,3 +475,68 @@ class TestCompositionalUnitRefused:
         seq = TemporalUnitSequence([TemporalUnit(tempus='1/4', prolatio=(1,))])
         with pytest.raises(TypeError):
             augment(host, seq, 1)
+
+
+class TestTheRefusalDoesNotStateAGroundTheNeighbourRefutes:
+    """OPS-17 -- the deferral may stand; the mechanical claim may not.
+
+    Derivation, from two docstrings rather than from behaviour. The
+    refusal at ``_following_target`` grounds itself on a claim about the
+    library: a rebuild destroys leaf identity, therefore "the pfields,
+    envelopes and slurs have nowhere to land". ``RhythmTree._respell``'s
+    own ``sources`` parameter doc states the opposite as its contract:
+    the map "is what carries pfields, mfields and instrument bindings
+    across the rebuild -- and, through ``_notify_nodes_relocated``,
+    everything else keyed by node id (slurs, memoized Bind draws,
+    control-envelope targets)".
+
+    Both cannot be true. The demonstration below settles which: an
+    ``extract`` is a DELETE -- four leaves become three, no output leaf is
+    an input leaf -- and it rebuilds through ``_respell``, and the
+    pfields land. So a message may defer this family behind R13-E, but it
+    may not tell a composer the carry is impossible.
+    """
+
+    @staticmethod
+    def _cu():
+        from klotho.thetos.composition.compositional import CompositionalUnit
+        return CompositionalUnit(tempus='4/4', prolatio=(1, 1, 1, 1))
+
+    def test_a_rebuild_that_destroys_leaf_identity_still_lands_the_pfields(self):
+        """The premise, run rather than asserted from the record."""
+        from klotho.thetos.composition.compositional import CompositionalTree
+        ct = CompositionalTree(meas='4/4', subdivisions=(1, 1, 1, 1))
+        for node, amp in zip(ct.leaf_nodes, (0.125, 0.25, 0.5, 0.75)):
+            ct.set_pfields(node, amp=amp)
+        before = list(ct.leaf_nodes)
+        ct.extract(1)
+        after = list(ct.leaf_nodes)
+        assert len(after) == len(before) - 1
+        assert [ct.get_pfield(n, 'amp') for n in after] == [0.125, 0.5, 0.75]
+
+    @pytest.mark.parametrize('verb, call', [
+        ('diminish', lambda cu: diminish(cu, 0)),
+        ('scale_tempus', lambda cu: scale_tempus(cu, 3, 2)),
+        ('augment', lambda cu: augment(cu, '3/10', 2)),
+    ], ids=['diminish', 'scale_tempus', 'augment'])
+    def test_the_refusal_does_not_claim_the_carry_is_impossible(self, verb, call):
+        with pytest.raises(NotImplementedError) as excinfo:
+            call(self._cu())
+        msg = str(excinfo.value)
+        assert 'nowhere to land' not in msg, msg
+        assert 'no output leaf is any input leaf' not in msg, msg
+
+    @pytest.mark.parametrize('verb, call', [
+        ('diminish', lambda cu: diminish(cu, 0)),
+        ('scale_tempus', lambda cu: scale_tempus(cu, 3, 2)),
+        ('augment', lambda cu: augment(cu, '3/10', 2)),
+    ], ids=['diminish', 'scale_tempus', 'augment'])
+    def test_the_refusal_still_names_the_staging_ticket_and_the_way_out(self, verb, call):
+        """Re-wording must not cost the composer the two things the old
+        message got right: which staged surface this is, and what to do
+        instead."""
+        with pytest.raises(NotImplementedError) as excinfo:
+            call(self._cu())
+        msg = str(excinfo.value)
+        assert 'R13-E' in msg, msg
+        assert 'uc.rt' in msg, msg

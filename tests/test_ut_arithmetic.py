@@ -321,3 +321,60 @@ class TestCompositionalUnit:
         out = uc * Fraction(3, 2)
         assert out.tempus == Meas(12, 8)
         assert out.bpm == 60
+
+
+class TestTheStrSpellingRefusesByValueNotBySpelling:
+    """OPS-15 -- a bad factor gets the refusal its VALUE earns.
+
+    Derivation, from the method's own contract rather than from what it
+    currently does: ``__mul__``'s Parameters block declares
+    ``other : Fraction, Meas, str, or float`` and says "A ``str`` is read
+    as a fraction (``'3/2'``)", i.e. the four spellings name one factor
+    type. Its Raises block declares exactly one refusal for a bad value:
+    "ValueError -- If *other* is zero or negative." Both statements
+    together force the invariant: for a value that is zero or negative,
+    every spelling must raise the SAME ValueError. A spelling-dependent
+    refusal contradicts the docstring, whichever spelling is the odd one.
+    """
+
+    @pytest.mark.parametrize('text, number', [
+        ('0', Fraction(0)),
+        ('0/5', Fraction(0)),
+        ('-2', Fraction(-2)),
+        ('-3/2', Fraction(-3, 2)),
+    ])
+    def test_a_str_factor_refuses_exactly_as_the_same_value_does(self, text, number):
+        with pytest.raises(ValueError) as as_fraction:
+            src() * number
+        with pytest.raises(ValueError) as as_str:
+            src() * text
+        assert str(as_str.value) == str(as_fraction.value)
+
+    def test_the_zero_refusal_survives_the_str_spelling(self):
+        with pytest.raises(ValueError) as exc:
+            src() * '0'
+        assert 'zero' in str(exc.value)
+
+    def test_the_negative_refusal_survives_the_str_spelling(self):
+        with pytest.raises(ValueError) as exc:
+            src() * '-2'
+        assert 'negative' in str(exc.value).lower()
+
+    @pytest.mark.parametrize('text', ['x', ''])
+    def test_an_unparsable_str_names_the_factor_not_string_repetition(self, text):
+        """The fallback the old ``NotImplemented`` reached was ``str``'s
+        sequence-repeat slot, so the composer was told about multiplying a
+        sequence -- a message about string repetition, for an arithmetic
+        operation, naming neither the factor nor the real problem."""
+        with pytest.raises(TypeError) as exc:
+            src() * text
+        msg = str(exc.value)
+        assert repr(text) in msg, msg
+        assert 'sequence' not in msg, msg
+
+    def test_the_reflected_spelling_refuses_the_same_way(self):
+        """``__rmul__`` delegates, so ``'0' * ut`` must not reach the
+        sequence-repeat slot either."""
+        with pytest.raises(ValueError) as exc:
+            '0' * src()
+        assert 'zero' in str(exc.value)

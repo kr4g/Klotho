@@ -139,3 +139,80 @@ class TestFreshDictsShareTheirValues:
         for n in a.nodes:
             assert (a._rx.get_node_data(n) is not deep._rx.get_node_data(n)) is (
                 a._rx.get_node_data(n) is not structural._rx.get_node_data(n))
+
+
+class TestNoCloneRouteSharesAMutablePayloadWithItsSource:
+    """LAYER-19 -- the isolation property, asserted over EVERY clone route.
+
+    Derivation, from the definition of a copy rather than from behaviour:
+    a copy is independent of its source, so no mutable container may be
+    reachable from both. ``GraphCore._copy_rx`` states exactly that as its
+    contract -- "Copy a rustworkx graph so the twin shares no payload dict
+    with it" -- and gives the reason: ``PyDiGraph.copy()`` "duplicate[s]
+    the node and edge tables but keep[s] every payload BY REFERENCE".
+    Note the scope of that sentence: NODE AND EDGE. Freshening only the
+    node table satisfies half a definition.
+
+    Asserted as a property over the routes rather than one route at a
+    time, because the defect is exactly the shape a per-route test misses:
+    four routes were already clean, and the fifth was the one nobody had a
+    test for.
+    """
+
+    ROUTES = [
+        ('deepcopy', lambda t: copy.deepcopy(t)),
+        ('copy', lambda t: t.copy()),
+        ('structural_clone', lambda t: t.structural_clone()),
+        ('subtree_at_root', lambda t: t.subtree(t.root)),
+        ('from_tree_structure', lambda t: type(t).from_tree_structure(t)),
+    ]
+
+    @staticmethod
+    def _mutable_payloads(tree):
+        """Every payload a writer could mutate in place, by graph position.
+
+        Immutable payloads (``None`` above all) are excluded on purpose:
+        ``None`` is a singleton, so an identity test on it reports sharing
+        that cannot be a channel for anything.
+        """
+        nodes = {i: tree._rx.get_node_data(i) for i in tree._rx.node_indices()}
+        edges = {i: tree._rx.get_edge_data_by_index(i)
+                 for i in tree._rx.edge_indices()}
+        return ({i: p for i, p in nodes.items() if isinstance(p, (dict, list, set))},
+                {i: p for i, p in edges.items() if isinstance(p, (dict, list, set))})
+
+    @pytest.mark.parametrize('name, clone', ROUTES, ids=[r[0] for r in ROUTES])
+    @pytest.mark.parametrize('make', [
+        lambda: Tree('root', ((1, (2, 3)), 4)),
+        _bar,
+    ], ids=['tree', 'rhythm_tree'])
+    def test_the_clone_shares_no_payload_container(self, make, name, clone):
+        source = make()
+        twin = clone(source)
+
+        src_nodes, src_edges = self._mutable_payloads(source)
+        twin_nodes, twin_edges = self._mutable_payloads(twin)
+
+        assert src_edges, 'the fixture must have edge payloads, or this checks nothing'
+
+        shared_nodes = [i for i, p in src_nodes.items()
+                        if i in twin_nodes and twin_nodes[i] is p]
+        shared_edges = [i for i, p in src_edges.items()
+                        if i in twin_edges and twin_edges[i] is p]
+        assert shared_nodes == [], f'{name} shares node payloads at {shared_nodes}'
+        assert shared_edges == [], f'{name} shares edge payloads at {shared_edges}'
+
+    def test_writing_an_edge_payload_on_the_source_is_not_felt_by_the_clone(self):
+        """The symptom the identity test predicts, made concrete.
+
+        Tree edge payloads are empty dicts and nothing writes them TODAY,
+        which is exactly the shape the node aliasing had until five live
+        instances were found behind it.
+        """
+        source = _bar()
+        twin = type(source).from_tree_structure(source)
+
+        first = next(iter(source._rx.edge_indices()))
+        source._rx.get_edge_data_by_index(first)['probe'] = 1
+
+        assert 'probe' not in twin._rx.get_edge_data_by_index(first)
