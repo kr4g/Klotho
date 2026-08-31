@@ -114,7 +114,12 @@ class Tree(GraphCore):
     def from_tree_structure(cls, source_tree):
         """Create a new instance with the same topology as source_tree but no node data."""
         inst = cls.__new__(cls)
-        inst._rx = source_tree._rx.copy()
+        # `_copy_rx`, not a bare `_rx.copy()`: rustworkx duplicates the node
+        # and edge TABLES but keeps every payload BY REFERENCE, and blanking
+        # the node payloads below leaves the EDGE payloads still shared with
+        # the source. This was the only clone route that did not go through
+        # the shared helper.
+        inst._rx = cls._copy_rx(source_tree._rx)
         for idx in inst._rx.node_indices():
             inst._rx[idx] = {}
         inst._root = source_tree._root
