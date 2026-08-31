@@ -6,6 +6,9 @@ the behaviour ever moves back, the wrong docstring is caught rather than
 rediscovered by the next audit.
 """
 
+import ast
+import inspect
+import re
 from pathlib import Path
 
 import pytest
@@ -14,6 +17,7 @@ import klotho.utils.playback as playback
 from klotho.topos.graphs.lattices.lattices import Lattice
 from klotho.topos.collections.sequences import Pattern
 from klotho.thetos.instruments.synthdef import SynthDefInstrument
+from klotho.chronos import RhythmTree
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -953,3 +957,50 @@ class TestTheIdStateObserverContract:
         copied = clone(tree)
         copied.insert_child(copied.root, 0, label=1)
         assert seen == [], name
+
+
+class TestTheGuardFileDescribesTheGuardItActuallyHas:
+    """REC-1(b). RT-27 replaced the node-count guard with a structure-version
+    guard and left the prose behind in the test file that exists to explain
+    it. The code states the key in as many words -- ``temporal.py``: "Keyed
+    on the TREE'S STRUCTURE VERSION, not on the node count." -- so the two
+    can be compared without a human in the loop, which is the only reason
+    this is testable at all."""
+
+    @staticmethod
+    def _guard_doc():
+        path = Path(__file__).parent / 'test_perf_regression_guards.py'
+        tree = ast.parse(path.read_text())
+        node = next(
+            n for n in tree.body
+            if isinstance(n, ast.ClassDef)
+            and n.name == 'TestTimingCacheInvalidationOnStructuralMutation')
+        return ' '.join(ast.get_docstring(node).split())
+
+    def test_it_does_not_claim_the_guard_counts_nodes(self):
+        assert 'compares node' not in self._guard_doc(), (
+            'the guard is keyed on the structure version, not the node count')
+
+    def test_it_names_the_key_the_guard_actually_uses(self):
+        assert 'structure version' in self._guard_doc().lower()
+
+
+class TestThePreservedFamilyDoesNotDenyWhatItDoes:
+    """``insert`` and ``scale`` both printed that control envelopes do NOT
+    survive the rebuild. ``_respell`` -- three docstrings away in the same
+    file -- says the source map carries "everything else keyed by node id
+    (slurs, memoized Bind draws, control-envelope targets)", and
+    ``tests/test_overlay_healing_matrix.py`` measures that it does. Two
+    docstrings in one file contradicted each other and the behaviour
+    settled it. This pins the prose to the measurement."""
+
+    @staticmethod
+    def _denials(method):
+        return re.findall(r'[Cc]ontrol envelopes do\s+(?:not|NOT)',
+                          inspect.getdoc(method) or '')
+
+    def test_insert_does_not_claim_envelopes_are_lost(self):
+        assert self._denials(RhythmTree.insert) == []
+
+    def test_scale_does_not_claim_envelopes_are_lost(self):
+        assert self._denials(RhythmTree.scale) == []
