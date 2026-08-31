@@ -1701,10 +1701,19 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         if isinstance(other, (Meas, Fraction, float)):
             return self._scaled(self._exact_scale_factor(other))
         if isinstance(other, str):
+            # Only the PARSE goes inside the try. Wrapping the _scaled call
+            # swallowed its deliberate zero/negative refusals into
+            # NotImplemented, and Python then reported a string-repetition
+            # error for a factor this method documents as first-class.
+            # `__truediv__` below already has this shape.
             try:
-                return self._scaled(Fraction(other))
-            except (ValueError, ZeroDivisionError):
-                return NotImplemented
+                factor = Fraction(other)
+            except ValueError:
+                raise TypeError(
+                    f"TemporalUnit * {other!r}: a str factor is read as a "
+                    f"fraction ('3/2'), and {other!r} does not parse as one."
+                ) from None
+            return self._scaled(factor)
         return NotImplemented
 
     def __rmul__(self, other):
