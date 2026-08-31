@@ -2759,37 +2759,95 @@ class CompositionalUnit(TemporalUnit):
         # min/max, not first/last: the caller has not normalised order yet,
         # and this must not become a second place that guarantees it. Time
         # ordering is settled at ONE point, after tie snapping.
-        positions = [leaf_index[n] for n in members]
-        low, high = min(positions), max(positions)
         current = list(members)
-        # only the leaves that could possibly join: strictly inside the span
-        # and not already covered. Without this the scan re-walks every leaf
-        # of the unit per overlay per announcement -- measured at +47% on a
-        # structural edit over 320 leaves and 16 arcs, for work that is
-        # almost always empty.
-        inside = [(leaf, i) for leaf, i in leaf_index.items() if low < i < high]
-        if not inside:
-            return current
-        while True:
-            covered = set(current)
-            newcomers = []
-            for leaf, i in inside:
-                if leaf in covered:
-                    continue
-                parent = self._rt.parent(leaf)
-                if parent is None:
-                    continue
+        # EVERY leaf is a candidate, and the positional window that used to
+        # stand here is gone. It restricted the scan to ``low < i < high``
+        # over the members' own positions -- so growth at the FIRST member
+        # arrived before ``low`` and growth at the LAST arrived after
+        # ``high``, and neither could ever be seen. Measured on a two-note
+        # slur whose last member grew three children: ``uc.subdivide`` gave
+        # the whole growth, three ``add_child`` calls gave one leaf of three,
+        # and the arc's ``_slur_end`` moved from t=2.667 to t=2.0 -- the
+        # legato releasing two thirds of a beat early with two sounding
+        # leaves left outside the arc.
+        #
+        # It was never the rule. Provenance is, and the geometry contradicted
+        # a principle this file's own tests already state by name: the tail
+        # EXTENDS, it does not retreat. A window that silently narrows a
+        # correctness rule to buy speed is the wrong trade, so the speed is
+        # bought below instead, where it costs no meaning.
+        # ONE pass, judged against the arc as it stood when the edit arrived.
+        #
+        # This used to iterate to a fixpoint, re-judging each round against
+        # the leaves it had just absorbed, and that is what let an OUTSIDER
+        # in. Measured on a four-beat unit with the arc on beats 2-3 and
+        # beat 3 grown: round one correctly refuses beat 1, because a leaf
+        # of the growth is not covered yet; round two absorbs that leaf, and
+        # now every other leaf under the root IS covered, so beat 1 -- a
+        # note the composer looked at and did not select -- joins the arc.
+        # The arc ate the music it was drawn to exclude.
+        #
+        # A single pass is also the honest reading of the rule. Growth UNDER
+        # a member is not this function's job at all: pass 1 above already
+        # expands a member that stopped being a leaf into everything it
+        # grew, however many leaves that is. What is left for this pass is
+        # the sequential case -- one new leaf arriving beside music the arc
+        # already covers, one announcement at a time -- so a second round
+        # can only ever be answering a question no edit asked.
+        covered = set(current)
+        positions = [leaf_index[n] for n in current]
+        low, high = min(positions), max(positions)
+        # Nodes the arc reaches INTO without lying wholly within: they hold
+        # some of its members and not all of them. That is exactly the shape
+        # a grown member leaves behind -- pass 1 replaced the ex-leaf with
+        # the first of its children, so the node now holds one member and
+        # the rest of the growth, while the arc continues outside it.
+        #
+        # Being outside ``low..high`` is why edge growth needs this: growth
+        # under the FIRST member lands before ``low`` and under the LAST
+        # after ``high``, so a purely positional window could never see it,
+        # and the arc silently kept only the first child of what its edge
+        # member grew.
+        #
+        # The condition is deliberately NOT "the parent holds a member".
+        # The root always holds one. Requiring the arc to extend BEYOND the
+        # parent is what keeps an outsider out: a leaf whose parent contains
+        # the whole arc is beside the music, not inside it, however much of
+        # the rest of the bar the arc happens to cover.
+        reach = set()
+        for member in current:
+            parent = self._rt.parent(member)
+            if parent is None or parent in reach:
+                continue
+            held = sum(1 for n in self._rt.subtree_leaves(parent)
+                       if n in covered)
+            if 0 < held < len(covered):
+                reach.add(parent)
+        newcomers = []
+        # ``subtree_leaves`` memoized per parent: the scan is over every
+        # leaf, but a parent's leaves are walked once, which is what the
+        # positional window was really paying for.
+        sounding_under = {}
+        for leaf, i in leaf_index.items():
+            if leaf in covered:
+                continue
+            parent = self._rt.parent(leaf)
+            if parent is None:
+                continue
+            if not (low < i < high or parent in reach):
+                continue
+            siblings = sounding_under.get(parent)
+            if siblings is None:
                 siblings = [n for n in self._rt.subtree_leaves(parent)
-                            if n != leaf
-                            and self._rt[n].get('proportion', 1) >= 0]
-                if not siblings:
-                    continue
-                if all(n in covered or head_of.get(n) in covered
-                       for n in siblings):
-                    newcomers.append(leaf)
-            if not newcomers:
-                return current
-            current = current + newcomers
+                            if self._rt[n].get('proportion', 1) >= 0]
+                sounding_under[parent] = siblings
+            others = [n for n in siblings if n != leaf]
+            if not others:
+                continue
+            if all(n in covered or head_of.get(n) in covered
+                   for n in others):
+                newcomers.append(leaf)
+        return current + newcomers
 
     def _contiguous_slur_segments(self, moved):
         """Partition relocated slur members into spans ``apply_slur`` could
