@@ -444,6 +444,13 @@ def lower_compositional_ir_to_sc_assembly(
     # _lower_score_uc) defaults it and the scheduler re-points the out
     # bus off-track mid-slur.
     slur_uid_groups: dict = {}
+    # The head's synth is the slur's ONLY synth: a continuation lowers to a
+    # `set` on the head's node id and carries no `defName` at all. So an
+    # instrument assigned to a mid-slur note is silently ignored and its
+    # controls are pushed onto the head's synth instead. These two maps let
+    # that be said out loud once per slur rather than never (NEW-41).
+    slur_uid_defnames: dict = {}
+    slur_instrument_warned: set = set()
 
     for event in events_iterable:
         step_idx = node_to_step.get(event.node_id, None) if animation else None
@@ -612,6 +619,7 @@ def lower_compositional_ir_to_sc_assembly(
                 if group is not None:
                     new_event["group"] = group
                     slur_uid_groups[slur_uid] = group
+                slur_uid_defnames[slur_uid] = voice_def_name
                 events.append(_attach_poly_meta(new_event, voice_event))
                 _track_event(slur_uid)
                 while len(active_uids) <= voice_index:
@@ -623,6 +631,21 @@ def lower_compositional_ir_to_sc_assembly(
             if slur_id is not None:
                 if voice_index < len(active_uids) and active_uids[voice_index] is not None:
                     target_uid = active_uids[voice_index]
+                    head_def_name = slur_uid_defnames.get(target_uid)
+                    if (head_def_name is not None
+                            and voice_def_name != head_def_name
+                            and target_uid not in slur_instrument_warned):
+                        slur_instrument_warned.add(target_uid)
+                        warnings.warn(
+                            f"Instrument change inside a slur is ignored: "
+                            f"{voice_def_name!r} on a slurred note sounds as "
+                            f"{head_def_name!r}, because a slur lowers to one "
+                            f"synth held from its head. Its controls are set "
+                            f"on that synth instead. Break the slur at the "
+                            f"change, or set the instrument on the slur's "
+                            f"first note.",
+                            RuntimeWarning, stacklevel=3
+                        )
                     set_event = {
                         "type": "set",
                         "id": target_uid,

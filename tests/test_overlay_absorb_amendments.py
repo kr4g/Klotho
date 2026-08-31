@@ -413,3 +413,55 @@ class TestSequentialAndOneShotGrowthMayDiverge:
             'the divergence is the ruled behaviour; if these ever agree, the '
             "docstring on apply_slur is wrong and someone has built the edit "
             'batching Ryan said not to build')
+
+
+class TestAMidSlurInstrumentChangeIsAnnounced:
+    """NEW-41. The one place SLUR-1 changes what a user HEARS.
+
+    A slur lowers to ONE synth, created at its head and held: a continuation
+    emits a ``set`` on the head's node id and carries no ``defName`` at all.
+    So an instrument assigned to a mid-slur note has never sounded, and its
+    controls are pushed onto the head's synth instead.
+
+    That was survivable while the raw path DROPPED a subdivided leaf out of
+    the slur -- an instrument set on a new child then sounded, because the
+    child was no longer a continuation. Absorb keeps it in the arc, so the
+    same code goes silent. Measured: on one edit, slur membership goes from
+    2 of 6 leaves to 6 of 6.
+
+    The policy question -- break the arc at the change, warn and continue, or
+    release and restrike -- is Ryan's, and is filed. What is fixed here is
+    only that it stops being SILENT, which is the standard the envelope side
+    and the tie side already meet (``_tie_join_reason`` refuses to join on an
+    instrument mismatch and says so).
+    """
+
+    @staticmethod
+    def _slurred(instrument_on_member):
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=60,
+                pfields={'freq': 440})
+        L = list(uc._rt.leaf_nodes)
+        uc.set_instrument(uc._rt.root, 'kl_tri')
+        uc.apply_slur([L[0], L[1], L[2]])
+        if instrument_on_member:
+            uc.set_instrument(L[1], 'kl_saw')
+        return uc
+
+    @staticmethod
+    def _lower(uc):
+        import klotho.utils.playback.supersonic.converters as converters
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            converters.lower_compositional_ir_to_sc_assembly(uc)
+            return [str(w.message) for w in caught
+                    if 'Instrument change inside a slur' in str(w.message)]
+
+    def test_a_mid_slur_instrument_change_warns(self):
+        messages = self._lower(self._slurred(instrument_on_member=True))
+        assert messages, 'a note that will not sound as written said nothing'
+        assert 'kl_saw' in messages[0] and 'kl_tri' in messages[0], (
+            'the warning must name both what was asked for and what sounds')
+
+    def test_a_uniform_slur_does_not_warn(self):
+        """The other direction: a warning that always fires is noise."""
+        assert self._lower(self._slurred(instrument_on_member=False)) == []
