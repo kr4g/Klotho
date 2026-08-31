@@ -146,6 +146,55 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_leaf_surface_change()
         return result
 
+    def move_subtree(self, node, new_parent):
+        """Re-parent a subtree (see :meth:`Tree.move_subtree`), announcing
+        the leaf-surface change.
+
+        ``new_parent`` may have been a leaf a moment ago; it is interior
+        now. That is the same THIRD event ``subdivide`` and
+        ``graft_subtree`` announce, and it was the one member of the class
+        left unwired -- so a slur's end marker landed on the note that
+        moved IN, which was never in the slur."""
+        result = super().move_subtree(node, new_parent)
+        self._announce_leaf_surface_change()
+        return result
+
+    # DEATH through a verb reached on the raw tree. ``_announce_leaf_surface_change``
+    # publishes the identity relocation over the SURVIVORS, and
+    # ``_notify_nodes_relocated`` reads absence from that mapping as destroyed --
+    # so the one seam serves both events and no third mechanism is introduced.
+    # The owning unit's own deleters suppress it via ``_owner_absorbs_leaf_growth``
+    # and run their richer heal instead; these overrides exist for the raw
+    # ``uc._rt.*`` path, which nothing intercepted.
+
+    def prune(self, node):
+        """Prune a leaf (see :meth:`Tree.prune`), announcing the death so
+        no overlay keeps naming the freed id."""
+        result = super().prune(node)
+        self._announce_leaf_surface_change()
+        return result
+
+    def remove_subtree(self, node):
+        """Remove a subtree (see :meth:`Tree.remove_subtree`), announcing
+        the death so no overlay keeps naming a freed id."""
+        result = super().remove_subtree(node)
+        self._announce_leaf_surface_change()
+        return result
+
+    def prune_leaves(self, n):
+        """Prune leaves (see :meth:`Tree.prune_leaves`), announcing the
+        deaths so no overlay keeps naming a freed id."""
+        result = super().prune_leaves(n)
+        self._announce_leaf_surface_change()
+        return result
+
+    def prune_to_depth(self, max_depth):
+        """Truncate below a depth (see :meth:`Tree.prune_to_depth`),
+        announcing the deaths so no overlay keeps naming a freed id."""
+        result = super().prune_to_depth(max_depth)
+        self._announce_leaf_surface_change()
+        return result
+
 
 @dataclass(frozen=True)
 class ParentDistributionView:
