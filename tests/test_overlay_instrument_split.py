@@ -303,3 +303,58 @@ class TestAnEnvelopeSplitsAndKeepsItsValues:
         assert list(uc.events['amp']) == before, (
             f'splitting a live envelope changed what it sounds: {before} -> '
             f'{list(uc.events["amp"])}')
+
+
+class TestTheStructuralHealSplitsToo:
+    """The site Ruling B names alongside authoring, and the one a structural
+    edit reaches: growth inherits its parent's instrument, so absorb cannot
+    itself create a mismatch -- but ``move_subtree`` and ``graft_subtree``
+    carry bindings in with them.
+
+    Measured before this landed: moving a ``kl_tri`` leaf into a ``kl_saw``
+    arc left the arc stored as two members on two different instruments,
+    which is exactly the state the ruling forbids and the state the lowering
+    warning was written to announce.
+    """
+
+    @staticmethod
+    def _mixed_by_moving():
+        uc = UC(tempus='6/4', prolatio=(1,) * 6, beat='1/4', bpm=60,
+                pfields={'freq': 440})
+        leaves = list(uc._rt.leaf_nodes)
+        for leaf in leaves:
+            uc.set_instrument(leaf, 'kl_saw')
+        uc.set_instrument(leaves[4], 'kl_tri')
+        uc.apply_slur([leaves[0], leaves[1]])
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            uc._rt.move_subtree(leaves[4], leaves[1])
+        return uc
+
+    def test_no_arc_survives_spanning_two_instruments(self):
+        uc = self._mixed_by_moving()
+
+        for slur_id, spec in uc._slur_specs.items():
+            instruments = [uc.get_instrument(n) for n in spec['leaf_nodes']]
+            assert len(set(map(repr, instruments))) == 1, (
+                f'arc {slur_id} spans {instruments}')
+
+    def test_an_envelope_healed_across_a_change_splits_as_well(self):
+        uc = UC(tempus='6/4', prolatio=(1,) * 6, beat='1/4', bpm=60,
+                pfields={'amp': 0.1})
+        leaves = list(uc._rt.leaf_nodes)
+        for leaf in leaves:
+            uc.set_instrument(leaf, 'kl_saw')
+        uc.set_instrument(leaves[4], 'kl_tri')
+        uc.apply_envelope(Envelope([0., 1.], times=[2.]), 'amp',
+                          node=[leaves[0], leaves[1]], control=True)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            uc._rt.move_subtree(leaves[4], leaves[1])
+
+        for env_id, desc in uc._control_envelopes.items():
+            resolved = uc._resolve_control_envelope_leaves(desc)
+            instruments = [uc.get_instrument(n) for n in resolved]
+            assert len(set(map(repr, instruments))) <= 1, (
+                f'envelope {env_id} spans {instruments}')

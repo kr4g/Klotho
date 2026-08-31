@@ -2675,25 +2675,40 @@ class CompositionalUnit(TemporalUnit):
                                          if len(run) >= 2])
 
         for env_id, desc in list((control_envelopes or {}).items()):
-            resolved = self._resolve_control_envelope_leaves(desc)
-            runs = self._partition_by_instrument(resolved)
-            if len(runs) <= 1:
-                continue
-            start, end = desc.get("curve_window") or (0.0, 1.0)
-            width = end - start
-            del self._control_envelopes[env_id]
-            for run, (inner_start, inner_end) in zip(
-                    runs, self._curve_windows(runs, desc["endpoint"])):
-                new_id = env_id if run is runs[0] else self._next_envelope_id
-                if run is not runs[0]:
-                    self._next_envelope_id += 1
-                self._control_envelopes[new_id] = {
-                    **desc,
-                    "leaf_subset": tuple(run),
-                    "baked_leaves": tuple(run),
-                    "curve_window": (start + inner_start * width,
-                                     start + inner_end * width),
-                }
+            self._split_envelope_at_instrument_changes(env_id, desc)
+
+    def _split_envelope_at_instrument_changes(self, env_id, desc):
+        """Split one control envelope wherever its leaves change instrument.
+
+        Shared by ``set_instrument`` and the structural heal, so the two
+        cannot drift into answering the same musical question differently --
+        the failure this whole area exists to remove.
+
+        The halves are NOT rebaked. Their values are already on the leaves,
+        and each half inherits its own slice of the parent's curve window, so
+        the split changes bookkeeping and nothing audible. That is Ryan's
+        ruling for envelopes: splitting keeps control messages inside one
+        instrument, it does not restart the gesture.
+        """
+        resolved = self._resolve_control_envelope_leaves(desc)
+        runs = self._partition_by_instrument(resolved)
+        if len(runs) <= 1:
+            return
+        start, end = desc.get("curve_window") or (0.0, 1.0)
+        width = end - start
+        del self._control_envelopes[env_id]
+        for run, (inner_start, inner_end) in zip(
+                runs, self._curve_windows(runs, desc["endpoint"])):
+            new_id = env_id if run is runs[0] else self._next_envelope_id
+            if run is not runs[0]:
+                self._next_envelope_id += 1
+            self._control_envelopes[new_id] = {
+                **desc,
+                "leaf_subset": tuple(run),
+                "baked_leaves": tuple(run),
+                "curve_window": (start + inner_start * width,
+                                 start + inner_end * width),
+            }
 
     def _split_slurs_for_rests(self, nodes_to_rest: set[int]):
         for slur_id, spec in list(self._slur_specs.items()):
@@ -2798,6 +2813,14 @@ class CompositionalUnit(TemporalUnit):
         self._remap_bind_memo(mapping)
         self._remap_slur_specs(mapping)
         self._remap_control_envelopes(mapping)
+        # The slur half splits at an instrument change inside its own
+        # segmentation, where identity and ordering are settled together.
+        # The envelope half has no such segmentation -- it is a curve over a
+        # span, not an arc over notes -- so it splits here, through the SAME
+        # method ``set_instrument`` uses. One implementation, because two
+        # would be two answers to one musical question.
+        for env_id, desc in list(self._control_envelopes.items()):
+            self._split_envelope_at_instrument_changes(env_id, desc)
         # a correspondence published to a mirror target is keyed by the ids
         # that just moved, so it no longer describes this unit
         self._mirror_id_map = None
@@ -2905,8 +2928,16 @@ class CompositionalUnit(TemporalUnit):
             rest_set = {n for n in kept
                         if self._rt[n].get('proportion', 1) < 0}
             segments = []
+            # ...and split at an instrument change, the third site Ruling B
+            # names. Growth inherits its parent's instrument, so absorb
+            # cannot itself mix two -- but ``move_subtree`` and
+            # ``graft_subtree`` carry bindings in with them. Measured before
+            # this line: moving a ``kl_tri`` leaf into a ``kl_saw`` arc left
+            # the arc stored across both.
             for run in self._partition_non_rest_segments(kept, rest_set):
-                segments.extend(self._contiguous_slur_segments(list(run)))
+                for piece in self._contiguous_slur_segments(list(run)):
+                    segments.extend(
+                        self._split_segments_at_instrument_changes([piece]))
 
             for i, segment in enumerate(segments):
                 if i == 0:
