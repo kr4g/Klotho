@@ -199,6 +199,64 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_leaf_surface_change()
         return result
 
+    def make_rest(self, node):
+        """Rest a node and its subtree (see :meth:`RhythmTree.make_rest`),
+        announcing the change to the TIE and REST surface.
+
+        A FOURTH kind of event, and the first one that moves no id and kills
+        no node. The leaf surface is untouched -- every leaf is still a leaf
+        -- but two things an overlay is defined against did change: a leaf
+        that was sounding is now silent, and ``make_rest`` clears ``tied``
+        on the way down (a tied rest is illegal, charter §1), so a leaf that
+        was a tie CONTINUATION has stopped being one.
+
+        Neither was announced, and the consequence was TIE-3. ``apply_slur``
+        snaps a selection onto tie-group heads, so a continuation sits in an
+        arc's SPAN but never in its member set; ``_split_slurs_for_rests``
+        guards on ``leaf_set.intersection(nodes_to_rest)``, which a
+        continuation cannot satisfy. Measured on a four-beat unit with leaf
+        3 tied to leaf 2 and a slur over 2..4: resting leaf 3 left the arc
+        stored as ``(2, 4)`` with a rest at 3 sitting inside its span, drawn
+        across that rest all the way to the lowering, and warned nothing.
+
+        The heal needed no new rule. ``_remap_slur_specs`` re-derives
+        leaf-ness, tie groups and rests from the tree, and
+        ``_contiguous_slur_segments`` already refuses a gap leaf that is not
+        a continuation of the member before it -- asked about the defective
+        state above it returns ``[]``, correctly, because two one-note runs
+        are not a slur. What was missing was only that anyone asked it.
+        """
+        result = super().make_rest(node)
+        self._announce_leaf_surface_change()
+        return result
+
+    def make_sounding(self, node):
+        """Un-rest a node and its subtree (see
+        :meth:`RhythmTree.make_sounding`), announcing the change to the TIE
+        and REST surface.
+
+        The other half of the fourth event, and the direction that is easy
+        to miss: un-resting a leaf can make the leaf AFTER it a tie
+        continuation, because that leaf's ``tied`` flag was inert only while
+        its predecessor was silent. TIE-4 is what follows when the newly
+        swallowed leaf is an arc's FIRST member -- it stops producing an
+        event at all, the ``_slur_start`` sitting on ``leaf_nodes[0]``
+        vanishes with it, and ``_sc_assembly`` takes the not-a-start branch
+        for every event of the arc. Measured: one ``_slur_end`` and no
+        ``_slur_start`` anywhere, an arc reaching playback that no note
+        opens.
+
+        Again the rule already existed. Charter §8 makes tie groups atomic
+        for slur membership and snaps a selection to the head; applying that
+        same rule after the fact re-heads the arc onto the leaf that now
+        carries the attack, and ``_contiguous_slur_segments`` accepts the
+        result because the swallowed member is a legal gap -- it is a
+        continuation of the member immediately before it.
+        """
+        result = super().make_sounding(node)
+        self._announce_leaf_surface_change()
+        return result
+
     def add_child(self, parent, **attr):
         """Add a child (see :meth:`Tree.add_child`), announcing the
         leaf-surface change.

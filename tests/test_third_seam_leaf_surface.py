@@ -421,6 +421,23 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
     So the rule is enforced mechanically rather than remembered. A mutator
     that genuinely does not need the announcement goes on the allowlist WITH
     ITS REASON, which makes the decision visible instead of absent.
+
+    **WIDENED 2026-08-31, because the first detector had a blind spot the
+    size of the defect it was written to prevent.** It looked only for
+    ``_post_mutation``/``_notify_nodes_relocated`` -- the STRUCTURAL class --
+    and ``make_rest``/``make_sounding`` mention neither: they write node data
+    through ``_write_node_data`` and invalidate. So the guard was fully green
+    while TIE-3 and TIE-4 sat open, and it would have stayed green however
+    many more such verbs were added.
+
+    An overlay is not defined against the leaf surface alone. It is defined
+    against which leaves SOUND and which are tie continuations, and a verb
+    that writes ``proportion`` or ``tied`` changes those without moving a
+    single id. Measured before the fix: resting a tie continuation inside an
+    arc left the arc drawn across the resulting rest, silently; un-resting a
+    leaf could swallow an arc's first member and send it to playback with an
+    end marker and no start. Both are now overridden, and the detector reads
+    the second class so the next such verb fails loudly instead.
     """
 
     #: Structural mutators that legitimately need no leaf-surface
@@ -433,11 +450,24 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
         'scale':
             'rebuilds through the preserved family, which announces a '
             'RELOCATION from inside Tree.insert_child. Measured clean.',
+        'tie_groups':
+            'a pure READ -- it DERIVES the groups from the tied flags rather '
+            'than writing them, and the charter says tie-group identity is '
+            'derived and never stored. It matches the surface detector only '
+            'because deriving requires naming the flag it reads.',
     }
 
-    @staticmethod
-    def _structural_mutators(cls):
-        """Public methods whose body runs the post-mutation machinery."""
+    #: A body naming any of these runs the structural machinery.
+    STRUCTURAL = ('_post_mutation', '_notify_nodes_relocated')
+
+    #: A body naming any of these touches the SOUNDING/TIE surface an overlay
+    #: is defined against, without necessarily moving or destroying an id.
+    SURFACE = ("'tied'", "'proportion'", 'tied=', 'proportion=')
+
+    @classmethod
+    def _structural_mutators(cls_, cls):
+        """Public methods that run the post-mutation machinery OR write the
+        sounding/tie surface. Both classes reach the overlays."""
         import ast
         import inspect
         found = set()
@@ -449,7 +479,7 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
             if not isinstance(node, ast.FunctionDef) or node.name.startswith('_'):
                 continue
             body = ast.dump(node)
-            if '_post_mutation' in body or '_notify_nodes_relocated' in body:
+            if any(n in body for n in cls_.STRUCTURAL + cls_.SURFACE):
                 found.add(node.name)
         return found
 
@@ -471,10 +501,11 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
         assert unwired == [], (
             f'{base}.{unwired} mutate structure but CompositionalTree does not '
             f'override them, so an overlay can be left naming a node that is '
-            f'no longer a leaf -- and rustworkx reuses freed ids, so it does '
-            f'not merely leak, it re-attaches. Either add the three-line '
-            f'override, or add the name to NO_ANNOUNCEMENT_NEEDED with the '
-            f'measurement that justifies it.')
+            f'no longer a leaf, or naming one that has silently stopped '
+            f'sounding or stopped being a tie continuation -- and rustworkx '
+            f'reuses freed ids, so it does not merely leak, it re-attaches. '
+            f'Either add the three-line override, or add the name to '
+            f'NO_ANNOUNCEMENT_NEEDED with the measurement that justifies it.')
 
     def test_the_allowlist_is_not_a_dumping_ground(self):
         """Every excuse must still name a real method and give a reason."""
