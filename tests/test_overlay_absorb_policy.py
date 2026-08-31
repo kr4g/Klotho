@@ -100,6 +100,13 @@ GROWTH_DOORS = [
         n, RhythmTree(meas='1/4', subdivisions=(1, 1))), 2),
     ('raw.insert_child', lambda uc, n: uc._rt.insert_child(n, 0, proportion=1), 1),
     ('raw.move_subtree', lambda uc, n: uc._rt.move_subtree(_spare(uc, n), n), 1),
+    # the fourth and fifth doors, found 2026-08-31: nothing announced here at
+    # all, because add_child APPENDS and Tree.insert_child's relocation fires
+    # only when a sibling shifts
+    ('raw.add_child', lambda uc, n: uc._rt.add_child(n, proportion=1), 1),
+    ('raw.add_subtree', lambda uc, n: uc._rt.add_subtree(
+        n, RhythmTree(meas='1/4', subdivisions=(1, 1))), 2),
+    ('uc.add_child', lambda uc, n: uc.add_child(n, proportion=1), 1),
     ('uc.subdivide', lambda uc, n: uc.subdivide(n, (1, 1, 1)), 3),
     ('uc.graft_subtree', lambda uc, n: uc.graft_subtree(
         n, RhythmTree(meas='1/4', subdivisions=(1, 1))), 2),

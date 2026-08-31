@@ -398,3 +398,90 @@ class TestEverySlurOnTheSurfaceIsOneArc:
         for slur_id, entry in _slur_shape(uc).items():
             assert entry['heads'] == 1, f'slur {slur_id}: {entry}'
             assert entry['tails'] == 1, f'slur {slur_id}: {entry}'
+
+
+class TestEveryStructuralMutatorIsWiredToTheSeam:
+    """PLUMB-1, made loud.
+
+    ``CompositionalTree`` carries NINE hand-written overrides that are all
+    the same three lines -- call ``super()``, announce, return. A future
+    author adding a ``Tree`` mutator has no way to learn they owe one:
+    nothing fails, and the corruption is silent until a node id is reused.
+
+    That is not hypothetical. Every silent-corruption defect closed in this
+    area was one missing copy of that boilerplate, and this test was written
+    after two MORE doors were found the same way on 2026-08-31 --
+    ``add_child`` and ``add_subtree``, which announced nothing because
+    ``add_child`` appends (so ``Tree.insert_child``'s shift-triggered
+    relocation never fires) and no override existed. Measured before the
+    fix: three ``add_child`` calls on a slurred member left the spec naming
+    the now-interior node and produced **three slur heads for one slur**,
+    the identical shape ``LAYER-12`` was written to close.
+
+    So the rule is enforced mechanically rather than remembered. A mutator
+    that genuinely does not need the announcement goes on the allowlist WITH
+    ITS REASON, which makes the decision visible instead of absent.
+    """
+
+    #: Structural mutators that legitimately need no leaf-surface
+    #: announcement, each with the measurement that says so.
+    NO_ANNOUNCEMENT_NEEDED = {
+        'replace_node':
+            'replaces a node\'s attributes and preserves structure, so no '
+            'leaf starts or stops being one. Measured: a slurred leaf keeps '
+            'its membership, no stale member, one head and one tail.',
+        'scale':
+            'rebuilds through the preserved family, which announces a '
+            'RELOCATION from inside Tree.insert_child. Measured clean.',
+    }
+
+    @staticmethod
+    def _structural_mutators(cls):
+        """Public methods whose body runs the post-mutation machinery."""
+        import ast
+        import inspect
+        found = set()
+        source = inspect.getsource(cls)
+        module = ast.parse(source)
+        class_def = next(n for n in ast.walk(module)
+                         if isinstance(n, ast.ClassDef) and n.name == cls.__name__)
+        for node in class_def.body:
+            if not isinstance(node, ast.FunctionDef) or node.name.startswith('_'):
+                continue
+            body = ast.dump(node)
+            if '_post_mutation' in body or '_notify_nodes_relocated' in body:
+                found.add(node.name)
+        return found
+
+    @pytest.mark.parametrize('base', ['Tree', 'RhythmTree'])
+    def test_no_structural_mutator_reaches_the_overlays_unannounced(self, base):
+        from klotho.chronos import RhythmTree as _RT
+        from klotho.thetos.composition.compositional import CompositionalTree
+        from klotho.topos.graphs.trees.trees import Tree as _Tree
+
+        cls = {'Tree': _Tree, 'RhythmTree': _RT}[base]
+        mutators = self._structural_mutators(cls)
+        assert mutators, f'{base}: the detector found nothing, so this proves nothing'
+
+        unwired = sorted(
+            name for name in mutators
+            if name not in CompositionalTree.__dict__
+            and name not in self.NO_ANNOUNCEMENT_NEEDED
+        )
+        assert unwired == [], (
+            f'{base}.{unwired} mutate structure but CompositionalTree does not '
+            f'override them, so an overlay can be left naming a node that is '
+            f'no longer a leaf -- and rustworkx reuses freed ids, so it does '
+            f'not merely leak, it re-attaches. Either add the three-line '
+            f'override, or add the name to NO_ANNOUNCEMENT_NEEDED with the '
+            f'measurement that justifies it.')
+
+    def test_the_allowlist_is_not_a_dumping_ground(self):
+        """Every excuse must still name a real method and give a reason."""
+        from klotho.chronos import RhythmTree as _RT
+        from klotho.topos.graphs.trees.trees import Tree as _Tree
+        known = (self._structural_mutators(_Tree)
+                 | self._structural_mutators(_RT))
+        for name, reason in self.NO_ANNOUNCEMENT_NEEDED.items():
+            assert name in known, f'{name} is allowlisted but is not a mutator'
+            assert len(reason) > 40, f'{name} is allowlisted without a reason'

@@ -199,6 +199,37 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_leaf_surface_change()
         return result
 
+    def add_child(self, parent, **attr):
+        """Add a child (see :meth:`Tree.add_child`), announcing the
+        leaf-surface change.
+
+        The FOURTH door, found 2026-08-31 while auditing why this class
+        carries seven hand-written copies of the same three lines. Nothing
+        announced here: ``add_child`` appends, so :meth:`Tree.insert_child`'s
+        relocation announcement -- which fires only when a sibling actually
+        shifts -- never ran, and there was no override to announce the
+        leaf-surface change either. Measured on a two-note slur: three
+        ``add_child`` calls on a member produced a spec still naming the now
+        interior node and **three slur heads for one slur** on the lowering
+        surface, byte-identical to the corruption ``LAYER-12`` was written to
+        close. It reached the freed-id hazard too: the stale member survives
+        until the id is reused.
+        """
+        result = super().add_child(parent, **attr)
+        self._announce_leaf_surface_change()
+        return result
+
+    def add_subtree(self, parent, subtree, **kwargs):
+        """Attach a subtree (see :meth:`Tree.add_subtree`), announcing the
+        leaf-surface change.
+
+        The FIFTH door, and the same omission: measured, a slurred leaf that
+        gained a subtree kept its stale spec and showed TWO slur heads.
+        """
+        result = super().add_subtree(parent, subtree, **kwargs)
+        self._announce_leaf_surface_change()
+        return result
+
     def move_subtree(self, node, new_parent):
         """Re-parent a subtree (see :meth:`Tree.move_subtree`), announcing
         the leaf-surface change.
