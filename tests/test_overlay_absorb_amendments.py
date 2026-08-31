@@ -353,3 +353,63 @@ class TestTheMemoKeyInvariant:
             'apply_slur changes membership without touching the tree, so it '
             'is the one path where the id mint and the dict size are the '
             'only signals the memo key has')
+
+
+class TestSequentialAndOneShotGrowthMayDiverge:
+    """SLUR-A5, and the docstring on ``apply_slur`` that states it.
+
+    Ryan ruled: sequential and one-shot growth MAY diverge, each edit heals
+    against what exists at that moment, and no edit batching may be built to
+    hide it. So this test does not assert that they AGREE -- it pins the two
+    outcomes so the documented example cannot rot, and so a future change
+    that silently converges or diverges further is visible.
+    """
+
+    @staticmethod
+    def _slurred_four():
+        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=60)
+        L = list(uc._rt.leaf_nodes)
+        uc.apply_slur([L[0], L[1], L[2], L[3]])
+        return uc, L
+
+    def test_plain_growth_agrees(self):
+        """Where nothing splits the arc, the two forms give one answer."""
+        one, L = self._slurred_four()
+        one.subdivide(L[1], (1, 1, 1))
+
+        many, M = self._slurred_four()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            for k in range(3):
+                many._rt.insert_child(M[1], k, proportion=1)
+
+        assert [len(s) for s in _specs(one).values()] == \
+               [len(s) for s in _specs(many).values()] == [6]
+
+    def test_growth_containing_a_rest_diverges_and_that_is_the_ruling(self):
+        """The documented example, pinned.
+
+        One-shot: the third child lands while the arc still covers its
+        parent, so it joins. Stepwise: the rest has already split the arc by
+        then, so the third child is landing in music the arc no longer
+        covers, and it stays out.
+        """
+        one, L = self._slurred_four()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            one.subdivide(L[1], (1, -1, 1))
+
+        many, M = self._slurred_four()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            for k, proportion in enumerate((1, -1, 1)):
+                many._rt.insert_child(M[1], k, proportion=proportion)
+
+        one_sizes = sorted(len(s) for s in _specs(one).values())
+        many_sizes = sorted(len(s) for s in _specs(many).values())
+        assert one_sizes == [2, 3], f'one-shot gave {_specs(one)}'
+        assert many_sizes == [2, 2], f'stepwise gave {_specs(many)}'
+        assert one_sizes != many_sizes, (
+            'the divergence is the ruled behaviour; if these ever agree, the '
+            "docstring on apply_slur is wrong and someone has built the edit "
+            'batching Ryan said not to build')

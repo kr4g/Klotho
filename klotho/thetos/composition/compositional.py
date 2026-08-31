@@ -2199,6 +2199,42 @@ class CompositionalUnit(TemporalUnit):
             If selection is invalid/non-contiguous, includes rests, overflows
             offset/take bounds, resolves to fewer than two leaves, overlaps an
             existing slur, or mode is invalid.
+
+        Notes
+        -----
+        **A slur survives later edits by ABSORBING them.** If a slurred leaf
+        grows children -- through ``subdivide``, ``graft_subtree``,
+        ``insert_child``, ``move_subtree``, or the same verbs reached through
+        ``uc._rt`` -- those children take its place in the arc. A rest among
+        them splits the arc into the runs either side of it, and a run left
+        with fewer than two adjacent sounding leaves dissolves with a
+        ``RuntimeWarning``. A note inserted among music the arc does NOT
+        already cover is an intruder and splits it: a slur is authored by
+        explicit selection, never by an edit landing nearby.
+
+        There is no bound on how far an arc can grow this way. A three-note
+        slur under a forty-leaf graft becomes a forty-two-note slur, without
+        a warning -- a slur is a phrase marking, not a size contract.
+
+        **Growing a leaf in one step and in several steps may give different
+        arcs**, and this is deliberate rather than a rounding error. Each
+        edit heals against the music that exists at that moment, which is the
+        honest reading of an incremental API. Measured on a four-note slur
+        whose second note grows three children, the middle one a rest::
+
+            uc.subdivide(n, (1, -1, 1))          -> two arcs, the second
+                                                    covering the third child
+            three separate insert_child calls    -> two arcs, the second NOT
+                                                    covering the third child
+
+        The third child differs because in the stepwise form the rest has
+        already split the arc by the time it arrives, so it is no longer
+        landing inside music the arc covers. Nothing batches edits to hide
+        this.
+
+        See Also
+        --------
+        make_rest : splits any slur it silences, by the same rule.
         """
         if mode == "span":
             selected = self._resolve_leaf_selection(node=node)
