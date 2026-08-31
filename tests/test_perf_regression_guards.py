@@ -92,10 +92,14 @@ class TestChrononReadSurface:
 
 
 class TestTimingCacheInvalidationOnStructuralMutation:
-    """UC.add_child/prune/remove_subtree mutate the rhythm tree and must
-    invalidate the timing cache explicitly: the cache guard compares node
-    counts, so a mutation sequence with a net-zero node-count change
-    (prune then add_child) would otherwise serve stale onsets."""
+    """UC.add_child/prune/remove_subtree mutate the rhythm tree and the next
+    timing read must recompute. The guard is keyed on the tree's STRUCTURE
+    VERSION, not on the node count (``TemporalUnit._ensure_timing_cache``):
+    a count is blind to every mutation that keeps the node count, which is
+    exactly what the net-zero sequence below (prune then add_child)
+    exercises -- under the old count guard it served stale onsets (RT-27).
+    ``_timing_dirty`` is the guard's other half and carries the bpm/beat
+    changes, which touch no node and move no version; both are required."""
 
     def test_prune_then_add_child_serves_fresh_timings(self):
         uc = _uc(prolatio=(1, (1, (1, 1)), 1))

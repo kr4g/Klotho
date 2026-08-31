@@ -1389,8 +1389,8 @@ class RhythmTree(Tree):
 
         Parameter overrides DO survive: a surviving event keeps its pfields,
         mfields and instrument binding, and the inserted event takes the
-        tree's inherited defaults. Control envelopes do not -- see
-        :meth:`scale`.
+        tree's inherited defaults. Control envelope targets survive too --
+        see :meth:`scale`.
 
         **Thesis erratum.** Figure 4.60 prints the source subscript as
         ``(2 1 1)``. The correct input is ``(2 1 2)``, proven three ways --
@@ -1589,10 +1589,16 @@ class RhythmTree(Tree):
         default. See :meth:`_respell` for why the default falls this way.
 
         Parameter overrides survive the rebuild: a scaled event keeps the
-        pfields, mfields and instrument binding it had. Control envelopes do
-        NOT -- they live on the
-        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`,
-        not on the tree, and hold node ids the rebuild frees.
+        pfields, mfields and instrument binding it had. So do slurs,
+        memoized Bind draws and control-envelope targets, even though they
+        live on the
+        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`
+        rather than on the tree: :meth:`_respell` announces the id relocation
+        through
+        :meth:`~klotho.topos.graphs.trees.Tree._notify_nodes_relocated`, and
+        the unit moves them onto the ids now holding their events. An
+        envelope whose every target was extracted is removed, with a
+        ``RuntimeWarning`` saying so.
 
         **Thesis erratum.** Never use the prolationis printed in figures 4.68
         and 4.69: both reprint the preceding expansion result
