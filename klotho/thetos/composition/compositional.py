@@ -544,6 +544,14 @@ PFieldContext = DistributionContext
 # names to mfields; everything else goes to pfields.
 ENGINE_MFIELDS = frozenset({'strum', 'group'})
 
+# The structural columns of ``CompositionalUnit.events``, in table order:
+# the unit's own facts about each event, written before the pfield/mfield
+# dicts are merged on top. They are the guaranteed contract, so the merge
+# must never overwrite one -- see ``CompositionalUnit.events``. Kept beside
+# ENGINE_MFIELDS rather than inside the property so a test can assert the
+# two lists have not drifted apart.
+_UC_EVENT_COLUMNS = ('node_id', 'start', 'dur', 'metric_dur', 'instrument')
+
 
 def _leaf_ordinal(pt, node):
     """Position of *node* among the tree's leaves (0 for non-leaves).
@@ -1905,6 +1913,21 @@ class CompositionalUnit(TemporalUnit):
         Rests are indicated by negative ``metric_dur``.  Pfield/mfield
         columns are the union across all events; missing keys are ``None``.
 
+        The five structural columns (:data:`_UC_EVENT_COLUMNS`) are the
+        guaranteed contract and always report the unit's own facts.  A
+        pfield or mfield with one of those names is NOT appended -- the
+        structural column wins, one warning names the shadowed field, and
+        the field stays readable on the unit (``uc.get_pfield(node, key)``,
+        ``uc.pt``, or the event objects from iterating the unit).  This
+        matches what :attr:`~klotho.chronos.TemporalBlock.events` does with
+        the same collision (BT-12).
+
+        The names are NOT reserved, deliberately: ``dur`` is a real
+        SynthDef control on bundled ``kl_kicktone``, and ``start`` is a
+        plausible one on any hand-authored sampler, so refusing them would
+        make legitimate instruments unusable.  The table's column namespace
+        does not get to constrain the field namespace.
+
         Returns
         -------
         pandas.DataFrame
@@ -1922,20 +1945,54 @@ class CompositionalUnit(TemporalUnit):
         all_mf_keys: list[str] = []
         pf_seen: set[str] = set()
         mf_seen: set[str] = set()
+        # Fields whose name collides with a structural column. Collected
+        # rather than merged: the merge below used to be a plain
+        # `row[k] = pf.get(k)` AFTER the structural keys were written, so a
+        # field named `start` replaced the onset and a field named `dur`
+        # replaced the duration -- a wrong number that looks entirely
+        # plausible, on the surface Ryan inspects and the one lowering
+        # reads from. Reachable with NO user field at all: bundled
+        # `kl_kicktone` declares a `dur` control, `set_instrument`
+        # registers every control a SynthDef declares, and the table then
+        # showed that control's 0.6 default as the note's duration -- which
+        # is not even what plays, since `_duration_inject_key` overwrites
+        # `dur` with the slot duration on the way to the engine.
+        shadowed: list[str] = []
+        shadowed_seen: set[str] = set()
+
+        def _register(k, seen, keys):
+            if k in _UC_EVENT_COLUMNS:
+                if k not in shadowed_seen:
+                    shadowed_seen.add(k)
+                    shadowed.append(k)
+                return
+            if k not in seen:
+                seen.add(k)
+                keys.append(k)
+
         rows = []
         for event in events:
             inst = self.get_instrument(event.node_id)
             pf = event.pfields
             mf = event.mfields
             for k in pf:
-                if k not in pf_seen:
-                    pf_seen.add(k)
-                    all_pf_keys.append(k)
+                _register(k, pf_seen, all_pf_keys)
             for k in mf:
-                if k not in mf_seen:
-                    mf_seen.add(k)
-                    all_mf_keys.append(k)
+                _register(k, mf_seen, all_mf_keys)
             rows.append((event, inst, pf, mf))
+
+        if shadowed:
+            warnings.warn(
+                f"{sorted(shadowed)} name structural columns of events and "
+                f"are not shown in the table: the unit's own node_id/start/"
+                f"dur/metric_dur/instrument always win there. The field "
+                f"itself is unaffected -- it still reaches the synth, and "
+                f"you can read it with uc.get_pfield(node, key) / "
+                f"uc.get_mfield(node, key) or on uc.pt. Rename it if you "
+                f"want it in the table.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         data = []
         for event, inst, pf, mf in rows:
