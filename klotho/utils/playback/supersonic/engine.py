@@ -137,7 +137,12 @@ class SuperSonicEngine:
         self._needed = self._needed_synthdefs() | _INFRA_SYNTHDEFS
         self.synthdef_assets = _filter_synthdef_assets(_load_all_synthdef_assets(), self._needed)
         self.sample_assets = self._load_needed_samples()
-        self._is_score = bool(self.meta.get("groups") or self.meta.get("inserts"))
+        # ``spatial`` alone makes this a score: a speaker array declared on
+        # "main" produces no ``groups`` and need produce no ``inserts``, and
+        # without scheduler_score.js there is no setupTracks at all -- the
+        # declaration would be dropped in silence rather than played.
+        self._is_score = bool(self.meta.get("groups") or self.meta.get("inserts")
+                              or self.meta.get("spatial"))
 
     def _needed_synthdefs(self):
         names = set()
@@ -153,6 +158,34 @@ class SuperSonicEngine:
                     names.add(dn)
         if self.control_data.get("descriptors"):
             names.add("__klEnvCtrl")
+        names |= self._needed_spatial_synthdefs()
+        return names
+
+    def _needed_spatial_synthdefs(self):
+        """The width-family defs a spatial score's scheduler instantiates.
+
+        None of these names is ever an event's ``defName``: the scheduler
+        builds the wide routers and the headphone decoder from
+        ``meta.spatial``, so the loop above cannot see them, and a def the
+        page was never sent is one scsynth SKIPS -- the ``/s_new`` creates
+        nothing and the array plays SILENTLY with no message anywhere.
+
+        The decoder's width is main's width, which is the widest declared
+        track: every track sums into main, so main's bus is the one place
+        the whole array exists at once.  Whether a fold is actually possible
+        (a labels-only array has no geometry) is the scheduler's decision,
+        and one small blob is cheaper than duplicating that decision here.
+        """
+        tracks = (self.meta.get("spatial") or {}).get("tracks") or {}
+        widths = {
+            entry.get("width") for entry in tracks.values()
+            if isinstance(entry.get("width"), int) and entry.get("width") > 0
+        }
+        if not widths:
+            return set()
+        main_width = max(widths | {2})
+        names = {f"__busRouter{w}" for w in widths | {main_width} if w != 2}
+        names.add(f"__spatialDecode{main_width}")
         return names
 
     def _needed_samples(self):

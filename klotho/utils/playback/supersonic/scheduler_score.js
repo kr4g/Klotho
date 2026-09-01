@@ -28,8 +28,58 @@
   // between unrelated voices instead of a loud refusal, which is the exact
   // failure this fallback exists to prevent.
   var LEGACY_AUDIO_BUSES = 128;
+  // Geometry-buffer layout, mirrored from klotho.thetos.spatial: N frames of
+  // SIX channels, one frame per speaker lane, fields in the order
+  // (delay_l, delay_r, gain_l, gain_r, shadow_l_hz, shadow_r_hz). The
+  // compiled __spatialDecodeN blobs index those six positionally, so the
+  // payload's own `stride` is checked against this rather than trusted --
+  // "N*6 frames of 1 channel" holds the same floats and is MISREAD in
+  // silence, which is the whole failure class this feature guards against.
+  var BINAURAL_STRIDE = 6;
+  // klotho.thetos.spatial.MAX_DECODER_SPEAKERS. SpeakerArray refuses wider at
+  // construction, so a wider array reaching here means the payload did not
+  // come from one -- and a too-wide decoder is exactly the def scsynth SKIPS
+  // (one printed line, then the /s_new does nothing and the piece is silent).
+  var MAX_SPATIAL_WIDTH = 32;
 
   var proto = globalThis.BrowserScheduler.prototype;
+
+  // '__busRouter' at stereo, '__busRouterN' at every other width.
+  //
+  // Width 2 keeps the ORIGINAL undecorated name deliberately. __busRouter2 is
+  // the same graph and would work, but a score with no speaker array has to
+  // put the same bytes on the wire as it did before this feature existed, and
+  // the def name is in those bytes.
+  function routerDefName(width) {
+    return (width === BUS_CHANNELS) ? '__busRouter' : '__busRouter' + width;
+  }
+
+  function decoderDefName(width) {
+    return '__spatialDecode' + width;
+  }
+
+  // Refuse a spatial def this page was never sent.
+  //
+  // scsynth does not report a missing SynthDef: the /s_new names nothing, so
+  // nothing is created and the track is SILENT with no message anywhere. The
+  // registry is the page's merged asset table (engine.py ships one blob per
+  // def name a payload needs), so a name missing from it means the width is
+  // off the precompiled family -- refuse here, before any node exists, rather
+  // than at the concert.
+  //
+  // No registry at all (a bare harness, or a page whose merge has not run) is
+  // NOT evidence of absence, so the check stands down rather than guessing.
+  function requireDef(name, why) {
+    var reg = globalThis.__klothoSynthdefAssets;
+    if (!reg || typeof reg !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(reg, name)) return;
+    throw new Error('[Klotho] this page has no SynthDef named ' + name
+      + ', which ' + why + ' needs. Klotho precompiles the spatial family at '
+      + 'widths 1, 2, 4, 6, 8, 12, 16, 24 and 32; a speaker count outside '
+      + 'that list has no compiled def to send, and scsynth does not refuse a '
+      + 'missing def -- it creates nothing and the array plays SILENTLY. '
+      + 'Declare an array at one of those widths, or fold to stereo offline.');
+  }
 
   // How many audio bus CHANNELS this page's engine actually booted with.
   // ss_init stashes its boot config on globalThis.__klothoSonic; an engine
@@ -131,8 +181,135 @@
     return gid;
   };
 
+  // Read meta.spatial into the shape setupTracks needs, or null for a score
+  // with no speaker array. Every refusal in here happens BEFORE a single
+  // node or bus exists, so a rejected payload leaves the engine untouched.
+  //
+  // What it decides, and why those are the answers:
+  //
+  // * **main is as wide as the widest spatial track.** Every track sums into
+  //   main, and a 24-wide track summing into a 2-wide main would write 22
+  //   channels past the end of main's bus run -- straight onto whatever the
+  //   allocator handed out next, which is another track's live audio. The
+  //   main chain is the one place the whole array exists at once, so it is
+  //   the place the array bus has to live.
+  // * **the fold uses the WIDEST array's geometry.** The decoder reads main's
+  //   bus, so its lane count is main's width; an array narrower than main
+  //   cannot describe the lanes above its own. When the widest array is
+  //   labels-only (no positions, hence no geometry) there is no fold at any
+  //   width, and that is reported as decoder: null rather than invented.
+  proto._spatialPlan = function(meta) {
+    var sp = meta && meta.spatial;
+    if (!sp || !sp.tracks) return null;
+    var trackMeta = sp.tracks;
+    var arrays = sp.arrays || {};
+    var names = Object.keys(trackMeta);
+    if (names.length === 0) return null;
+
+    var widths = {};
+    var mainWidth = BUS_CHANNELS;
+    for (var i = 0; i < names.length; i++) {
+      var nm = names[i];
+      var w = (trackMeta[nm] || {}).width;
+      if (typeof w !== 'number' || !isFinite(w) || Math.floor(w) !== w || w < 1) {
+        throw new Error('[Klotho] spatial track ' + JSON.stringify(nm)
+          + ' declares width '
+          + (typeof w === 'string' ? JSON.stringify(w) : String(w))
+          + '; a speaker count must be a whole number of at least 1.');
+      }
+      if (w > MAX_SPATIAL_WIDTH) {
+        throw new Error('[Klotho] spatial track ' + JSON.stringify(nm)
+          + ' declares ' + w + ' speakers and the decoder family stops at '
+          + MAX_SPATIAL_WIDTH + '. SpeakerArray refuses a wider array at '
+          + 'construction, so this payload was not built by one. Refusing '
+          + 'here rather than sending it: scsynth would skip the oversized '
+          + 'SynthDef and the array would play SILENTLY.');
+      }
+      widths[nm] = w;
+      if (w > mainWidth) mainWidth = w;
+    }
+
+    // Deterministic pick among tracks tied at the widest width: main's own
+    // array first (it is the chain the decoder sits on), then declaration
+    // order. Ties matter only when two DIFFERENT arrays share the width --
+    // they all sum lane-for-lane into one main bus, so exactly one geometry
+    // can describe the result, and the composer is told which was used.
+    var order = (meta.groups || []).slice();
+    order.push('main');
+    var widest = [];
+    for (var oi = 0; oi < order.length; oi++) {
+      if (widths[order[oi]] === mainWidth && widest.indexOf(order[oi]) === -1) {
+        widest.push(order[oi]);
+      }
+    }
+    for (var ni = 0; ni < names.length; ni++) {
+      if (widths[names[ni]] === mainWidth && widest.indexOf(names[ni]) === -1) {
+        widest.push(names[ni]);
+      }
+    }
+    var chosen = (widest.indexOf('main') !== -1) ? 'main' : widest[0];
+    var arrayName = chosen != null ? (trackMeta[chosen] || {}).array : null;
+    var arrayMeta = (arrayName != null) ? arrays[arrayName] : null;
+    var decoder = (arrayMeta && arrayMeta.decoder) || null;
+
+    var distinct = [];
+    for (var wi = 0; wi < widest.length; wi++) {
+      var an = (trackMeta[widest[wi]] || {}).array;
+      if (an != null && distinct.indexOf(an) === -1) distinct.push(an);
+    }
+    if (distinct.length > 1) {
+      console.warn('[Klotho] tracks ' + widest.join(', ') + ' declare '
+        + distinct.length + ' different speaker arrays (' + distinct.join(', ')
+        + ') at the same width. They sum lane for lane onto one set of '
+        + 'speakers; the headphone fold uses ' + JSON.stringify(arrayName)
+        + "'s geometry.");
+    }
+
+    if (decoder) {
+      var stride = decoder.stride;
+      var coeffs = decoder.coefficients;
+      if (stride !== BINAURAL_STRIDE) {
+        throw new Error('[Klotho] the geometry table for array '
+          + JSON.stringify(arrayName) + ' declares stride ' + stride
+          + ' and the compiled decoders index ' + BINAURAL_STRIDE
+          + ' fields per lane positionally. Loading it would misread every '
+          + 'lane -- a silent geometry error, not a load failure.');
+      }
+      if (!coeffs || coeffs.length !== mainWidth * BINAURAL_STRIDE) {
+        throw new Error('[Klotho] the geometry table for array '
+          + JSON.stringify(arrayName) + ' has '
+          + (coeffs ? coeffs.length : 'no') + ' floats; a ' + mainWidth
+          + '-lane decoder needs exactly '
+          + (mainWidth * BINAURAL_STRIDE) + '.');
+      }
+      requireDef(decoderDefName(mainWidth),
+        'the ' + mainWidth + '-speaker headphone fold');
+    }
+
+    // Every router width the chain will name, checked once, up front.
+    var seen = {};
+    for (var ci = 0; ci < names.length; ci++) seen[widths[names[ci]]] = true;
+    seen[mainWidth] = true;
+    for (var key in seen) {
+      if (!seen.hasOwnProperty(key)) continue;
+      var wdt = Number(key);
+      requireDef(routerDefName(wdt), 'a ' + wdt + '-channel track chain');
+    }
+
+    return {
+      widths: widths,
+      mainWidth: mainWidth,
+      arrayName: arrayName,
+      decoderTrack: chosen,
+      decoder: decoder,
+      // One key per distinct geometry table, so a replay of the same widget
+      // reuses the buffer it already uploaded instead of allocating another.
+      geomKey: arrayName + '|' + mainWidth
+    };
+  };
+
   proto.setupTracks = async function(meta, scoreGroupId) {
-    if (!meta || (!meta.groups && !meta.inserts)) {
+    if (!meta || (!meta.groups && !meta.inserts && !meta.spatial)) {
       this._trackMap = null;
       return;
     }
@@ -142,13 +319,25 @@
     var insertSpecs = meta.inserts || {};
     var trackMap = {};
 
+    // Refusals first: nothing below runs against a payload that cannot work.
+    var spatial = this._spatialPlan(meta);
+    var mainWidth = spatial ? spatial.mainWidth : BUS_CHANNELS;
+    function widthOf(name) {
+      if (!spatial) return BUS_CHANNELS;
+      var w = spatial.widths[name];
+      return (typeof w === 'number') ? w : BUS_CHANNELS;
+    }
+
     for (var t = 0; t < trackNames.length; t++) {
       var nm = trackNames[t];
+      var nmWidth = widthOf(nm);
       var parentGid = sonic.nextNodeId();
       var srcGid = sonic.nextNodeId();
       var fxGid = sonic.nextNodeId();
-      var srcBus = this._allocAudioBus();
-      var fxBus = this._allocAudioBus();
+      // One bus CHANNEL per speaker. A stereo track is the width-2 case of
+      // the same call, so both draw from the one page-global cursor.
+      var srcBus = this._allocAudioBusN(nmWidth);
+      var fxBus = this._allocAudioBusN(nmWidth);
 
       sonic.send('/g_new', parentGid, 1, scoreGroupId);
       sonic.send('/g_new', srcGid, 0, parentGid);
@@ -160,6 +349,7 @@
         fxGroup: fxGid,
         srcBus: srcBus,
         fxBus: fxBus,
+        width: nmWidth,
         insertNodes: {}
       };
     }
@@ -167,8 +357,8 @@
     var mainParentGid = sonic.nextNodeId();
     var mainSrcGid = sonic.nextNodeId();
     var mainFxGid = sonic.nextNodeId();
-    var mainSrcBus = this._allocAudioBus();
-    var mainFxBus = this._allocAudioBus();
+    var mainSrcBus = this._allocAudioBusN(mainWidth);
+    var mainFxBus = this._allocAudioBusN(mainWidth);
 
     sonic.send('/g_new', mainParentGid, 1, scoreGroupId);
     sonic.send('/g_new', mainSrcGid, 0, mainParentGid);
@@ -180,25 +370,53 @@
       fxGroup: mainFxGid,
       srcBus: mainSrcBus,
       fxBus: mainFxBus,
+      width: mainWidth,
       insertNodes: {}
     };
+
+    // Score.track() checks an insert's channel count against the track's
+    // speaker count -- but only for a track that DECLARES speakers. main
+    // here declares none and was widened by a sub-track, so its inserts were
+    // accepted as stereo and are about to be placed on a wide chain, where
+    // they read two lanes and write two: every lane above the first pair
+    // reaches main's post-FX bus unwritten, and those speakers go silent.
+    // Nothing downstream would say so, hence this.
+    if (spatial && mainWidth > BUS_CHANNELS
+        && spatial.widths['main'] == null
+        && insertSpecs['main'] && insertSpecs['main'].length > 0) {
+      console.warn('[Klotho] the master chain has inserts and main was '
+        + 'widened to ' + mainWidth + ' channels by a spatial track, but main '
+        + 'declares no speakers of its own -- so those inserts were only ever '
+        + 'checked as STEREO. A stereo insert on a ' + mainWidth
+        + '-channel chain reads and writes two lanes and leaves the other '
+        + (mainWidth - BUS_CHANNELS) + ' unwritten: those speakers will be '
+        + 'SILENT. Declare the master with its array too -- '
+        + "score.track('main', speakers=..., inserts=[...]) -- so the widths "
+        + 'are checked, or take the inserts off main.');
+    }
 
     var allTracks = trackNames.concat(["main"]);
     for (var ti = 0; ti < allTracks.length; ti++) {
       var tName = allTracks[ti];
       var track = trackMap[tName];
       var specs = insertSpecs[tName];
+      var chainWidth = track.width;
+      var chainRouter = routerDefName(chainWidth);
 
       if (!specs || specs.length === 0) {
         var bypassId = sonic.nextNodeId();
-        sonic.send('/s_new', '__busRouter', bypassId, 0, track.fxGroup,
+        sonic.send('/s_new', chainRouter, bypassId, 0, track.fxGroup,
           'inBus', track.srcBus, 'outBus', track.fxBus, 'gain', 1.0);
         track.insertNodes['__bypass'] = bypassId;
       } else {
         var prevBus = track.srcBus;
         for (var fi = 0; fi < specs.length; fi++) {
           var spec = specs[fi];
-          var nextBus = (fi < specs.length - 1) ? this._allocAudioBus() : track.fxBus;
+          // Intermediate buses are as wide as the chain. Score.track()
+          // already refused any insert that does not read and write exactly
+          // this many channels, so the width is wired, not re-checked.
+          var nextBus = (fi < specs.length - 1)
+            ? this._allocAudioBusN(chainWidth) : track.fxBus;
           var fxDefName = spec.defName;
           var fxUid = spec.uid;
           var fxArgs = spec.args || {};
@@ -224,31 +442,137 @@
       }
     }
 
+    // Each track sums into main at ITS OWN width, starting at main's lane 0.
+    // For a spatial track that is speaker-for-speaker, because main's lanes
+    // ARE the speakers. For a stereo track in a spatial score it means the
+    // first two speakers of the array: a stereo signal names no speaker, the
+    // room has no other place to put it, and every lane of main reaches the
+    // listener through the fold, so the material stays audible instead of
+    // being dropped for want of a speaker assignment.
+    var narrow = [];
     for (var ri = 0; ri < trackNames.length; ri++) {
       var rName = trackNames[ri];
       var rTrack = trackMap[rName];
       var routerId = sonic.nextNodeId();
-      sonic.send('/s_new', '__busRouter', routerId, 1, rTrack.parentGroup,
+      sonic.send('/s_new', routerDefName(rTrack.width), routerId, 1,
+        rTrack.parentGroup,
         'inBus', rTrack.fxBus, 'outBus', mainSrcBus, 'gain', 1.0);
       rTrack.routerNode = routerId;
+      if (rTrack.width < mainWidth) narrow.push(rName);
+    }
+    if (narrow.length > 0) {
+      console.warn('[Klotho] no speakers are declared for: ' + narrow.join(', ')
+        + '. Those tracks play through the first ' + BUS_CHANNELS
+        + ' speakers of the array (lanes 0 and 1), because a stereo signal '
+        + 'names no speaker and the room has nowhere else to put it. Declare '
+        + 'the track with speakers= to place it anywhere else.');
     }
 
-    var mainRouterId = sonic.nextNodeId();
-    sonic.send('/s_new', '__busRouter', mainRouterId, 1, trackMap["main"].parentGroup,
-      'inBus', mainFxBus, 'outBus', 0, 'gain', 1.0);
-    trackMap["main"].routerNode = mainRouterId;
+    if (spatial && spatial.decoder) {
+      // The headphone fold: N lanes in, hardware 0/1 out, so a 24-speaker
+      // score auditions on a stereo interface. addToTail of main's parent
+      // group puts it after main's own source and FX groups -- and main's
+      // group is the last child of the score group, so every track router
+      // has already written the array by the time this reads it.
+      await this._preloadSpatialGeometry(spatial);
+      var decId = sonic.nextNodeId();
+      sonic.send('/s_new', decoderDefName(mainWidth), decId, 1,
+        trackMap["main"].parentGroup,
+        'inBus', mainFxBus, 'outBus', 0,
+        'bufnum', this._geomPreload.bufnum, 'gain', 1.0);
+      trackMap["main"].decoderNode = decId;
+      trackMap["main"].routerNode = decId;
+    } else {
+      // No geometry, no fold. The stock STEREO router is still the right
+      // output stage even for a wide main: an N-wide router onto hardware
+      // bus 0 would spray lanes 2..N-1 across the output channels the stem
+      // taps live on. Lanes 0/1 monitored, everything else inaudible --
+      // said out loud, because an unheard speaker is the failure nobody
+      // notices.
+      var mainRouterId = sonic.nextNodeId();
+      sonic.send('/s_new', '__busRouter', mainRouterId, 1,
+        trackMap["main"].parentGroup,
+        'inBus', mainFxBus, 'outBus', 0, 'gain', 1.0);
+      trackMap["main"].routerNode = mainRouterId;
+      if (spatial) {
+        console.warn('[Klotho] the speaker array on this score carries labels '
+          + 'but no positions, so there is no geometry to fold with. Only '
+          + 'speakers 1 and 2 reach the output; the rest are routed but '
+          + 'inaudible here. Declare the track with a SpeakerArray (which '
+          + 'carries positions) for a headphone audition.');
+      }
+    }
 
     if (!trackMap["default"]) {
       trackMap["default"] = trackMap["main"];
     }
 
-    // No sync round-trip here: OSC messages are processed in order, so
-    // the group/insert /s_new burst above always lands before the
-    // timestamped note bundles sent afterwards, and the scheduler's
+    // No sync round-trip on the ordinary path: OSC messages are processed
+    // in order, so the group/insert /s_new burst above always lands before
+    // the timestamped note bundles sent afterwards, and the scheduler's
     // startup cushion covers engine-side processing. In postMessage mode
-    // (Colab/Jupyter) a sync costs ~300ms of press-to-sound latency.
+    // (Colab/Jupyter) a sync costs ~300ms of press-to-sound latency. A
+    // spatial score pays exactly one, on its FIRST play only -- see
+    // _preloadSpatialGeometry, where /b_alloc makes it unavoidable.
     this._trackMap = trackMap;
     this._trackOrder = trackNames.slice();
+  };
+
+  // Upload one array's geometry table, once per widget.
+  //
+  // Same /b_alloc -> /sync -> /b_setn fence as preloadControlBuffer, for the
+  // same reason: /b_alloc is an ASYNC scsynth command, so fills sent straight
+  // after it land on a buffer that does not exist yet and are dropped. The
+  // decoder would then read a buffer of zeros -- and a zero shadow cutoff is
+  // a one-pole coefficient of exactly 1.0, which mutes the lane. Every
+  // speaker silent, no error anywhere.
+  //
+  // Cached on the scheduler, not in _activeBuffers: the table is fixed for
+  // the widget's lifetime, so a replay reuses it and pays no fence. Freed by
+  // releaseControlPreload, the bridge's teardown hook.
+  proto._preloadSpatialGeometry = function(plan) {
+    if (this._geomPreload && this._geomPreload.key === plan.geomKey) {
+      return this._geomPreload.ready;
+    }
+    var sonic = this.sonic;
+    var coeffs = plan.decoder.coefficients;
+    var width = plan.mainWidth;
+
+    var bufnum = 0;
+    var sharedState = globalThis.__klothoSonic;
+    if (sharedState && sharedState._nextBufnum != null) {
+      bufnum = sharedState._nextBufnum++;
+    } else if (sharedState) {
+      sharedState._nextBufnum = 1;
+      bufnum = 0;
+    }
+
+    // N frames of SIX channels. The same floats in an "N*6 frames of 1"
+    // buffer are read as six consecutive lanes' worth of numbers by
+    // BufRd.kr(6, buf, lane) -- every speaker in the wrong place, silently.
+    sonic.send('/b_alloc', bufnum, width, BINAURAL_STRIDE);
+
+    var ready = (async function() {
+      try { await sonic.sync(); } catch (e) {}
+      for (var off = 0; off < coeffs.length; off += CTRL_ENVELOPE_CHUNK) {
+        var end = Math.min(off + CTRL_ENVELOPE_CHUNK, coeffs.length);
+        var chunk = [];
+        for (var ci = off; ci < end; ci++) chunk.push(coeffs[ci]);
+        sonic.send.apply(sonic, ['/b_setn', bufnum, off, chunk.length].concat(chunk));
+      }
+    })();
+
+    this._geomPreload = {
+      bufnum: bufnum, key: plan.geomKey, width: width,
+      stride: BINAURAL_STRIDE, ready: ready
+    };
+    return ready;
+  };
+
+  proto.releaseSpatialGeometry = function() {
+    if (!this._geomPreload) return;
+    try { this.sonic.send('/b_free', this._geomPreload.bufnum); } catch (e) {}
+    this._geomPreload = null;
   };
 
   // Stems recording: one extra __busRouter per non-main track, placed
@@ -269,14 +593,26 @@
       names = names.slice(0, MAX_STEMS);
     }
     var layout = [];
+    var folded = [];
     for (var i = 0; i < names.length; i++) {
       var track = this._trackMap[names[i]];
       if (!track || track.routerNode == null) continue;
+      // A stem pair is two hardware channels wide and the next track's pair
+      // starts two channels later, so a spatial track's stem carries its
+      // first two speakers and no more. Said out loud rather than quietly
+      // handing back a stem that is missing most of the music.
+      if (track.width > 2) folded.push(names[i]);
       var outCh = STEM_OUT_BASE + 2 * i;
       var tapId = sonic.nextNodeId();
       sonic.send('/s_new', '__busRouter', tapId, 3, track.routerNode,
         'inBus', track.fxBus, 'outBus', outCh, 'gain', 1.0);
       layout.push({ name: names[i], ch: [outCh, outCh + 1] });
+    }
+    if (folded.length > 0) {
+      console.warn('[Klotho] stems: ' + folded.join(', ') + ' have more than '
+        + 'two speakers, and a stem is a stereo pair -- those stems carry '
+        + 'speakers 1 and 2 only. Record the full mix for the headphone fold '
+        + 'of the whole array.');
     }
     return layout;
   };
@@ -334,6 +670,11 @@
   };
 
   proto.releaseControlPreload = function() {
+    // The bridge's orphan cleanup is the only widget-teardown hook the
+    // scheduler is given, and the geometry buffer has exactly the same
+    // per-widget lifetime for exactly the same reason, so it is freed here
+    // too rather than being left to leak a bufnum per widget.
+    this.releaseSpatialGeometry();
     if (!this._ctrlPreload) return;
     try { this.sonic.send('/b_free', this._ctrlPreload.bufnum); } catch (e) {}
     this._ctrlPreload = null;

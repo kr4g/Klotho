@@ -667,7 +667,14 @@
         }
         target = trackInfo ? trackInfo.srcGroup : (this._scoreGroupId || this._groupId || 0);
         if (trackInfo) {
-          pf.out = trackInfo.srcBus;
+          // One bus CHANNEL per speaker, so a lane is an OFFSET into the
+          // track's run: lane 0 is the track's own srcBus, lane k is k
+          // channels up. Non-spatial events carry no speakerLane and land
+          // on srcBus exactly as before. The lane is already known to be
+          // inside the track's array -- converters.py resolved the label
+          // against the declaration and refused anything else, with the
+          // score in hand, long before the number reached here.
+          pf.out = trackInfo.srcBus + (ev.speakerLane || 0);
         }
       } else {
         target = this._groupId != null ? this._groupId : 0;
@@ -730,7 +737,11 @@
           trackInfo = this._trackMap["default"];
         }
         if (trackInfo) {
-          pf.out = trackInfo.srcBus;
+          // Same lane offset as _bundleNew, for the same reason it mirrors
+          // the track routing at all: a slurred note that reaches its next
+          // event as a /n_set must not be moved to a different speaker
+          // (or back to lane 0) in the middle of its own sound.
+          pf.out = trackInfo.srcBus + (ev.speakerLane || 0);
         }
       }
       var args = [intId];
@@ -993,7 +1004,13 @@
       var scoreMeta = options.meta || null;
       var scoreControlData = options.controlData || null;
 
-      if (scoreMeta && (scoreMeta.groups || scoreMeta.inserts) && typeof this.setupTracks === 'function') {
+      // `spatial` counts as score metadata in its own right: a score whose
+      // only speaker array is declared on "main" has no `groups` and may
+      // have no `inserts`, and without this it would take the bare
+      // single-group path -- no track map, no array bus, every voice on
+      // out=0 and the whole declaration silently ignored.
+      if (scoreMeta && (scoreMeta.groups || scoreMeta.inserts || scoreMeta.spatial)
+          && typeof this.setupTracks === 'function') {
         this._createScoreGroup();
         await this.setupTracks(scoreMeta, this._scoreGroupId);
       } else {
