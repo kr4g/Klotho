@@ -87,12 +87,21 @@ def _is_speaker_label(value) -> bool:
                                       and not isinstance(value, bool))
 
 
-def _normalize_speakers(value, track_name: str):
+def _normalize_speakers(value, track_name: str, has_array: bool = False):
     """``speakers=`` -> ``(labels, lanes, array)``.
 
     *labels* is a tuple in lane order, *lanes* maps label to 0-based lane,
     and *array* is the :class:`SpeakerArray` when one was given (``None``
     for a labels-only declaration, which has no geometry to fold).
+
+    An EMPTY sequence is the un-declare spelling, and *has_array* says
+    whether there is anything to un-declare.  With one, ``speakers=[]``
+    returns ``(None, None, None)`` -- the track keeps existing but stops
+    being spatial -- which is the same shape ``inserts=[]`` already has for
+    the chain.  Without one it is refused, because "no speakers" and "no
+    ``speakers=`` argument" would then be the same track, and an empty list
+    arriving there is far more likely a label list that computed to nothing
+    than a deliberate no-op.
     """
     if isinstance(value, SpeakerArray):
         labels = value.labels
@@ -128,11 +137,25 @@ def _normalize_speakers(value, track_name: str):
         ) from None
 
     if not items:
+        if has_array:
+            # The un-declare: this track HAS an array and the caller states
+            # an empty one, so it stops being spatial.  Symmetric with
+            # inserts=[], and the only way back to stereo -- omitting
+            # speakers= on a re-registration KEEPS the array (that is what
+            # makes the incremental notebook shape work), so it cannot also
+            # mean "clear".
+            return None, None, None
         raise ValueError(
             f"speakers={value!r} on track {track_name!r} declares no speakers, "
-            f"so there is no lane to route a voice to. Give it at least one "
-            f"label (speakers=[1]), or drop speakers= to leave {track_name!r} "
-            f"an ordinary stereo track."
+            f"so there is no lane to route a voice to, and {track_name!r} has "
+            f"no array for an empty list to clear. Give it at least one label "
+            f"(speakers=[1]), or leave speakers= off entirely -- a track that "
+            f"declares no speakers IS an ordinary stereo track. ('main' is "
+            f"the only track that can be registered twice: on 'main' an "
+            f"empty speakers=[] un-declares an array it already has, and "
+            f"omitting speakers= keeps it. Every other track refuses a "
+            f"second track() call outright, so there is no re-registration "
+            f"to clear anything on.)"
         )
 
     lanes = {}
@@ -187,6 +210,41 @@ def _check_insert_width(effect, track_name: str, width: int) -> None:
             f"silently summing or duplicating lanes would change where the "
             f"music comes from."
         )
+
+
+def _check_insert_fits_stereo(effect, track_name: str) -> None:
+    """Refuse an insert left behind by ``speakers=[]`` that is too wide.
+
+    Un-declaring an array changes the track's width contract from N
+    channels back to 2, so an insert that was accepted against the array
+    and is not restated in the same call would land on a stereo chain.  An
+    insert reading more channels than the bus carries reads PAST it -- into
+    whatever bus is allocated next -- and nothing downstream says so.
+
+    Only the too-wide direction is refused, and only when the width is
+    recorded.  A narrower or unrecorded insert is left alone so that
+    clearing an array lands on exactly the rules an ordinary stereo track
+    has always had, rather than inventing a stricter regime reachable only
+    through this one spelling.
+    """
+    def_name = canonical_def_name(getattr(effect, 'defName', None))
+    label = getattr(effect, 'name', None) or def_name
+    shown = repr(label) if label == def_name else f"{label!r} ({def_name})"
+    ins, outs = ss_synth_channels(def_name)
+    if ins is None or outs is None:
+        return
+    if ins <= 2 and outs <= 2:
+        return
+    raise ValueError(
+        f"speakers=[] un-declares the array on track {track_name!r}, which "
+        f"leaves it stereo, but its chain still carries insert {shown}, which "
+        f"reads {ins} and writes {outs} channels. On a stereo chain that insert "
+        f"would read past the two channels the bus has. State the chain the "
+        f"stereo track should have in the same call -- "
+        f"score.track({track_name!r}, speakers=[], inserts=[...]) -- or "
+        f"inserts=[] to empty it."
+    )
+
 
 TemporalLike = Union[
     TemporalUnit, TemporalUnitSequence, TemporalBlock, CompositionalUnit, Event
@@ -479,11 +537,35 @@ class Score:
             Unique track name, matched against the ``group`` mfield of each
             lowered event.  ``"main"`` is implicit and always
             exists; calling ``track("main", inserts=[...])`` sets master
-            inserts.
+            inserts.  Every other name may be registered only once.
+
+            ``"main"`` may be registered again, and a second call
+            **merges**: the arguments this call names are set, the ones it
+            omits keep what the earlier call declared.  So the ordinary
+            notebook shape -- declare the rig in one cell, add a master
+            insert in a later one -- keeps both::
+
+                score.track('main', speakers=PAVILION)   # cell 3
+                score.track('main', inserts=[limiter])   # cell 9: array kept
+
+            Naming an argument again replaces that argument's previous
+            value; it never appends to it.  ``inserts=`` is the whole chain
+            in signal order, exactly as ``speakers=`` is the whole array,
+            so re-running one cell declares the same chain rather than
+            stacking a second copy of it, and ``inserts=[]`` empties the
+            chain.  An insert dropped this way is released and may be
+            placed on another track.  ``speakers=[]`` is the same spelling
+            on the other argument: it un-declares the array and leaves the
+            track stereo.
         inserts : list of Effect, Effect, or None
             Insert FX instances to place in this track's chain, applied in
             list order (signal flows left to right).  A bare
-            ``Effect`` is accepted as a one-element chain.
+            ``Effect`` is accepted as a one-element chain.  ``None`` means
+            "not stated": on a first registration the chain is empty, and
+            on a re-registration of ``"main"`` the existing chain is kept.
+            One ``Effect`` cannot appear twice in the same chain -- the
+            engine addresses an insert node by its uid, so a repeat would
+            leave one of the two nodes unreachable.
         speakers : SpeakerArray, sequence of labels, or None
             Declare this a **spatial** track carrying one bus channel per
             speaker.  A :class:`~klotho.thetos.spatial.SpeakerArray`
@@ -507,7 +589,22 @@ class Score:
             channels (an N-wide reverb is N independent reverbs, which is
             the correct semantics for speakers that share no room
             response).  Inserts are checked here, at declaration, before
-            any audio exists.
+            any audio exists.  ``None`` means "not stated" here too: a
+            re-registration of ``"main"`` that omits ``speakers=`` keeps
+            the array declared earlier, and the inserts it carries over are
+            re-checked against that array's width.
+
+            ``speakers=[]`` is the un-declare, matching ``inserts=[]``: the
+            track keeps existing and stops being spatial.  It is refused on
+            a track that declares no array, where it would be a no-op that
+            is much more likely a label list that computed to nothing.
+            Because a stereo chain is two channels wide, an insert carried
+            over from the array that reads or writes more than two is
+            refused too -- state the stereo chain in the same call.  Note
+            that on a score where another equally-wide spatial track is
+            still declared, un-declaring main's array hands the headphone
+            fold to THAT track's geometry (see the comment at the merge
+            site); the fold changes, silently and by design.
 
         Returns
         -------
@@ -518,37 +615,119 @@ class Score:
         ------
         ValueError
             For a bare speaker count, a duplicate or non-label speaker
-            name, an empty array, or an insert whose channel width does
-            not match the array's (including an insert whose width is not
-            recorded anywhere -- unknown widths are refused, never
-            guessed).
+            name, an empty array on a track that has none to un-declare,
+            an insert listed twice in one chain or already owned by
+            another track, or an insert whose channel width does not match
+            the array's (including an insert whose width is not recorded
+            anywhere -- unknown widths are refused, never guessed).
         """
         if isinstance(inserts, Effect):
             inserts = [inserts]
-        if name != "main" and name in self._tracks:
+        prior = self._tracks.get(name)
+        if name != "main" and prior is not None:
             raise ValueError(f"Track '{name}' already exists")
 
-        labels = lanes = array = None
+        # A second registration of 'main' MERGES rather than replaces the
+        # whole record.  An omitted argument is "not stated", not "cleared":
+        # a full replacement made the ordinary incremental shape (declare the
+        # rig in one cell, add a master insert in a later one) silently throw
+        # away whichever half was configured first, taking the stereo fold and
+        # the spatial decoder with it.  An argument that IS stated wins,
+        # because the caller stated an intent this time; that also keeps a
+        # re-run cell idempotent instead of stacking a second copy of its
+        # chain, and leaves inserts=[] as the way to empty one.
+        had_array = prior is not None and prior["labels"] is not None
         if speakers is not None:
-            labels, lanes, array = _normalize_speakers(speakers, name)
+            # An empty sequence is the un-declare, and only when there is
+            # something to un-declare; see _normalize_speakers.
+            labels, lanes, array = _normalize_speakers(speakers, name,
+                                                       has_array=had_array)
+        elif prior is not None:
+            # CARRYING MAIN'S ARRAY OVER CHANGES WHICH GEOMETRY IS HEARD.
+            # The headphone fold is one decoder for the summed main bus, so
+            # when several equally-wide spatial tracks declare DIFFERENT
+            # arrays only one geometry can describe the result, and
+            # scheduler_score.js breaks that tie in main's favour
+            # (``var chosen = (widest.indexOf('main') !== -1) ? 'main' : ...``,
+            # near line 250).  While the second call erased main's array,
+            # main dropped out of the tie and the other track's geometry was
+            # folded; keeping it, main's own geometry is -- with measurably
+            # different binaural coefficients, no error either way.  Main's
+            # is the right answer -- it is the chain the decoder sits on --
+            # and the composer is now TOLD, because the "different speaker
+            # arrays at the same width" warning beside that line fires only
+            # when the tie has more than one array in it, which under the
+            # erasure it never did.
+            #
+            # The other warning at the far end goes the other way and is
+            # correctly quieter: the one at scheduler_score.js line ~385
+            # ("the master chain has inserts and main was widened ... but
+            # main declares no speakers of its own -- so those inserts were
+            # only ever checked as STEREO") tests
+            # ``spatial.widths['main'] == null``.  The erasure made that true
+            # and the warning fired; keeping the array makes it false, and
+            # the warning stops -- rightly, since the inserts really were
+            # checked against the array, a few lines below this one.
+            labels, lanes, array = (prior["labels"], prior["lanes"],
+                                    prior["speakers"])
+        else:
+            labels = lanes = array = None
+        cleared_array = had_array and labels is None
+
+        if inserts is None and prior is not None:
+            incoming = list(prior["inserts"])
+        else:
+            incoming = list(inserts or [])
 
         # Validate BEFORE mutating anything: a refused declaration must
         # leave the score exactly as it was, or a caught error would leave
-        # half a track registered and its inserts owned by it.
+        # half a track registered and its inserts owned by it.  Inserts
+        # carried over from a previous call are re-validated too -- a newly
+        # declared array changes the width they have to match.
         checked = []
-        for ins in (inserts or []):
+        seen: dict[str, Effect] = {}
+        for ins in incoming:
             if not isinstance(ins, Effect):
                 raise TypeError(f"Expected SynthDefFX, got {type(ins).__name__}")
-            if ins.uid in self._insert_registry:
-                existing = self._insert_registry[ins.uid]
+            owner = self._insert_registry.get(ins.uid)
+            if owner is not None and owner != name:
                 raise ValueError(
                     f"Insert '{ins.name}' (uid={ins.uid}) already assigned to "
-                    f"track '{existing}'"
+                    f"track '{owner}'"
+                )
+            if ins.uid in seen:
+                # ``defName`` belongs to SynthDefFX, not to the Effect base
+                # class, so read it the way _check_insert_width does: a bare
+                # Effect must reach the teaching ValueError below, not an
+                # AttributeError raised while formatting it.
+                def_name = canonical_def_name(getattr(ins, 'defName', None))
+                how = (
+                    f"build two instances (inserts=[SynthDefFX('{def_name}'), "
+                    f"SynthDefFX('{def_name}')])"
+                    if def_name is not None else
+                    "build two instances rather than listing one of them twice"
+                )
+                raise ValueError(
+                    f"Insert '{ins.name}' (uid={ins.uid}) appears twice in "
+                    f"the chain of track '{name}'. The engine addresses an "
+                    f"insert node by its uid, so the second node would "
+                    f"overwrite the first one's handle and leave it "
+                    f"unreachable. For two stages of the same effect, "
+                    f"{how}."
                 )
             if labels is not None:
                 _check_insert_width(ins, name, len(labels))
+            elif cleared_array:
+                _check_insert_fits_stereo(ins, name)
+            seen[ins.uid] = ins
             checked.append(ins)
 
+        # Release the uids this track owned and no longer carries, so a
+        # dropped insert is placeable again instead of staying owned by a
+        # chain it has left.
+        for uid, owner in list(self._insert_registry.items()):
+            if owner == name and uid not in seen:
+                del self._insert_registry[uid]
         for ins in checked:
             self._insert_registry[ins.uid] = name
         self._tracks[name] = {
