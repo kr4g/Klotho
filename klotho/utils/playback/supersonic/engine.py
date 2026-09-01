@@ -45,6 +45,91 @@ def _load_all_synthdef_assets():
     return {**_load_disk_synthdef_assets(), **runtime_assets()}
 
 
+def needed_spatial_synthdefs(meta):
+    """The width-family defs a spatial score's scheduler instantiates.
+
+    None of these names is ever an event's ``defName``: the scheduler
+    builds the wide routers and the headphone decoder from
+    ``meta.spatial``, so a walk over events cannot see them, and a def the
+    page was never sent is one scsynth SKIPS -- the ``/s_new`` creates
+    nothing and the array plays SILENTLY with no message anywhere.
+
+    The decoder's width is main's width, which is the widest declared
+    track: every track sums into main, so main's bus is the one place the
+    whole array exists at once.  Whether a fold is actually possible (a
+    labels-only array has no geometry) is the scheduler's decision, and
+    one small blob is cheaper than duplicating that decision here.
+    """
+    tracks = ((meta or {}).get("spatial") or {}).get("tracks") or {}
+    widths = {
+        entry.get("width") for entry in tracks.values()
+        if isinstance(entry.get("width"), int) and entry.get("width") > 0
+    }
+    if not widths:
+        return set()
+    main_width = max(widths | {2})
+    names = {f"__busRouter{w}" for w in widths | {main_width} if w != 2}
+    names.add(f"__spatialDecode{main_width}")
+    return names
+
+
+def needed_synthdefs(events, meta=None, control_data=None):
+    """Every SynthDef name a payload needs sent to its page.
+
+    ONE source of truth for both playback surfaces.  ``play(score)``
+    reaches it through :class:`SuperSonicEngine`; ``plot(score).play()``
+    reaches it through
+    ``klotho.semeios.visualization._animation.animated._extract_needed_synthdefs``,
+    which only unwraps the payload's shape before delegating here.
+
+    They were separate, and the animation copy collected event
+    ``defName`` s alone.  Every other source below was therefore missing
+    from the animated page, and the drop is SILENT at every layer:
+    ``_filter_synthdef_assets`` skips a name it cannot place, and scsynth
+    skips an ``/s_new`` naming a def it never received.  An insert FX is
+    the only writer of its track's ``fxBus``, which the track's summing
+    router reads, so a track with an insert played in TOTAL SILENCE; a
+    spatial score, whose wide routers exist only here, did not play at
+    all.  Keep the two callers on this function.
+
+    Parameters
+    ----------
+    events : sequence of dict
+        Lowered SC events.  ``__rest__`` carries no sound and is skipped.
+    meta : dict, optional
+        Score metadata.  ``inserts`` names per-track FX defs; ``spatial``
+        names the width family (see :func:`needed_spatial_synthdefs`).
+    control_data : dict, optional
+        Control-envelope payload.  Any ``descriptors`` mean the page runs
+        ``__klEnvCtrl`` synths, which are likewise never an event
+        ``defName``.
+
+    Returns
+    -------
+    set of str
+        SynthDef names, without the infrastructure defs every page gets
+        (see ``_INFRA_SYNTHDEFS``).
+    """
+    meta = meta or {}
+    names = set()
+    for ev in events or ():
+        if not isinstance(ev, dict):
+            continue
+        if ev.get("type") == "new" and ev.get("defName"):
+            name = ev["defName"]
+            if name != "__rest__":
+                names.add(name)
+    for track_inserts in (meta.get("inserts") or {}).values():
+        for ins in track_inserts or ():
+            dn = ins.get("defName") if isinstance(ins, dict) else None
+            if dn:
+                names.add(dn)
+    if (control_data or {}).get("descriptors"):
+        names.add("__klEnvCtrl")
+    names |= needed_spatial_synthdefs(meta)
+    return names
+
+
 def _filter_synthdef_assets(all_assets, needed):
     filtered = {}
     for name in needed | _INFRA_SYNTHDEFS:
@@ -145,48 +230,10 @@ class SuperSonicEngine:
                               or self.meta.get("spatial"))
 
     def _needed_synthdefs(self):
-        names = set()
-        for ev in self.events:
-            if ev.get("type") == "new" and ev.get("defName"):
-                name = ev["defName"]
-                if name != "__rest__":
-                    names.add(name)
-        for track_inserts in self.meta.get("inserts", {}).values():
-            for ins in track_inserts:
-                dn = ins.get("defName")
-                if dn:
-                    names.add(dn)
-        if self.control_data.get("descriptors"):
-            names.add("__klEnvCtrl")
-        names |= self._needed_spatial_synthdefs()
-        return names
+        return needed_synthdefs(self.events, self.meta, self.control_data)
 
     def _needed_spatial_synthdefs(self):
-        """The width-family defs a spatial score's scheduler instantiates.
-
-        None of these names is ever an event's ``defName``: the scheduler
-        builds the wide routers and the headphone decoder from
-        ``meta.spatial``, so the loop above cannot see them, and a def the
-        page was never sent is one scsynth SKIPS -- the ``/s_new`` creates
-        nothing and the array plays SILENTLY with no message anywhere.
-
-        The decoder's width is main's width, which is the widest declared
-        track: every track sums into main, so main's bus is the one place
-        the whole array exists at once.  Whether a fold is actually possible
-        (a labels-only array has no geometry) is the scheduler's decision,
-        and one small blob is cheaper than duplicating that decision here.
-        """
-        tracks = (self.meta.get("spatial") or {}).get("tracks") or {}
-        widths = {
-            entry.get("width") for entry in tracks.values()
-            if isinstance(entry.get("width"), int) and entry.get("width") > 0
-        }
-        if not widths:
-            return set()
-        main_width = max(widths | {2})
-        names = {f"__busRouter{w}" for w in widths | {main_width} if w != 2}
-        names.add(f"__spatialDecode{main_width}")
-        return names
+        return needed_spatial_synthdefs(self.meta)
 
     def _needed_samples(self):
         """Sample names referenced symbolically by ``buf*`` pfields."""

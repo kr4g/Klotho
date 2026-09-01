@@ -17,15 +17,32 @@ from .._renderers.threejs_lattice import (
 
 
 def _extract_needed_synthdefs(audio_payload):
+    """SynthDef names an animated payload's page must be sent.
+
+    Shape adapter only: an animation payload is either a bare event list
+    or a dict carrying ``events`` plus (for a Score) ``meta`` and
+    ``controlData``.  The name collection itself is
+    :func:`klotho.utils.playback.supersonic.engine.needed_synthdefs`, the
+    same function ``SuperSonicEngine`` uses, so the animated page and the
+    standalone widget cannot ship different sets.  They did: this
+    function once walked event ``defName`` s alone, and dropped every
+    insert FX and every spatial width def, silently, all the way to
+    silence in the browser.
+    """
+    from klotho.utils.playback.supersonic.engine import needed_synthdefs
+
     if not audio_payload:
         return None
-    events = audio_payload if isinstance(audio_payload, list) else audio_payload.get("events", [])
-    names = set()
-    for ev in events:
-        if isinstance(ev, dict) and ev.get("type") == "new":
-            dn = ev.get("defName")
-            if dn and dn != "__rest__":
-                names.add(dn)
+    if isinstance(audio_payload, list):
+        events, meta, control_data = audio_payload, None, None
+    else:
+        events = audio_payload.get("events", [])
+        meta = audio_payload.get("meta")
+        # ``controlData`` is the JSON-safe animation spelling of the
+        # engine's ``control_data``; accept either.
+        control_data = (audio_payload.get("controlData")
+                        or audio_payload.get("control_data"))
+    names = needed_synthdefs(events, meta, control_data)
     return names if names else None
 
 

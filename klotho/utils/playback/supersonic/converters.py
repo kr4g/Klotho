@@ -784,6 +784,16 @@ def _apply_spatial_routing(score, events) -> None:
     for event in events:
         if event.get('type') != 'new':
             continue
+        # A rest carries no sound, so it has no speaker to come out of.
+        # The animation payload keeps ``__rest__`` as a step marker (and
+        # ``_lower_score_uc`` appends it BEFORE the ``group`` stamp, so it
+        # arrives here reading 'default' -> 'main'); the scheduler's
+        # ``_bundleNew`` returns on ``__rest__`` before it ever looks at
+        # ``speakerLane``.  Without this, plot(score) on a spatial score
+        # containing a rest refused the score and named '__rest__' as the
+        # instrument the composer had to set a speaker on.
+        if event.get('defName') == '__rest__':
+            continue
         group = event.get('group', 'default')
         labels = _spatial_labels(_track_spec_for(score, group))
         speaker = event.get('speaker', None)
