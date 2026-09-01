@@ -149,7 +149,10 @@
       // Track the bus range allocated by THIS play, so it can be reclaimed
       // when the group is freed. Without this, ``__klothoBusAlloc`` only
       // grows monotonically and the user runs out of private audio buses
-      // (default scsynth limit: 128 channels) after a few dozen plays.
+      // after a few dozen plays. The budget is whatever the page's engine
+      // booted with (numAudioBusChannels in supersonic_config(), currently
+      // 1024); running past it now raises from _allocAudioBusN rather than
+      // handing out buses scsynth does not have.
       this._audioBusRangeStart = null;
       this._controlBusRangeStart = null;
       this._activeBuffers = [];

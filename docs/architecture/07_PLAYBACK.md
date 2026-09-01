@@ -269,7 +269,12 @@ same page can neither clobber nor be broken by new widgets.
 ### Engine boot configuration
 
 `cdn.py` pins the SuperSonic version and boots scsynth with
-`scsynthOptions: {numOutputBusChannels: 32, numAudioBusChannels: 256}`.
+`scsynthOptions: {numOutputBusChannels: 32, numAudioBusChannels: 1024}`.
+The audio-bus budget was raised from 256 for multichannel work: 256 left
+only 208 channels above the private floor, enough for a single 24-wide
+speaker array with one insert. Output channels stay at 32 -- the array
+lives on PRIVATE buses, since hardware channels above the master pair are
+inaudible in the browser anyway.
 Output channels 0/1 are the audible master pair (the browser clamps the
 speaker path to the hardware's channel count); channels 2–31 are
 **stem-tap pairs** used only while recording stems. Consequently the JS

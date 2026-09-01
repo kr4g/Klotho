@@ -18,8 +18,25 @@ DRAW_JS_PATH = Path(__file__).parent / "draw.js"
 # bus space starts at numOutput + numInput = 34; the JS schedulers allocate
 # track/FX buses from FIRST_PRIVATE_BUS = 48 (see scheduler_core.js), which
 # must stay >= that hardware span.
+# Private audio buses. Raised 256 -> 1024 for multichannel output: one bus
+# channel per speaker means a 24-speaker track costs 24 channels per bus, and
+# 256 channels leave only 208 above FIRST_PRIVATE_BUS = 48 -- room for exactly
+# one spatial track with one insert. 1024 leaves 976, about 13 spatial tracks
+# with two inserts each. The raise is UNCONDITIONAL, so every fresh page is
+# spatial-capable: a per-page opt-in would mean the first spatial play() on a
+# page whose engine already booted non-spatial raises "reload the notebook",
+# which in a Colab session is the moment you least want to lose state. Cost is
+# one contiguous float array, 1024 x 64 samples x 4 B = 256 KB, against the
+# ~90 MB/widget a SuperSonic widget already costs.
+#
+# numOutputBusChannels stays 32 and must not follow: the speaker array lives on
+# PRIVATE buses, hardware channels above 0/1 are inaudible in the browser
+# (the speaker path is clamped to 2), 2..31 are already spoken for as stem-tap
+# pairs, and raising it would push the hardware span above FIRST_PRIVATE_BUS.
+# 32 also already covers the widest hardware mirror the design asks for
+# (channels 2..31 = 30 speakers).
 SCSYNTH_NUM_OUTPUT_CHANNELS = 32
-SCSYNTH_NUM_AUDIO_BUSES = 256
+SCSYNTH_NUM_AUDIO_BUSES = 1024
 
 
 def supersonic_config():

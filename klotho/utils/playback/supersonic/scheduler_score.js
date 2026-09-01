@@ -12,15 +12,87 @@
   var FIRST_PRIVATE_BUS = 48; // keep in sync with scheduler_core.js
   var BUS_CHANNELS = 2;
   var CTRL_ENVELOPE_CHUNK = 200;
+  // Widest single run any caller may ask for. A speaker array is capped far
+  // below this (the hardware mirror carries at most 30 speakers), so a width
+  // above it is a caller bug, not a venue — refuse rather than swallow a
+  // quarter of the bus space on a typo.
+  var MAX_BUS_WIDTH = 256;
+  // Assumed audio-bus budget when the page cannot say what it booted with.
+  // Deliberately the OLD budget: a page with no bootConfig stash was started
+  // by an output saved before this build, and guessing high would hand out
+  // buses scsynth does not have — silent cross-talk between unrelated voices
+  // instead of a loud refusal.
+  var LEGACY_AUDIO_BUSES = 256;
 
   var proto = globalThis.BrowserScheduler.prototype;
 
-  proto._allocAudioBus = function() {
+  // How many audio bus CHANNELS this page's engine actually booted with.
+  // ss_init stashes its boot config on globalThis.__klothoSonic; an engine
+  // booted by a stale pre-10.16 output has no stash, which is exactly how the
+  // recorder detects that page state too. getSystemReport() is deliberately
+  // not consulted: it publishes the HARDWARE channel count
+  // (audio.channelCount, which the bridge's stemCapacity reads), not the
+  // private audio-bus count, so there is nothing there to read.
+  proto._audioBusCapacity = function() {
+    var n = 0;
+    try {
+      var st = globalThis.__klothoSonic;
+      var so = st && st.bootConfig && st.bootConfig.scsynthOptions;
+      if (so && so.numAudioBusChannels) n = so.numAudioBusChannels;
+    } catch (e) {}
+    return n || LEGACY_AUDIO_BUSES;
+  };
+
+  // Allocate a run of `width` CONSECUTIVE audio bus channels; returns the
+  // first channel of the run.
+  //
+  // ONE cursor, ONE implementation: _allocAudioBus() below is literally
+  // _allocAudioBusN(BUS_CHANNELS), so a stereo track and a 24-wide spatial
+  // track drawing from the same page-global __klothoBusAlloc can never be
+  // handed overlapping ranges. Two allocators would be two chances to drift,
+  // and an overlap here is two unrelated voices silently summing into each
+  // other — the exact failure this whole feature exists to remove.
+  //
+  // Widths are rounded UP TO EVEN. scsynth imposes no alignment rule, and
+  // correctness comes from the single monotonic cursor rather than from
+  // parity — so this is a deliberate choice, not a requirement. The cursor
+  // starts at an even floor (48) and every allocation in the tree today
+  // steps it by 2, so it has always been even; one odd-width run would
+  // de-align it permanently and every stereo pair allocated afterwards on
+  // that page would straddle an odd boundary. Preserving the invariant costs
+  // at most one wasted channel per odd-width run; losing it costs every bus
+  // number in every log its match with the "pairs from 48" model this file
+  // is written around.
+  proto._allocAudioBusN = function(width) {
+    if (typeof width !== 'number' || !isFinite(width)
+        || Math.floor(width) !== width
+        || width <= 0 || width > MAX_BUS_WIDTH) {
+      throw new Error('[Klotho] audio bus width must be a whole number from 1 '
+        + 'to ' + MAX_BUS_WIDTH + '; got ' + width + '. One bus channel per '
+        + 'speaker: pass the number of channels the run has to carry.');
+    }
     var idx = this._nextAudioBus;
-    this._nextAudioBus += BUS_CHANNELS;
+    var w = width + (width & 1); // round up to even — see note above
+    var capacity = this._audioBusCapacity();
+    if (idx + w > capacity) {
+      throw new Error('[Klotho] out of private audio buses: a ' + width
+        + '-channel run at bus ' + idx + ' would reach ' + (idx + w)
+        + ', past this page\'s engine budget of ' + capacity
+        + ' audio bus channels (' + (capacity - FIRST_PRIVATE_BUS)
+        + ' above the private floor of ' + FIRST_PRIVATE_BUS + '). Use fewer '
+        + 'tracks, fewer inserts, or a smaller speaker array. If you upgraded '
+        + 'Klotho since this engine started, reload the notebook page and '
+        + 're-run the cells -- a running engine keeps the bus budget it '
+        + 'booted with.');
+    }
+    this._nextAudioBus = idx + w;
     var g = globalThis.__klothoBusAlloc;
     if (this._nextAudioBus > g.nextAudio) g.nextAudio = this._nextAudioBus;
     return idx;
+  };
+
+  proto._allocAudioBus = function() {
+    return this._allocAudioBusN(BUS_CHANNELS);
   };
 
   proto._allocControlBus = function() {
