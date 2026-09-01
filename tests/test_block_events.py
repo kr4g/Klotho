@@ -218,11 +218,19 @@ class TestNesting:
         assert len(df) == 6
         assert min(df[df['voice'] == '0.0']['start']) == pytest.approx(2.0)
 
-    def test_a_compositional_unit_row_yields_the_same_columns(self):
+    def test_a_compositional_unit_row_yields_the_same_timing_columns(self):
+        """The ten timing columns lead; a UC row APPENDS its own (BT-12).
+
+        This used to assert the exact ten and pass, which was the defect:
+        the block table silently dropped the instrument and every pfield the
+        unit carried. The timing contract is what is pinned here — the
+        appended parameter columns are pinned in
+        ``tests/test_lane_b_block_events_parameter_columns.py``.
+        """
         uc = CompositionalUnit(tempus='4/4', prolatio=(1, 1, 2), bpm=100)
         blk = TemporalBlock([uc, _u('2/4', (1, 1))], sort_rows=False)
         df = blk.events
-        assert list(df.columns) == EXPECTED_COLUMNS
+        assert list(df.columns)[:len(EXPECTED_COLUMNS)] == EXPECTED_COLUMNS
         assert len(df[df['row'] == 0]) == len(uc)
 
 

@@ -1358,8 +1358,10 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
             prolatio=ut.prolationis,
             beat=beat,
             bpm=bpm,
-            pfields=ut.pfields
         )
+        # NO `pfields=`: see TemporalUnit._scaled. The list form defaults
+        # every registered name to 0.0, which is a VALUE, not "unset" --
+        # `_mirror_param_state` registers the names without inventing one.
         new_cu._mirror_param_state(ut)
         new_cu._slur_specs = ut._copy_slur_specs()
         new_cu._next_slur_id = ut._next_slur_id
@@ -1412,8 +1414,10 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
             prolatio=ut.prolationis,
             beat=ut.beat,
             bpm=ut.bpm * ratio,
-            pfields=ut.pfields
         )
+        # NO `pfields=`: see TemporalUnit._scaled. The list form defaults
+        # every registered name to 0.0, which is a VALUE, not "unset" --
+        # `_mirror_param_state` registers the names without inventing one.
         new_cu._mirror_param_state(ut)
         new_cu._slur_specs = ut._copy_slur_specs()
         new_cu._next_slur_id = ut._next_slur_id

@@ -849,14 +849,22 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
 
     Parameters
     ----------
-    span : int, float, or Fraction, optional
-        Number of measures. Default is 1.
+    span : int or Fraction, optional
+        Number of measures. Must be positive. ``float`` is refused: it is
+        passed through to :class:`~klotho.chronos.rhythm_trees.RhythmTree`
+        unconverted and only fails there, long after the unit has reported a
+        duration. A non-integer ``Fraction`` is accepted and means what it
+        says — ``span=Fraction(1, 2)`` on a ``4/4`` is the same unit as
+        ``tempus='2/4'``. Default is 1.
     tempus : Meas, Fraction, int, float, or str, optional
         The time signature. Default is ``'4/4'``.
     prolatio : tuple or str, optional
         The subdivision specification. A tuple gives explicit proportions;
         a string selects a preset (``'d'`` = duration, ``'r'`` = rest,
-        ``'p'`` = pulse). Default is ``'d'``.
+        ``'p'`` = pulse). The tuple may not be EMPTY at the top level — an
+        empty prolatio has no leaves, so the root becomes its own event and
+        reports the tempus numerator as its duration. A nested empty group
+        (``(1, (1, ()))``) is fine. Default is ``'d'``.
     beat : Fraction, int, float, str, or None, optional
         The beat reference for tempo calculation. When None, defaults to
         ``1/tempus-denominator`` (6/8 gets 1/8) — a default for now, an
@@ -873,7 +881,7 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
     4
     """
     def __init__(self,
-                 span     : Union[int,float,Fraction]          = 1,
+                 span     : Union[int,Fraction]                = 1,
                  tempus   : Union[Meas,Fraction,int,float,str] = _UNSET,
                  prolatio : Union[tuple,str]                   = 'd',
                  beat     : Union[None,Fraction,int,float,str] = None,
@@ -881,6 +889,31 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         ):
 
         self._type   = None
+
+        # `span` was never validated, and the hint above used to advertise
+        # `float` -- which is the one type that cannot work. It is passed
+        # through unconverted to `RhythmTree(span=Meas(tempus).numerator *
+        # span)`, so a float builds, reports a plausible `.duration`, and
+        # only dies on the first `.events` read, deep inside the tree, with
+        # "'float' object has no attribute 'numerator'". Zero and negative
+        # never raised at all: `UT(span=-1).duration` was -4.0, a backwards
+        # real duration that flows into sequences and blocks as an
+        # overlapping timeline. A non-integer Fraction is DELIBERATELY still
+        # accepted -- it is exact all the way down and is event-for-event
+        # identical to writing the tempus you mean.
+        if not isinstance(span, (int, Fraction)) or span <= 0:
+            raise ValueError(
+                "span must be a positive int or Fraction of measures; got "
+                f"{span!r}. A float span is never converted -- it reaches "
+                "RhythmTree intact and dies with \"'float' object has no "
+                "attribute 'numerator'\" the first time you read .events, "
+                "after the unit has already reported a duration. A span of 0 "
+                "has no duration and a negative span runs backwards -- "
+                "neither is a passage a player could read. Write span=2 for "
+                "two measures, Fraction(1, 2) for half of one, or say it in "
+                "the tempus: UT(tempus='2/4') rather than "
+                "UT(span=0.5, tempus='4/4')."
+            )
 
         # Attribution (NEW-39's prerequisite, ruled with LAYER-5): record
         # which tempo slots were explicitly given. Only the constructor
@@ -1412,6 +1445,28 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         tree_cls = self._tree_class
         match prolatio:
             case tuple():
+                # RT-30, the TemporalUnit door. A TOP-LEVEL empty tuple builds
+                # a tree with only a root, so the root is its own single event
+                # and carries `Meas.numerator * span` as its metric duration
+                # instead of the measure: UT(tempus='6/8', prolatio=()) reported
+                # .duration == 6.0 while its one event ran 36.0 seconds. The
+                # RhythmTree constructor refuses this too, but in its own
+                # `subdivisions` vocabulary -- a UT caller who wrote `prolatio`
+                # is owed a message about `prolatio`.
+                #
+                # Scoped to the top level ON PURPOSE. A NESTED empty group --
+                # the (1, ()) pair inside (1, (1, ())) -- is correct today,
+                # sums to the measure, and is real emitted data (the
+                # asymmetric tree in tests/test_decompose.py).
+                if not prolatio:
+                    raise ValueError(
+                        "prolatio cannot be an empty tuple -- an empty "
+                        "prolatio builds a unit whose single event runs "
+                        f"{tempus._numerator}x longer than the unit reports. "
+                        "Pass 'd' for one undivided event, or (1,), or 'r' "
+                        "for a rest. (A nested empty group -- the (1, ()) "
+                        "pair inside (1, (1, ())) -- is still accepted.)"
+                    )
                 self._type = ProlatioTypes.SUBDIVISION
                 return tree_cls(span = span, meas = tempus, subdivisions = prolatio)
             
@@ -1605,8 +1660,16 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
                 prolatio=self.prolationis,
                 beat=self.beat,
                 bpm=self.bpm,
-                pfields=self.pfields,
             )
+            # NO `pfields=` here. It looked like registry carry and was not:
+            # `self.pfields` is the sorted list of registered NAMES, and the
+            # constructor's list branch means "declare these and default them
+            # to 0.0". Every name the source had merely registered came back
+            # pinned to 0.0 at the root and inherited down -- amp=0.0 is
+            # silence, gate=0.0 never opens the envelope -- so `uc * 1`, a
+            # documented no-op, muted the unit. `_mirror_param_state` does
+            # the registration itself (`dst.register_pfields(...)`), so the
+            # argument was redundant as well as harmful.
             out._mirror_param_state(self)
             out._slur_specs = self._copy_slur_specs()
             out._next_slur_id = self._next_slur_id
@@ -2180,7 +2243,9 @@ def _validate_axis(axis):
 # Column order of TemporalBlock.events. The tail is exactly
 # TemporalUnit.events' columns, so a block table and a unit table can be
 # read the same way; ``row`` and ``voice`` are the two identity columns the
-# merge adds. See TemporalBlock.events.
+# merge adds. These are the GUARANTEED LEADING columns: a CompositionalUnit
+# row appends its instrument and parameter columns after them (BT-12).
+# See TemporalBlock.events.
 _BLOCK_EVENT_COLUMNS = ('row', 'voice', 'node_id', 'start', 'duration',
                         'end', 'is_rest', 's', 'metric_onset',
                         'metric_duration')
@@ -2543,6 +2608,18 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         ``node_id``, ``start``, ``duration``, ``end``, ``is_rest``, ``s``, ``metric_onset``, ``metric_duration``
             Exactly the columns of :attr:`TemporalUnit.events`.
 
+        The ten columns above are the guaranteed contract and always come
+        first. AFTER them, a
+        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`
+        row contributes exactly the columns its own ``events`` table shows
+        minus the timing ones — ``instrument``, then one column per pfield,
+        then one per mfield — unioned across every such row and NaN-filled
+        wherever a row does not carry them (BT-12). A block with no
+        ``CompositionalUnit`` anywhere in it reports the ten columns alone.
+        A parameter whose name collides with a timing column (a pfield
+        called ``duration``, say) is NOT appended: the timing column wins,
+        and the parameter is still readable on the unit itself.
+
         ``start`` and ``end`` are **absolute** seconds: they include the
         block's own offset and every row's alignment offset, so the table
         is directly comparable across voices under any ``axis``.
@@ -2570,10 +2647,20 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         pandas.DataFrame
         """
         self._ensure_aligned()
+        # BT-12: the ten timing keys below used to be the WHOLE row, so a
+        # CompositionalUnit's instrument and pfields — visible in that unit's
+        # own ``events`` — vanished the moment it was placed in a block. The
+        # sound was never affected (lowering reads the units, not this table);
+        # the table lied by omission, which is why the answer is to show the
+        # data rather than to refuse anything.
+        from klotho.thetos.composition.compositional import (
+            CompositionalUnit, Parametron)
         data = []
+        param_columns = []          # union of contributed keys, first seen first
+        seen = set()
         for i, row in enumerate(self._rows):
             for voice, c in _walk_block_events(row, str(i)):
-                data.append({
+                event = {
                     'row': i,
                     'voice': voice,
                     'node_id': c.node_id,
@@ -2584,8 +2671,31 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
                     's': c.proportion,
                     'metric_onset': c.metric_onset,
                     'metric_duration': c.metric_duration,
-                })
-        df = pd.DataFrame(data, columns=list(_BLOCK_EVENT_COLUMNS))
+                }
+                if isinstance(c, Parametron):
+                    # Exactly the columns this event's own unit would show
+                    # in ``uc.events``, minus the timing ones: instrument
+                    # first (present even when unbound, as it is there),
+                    # then pfields, then mfields.
+                    extra = {'instrument': CompositionalUnit._instrument_display(
+                        c._resolve_instrument())}
+                    extra.update(c.pfields)
+                    extra.update(c.mfields)
+                    for key, value in extra.items():
+                        # A pfield may legitimately be named ``duration``
+                        # (the duration-injection control). The timing
+                        # columns are the guaranteed contract, so they win
+                        # and the collision is dropped rather than silently
+                        # overwriting a timing value with a parameter.
+                        if key in _BLOCK_EVENT_COLUMNS:
+                            continue
+                        if key not in seen:
+                            seen.add(key)
+                            param_columns.append(key)
+                        event[key] = value
+                data.append(event)
+        df = pd.DataFrame(data,
+                          columns=list(_BLOCK_EVENT_COLUMNS) + param_columns)
         if len(df):
             df = df.sort_values(['start', 'row'], kind='stable',
                                 ignore_index=True)
