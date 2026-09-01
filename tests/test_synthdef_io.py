@@ -12,12 +12,22 @@ Three things are pinned here:
    ``io.json`` record and vice versa.  A missing key must mean "the sidecar
    is stale", never "this def has no width" -- so the absence of a key is a
    failure, not a shrug.
-2. **The exceptions.**  Six defs write twice and one writes at control rate.
-   They are named individually, because they are exactly what a future
-   width validator trips on, and an asset rebuild that changes one should
-   say so loudly rather than quietly widening a def.
+2. **The exceptions.**  Most of the tree is 0-in/2-out or 2-in/2-out.
+   Everything else is named -- the defs that write twice, the one that
+   writes at control rate, and the ``__spatialDecodeN`` width families --
+   because they are exactly what a width validator trips on, and an asset
+   rebuild that changes one should say so loudly rather than quietly
+   widening a def.
 3. **Regeneration is deterministic.**  A generated file that reorders itself
    produces noisy diffs forever.
+
+The spatial width families are pinned by DERIVATION here rather than by
+listing: ``spatial_defs.parse_def_name`` reads the width out of a def's
+name and this file checks the sidecar agrees, so "``__spatialDecode24``
+reads 24 lanes" is verified rather than transcribed.  Their kind, their
+completeness and their writer shapes are pinned in
+``test_synthdef_kinds.py``; what is pinned here is that they do not
+disturb the rest of the tree.
 """
 
 import json
@@ -25,6 +35,7 @@ from pathlib import Path
 
 import pytest
 
+from klotho.utils.playback.supersonic import spatial_defs as sd
 from klotho.utils.playback.supersonic._vendor.synthdef_parser import (
     parse_synthdef_file,
 )
@@ -39,18 +50,30 @@ _IO = json.loads(rm._IO_PATH.read_text()) if rm._IO_PATH.exists() else {}
 _MANIFEST = json.loads(rm._MANIFEST_PATH.read_text())
 _KINDS = json.loads(rm._KINDS_PATH.read_text())
 
-#: Defs that emit more than one bus-writer UGen.  The three ``__*`` routers
-#: write 2 channels to two *different* buses (``ReplaceOut(inBus)`` clears
-#: the source, ``Out(outBus)`` emits); the three ``fd_*`` are sclang
-#: multichannel-expanding one ``Out.ar`` into two 2-channel writes to the
-#: *same* bus, which sum.  Both are 2 channels wide.
+#: Defs that emit more than one bus-writer UGen, EXCLUDING the width
+#: family.  The three ``__*`` routers write 2 channels to two *different*
+#: buses (``ReplaceOut(inBus)`` clears the source, ``Out(outBus)`` emits);
+#: the three ``fd_*`` are sclang multichannel-expanding one ``Out.ar`` into
+#: two 2-channel writes to the *same* bus, which sum.  Both are 2 channels
+#: wide.  Every ``__busRouterN`` writes twice for the first reason, at its
+#: own width, and is checked by derivation instead of being listed.
 MULTI_WRITER = [
     '__busRouter', '__busRouterMonitor', '__chainLimiter',
     'fd_glass', 'fd_longsaw', 'fd_quin',
 ]
 
-#: The only def in the tree that does not write 2 audio channels.
+#: The only def in the tree that does not write audio.
 CONTROL_RATE_WRITER = '__klEnvCtrl'
+
+#: The ``__spatialDecodeN`` / ``__busRouterN`` / ``__spatialArrayOutN``
+#: members present in the sidecar, by name.  Derived from the names
+#: themselves, so a member that appears without anyone updating this file
+#: is still recognized as one -- and a def that merely LOOKS like one is
+#: not, since the parse has to round-trip.
+FAMILY = sorted(n for n in _IO if sd.parse_def_name(n))
+
+#: Everything else: the tree as it was before the families landed.
+NON_FAMILY = sorted(set(_IO) - set(FAMILY))
 
 
 def _names(kind):
@@ -177,11 +200,17 @@ class TestKindInvariants:
                 'writes': [{'ugen': 'ReplaceOut', 'rate': 'audio', 'channels': 2}],
             }, name
 
-    def test_infra_is_three_routers_plus_the_envelope_writer(self):
-        assert _names('infra') == [
+    def test_infra_is_the_four_fixed_defs_plus_the_width_families(self):
+        """The fixed four are the stock stereo router, its monitoring twin,
+        the chain limiter and the control-envelope writer.  Everything else
+        classified ``infra`` must be a width-family member -- an infra def
+        that is neither means the assets and the name parser have drifted.
+        """
+        assert sorted(set(_names('infra')) - set(FAMILY)) == [
             '__busRouter', '__busRouterMonitor', '__chainLimiter',
             '__klEnvCtrl',
         ]
+        assert set(FAMILY) <= set(_names('infra'))
 
 
 class TestExceptions:
@@ -191,16 +220,44 @@ class TestExceptions:
     rather than surfacing as a silent routing bug.
     """
 
-    def test_shape_distribution(self):
+    def test_shape_distribution_outside_the_width_families(self):
+        """The tree the families did not touch: 149 instruments writing a
+        stereo pair, 33 two-in/two-out defs (30 effects plus the three
+        stock routers), and the one control-rate writer."""
         counts = {}
-        for rec in _IO.values():
+        for name in NON_FAMILY:
+            rec = _IO[name]
             key = (rec['ins'], rec['outs'])
             counts[key] = counts.get(key, 0) + 1
         assert counts == {(0, 2): 149, (2, 2): 33, (0, 1): 1}
-        assert sum(counts.values()) == len(_MANIFEST) == 183
+        assert sum(counts.values()) == 183
 
-    def test_multi_writer_defs_are_exactly_these_six(self):
-        assert sorted(n for n, r in _IO.items() if len(r['writes']) > 1) == MULTI_WRITER
+    def test_the_families_shapes_are_the_widths_in_their_names(self):
+        """Each family's shape is a FUNCTION of its width, so it is checked
+        as one.  A ``__spatialDecode24`` recorded as 16-in would drop eight
+        speakers with nothing to read anywhere."""
+        expected = {}
+        for n in sd.PRECOMPILED_WIDTHS:
+            expected[sd.decoder_name(n)] = (n, 2)      # N lanes -> stereo
+            expected[sd.router_name(n)] = (n, n)       # N through, N out
+            expected[sd.array_out_name(n)] = (n, n)    # N mirrored to hardware
+        assert {name: (_IO[name]['ins'], _IO[name]['outs'])
+                for name in FAMILY} == expected
+
+    def test_the_sidecar_holds_every_def_and_nothing_more(self):
+        assert len(_IO) == len(_MANIFEST) == 183 + len(FAMILY) == 210
+        assert len(FAMILY) == 27
+
+    def test_multi_writer_defs_outside_the_families_are_exactly_these_six(self):
+        assert sorted(n for n in NON_FAMILY
+                      if len(_IO[n]['writes']) > 1) == MULTI_WRITER
+
+    def test_the_only_multi_writer_family_is_the_router(self):
+        """A router clears its source bus and emits; a decoder and an
+        array-out each write once.  A second writer appearing on either
+        would be a lane written twice."""
+        multi = sorted(n for n in FAMILY if len(_IO[n]['writes']) > 1)
+        assert multi == sorted(sd.router_name(n) for n in sd.PRECOMPILED_WIDTHS)
 
     def test_routers_write_two_buses_and_the_fd_trio_writes_one_twice(self):
         for name in ('__busRouter', '__busRouterMonitor', '__chainLimiter'):
@@ -213,14 +270,29 @@ class TestExceptions:
                       if any(w['rate'] != 'audio' for w in r['writes'])) == [
             CONTROL_RATE_WRITER]
 
-    def test_only_def_that_is_not_two_channels_out_is_kl_env_ctrl(self):
-        assert sorted((n, r['outs']) for n, r in _IO.items() if r['outs'] != 2) == [
-            (CONTROL_RATE_WRITER, 1)]
+    def test_the_only_non_family_def_not_two_out_is_kl_env_ctrl(self):
+        assert sorted((n, _IO[n]['outs']) for n in NON_FAMILY
+                      if _IO[n]['outs'] != 2) == [(CONTROL_RATE_WRITER, 1)]
 
-    def test_every_reader_reads_exactly_two_audio_channels(self):
-        for name, rec in _IO.items():
-            for r in rec['reads']:
+    def test_the_only_family_defs_that_are_two_out_are_the_narrow_ones(self):
+        """A decoder is stereo out at every width, and a 2-wide router and
+        array-out happen to be too.  Anything else in the family that
+        records 2 outs has lost its width."""
+        two_out = sorted(n for n in FAMILY if _IO[n]['outs'] == 2)
+        assert two_out == sorted(
+            [sd.decoder_name(n) for n in sd.PRECOMPILED_WIDTHS]
+            + [sd.router_name(2), sd.array_out_name(2)])
+
+    def test_every_non_family_reader_reads_exactly_two_audio_channels(self):
+        for name in NON_FAMILY:
+            for r in _IO[name]['reads']:
                 assert (r['ugen'], r['rate'], r['channels']) == ('In', 'audio', 2), name
+
+    def test_every_family_def_reads_its_own_width_once(self):
+        for name in FAMILY:
+            _, width = sd.parse_def_name(name)
+            assert _IO[name]['reads'] == [
+                {'ugen': 'In', 'rate': 'audio', 'channels': width}], name
 
     def test_no_def_reads_a_bus_without_also_writing_one(self):
         assert not [n for n, r in _IO.items() if r['reads'] and not r['writes']]

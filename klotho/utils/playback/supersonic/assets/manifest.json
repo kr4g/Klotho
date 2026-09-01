@@ -4,6 +4,51 @@
     "outBus": 0.0,
     "gain": 1.0
   },
+  "__busRouter1": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter12": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter16": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter2": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter24": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter32": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter4": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter6": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
+  "__busRouter8": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "gain": 1.0
+  },
   "__busRouterMonitor": {
     "inBus": 0.0,
     "outBus": 0.0,
@@ -24,6 +69,105 @@
     "dur": 1.0,
     "startFrame": 0.0,
     "numFrames": 512.0
+  },
+  "__spatialArrayOut1": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut12": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut16": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut2": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut24": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut32": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut4": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut6": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialArrayOut8": {
+    "inBus": 0.0,
+    "outBus": 2.0,
+    "gain": 1.0
+  },
+  "__spatialDecode1": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode12": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode16": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode2": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode24": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode32": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode4": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode6": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
+  },
+  "__spatialDecode8": {
+    "inBus": 0.0,
+    "outBus": 0.0,
+    "bufnum": 0.0,
+    "gain": 1.0
   },
   "kl_bitcrush": {
     "inBus": 0.0,

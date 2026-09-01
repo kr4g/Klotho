@@ -22,6 +22,213 @@
       }
     ]
   },
+  "__busRouter1": {
+    "ins": 1,
+    "outs": 1,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 1
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 1
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 1
+      }
+    ]
+  },
+  "__busRouter12": {
+    "ins": 12,
+    "outs": 12,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 12
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 12
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 12
+      }
+    ]
+  },
+  "__busRouter16": {
+    "ins": 16,
+    "outs": 16,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 16
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 16
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 16
+      }
+    ]
+  },
+  "__busRouter2": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__busRouter24": {
+    "ins": 24,
+    "outs": 24,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 24
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 24
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 24
+      }
+    ]
+  },
+  "__busRouter32": {
+    "ins": 32,
+    "outs": 32,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 32
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 32
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 32
+      }
+    ]
+  },
+  "__busRouter4": {
+    "ins": 4,
+    "outs": 4,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 4
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 4
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 4
+      }
+    ]
+  },
+  "__busRouter6": {
+    "ins": 6,
+    "outs": 6,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 6
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 6
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 6
+      }
+    ]
+  },
+  "__busRouter8": {
+    "ins": 8,
+    "outs": 8,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 8
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 8
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 8
+      }
+    ]
+  },
   "__busRouterMonitor": {
     "ins": 2,
     "outs": 2,
@@ -77,6 +284,330 @@
         "ugen": "Out",
         "rate": "control",
         "channels": 1
+      }
+    ]
+  },
+  "__spatialArrayOut1": {
+    "ins": 1,
+    "outs": 1,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 1
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 1
+      }
+    ]
+  },
+  "__spatialArrayOut12": {
+    "ins": 12,
+    "outs": 12,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 12
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 12
+      }
+    ]
+  },
+  "__spatialArrayOut16": {
+    "ins": 16,
+    "outs": 16,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 16
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 16
+      }
+    ]
+  },
+  "__spatialArrayOut2": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialArrayOut24": {
+    "ins": 24,
+    "outs": 24,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 24
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 24
+      }
+    ]
+  },
+  "__spatialArrayOut32": {
+    "ins": 32,
+    "outs": 32,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 32
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 32
+      }
+    ]
+  },
+  "__spatialArrayOut4": {
+    "ins": 4,
+    "outs": 4,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 4
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 4
+      }
+    ]
+  },
+  "__spatialArrayOut6": {
+    "ins": 6,
+    "outs": 6,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 6
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 6
+      }
+    ]
+  },
+  "__spatialArrayOut8": {
+    "ins": 8,
+    "outs": 8,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 8
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 8
+      }
+    ]
+  },
+  "__spatialDecode1": {
+    "ins": 1,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 1
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode12": {
+    "ins": 12,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 12
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode16": {
+    "ins": 16,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 16
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode2": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode24": {
+    "ins": 24,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 24
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode32": {
+    "ins": 32,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 32
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode4": {
+    "ins": 4,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 4
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode6": {
+    "ins": 6,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 6
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__spatialDecode8": {
+    "ins": 8,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 8
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
       }
     ]
   },
