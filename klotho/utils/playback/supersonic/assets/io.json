@@ -1,0 +1,2426 @@
+{
+  "__busRouter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__busRouterMonitor": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__chainLimiter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "__klEnvCtrl": {
+    "ins": 0,
+    "outs": 1,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "control",
+        "channels": 1
+      }
+    ]
+  },
+  "kl_bitcrush": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_chop": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_delay": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_distortion": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_hpf": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_kicktone": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_lpf": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_noisebpf": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_reverb": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_sampler1": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_sampler2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_saw": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_sine": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_sqr": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_tremolo": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "kl_tri": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_ambi": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_angel": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_arpy": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_bandPassFilter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_bass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_bell": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_bitcrush": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_blip": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_brass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_bug": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_charm": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_chop": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_combDelay": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_creep": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_crunch": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_dab": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_dbass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_dirt": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_distortion": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_donk": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_donk1": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_donk2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_dub": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_feel": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_filterSwell": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_formantFilter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_fuzz": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_glass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_gong": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_growl": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_highPassFilter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_jbass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_karp": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_keys": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_klank": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_lazer": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_longsaw": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_lowPassFilter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_marimba": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_noise": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_nylon": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_orient": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_overdriveDistortion": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_pads": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_pasha": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_piano": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_pluck": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_prophet": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_pulse": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_quin": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      },
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_rave": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_razz": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_reverb": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_ripple": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_saw": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_sawbass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_scatter": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_scrap": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_scratch": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_sinepad": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_siren": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_sitar": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_snick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_soft": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_soprano": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_space": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_spark": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_spick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_spinPan": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_squish": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_star": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_swell": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_tremolo": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_twang": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_varsaw": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_viola": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_wavesShapeDistortion": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "fd_zap": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_bass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_bitSnare": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_blipLead": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_chorusLite": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_coinBlip": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_downSampler": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_echo": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_fmBell": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_glassPad": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_gridKick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_lead": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_powerArp": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_powerDown": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_pulseChord": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_pulseDuck": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_riser": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_tickHat": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "chip_zapDown": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_blip": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_chipSweep1": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_chipSweep2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_chipSweep3": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_clank": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_clap": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_deepKick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_ghostSnare": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_hat": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_hat2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_hatLong": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_hatShort": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_kick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_kickSoft": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_ping": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_revCymbal": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_rubber1": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_rubber2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_snare": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_snare2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_subBass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_sweep": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_tom": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_woodblock": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_wub1": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_wub2": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "edm_wub3": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_beep": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_cresc": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_driftPad": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_dustCrackle": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_dustKick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_dustPluck": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_ghostSnare": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_glassLead": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_glitchBlip": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_glitchBurst": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_glitchZap": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_hazePad": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_hissDust": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_hushHat": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_hushHatOpen": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_lead": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_rim": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_snare": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_subBass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tape": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapeBass": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapeCrash": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapePop": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapeRise": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapeSat": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapeSnap": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_tapeTick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_wash": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "Out",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "lofi_wowFlutter": {
+    "ins": 2,
+    "outs": 2,
+    "reads": [
+      {
+        "ugen": "In",
+        "rate": "audio",
+        "channels": 2
+      }
+    ],
+    "writes": [
+      {
+        "ugen": "ReplaceOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_clap": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_clave": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_cowbell": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_cymbal": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_hat": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_hatOpen": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_kick": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_maracas": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_rim": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_snare": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  },
+  "tr808_tom": {
+    "ins": 0,
+    "outs": 2,
+    "reads": [],
+    "writes": [
+      {
+        "ugen": "OffsetOut",
+        "rate": "audio",
+        "channels": 2
+      }
+    ]
+  }
+}
