@@ -37,7 +37,8 @@ from klotho.thetos.spatial import (
     BINAURAL_FIELDS,
     BINAURAL_STRIDE,
     DECODER_MAX_DELAY_S,
-    DECODER_WIRE_BUFS_OVERHEAD,
+    DECODER_WIRE_BUFS_PER_SPEAKER,
+    decoder_wire_bufs,
     HEAD_HALF,
     HEAD_HALF_FT,
     MAX_DECODER_SPEAKERS,
@@ -164,12 +165,41 @@ class TestTheSharedModelConstants:
         assert frames > 8192                        # not wastefully small
         assert DECODER_MAX_DELAY_S == 0.33
 
-    def test_the_wire_buffer_arithmetic_the_speaker_cap_comes_from(self):
+    def test_the_wire_buffer_cost_is_two_per_speaker(self):
+        """The RULE, at every width that was measured.
+
+        Pinning ``MAX_DECODER_SPEAKERS == 32`` alone would not have caught
+        the model this replaces: the old ``N + 4`` estimate also produced a
+        plausible cap, and a literal never says where it came from. What is
+        measured is one compile per width, so that is what is asserted --
+        and 2*N with no constant term is falsified by any of these rows
+        disagreeing, which ``N + 4`` does at every one of them.
+        """
+        measured = {1: 2, 2: 4, 4: 8, 6: 12, 8: 16, 12: 24, 16: 32,
+                    24: 48, 32: 64, 40: 80}
+        assert {n: decoder_wire_bufs(n) for n in measured} == measured
+        assert DECODER_WIRE_BUFS_PER_SPEAKER == 2
+
+    def test_the_cap_is_where_that_cost_meets_the_stock_budget(self):
+        """32, and 32 for a reason: ``2 * 32`` is exactly the 64 buffers
+        the engine boots with, and 33 would need 66."""
         assert SCSYNTH_DEFAULT_MAX_WIRE_BUFS == 64
-        assert DECODER_WIRE_BUFS_OVERHEAD == 4
-        assert MAX_DECODER_SPEAKERS == 60
-        assert (MAX_DECODER_SPEAKERS + DECODER_WIRE_BUFS_OVERHEAD
-                == SCSYNTH_DEFAULT_MAX_WIRE_BUFS)
+        assert decoder_wire_bufs(MAX_DECODER_SPEAKERS) \
+            <= SCSYNTH_DEFAULT_MAX_WIRE_BUFS
+        assert decoder_wire_bufs(MAX_DECODER_SPEAKERS + 1) \
+            > SCSYNTH_DEFAULT_MAX_WIRE_BUFS
+        assert MAX_DECODER_SPEAKERS == 32
+
+    def test_the_old_estimate_would_have_admitted_a_silent_array(self):
+        """Regression pin for the correction itself.
+
+        The superseded ``N + 4`` model put the cap at 60. A 40-speaker
+        array needs 80 wire buffers, does not load, and plays silently with
+        no error -- so under that model the guard would have been causing
+        the exact failure it exists to prevent.
+        """
+        assert decoder_wire_bufs(40) > SCSYNTH_DEFAULT_MAX_WIRE_BUFS
+        assert 40 > MAX_DECODER_SPEAKERS
 
 
 class TestPavilionNumbering:
@@ -1066,7 +1096,7 @@ class TestAxisOrderTieBreak:
 
 
 class TestAnArrayTooWideToDecodeIsRefused:
-    """Past 60 speakers the decoder exceeds scsynth's stock interconnect
+    """Past 32 speakers the decoder exceeds scsynth's stock interconnect
     buffers, and scsynth SKIPS the def and keeps running -- the piece is
     silent with no error anywhere. Refuse where it can be seen.
     """
@@ -1077,22 +1107,30 @@ class TestAnArrayTooWideToDecodeIsRefused:
 
     def test_the_widest_decodable_array_is_accepted(self):
         arr = SpeakerArray.from_positions(self._line(MAX_DECODER_SPEAKERS))
-        assert len(arr) == 60
+        assert len(arr) == 32
 
     def test_one_speaker_past_it_is_refused(self):
         with pytest.raises(ValueError) as e:
             SpeakerArray.from_positions(self._line(MAX_DECODER_SPEAKERS + 1))
-        assert '61 speakers' in str(e.value)
+        assert '33 speakers' in str(e.value)
+
+    def test_the_sonic_pavilion_still_fits(self):
+        """24 needs 48 of 64. The venue this was written for is inside the
+        corrected cap, which is why the correction costs nothing today."""
+        arr = SpeakerArray.grid(cols=6, rows=4, col_spacing=50.0,
+                                row_spacing=60.0)
+        assert len(arr) == 24 and decoder_wire_bufs(24) == 48
 
     def test_the_refusal_names_the_real_limit_and_how_to_lift_it(self):
         with pytest.raises(ValueError) as e:
-            SpeakerArray.from_positions(self._line(64))
+            SpeakerArray.from_positions(self._line(40))
         msg = str(e.value)
-        assert '64 speakers' in msg                  # what was asked for
-        assert '60' in msg                           # the cap
+        assert '40 speakers' in msg                  # what was asked for
+        assert '32' in msg                           # the cap
         assert 'maxWireBufs' in msg                  # where the cap comes from
+        assert 'stock boot options' in msg           # whose default it is
         assert 'SILENT' in msg                       # why it must be refused
-        assert 'at least 68' in msg                  # 64 + 4, what would lift it
+        assert 'at least 80' in msg                  # 2*40, what would lift it
         assert 'fold the array offline' in msg       # the other way out
 
     def test_a_grid_is_refused_the_same_way(self):

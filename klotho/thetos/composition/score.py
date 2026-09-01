@@ -36,9 +36,157 @@ from klotho.thetos.composition.compositional import (
 )
 from klotho.thetos.composition.events import Event
 from klotho.thetos.instruments.base import Effect
+from klotho.thetos.instruments._shared import (
+    canonical_def_name,
+    ss_synth_channels,
+)
+from klotho.thetos.spatial import SpeakerArray
 
 
 _DEFAULT_BLOCK_SIZE = 512
+
+
+# ---------------------------------------------------------------------------
+# Speaker arrays on a track
+# ---------------------------------------------------------------------------
+#
+# A track's ``speakers=`` declaration decides the WIDTH of its buses and of
+# its insert chain: one bus channel per speaker.  Everything downstream --
+# lane routing, the instrument's adjacent-lane occupancy, the insert width
+# contract -- is derived from the labels declared here, so this is the one
+# place that normalizes them.
+#
+# Two shapes are accepted and they carry different amounts of information:
+#
+#   * a :class:`~klotho.thetos.spatial.SpeakerArray` -- labels AND geometry.
+#     Only this one can be auditioned on headphones, because a binaural
+#     fold needs positions.
+#   * a plain sequence of labels -- routing only.  Honest about having no
+#     geometry rather than inventing some; a made-up position would produce
+#     a confident, wrong audition.
+#
+# A bare count is refused in both shapes (see ``_normalize_speakers``).
+
+
+def _format_labels(labels, limit=12):
+    """Labels for an error message, truncated when there are many."""
+    labels = tuple(labels)
+    if len(labels) <= limit:
+        return ', '.join(repr(x) for x in labels)
+    head = ', '.join(repr(x) for x in labels[:4])
+    return f"{head}, ... , {labels[-1]!r} ({len(labels)} in all)"
+
+
+def _is_speaker_label(value) -> bool:
+    """True for something addressable as a speaker label.
+
+    ``bool`` is excluded on purpose: ``True`` is an ``int`` in Python, so a
+    boolean label would silently collide with speaker 1.
+    """
+    return isinstance(value, str) or (isinstance(value, int)
+                                      and not isinstance(value, bool))
+
+
+def _normalize_speakers(value, track_name: str):
+    """``speakers=`` -> ``(labels, lanes, array)``.
+
+    *labels* is a tuple in lane order, *lanes* maps label to 0-based lane,
+    and *array* is the :class:`SpeakerArray` when one was given (``None``
+    for a labels-only declaration, which has no geometry to fold).
+    """
+    if isinstance(value, SpeakerArray):
+        labels = value.labels
+        return labels, {lb: i for i, lb in enumerate(labels)}, value
+
+    if isinstance(value, bool) or isinstance(value, (int, float)):
+        raise ValueError(
+            f"speakers={value!r} on track {track_name!r} is ambiguous: Klotho "
+            f"will not guess whether your speakers are labelled 0..n-1 or "
+            f"1..n, and a lane index is not a speaker. Pass the labels "
+            f"(speakers=range(1, 25)) or a SpeakerArray "
+            f"(SpeakerArray.grid(cols=6, rows=4, col_spacing=50.0, "
+            f"row_spacing=60.0)), which also carries the geometry the "
+            f"binaural preview folds."
+        )
+
+    if isinstance(value, (str, bytes, bytearray)):
+        raise ValueError(
+            f"speakers={value!r} on track {track_name!r} is one label, not an "
+            f"array of them: a string iterates to its characters, so this "
+            f"would declare {len(value)} speakers. Pass a sequence "
+            f"(speakers=['FL', 'FR']) or a SpeakerArray."
+        )
+
+    try:
+        items = list(value)
+    except TypeError:
+        raise ValueError(
+            f"speakers={value!r} on track {track_name!r} is not a sequence of "
+            f"speaker labels ({type(value).__name__}). Pass the labels "
+            f"(speakers=range(1, 25), speakers=['FL', 'FR']) or a "
+            f"SpeakerArray."
+        ) from None
+
+    if not items:
+        raise ValueError(
+            f"speakers={value!r} on track {track_name!r} declares no speakers, "
+            f"so there is no lane to route a voice to. Give it at least one "
+            f"label (speakers=[1]), or drop speakers= to leave {track_name!r} "
+            f"an ordinary stereo track."
+        )
+
+    lanes = {}
+    for label in items:
+        if not _is_speaker_label(label):
+            raise ValueError(
+                f"speaker label {label!r} on track {track_name!r} must be an "
+                f"int or a str, not {type(label).__name__}. Rigs are labelled "
+                f"1..24 or 'FL'/'FR'; a float or a bool cannot name a speaker."
+            )
+        if label in lanes:
+            raise ValueError(
+                f"speaker label {label!r} appears twice in track "
+                f"{track_name!r}'s speakers ({_format_labels(items)}). Every "
+                f"speaker needs its own label -- a repeated one would make "
+                f"speaker={label!r} mean two different lanes."
+            )
+        lanes[label] = len(lanes)
+    return tuple(items), lanes, None
+
+
+def _check_insert_width(effect, track_name: str, width: int) -> None:
+    """Refuse an insert that cannot process a *width*-channel track.
+
+    A spatial track's chain carries one channel per speaker, so an insert
+    must read and write exactly that many.  Klotho does not adapt the
+    width: summing lanes would move the music to a different loudspeaker
+    and duplicating them would put it on two.
+    """
+    def_name = canonical_def_name(getattr(effect, 'defName', None))
+    label = getattr(effect, 'name', None) or def_name
+    shown = repr(label) if label == def_name else f"{label!r} ({def_name})"
+    ins, outs = ss_synth_channels(def_name)
+    if ins is None or outs is None:
+        raise ValueError(
+            f"Insert {shown} has no "
+            f"recorded channel count, so Klotho cannot check it against track "
+            f"{track_name!r} ({width} speakers). Bundled SynthDefs record "
+            f"their width in assets/io.json; a SynthDef registered at runtime "
+            f"records it via register_synthdef(). Add it there, or put this "
+            f"insert on a stereo track."
+        )
+    if ins != width or outs != width:
+        raise ValueError(
+            f"Insert {shown} reads "
+            f"{ins} and writes {outs} channels, but track {track_name!r} is "
+            f"{width} channels wide ({width} speakers). A spatial track's "
+            f"inserts must read and write exactly as many channels as the "
+            f"track has speakers: declare the SynthDef as "
+            f"In.ar(inBus, {width}) ... ReplaceOut.ar(outBus, sig) with "
+            f"{width} channels. Klotho will not adapt the width for you -- "
+            f"silently summing or duplicating lanes would change where the "
+            f"music comes from."
+        )
 
 TemporalLike = Union[
     TemporalUnit, TemporalUnitSequence, TemporalBlock, CompositionalUnit, Event
@@ -309,7 +457,8 @@ class Score:
     # Track management
     # ------------------------------------------------------------------
 
-    def track(self, name: str, inserts: Optional[Iterable[Effect]] = None) -> "Score":
+    def track(self, name: str, inserts: Optional[Iterable[Effect]] = None,
+              speakers=None) -> "Score":
         """Register a named track with optional insert effects.
 
         A track's chain is selected per *event*, not per unit: an event enters
@@ -335,16 +484,58 @@ class Score:
             Insert FX instances to place in this track's chain, applied in
             list order (signal flows left to right).  A bare
             ``Effect`` is accepted as a one-element chain.
+        speakers : SpeakerArray, sequence of labels, or None
+            Declare this a **spatial** track carrying one bus channel per
+            speaker.  A :class:`~klotho.thetos.spatial.SpeakerArray`
+            carries labels *and* geometry (the only form a binaural
+            audition can fold); a plain sequence of labels
+            (``range(1, 25)``, ``['FL', 'FR']``) declares routing only.
+            A bare count (``speakers=24``) is refused -- see
+            :func:`_normalize_speakers`.
+
+            Speakers are addressed by the **label you declare**, never by
+            a lane index, and a voice picks one with the ``speaker``
+            mfield::
+
+                score.track('array', speakers=PAVILION)
+                uc.set(uc.leaves, speaker=17)      # or set_mfields(...)
+                score.add(uc, track='array')
+
+            Speakers and inserts compose: a spatial voice still goes
+            through its track's chain.  The chain is simply as wide as the
+            array, so each insert must read and write exactly that many
+            channels (an N-wide reverb is N independent reverbs, which is
+            the correct semantics for speakers that share no room
+            response).  Inserts are checked here, at declaration, before
+            any audio exists.
 
         Returns
         -------
         Score
             ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            For a bare speaker count, a duplicate or non-label speaker
+            name, an empty array, or an insert whose channel width does
+            not match the array's (including an insert whose width is not
+            recorded anywhere -- unknown widths are refused, never
+            guessed).
         """
         if isinstance(inserts, Effect):
             inserts = [inserts]
         if name != "main" and name in self._tracks:
             raise ValueError(f"Track '{name}' already exists")
+
+        labels = lanes = array = None
+        if speakers is not None:
+            labels, lanes, array = _normalize_speakers(speakers, name)
+
+        # Validate BEFORE mutating anything: a refused declaration must
+        # leave the score exactly as it was, or a caught error would leave
+        # half a track registered and its inserts owned by it.
+        checked = []
         for ins in (inserts or []):
             if not isinstance(ins, Effect):
                 raise TypeError(f"Expected SynthDefFX, got {type(ins).__name__}")
@@ -354,8 +545,18 @@ class Score:
                     f"Insert '{ins.name}' (uid={ins.uid}) already assigned to "
                     f"track '{existing}'"
                 )
+            if labels is not None:
+                _check_insert_width(ins, name, len(labels))
+            checked.append(ins)
+
+        for ins in checked:
             self._insert_registry[ins.uid] = name
-        self._tracks[name] = {"inserts": list(inserts or [])}
+        self._tracks[name] = {
+            "inserts": checked,
+            "speakers": array,
+            "labels": labels,
+            "lanes": lanes,
+        }
         return self
 
     # ------------------------------------------------------------------
@@ -554,8 +755,9 @@ class Score:
         **pfields
             Pfield values, with the same semantics as
             ``UC.set_pfields`` — a tuple value means a simultaneity (one
-            synth voice per element).  ``strum`` and ``group`` are
-            routed to engine meta-fields.
+            synth voice per element).  ``strum``, ``group`` and
+            ``speaker`` are routed to engine meta-fields; ``speaker``
+            names a loudspeaker in the track's declared array.
 
         Returns
         -------

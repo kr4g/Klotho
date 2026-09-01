@@ -37,6 +37,15 @@ import copy
 _MFIELD_PREFIX = '@mf:'
 
 
+# NOTE on ``out``: it is a genuine SynthDef control (149 of the 183 bundled
+# defs declare it) and it stays freely settable as an ordinary pfield. On any
+# path that has a track the scheduler re-points it to the track's own bus, so
+# an authored value is overwritten there and honored only on the bare
+# track-less path; ``speaker`` is the supported way to choose a loudspeaker.
+# Refusing ``out`` at the write doors is a possible future guard, deliberately
+# not built now.
+
+
 def mfield_storage_key(name):
     """Node-payload key under which the mfield *name* is stored.
 

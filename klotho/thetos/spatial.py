@@ -111,9 +111,19 @@ DECODER_MAX_DELAY_S = 0.33
 
 # scsynth's default interconnect ("wire") buffer count, and what a decoder
 # costs in them. Both are stock scsynth, not Klotho settings:
-# supersonic-scsynth defaults maxWireBufs to 64, and an N-lane decoder was
-# measured to need exactly N + 4 (checked at N = 8, 24, 64 and 256, which
-# needed 12, 28, 68 and 260).
+# supersonic-scsynth defaults maxWireBufs to 64, and an N-speaker decoder
+# needs exactly 2*N of them -- TWO PER SPEAKER, no constant term.
+#
+# Measured one compile per width at N = 1, 2, 4, 6, 8, 12, 16, 24, 32, 40:
+# 2, 4, 8, 12, 16, 24, 32, 48, 64, 80. N=32 needs exactly the 64 the engine
+# boots with; N=40 needs 80 and does not load. (An earlier estimate of
+# "N + 4" was extrapolated rather than measured, and put the cap at 60 --
+# which would have waved a 40-speaker array straight into the silence this
+# guard exists to prevent. Corrected 2026-08-31.)
+#
+# The cost is the PER-LANE COEFFICIENT ARITHMETIC, not the filter choice:
+# an LPF fed through the same exp() coefficient chain measures the same 48
+# at N=24 as a OnePole does, and no reordering of the graph avoids it.
 #
 # Past the limit scsynth prints "exception in GraphDef_Load: exceeded number
 # of interconnect buffers", SKIPS the def, and carries on -- so the later
@@ -121,9 +131,26 @@ DECODER_MAX_DELAY_S = 0.33
 # is why an array too wide to decode is refused when it is built rather than
 # when it is played.
 SCSYNTH_DEFAULT_MAX_WIRE_BUFS = 64
-DECODER_WIRE_BUFS_OVERHEAD = 4
+DECODER_WIRE_BUFS_PER_SPEAKER = 2
+
+
+def decoder_wire_bufs(n_speakers: int) -> int:
+    """Interconnect ("wire") buffers an *n_speakers* decoder needs.
+
+    Exactly :data:`DECODER_WIRE_BUFS_PER_SPEAKER` per speaker, measured
+    rather than modelled.  Exposed as a function so a caller checking a
+    proposed array, and the refusal message that reports the shortfall,
+    compute the same number from the same place.
+    """
+    return DECODER_WIRE_BUFS_PER_SPEAKER * n_speakers
+
+
+#: Widest array a decoder can carry on stock boot options: 32, because
+#: ``2 * 32 == 64``.  Derived, never written down as a literal -- a cap
+#: stated as a bare number cannot say where it came from, and this one has
+#: already been wrong once.
 MAX_DECODER_SPEAKERS = (SCSYNTH_DEFAULT_MAX_WIRE_BUFS
-                        - DECODER_WIRE_BUFS_OVERHEAD)
+                        // DECODER_WIRE_BUFS_PER_SPEAKER)
 
 Label = Union[int, str]
 Point = Sequence[float]
@@ -134,7 +161,8 @@ __all__ = [
     'BINAURAL_FIELDS',
     'BINAURAL_STRIDE',
     'DECODER_MAX_DELAY_S',
-    'DECODER_WIRE_BUFS_OVERHEAD',
+    'DECODER_WIRE_BUFS_PER_SPEAKER',
+    'decoder_wire_bufs',
     'FACINGS',
     'HEAD_HALF',
     'HEAD_HALF_FT',
@@ -449,15 +477,17 @@ class SpeakerArray:
                 f"{len(labels)} speakers is more than the "
                 f"{MAX_DECODER_SPEAKERS} a decoder can carry on stock boot "
                 f"options. The limit is scsynth's interconnect ('wire') "
-                f"buffers, not memory: an N-speaker decoder needs N + "
-                f"{DECODER_WIRE_BUFS_OVERHEAD} of them and scsynth defaults "
-                f"maxWireBufs to {SCSYNTH_DEFAULT_MAX_WIRE_BUFS}. Past that "
-                "it refuses to load the decoder, keeps running, and the piece "
-                "plays SILENTLY with no error -- so this is refused here, "
-                "where you can see it. Use fewer speakers, fold the array "
-                "offline, or boot the engine with a larger maxWireBufs "
-                f"(at least {len(labels) + DECODER_WIRE_BUFS_OVERHEAD} for "
-                "this array), which Klotho does not set today.")
+                f"buffers, not memory: an N-speaker decoder needs "
+                f"{DECODER_WIRE_BUFS_PER_SPEAKER}*N of them "
+                f"({decoder_wire_bufs(len(labels))} for this array) and "
+                f"scsynth defaults maxWireBufs to "
+                f"{SCSYNTH_DEFAULT_MAX_WIRE_BUFS}. Past that it refuses to "
+                "load the decoder, keeps running, and the piece plays "
+                "SILENTLY with no error -- so this is refused here, where you "
+                "can see it. Use fewer speakers, fold the array offline, or "
+                "boot the engine with a larger maxWireBufs (at least "
+                f"{decoder_wire_bufs(len(labels))} for this array), which "
+                "Klotho does not set today.")
 
         if speed_of_sound is None:
             if units not in SPEED_OF_SOUND:

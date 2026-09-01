@@ -599,7 +599,38 @@ _SC_CONVERT_HANDLERS = {
 def convert_to_sc_events(obj, **kwargs):
     from klotho.thetos.instruments.base import reset_kit_rotations
     reset_kit_rotations()
-    return dispatch_convert(obj, kwargs, _SC_CONVERT_HANDLERS, include_inst=True)
+    events = dispatch_convert(obj, kwargs, _SC_CONVERT_HANDLERS,
+                              include_inst=True)
+    _refuse_bare_speaker(events)
+    return events
+
+
+def _refuse_bare_speaker(events) -> None:
+    """Refuse a ``speaker`` mfield on the bare (track-less) playback path.
+
+    A speaker label only means something against a declared array, and an
+    array is declared on a Score's track -- a bare ``play(unit)`` has no
+    tracks, so there is nothing to resolve the label against and nothing to
+    set the bus width. Silently ignoring it would drop the whole spatial
+    intent of the material without a word.
+    """
+    if not isinstance(events, list):
+        return
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        speaker = event.get('speaker')
+        if speaker is None:
+            continue
+        raise ValueError(
+            f"speaker={speaker!r} needs a Score: the speaker array and the "
+            f"bus width it implies are declared on a track, and a bare "
+            f"play()/plot() has no tracks. Wrap it:\n"
+            f"    score = Score()\n"
+            f"    score.track('array', speakers=PAVILION)\n"
+            f"    score.add(unit, track='array')\n"
+            f"    play(score)"
+        )
 
 
 _SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
@@ -630,6 +661,254 @@ def _iter_ucs(unit):
             yield from _iter_ucs(row)
 
 
+# ---------------------------------------------------------------------------
+# Spatial routing: speaker labels -> bus lanes
+# ---------------------------------------------------------------------------
+
+
+def _track_spec_for(score, group):
+    """The track spec an event with this ``group`` actually plays through.
+
+    Mirrors the scheduler's own resolution exactly --
+    ``trackMap[group] -> default -> main`` -- so a typo in a group name
+    lands its events on the main chain here for the same reason it does in
+    the browser.  Getting this wrong in either direction would validate a
+    voice against a track it does not play on.
+    """
+    tracks = getattr(score, '_tracks', None) or {}
+    for key in (group, 'default', 'main'):
+        if key in tracks:
+            return tracks[key]
+    return None
+
+
+def _spatial_labels(spec):
+    """Declared speaker labels of a track spec, or ``None`` if not spatial."""
+    return spec.get('labels') if spec else None
+
+
+def _refuse_speaker_without_array(group, speaker):
+    where = ("the master chain ('main')" if group in ('default', 'main')
+             else f"track {group!r}")
+    return ValueError(
+        f"speaker={speaker!r} was set on a voice playing through {where}, "
+        f"which has no speaker array, so there is no lane {speaker!r} to "
+        f"route it to. Declare the array on the track "
+        f"(score.track({'main' if group in ('default', 'main') else group!r}, "
+        f"speakers=PAVILION)), or drop speaker= to leave the voice in stereo."
+    )
+
+
+def _refuse_missing_speaker(group, labels, def_name):
+    where = ("the master chain ('main')" if group in ('default', 'main')
+             else f"track {group!r}")
+    return ValueError(
+        f"a voice on {def_name!r} plays through {where}, which declares "
+        f"{len(labels)} speakers, but names no speaker -- so Klotho does not "
+        f"know which of them it comes out of, and will not pick one for you. "
+        f"Set the speaker mfield (uc.set(uc.leaves, speaker={labels[0]!r}), or "
+        f"uc.set_mfields(...)), or put this voice on a track with no speaker "
+        f"array. Note set_pfields(speaker=...) does NOT route: speaker is an "
+        f"engine meta-field, like group."
+    )
+
+
+def _refuse_unknown_speaker(group, labels, speaker):
+    from klotho.thetos.composition.score import _format_labels
+    where = ("the master chain ('main')" if group in ('default', 'main')
+             else f"track {group!r}")
+    return ValueError(
+        f"no speaker labelled {speaker!r} on {where}. Known speakers: "
+        f"{_format_labels(labels)}. (Speakers are addressed by the label you "
+        f"declared, not by a 0-based index.)"
+    )
+
+
+def _refuse_unknown_width(def_name, group, speaker):
+    where = ("the master chain ('main')" if group in ('default', 'main')
+             else f"track {group!r}")
+    return ValueError(
+        f"instrument {def_name!r} at speaker {speaker!r} on {where} has no "
+        f"recorded channel count, so Klotho cannot tell how many speakers it "
+        f"occupies. Bundled SynthDefs record their width in assets/io.json; a "
+        f"SynthDef registered at runtime records it via register_synthdef(). "
+        f"Add it there, or play this voice on a track with no speaker array."
+    )
+
+
+def _refuse_lane_overrun(def_name, group, speaker, labels, lane, outs):
+    where = ("the master chain ('main')" if group in ('default', 'main')
+             else f"track {group!r}")
+    span = labels[lane:lane + outs]
+    listed = ', '.join(repr(x) for x in span)
+    return ValueError(
+        f"instrument {def_name!r} writes {outs} channels, so it occupies "
+        f"{outs} adjacent speakers starting at the one it names. Speaker "
+        f"{speaker!r} on {where} leaves only {len(span)} ({listed}), because "
+        f"the array ends at {labels[-1]!r} -- {len(labels)} speakers in all. "
+        f"Use a 1-channel SynthDef for a point source at the last speaker, or "
+        f"name a speaker with {outs - 1} more above it."
+    )
+
+
+def _refuse_pan_on_point_source(def_name, group, speaker):
+    where = ("the master chain ('main')" if group in ('default', 'main')
+             else f"track {group!r}")
+    return ValueError(
+        f"{def_name!r} writes 1 channel, so it has no stereo image to pan: at "
+        f"speaker {speaker!r} on {where} it is a point source. Drop pan, or "
+        f"use a 2-channel SynthDef, which occupies two adjacent speakers and "
+        f"pans between them."
+    )
+
+
+def _apply_spatial_routing(score, events) -> None:
+    """Resolve every event's ``speaker`` label to a bus lane, in place.
+
+    One pass, after both lowering paths have stamped their final ``group``,
+    because this is the first moment an event's track is settled and the
+    only layer that knows what tracks exist.  Nothing here is left for
+    JavaScript: the scheduler adds ``speakerLane`` to the track's bus and
+    trusts it, exactly as it trusts ``meta.groups`` today.
+
+    ``new`` events carry the ``defName`` and so are where every check
+    happens.  ``set`` and ``release`` target a node that already exists,
+    and an engine mfield cannot change on a live node, so they inherit
+    their head's lane rather than resolving one of their own -- which is
+    also what stops a slur from walking across the array mid-note.
+    """
+    from klotho.thetos.instruments._shared import ss_synth_channels
+
+    # id -> (speaker, lane, defName, outs) for every spawned node.
+    heads: dict = {}
+    for event in events:
+        if event.get('type') != 'new':
+            continue
+        group = event.get('group', 'default')
+        labels = _spatial_labels(_track_spec_for(score, group))
+        speaker = event.get('speaker', None)
+
+        if labels is None:
+            if speaker is not None:
+                raise _refuse_speaker_without_array(group, speaker)
+            continue
+
+        def_name = event.get('defName')
+        if speaker is None:
+            raise _refuse_missing_speaker(group, labels, def_name)
+
+        spec = _track_spec_for(score, group)
+        lanes = spec['lanes']
+        if speaker not in lanes:
+            raise _refuse_unknown_speaker(group, labels, speaker)
+        lane = lanes[speaker]
+
+        _, outs = ss_synth_channels(def_name)
+        if outs is None or outs < 1:
+            raise _refuse_unknown_width(def_name, group, speaker)
+        if lane + outs > len(labels):
+            raise _refuse_lane_overrun(def_name, group, speaker, labels,
+                                       lane, outs)
+        if outs == 1 and 'pan' in (event.get('pfields') or {}):
+            raise _refuse_pan_on_point_source(def_name, group, speaker)
+
+        event['speakerLane'] = lane
+        heads[event['id']] = (speaker, lane, def_name, outs)
+
+    for event in events:
+        if event.get('type') == 'new':
+            continue
+        head = heads.get(event.get('id'))
+        if head is None:
+            continue
+        speaker, lane, def_name, outs = head
+        if outs == 1 and 'pan' in (event.get('pfields') or {}):
+            raise _refuse_pan_on_point_source(
+                def_name, event.get('group', 'default'), speaker)
+        event['speaker'] = speaker
+        event['speakerLane'] = lane
+
+
+def _build_spatial_meta(score) -> dict:
+    """Build ``meta.spatial``, or ``{}`` when the score has no spatial track.
+
+    Arrays are deduplicated: two tracks declared against the same speakers
+    share one entry, so a 24-speaker coefficient table is serialized once.
+    """
+    tracks = getattr(score, '_tracks', None) or {}
+    spatial = [(name, data) for name, data in tracks.items()
+               if data.get('labels') is not None]
+    if not spatial:
+        return {}
+
+    arrays: dict = {}
+    by_key: dict = {}
+    track_meta: dict = {}
+    for name, data in spatial:
+        labels = data['labels']
+        array = data.get('speakers')
+        key = (id(array), tuple(labels)) if array is not None else \
+            (None, tuple(labels))
+        array_id = by_key.get(key)
+        if array_id is None:
+            array_id = _array_id(array, labels, arrays)
+            by_key[key] = array_id
+            arrays[array_id] = _array_meta(array, labels)
+        track_meta[name] = {"array": array_id, "width": len(labels)}
+    return {"arrays": arrays, "tracks": track_meta}
+
+
+def _array_id(array, labels, taken) -> str:
+    base = getattr(array, 'name', None) if array is not None else None
+    base = str(base) if base else 'array'
+    candidate = base
+    n = 2
+    while candidate in taken:
+        candidate = f"{base}_{n}"
+        n += 1
+    return candidate
+
+
+def _array_meta(array, labels) -> dict:
+    """One array's entry in ``meta.spatial.arrays``.
+
+    ``positions``/``decoder`` are ``null`` for a labels-only declaration.
+    That is the honest answer -- a routing-only array has no geometry --
+    and the consumer must treat it as "no binaural fold available", never
+    as an array at the origin.
+    """
+    entry: dict = {
+        "name": (getattr(array, 'name', None) if array is not None else None),
+        "labels": list(labels),
+        "width": len(labels),
+        "positions": None,
+        "units": None,
+        "speedOfSound": None,
+        "decoder": None,
+    }
+    if array is None:
+        return entry
+
+    from klotho.thetos.spatial import (
+        BINAURAL_FIELDS, BINAURAL_STRIDE, DECODER_MAX_DELAY_S,
+    )
+    entry["positions"] = [list(p) for p in array.positions]
+    entry["units"] = array.units
+    entry["speedOfSound"] = array.speed_of_sound
+    coeffs = array.binaural_coefficients(max_delay=DECODER_MAX_DELAY_S)
+    entry["decoder"] = {
+        "kind": "binaural",
+        "listener": list(coeffs.listener),
+        "facing": coeffs.facing,
+        "headHalf": coeffs.head_half,
+        "fields": list(BINAURAL_FIELDS),
+        "stride": BINAURAL_STRIDE,
+        "maxDelay": DECODER_MAX_DELAY_S,
+        "coefficients": list(coeffs.flat()),
+    }
+    return entry
+
+
 def _build_score_meta(score) -> dict:
     """Build the SuperSonic ``meta`` dict (tracks + inserts) for a Score."""
     groups = [name for name in score._tracks if name != "main"]
@@ -645,6 +924,13 @@ def _build_score_meta(score) -> dict:
         meta["groups"] = groups
     if inserts:
         meta["inserts"] = inserts
+    # Omitted when unused, exactly as ``groups`` and ``inserts`` are. A
+    # non-spatial score's payload must be byte-identical to what it was
+    # before this key existed -- an always-present ``"spatial": {}`` would
+    # move every payload in the world for no one's benefit.
+    spatial = _build_spatial_meta(score)
+    if spatial:
+        meta["spatial"] = spatial
     return meta
 
 
@@ -841,6 +1127,10 @@ def _lower_score_event(item):
         group = item.track
     else:
         group = event.mfields.get('group') or 'default'
+    # Lane routing, stamped only when set -- same conditional shape as
+    # ``group``, so a non-spatial payload gains no key. Validated against
+    # the track's declared array by ``_apply_spatial_routing``.
+    speaker = event.mfields.get('speaker')
 
     is_hold = event._dur is None
     if is_hold and event.mfields.get('strum'):
@@ -921,6 +1211,8 @@ def _lower_score_event(item):
             "pfields": pf,
             "group": group,
         }
+        if speaker is not None:
+            new_event["speaker"] = speaker
         _attach_poly_meta(new_event, voice)
         events.append(new_event)
 
@@ -1058,6 +1350,10 @@ def convert_score_to_sc_events(score, start_time=None, **kwargs) -> dict:
         key=lambda e: (e["start"], _SC_EVENT_PRIORITY.get(e["type"], 3))
     )
 
+    # Once, after every item has stamped its final `group` -- that is the
+    # first moment an event's track, and so its speaker array, is settled.
+    _apply_spatial_routing(score, all_events)
+
     if start_time is not None and all_events:
         shift = float(start_time) - all_events[0]["start"]
         if shift:
@@ -1172,6 +1468,12 @@ def convert_score_to_sc_animation_events(score) -> dict:
     all_events.sort(
         key=lambda e: (e["start"], _SC_EVENT_PRIORITY.get(e["type"], 3))
     )
+
+    # The same pass convert_score_to_sc_events runs, for the same reason.
+    # plot(score).play() must sound identical to play(score); without this
+    # the animated payload would carry a speaker LABEL and no lane, and
+    # every voice would land on lane 0 of its track.
+    _apply_spatial_routing(score, all_events)
 
     from klotho.utils.playback._sc_validate import validate_sc_events
     validate_sc_events(all_events, animation=True)

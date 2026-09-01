@@ -17,7 +17,22 @@ def _uc(prolatio=(1, 1, 1, 1)):
 
 class TestRouting:
     def test_engine_mfields_constant(self):
-        assert ENGINE_MFIELDS == {'strum', 'group'}
+        assert ENGINE_MFIELDS == {'strum', 'group', 'speaker'}
+
+    def test_speaker_routes_to_mfields_like_group(self):
+        """``speaker`` is a routing selector, not a synth control.
+
+        ``group`` picks which bus a voice writes to; ``speaker`` picks the
+        lane within it. A bare ``speaker=`` kwarg must therefore land in
+        mfields on the same door ``group`` does, or the label would reach
+        the synth as a control and the voice would stay on lane 0.
+        """
+        uc = _uc()
+        uc.set(uc._rt.root, speaker=17, freq=440.0)
+        n = uc._rt.leaf_nodes[0]
+        assert uc.get_mfield(n, 'speaker') == 17
+        assert uc.get_pfield(n, 'speaker') is None
+        assert uc.get_pfield(n, 'freq') == 440.0
 
     def test_single_call_equivalent_to_three(self):
         a = _uc()

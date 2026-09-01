@@ -63,13 +63,22 @@ def test_engine_mfields_is_the_list_these_tests_are_about():
     """TRIPWIRE, not proof. If a name joins ENGINE_MFIELDS, it joins this
     contract too.
 
-    ``speaker`` is the next one queued. This test does not demand it
-    exists; it pins that everything currently in the set is covered by
-    the parametrized tests below, so adding a name without reading this
-    file fails here. It cannot fail for any other reason, and it is the
-    one test here that no mutation of the implementation reddens.
+    This test does not demand any particular name exists; it pins that
+    everything currently in the set is covered by the parametrized tests
+    below, so adding a name without reading this file fails here. It
+    cannot fail for any other reason, and it is the one test here that no
+    mutation of the implementation reddens.
+
+    ``speaker`` joined on 2026-08-31 for multichannel output, which is
+    the arrival this tripwire was armed for. It was tripped, this file
+    was read, and the two parametrized tests below then ran against
+    ``speaker`` unchanged and passed -- so the namespace split covers the
+    routing field that decides WHICH LOUDSPEAKER a voice comes out of,
+    and a synth control named ``speaker`` cannot move it. That is the
+    exact claim the split was built to make, now checked against the case
+    it was built for rather than only against ``group``.
     """
-    assert ENGINE_MFIELDS == frozenset({'strum', 'group'})
+    assert ENGINE_MFIELDS == frozenset({'strum', 'group', 'speaker'})
 
 
 @pytest.mark.parametrize('name', sorted(ENGINE_MFIELDS))

@@ -78,6 +78,7 @@ def register_compiled(def_name: str, compiled_bytes: bytes, controls: dict,
         "b64": base64.b64encode(bytes(compiled_bytes)).decode("ascii"),
         "controls": dict(controls),
         "kind": kind,
+        "io": _io_from_compiled(compiled_bytes, def_name),
     }
     _REGISTRY_VERSION += 1
     return def_name
@@ -96,6 +97,19 @@ def runtime_controls() -> dict:
 def runtime_kinds() -> dict:
     """Return ``{def_name: kind}`` for all runtime-registered synths."""
     return {name: entry.get("kind", "inst") for name, entry in _RUNTIME.items()}
+
+
+def runtime_io() -> dict:
+    """Return ``{def_name: io_record}`` for all runtime-registered synths.
+
+    Same record shape as ``assets/io.json`` (``ins``/``outs``/``reads``/
+    ``writes``), and produced by the same function, so a Supriya-authored
+    def is width-checkable exactly like a bundled one.  A def whose widths
+    could not be derived is **omitted**, not recorded as zero: a missing
+    entry means "refuse", and a zero would read as "touches no bus".
+    """
+    return {name: entry["io"] for name, entry in _RUNTIME.items()
+            if entry.get("io")}
 
 
 def is_registered(def_name: str) -> bool:
@@ -129,6 +143,42 @@ def _controls_from_compiled(compiled_bytes: bytes, def_name: str) -> dict:
         return {}
     return {k: _round_default(v)
             for k, v in synth.get("named_parameters", {}).items()}
+
+
+def _io_from_compiled(compiled_bytes: bytes, def_name: str):
+    """Extract the ``io.json`` record from compiled SynthDef bytes.
+
+    Delegates to ``scripts.regenerate_manifest._io_for_synth`` -- the same
+    derivation that built the bundled sidecar -- so a runtime-registered
+    def and a bundled one can never disagree about what ``outs`` means.
+    Imported lazily: that module imports this one at module scope.
+
+    Returns ``None`` when the bytes cannot be parsed or the named synth is
+    not in them.  ``None`` propagates as "no recorded width", which the
+    width validators refuse on; inventing a 2 here is exactly the guess
+    that would reserve a loudspeaker channel that does not exist.
+    """
+    from klotho.utils.playback.supersonic._vendor.synthdef_parser import (
+        parse_synthdef,
+    )
+    from klotho.utils.playback.supersonic.scripts.regenerate_manifest import (
+        _io_for_synth,
+    )
+
+    try:
+        parsed = parse_synthdef(bytes(compiled_bytes))
+    except Exception:
+        return None
+    synths = parsed.get("synths", {})
+    synth = synths.get(def_name)
+    if synth is None and synths:
+        synth = next(iter(synths.values()))
+    if synth is None:
+        return None
+    try:
+        return _io_for_synth(synth)
+    except Exception:
+        return None
 
 
 def register_compiled_file(path, kind: str = None):

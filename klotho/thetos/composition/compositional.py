@@ -548,7 +548,18 @@ PFieldContext = DistributionContext
 # Meta-field names the playback engine consumes (poly-voice strum spread and
 # track/group routing). The unified ``set()`` routes bare kwargs with these
 # names to mfields; everything else goes to pfields.
-ENGINE_MFIELDS = frozenset({'strum', 'group'})
+#
+# An mfield is not a pfield but has an effect on one or more pfields.
+# ``group`` declares no synth control at all, and its whole effect is to
+# set ``out``: it picks WHICH BUS the voice writes to. ``speaker`` does the
+# same thing at finer grain -- ``group`` picks the bus, ``speaker`` picks
+# the lane within it, and the engine adds the two together. Neither is
+# ever passed to a synth as a control.
+#
+# Membership here also buys ``speaker`` the rule multichannel v1 needs:
+# engine mfields cannot be changed on a live node (``Event.add_set``), so
+# a source cannot walk across loudspeakers during a held note.
+ENGINE_MFIELDS = frozenset({'strum', 'group', 'speaker'})
 
 # The structural columns of ``CompositionalUnit.events``, in table order:
 # the unit's own facts about each event, written before the pfield/mfield
@@ -2162,11 +2173,13 @@ class CompositionalUnit(TemporalUnit):
 
         if distributable_fields:
             self._distribute_to_targets(targets, distributable_fields, include_rests, setter='mfields')
-        if 'group' in kwargs:
+        if 'group' in kwargs or 'speaker' in kwargs:
             # ``group`` is half of the overlay identity (ruling six: the
             # scheduler re-points the out bus by group), so changing it is an
             # instrument change for an overlay's purposes and gets the same
-            # treatment ``set_instrument`` gets.
+            # treatment ``set_instrument`` gets. ``speaker`` is the same
+            # identity one level finer -- it moves the voice to a different
+            # physical loudspeaker -- so it re-splits for the same reason.
             #
             # This is ``Score.track``'s own documented per-leaf routing
             # idiom, so it is not an exotic door. Measured before this line:
@@ -2642,6 +2655,16 @@ class CompositionalUnit(TemporalUnit):
         at lowering, so a cross-track slur carries the hazard a cross-track
         tie carries.
 
+        ``speaker`` joins it for exactly that reason one level finer. It
+        picks the LANE within the track's bus -- which physical loudspeaker
+        the voice comes out of -- and a slur lowers to one synth held from
+        its head, so a slur spanning a speaker change would play entirely
+        out of the head's loudspeaker and say nothing about the change. In
+        a 24-speaker installation that is a sound arriving fifty feet from
+        where it was written. Splitting there renders the move the composer
+        wrote; a source travelling DURING one held note is a separate
+        feature, not this one.
+
         Comparison is always on the RESOLVED walk, never on binding
         presence -- adjacent leaves routinely agree purely by inheritance.
         """
@@ -2651,6 +2674,8 @@ class CompositionalUnit(TemporalUnit):
         from klotho.utils.playback._sc_assembly import _tie_instruments_join
         if not _tie_instruments_join(self.get_instrument(a),
                                      self.get_instrument(b)):
+            return False
+        if self.get_mfield(a, 'speaker') != self.get_mfield(b, 'speaker'):
             return False
         return self.get_mfield(a, 'group') == self.get_mfield(b, 'group')
 
@@ -3913,7 +3938,7 @@ class CompositionalUnit(TemporalUnit):
         Set instrument, parameter fields, and meta fields in one call.
 
         Bare keyword fields are routed automatically: names in
-        :data:`ENGINE_MFIELDS` (currently ``strum`` and ``group``) go to
+        :data:`ENGINE_MFIELDS` (``strum``, ``group``, ``speaker``) go to
         meta fields, everything else goes to parameter fields. So::
 
             uc.set(node, inst='fd_saw', freq='F#3', amp=0.15, strum=0.2)

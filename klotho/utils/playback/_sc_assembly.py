@@ -58,6 +58,14 @@ def _warn_unknown_pfields(def_name, pfields, manifest):
         )
 
 
+# NOTE on ``out``: an instrument's defaults can carry a control named ``out``
+# (``kl_saw`` declares one) and it is carried straight into the payload here,
+# as it always has been. On any path with a track the scheduler re-points it
+# to the track's own bus, so the payload value only takes effect on the bare
+# track-less path. Stripping it here is a possible future guard, deliberately
+# not built now -- ``out`` stays settable.
+
+
 def sort_sc_assembly_events(events):
     indexed = list(enumerate(events))
     indexed.sort(
@@ -251,6 +259,7 @@ def _tie_join_reason(obj, members, env_cover):
         return ("the instrument is an Effect -- it emits sets on a "
                 "persistent node; there is no attack to tie")
     head_group = head.get_mfield('group')
+    head_speaker = head.get_mfield('speaker')
     head_pf = head.pfields
     head_voices = _tie_voice_count(head_pf)
     kit_selector = head_inst.selector if isinstance(head_inst, Kit) else None
@@ -277,6 +286,15 @@ def _tie_join_reason(obj, members, env_cover):
             # group is track routing: a cross-group tie would silently
             # move a note between tracks mid-sound
             return f"group mismatch ({head_group!r} vs {m_group!r})"
+        m_speaker = m.get_mfield('speaker')
+        if m_speaker != head_speaker:
+            # speaker is lane routing, one level finer than group, and a
+            # tie lowers to ONE synth: joining these would play the whole
+            # tie out of the head's loudspeaker and say nothing about the
+            # speaker the continuation asked for. Separate attacks are the
+            # honest rendering -- the sound really does move, at the point
+            # the composer wrote the move.
+            return f"speaker mismatch ({head_speaker!r} vs {m_speaker!r})"
         m_voices = _tie_voice_count(m_pf)
         if m_voices != head_voices:
             return f"voice-count mismatch ({head_voices} vs {m_voices})"
@@ -444,6 +462,20 @@ def lower_compositional_ir_to_sc_assembly(
     # _lower_score_uc) defaults it and the scheduler re-points the out
     # bus off-track mid-slur.
     slur_uid_groups: dict = {}
+    # Speaker (lane routing within the track's bus) of the synth each slur
+    # uid was created in. Same reason as ``slur_uid_groups`` one line up,
+    # one level finer: a continuation cannot move the synth, so it cannot
+    # move which loudspeaker the synth is coming out of either, and it has
+    # to carry the head's speaker so the stamping downstream agrees.
+    #
+    # The Score converter re-derives the same answer from its own head map,
+    # so on THAT path this is belt and braces. It is not redundant for the
+    # other consumers of this format -- animation, ``Score.write``, a native
+    # SC scheduler -- which never run that pass, and for them this is the
+    # only place a continuation's lane is stated at all. Pinned directly at
+    # this layer by ``test_spatial_lowering``, because a payload-level test
+    # cannot see the difference.
+    slur_uid_speakers: dict = {}
     # The head's synth is the slur's ONLY synth: a continuation lowers to a
     # `set` on the head's node id and carries no `defName` at all. So an
     # instrument assigned to a mid-slur note is silently ignored and its
@@ -513,6 +545,13 @@ def lower_compositional_ir_to_sc_assembly(
             resolved_instrument, def_name, manifest
         )
         group = event.get_mfield('group')
+        # Routing, one level finer than ``group``: which loudspeaker LANE
+        # of the track's bus this voice writes to. Stamped exactly the way
+        # ``group`` is -- only when set, so a non-spatial score's payload
+        # is byte-identical to what it was before this field existed. The
+        # label is validated against the track's declared array later, in
+        # the converter, which is the layer that knows what tracks exist.
+        speaker = event.get_mfield('speaker')
         is_slur_start = event.get_mfield('_slur_start', 0)
         is_slur_end = event.get_mfield('_slur_end', 0)
         slur_id = event.get_mfield('_slur_id')
@@ -625,6 +664,9 @@ def lower_compositional_ir_to_sc_assembly(
                 if group is not None:
                     new_event["group"] = group
                     slur_uid_groups[slur_uid] = group
+                if speaker is not None:
+                    new_event["speaker"] = speaker
+                    slur_uid_speakers[slur_uid] = speaker
                 slur_uid_defnames[slur_uid] = voice_def_name
                 events.append(_attach_poly_meta(new_event, voice_event))
                 _track_event(slur_uid)
@@ -663,6 +705,9 @@ def lower_compositional_ir_to_sc_assembly(
                     head_group = slur_uid_groups.get(target_uid)
                     if head_group is not None:
                         set_event["group"] = head_group
+                    head_speaker = slur_uid_speakers.get(target_uid)
+                    if head_speaker is not None:
+                        set_event["speaker"] = head_speaker
                     events.append(_attach_poly_meta(set_event, voice_event))
                     _track_event(target_uid)
                     _record(event.node_id, target_uid, voice_start)
@@ -705,6 +750,8 @@ def lower_compositional_ir_to_sc_assembly(
             }
             if group is not None:
                 new_event["group"] = group
+            if speaker is not None:
+                new_event["speaker"] = speaker
             events.append(_attach_poly_meta(new_event, voice_event))
             _track_event(uid)
             _record(event.node_id, uid, voice_start)
