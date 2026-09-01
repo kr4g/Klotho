@@ -76,8 +76,22 @@ class TestRejectsSilentCorruption:
 
 
 class TestAcceptsWhatKlothoRoundTrips:
-    """Every shape here is emitted by Klotho itself. Rejecting any of them
-    breaks the library -- this is the NEW-27 constraint, as tests."""
+    """Every shape here is emitted by Klotho itself, and rejecting it breaks
+    the library -- this is the NEW-27 constraint, as tests.
+
+    AMENDED 2026-08-31 (RT-30). That claim used to be made about the empty
+    ``S`` as well, and for the TOP-LEVEL empty it was false. An instrumented
+    probe over every test module that touches ``rhythm_trees`` recorded
+    exactly ONE top-level empty construction: ``test_empty_s`` below, doing
+    it on purpose. Nothing in Klotho emits one, and the tree it built was
+    wrong -- only the root, whose single event reported the measure's
+    numerator as its duration (``4/4`` -> four whole notes, not one bar). It
+    is now refused, and ``test_empty_s`` pins the refusal.
+
+    The claim remains TRUE for the NESTED empty, which is why the refusal is
+    scoped to the top level: ``test_nested_empty_s`` must stay green, because
+    the asymmetric tree at ``tests/test_decompose.py`` really does emit
+    ``(1, ())`` pairs and its durations really do sum to the measure."""
 
     def test_length_one_s(self):
         """The 'd' prolatio preset builds (1,)."""
@@ -88,10 +102,16 @@ class TestAcceptsWhatKlothoRoundTrips:
         assert RhythmTree(span=1, meas='4/4', subdivisions=(-1,)) is not None
 
     def test_empty_s(self):
-        assert RhythmTree(span=1, meas='4/4', subdivisions=()) is not None
+        """FLIPPED under RT-30: the top-level empty S is now refused. See the
+        class docstring for why this one shape is not covered by the
+        round-trip claim the others are."""
+        with pytest.raises(ValueError, match='subdivisions cannot be empty'):
+            RhythmTree(span=1, meas='4/4', subdivisions=())
 
     def test_nested_empty_s(self):
-        """Produced by real test data (the asymmetric tree in test_decompose)."""
+        """Produced by real test data (the asymmetric tree in test_decompose).
+        Still accepted, and deliberately so -- RT-30's refusal is top-level
+        only."""
         assert RhythmTree(span=1, meas='4/4', subdivisions=(1, (1, ()))) is not None
 
     def test_whole_valued_float_is_a_tie_marker_not_a_typo(self):

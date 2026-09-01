@@ -267,9 +267,28 @@ class RhythmTree(Tree):
         subdivisions : tuple, optional
             The proportional subdivisions of the measure. Elements may
             be integers or nested ``(D, S)`` tuples. Default is ``(1, 1)``.
+            Must not be empty -- see the ``ValueError`` below. A nested
+            empty group is fine.
+
+        Raises
+        ------
+        ValueError
+            If *subdivisions* is empty at the TOP level (RT-30), or fails
+            :meth:`_validate_s_grammar`.
         """
         casted = self._cast_subdivs(subdivisions)
         self._validate_s_grammar(casted)
+        # RT-30. TOP-LEVEL only -- a nested empty group is a different shape
+        # and a correct one; see the note in :meth:`_validate_s_grammar`.
+        if not casted:
+            raise ValueError(
+                "subdivisions cannot be empty -- an empty S builds a tree "
+                "with no leaves, whose single event is the root itself and "
+                "reports the measure's numerator as its duration (4/4 -> 4 "
+                "whole notes, not one bar). Pass (1,) for an undivided "
+                "measure. A nested empty group -- the (1, ()) pair inside "
+                "(1, (1, ())) -- is still accepted."
+            )
         super().__init__(Meas(meas).numerator * span, casted)
         
         self._meta['span'] = span
@@ -418,7 +437,14 @@ class RhythmTree(Tree):
 
         - any length, including ``()`` and ``(1,)`` -- the ``'d'``/``'r'``
           prolatio presets build length-1 S, and ``subtree``/``decompose``
-          emit both;
+          emit both. **This validator still accepts ``()`` because it
+          recurses**, and a NESTED empty group is correct and is emitted
+          data. The TOP-LEVEL empty is refused one level up, in
+          :meth:`__init__` (RT-30): it builds a tree with only the root,
+          whose single event reports the measure's numerator as its
+          duration. Scoping that refusal here instead would break
+          ``decompose``, whose asymmetric fixture really does carry
+          ``(1, ())`` pairs;
         - whole-valued floats -- these are the tie markers ``_evaluate``
           writes and re-reads, so ``2.0`` is data, not a typo;
         - negative values -- rests;
@@ -1001,14 +1027,30 @@ class RhythmTree(Tree):
         Raises
         ------
         ValueError
-            If node is not found, is not a leaf, or S is invalid.
+            If node is not found, is not a leaf, is repeated in the list,
+            or S is invalid.
         """
         nodes = [node] if isinstance(node, int) else list(node)
+        # RT-33. The leaf precondition is checked for EVERY node up front and
+        # the subdivision happens in a second loop below, so a repeated node
+        # passed this check while it was still a leaf and was then subdivided
+        # twice -- (1, 1) came back as (1 (1 1 1 1)), walking straight past
+        # the precondition this loop exists to enforce. Refused rather than
+        # de-duplicated: silently answering a nonsense request with a
+        # plausible-looking tree is the failure mode, not the fix.
+        seen = set()
         for n in nodes:
             if n not in self:
                 raise ValueError(f"Node {n} not found in tree")
             if self.out_degree(n) != 0:
                 raise ValueError(f"Node {n} must be a leaf")
+            if n in seen:
+                raise ValueError(
+                    f"subdivide received node {n} more than once. Each node "
+                    f"is subdivided in turn, so a repeat would subdivide a "
+                    f"node that is no longer a leaf -- pass each node once."
+                )
+            seen.add(n)
 
         S = self._normalize_s_for_subdivide(S)
         S = self._cast_subdivs(S)
@@ -1287,14 +1329,45 @@ class RhythmTree(Tree):
         self._post_mutation(scope_node=root, op=op)
         return self
 
+    # RT-29. A float is read decimal-exactly, so a value the composer
+    # actually typed ("0.5", "0.25") lands on a small denominator and a
+    # value that came out of a DIVISION ("1/3" -> 0.3333333333333333) lands
+    # on 10**16. Any threshold between the two separates them; 10**6 is
+    # generous enough to admit every plausible authored decimal.
+    _MAX_FLOAT_DENOMINATOR = 10 ** 6
+
     @staticmethod
     def _as_fraction(value, what):
-        """Coerce a duration/ratio argument to an exact Fraction."""
+        """Coerce a duration/ratio argument to an exact Fraction.
+
+        A float whose decimal-exact reading needs a denominator above
+        :attr:`_MAX_FLOAT_DENOMINATOR` is REFUSED rather than repaired.
+        Repairing it (``limit_denominator``) would guess at which rational
+        the composer meant and write that guess into the score in silence,
+        which is strictly worse than stopping: the arithmetic was never the
+        casualty here, the spelling was.
+        """
         if isinstance(value, Meas):
             return value.to_fraction()
         if isinstance(value, float):
             # decimal-exact, not the binary expansion of the float
-            return Fraction(str(value))
+            exact = Fraction(str(value))
+            if exact.denominator > RhythmTree._MAX_FLOAT_DENOMINATOR:
+                meant = Fraction(value).limit_denominator(1000)
+                raise ValueError(
+                    f"{what} {value!r} is a float whose exact decimal value "
+                    f"is {exact.numerator}/{exact.denominator} -- a "
+                    f"non-terminating quotient like 1/3, not a {what} you "
+                    f"wrote. Klotho reads floats decimal-exactly (0.5 -> "
+                    f"1/2), so this spells the tree with a "
+                    f"{len(str(exact.denominator))}-digit denominator: "
+                    f"arithmetically correct, and unreadable in every print, "
+                    f"plot and export. Pass "
+                    f"Fraction({meant.numerator}, {meant.denominator}) or "
+                    f"the string '{meant.numerator}/{meant.denominator}' "
+                    f"instead."
+                )
+            return exact
         try:
             return Fraction(value)
         except (TypeError, ValueError) as exc:
