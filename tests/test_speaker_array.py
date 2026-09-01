@@ -37,8 +37,11 @@ from klotho.thetos.spatial import (
     BINAURAL_FIELDS,
     BINAURAL_STRIDE,
     DECODER_MAX_DELAY_S,
+    DECODER_WIRE_BUFS_OVERHEAD,
     HEAD_HALF,
     HEAD_HALF_FT,
+    MAX_DECODER_SPEAKERS,
+    SCSYNTH_DEFAULT_MAX_WIRE_BUFS,
     SHADOW_HI_HZ,
     SHADOW_LO_HZ,
     SPEED_OF_SOUND,
@@ -131,10 +134,42 @@ class TestTheSharedModelConstants:
         assert SPEED_OF_SOUND['ft'] == 1125.0
         assert SPEED_OF_SOUND['m'] == 343.0
 
-    def test_the_decoder_delay_line_is_half_a_second(self):
-        # The venue diagonal is 0.274 s, so half a second leaves room for an
-        # off-centre listener.
-        assert DECODER_MAX_DELAY_S == 0.5
+    def test_the_decoder_delay_line_covers_the_worst_listener(self, pav):
+        """Pinned by its REASON, not by its digits.
+
+        The constant is coupled to the geometry: it must cover the worst ear
+        delay the array admits, with headroom. A future venue with a longer
+        diagonal has to move this number, and this is what says so.
+        """
+        worst = max(
+            pav.binaural_coefficients(where).max_delay()
+            for where in (None, (0.0, 0.0), (-1.0, -1.0),
+                          (250.0, 180.0), (251.0, 181.0))
+        )
+        assert worst == pytest.approx(0.2753, abs=5e-5)   # a foot past a corner
+        assert DECODER_MAX_DELAY_S > worst
+        assert DECODER_MAX_DELAY_S / worst >= 1.15
+
+    def test_the_delay_line_stays_inside_one_power_of_two_bucket(self):
+        """And pinned from ABOVE, which is the half that is easy to miss.
+
+        scsynth rounds a delay line up to the next power-of-two frame count,
+        so 0.35 s and 0.5 s cost the same and 0.33 s costs half of either.
+        Rounding this constant up "for safety" therefore buys no safety and
+        doubles the decoder's delay memory (measured: 3081 KiB against
+        6153 KiB for 24 lanes).
+        """
+        frames = DECODER_MAX_DELAY_S * 48000        # the tighter of 44.1/48k
+        assert frames <= 16384
+        assert frames > 8192                        # not wastefully small
+        assert DECODER_MAX_DELAY_S == 0.33
+
+    def test_the_wire_buffer_arithmetic_the_speaker_cap_comes_from(self):
+        assert SCSYNTH_DEFAULT_MAX_WIRE_BUFS == 64
+        assert DECODER_WIRE_BUFS_OVERHEAD == 4
+        assert MAX_DECODER_SPEAKERS == 60
+        assert (MAX_DECODER_SPEAKERS + DECODER_WIRE_BUFS_OVERHEAD
+                == SCSYNTH_DEFAULT_MAX_WIRE_BUFS)
 
 
 class TestPavilionNumbering:
@@ -892,3 +927,181 @@ class TestRefusals:
             pav.axis_order('z')
         assert '2-D' in str(e.value)
         assert 'x, y' in str(e.value)
+
+
+class TestTheDelayGuardThreshold:
+    """Where the ``max_delay`` refusal actually sits.
+
+    The refusals above squeeze the limit to 0.05 s against a 0.274 s array --
+    5.4x of slack, so the guard fires under any mis-scaling of the
+    comparison. Deleting it is caught; multiplying it by two or by five is
+    not. These tests stand the limit right next to the answer, from both
+    sides, so any scaling breaks one of them.
+    """
+
+    def test_a_hair_of_headroom_passes_and_a_hair_short_refuses(self, pav):
+        worst = pav.binaural_coefficients((0.0, 0.0)).max_delay()
+        assert pav.binaural_coefficients(
+            (0.0, 0.0), max_delay=worst * 1.001) is not None
+        with pytest.raises(ValueError) as e:
+            pav.binaural_coefficients((0.0, 0.0), max_delay=worst * 0.999)
+        assert 'furthest speaker' in str(e.value)
+
+    def test_exactly_reaching_the_line_is_allowed(self, pav):
+        """``>`` not ``>=``: a delay the line reaches exactly is reachable."""
+        worst = pav.binaural_coefficients((0.0, 0.0)).max_delay()
+        assert pav.binaural_coefficients(
+            (0.0, 0.0), max_delay=worst) is not None
+
+    def test_the_guard_measures_the_far_ear_not_the_near_one(self):
+        """The two ears differ by the ITD alone -- under a millisecond on any
+        real array -- so tracking ``min(t_l, t_r)`` instead of ``max`` is
+        near-indistinguishable on the venue and stayed green. Here the limit
+        is set BETWEEN the two ears, where the near ear fits and the far one
+        does not, and only the far one is allowed to decide.
+        """
+        lop = SpeakerArray.from_positions({'L': (-10.0, 0.0)}, name='LOPSIDED')
+        c = lop.binaural_coefficients((0.0, 0.0))
+        near, far = c.delay_l[0], c.delay_r[0]
+        assert near < far                                    # 8.63 vs 9.15 ms
+        between = (near + far) / 2
+        with pytest.raises(ValueError) as e:
+            lop.binaural_coefficients((0.0, 0.0), max_delay=between)
+        assert "array 'LOPSIDED'" in str(e.value)
+        # …and the near ear alone would have fit, which is the whole point.
+        assert near < between < far
+
+
+class TestCentroidIsTheMeanNotTheBoundingBox:
+    """``centroid`` is the DEFAULT LISTENER, so a silent change here moves
+    every default audition. The docstring distinguishes the mean from the
+    bounding-box midpoint; on the uniform Pavilion the two are identical, so
+    swapping one for the other left the whole suite green. Pinned on a
+    deliberately irregular array, where they differ.
+    """
+
+    @staticmethod
+    def _lopsided():
+        # Three speakers clustered near the origin and one far corner.
+        return SpeakerArray.from_positions({
+            'a': (0.0, 0.0), 'b': (1.0, 0.0), 'c': (2.0, 0.0),
+            'd': (9.0, 6.0)}, name='LOPSIDED')
+
+    def test_the_mean_and_the_bounding_box_midpoint_differ_here(self):
+        arr = self._lopsided()
+        xs = [p[0] for p in arr.positions]
+        ys = [p[1] for p in arr.positions]
+        box_mid = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
+        assert box_mid == (4.5, 3.0)
+        assert arr.centroid == (3.0, 1.5)
+        assert arr.centroid != box_mid
+
+    def test_centre_is_the_same_object_value_as_centroid(self):
+        arr = self._lopsided()
+        assert arr.centre == arr.centroid == (3.0, 1.5)
+
+    def test_the_default_listener_is_the_centroid(self):
+        """Not merely reported: this is where ``listener=None`` auditions."""
+        arr = self._lopsided()
+        assert arr.binaural_coefficients().listener == arr.centroid
+        assert arr.binaural_coefficients().listener == (3.0, 1.5)
+
+    def test_it_stays_the_mean_in_three_dimensions(self):
+        arr = SpeakerArray.from_positions({
+            1: (0.0, 0.0, 0.0), 2: (0.0, 0.0, 0.0), 3: (0.0, 0.0, 9.0)})
+        assert arr.centroid == (0.0, 0.0, 3.0)     # box midpoint is 4.5
+
+
+class TestSerpentineCornerLetters:
+    """``'se'`` reads south-east, and the refusal message has to say the
+    letters in the order the code reads them. It said the opposite."""
+
+    def test_each_corner_letter_pair_starts_at_that_corner(self, pav):
+        starts = {c: pav.position(pav.serpentine(start=c)[0])
+                  for c in ('sw', 'nw', 'se', 'ne')}
+        assert starts == {
+            'sw': (0.0, 0.0),        # south-west: x low,  y low
+            'nw': (0.0, 180.0),      # north-west: x low,  y high
+            'se': (250.0, 0.0),      # south-east: x high, y low
+            'ne': (250.0, 180.0),    # north-east: x high, y high
+        }
+
+    def test_the_refusal_reads_the_letters_in_the_order_the_code_does(self, pav):
+        with pytest.raises(ValueError) as e:
+            pav.serpentine(start='ws')
+        msg = str(e.value)
+        assert 'south/north then west/east' in msg
+        assert 'west/east then south/north' not in msg
+
+
+class TestAxisOrderTieBreak:
+    """``axis_order`` documents a total order: ties break on the remaining
+    coordinates, then on lane. Dropping the tie-break left every test green,
+    because no tested array had two speakers sharing an axis value.
+    """
+
+    @staticmethod
+    def _tied():
+        # b and c share x; c and d share the WHOLE position, so only lane
+        # can separate them.
+        return SpeakerArray.from_positions({
+            'a': (1.0, 5.0), 'b': (0.0, 9.0),
+            'c': (0.0, 2.0), 'd': (0.0, 2.0)})
+
+    def test_a_tie_on_the_sorted_axis_breaks_on_the_other_coordinate(self):
+        arr = self._tied()
+        # Plain stable sort on x alone would leave b (lane 1) ahead of c.
+        assert arr.axis_order('x') == ('c', 'd', 'b', 'a')
+
+    def test_a_full_position_tie_breaks_on_lane(self):
+        arr = self._tied()
+        order = arr.axis_order('x')
+        assert order.index('c') < order.index('d')
+        assert arr.lane('c') < arr.lane('d')
+
+    def test_reverse_is_the_whole_order_reversed(self):
+        arr = self._tied()
+        assert arr.axis_order('x', reverse=True) == \
+            tuple(reversed(arr.axis_order('x')))
+
+
+class TestAnArrayTooWideToDecodeIsRefused:
+    """Past 60 speakers the decoder exceeds scsynth's stock interconnect
+    buffers, and scsynth SKIPS the def and keeps running -- the piece is
+    silent with no error anywhere. Refuse where it can be seen.
+    """
+
+    @staticmethod
+    def _line(n):
+        return {i: (float(i), 0.0) for i in range(n)}
+
+    def test_the_widest_decodable_array_is_accepted(self):
+        arr = SpeakerArray.from_positions(self._line(MAX_DECODER_SPEAKERS))
+        assert len(arr) == 60
+
+    def test_one_speaker_past_it_is_refused(self):
+        with pytest.raises(ValueError) as e:
+            SpeakerArray.from_positions(self._line(MAX_DECODER_SPEAKERS + 1))
+        assert '61 speakers' in str(e.value)
+
+    def test_the_refusal_names_the_real_limit_and_how_to_lift_it(self):
+        with pytest.raises(ValueError) as e:
+            SpeakerArray.from_positions(self._line(64))
+        msg = str(e.value)
+        assert '64 speakers' in msg                  # what was asked for
+        assert '60' in msg                           # the cap
+        assert 'maxWireBufs' in msg                  # where the cap comes from
+        assert 'SILENT' in msg                       # why it must be refused
+        assert 'at least 68' in msg                  # 64 + 4, what would lift it
+        assert 'fold the array offline' in msg       # the other way out
+
+    def test_a_grid_is_refused_the_same_way(self):
+        with pytest.raises(ValueError) as e:
+            SpeakerArray.grid(cols=9, rows=8, col_spacing=1.0, row_spacing=1.0)
+        assert '72 speakers' in str(e.value)
+
+    def test_the_cap_is_about_lanes_not_about_geometry(self):
+        """Same count, any shape: a 3-D rig is refused at the same width."""
+        with pytest.raises(ValueError):
+            SpeakerArray.from_positions(
+                {i: (float(i), 1.0, 2.0) for i in range(61)})

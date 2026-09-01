@@ -27,6 +27,14 @@ def _const(src, name):
     return int(m.group(1))
 
 
+def _newest_core_marker():
+    """The highest ``__klothoSchedCoreVn`` the core claims on its way out."""
+    ns = [int(n) for n in
+          re.findall(r"globalThis\.__klothoSchedCoreV(\d+) = true;", CORE_SRC)]
+    assert ns, "the core claims no version marker at all"
+    return max(ns)
+
+
 class TestBusFloorContract:
     def test_first_private_bus_matches_across_files(self):
         assert _const(CORE_SRC, "FIRST_PRIVATE_BUS") == \
@@ -49,7 +57,8 @@ class TestBusFloorContract:
         versioned early-return — so it also repairs pages where a
         stale pre-10.16 scheduler was installed first."""
         guard = CORE_SRC.index("__klothoBusAlloc.nextAudio < 48")
-        install = CORE_SRC.index("if (globalThis.__klothoSchedCoreV5) return;")
+        install = CORE_SRC.index(
+            f"if (globalThis.__klothoSchedCoreV{_newest_core_marker()}) return;")
         assert guard < install
 
     def test_cdn_version_pinned(self):
@@ -64,20 +73,26 @@ class TestSchedulerVersionSkew:
     setupStemTaps, so stems ZIPs silently contained only main.wav)."""
 
     def test_core_install_guard_is_versioned(self):
-        # V5 keys on its own name (pages with saved V4 outputs already set
-        # V4, and their core fires finish before the trailing pause and
-        # pads every teardown fence with the upstream sync() sleep)…
-        assert "if (globalThis.__klothoSchedCoreV5) return;" in CORE_SRC
+        """The discipline, not one literal: whatever the newest marker N is,
+        the install guard keys on N alone, every marker from V2 to N is
+        claimed on the way out, and no older marker is used as a guard.
+
+        Written generically because it is edited on every behavioural fix to
+        the core (V6 = the per-play bus-run ledger), and a test that has to
+        be hand-edited to say a new number is a test that gets edited
+        without being read.
+        """
+        newest = _newest_core_marker()
+        assert newest >= 6, newest
+        assert f"if (globalThis.__klothoSchedCoreV{newest}) return;" in CORE_SRC
         assert "if (globalThis.BrowserScheduler) return;" not in CORE_SRC
-        assert "globalThis.__klothoSchedCoreV5 = true;" in CORE_SRC
-        # …but still claims every older marker so a stale core rendering
-        # later can never downgrade the installed class.
-        assert "globalThis.__klothoSchedCoreV2 = true;" in CORE_SRC
-        assert "globalThis.__klothoSchedCoreV3 = true;" in CORE_SRC
-        assert "globalThis.__klothoSchedCoreV4 = true;" in CORE_SRC
-        assert "if (globalThis.__klothoSchedCoreV2) return;" not in CORE_SRC
-        assert "if (globalThis.__klothoSchedCoreV3) return;" not in CORE_SRC
-        assert "if (globalThis.__klothoSchedCoreV4) return;" not in CORE_SRC
+        # Every marker up to the newest is claimed, so a stale core
+        # rendering later can never downgrade the installed class…
+        for n in range(2, newest + 1):
+            assert f"globalThis.__klothoSchedCoreV{n} = true;" in CORE_SRC, n
+        # …and none of the older ones is what the install guard keys on.
+        for n in range(2, newest):
+            assert f"if (globalThis.__klothoSchedCoreV{n}) return;" not in CORE_SRC, n
 
     def test_boot_stashes_config_for_capacity_checks(self):
         from klotho.utils.playback.supersonic._js_fragments import ss_init_js

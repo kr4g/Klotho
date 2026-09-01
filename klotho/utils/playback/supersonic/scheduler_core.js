@@ -33,7 +33,14 @@
   // the payload's tail pause (shape widgets reset their visuals early on
   // every play), and paid supersonic sync()'s ~300 ms postMessage settling
   // sleep on every teardown fence; same marker discipline.
-  if (globalThis.__klothoSchedCoreV5) return;
+  // V6 (per-play bus-run ledger): the V4/V5 core reclaimed a bus range whose
+  // END it read off the SHARED cursor at free time, so a widget ringing out
+  // while a second widget was still playing handed back the second widget's
+  // live channels — two unrelated voices summing into the same buses, with
+  // nothing in the output to say so. Pages carrying saved 10.17/10.18
+  // outputs already set V5, so V6 must key on its own name to install over
+  // them. Same marker discipline: old instances keep the old prototype.
+  if (globalThis.__klothoSchedCoreV6) return;
 
   // The supersonic-scsynth engine holds at most SCHEDULER_SLOT_COUNT (512)
   // timestamped bundles; when that queue is full an arriving bundle is
@@ -73,6 +80,34 @@
 
   function getNTP() {
     return (performance.timeOrigin + performance.now()) / 1000 + NTP_EPOCH_OFFSET;
+  }
+
+  // Append [start, end) to a play's run ledger, merging when it continues
+  // the previous run. A piece with hundreds of control envelopes therefore
+  // keeps ONE entry, not hundreds.
+  function _noteRun(runs, start, end) {
+    if (!(end > start)) return;
+    var last = runs.length ? runs[runs.length - 1] : null;
+    if (last && last[1] === start) { last[1] = end; return; }
+    runs.push([start, end]);
+  }
+
+  // Peel runs off the top of a shared cursor, highest first, stopping at
+  // the first one that is not the topmost allocation. A peeled run is
+  // emptied in place so a second reclaim of the same ledger cannot hand the
+  // same channels back twice — defence in depth, since every free path
+  // clears the list it took, so nothing reaches that today. See
+  // _reclaimBusRuns for the reasoning behind peeling at all.
+  function _peelRuns(runs, g, key) {
+    if (!runs || !runs.length) return;
+    var sorted = runs.slice().sort(function(a, b) { return b[0] - a[0]; });
+    for (var i = 0; i < sorted.length; i++) {
+      var run = sorted[i];
+      if (run[0] >= run[1]) continue;          // already given back
+      if (g[key] !== run[1]) break;            // something live sits above
+      g[key] = run[0];
+      run[1] = run[0];
+    }
   }
 
   // Shared in-flight load tracker: one due-NTP entry per timestamped bundle
@@ -144,17 +179,16 @@
       globalThis.__klothoTrackWarned = {};
       this._controlGroupId = null;
       this._controlBusMap = [];
-      this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
-      this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
-      // Track the bus range allocated by THIS play, so it can be reclaimed
-      // when the group is freed. Without this, ``__klothoBusAlloc`` only
-      // grows monotonically and the user runs out of private audio buses
-      // after a few dozen plays. The budget is whatever the page's engine
-      // booted with (numAudioBusChannels in supersonic_config(), currently
-      // 1024); running past it now raises from _allocAudioBusN rather than
-      // handing out buses scsynth does not have.
-      this._audioBusRangeStart = null;
-      this._controlBusRangeStart = null;
+      // Ledger of the bus runs allocated by THIS play, so they can be
+      // reclaimed when the group is freed. Without reclaim,
+      // ``__klothoBusAlloc`` only grows monotonically and the user runs out
+      // of private audio buses after a few dozen plays. The budget is
+      // whatever the page's engine booted with (numAudioBusChannels in
+      // supersonic_config(), currently 1024); running past it raises from
+      // _allocAudioBusN rather than handing out buses scsynth does not have.
+      // Sets _nextAudioBus / _nextControlBus / _audioBusRuns /
+      // _controlBusRuns.
+      this._beginBusRuns();
       this._activeBuffers = [];
 
       this._playStartNTP = 0;
@@ -201,36 +235,60 @@
       this._groupId = gid;
     }
 
-    _snapshotBusRangeStart() {
-      this._audioBusRangeStart = globalThis.__klothoBusAlloc.nextAudio;
-      this._controlBusRangeStart = globalThis.__klothoBusAlloc.nextControl;
+    // Start of a play: this scheduler's local cursors resume from the shared
+    // page cursor, and its ledger of allocated runs starts empty.
+    _beginBusRuns() {
+      var g = globalThis.__klothoBusAlloc;
+      this._nextAudioBus = g.nextAudio;
+      this._nextControlBus = g.nextControl;
+      this._audioBusRuns = [];
+      this._controlBusRuns = [];
     }
 
-    // Reclaim a bus range back to the global allocator if no later play
-    // has extended past it. The conditional check protects against
-    // clobbering allocations made by a concurrent widget's scheduler.
-    _reclaimBusRange(audioStart, audioEnd, controlStart, controlEnd) {
+    // Record [start, end) as allocated by THIS play. The allocators in
+    // scheduler_score.js call these; they are the only writers.
+    _noteAudioBusRun(start, end) {
+      if (!this._audioBusRuns) this._audioBusRuns = [];
+      _noteRun(this._audioBusRuns, start, end);
+    }
+
+    _noteControlBusRun(start, end) {
+      if (!this._controlBusRuns) this._controlBusRuns = [];
+      _noteRun(this._controlBusRuns, start, end);
+    }
+
+    // Give this play's runs back to the shared allocator, peeling from the
+    // TOP of the cursor and stopping at the first run that is not on top.
+    //
+    // What this replaced captured a range START at play time and read the
+    // SHARED cursor as the range END at free time, which makes "my range"
+    // mean "everything anybody allocated since I started". Two widgets on
+    // one page: A gets [48,52), B then gets [52,76), A rings out and hands
+    // back [48,76) — so the next play is handed 20 of B's 24 live channels
+    // and two unrelated voices sum into the same buses, silently.
+    //
+    // The cursor is monotonic, so the only rewind that CANNOT take back a
+    // bus somebody else is using is a rewind over a run that is currently
+    // the topmost thing allocated. Anything under a live run stays
+    // allocated: an out-of-order free leaks bus NUMBERS until the page
+    // reloads (nothing is leaked in the engine — scsynth allocated its
+    // whole bus array at boot either way). That is the deliberate trade.
+    // A real free list would recover more, but every extra mechanism here
+    // is another chance to hand two voices the same channels, and an
+    // overlap makes no noise to debug by.
+    _reclaimBusRuns(audioRuns, controlRuns) {
       var g = globalThis.__klothoBusAlloc;
-      if (audioStart != null && audioEnd != null
-          && g.nextAudio === audioEnd && audioStart < audioEnd) {
-        g.nextAudio = audioStart;
-      }
-      if (controlStart != null && controlEnd != null
-          && g.nextControl === controlEnd && controlStart < controlEnd) {
-        g.nextControl = controlStart;
-      }
+      _peelRuns(audioRuns, g, 'nextAudio');
+      _peelRuns(controlRuns, g, 'nextControl');
     }
 
     _freeGroup() {
       if (this._groupId == null) return;
       try { this.sonic.send('/g_freeAll', this._groupId); } catch(e) {}
       try { this.sonic.send('/n_free', this._groupId); } catch(e) {}
-      this._reclaimBusRange(
-        this._audioBusRangeStart, globalThis.__klothoBusAlloc.nextAudio,
-        this._controlBusRangeStart, globalThis.__klothoBusAlloc.nextControl
-      );
-      this._audioBusRangeStart = null;
-      this._controlBusRangeStart = null;
+      this._reclaimBusRuns(this._audioBusRuns, this._controlBusRuns);
+      this._audioBusRuns = [];
+      this._controlBusRuns = [];
       this._groupId = null;
       this._scoreGroupId = null;
     }
@@ -240,19 +298,17 @@
       var sonic = this.sonic;
       var ringMs = this.ringTime * 1000;
       var bufs = this._activeBuffers.slice();
-      // Snapshot this play's bus range; on ring-out, reclaim it so the
-      // global allocator doesn't grow unboundedly.
-      var audioStart = this._audioBusRangeStart;
-      var audioEnd = globalThis.__klothoBusAlloc.nextAudio;
-      var controlStart = this._controlBusRangeStart;
-      var controlEnd = globalThis.__klothoBusAlloc.nextControl;
+      // Take THIS play's own run ledger onto the deferred entry; on
+      // ring-out, give those runs back so the global allocator doesn't grow
+      // unboundedly. Reading the shared cursor here instead would claim
+      // every bus a concurrent widget allocated in the meantime.
+      var audioRuns = this._audioBusRuns;
+      var controlRuns = this._controlBusRuns;
       var entry = {
         gid: groupId,
         bufs: bufs,
-        audioStart: audioStart,
-        audioEnd: audioEnd,
-        controlStart: controlStart,
-        controlEnd: controlEnd,
+        audioRuns: audioRuns,
+        controlRuns: controlRuns,
         tid: null,
       };
       entry.tid = setTimeout(function() {
@@ -261,7 +317,7 @@
         for (var i = 0; i < bufs.length; i++) {
           try { sonic.send('/b_free', bufs[i]); } catch(e) {}
         }
-        self._reclaimBusRange(audioStart, audioEnd, controlStart, controlEnd);
+        self._reclaimBusRuns(audioRuns, controlRuns);
         // Done entries leave the list so an idle replay reads as clean
         // (play()'s dirty check) and doesn't re-free dead nodes.
         var ix = self._deferredRings.indexOf(entry);
@@ -269,11 +325,10 @@
       }, ringMs);
       this._deferredRings.push(entry);
       this._activeBuffers = [];
-      // Ownership of the range moves onto the deferred entry; clear so
-      // the next play snapshots a fresh range starting from the (still
-      // unreclaimed) global cursor.
-      this._audioBusRangeStart = null;
-      this._controlBusRangeStart = null;
+      // Ownership of the runs moves onto the deferred entry; clear so the
+      // next play starts a fresh ledger and cannot free these twice.
+      this._audioBusRuns = [];
+      this._controlBusRuns = [];
     }
 
     _freeBuffers() {
@@ -294,10 +349,7 @@
             try { this.sonic.send('/b_free', entry.bufs[j]); } catch(e) {}
           }
         }
-        this._reclaimBusRange(
-          entry.audioStart, entry.audioEnd,
-          entry.controlStart, entry.controlEnd
-        );
+        this._reclaimBusRuns(entry.audioRuns, entry.controlRuns);
       }
       this._deferredRings = [];
     }
@@ -923,9 +975,7 @@
       this._trackMap = null;
       globalThis.__klothoTrackWarned = {};
       this._controlBusMap = [];
-      this._nextAudioBus = globalThis.__klothoBusAlloc.nextAudio;
-      this._nextControlBus = globalThis.__klothoBusAlloc.nextControl;
-      this._snapshotBusRangeStart();
+      this._beginBusRuns();
 
       if (token !== this.stopToken) return;
 
@@ -1060,4 +1110,5 @@
   globalThis.__klothoSchedCoreV3 = true;
   globalThis.__klothoSchedCoreV4 = true;
   globalThis.__klothoSchedCoreV5 = true;
+  globalThis.__klothoSchedCoreV6 = true;
 })();

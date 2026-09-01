@@ -82,7 +82,7 @@ refuse, so it must never be how a widthless def is spelled.  Three states
 are kept distinct: ``0`` (reads/writes no bus — determinate), ``null``
 (a reader/writer exists but its width could not be derived — refuse, do
 not fall back to 2), and *key absent* (stale sidecar).  ``null`` arises
-when a writer carries a packed input, for which ``len(inputs) - 1`` is not
+when a writer carries a packed input, for which the input count is not
 the channel count; no bundled def does today, and ``main`` shouts if one
 ever appears.
 
@@ -110,9 +110,20 @@ _MANIFEST_PATH = _ASSETS_DIR / "manifest.json"
 _KINDS_PATH = _ASSETS_DIR / "kinds.json"
 _IO_PATH = _ASSETS_DIR / "io.json"
 
-#: UGens that write a signal to a bus. First input is the bus; the rest are
-#: one input per channel.
-_WRITER_UGENS = ("Out", "OffsetOut", "ReplaceOut", "XOut")
+#: UGens that write a signal to a bus, mapped to how many leading inputs are
+#: NOT channels.  ``Out.ar(bus, sig)`` takes one (the bus);
+#: ``XOut.ar(bus, xfade, sig)`` takes two, because the crossfade level sits
+#: between the bus and the signal.  Counting ``xfade`` as a channel made
+#: every ``XOut`` one channel too wide -- harmless while no bundled def uses
+#: one, and a lane validator reserving a channel that does not exist as soon
+#: as one does.
+_WRITER_LEADING_INPUTS = {
+    "Out": 1,
+    "OffsetOut": 1,
+    "ReplaceOut": 1,
+    "XOut": 2,
+}
+_WRITER_UGENS = tuple(_WRITER_LEADING_INPUTS)
 
 #: UGens that read a signal from a bus. One output per channel.
 _READER_UGENS = ("In", "InFeedback")
@@ -141,13 +152,15 @@ def _kind_for_path(path: Path) -> str:
 def _writer_channels(ugen: dict) -> int | None:
     """Channels written by a bus-writer *ugen*, or ``None`` if underivable.
 
-    ``len(inputs) - 1`` (bus, then one input per channel) — but a packed
-    input stands for an unknown number of inputs, so the arithmetic does
-    not hold and the width is refused rather than guessed.
+    ``len(inputs)`` less the writer's own leading arguments (the bus, plus
+    ``xfade`` for ``XOut``), each remaining input being one channel — but a
+    packed input stands for an unknown number of inputs, so the arithmetic
+    does not hold and the width is refused rather than guessed.
     """
     if any("packed" in inp for inp in ugen["inputs"]):
         return None
-    return len(ugen["inputs"]) - 1
+    lead = _WRITER_LEADING_INPUTS[ugen["name"]]
+    return len(ugen["inputs"]) - lead
 
 
 def _io_for_synth(synth: dict) -> dict:

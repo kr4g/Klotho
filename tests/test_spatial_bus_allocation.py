@@ -107,6 +107,99 @@ class TestSharedCursor:
         _assert_pairwise_disjoint(occupied, allocs, "occupied across inclusions")
         _assert_pairwise_disjoint(reserved, allocs, "reserved across inclusions")
 
+    def test_nothing_lands_inside_a_second_widgets_live_run(self):
+        """Two widgets ALIVE AT ONCE, which the pairwise checks above cannot
+        see: those compare allocations made by ONE scheduler, and every one
+        of them passed while this was broken.
+
+        B holds a 24-wide run. A allocates again mid-play after B has moved
+        the cursor, then rings out; the ring-out free used to read the SHARED
+        cursor as its own range end, so A handed back everything allocated
+        since A started -- B's 24 live channels included -- and the next play
+        was handed 20 of them.
+        """
+        r = _probe("two_widgets", 1024)
+        b = _spans(r["bAllocations"])[1]        # B's reserved run(s)
+        others = [("A", a) for a in r["aAllocations"]] \
+            + [("C", a) for a in r["cAllocations"]]
+        for who, a in others:
+            a0, a1 = a["start"], a["localCursor"]
+            for (b0, b1) in b:
+                assert a1 <= b0 or b1 <= a0, (
+                    f"widget B is still playing on audio buses [{b0},{b1}) "
+                    f"and widget {who} was handed [{a0},{a1}) -- overlapping "
+                    f"channels {max(a0, b0)}..{min(a1, b1)}, where two "
+                    f"unrelated voices sum into each other"
+                )
+        live_control = set(r["bControlBuses"])
+        for who, buses in (("A", r["aControlBuses"]), ("C", r["cControlBuses"])):
+            assert not (set(buses) & live_control), (who, buses, live_control)
+
+    def test_an_out_of_order_free_gives_back_only_what_is_on_top(self):
+        """The chosen semantics, pinned as a choice, from both sides.
+
+        A monotonic cursor can only rewind over the allocation that is
+        currently on TOP of it. A's ring-out gives back its own last run --
+        so reclaim is not simply switched off -- and stops dead at B's live
+        range rather than rewinding through it. A's earlier channels leak
+        until the page reloads: leaked bus NUMBERS cost nothing at runtime
+        (scsynth allocated its whole bus array at boot), and the alternative
+        is two voices summing with nothing in the output to say so.
+        """
+        r = _probe("two_widgets", 1024)
+        assert r["timersPending"] == 1 and r["timersFired"] == 1, r
+        before, after = r["globalBeforeRingOut"], r["globalAfterRingOut"]
+        b_end = r["bAudio"][1]
+        assert after["audio"] < before["audio"], (
+            "the free gave nothing back at all; the topmost run was its own")
+        assert after["audio"] >= b_end, (
+            f"the cursor rewound to {after['audio']}, inside widget B's live "
+            f"run which ends at {b_end}")
+        assert after["control"] < before["control"]
+        assert after["control"] >= max(r["bControlBuses"]) + 1
+
+    def test_a_widget_alone_still_gets_its_buses_back(self):
+        """The other half of the trade. Reclaim is what stops a page running
+        out after a few dozen plays, so 'never rewind' is not an acceptable
+        way to make overlaps impossible."""
+        r = _probe("ring_out_reclaims", 1024)
+        assert r["globalBeforeRingOut"]["audio"] > FIRST_PRIVATE_BUS
+        assert r["globalAfterRingOut"] == {"audio": FIRST_PRIVATE_BUS,
+                                           "control": 0}
+        assert [a["start"] for a in r["second"]] == [FIRST_PRIVATE_BUS]
+        assert r["secondControl"] == [0]
+        # And again, so reclaim is not a one-shot.
+        assert r["globalAfterSecondRingOut"] == {"audio": FIRST_PRIVATE_BUS,
+                                                 "control": 0}
+
+    def test_the_two_stop_paths_reclaim_the_same_ledger(self):
+        """A ring-out is not the only way a range comes back: ``stop()``
+        frees the live group immediately and cancels rings that have not
+        fired yet. All three read the same per-play ledger, so a mismatch
+        there is a stuck transport rather than a quiet overlap -- but it is
+        still a way for the bus space to drain away."""
+        r = _probe("stop_paths", 1024)
+        assert r["beforeAll"] == FIRST_PRIVATE_BUS
+        assert r["afterFreeGroup"] == FIRST_PRIVATE_BUS
+        assert r["ringsPending"] == 1
+        assert r["afterCancel"] == FIRST_PRIVATE_BUS
+        assert r["ringsAfterCancel"] == 0
+        assert r["timersLeft"] == 0      # the cancelled ring's timer is gone
+
+    def test_freeing_the_same_ledger_twice_cannot_take_it_back_twice(self):
+        """Defence in depth, driving ``_reclaimBusRuns`` directly: no path
+        frees one play's ledger twice today (every free clears the list it
+        took), so this is a guard against a future one rather than a
+        reachable defect. It matters because the cursor can legitimately
+        return to the same number under new ownership."""
+        r = _probe("double_reclaim", 1024)
+        assert r["afterFirstReclaim"] == FIRST_PRIVATE_BUS
+        assert [a["start"] for a in r["other"]] == [48, 50]
+        assert r["afterOther"] == 52
+        assert r["afterSecondReclaim"] == 52, (
+            "a second free of an already-freed ledger handed back channels "
+            "that now belong to another widget")
+
     def test_nothing_is_allocated_below_the_private_floor(self):
         """A stale pre-10.16 page leaves the shared cursor at 16, inside the
         hardware span. The floor guard lifts it before anything is handed
@@ -205,16 +298,39 @@ class TestExhaustion:
         assert r["localCursorAfterThrow"] == last_good
         assert r["globalCursorAfterThrow"] == last_good
 
-    def test_page_with_no_boot_stash_falls_back_to_the_old_budget(self):
+    def test_odd_width_runs_also_stop_at_the_budget(self):
+        """Even widths divide the budget cleanly, so the only exhaustion case
+        tested was one where rounding never decides anything. An odd run is
+        RESERVED one channel wider than it is asked for, and it is the
+        reserved width that must be checked against the budget -- checking
+        the asked-for width would let the last run reserve past the end."""
+        r = _probe("exhaust_odd", 125)
+        assert r["runWidth"] == 25 and r["threw"] is True
+        assert [(a["start"], a["localCursor"]) for a in r["allocations"]] == [
+            (48, 74), (74, 100)]
+        for a in r["allocations"]:
+            assert a["start"] + a["width"] <= 125, a   # occupied
+            assert a["localCursor"] <= 125, a          # reserved
+        # A third run would OCCUPY 100..125, which fits, and RESERVE
+        # 100..126, which does not. The reserved width is what must decide.
+        assert r["localCursorAfterThrow"] == 100
+        assert "a 25-channel run at bus 100 would reach 126" in r["message"]
+
+    def test_page_with_no_boot_stash_falls_back_to_supersonics_own_default(self):
         """An engine booted by a pre-10.16 saved output has no bootConfig --
-        the same page state the recorder detects for stems. Assume the OLD
-        256, not the new 1024: guessing high on a page that cannot say what
-        it booted hands out buses that do not exist."""
+        the same page state the recorder detects for stems. Klotho passed no
+        scsynthOptions at all before 10.16, so such an engine booted on
+        SuperSonic's OWN default of 128 audio bus channels (checked against
+        the pinned dist bundle by the test below). Assuming the 1024 this
+        build boots with would hand a stale page buses that do not exist."""
         r = _probe("exhaust")  # no capacity argument => no bootConfig stash
-        assert r["reportedCapacity"] == 256
+        assert r["reportedCapacity"] == 128
         assert r["threw"] is True
         for a in r["allocations"]:
-            assert a["localCursor"] <= 256, a
+            assert a["localCursor"] <= 128, a
+        # Not merely "some small number": the fallback must be the engine's
+        # own default, and 256 (the value that shipped) is past it.
+        assert [a["localCursor"] for a in r["allocations"]] == [72, 96, 120]
 
 
 @requires_node
@@ -233,6 +349,41 @@ class TestWidthRefusals:
         r = _probe("bad_width", 1024)
         assert r["cursorAfter"] == r["cursorBefore"] == FIRST_PRIVATE_BUS
         assert r["globalCursorAfter"] == FIRST_PRIVATE_BUS
+
+
+class TestLegacyFallbackMatchesTheEngine:
+    """The no-stash fallback is a guess about somebody else's default, so it
+    is pinned against the engine version it is a guess about. A SuperSonic
+    bump must force a re-read of that bundle rather than silently leaving a
+    stale number in a file nobody rereads."""
+
+    def test_the_fallback_is_supersonics_own_default(self):
+        from klotho.utils.playback.supersonic.cdn import (
+            SUPERSONIC_DEFAULT_NUM_AUDIO_BUSES, SUPERSONIC_VERSION)
+        assert SUPERSONIC_VERSION == "0.71.0"
+        assert SUPERSONIC_DEFAULT_NUM_AUDIO_BUSES == 128
+        assert (f"var LEGACY_AUDIO_BUSES = "
+                f"{SUPERSONIC_DEFAULT_NUM_AUDIO_BUSES};") in SCORE_SRC
+
+    def test_the_fallback_is_not_the_budget_this_build_boots_with(self):
+        """The two are unrelated numbers and were once confused. A page that
+        cannot say what it booted with did NOT boot with our budget."""
+        from klotho.utils.playback.supersonic.cdn import (
+            SCSYNTH_NUM_AUDIO_BUSES, SUPERSONIC_DEFAULT_NUM_AUDIO_BUSES)
+        assert SUPERSONIC_DEFAULT_NUM_AUDIO_BUSES < SCSYNTH_NUM_AUDIO_BUSES
+
+    def test_the_block_size_the_memory_note_is_written_against(self):
+        """cdn.py's cost arithmetic multiplies by the block size; SuperSonic
+        refuses any bufLength but 128, so 64 was simply wrong."""
+        from klotho.utils.playback.supersonic.cdn import (
+            SCSYNTH_NUM_AUDIO_BUSES, SUPERSONIC_BLOCK_SIZE)
+        assert SUPERSONIC_BLOCK_SIZE == 128
+        kib = SCSYNTH_NUM_AUDIO_BUSES * SUPERSONIC_BLOCK_SIZE * 4 / 1024
+        assert kib == 512.0
+        from klotho.utils.playback.supersonic import cdn
+        src = Path(cdn.__file__).read_text()
+        assert "1024 x 128 samples x 4 B =" in src
+        assert "512 KB" in src
 
 
 class TestOneImplementation:

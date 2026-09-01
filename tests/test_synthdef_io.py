@@ -21,10 +21,17 @@ Three things are pinned here:
 """
 
 import json
+from pathlib import Path
 
 import pytest
 
+from klotho.utils.playback.supersonic._vendor.synthdef_parser import (
+    parse_synthdef_file,
+)
 from klotho.utils.playback.supersonic.scripts import regenerate_manifest as rm
+
+#: Compiled by ``tests/fixtures/synthdefs/io_probe.scd`` (sclang 3.13.0).
+_PROBE_DIR = Path(__file__).parent / "fixtures" / "synthdefs"
 
 # Tolerated so a missing sidecar fails as ``test_io_json_exists_and_parses``
 # rather than as a collection error naming nothing in particular.
@@ -285,6 +292,62 @@ class TestWidthDerivation:
                                         'channels': None}]}}
         refusals, _ = rm._io_review_notes(io)
         assert len(refusals) == 1 and 'zz_broken' in refusals[0]
+
+
+class TestEnumeratedButUnusedUGens:
+    """``XOut`` and ``InFeedback`` are in the generator's tables and in no
+    bundled def, so every test above stays green if they are deleted -- and
+    ``XOut``'s width was in fact wrong the whole time, counting its
+    ``xfade`` argument as an audio channel.
+
+    Pinned against SynthDefs compiled by sclang (see
+    ``fixtures/synthdefs/io_probe.scd``) rather than hand-written parser
+    dicts, so a change in what the parser emits cannot leave these passing
+    while the real answer moves.
+    """
+
+    @staticmethod
+    def _record(stem):
+        parsed = parse_synthdef_file(str(_PROBE_DIR / f"{stem}.scsyndef"))
+        (synth,) = parsed["synths"].values()
+        return rm._io_for_synth(synth)
+
+    def test_xout_does_not_count_its_crossfade_as_a_channel(self):
+        # XOut.ar(outBus, xfade, sig) over a 2-channel sig: four inputs,
+        # TWO channels. `len(inputs) - 1` answered 3.
+        assert self._record("io_probe_xout2") == {
+            'ins': 2, 'outs': 2,
+            'reads': [{'ugen': 'InFeedback', 'rate': 'audio', 'channels': 2}],
+            'writes': [{'ugen': 'XOut', 'rate': 'audio', 'channels': 2}],
+        }
+
+    def test_xout_width_tracks_the_signal_at_a_second_width(self):
+        """One width cannot tell ``inputs - 2`` from ``inputs / 2``."""
+        assert self._record("io_probe_xout4") == {
+            'ins': 4, 'outs': 4,
+            'reads': [{'ugen': 'InFeedback', 'rate': 'audio', 'channels': 4}],
+            'writes': [{'ugen': 'XOut', 'rate': 'audio', 'channels': 4}],
+        }
+
+    def test_a_writer_dropped_from_the_table_is_a_missed_write(self):
+        """Dropping ``XOut`` from the writer table records the def as writing
+        nothing at all -- a determinate 0, not a refusal."""
+        assert 'XOut' in rm._WRITER_UGENS
+        assert rm._WRITER_LEADING_INPUTS['XOut'] == 2
+        for name in ('Out', 'OffsetOut', 'ReplaceOut'):
+            assert rm._WRITER_LEADING_INPUTS[name] == 1
+        assert tuple(rm._WRITER_LEADING_INPUTS) == rm._WRITER_UGENS
+
+    def test_a_reader_dropped_from_the_table_is_a_missed_read(self):
+        assert 'InFeedback' in rm._READER_UGENS
+        rec = self._record("io_probe_xout2")
+        assert [r['ugen'] for r in rec['reads']] == ['InFeedback']
+        assert rec['ins'] == 2
+
+    def test_the_probe_defs_are_not_in_the_shipped_assets(self):
+        """They are test fixtures; they must never reach the widget."""
+        assert not (set(_IO) & {'io_probe_xout2', 'io_probe_xout4'})
+        assert not list(rm._SYNTHDEFS_DIR.rglob('io_probe_*'))
 
 
 class TestGeneratorGuards:

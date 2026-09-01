@@ -14,8 +14,13 @@
 //   stereo_only   pure _allocAudioBus() sequence (pre-change behavior)
 //   mixed         interleaved _allocAudioBus() / _allocAudioBusN(N)
 //   two_includes  the sources included TWICE, with a second scheduler after
+//   two_widgets   two schedulers ALIVE AT ONCE, one ringing out under the
+//                 other — the interleaving a pairwise-disjointness check on
+//                 one scheduler's allocations cannot see
+//   ring_out_reclaims  one widget alone: the reclaim must still happen
 //   stale_floor   a stale pre-10.16 page (cursor 16) loaded first
-//   exhaust       allocate until the budget refuses
+//   exhaust       allocate until the budget refuses (even width, 24)
+//   exhaust_odd   the same, at an ODD width, where rounding decides the edge
 //   bad_width     every rejected width shape
 //   setup_tracks  the real setupTracks(), reporting its bus assignments
 //
@@ -37,10 +42,20 @@ const capacity = process.argv[3] ? Number(process.argv[3]) : null;
 
 let virtualMs = 0;
 const sends = [];
+// Deferred ring-outs are the whole point of the two-widget scenarios, so
+// timers are queued rather than dropped and fired on demand.
+const timers = new Map();
+let nextTimerId = 1;
+function runTimers() {
+  const due = [...timers.entries()];
+  timers.clear();
+  for (const [, fn] of due) fn();
+  return due.length;
+}
 const sandbox = {
   performance: { timeOrigin: 0, now: () => virtualMs },
-  setTimeout: () => 1,
-  clearTimeout: () => {},
+  setTimeout: (fn) => { const id = nextTimerId++; timers.set(id, fn); return id; },
+  clearTimeout: (id) => { timers.delete(id); },
   console: { log: () => {}, warn: () => {}, debug: () => {}, error: () => {} },
   atob: (s) => Buffer.from(s, 'base64').toString('binary'),
   DrawScheduler: class { schedule() {} clear() {} },
@@ -135,6 +150,144 @@ if (scenario === 'stereo_only') {
   const b = newScheduler();
   out.second = [alloc(b, 24, 'wide'), alloc(b, 2, 'stereo'), alloc(b, 7, 'wide')];
 
+} else if (scenario === 'two_widgets') {
+  // TWO WIDGETS ALIVE AT ONCE on one page, which is the case a per-widget
+  // disjointness check cannot reach: A is still ringing out when B starts.
+  //
+  //   A plays a stereo pair (+ control buses)
+  //   B plays a 24-wide spatial run (+ control buses) while A rings
+  //   A allocates AGAIN, still mid-play, after B has moved the cursor
+  //   A's ring-out timer fires -- A frees
+  //   C (the next play on the page) allocates
+  //
+  // Nothing A or C is handed may land inside B's live run. Both cursors are
+  // driven, because _allocControlBus has the same shape as the audio one.
+  // Every allocation is reported individually, so Python can compare every
+  // pair rather than trusting a range.
+  const A = newScheduler();
+  A._beginBusRuns();
+  const aAudio = [alloc(A, 2, 'stereo'), alloc(A, 2, 'stereo')];
+  const aCtrl = [A._allocControlBus(), A._allocControlBus()];
+
+  const B = newScheduler();
+  B._beginBusRuns();
+  const bAudio = [alloc(B, 24, 'wide')];
+  const bCtrl = [B._allocControlBus(), B._allocControlBus(), B._allocControlBus()];
+
+  // A is STILL PLAYING and allocates again. Its own cursor is stale by 24
+  // channels now, so drawing from it would land inside B's live run.
+  aAudio.push(alloc(A, 2, 'stereo'));
+  aCtrl.push(A._allocControlBus());
+
+  out.aAllocations = aAudio;
+  out.bAllocations = bAudio;
+  out.aControlBuses = aCtrl;
+  out.bControlBuses = bCtrl;
+  out.aAudio = [aAudio[0].start, aAudio[aAudio.length - 1].localCursor];
+  out.bAudio = [bAudio[0].start, bAudio[bAudio.length - 1].localCursor];
+  out.aControl = [aCtrl[0], aCtrl[aCtrl.length - 1] + 1];
+  out.bControl = [bCtrl[0], bCtrl[bCtrl.length - 1] + 1];
+  out.globalBeforeRingOut = {
+    audio: sandbox.__klothoBusAlloc.nextAudio,
+    control: sandbox.__klothoBusAlloc.nextControl,
+  };
+
+  // A finishes and rings out. B is still sounding.
+  A._groupId = 999;
+  A._freeGroupDeferred(999);
+  out.timersPending = timers.size;
+  out.timersFired = runTimers();
+  out.globalAfterRingOut = {
+    audio: sandbox.__klothoBusAlloc.nextAudio,
+    control: sandbox.__klothoBusAlloc.nextControl,
+  };
+
+  const C = newScheduler();
+  C._beginBusRuns();
+  const cAudio = [alloc(C, 24, 'wide')];
+  const cCtrl = [C._allocControlBus(), C._allocControlBus()];
+  out.cAllocations = cAudio;
+  out.cControlBuses = cCtrl;
+  out.cAudio = [cAudio[0].start, cAudio[cAudio.length - 1].localCursor];
+  out.cControl = [cCtrl[0], cCtrl[cCtrl.length - 1] + 1];
+
+} else if (scenario === 'ring_out_reclaims') {
+  // The other half of the trade: one widget alone must still get its buses
+  // back, or the page runs out after a few dozen plays. A ring-out with
+  // nothing allocated above it is the reclaimable case.
+  const s = newScheduler();
+  s._beginBusRuns();
+  out.first = [alloc(s, 2, 'stereo'), alloc(s, 24, 'wide')];
+  out.firstControl = [s._allocControlBus(), s._allocControlBus()];
+  out.globalBeforeRingOut = {
+    audio: sandbox.__klothoBusAlloc.nextAudio,
+    control: sandbox.__klothoBusAlloc.nextControl,
+  };
+  s._groupId = 777;
+  s._freeGroupDeferred(777);
+  out.timersFired = runTimers();
+  out.globalAfterRingOut = {
+    audio: sandbox.__klothoBusAlloc.nextAudio,
+    control: sandbox.__klothoBusAlloc.nextControl,
+  };
+  s._beginBusRuns();
+  out.second = [alloc(s, 2, 'stereo')];
+  out.secondControl = [s._allocControlBus()];
+  // A second free with nothing above it must also give everything back.
+  s._groupId = 778;
+  s._freeGroupDeferred(778);
+  runTimers();
+  out.globalAfterSecondRingOut = {
+    audio: sandbox.__klothoBusAlloc.nextAudio,
+    control: sandbox.__klothoBusAlloc.nextControl,
+  };
+
+} else if (scenario === 'stop_paths') {
+  // The other two ways a range comes back: the immediate _freeGroup() a
+  // stop() does, and _cancelAllDeferredRings() cancelling a ring that has
+  // not fired. Both read the same ledger, and a stop that threw would be a
+  // stuck transport rather than a quiet overlap.
+  const s = newScheduler();
+  s._beginBusRuns();
+  out.beforeAll = sandbox.__klothoBusAlloc.nextAudio;
+
+  s._groupId = 1;
+  out.immediate = [alloc(s, 24, 'wide'), alloc(s, 2, 'stereo')];
+  s._freeGroup();
+  out.afterFreeGroup = sandbox.__klothoBusAlloc.nextAudio;
+
+  s._beginBusRuns();
+  s._groupId = 2;
+  out.deferred = [alloc(s, 16, 'wide')];
+  s._freeGroupDeferred(2);
+  out.ringsPending = s._deferredRings.length;
+  s._cancelAllDeferredRings();          // stop() before the ring fired
+  out.afterCancel = sandbox.__klothoBusAlloc.nextAudio;
+  out.ringsAfterCancel = s._deferredRings.length;
+  out.timersLeft = timers.size;
+
+} else if (scenario === 'double_reclaim') {
+  // Defence in depth: no path frees one play's ledger twice today, so this
+  // drives _reclaimBusRuns directly. A second reclaim of a ledger that has
+  // already been given back must be a no-op even when the cursor happens to
+  // have returned to the same number -- by then those channels belong to
+  // somebody else.
+  const s = newScheduler();
+  s._beginBusRuns();
+  out.mine = [alloc(s, 2, 'stereo'), alloc(s, 2, 'stereo')];
+  const stale = s._audioBusRuns;          // the reference a ring entry holds
+  const staleCtrl = s._controlBusRuns;
+  s._reclaimBusRuns(stale, staleCtrl);
+  out.afterFirstReclaim = sandbox.__klothoBusAlloc.nextAudio;
+
+  const other = newScheduler();
+  other._beginBusRuns();
+  out.other = [alloc(other, 2, 'stereo'), alloc(other, 2, 'stereo')];
+  out.afterOther = sandbox.__klothoBusAlloc.nextAudio;
+
+  s._reclaimBusRuns(stale, staleCtrl);    // stray second free
+  out.afterSecondReclaim = sandbox.__klothoBusAlloc.nextAudio;
+
 } else if (scenario === 'stale_floor') {
   const s = newScheduler();
   out.staleCursorBefore = 16;
@@ -142,14 +295,22 @@ if (scenario === 'stereo_only') {
     alloc(s, 2, 'stereo'), alloc(s, 24, 'wide'), alloc(s, 2, 'stereo'),
   ];
 
-} else if (scenario === 'exhaust') {
+} else if (scenario === 'exhaust' || scenario === 'exhaust_odd') {
+  // Even width divides the budget cleanly; an ODD one does not, and the
+  // round-up-to-even means the last run that fits is decided by the
+  // RESERVED width, not the asked-for one. That boundary is its own case.
+  // 25 divides 125 - 48 = 77 into three runs of ASKED-for width but only
+  // two of RESERVED width, so a budget check written against the asked-for
+  // width lets the last one reserve past the end.
+  const runWidth = scenario === 'exhaust_odd' ? 25 : 24;
   const s = newScheduler();
+  out.runWidth = runWidth;
   out.allocations = [];
   out.threw = false;
   out.message = null;
   for (let i = 0; i < 500; i++) {
     try {
-      out.allocations.push(alloc(s, 24, 'wide'));
+      out.allocations.push(alloc(s, runWidth, 'wide'));
     } catch (e) {
       out.threw = true;
       out.message = String(e && e.message);

@@ -89,7 +89,41 @@ BINAURAL_STRIDE = len(BINAURAL_FIELDS)
 # The live decoder's delay line, in seconds. Pass it as ``max_delay`` to
 # refuse a listener the decoder could not reach; the offline fold has no
 # such limit and passes nothing.
-DECODER_MAX_DELAY_S = 0.5
+#
+# 0.33 rather than a round half second, and the two halves of that number are
+# both measured rather than chosen:
+#
+#   * It has to COVER the venue. The worst ear delay on the 6x4 / 50 ft /
+#     60 ft array is 137.1 ms for a listener at the centroid and 275.3 ms for
+#     the worst listener the array admits (a foot beyond a corner speaker,
+#     on the long diagonal). 0.33 s clears that by about 20%.
+#   * It must not cost double. scsynth rounds a delay line up to the next
+#     power-of-two frame count, so delay memory is a step function: at
+#     48 kHz, 0.33 s is 15840 frames and lands in the 16384-frame bucket,
+#     while 0.5 s is 24000 and lands in the 32768 one. Measured on a 24-lane
+#     decoder: 3081 KiB against 6153 KiB, for delay the array can never use.
+#     0.35 s and 0.5 s cost exactly the same, which is why "round up for
+#     safety" buys nothing here and doubling is the only way to buy more.
+#
+# It is therefore COUPLED TO THE GEOMETRY: change the array this is written
+# against and the constant has to be re-derived, not merely re-guessed.
+DECODER_MAX_DELAY_S = 0.33
+
+# scsynth's default interconnect ("wire") buffer count, and what a decoder
+# costs in them. Both are stock scsynth, not Klotho settings:
+# supersonic-scsynth defaults maxWireBufs to 64, and an N-lane decoder was
+# measured to need exactly N + 4 (checked at N = 8, 24, 64 and 256, which
+# needed 12, 28, 68 and 260).
+#
+# Past the limit scsynth prints "exception in GraphDef_Load: exceeded number
+# of interconnect buffers", SKIPS the def, and carries on -- so the later
+# /s_new does nothing and the piece is SILENT with no error anywhere. That
+# is why an array too wide to decode is refused when it is built rather than
+# when it is played.
+SCSYNTH_DEFAULT_MAX_WIRE_BUFS = 64
+DECODER_WIRE_BUFS_OVERHEAD = 4
+MAX_DECODER_SPEAKERS = (SCSYNTH_DEFAULT_MAX_WIRE_BUFS
+                        - DECODER_WIRE_BUFS_OVERHEAD)
 
 Label = Union[int, str]
 Point = Sequence[float]
@@ -100,10 +134,13 @@ __all__ = [
     'BINAURAL_FIELDS',
     'BINAURAL_STRIDE',
     'DECODER_MAX_DELAY_S',
+    'DECODER_WIRE_BUFS_OVERHEAD',
     'FACINGS',
     'HEAD_HALF',
     'HEAD_HALF_FT',
+    'MAX_DECODER_SPEAKERS',
     'NUMBERINGS',
+    'SCSYNTH_DEFAULT_MAX_WIRE_BUFS',
     'SHADOW_HI_HZ',
     'SHADOW_LO_HZ',
     'SPEED_OF_SOUND',
@@ -314,8 +351,9 @@ class SpeakerArray:
     Raises
     ------
     ValueError
-        For an empty array, duplicate labels, mixed position dimensions, a
-        non-positive speed of sound, or an unknown unit with no speed given.
+        For an empty array, more speakers than :data:`MAX_DECODER_SPEAKERS`,
+        duplicate labels, mixed position dimensions, a non-positive speed of
+        sound, or an unknown unit with no speed given.
     TypeError
         For a label that is not an ``int`` or ``str``, or a coordinate that
         is not a real number.
@@ -405,6 +443,21 @@ class SpeakerArray:
                 "a SpeakerArray needs at least one speaker; an empty array "
                 "has no lanes to route to and no geometry to fold. Pass "
                 "positions, e.g. SpeakerArray.from_positions({1: (0.0, 0.0)}).")
+
+        if len(labels) > MAX_DECODER_SPEAKERS:
+            raise ValueError(
+                f"{len(labels)} speakers is more than the "
+                f"{MAX_DECODER_SPEAKERS} a decoder can carry on stock boot "
+                f"options. The limit is scsynth's interconnect ('wire') "
+                f"buffers, not memory: an N-speaker decoder needs N + "
+                f"{DECODER_WIRE_BUFS_OVERHEAD} of them and scsynth defaults "
+                f"maxWireBufs to {SCSYNTH_DEFAULT_MAX_WIRE_BUFS}. Past that "
+                "it refuses to load the decoder, keeps running, and the piece "
+                "plays SILENTLY with no error -- so this is refused here, "
+                "where you can see it. Use fewer speakers, fold the array "
+                "offline, or boot the engine with a larger maxWireBufs "
+                f"(at least {len(labels) + DECODER_WIRE_BUFS_OVERHEAD} for "
+                "this array), which Klotho does not set today.")
 
         if speed_of_sound is None:
             if units not in SPEED_OF_SOUND:
@@ -1056,7 +1109,7 @@ class SpeakerArray:
             raise ValueError(
                 f"start={start!r} must be one of "
                 f"{', '.join(repr(s) for s in START_CORNERS)} -- the corner "
-                "the snake begins at, west/east then south/north.")
+                "the snake begins at, south/north then west/east.")
 
         cols, rows = self._grid_shape
         cell_lane = {cell: i for i, cell in

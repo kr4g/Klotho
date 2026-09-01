@@ -18,11 +18,16 @@
   // quarter of the bus space on a typo.
   var MAX_BUS_WIDTH = 256;
   // Assumed audio-bus budget when the page cannot say what it booted with.
-  // Deliberately the OLD budget: a page with no bootConfig stash was started
-  // by an output saved before this build, and guessing high would hand out
-  // buses scsynth does not have — silent cross-talk between unrelated voices
-  // instead of a loud refusal.
-  var LEGACY_AUDIO_BUSES = 256;
+  // No stash means the engine was started by an output saved before 10.16,
+  // when Klotho passed no scsynthOptions at all — so that engine booted on
+  // SuperSonic's OWN defaults, and supersonic-scsynth@0.71.0 defaults
+  // numAudioBusChannels to 128 (verified against the published dist bundle;
+  // bootConfig and scsynthOptions both arrived in the same 10.16 commit, so
+  // "no bootConfig" cannot mean "booted with a Klotho budget"). Guessing
+  // higher would hand out buses scsynth does not have — silent cross-talk
+  // between unrelated voices instead of a loud refusal, which is the exact
+  // failure this fallback exists to prevent.
+  var LEGACY_AUDIO_BUSES = 128;
 
   var proto = globalThis.BrowserScheduler.prototype;
 
@@ -48,10 +53,16 @@
   //
   // ONE cursor, ONE implementation: _allocAudioBus() below is literally
   // _allocAudioBusN(BUS_CHANNELS), so a stereo track and a 24-wide spatial
-  // track drawing from the same page-global __klothoBusAlloc can never be
-  // handed overlapping ranges. Two allocators would be two chances to drift,
-  // and an overlap here is two unrelated voices silently summing into each
-  // other — the exact failure this whole feature exists to remove.
+  // track draw from the same page-global __klothoBusAlloc. Two allocators
+  // would be two chances to drift, and an overlap here is two unrelated
+  // voices silently summing into each other — the exact failure this whole
+  // feature exists to remove.
+  //
+  // A shared cursor is only half of it, and saying otherwise is what let a
+  // real overlap ship: allocation being monotonic means nothing if a FREE
+  // can wind the cursor back over somebody else's live range. The other
+  // half is scheduler_core.js's _reclaimBusRuns, which gives back only the
+  // runs this play allocated and only while they are on top of the cursor.
   //
   // Widths are rounded UP TO EVEN. scsynth imposes no alignment rule, and
   // correctness comes from the single monotonic cursor rather than from
@@ -71,7 +82,12 @@
         + 'to ' + MAX_BUS_WIDTH + '; got ' + width + '. One bus channel per '
         + 'speaker: pass the number of channels the run has to carry.');
     }
-    var idx = this._nextAudioBus;
+    // Draw from the SHARED cursor when it has moved past this scheduler's
+    // own copy of it. Two widgets whose play() calls interleave each
+    // snapshot the cursor when they start, so the one that allocates second
+    // would otherwise hand out channels the first has already taken.
+    var g = globalThis.__klothoBusAlloc;
+    var idx = Math.max(this._nextAudioBus, g.nextAudio);
     var w = width + (width & 1); // round up to even — see note above
     var capacity = this._audioBusCapacity();
     if (idx + w > capacity) {
@@ -86,8 +102,11 @@
         + 'booted with.');
     }
     this._nextAudioBus = idx + w;
-    var g = globalThis.__klothoBusAlloc;
     if (this._nextAudioBus > g.nextAudio) g.nextAudio = this._nextAudioBus;
+    // Ledger entry for the reclaim in scheduler_core.js. Guarded because a
+    // page could pair this file with an older core: no ledger there means
+    // no reclaim, which leaks bus numbers — never an overlap.
+    if (this._noteAudioBusRun) this._noteAudioBusRun(idx, this._nextAudioBus);
     return idx;
   };
 
@@ -96,9 +115,11 @@
   };
 
   proto._allocControlBus = function() {
-    var idx = this._nextControlBus++;
     var g = globalThis.__klothoBusAlloc;
+    var idx = Math.max(this._nextControlBus, g.nextControl);
+    this._nextControlBus = idx + 1;
     if (this._nextControlBus > g.nextControl) g.nextControl = this._nextControlBus;
+    if (this._noteControlBusRun) this._noteControlBusRun(idx, this._nextControlBus);
     return idx;
   };
 
