@@ -994,10 +994,9 @@ def interleave(a, b):
 
     ``C = [i || j]`` for ``i`` in *a* and ``j`` in ``reverse(b)``: a
     strict alternating zip of WHOLE units. Nothing is merged, scaled or
-    re-metered -- every unit passes through untouched (as a copy),
-    keeping its own tempus, prolationis, beat and bpm -- so the result is
-    one single-voice :class:`TemporalUnitSequence` whose duration is
-    exactly ``a.duration + b.duration``. No arithmetic crosses an operand
+    re-metered -- every unit keeps its own tempus, prolationis, beat and
+    bpm -- so the result is a :class:`TemporalUnitSequence` whose duration
+    is exactly ``a.duration + b.duration``. No arithmetic crosses an operand
     boundary, so there is no tempo to reconcile.
 
     Source: sect4.6.2 pp. 133-134, figs. 4.80-4.83 (2008 English original
@@ -1030,21 +1029,59 @@ def interleave(a, b):
     then appended **in their own traversal order**. *a*'s tail is
     appended forward, *b*'s tail in ``reverse(b)`` order, so
     ``interleave(x, y)`` and ``interleave(y, x)`` are not reverses of
-    each other. Both are lossless.
+    each other. Both keep every unit -- no member is dropped or truncated.
+
+    WHAT DOES *NOT* SURVIVE THE ZIP -- measured, not assumed
+    ---------------------------------------------------------
+    Members arrive by way of ``TemporalUnitSequence(out)``, whose
+    constructor **copies** every member. This docstring used to call them
+    "untouched" and the operation "lossless"; both were wrong, and the
+    corrections below are what a 2026-09-01 audit actually measured.
+
+    * **Stochastic draws are RE-ROLLED.** A :class:`~klotho.thetos.Bind`
+      pfield -- or mfield, ``speaker`` included -- is drawn again, because
+      ``CompositionalUnit.copy()`` clears the bind memo by design (ruling
+      R22: a copy is a fresh instance of the *recipe*). Measured: an amp
+      Bind of ``[0.1169, 0.911, 0.0349, 0.0839]`` came back as
+      ``[0.2368, 0.9867, 0.3461, 0.4842]``, and a ``speaker`` Bind of
+      ``[14, 2, 18, 22]`` came back as ``[11, 0, 0, 19]`` -- a composed
+      spatial assignment moving to different physical loudspeakers.
+      This is uniform across the container family (``UTS([uc])``,
+      ``append``, ``extend`` and ``TemporalBlock([uc])`` all re-roll
+      independently), so it is not a hole in this verb. **Whether a
+      re-arrangement verb SHOULD re-roll is an open design question for
+      the composer, filed as SP-WEEK finding H1** -- scaling by
+      ``Fraction(1, 1)`` preserves draws and is today's workaround.
+    * **Mutable pfield VALUES are shared, not deep-copied.** Two members
+      built from the same source share one list object with each other
+      and with the caller, so ``m0.get_pfield(n, 'chord').append(72)`` is
+      visible in ``m1`` and in the original.
+
+    Everything else was verified to survive byte-identically and to be
+    correctly re-timed: pfields (scalar, list, callable and ``Pattern``),
+    mfields (``group``, ``speaker``, ``strum``), the bound instrument at
+    root and per leaf, control envelopes *with their ``time_span`` shifted
+    to the member's new offset*, slur specs, tie groups, rests, and node
+    ids.
 
     Parameters
     ----------
     a : TemporalUnit, TemporalUnitSequence, or list of them
         Traversed forward. A ``CompositionalUnit`` is an ordinary member:
         unlike ``fuse``, this verb merges no parameter state, so there is
-        nothing to reconcile.
+        nothing to reconcile. Its parameters travel with it -- with the
+        two exceptions named above.
     b : TemporalUnit, TemporalUnitSequence, or list of them
         Traversed in retrograde.
 
     Returns
     -------
     TemporalUnitSequence
-        One single-voice sequence, ``len(a) + len(b)`` units long.
+        One sequence, ``len(a) + len(b)`` members long. Single-voice for
+        the operand types this verb is meant for; a ``TemporalBlock``
+        nested *inside* a sequence operand rides through as one member and
+        is NOT refused the way a top-level block is, so that output is
+        polyphonic. The inconsistency is filed as SP-WEEK finding H2.
 
     Raises
     ------
