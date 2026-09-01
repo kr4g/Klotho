@@ -31,37 +31,118 @@ DegreeList = Union[List[float], List[Fraction], List[int], List[str]]
 PitchList = Union[List[Pitch], List[str]]
 
 
-def _parse_equave(equave: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
-    """
-    Parse an equave value into a float or Fraction.
+MAX_EQUAVE_DENOMINATOR = 10 ** 6
+"""Denominator ceiling when a float equave is turned into an exact ratio.
+
+``Fraction(1.0594630943592953)`` is exact in binary and therefore enormous:
+a 53-bit numerator over a 52-bit denominator. Reducing by such a ratio adds
+about 105 bits per division, so a scale built on one becomes too large to
+print long before it becomes slow to build. ``limit_denominator`` keeps the
+equave compact; the cost is an error under 1e-12 relative, which is under a
+millionth of a cent -- far below anything audible or notatable.
+"""
+
+
+def _resolve_equave(equave: Union[float, Fraction, int, str],
+                    interval_type: str = 'ratios',
+                    where: str = 'equave') -> Union[Fraction, float]:
+    """Resolve an equave argument into the form *interval_type* works in.
+
+    **The declared mode decides. Nothing is inferred from a Python type.**
+    (Ryan, 2026-09-01.) ``Scale``, ``Chord``, ``Voicing`` and
+    ``RelativePitchCollection`` all carry an explicit ``interval_type``
+    selector, validated to be exactly ``'ratios'`` or ``'cents'``, so there
+    is nothing here for a type to disambiguate:
+
+    * In ``'ratios'`` mode the equave is a RATIO, in every spelling.
+      ``2``, ``2.0``, ``Fraction(2, 1)`` and ``'2/1'`` are all the octave.
+    * In ``'cents'`` mode the equave is a CENTS value. ``1200.0`` is the
+      octave and ``1901.955`` the Bohlen-Pierce tritave. A plain ``int`` or
+      ``float`` is fine; both are cents.
+    * The one real category error is a FRACTION in cents mode -- a
+      ``Fraction`` instance, or a string in fraction format such as
+      ``'3/1'``. A ratio written in a field that means cents is a mistake,
+      not an ambiguity, and it is refused with both readings spelled out
+      rather than guessed at in either direction.
+
+    Deciding this separately at each use site is what let a cents number be
+    used directly as a ratio, and let a ratio equave be stored as that many
+    cents. Resolve once, here, and no caller has to guess again.
 
     Parameters
     ----------
     equave : float, Fraction, int, or str
-        The equave (interval of equivalence) to parse.
+        The raw equave argument, before any mode-specific handling.
+    interval_type : str, optional
+        ``'ratios'`` or ``'cents'``. Default ``'ratios'``.
+    where : str, optional
+        Name of the caller, used in refusal messages (e.g. ``'Scale'``).
 
     Returns
     -------
-    float or Fraction
-        The parsed equave value.
+    Fraction or float
+        A ``Fraction`` ratio in ``'ratios'`` mode; a cents ``float`` in
+        ``'cents'`` mode.
 
     Raises
     ------
     ValueError
-        If the value cannot be parsed.
+        If the equave cannot be parsed; if it is not above the unison (an
+        equave of 1 or less never walks a value into range, so the reduction
+        loop would never end); or, in cents mode, if it is written as a
+        fraction.
+
+    Examples
+    --------
+    >>> _resolve_equave('3/1')
+    Fraction(3, 1)
+    >>> _resolve_equave(3)
+    Fraction(3, 1)
+    >>> _resolve_equave(3.0)
+    Fraction(3, 1)
+    >>> _resolve_equave(1901.955, 'cents')
+    1901.955
+    >>> _resolve_equave(3, 'cents')
+    3.0
     """
-    if isinstance(equave, float):
-        return equave
+    from ..utils.interval_normalization import (
+        _refuse_degenerate_equave,
+        _refuse_ratio_equave_in_cents_mode,
+    )
+
+    if interval_type == 'cents':
+        if isinstance(equave, Fraction) or (isinstance(equave, str) and '/' in equave):
+            raise _refuse_ratio_equave_in_cents_mode(where, equave)
+        try:
+            cents = float(equave)
+        except (TypeError, ValueError):
+            raise ValueError(f"Cannot parse equave value: {equave!r}")
+        if not math.isfinite(cents) or cents <= 0.0:
+            raise _refuse_degenerate_equave(where, equave)
+        return cents
+
     if isinstance(equave, Fraction):
-        return equave
-    if isinstance(equave, int):
-        return Fraction(equave, 1)
-    if isinstance(equave, str) and '/' in equave:
-        return Fraction(equave)
-    try:
-        return float(equave)
-    except ValueError:
-        raise ValueError(f"Cannot parse equave value: {equave}")
+        ratio = equave
+    elif isinstance(equave, bool):
+        raise ValueError(f"Cannot parse equave value: {equave!r}")
+    elif isinstance(equave, int):
+        ratio = Fraction(equave, 1)
+    elif isinstance(equave, float):
+        if not math.isfinite(equave):
+            raise _refuse_degenerate_equave(where, equave)
+        # Bounded so the ratio stays compact; see MAX_EQUAVE_DENOMINATOR.
+        # An equave that is already a tidy ratio (2.0, 1.5, 3.0) is exact
+        # in binary and survives this untouched.
+        ratio = Fraction(equave).limit_denominator(MAX_EQUAVE_DENOMINATOR)
+    else:
+        try:
+            ratio = Fraction(equave)
+        except (TypeError, ValueError, ZeroDivisionError):
+            raise ValueError(f"Cannot parse equave value: {equave!r}")
+
+    if ratio <= 1:
+        raise _refuse_degenerate_equave(where, equave)
+    return ratio
 
 
 def _convert_degree(value: Union[float, Fraction, int, str]) -> Union[float, Fraction]:
@@ -305,7 +386,11 @@ class RelativePitchCollection(PitchCollectionBase):
         ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
     equave : float, Fraction, int, str, or None, optional
         Interval of equivalence. When provided, equave-cyclic indexing
-        is enabled.
+        is enabled. **The mode decides how it is read, not its Python
+        type.** In ``"ratios"`` mode it is a ratio in every spelling, so
+        ``3``, ``3.0``, ``Fraction(3, 1)`` and ``'3/1'`` are all the
+        tritave. In ``"cents"`` mode it is a cents value, so the tritave is
+        ``1901.955``; a fraction there is refused.
     reference_pitch : Pitch, str, or None, optional
         The root pitch. ``None`` (default) resolves to C4.
 
@@ -334,13 +419,14 @@ class RelativePitchCollection(PitchCollectionBase):
         if equave is None:
             equave_value = 1200.0 if interval_type == "cents" else Fraction(2, 1)
         else:
-            equave_value = _parse_equave(equave)
+            # The declared mode decides, and it decides once. Guessing the
+            # raw type separately per branch used to turn a ratio equave into
+            # a cents value of the same number -- equave=3 stored as 3 cents.
+            equave_value = _resolve_equave(equave, interval_type, type(self).__name__)
         converted = [_convert_degree(d) for d in degrees] if degrees else []
 
         if interval_type == "cents":
             converted = [float(d) if isinstance(d, Fraction) else float(d) for d in converted]
-            if isinstance(equave_value, Fraction):
-                equave_value = 1200.0 if equave_value == Fraction(2, 1) else float(equave_value)
         else:
             converted = [
                 d if isinstance(d, Fraction)
@@ -348,8 +434,6 @@ class RelativePitchCollection(PitchCollectionBase):
                 else d
                 for d in converted
             ]
-            if isinstance(equave_value, float):
-                equave_value = Fraction.from_float(2 ** (equave_value / 1200))
 
         if self._equave_cyclic_enabled is not None:
             equave_cyclic = self._equave_cyclic_enabled
@@ -718,7 +802,10 @@ class AbsolutePitchCollection(PitchCollectionBase):
     pitches : list of Pitch or str
         The pitches in the collection.
     equave : float, Fraction, int, str, or None, optional
-        Interval of equivalence for cyclic indexing.
+        Interval of equivalence for cyclic indexing, as a RATIO in every
+        spelling -- ``2``, ``2.0``, ``Fraction(2, 1)`` and ``'2/1'`` are all
+        the octave. This class has no ``interval_type`` selector, so there is
+        no cents reading of the argument here.
     reference_pitch : Pitch, str, or None, optional
         Optional reference pitch for partial calculations.
     """
@@ -729,7 +816,14 @@ class AbsolutePitchCollection(PitchCollectionBase):
         equave: Union[float, Fraction, int, str, None] = None,
         reference_pitch: Union[Pitch, str, None] = None,
     ):
-        self._equave = _parse_equave(equave) if equave is not None else Fraction(2, 1)
+        # AbsolutePitchCollection has no interval_type selector, so it is one
+        # of the mode-less surfaces where a bare equave is a RATIO -- the same
+        # convention as equave_reduce(), ToneLattice and Tonnetz. Resolving it
+        # here rather than storing the raw argument is what keeps as_voicing()
+        # able to hand a cents-mode Voicing a cents number (see below): the
+        # stored value now has one known meaning instead of two.
+        self._equave = (_resolve_equave(equave, 'ratios', 'AbsolutePitchCollection')
+                        if equave is not None else Fraction(2, 1))
         self._equave_cyclic = equave is not None
         self._reference_pitch = Pitch(reference_pitch) if isinstance(reference_pitch, str) else reference_pitch
 
@@ -811,10 +905,16 @@ class AbsolutePitchCollection(PitchCollectionBase):
         Voicing
         """
         from klotho.tonos.chords.chord import Voicing
+        # The Voicing is built in CENTS, while this collection stores its
+        # equave as a RATIO. Handing the ratio straight across would ask a
+        # cents-mode constructor to read a fraction, which it refuses; before
+        # the refusal existed it silently stored the octave as 2 cents.
+        # Convert at the seam so the Voicing carries the same interval.
+        equave_cents = 1200.0 * math.log2(float(self._equave))
         if not self._pitches:
-            return Voicing([], 'cents', self._equave, self._reference_pitch)
+            return Voicing([], 'cents', equave_cents, self._reference_pitch)
         ref = self._reference_pitch if self._reference_pitch is not None else self._pitches[0]
-        return Voicing(self.degrees, 'cents', self._equave, ref)
+        return Voicing(self.degrees, 'cents', equave_cents, ref)
 
     def root(self, pitch: Union[Pitch, str]) -> "AbsolutePitchCollection":
         """

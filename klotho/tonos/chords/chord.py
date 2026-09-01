@@ -8,12 +8,13 @@ from ..pitch.pitch_collections import (
     DegreeList,
     RelativePitchCollection,
     PitchCollectionBase,
-    _parse_equave,
+    _resolve_equave,
     _convert_degree,
     _resolve_reference,
 )
 from ..utils.interval_normalization import (
     equave_reduce,
+    check_reduction_cost,
     _refuse_degenerate_equave,
     _refuse_non_positive,
 )
@@ -36,7 +37,14 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
     interval_type : str, optional
         ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
     equave : float, Fraction, int, or str, optional
-        Interval of equivalence. Default is ``"2/1"`` (octave).
+        Interval of equivalence. Defaults to the octave, spelled to match
+        the mode: ``Fraction(2, 1)`` in ``"ratios"``, ``1200.0`` in
+        ``"cents"``. **``interval_type`` decides how this is read; its
+        Python type does not.** In ``"ratios"`` mode it is a ratio in every spelling, so
+        ``3``, ``3.0``, ``Fraction(3, 1)`` and ``'3/1'`` all give the
+        Bohlen-Pierce tritave. In ``"cents"`` mode it is a cents value, so
+        the tritave is ``equave=1901.955``; a fraction written there is
+        refused as a category error rather than guessed at.
     reference_pitch : Pitch, str, or None, optional
         The root pitch. ``None`` (default) resolves to C4.
 
@@ -56,39 +64,53 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
     
     def __init__(self, degrees: DegreeList = ["1/1", "5/4", "3/2"],
                  interval_type: str = "ratios",
-                 equave: Union[float, Fraction, int, str] = "2/1",
+                 equave: Union[float, Fraction, int, str, None] = None,
                  reference_pitch: Union[Pitch, str, None] = None):
         if interval_type not in ["ratios", "cents"]:
             raise ValueError("interval_type must be 'ratios' or 'cents'")
-        
-        parsed_equave = _parse_equave(equave)
-        processed_degrees = self._process_chord_degrees(degrees, interval_type, parsed_equave)
-        
-        if interval_type == "cents":
-            if isinstance(parsed_equave, Fraction):
-                parsed_equave = 1200.0 if parsed_equave == Fraction(2, 1) else float(parsed_equave)
-        else:
-            if isinstance(parsed_equave, float):
-                parsed_equave = Fraction.from_float(2 ** (parsed_equave / 1200))
-        
-        self._equave = parsed_equave
+
+        # The default is spelled per mode rather than as one literal. It used
+        # to be the string "2/1", which reads as the octave in ratios mode and
+        # as a ratio-written-in-a-cents-field in cents mode -- so the class's
+        # own default would have been refused by its own rule.
+        if equave is None:
+            equave = 1200.0 if interval_type == "cents" else Fraction(2, 1)
+
+        # The declared interval_type decides how the equave reads, and it is
+        # resolved once, up front; see Scale.__init__ for what guessing the
+        # raw Python type at each use site cost.
+        resolved_equave = _resolve_equave(equave, interval_type, 'Chord')
+        processed_degrees = self._process_chord_degrees(
+            degrees, interval_type, resolved_equave)
+
+        self._equave = resolved_equave
         self._equave_cyclic = True
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
         self._reference_pitch = _resolve_reference(reference_pitch)
         self._intervals = self._compute_chord_intervals()
-    
+
     def _process_chord_degrees(self, degrees: DegreeList, interval_type: str,
                                 equave: Union[float, Fraction]) -> List[IntervalType]:
+        """Sort, reduce and dedupe the degrees (no unison anchor, unlike Scale).
+
+        *equave* arrives already resolved to the form this *interval_type*
+        works in -- cents (float) for ``"cents"``, a ratio (Fraction) for
+        ``"ratios"``. It is not the raw constructor argument; do not infer
+        the caller's intent from its type here.
+        """
         if not degrees:
             return []
-        
+
         converted = [_convert_degree(d) for d in degrees]
-        
+        # Price the reduction before any of it runs; see the same call in
+        # Scale._process_scale_degrees for why the loops below need it.
+        check_reduction_cost('Chord', equave, converted, interval_type)
+
         if interval_type == "cents":
             converted = [float(d) if isinstance(d, Fraction) else d for d in converted]
-            equave_val = equave if isinstance(equave, float) else 1200.0
-            
+            equave_val = float(equave)
+
             reduced = []
             for d in converted:
                 while d >= equave_val:
@@ -106,10 +128,13 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
             converted = [d if isinstance(d, Fraction) else Fraction(d) if isinstance(d, int) else d for d in converted]
             has_float = any(isinstance(d, float) for d in converted)
             if has_float:
-                equave_val = float(equave) if not isinstance(equave, float) else equave
+                equave_val = float(equave)
                 # This branch carries its own copy of the equave_reduce loop,
                 # so it needs the same guards; without them a 0 degree froze
-                # the interpreter here instead of raising.
+                # the interpreter here instead of raising. The equave check is
+                # unreachable from the constructor now that _resolve_equave
+                # refuses first; it stays because this method is callable on
+                # its own and the loop below is unbounded without it.
                 if equave_val <= 1:
                     raise _refuse_degenerate_equave('Chord', equave_val)
                 reduced = []
@@ -128,10 +153,10 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
                         unique.append(d)
                 unique.sort()
             else:
-                equave_val = equave if isinstance(equave, Fraction) else Fraction(2, 1)
+                equave_val = Fraction(equave)
                 reduced = [equave_reduce(d, equave_val) for d in converted]
                 unique = sorted(list(set(reduced)))
-        
+
         return unique
     
     def _compute_chord_intervals(self) -> List[IntervalType]:
@@ -358,7 +383,12 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         """
         if not collection.is_relative:
             raise ValueError("Cannot create Chord from absolute collection")
-        target_equave = equave if equave is not None else (collection.equave if collection.equave is not None else Fraction(2, 1))
+        # The fallback has to match the collection's own mode: an octave is
+        # Fraction(2, 1) in ratio mode and 1200.0 in cents mode, and a ratio
+        # handed to a cents-mode constructor is refused outright.
+        default_equave = 1200.0 if collection._interval_type_mode == "cents" else Fraction(2, 1)
+        target_equave = equave if equave is not None else (
+            collection.equave if collection.equave is not None else default_equave)
         return cls(
             list(collection._degrees),
             collection._interval_type_mode,
@@ -384,7 +414,13 @@ class Voicing(RelativePitchCollection):
     interval_type : str, optional
         ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
     equave : float, Fraction, int, or str, optional
-        Interval of equivalence. Default is ``"2/1"``.
+        Interval of equivalence. Defaults to the octave, spelled to match
+        the mode: ``Fraction(2, 1)`` in ``"ratios"``, ``1200.0`` in
+        ``"cents"``. **``interval_type`` decides how this is read; its
+        Python type does not.** In ``"ratios"`` mode it is a ratio in every spelling -- ``3``,
+        ``3.0``, ``Fraction(3, 1)`` and ``'3/1'`` are all the tritave. In
+        ``"cents"`` mode it is a cents value (the tritave is ``1901.955``),
+        and a fraction written there is refused.
     reference_pitch : Pitch, str, or None, optional
         The root pitch. ``None`` (default) resolves to C4.
     dedupe : bool, optional
@@ -407,24 +443,28 @@ class Voicing(RelativePitchCollection):
     
     def __init__(self, degrees: DegreeList = ["1/1", "5/4", "3/2"],
                  interval_type: str = "ratios",
-                 equave: Union[float, Fraction, int, str] = "2/1",
+                 equave: Union[float, Fraction, int, str, None] = None,
                  reference_pitch: Union[Pitch, str, None] = None,
                  *, dedupe: bool = True):
         if interval_type not in ["ratios", "cents"]:
             raise ValueError("interval_type must be 'ratios' or 'cents'")
 
-        parsed_equave = _parse_equave(equave)
-        processed_degrees = self._process_sonority_degrees(degrees, interval_type, parsed_equave,
-                                                           dedupe=dedupe)
-        
-        if interval_type == "cents":
-            if isinstance(parsed_equave, Fraction):
-                parsed_equave = 1200.0 if parsed_equave == Fraction(2, 1) else float(parsed_equave)
-        else:
-            if isinstance(parsed_equave, float):
-                parsed_equave = Fraction.from_float(2 ** (parsed_equave / 1200))
-        
-        self._equave = parsed_equave
+        # The default is spelled per mode rather than as one literal. It used
+        # to be the string "2/1", which reads as the octave in ratios mode and
+        # as a ratio-written-in-a-cents-field in cents mode -- so the class's
+        # own default would have been refused by its own rule.
+        if equave is None:
+            equave = 1200.0 if interval_type == "cents" else Fraction(2, 1)
+
+        # A Voicing does not equave-reduce, but it still has to STORE the
+        # equave in the form its mode reads back -- cents in cents mode, a
+        # ratio in ratio mode -- or a Chord built from the same argument
+        # disagrees with it. Same single resolution as Chord, for that reason.
+        resolved_equave = _resolve_equave(equave, interval_type, 'Voicing')
+        processed_degrees = self._process_sonority_degrees(
+            degrees, interval_type, resolved_equave, dedupe=dedupe)
+
+        self._equave = resolved_equave
         self._equave_cyclic = False
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
@@ -572,7 +612,12 @@ class Voicing(RelativePitchCollection):
         """
         if not collection.is_relative:
             raise ValueError("Cannot create Voicing from absolute collection")
-        target_equave = equave if equave is not None else (collection.equave if collection.equave is not None else Fraction(2, 1))
+        # The fallback has to match the collection's own mode: an octave is
+        # Fraction(2, 1) in ratio mode and 1200.0 in cents mode, and a ratio
+        # handed to a cents-mode constructor is refused outright.
+        default_equave = 1200.0 if collection._interval_type_mode == "cents" else Fraction(2, 1)
+        target_equave = equave if equave is not None else (
+            collection.equave if collection.equave is not None else default_equave)
         return cls(
             list(collection._degrees),
             collection._interval_type_mode,

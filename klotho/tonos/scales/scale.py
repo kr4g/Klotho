@@ -7,12 +7,13 @@ from ..pitch.pitch_collections import (
     DegreeList,
     RelativePitchCollection,
     PitchCollectionBase,
-    _parse_equave,
+    _resolve_equave,
     _convert_degree,
     _resolve_reference,
 )
 from ..utils.interval_normalization import (
     equave_reduce,
+    check_reduction_cost,
     _refuse_degenerate_equave,
     _refuse_non_positive,
 )
@@ -35,7 +36,14 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     interval_type : str, optional
         ``"ratios"`` or ``"cents"``. Default is ``"ratios"``.
     equave : float, Fraction, int, or str, optional
-        Interval of equivalence. Default is ``"2/1"`` (octave).
+        Interval of equivalence. Defaults to the octave, spelled to match
+        the mode: ``Fraction(2, 1)`` in ``"ratios"``, ``1200.0`` in
+        ``"cents"``. **``interval_type`` decides how this is read; its
+        Python type does not.** In ``"ratios"`` mode it is a ratio in every spelling, so
+        ``3``, ``3.0``, ``Fraction(3, 1)`` and ``'3/1'`` all give the
+        Bohlen-Pierce tritave. In ``"cents"`` mode it is a cents value, so
+        the tritave is ``equave=1901.955``; a fraction written there is
+        refused as a category error rather than guessed at.
     reference_pitch : Pitch, str, or None, optional
         The root pitch. ``None`` (default) resolves to C4.
 
@@ -55,22 +63,29 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     
     def __init__(self, degrees: DegreeList = ["1/1", "9/8", "5/4", "4/3", "3/2", "5/3", "15/8"],
                  interval_type: str = "ratios",
-                 equave: Union[float, Fraction, int, str] = "2/1",
+                 equave: Union[float, Fraction, int, str, None] = None,
                  reference_pitch: Union[Pitch, str, None] = None):
         if interval_type not in ["ratios", "cents"]:
             raise ValueError("interval_type must be 'ratios' or 'cents'")
+
+        # The default is spelled per mode rather than as one literal. It used
+        # to be the string "2/1", which reads as the octave in ratios mode and
+        # as a ratio-written-in-a-cents-field in cents mode -- so the class's
+        # own default would have been refused by its own rule.
+        if equave is None:
+            equave = 1200.0 if interval_type == "cents" else Fraction(2, 1)
         
-        parsed_equave = _parse_equave(equave)
-        processed_degrees = self._process_scale_degrees(degrees, interval_type, parsed_equave)
-        
-        if interval_type == "cents":
-            if isinstance(parsed_equave, Fraction):
-                parsed_equave = 1200.0 if parsed_equave == Fraction(2, 1) else float(parsed_equave)
-        else:
-            if isinstance(parsed_equave, float):
-                parsed_equave = Fraction.from_float(2 ** (parsed_equave / 1200))
-        
-        self._equave = parsed_equave
+        # The declared interval_type decides how the equave reads, and it is
+        # resolved once, up front. The degrees used to be processed against
+        # the RAW argument with each branch guessing its Python type: a cents
+        # equave then reduced ratio degrees by a hardcoded octave while the
+        # scale stored the tritave it was handed, or was used directly as a
+        # ratio.
+        resolved_equave = _resolve_equave(equave, interval_type, 'Scale')
+        processed_degrees = self._process_scale_degrees(
+            degrees, interval_type, resolved_equave)
+
+        self._equave = resolved_equave
         self._equave_cyclic = True
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
@@ -78,17 +93,30 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         self._reference_pitch = _resolve_reference(reference_pitch)
         self._intervals = self._compute_scale_intervals()
     
-    def _process_scale_degrees(self, degrees: DegreeList, interval_type: str, 
+    def _process_scale_degrees(self, degrees: DegreeList, interval_type: str,
                                 equave: Union[float, Fraction]) -> List[IntervalType]:
+        """Sort, reduce, dedupe and unison-anchor the degrees.
+
+        *equave* arrives already resolved to the form this *interval_type*
+        works in -- cents (float) for ``"cents"``, a ratio (Fraction) for
+        ``"ratios"``. It is not the raw constructor argument, and this method
+        must not try to infer the caller's intent from its type: doing that
+        here is what made a cents equave reduce ratio degrees by an octave.
+        """
         if not degrees:
             return []
-        
+
         converted = [_convert_degree(d) for d in degrees]
-        
+        # Four copies of the reduction loop follow (two here, two in Chord),
+        # and none of them is bounded. Price the work once, before any of it
+        # runs, so an equave a hair above the unison refuses instead of
+        # freezing the interpreter or building a scale too large to print.
+        check_reduction_cost('Scale', equave, converted, interval_type)
+
         if interval_type == "cents":
             converted = [float(d) if isinstance(d, Fraction) else d for d in converted]
-            equave_val = equave if isinstance(equave, float) else 1200.0
-            
+            equave_val = float(equave)
+
             reduced = []
             for d in converted:
                 while d >= equave_val:
@@ -109,10 +137,13 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             converted = [d if isinstance(d, Fraction) else Fraction(d) if isinstance(d, int) else d for d in converted]
             has_float = any(isinstance(d, float) for d in converted)
             if has_float:
-                equave_val = float(equave) if not isinstance(equave, float) else equave
+                equave_val = float(equave)
                 # This branch carries its own copy of the equave_reduce loop,
                 # so it needs the same guards; without them a 0 degree froze
-                # the interpreter here instead of raising.
+                # the interpreter here instead of raising. The equave check is
+                # unreachable from the constructor now that _resolve_equave
+                # refuses first; it stays because this method is callable on
+                # its own and the loop below is unbounded without it.
                 if equave_val <= 1:
                     raise _refuse_degenerate_equave('Scale', equave_val)
                 reduced = []
@@ -133,7 +164,7 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
                 if not unique or abs(unique[0] - 1.0) >= 1e-9:
                     unique.insert(0, 1.0)
             else:
-                equave_val = equave if isinstance(equave, Fraction) else Fraction(2, 1)
+                equave_val = Fraction(equave)
                 reduced = [equave_reduce(d, equave_val) for d in converted]
                 unique = sorted(list(set(reduced)))
                 if not unique or unique[0] != Fraction(1, 1):
@@ -366,24 +397,49 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
     @classmethod
     def n_edo(cls, n: int = 12, equave: float = 1200.0, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':
         """
-        Construct an equal-division-of-the-octave (EDO) scale.
+        Construct an equal-division-of-the-equave (EDO) scale.
+
+        The scale is built in ``cents`` mode, so **``equave`` is a size in
+        cents, not a ratio** -- the same unit the ``n`` steps are measured in.
+        ``n_edo(12)`` divides 1200.0 cents into twelve 100-cent steps;
+        ``n_edo(13, equave=1901.955)`` divides the Bohlen-Pierce tritave into
+        thirteen. Writing that tritave as a fraction (``equave='3/1'`` or
+        ``Fraction(3, 1)``) is refused, because a ratio in a cents field is a
+        category error rather than a second reading of the same number.
+
+        The step size and the stored equave are derived from the same value,
+        so ``max(scale.degrees) + step == scale.equave`` holds at any equave,
+        not only the default.
 
         Parameters
         ----------
         n : int, optional
             Number of equal divisions. Default is 12.
         equave : float, optional
-            Size of the equave in cents. Default is 1200.0.
+            Size of the equave **in cents**. Default is 1200.0 (the octave).
         reference_pitch : Pitch, str, or None, optional
             Optional root pitch.
 
         Returns
         -------
         Scale
+
+        Examples
+        --------
+        >>> Scale.n_edo(12).equave
+        1200.0
+        >>> [round(d, 3) for d in Scale.n_edo(13, equave=1901.955).degrees[:3]]
+        [0.0, 146.304, 292.608]
         """
-        step_size = equave / n
+        # float() up front so the degrees below and the equave the constructor
+        # stores are derived from ONE value in ONE unit. Passing the raw
+        # argument to both while dividing it here as a raw cents number is
+        # what made n_edo(13, equave=3) span 2.77 cents while reporting an
+        # equave of 1901.955.
+        equave_cents = _resolve_equave(equave, 'cents', 'Scale.n_edo')
+        step_size = equave_cents / n
         degrees = [i * step_size for i in range(n)]
-        return cls(degrees, 'cents', equave, reference_pitch)
+        return cls(degrees, 'cents', equave_cents, reference_pitch)
     
     @classmethod
     def ionian(cls, reference_pitch: Union[Pitch, str, None] = None) -> 'Scale':

@@ -168,18 +168,29 @@ def ratio_to_setclass(ratio: Union[str, float], n_tet: int = 12, round_to: int =
 
 def split_partial(interval:Union[int, float, Fraction, str], n:int = 2):
     """
-    Find the smallest harmonic subdivision of an interval into *n* equal steps.
+    Divide an interval into *n* steps of equal *arithmetic* size.
 
-    Returns a sequence of *n + 1* integers ``[a₀, a₁, …, aₙ]`` where each
-    adjacent pair forms the same ratio and ``aₙ / a₀`` equals the target
-    interval.
+    Returns *n + 1* integers ``[a₀, a₁, …, aₙ]`` in arithmetic progression --
+    adjacent members differ by a constant *amount*, not by a constant *ratio*
+    -- with ``aₙ / a₀`` equal to the target interval. Read as partials over a
+    common fundamental they are harmonic-series pitches, so the subdivision is
+    in tune with the harmonic series and not with equal temperament: measured
+    in cents the steps shrink as the numbers rise.
+
+    ``split_partial('3/2', 2)`` returns ``[4, 5, 6]``, whose steps are ``5/4``
+    (386.31 cents) and ``6/5`` (315.64 cents) -- 70.7 cents apart, more than a
+    third of a semitone. Only the additive difference is constant; ``[4, 5, 6]``
+    is *not* two equal-tempered steps of half a fifth each.
+
+    "Smallest" is ``k``: the search returns the lowest ``a₀`` for which the
+    progression lands exactly on the target interval.
 
     Parameters
     ----------
     interval : int, float, Fraction, or str
         The target interval ratio to subdivide.
     n : int, optional
-        Number of equal subdivisions. Default is 2.
+        Number of arithmetic steps. Default is 2.
 
     Returns
     -------
@@ -193,6 +204,12 @@ def split_partial(interval:Union[int, float, Fraction, str], n:int = 2):
     --------
     >>> split_partial('3/2', 2)
     result(harmonics=[4, 5, 6], k=4)
+
+    The common difference need not be 1, so the partials are not always
+    consecutive:
+
+    >>> split_partial('5/1', 2)
+    result(harmonics=[1, 3, 5], k=1)
     """
     result = namedtuple('result', ['harmonics', 'k'])
 

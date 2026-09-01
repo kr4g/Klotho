@@ -1,4 +1,5 @@
 from klotho.utils.algorithms.factors import to_factors
+import math
 from typing import Union, List, Tuple, Dict, Set
 from fractions import Fraction
 
@@ -42,6 +43,173 @@ def _refuse_degenerate_equave(where: str, equave) -> ValueError:
       f"and no output. Use 2 for the octave, 3 for the Bohlen-Pierce tritave, "
       f"or any ratio above 1."
   )
+
+
+# --- Cost guards on an equave reduction ---------------------------------
+#
+# ``_refuse_degenerate_equave`` above catches an equave of 1 or less, which
+# never terminates at all. An equave a hair ABOVE 1 does terminate, in
+# principle, and is useless in practice: reduction walks a degree into range
+# one equave at a time, so the number of steps is (size of the degree)
+# divided by (size of the equave).
+#
+# Two different things go wrong as that step count grows.
+#
+#   TIME. Each step is one arithmetic operation, so a million steps is a
+#   visible pause and a billion is a frozen interpreter with no exception and
+#   no output -- the same symptom the degenerate guard exists to prevent.
+#
+#   SIZE. In ratio mode the arithmetic is exact, so each division multiplies
+#   the numerator and the denominator by the equave's own numerator and
+#   denominator: the result grows by roughly one equave's worth of BITS per
+#   step. Measured 2026-09-01: reducing 3/2 by 761963/761523 (one cent, a
+#   20-bit numerator) takes 701 steps and lands on a Fraction whose numerator
+#   is 13,699 bits -- 4,124 decimal digits. CPython refuses to render an
+#   integer longer than ``sys.get_int_max_str_digits()`` (4300 digits by
+#   default), so such an object is CONSTRUCTED successfully and then cannot
+#   be printed: ``repr()`` raises "Exceeds the limit (4300 digits) for integer
+#   string conversion". That is worse than a hang, because nothing looks wrong
+#   until someone prints the scale.
+#
+# The size limit binds long before the time limit, so both are checked, and
+# both are checked BEFORE any reduction runs. 14,000 bits is about 4,214
+# decimal digits, which stays under CPython's 4,300-digit default with margin
+# for the estimate being approximate (measured within 10% across two decades
+# of equave sizes).
+MAX_REDUCTION_STEPS = 100_000
+MAX_REDUCTION_BITS = 14_000
+
+
+def _size_in_cents(value) -> float:
+  """Size of a positive ratio in cents, without ever calling ``float()`` on it.
+
+  A Fraction produced by reduction can be far too large to survive
+  ``float()``, so the logarithm is taken on the numerator and the denominator
+  separately. Returns 0.0 for anything that is not a positive ratio; the
+  zero/negative cases are refused by ``_refuse_non_positive`` at the point
+  where they would actually spin.
+  """
+  if isinstance(value, Fraction):
+    if value.numerator <= 0:
+      return 0.0
+    return 1200.0 * (math.log2(value.numerator) - math.log2(value.denominator))
+  try:
+    value = float(value)
+  except (TypeError, ValueError, OverflowError):
+    return 0.0
+  if not (value > 0.0) or not math.isfinite(value):
+    return 0.0
+  return 1200.0 * math.log2(value)
+
+
+def _refuse_costly_reduction(where: str, equave, steps: int, bits) -> ValueError:
+  """Build the refusal for an equave so close to the unison that reducing by
+  it would appear to hang, or would build a number too large to print."""
+  detail = (
+      f"about {steps:,} divisions per degree"
+      if bits is None else
+      f"about {steps:,} divisions per degree, ending on a number of roughly "
+      f"{bits:,} bits ({int(bits * 0.30103):,} decimal digits)"
+  )
+  return ValueError(
+      f"{where} cannot reduce by equave={equave!r}: it is too close to the "
+      f"unison. Reduction walks each degree into range one equave at a time, "
+      f"and this equave needs {detail}. Past that point the call stops "
+      f"responding with no exception and no output, and in ratio mode the "
+      f"result can exceed CPython's 4300-digit limit on printing an integer, "
+      f"so the object is built and then raises when anyone prints it. Note "
+      f"which reading applies: in ratios mode EVERY spelling of the equave is "
+      f"a ratio -- 2, 2.0, Fraction(2, 1) and '2/1' are all the octave -- "
+      f"while in cents mode the equave is a cents value, so 1200.0 is the "
+      f"octave and 1901.955 the Bohlen-Pierce tritave."
+  )
+
+
+def _refuse_ratio_equave_in_cents_mode(where: str, equave) -> ValueError:
+  """Build the refusal for a ratio written where cents are meant.
+
+  A fraction -- a ``Fraction`` instance, or a string in fraction format like
+  ``'3/1'`` -- is unambiguously a ratio everywhere else in Klotho. Written in
+  a field that means cents it is a category error, not an ambiguity, so it is
+  refused rather than guessed at in either direction.
+  """
+  try:
+    as_ratio = Fraction(equave)
+    ratio_cents = 1200.0 * (math.log2(as_ratio.numerator)
+                            - math.log2(as_ratio.denominator))
+    ratio_reading = (f"the interval {as_ratio.numerator}/{as_ratio.denominator}"
+                     f", which is {ratio_cents:.4f} cents")
+    ratio_fix = f"pass equave={ratio_cents:.4f}"
+  except (ValueError, ZeroDivisionError, TypeError):
+    ratio_reading = "an interval ratio"
+    ratio_fix = "pass its size in cents"
+  return ValueError(
+      f"{where} was given interval_type='cents' with equave={equave!r}, which "
+      f"is written as a RATIO. In cents mode the equave is a CENTS value, so "
+      f"the two readings disagree and neither is guessed. Both readings, and "
+      f"how to spell each: (1) you meant {ratio_reading} -- {ratio_fix}, or "
+      f"keep equave={equave!r} and use interval_type='ratios'; (2) you meant "
+      f"that many cents -- write it as a plain number, e.g. equave=1200.0 for "
+      f"the octave or equave=1901.955 for the Bohlen-Pierce tritave. In "
+      f"ratios mode no such refusal applies: 2, 2.0, Fraction(2, 1) and '2/1' "
+      f"are all the octave."
+  )
+
+
+def check_reduction_cost(where: str, equave, degrees, interval_type: str = 'ratios') -> None:
+  """Refuse an unaffordable equave reduction before any of it runs.
+
+  Parameters
+  ----------
+  where : str
+      Name of the caller, used in the refusal message.
+  equave : Fraction or float
+      The equave already resolved to the form *interval_type* works in: a
+      ``Fraction`` ratio for ``"ratios"``, a cents ``float`` for ``"cents"``.
+  degrees : iterable
+      The converted degrees, in the same units as *equave*.
+  interval_type : str, optional
+      ``"ratios"`` or ``"cents"``. Default ``"ratios"``.
+  """
+  degrees = [d for d in degrees]
+  if not degrees:
+    return
+
+  if interval_type == 'cents':
+    equave_cents = float(equave)
+    if not (equave_cents > 0.0) or not math.isfinite(equave_cents):
+      raise _refuse_degenerate_equave(where, equave)
+    widest = max((abs(float(d)) for d in degrees), default=0.0)
+    steps = int(widest / equave_cents)
+    if steps > MAX_REDUCTION_STEPS:
+      raise _refuse_costly_reduction(where, equave, steps, None)
+    return
+
+  equave = Fraction(equave)
+  if equave <= 1:
+    raise _refuse_degenerate_equave(where, equave)
+  equave_cents = 1200.0 * (math.log2(equave.numerator)
+                           - math.log2(equave.denominator))
+  # Bits added per division: measured against actual reductions across
+  # equaves from 1 to 20 cents and denominators from 10**3 to 2**52, the
+  # result's bit length came to 0.90-1.00 times this estimate.
+  equave_bits = max(equave.numerator.bit_length(),
+                    equave.denominator.bit_length())
+  widest = max((abs(_size_in_cents(d)) for d in degrees), default=0.0)
+  if equave_cents <= 0.0:
+    # An exact Fraction strictly greater than 1 whose numerator and
+    # denominator are within one float ulp of each other in log2 -- e.g.
+    # Fraction(2**53 + 1, 2**53) -- measures as exactly 0.0 cents wide.
+    # The equave is real, so the `equave <= 1` guard above does not fire,
+    # but no finite number of divisions by it reduces anything, and
+    # dividing by that width to price the work raises ZeroDivisionError
+    # rather than the ValueError this function exists to produce.
+    raise _refuse_costly_reduction(where, equave, MAX_REDUCTION_STEPS + 1, None)
+  steps = int(widest / equave_cents)
+  if steps > MAX_REDUCTION_STEPS:
+    raise _refuse_costly_reduction(where, equave, steps, steps * equave_bits)
+  if steps * equave_bits > MAX_REDUCTION_BITS:
+    raise _refuse_costly_reduction(where, equave, steps, steps * equave_bits)
 
 
 def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fraction, int, str, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:

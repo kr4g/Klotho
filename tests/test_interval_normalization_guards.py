@@ -29,6 +29,30 @@ Measured before the guards, each aborted by a one-second alarm::
 
 Every test here asserts a ``ValueError``, which is immediate. None of them
 waits on a timeout: a test that waits for a hang would hang the suite.
+
+A near-unison *equave* is the same defect once removed. The degenerate guard
+asks only ``equave > 1``, so an equave a hair *above* 1 passes it and then
+spins practically forever: reduction divides one equave at a time, and in
+exact rational arithmetic each division adds about one equave's worth of bits
+to the numbers. Measured 2026-09-01::
+
+    equave_reduce(Fraction(3, 2), equave=Fraction(1000001, 1000000))
+                                      -> no result after 120 s
+
+``Scale`` and ``Chord`` now price the reduction before running any of it
+(``check_reduction_cost``), so a near-unison equave refuses immediately in
+both modes. STILL OPEN: ``equave_reduce``, ``reduce_interval``,
+``reduce_interval_relative`` and ``ToneLattice._custom_equave_reduce`` are
+reachable directly and still carry only the ``> 1`` guard, so calling them
+with a near-unison equave still hangs.
+
+The cost guard also fixes a second symptom that is worse than a hang, because
+nothing looks wrong until someone prints the result. On HEAD::
+
+    Scale(["1/1", "3/2"], equave=Fraction(10001, 10000))
+        -> constructs; the second degree's numerator is 13,815 bits, and
+           repr() then raises "Exceeds the limit (4300 digits) for integer
+           string conversion"
 """
 
 from fractions import Fraction
@@ -139,8 +163,54 @@ class TestScaleAndChordRefuseInsteadOfHanging:
             Scale(["1/1", "3/2"], equave="1/1")
 
     def test_scale_unison_equave_float_degrees(self):
-        with pytest.raises(ValueError):
-            Scale([1.0, 1.5], equave=1.0)
+        """RESTORED 2026-09-01. ``equave=1.0`` IS the unison.
+
+        A previous pass changed this test to expect success, on a convention
+        (a float equave means CENTS, so ``1.0`` asks for a one-cent equave)
+        that the project owner then superseded: for ``Scale``, ``Chord``,
+        ``Voicing`` and ``RelativePitchCollection`` the declared
+        ``interval_type`` decides, not the Python type. In the default
+        ``ratios`` mode every spelling of the equave is a RATIO, so ``1.0``,
+        ``1``, ``'1/1'`` and ``Fraction(1, 1)`` are all the unison and all
+        refuse. See tests/test_scale_chord_equave_mode_convention.py.
+
+        The float-degree branch is kept as its own case because it carries a
+        separate copy of the reduction loop from the Fraction branch above.
+        """
+        for unison in (1.0, 1, "1/1", Fraction(1, 1)):
+            with pytest.raises(ValueError, match="greater than 1"):
+                Scale([1.0, 1.5], equave=unison)
+
+    def test_scale_near_unison_equave_is_refused_before_it_can_appear_to_hang(self):
+        """An equave just ABOVE the unison passes the degenerate guard.
+
+        It terminates in principle and is useless in practice. At one cent a
+        3/2 takes 701 divisions and lands on a 13,699-bit numerator -- 4,124
+        decimal digits, at the edge of what CPython will print; a thousandth
+        of a cent takes 700,000 and returned nothing in 120 seconds. Both are
+        the symptom this module exists to prevent, so the cost of the
+        reduction is priced before any of it runs.
+        """
+        for equave in (Fraction(1000001, 1000000), 1.000001, Fraction(10001, 10000)):
+            with pytest.raises(ValueError, match="too close to the unison"):
+                Scale([1.0, 1.5], equave=equave)
+            with pytest.raises(ValueError, match="too close to the unison"):
+                Scale(["1/1", "3/2"], equave=equave)
+
+    def test_scale_near_unison_equave_in_cents_mode_too(self):
+        """Cents mode subtracts rather than divides, so it does not build
+        enormous numbers -- but a billion float subtractions per degree still
+        freezes the interpreter."""
+        with pytest.raises(ValueError, match="too close to the unison"):
+            Scale([0.0, 700.0], "cents", equave=1e-9)
+
+    def test_a_real_comma_sized_equave_is_still_allowed(self):
+        """The guard prices work; it is not a floor on musical size. The
+        syntonic comma (21.5 cents) and the Pythagorean comma (23.5 cents)
+        are real intervals people build lattices on, and both pass.
+        """
+        for comma in (Fraction(81, 80), Fraction(531441, 524288)):
+            assert repr(Scale(["1/1", "3/2"], equave=comma))
 
     def test_chord_zero_ratio_degree(self):
         with pytest.raises(ValueError):
