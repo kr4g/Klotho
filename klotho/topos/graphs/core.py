@@ -2,6 +2,7 @@ import rustworkx as rx
 import copy
 import operator
 import sys
+from collections.abc import Mapping
 from contextlib import contextmanager
 from typing import List, TypeVar, Optional, Any, Union, Dict, Tuple
 from types import MappingProxyType
@@ -166,10 +167,27 @@ class GraphCore:
         self._invalidate_caches()
 
     def _write_node_data(self, node, attrs: Dict[str, Any], replace: bool = False):
-        """Sanctioned write of node data. Used by subclasses and internal code."""
+        """Sanctioned write of node data. Used by subclasses and internal code.
+
+        ``attrs`` must be a mapping. This used to read
+        ``dict(attrs) if isinstance(attrs, dict) else {}``, which discarded
+        anything else in silence -- including two payloads a caller has every
+        reason to pass: a list of pairs (valid ``dict()`` input), and a node
+        view. ``graph[n]`` is a ``mappingproxy``, not a ``dict``, so
+        ``replace_node_data(a, graph[b])`` erased node ``a`` instead of
+        copying ``b`` onto it. Accepting ``Mapping`` fixes the second; raising
+        on anything else makes the first loud instead of ignored.
+        """
         if not self._has_node(node):
             raise KeyError(f"Node {node} not found in graph")
-        normalized = dict(attrs) if isinstance(attrs, dict) else {}
+        if not isinstance(attrs, Mapping):
+            raise TypeError(
+                f"node data must be a mapping of attributes; got "
+                f"{type(attrs).__name__}. A list of pairs is valid dict() "
+                f"input but this write path used to discard it in silence -- "
+                f"pass dict(attrs) instead."
+            )
+        normalized = dict(attrs)
         existing = self._rx.get_node_data(node)
         existing = existing if isinstance(existing, dict) else {}
         if replace:

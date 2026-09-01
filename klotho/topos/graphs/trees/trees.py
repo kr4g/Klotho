@@ -2,6 +2,7 @@ from ..core import GraphCore
 from ..graphs import Graph
 from .layers import TreeLayer
 import rustworkx as rx
+from collections.abc import Mapping
 from functools import cached_property
 from .group import Group
 import copy
@@ -158,10 +159,57 @@ class Tree(GraphCore):
         """Set attributes for a node (routed through layers)."""
         self._apply_layer_node_write(node, attributes, replace=False, op='set_node_attributes')
 
+    def _validate_node_data_payload(self, node, attrs, op):
+        """Refuse a payload this write path cannot honour, before anything is written.
+
+        Two shapes used to be accepted and then answered with a corrupt tree:
+
+        * a **non-mapping** -- a list of pairs is valid ``dict()`` input and
+          was coerced to ``{}`` in silence;
+        * an **empty mapping** -- which is not the no-op it looks like.
+
+        The empty case is the load-bearing one and it is worth naming exactly,
+        because a guard is all that stands in front of it. An empty payload
+        makes ``changed_keys`` empty, so ``RhythmLayer.data_scope`` returns
+        ``None`` meaning *defer*; but ``_resolve_write_scope`` below seeds
+        ``scope = node`` and only overrides on a **non-**``None`` return, so
+        "defer" silently resolves to "recompute from the written node" and
+        ``RhythmTree._evaluate`` then treats a LEAF as a subtree root.
+        Measured on ``RhythmTree(meas='4/4', subdivisions=(3, 1, 1, 1))``:
+        ``update_node_data(leaf0, {})`` moved that leaf from ``1/2`` to
+        ``3/2`` and the bar stopped summing to 1, with no exception.
+
+        **The root cause is still open.** This guard sandboxes it at the four
+        public writers; it does NOT resolve the ``data_scope``-returns-``None``
+        confusion, which remains reachable from any future caller that reaches
+        ``_resolve_write_scope`` with no changed keys. Fixing that is a
+        ``TreeLayer`` contract change and is deliberately not attempted here.
+        """
+        if not isinstance(attrs, Mapping):
+            raise TypeError(
+                f"{op} expects a mapping of node attributes; got "
+                f"{type(attrs).__name__}. A list of pairs is valid dict() "
+                f"input but this write path discards it in silence, so it is "
+                f"refused here rather than accepted and ignored. Pass "
+                f"dict(attrs) instead."
+            )
+        if not attrs:
+            raise ValueError(
+                f"{op} received an empty attribute dict. An empty write is "
+                f"not a no-op on this path: it recomputes node {node} as if "
+                f"it were a subtree root and silently rewrites its "
+                f"metric_duration; replace_node_data with an empty dict also "
+                f"erases the node's payload and leaves the tree unreadable. "
+                f"To reset a node's attributes use replace_node(node), which "
+                f"re-derives them from the parent; to write nothing, do not "
+                f"call this."
+            )
+
     def _apply_layer_node_write(self, node, attrs, replace, op):
         if node not in self:
             raise KeyError(f"Node {node} not found in graph")
-        normalized = dict(attrs) if isinstance(attrs, dict) else {}
+        self._validate_node_data_payload(node, attrs, op)
+        normalized = dict(attrs)
         for layer in self._layers:
             normalized = layer.normalize_attrs(self, node, normalized, op)
         for layer in self._layers:
@@ -808,10 +856,61 @@ class Tree(GraphCore):
         self._post_mutation(scope_node=parent, op='insert_child')
         return merged[index]
 
+    def _reject_donor_this_verb_cannot_carry(self, subtree):
+        """Refuse an ``add_subtree`` donor whose state is not in its node payloads.
+
+        S2: ``add_subtree`` copies node payloads verbatim and looks at nothing
+        else, so a donor carrying a parameter registry or an instrument
+        binding lost both. The values stayed in the raw node data, invisible,
+        until an unrelated later write on the host registered the same key --
+        and then resurfaced, so the donor's ``cutoff=1200.0`` reappeared in
+        ``events`` long after the graft that dropped it.
+        ``graft_subtree`` (the ``ParameterApiMixin`` override) merges the
+        registries and remaps the bindings; this verb does not.
+
+        Read through the donor's PUBLIC parameter surface via ``getattr``, so
+        that a plain ``Tree``/``RhythmTree`` donor -- which has no such
+        surface, and no state to lose -- is unaffected and no name from an
+        upper package is hard-coded into the topology layer.
+
+        Scoped to what would actually be LOST, which is narrower than "the
+        donor has parameters". Per-node override VALUES ride along in the node
+        payloads this verb does copy, so a key the host already has registered
+        survives the trip intact; only a key the host does not know is buried.
+        Every ``CompositionalUnit`` registers ``group`` by default, so
+        refusing on "the donor has an mfield" would refuse every such donor
+        for a key nothing loses. Instrument bindings are never carried and are
+        refused unconditionally.
+        """
+        def _registry(tree, name):
+            return set(getattr(tree, name, None) or ())
+
+        lost = []
+        for name, label in (('pfields', 'parameter fields'),
+                            ('mfields', 'meta fields')):
+            orphaned = _registry(subtree, name) - _registry(self, name)
+            if orphaned:
+                lost.append(f"{label} {sorted(orphaned)}")
+        instruments = getattr(subtree, 'node_instruments', None)
+        if instruments:
+            lost.append(f"instrument bindings on {len(instruments)} node(s)")
+        if not lost:
+            return
+        raise ValueError(
+            f"add_subtree cannot attach a donor that carries "
+            f"{'; '.join(lost)} -- it copies node payloads verbatim and would "
+            f"drop the donor's registries and instruments, burying its "
+            f"overrides until an unrelated later write resurrects them. Use "
+            f"graft_subtree(target_leaf, donor, mode='replace'), which "
+            f"carries them."
+        )
+
     def add_subtree(self, parent, subtree):
         """Add a subtree as a child of a parent node. Returns the attached subtree root id."""
         if not isinstance(subtree, Tree):
             raise TypeError("subtree must be a Tree instance")
+
+        self._reject_donor_this_verb_cannot_carry(subtree)
 
         node_mapping = {}
 
@@ -830,6 +929,14 @@ class Tree(GraphCore):
 
     def prune(self, node):
         """Remove a node and promote its children to its parent."""
+        # LAYER-9: this used to check only the root, so pruning a node that is
+        # not in the tree deleted nothing, mutated nothing and reported
+        # success -- while `remove_subtree` raised for the identical argument
+        # (it reaches `descendants`, which does check). Two public verbs, one
+        # request, two answers. The wording below is `remove_subtree`'s so
+        # they now answer alike.
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
         if node == self.root:
             raise ValueError("Cannot prune the root node")
 
@@ -972,9 +1079,33 @@ class Tree(GraphCore):
         The moved node keeps its id, and child order is ascending node index
         (see :meth:`insert_child`), so it lands wherever its id ranks among
         the new parent's children -- NOT necessarily last.
+
+        ``new_parent`` must be outside ``node``'s own subtree; moving a node
+        under itself or under one of its descendants raises ``ValueError``.
         """
+        # TREE-5: the only precondition here used to be the root check, so a
+        # move into the moved node's own subtree removed one edge and added a
+        # cycle. Nothing raised; `rx.is_directed_acyclic_graph` flipped to
+        # False, and every traversal-based read (durations, events, onsets)
+        # silently returned a truncated answer from then on -- measured, a
+        # five-event tree reported two. Refusal, not repair: there is no
+        # correct tree to build from the request.
+        if node not in self:
+            raise ValueError(f"Node {node} not found in tree")
+        if new_parent not in self:
+            raise ValueError(f"Node {new_parent} not found in tree")
         if node == self.root:
             raise ValueError("Cannot move the root node")
+        if new_parent == node or new_parent in self.descendants(node):
+            relation = ("the node itself" if new_parent == node
+                        else f"a descendant of {node}")
+            raise ValueError(
+                f"Cannot move node {node} under {new_parent}: {new_parent} is "
+                f"{relation}. This would make the graph cyclic and every "
+                f"traversal read would silently return a truncated answer. "
+                f"Move {new_parent} out of {node}'s subtree first, or pick a "
+                f"new parent outside it."
+            )
 
         old_parent = self.parent(node)
         scope_node = new_parent
