@@ -153,7 +153,9 @@ class TestAFreedIdIsNotInheritedByItsSuccessor:
         L = list(uc._rt.leaf_nodes)
         uc.set_pfields(uc._rt.root, amp=Bind(lambda ctx: random.random()))
         _ = uc.events
-        dead_draw = uc._bind_memo[(L[2], 'amp')]
+        # a memo entry is a _BindDraw(bind, value); the drawn value is .value
+        dead_draw = uc._bind_memo[(L[2], 'amp')].value
+        assert isinstance(dead_draw, float)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             uc._rt.remove_subtree(L[2])

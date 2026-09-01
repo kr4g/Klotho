@@ -16,7 +16,7 @@ snapshot on demand. Neither is stored, and mutating either does not reach
 the unit.
 """
 
-from typing import Union, Optional, Any, Literal
+from typing import Union, Optional, Any, Literal, NamedTuple
 from fractions import Fraction
 from dataclasses import dataclass, field
 from contextlib import contextmanager
@@ -42,6 +42,42 @@ from klotho.thetos.instruments.base import Effect
 from klotho.thetos.instruments.base import Kit
 from klotho.dynatos.envelopes import Envelope
 from klotho.topos.collections.sequences import Pattern
+
+
+class _BindDraw(NamedTuple):
+    """One memoized :class:`Bind` evaluation, stamped with its source Bind.
+
+    ``_bind_memo`` used to hold the drawn value alone, so a draw outlived
+    the ``Bind`` that produced it. Every door that REPLACES a Bind had to
+    invalidate the memo by hand, and only the public verbs did:
+    ``uc.set_pfields`` calls ``_invalidate_bind_memo_subtree``, while the
+    raw door ``uc._rt.set_pfields`` reaches the parameter layer directly
+    and announces nothing. Measured (LAYER-15): after a raw rebind
+    ``uc.events`` served ``0.9664`` and ``uc.copy().events`` served
+    ``999.0`` for the same node of the same unit -- two handles disagreeing
+    about the music.
+
+    Carrying *bind* makes the memo self-validating: a draw is served only
+    while the Bind it came from is still the one the tree holds, so every
+    door is closed by construction rather than one override per verb.
+    """
+
+    bind: Bind
+    value: Any
+
+    def __deepcopy__(self, memo):
+        """Share *bind* with the clone; deep-copy only the drawn value.
+
+        ``GraphCore.__deepcopy__`` freshens each node's payload DICT but
+        shares the objects inside it, so a deep copy of a unit holds the
+        very same ``Bind`` instance its source does. The stamp has to be
+        shared the same way, or every deep copy would fail its own identity
+        check and silently re-roll every stochastic draw -- measured, that
+        was the one regression this class introduced before this method
+        existed.
+        """
+        return _BindDraw(self.bind, copy.deepcopy(self.value, memo))
+
 
 
 class CompositionalTree(ParameterApiMixin, RhythmTree):
@@ -1470,6 +1506,12 @@ class CompositionalUnit(TemporalUnit):
         ancestor-or-self holding the raw Bind override). Results are
         memoized per ``(node, key)`` so stochastic functions are stable
         across repeated reads and structural edits.
+
+        A memoized draw is served only while *value* is still the very Bind
+        it was drawn from (see :class:`_BindDraw`). Replacing the Bind by
+        any door -- including the raw ``uc._rt.set_pfields``, which
+        announces nothing to this unit -- therefore retires its draw
+        without a per-verb invalidation call.
         """
         if not isinstance(value, Bind):
             return value
@@ -1480,8 +1522,10 @@ class CompositionalUnit(TemporalUnit):
         # while new ones use the new one. Stochastic Binds still memoize --
         # that is the point of the memo.
         selection_bound = getattr(value, 'reads_selection', False)
-        if not selection_bound and memo_key in self._bind_memo:
-            return self._bind_memo[memo_key]
+        if not selection_bound:
+            memoized = self._bind_memo.get(memo_key)
+            if memoized is not None and memoized.bind is value:
+                return memoized.value
         if memo_key in self._bind_active:
             raise ValueError(
                 f"Bind cycle detected: field '{key}' at node {node} is being "
@@ -1519,7 +1563,7 @@ class CompositionalUnit(TemporalUnit):
         if key in self._rt.pfield_names:
             result = _coerce_set_pfield_value(key, result)
         if not selection_bound:
-            self._bind_memo[memo_key] = result
+            self._bind_memo[memo_key] = _BindDraw(value, result)
         return result
 
     def _invalidate_bind_memo(self, nodes=None, keys=None):

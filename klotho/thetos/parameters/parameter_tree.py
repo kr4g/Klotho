@@ -157,8 +157,59 @@ class ParameterLayer(TreeLayer):
             for c in tree.successors(n):
                 stack.append(c)
 
+    def reserved_keys(self, tree):
+        """Node keys owned or derived by *tree*'s OTHER layers.
+
+        On a ``CompositionalTree`` -- one topology carrying a ``RhythmLayer``
+        and this layer -- that is ``proportion``/``tied`` (the rhythm layer's
+        writable keys) and ``metric_duration``/``metric_onset`` (its derived,
+        read-only ones). On a bare :class:`ParameterTree` there is no other
+        layer, the set is empty, and nothing is refused: with no structural
+        data sharing the node dict there is nothing a field can poison.
+
+        Derived from the attached layers rather than hard-coded, so a tree
+        that fuses some other structural layer (``HarmonicLayer``'s
+        ``factor``/``ratio``) is covered by the same lock without restating
+        its key set here.
+        """
+        reserved = set()
+        for layer in getattr(tree, '_layers', ()):
+            if layer is self:
+                continue
+            reserved |= set(layer.owned_keys) | set(layer.derived_keys)
+        return reserved
+
+    def _reject_reserved_keys(self, tree, keys, what):
+        """Refuse field names that collide with another layer's node keys.
+
+        Field writes go through ``tree._write_node_data``, which bypasses
+        ``normalize_attrs``/``validate_attrs`` entirely -- so without this
+        the fused tree accepted ``set_pfields(leaf, proportion=5)`` in
+        silence, overwrote the rhythm layer's own data, and the poisoned
+        value took effect only at the NEXT structural edit, far from the
+        write that caused it. The mirror door has always been shut
+        (``set_node_data(leaf, amp=0.5)`` raises ``Illegal RhythmTree node
+        attribute update``); this is the other half of the same lock.
+        """
+        reserved = self.reserved_keys(tree)
+        if not reserved:
+            return
+        illegal = sorted(k for k in keys if k in reserved)
+        if illegal:
+            raise ValueError(
+                f"Illegal {what} name(s) {illegal}: these node keys are owned "
+                f"by another layer of this tree and cannot be used as field "
+                f"names (reserved here: {', '.join(sorted(reserved))}). "
+                f"Writing one here overwrites that layer's own node data -- a "
+                f"'proportion' written as a field silently rewrites every "
+                f"duration at the next structural edit -- and registers the "
+                f"name as a field inherited by every node. Choose a different "
+                f"field name."
+            )
+
     def set_pfields(self, tree, node, **kwargs):
         """Register the keys and write pfield overrides at *node*."""
+        self._reject_reserved_keys(tree, kwargs.keys(), 'pfield')
         self._pfields.update(kwargs.keys())
         cache = self._effective_cache
         tree._write_node_data(node, kwargs, replace=False)
@@ -172,6 +223,7 @@ class ParameterLayer(TreeLayer):
 
     def set_mfields(self, tree, node, **kwargs):
         """Register the keys and write mfield overrides at *node*."""
+        self._reject_reserved_keys(tree, kwargs.keys(), 'mfield')
         self._mfields.update(kwargs.keys())
         cache = self._effective_cache
         tree._write_node_data(node, kwargs, replace=False)
@@ -391,11 +443,22 @@ class ParameterApiMixin:
         return self._param_layer._node_instruments
 
     def register_pfields(self, keys):
-        """Register pfield names without writing any values."""
+        """Register pfield names without writing any values.
+
+        Guarded like the write doors: registering a name another layer owns
+        writes nothing, but it makes that layer's raw node data read back as
+        an inherited field on every node -- an events/playback column that
+        the parameter layer does not own.
+        """
+        keys = list(keys)
+        self._param_layer._reject_reserved_keys(self, keys, 'pfield')
         self._param_layer._pfields.update(keys)
 
     def register_mfields(self, keys):
-        """Register mfield names without writing any values."""
+        """Register mfield names without writing any values (see
+        :meth:`register_pfields` for why this is guarded)."""
+        keys = list(keys)
+        self._param_layer._reject_reserved_keys(self, keys, 'mfield')
         self._param_layer._mfields.update(keys)
 
     def set_pfields(self, node, **kwargs):
