@@ -2058,6 +2058,205 @@ class TemporalUnitSequence(_RepeatableTemporal, metaclass=TemporalMeta):
         """The absolute start and end times (in seconds) of the sequence."""
         return self._offset, self._offset + self.duration
 
+    @property
+    def events(self):
+        """A :class:`~pandas.DataFrame` of every event in the sequence, by date.
+
+        One row per event, flattened across all members and ordered by
+        ``start``. Nesting is flattened too: a member may itself be a
+        :class:`TemporalUnitSequence` or a :class:`TemporalBlock`.
+
+        This is :attr:`TemporalBlock.events`' contract with one
+        substitution, and it exists for the same reason: a
+        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`
+        placed in a container must not lose its parameters on the way into
+        the table (BT-12). The substitution is the identity column --
+        see ``member`` below.
+
+        Columns
+        -------
+        ``member``
+            Index of the **top-level** sequence member the event came
+            from. Needed because ``node_id`` is *not* unique across
+            members: two structurally identical units both number their
+            leaves ``1, 2, 3``, so ``(member, node_id)`` is the
+            identifying pair.
+
+            Where a block calls this column ``row`` and adds a second,
+            ``voice``, a sequence has one column and it is neither.
+            Members here are **successive, not simultaneous**:
+            :func:`~klotho.chronos.temporal_units.algorithms.interleave`
+            calls its result "one single-voice ``TemporalUnitSequence``",
+            and ``_walk_block_events`` already declines to extend a
+            block's voice path through a sequence for exactly this
+            reason. So ``member`` is a position in time, not a part
+            assignment, and there is no dotted voice path to report. It
+            is an ``int``, not the block's dotted string.
+        ``node_id``, ``start``, ``duration``, ``end``, ``is_rest``, ``s``, ``metric_onset``, ``metric_duration``
+            Exactly the columns of :attr:`TemporalUnit.events`.
+
+        The nine columns above are the guaranteed contract and always come
+        first. AFTER them, a ``CompositionalUnit`` member contributes
+        exactly the columns its own ``events`` table shows minus the
+        timing ones -- ``instrument``, then one column per pfield, then
+        one per mfield -- unioned across every such member and NaN-filled
+        wherever a row does not carry them. A sequence with no
+        ``CompositionalUnit`` anywhere in it reports the nine columns
+        alone. **A mixed sequence is the normal case**, not an edge one:
+        ``interleave`` zips whole units untouched, so its result routinely
+        holds plain :class:`TemporalUnit`\\ s and ``CompositionalUnit``\\ s
+        side by side, and the plain ones simply have no parameters to show.
+
+        A parameter whose name collides with one of the nine (a pfield
+        called ``duration``, or one called ``member``) is NOT appended:
+        the structural column wins, and the parameter is still readable on
+        the unit itself. A name registered as both a pfield and an mfield
+        on the same unit resolves the same way ``uc.events`` resolves it --
+        the mfield wins the column. Both collisions raise a
+        ``UserWarning`` naming the shadowed field(s); a sequence with no
+        collision warns about neither.
+
+        ``start`` and ``end`` are **absolute** seconds: they include the
+        sequence's own offset and each member's position within it, so a
+        member's events are reported where the member sounds rather than
+        at its local zero.
+
+        Ordering is by ``start``, then by ``member``; events that share
+        both keep their discovery order (the sort is stable). For a flat
+        sequence that is already the reading order -- the sort matters
+        only where a nested block puts several events on the same date.
+
+        Notes
+        -----
+        Events are **tie groups**, not leaves (``07_TIES_CHARTER.md`` §2):
+        a tied group contributes one event, anchored at its head, whose
+        duration is the sum over its members. Rests are present, with
+        ``is_rest`` true and a positive ``duration``.
+
+        A member that is a :class:`TemporalBlock` is flattened like any
+        other container, but its rows sound **in parallel** and this table
+        has no column to say which row an event came from -- they share
+        one ``member`` value. That case warns, and the block's own
+        :attr:`TemporalBlock.events` is where voice identity lives.
+
+        The table is **computed on every read, not cached**, for the
+        reason :attr:`TemporalBlock.events` gives: a correct cache key
+        would have to recurse over every member's structure version,
+        tempo, beat and offset across four container types, and the
+        sequence hands out its members **live**, so a member mutated
+        through its own API would defeat an identity-based key.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        self._ensure_offsets()
+        from klotho.thetos.composition.compositional import (
+            CompositionalUnit, Parametron)
+        data = []
+        param_columns = []          # union of contributed keys, first seen first
+        seen = set()
+        # Collected across the whole sequence and warned once each, matching
+        # the one-warning-per-read shape of ``uc.events`` and
+        # ``TemporalBlock.events`` rather than one warning per event.
+        shadowed_structural: set = set()
+        shadowed_namespace: set = set()
+        parallel_members: set = set()
+        for i, member in enumerate(self._seq):
+            # Seeded with the EMPTY path: a sequence is one voice, so there
+            # is no top-level voice index to start from. The walker only
+            # extends the path through a nested TemporalBlock, which makes a
+            # member that yields more than one distinct path exactly the
+            # member whose parallel rows this table cannot tell apart.
+            paths = set()
+            for path, c in _walk_block_events(member, ''):
+                paths.add(path)
+                event = {
+                    'member': i,
+                    'node_id': c.node_id,
+                    'start': c.start,
+                    'duration': c.duration,
+                    'end': c.end,
+                    'is_rest': c.is_rest,
+                    's': c.proportion,
+                    'metric_onset': c.metric_onset,
+                    'metric_duration': c.metric_duration,
+                }
+                if isinstance(c, Parametron):
+                    # Exactly the columns this event's own unit would show
+                    # in ``uc.events``, minus the timing ones: instrument
+                    # first (present even when unbound, as it is there),
+                    # then pfields, then mfields.
+                    pf = c.pfields
+                    mf = c.mfields
+                    # A name registered in BOTH namespaces is two
+                    # independent values and one column; ``extra.update``
+                    # below lets the mfield win, and the warning says so.
+                    both = pf.keys() & mf.keys()
+                    if both:
+                        shadowed_namespace.update(both)
+                    extra = {'instrument': CompositionalUnit._instrument_display(
+                        c._resolve_instrument())}
+                    extra.update(pf)
+                    extra.update(mf)
+                    for key, value in extra.items():
+                        # The nine structural columns are the guaranteed
+                        # contract, so they win and the collision is
+                        # dropped rather than silently overwriting a timing
+                        # value -- or the member index -- with a parameter.
+                        if key in _SEQUENCE_EVENT_COLUMNS:
+                            shadowed_structural.add(key)
+                            continue
+                        if key not in seen:
+                            seen.add(key)
+                            param_columns.append(key)
+                        event[key] = value
+                data.append(event)
+            if len(paths) > 1:
+                parallel_members.add(i)
+        if shadowed_structural:
+            warnings.warn(
+                f"{sorted(shadowed_structural)} name structural columns of "
+                f"TemporalUnitSequence.events and are not shown in the "
+                f"table: the sequence's own member/node_id/start/duration/"
+                f"end/is_rest/s/metric_onset/metric_duration always win "
+                f"there. The field itself is unaffected -- it still reaches "
+                f"the synth, and you can read it with uc.get_pfield(node, "
+                f"key) / uc.get_mfield(node, key) or on uc.pt. Rename it if "
+                f"you want it in the table.",
+                UserWarning,
+                stacklevel=2,
+            )
+        if shadowed_namespace:
+            warnings.warn(
+                f"{sorted(shadowed_namespace)} name both a pfield and an "
+                f"mfield on a unit in this sequence; the table shows the "
+                f"mfield. They are separate values -- read the pfield with "
+                f"uc.get_pfield(node, key) on the unit itself, and it "
+                f"still reaches the synth.",
+                UserWarning,
+                stacklevel=2,
+            )
+        if parallel_members:
+            warnings.warn(
+                f"members {sorted(parallel_members)} of this "
+                f"TemporalUnitSequence hold a TemporalBlock, whose rows "
+                f"sound in parallel. A sequence is one voice, so this table "
+                f"has no voice column and those parallel rows share a "
+                f"single member value -- their events are flattened "
+                f"together and (member, node_id) does not identify a row "
+                f"there. Read that TemporalBlock's own .events for voice "
+                f"identity.",
+                UserWarning,
+                stacklevel=2,
+            )
+        df = pd.DataFrame(data,
+                          columns=list(_SEQUENCE_EVENT_COLUMNS) + param_columns)
+        if len(df):
+            df = df.sort_values(['start', 'member'], kind='stable',
+                                ignore_index=True)
+        return df
+
     def _scale_bpm(self, factor: float) -> None:
         """Multiply every member's bpm by ``factor`` and recompute offsets.
 
@@ -2259,15 +2458,29 @@ def _validate_axis(axis):
     return float(axis)
 
 
-# Column order of TemporalBlock.events. The tail is exactly
-# TemporalUnit.events' columns, so a block table and a unit table can be
-# read the same way; ``row`` and ``voice`` are the two identity columns the
-# merge adds. These are the GUARANTEED LEADING columns: a CompositionalUnit
-# row appends its instrument and parameter columns after them (BT-12).
-# See TemporalBlock.events.
-_BLOCK_EVENT_COLUMNS = ('row', 'voice', 'node_id', 'start', 'duration',
-                        'end', 'is_rest', 's', 'metric_onset',
-                        'metric_duration')
+# Column order of TemporalUnit.events -- the shared tail of every container
+# table below, so a unit table, a sequence table and a block table can all
+# be read the same way. Derived rather than repeated: the "the tail is
+# exactly the unit's columns" promise is made in three docstrings, and two
+# hand-copied tuples would drift apart silently.
+_UNIT_EVENT_COLUMNS = ('node_id', 'start', 'duration', 'end', 'is_rest',
+                       's', 'metric_onset', 'metric_duration')
+
+# Column order of TemporalBlock.events: ``row`` and ``voice`` are the two
+# identity columns the merge adds, because a block's rows are SIMULTANEOUS
+# and row order is voice assignment. These are the GUARANTEED LEADING
+# columns: a CompositionalUnit row appends its instrument and parameter
+# columns after them (BT-12). See TemporalBlock.events.
+_BLOCK_EVENT_COLUMNS = ('row', 'voice') + _UNIT_EVENT_COLUMNS
+
+# Column order of TemporalUnitSequence.events. One identity column, not
+# two, and it is neither of the block's: a sequence's members are
+# SUCCESSIVE, so ``member`` is a position in time rather than a part
+# assignment. ``interleave`` calls its result "one single-voice
+# TemporalUnitSequence" and ``_walk_block_events`` already declines to
+# extend the voice path through a sequence for the same reason, so there
+# is no voice here to name. See TemporalUnitSequence.events.
+_SEQUENCE_EVENT_COLUMNS = ('member',) + _UNIT_EVENT_COLUMNS
 
 
 class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
