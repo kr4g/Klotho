@@ -1324,6 +1324,12 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
     source's span folded into the tempus numerator (span 2 of 6/20 comes
     back as 12/20).
 
+    On a ``CompositionalUnit`` nothing is re-evaluated -- parameters,
+    instruments, slurs, envelopes and the draws a stochastic ``Bind`` has
+    already made all come across unchanged. See ``TemporalUnit.__mul__``
+    for the ruling, and ``CompositionalUnit.copy`` for the deliberate
+    asymmetry (a copy re-rolls; a modulation does not).
+
     Parameters
     ----------
     ut : TemporalUnit or CompositionalUnit
@@ -1367,6 +1373,10 @@ def modulate_tempo(ut: Union[TemporalUnit, 'CompositionalUnit'], beat: Union[Fra
         new_cu._next_slur_id = ut._next_slur_id
         new_cu._control_envelopes = ut._copy_control_envelopes()
         new_cu._next_envelope_id = ut._next_envelope_id
+        # The modulation scales the unit AS IT IS: see TemporalUnit._scaled.
+        # Draws already made by a stochastic Bind are part of the music being
+        # modulated, not something to re-roll.
+        new_cu._bind_memo = ut._copy_bind_memo()
         return new_cu
     else:
         return TemporalUnit(
@@ -1385,6 +1395,12 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
     as *ut* under the new tempus and span. Note the output bpm is computed
     through float division, so chained modulations park float noise in the
     bpm (e.g. 52.50000000000001) -- the tempus stays exactly as given.
+
+    On a ``CompositionalUnit`` nothing is re-evaluated -- parameters,
+    instruments, slurs, envelopes and the draws a stochastic ``Bind`` has
+    already made all come across unchanged. See ``TemporalUnit.__mul__``
+    for the ruling, and ``CompositionalUnit.copy`` for the deliberate
+    asymmetry (a copy re-rolls; a modulation does not).
 
     Parameters
     ----------
@@ -1423,6 +1439,10 @@ def modulate_tempus(ut: Union[TemporalUnit, 'CompositionalUnit'], span: int, tem
         new_cu._next_slur_id = ut._next_slur_id
         new_cu._control_envelopes = ut._copy_control_envelopes()
         new_cu._next_envelope_id = ut._next_envelope_id
+        # The modulation scales the unit AS IT IS: see TemporalUnit._scaled.
+        # Draws already made by a stochastic Bind are part of the music being
+        # modulated, not something to re-roll.
+        new_cu._bind_memo = ut._copy_bind_memo()
         return new_cu
     else:
         return TemporalUnit(

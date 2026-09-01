@@ -1675,6 +1675,11 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
             out._next_slur_id = self._next_slur_id
             out._control_envelopes = self._copy_control_envelopes()
             out._next_envelope_id = self._next_envelope_id
+            # Scaling scales the unit AS IT IS (Ryan, 2026-08-31), so the
+            # draws a stochastic Bind has already made come across with
+            # everything else. Rebuilding without them made `uc * Fraction(1,
+            # 1)` -- an identity -- return different music.
+            out._bind_memo = self._copy_bind_memo()
         else:
             out = TemporalUnit(
                 span=1,
@@ -1722,6 +1727,20 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         12/20), the same span collapse `modulate_tempo` and `fuse` apply.
         Prolationes are carried verbatim, so the event count never changes.
         Scaling by 1 is a true no-op on the spelling: 6/20 stays 6/20.
+
+        ONLY THE TIMING MOVES. On a
+        :class:`~klotho.thetos.composition.compositional.CompositionalUnit`
+        nothing is re-evaluated: parameters, instruments, slurs, envelopes
+        and -- since 2026-08-31 -- the draws a stochastic
+        :class:`~klotho.thetos.parameters.bind.Bind` has already made all
+        come across unchanged (Ryan: *"we simply scale the ut/uc as it is.
+        No need to re-eval things."*). ``uc * Fraction(1, 1)`` used to
+        re-roll every draw, so an identity returned different music. Note
+        the asymmetry with
+        :meth:`~klotho.thetos.composition.compositional.CompositionalUnit.copy`,
+        which still re-rolls deliberately: a copy is a fresh instance of the
+        recipe, scaling is a transformation of this music. That docstring
+        carries the full argument.
 
         Parameters
         ----------

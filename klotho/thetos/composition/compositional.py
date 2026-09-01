@@ -1178,6 +1178,7 @@ class CompositionalUnit(TemporalUnit):
         self._control_envelopes: dict[int, dict] = {}
         self._next_envelope_id = 0
         self._mirror_id_map = None
+        self._mirror_bind_targets = None
         self._rt.set_id_state_observer(self._relocate_id_keyed_state)
 
     @classmethod
@@ -1456,17 +1457,26 @@ class CompositionalUnit(TemporalUnit):
         degenerate shape, with the root's raw overrides reaching the
         rebuilt leaf by inheritance.
 
-        The same recipe then copies the slur specs and envelope anchors, which
-        are keyed by node id too -- so the correspondence is published on the
-        source for :meth:`_copy_slur_specs` and
-        :meth:`_copy_control_envelopes` to follow.
+        The same recipe then copies the slur specs, envelope anchors and
+        memoized Bind draws, which are keyed by node id too -- so the
+        correspondence is published on the source for :meth:`_copy_slur_specs`,
+        :meth:`_copy_control_envelopes` and :meth:`_copy_bind_memo` to follow.
         """
         src = source_uc._rt
         dst = self._rt
         if list(src.successors(src.root)):
             mapping = src.map_parallel_nodes(dst)
+            bind_targets = {s: (d,) for s, d in mapping.items()}
         else:
             mapping = {src.root: dst.root}
+            # The degenerate rebuild is root -> root PLUS a leaf the source
+            # never had, so a memoized draw has to reach BOTH ends of it. The
+            # source's root is simultaneously the unit's only EVENT -- whose
+            # draw the destination now reads at its new leaf -- and a node a
+            # caller can inspect directly, which is still the destination's
+            # root. One Bind, one drawn value, named at both places rather
+            # than re-rolled at either.
+            bind_targets = {src.root: (dst.root, *dst.leaf_nodes)}
         dst.register_pfields(src.pfield_names)
         dst.register_mfields(src.mfield_names)
         keys = src.pfield_names | src.mfield_names
@@ -1482,6 +1492,7 @@ class CompositionalUnit(TemporalUnit):
                 dst.set_instrument(dst_node, inst)
         dst._param_layer._effective_cache = None
         source_uc._mirror_id_map = mapping
+        source_uc._mirror_bind_targets = bind_targets
 
     def _resolve_governing_instrument_node(self, node: int):
         return self._rt._resolve_governing_instrument_node(node)
@@ -3016,6 +3027,7 @@ class CompositionalUnit(TemporalUnit):
         # a correspondence published to a mirror target is keyed by the ids
         # that just moved, so it no longer describes this unit
         self._mirror_id_map = None
+        self._mirror_bind_targets = None
 
     def _remap_bind_memo(self, mapping):
         if not self._bind_memo:
@@ -4095,6 +4107,27 @@ class CompositionalUnit(TemporalUnit):
         between the copy and the original; per-node override placement
         (inheritance structure) is preserved as-is.
 
+        **A copy RE-ROLLS every stochastic** :class:`~klotho.thetos.parameters.bind.Bind`,
+        **and scaling does not.** ``uc.copy()`` starts with an empty
+        ``_bind_memo``, so a ``Bind(random.random)`` draws again; ``uc * k``,
+        ``modulate_tempo`` and ``modulate_tempus`` carry the draws across
+        (:meth:`_copy_bind_memo`). The asymmetry is deliberate and it will
+        surprise someone, so: a copy is a fresh instance OF THE RECIPE, and
+        the recipe says "a random amp per note" -- two copies of a passage
+        with a random amp are meant to differ, which is the whole reason to
+        write a ``Bind`` instead of a number. Scaling is a transformation of
+        THIS music (Ryan, 2026-08-31: *"we simply scale the ut/uc as it is.
+        No need to re-eval things."*), so the notes the composer has already
+        heard are the notes that come back, only longer or shorter. If you
+        want a copy that keeps the draws, scale it by one: ``uc *
+        Fraction(1, 1)``. If you want a scaled unit that re-rolls, scale
+        then copy.
+
+        One wrinkle in both directions: only draws that have actually BEEN
+        made are preserved, because the memo fills lazily on read. Scaling a
+        unit whose Binds have never been resolved leaves both units free to
+        draw independently -- there is no draw yet to keep.
+
         Returns
         -------
         CompositionalUnit
@@ -4122,6 +4155,7 @@ class CompositionalUnit(TemporalUnit):
         c._control_envelopes = self._copy_control_envelopes(follow_mirror=False)
         c._next_envelope_id = self._next_envelope_id
         c._mirror_id_map = None
+        c._mirror_bind_targets = None
         c._rt.set_id_state_observer(c._relocate_id_keyed_state)
         return c
 
@@ -4189,6 +4223,43 @@ class CompositionalUnit(TemporalUnit):
                 "baked_leaves": desc.get("baked_leaves"),
             }
         return descs
+
+    def _copy_bind_memo(self):
+        """Fresh memo container, in the mirror target's ids.
+
+        Ryan's ruling, 2026-08-31: *"we simply scale the ut/uc as it is. No
+        need to re-eval things."* Scaling is a transformation of THIS music,
+        so the draws a stochastic :class:`~klotho.thetos.parameters.bind.Bind`
+        has already made are part of what is being scaled. Without this the
+        three rebuild-from-prolatio recipes re-rolled every draw, and
+        ``uc * Fraction(1, 1)`` -- an identity -- came back with different
+        music (measured: an amp of 0.3238 became 0.1508).
+
+        Unlike :meth:`_copy_slur_specs` there is no ``follow_mirror``
+        argument, because there is no verbatim-id caller: :meth:`copy`
+        deliberately re-rolls (see its docstring) and every other id-preserving
+        route goes through ``__deepcopy__``, which carries the memo as it is.
+        A source with no published correspondence therefore carries its ids
+        verbatim, the same fallback the siblings use.
+
+        A draw is dropped when its node has no target, exactly as a slur is:
+        the correspondence is total over survivors, so a missing node means
+        destroyed, and rustworkx reuses freed ids -- carrying such an entry
+        would re-attach the draw to whatever later lands in the slot. The
+        entry is shared, not rebuilt: a :class:`_BindDraw` is immutable and
+        its drawn value is shared between a unit and its copies everywhere
+        else too.
+        """
+        if not self._bind_memo:
+            return {}
+        targets = self._mirror_bind_targets
+        if targets is None:
+            return dict(self._bind_memo)
+        memo = {}
+        for (node, key), draw in self._bind_memo.items():
+            for dst_node in targets.get(node, ()):
+                memo[(dst_node, key)] = draw
+        return memo
 
     def _copy_rebuild(self):
         """Legacy copy path: reconstruct from prolatio and remap node data.
