@@ -2637,7 +2637,11 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         ``CompositionalUnit`` anywhere in it reports the ten columns alone.
         A parameter whose name collides with a timing column (a pfield
         called ``duration``, say) is NOT appended: the timing column wins,
-        and the parameter is still readable on the unit itself.
+        and the parameter is still readable on the unit itself. A name
+        registered as both a pfield and an mfield on the same unit resolves
+        the same way ``uc.events`` resolves it -- the mfield wins the
+        column. Both collisions raise a ``UserWarning`` naming the
+        shadowed field(s); a block with no collision warns about neither.
 
         ``start`` and ``end`` are **absolute** seconds: they include the
         block's own offset and every row's alignment offset, so the table
@@ -2677,6 +2681,13 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
         data = []
         param_columns = []          # union of contributed keys, first seen first
         seen = set()
+        # Two collision kinds this table can hide, both resolved the same
+        # way ``uc.events`` resolves them (the narrower namespace wins) but
+        # -- until now -- with no disclosure here at all. Collected across
+        # every row and warned once, matching ``uc.events``'s one-warning-
+        # per-read shape rather than one per event.
+        shadowed_structural: set = set()
+        shadowed_namespace: set = set()
         for i, row in enumerate(self._rows):
             for voice, c in _walk_block_events(row, str(i)):
                 event = {
@@ -2696,10 +2707,20 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
                     # in ``uc.events``, minus the timing ones: instrument
                     # first (present even when unbound, as it is there),
                     # then pfields, then mfields.
+                    pf = c.pfields
+                    mf = c.mfields
+                    # A name registered in BOTH namespaces (post pfield/
+                    # mfield split) is two independent values and one
+                    # column; ``extra.update`` below already lets the
+                    # mfield win (it is merged in second), silently. Same
+                    # shape of gap as the structural one, just newer.
+                    both = pf.keys() & mf.keys()
+                    if both:
+                        shadowed_namespace.update(both)
                     extra = {'instrument': CompositionalUnit._instrument_display(
                         c._resolve_instrument())}
-                    extra.update(c.pfields)
-                    extra.update(c.mfields)
+                    extra.update(pf)
+                    extra.update(mf)
                     for key, value in extra.items():
                         # A pfield may legitimately be named ``duration``
                         # (the duration-injection control). The timing
@@ -2707,12 +2728,36 @@ class TemporalBlock(_RepeatableTemporal, metaclass=TemporalMeta):
                         # and the collision is dropped rather than silently
                         # overwriting a timing value with a parameter.
                         if key in _BLOCK_EVENT_COLUMNS:
+                            shadowed_structural.add(key)
                             continue
                         if key not in seen:
                             seen.add(key)
                             param_columns.append(key)
                         event[key] = value
                 data.append(event)
+        if shadowed_structural:
+            warnings.warn(
+                f"{sorted(shadowed_structural)} name structural columns of "
+                f"TemporalBlock.events and are not shown in the table: the "
+                f"block's own row/voice/node_id/start/duration/end/is_rest/"
+                f"s/metric_onset/metric_duration always win there. The "
+                f"field itself is unaffected -- it still reaches the synth, "
+                f"and you can read it with uc.get_pfield(node, key) / "
+                f"uc.get_mfield(node, key) or on uc.pt. Rename it if you "
+                f"want it in the table.",
+                UserWarning,
+                stacklevel=2,
+            )
+        if shadowed_namespace:
+            warnings.warn(
+                f"{sorted(shadowed_namespace)} name both a pfield and an "
+                f"mfield on a unit in this block; the table shows the "
+                f"mfield. They are separate values -- read the pfield with "
+                f"uc.get_pfield(node, key) on the unit itself, and it "
+                f"still reaches the synth.",
+                UserWarning,
+                stacklevel=2,
+            )
         df = pd.DataFrame(data,
                           columns=list(_BLOCK_EVENT_COLUMNS) + param_columns)
         if len(df):
