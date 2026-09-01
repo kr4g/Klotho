@@ -116,8 +116,16 @@ def metric_modulation(current_tempo:float, current_beat_value:Union[Fraction,str
     """
     Determine the new tempo for a metric modulation between two beat values.
 
-    Metric modulation maintains the duration of a beat constant while changing
-    the note value that represents the beat, effectively changing the tempo.
+    A metric modulation holds the underlying NOTE-VALUE GRID steady and
+    changes which note value is counted as the beat. The pivot note value
+    keeps the duration it already had; because a different note value now
+    carries the pulse, the tempo number changes. (The beat's duration is
+    exactly what does NOT stay constant -- if it did, the tempo could not
+    change.)
+
+    So a shorter new beat value gives a faster tempo: at quarter = 120 an
+    eighth lasts 0.25 s, and counting that eighth as the beat is 240 bpm.
+    The relation is ``T' = T * b / b'``.
 
     See: https://en.wikipedia.org/wiki/Metric_modulation
 
@@ -144,8 +152,12 @@ def metric_modulation(current_tempo:float, current_beat_value:Union[Fraction,str
     """
     current_beat_value = Fraction(current_beat_value)
     new_beat_value = Fraction(new_beat_value)
-    current_duration = 60 / current_tempo * current_beat_value
-    new_tempo = 60 / current_duration * new_beat_value
+    # The invariant is the grid, expressed as the whole note's duration:
+    # one beat of value b lasts 60/T seconds and lasts W*b, so W = 60/(T*b).
+    # Both steps DIVIDE by the beat value; multiplying inverted the result
+    # (it returned T*b'/b, i.e. 60.0 for the example above, not 240.0).
+    whole_note_duration = 60 / current_tempo / current_beat_value
+    new_tempo = 60 / whole_note_duration / new_beat_value
     return float(new_tempo)
 
 def tempo_for_duration(metric_ratio: Union[Fraction, str, float], reference_beat: Union[Fraction, str, float], duration: float) -> float:

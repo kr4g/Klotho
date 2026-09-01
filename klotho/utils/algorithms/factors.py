@@ -165,6 +165,17 @@ def nth_prime(prime: int) -> int:
     # sympy.prime(n) for every n up to the answer
     return int(primepi(prime))
 
+
+@lru_cache(maxsize=256)
+def _prime_at(index: int) -> int:
+    """The ``index``-th prime, 1-based: ``_prime_at(1) == 2``.
+
+    Inverse of :func:`nth_prime`, and cached for the same reason:
+    ``factors_to_lattice_vector`` walks ``1..target_size`` on every call
+    and ``ratios_to_coordinates`` calls it once per ratio.
+    """
+    return int(sp.prime(index))
+
 def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int] = None) -> np.ndarray:
     """
     Convert a prime-factor dictionary to a prime-coordinate vector.
@@ -222,7 +233,7 @@ def factors_to_lattice_vector(factors: Dict[int, int], vector_size: Optional[int
         raise ValueError(f"vector_size ({vector_size}) must be at least {min_size} to represent prime {max_prime}")
     
     target_size = vector_size or min_size
-    primes = [sympy_prime(i) for i in range(1, target_size + 1)]
+    primes = [_prime_at(i) for i in range(1, target_size + 1)]
     arr = np.array([factors.get(p, 0) for p in primes], dtype=int)
     arr.setflags(write=False)
     return arr

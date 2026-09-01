@@ -1004,3 +1004,136 @@ class TestThePreservedFamilyDoesNotDenyWhatItDoes:
 
     def test_scale_does_not_claim_envelopes_are_lost(self):
         assert self._denials(RhythmTree.scale) == []
+
+
+class TestMetricModulationIsNotInverted:
+    """``metric_modulation`` computed ``T * b' / b`` where the relation is
+    ``T * b / b'``, so it returned the RECIPROCAL tempo: its own docstring
+    example, ``metric_modulation(120, '1/4', '1/8')``, promised ``240.0``
+    and the function returned ``60.0``.
+
+    The musical statement, which is what settles it: quarter = 120 makes
+    the quarter 0.5 s and the eighth 0.25 s. Counting that eighth as the
+    beat is 60/0.25 = 240 bpm -- a metric modulation to a shorter beat
+    value is FASTER. The sibling ``tempo_for_duration`` already used the
+    dividing convention and already passed its own example, so the two
+    functions in one module disagreed about the arithmetic.
+
+    There were no callers and no tests, which is why an inverted result
+    survived. The docstring prose was self-defeating too: it said the
+    modulation "maintains the duration of a beat constant while changing
+    the note value that represents the beat, effectively changing the
+    tempo" -- if the beat duration were constant the tempo could not
+    change. What stays constant is the note-value GRID (the pivot).
+    """
+
+    @staticmethod
+    def _mm():
+        from klotho.chronos.utils.tempo import metric_modulation
+        return metric_modulation
+
+    def test_the_docstring_example_holds(self):
+        assert self._mm()(120, '1/4', '1/8') == pytest.approx(240.0)
+
+    def test_a_shorter_new_beat_value_is_a_faster_tempo(self):
+        assert self._mm()(120, '1/4', '1/8') > 120
+        assert self._mm()(120, '1/8', '1/4') < 120
+
+    def test_the_pivot_note_value_keeps_its_duration(self):
+        """The invariant, measured directly: the new beat's duration at the
+        new tempo equals the same note value's duration at the old one."""
+        from fractions import Fraction
+        T, b, b_new = 120.0, Fraction(1, 4), Fraction(1, 8)
+        before = (60 / T) * (b_new / b)          # 0.25 s
+        after = 60 / self._mm()(T, b, b_new)
+        assert after == pytest.approx(float(before))
+
+    @pytest.mark.parametrize('new_beat,expected', [
+        ('1/4', 120.0),   # identity
+        ('1/8', 240.0),
+        ('1/2', 60.0),
+        ('1/6', 180.0),   # quarter -> triplet quarter
+    ])
+    def test_the_relation_is_T_times_b_over_b_prime(self, new_beat, expected):
+        assert self._mm()(120, '1/4', new_beat) == pytest.approx(expected)
+
+    def test_it_round_trips(self):
+        there = self._mm()(120, '1/4', '1/8')
+        assert self._mm()(there, '1/8', '1/4') == pytest.approx(120.0)
+
+    def test_the_prose_no_longer_says_the_beat_duration_is_constant(self):
+        doc = inspect.getdoc(self._mm()) or ''
+        assert not re.search(r'duration of a beat constant', doc)
+
+
+class TestThePrimeCoordinateFunctionsAreNotDead:
+    """``factors_to_lattice_vector`` and ``ratio_to_coordinate`` both raised
+    ``NameError: name 'sympy_prime' is not defined``. The module imports
+    ``factorint, primepi, isprime`` and ``sympy as sp``; ``sympy_prime`` was
+    never imported, so every call through the prime-basis branch died --
+    including ``ratios_to_coordinates`` whenever ``generators is None``.
+
+    Both names are in ``klotho.utils.algorithms.__all__`` and both are
+    listed in ``docs/architecture/09_UTILS.md``, so the public surface
+    advertised two functions that could not run at all. The only existing
+    test of either passed ``generators=`` explicitly, which takes the
+    Diophantine branch and never reaches the dead line.
+
+    The values below are the ones the docstrings already claimed; the
+    corrected code reproduces them, so the docstrings were right and only
+    the import was missing.
+    """
+
+    @staticmethod
+    def _mod():
+        from klotho.utils.algorithms import factors
+        return factors
+
+    def test_factors_to_lattice_vector_matches_its_docstring(self):
+        f = {2: 1, 3: 1, 5: -1}
+        assert list(self._mod().factors_to_lattice_vector(f)) == [1, 1, -1]
+
+    def test_factors_to_lattice_vector_pads_as_documented(self):
+        f = {2: 1, 3: 1, 5: -1}
+        got = self._mod().factors_to_lattice_vector(f, vector_size=5)
+        assert list(got) == [1, 1, -1, 0, 0]
+
+    def test_position_i_is_the_i_plus_first_prime(self):
+        """The docstring's indexing claim, stated as a coordinate: 7 is the
+        4th prime, so 7/1 is a 1 in slot 3."""
+        got = self._mod().factors_to_lattice_vector({7: 1})
+        assert list(got) == [0, 0, 0, 1]
+
+    @pytest.mark.parametrize('ratio,expected', [
+        ('3/2', [-1, 1]),
+        ('5/4', [-2, 0, 1]),
+        ('2', [1]),
+        ('1', [0]),
+    ])
+    def test_ratio_to_coordinate_gives_the_monzo(self, ratio, expected):
+        got = self._mod().ratio_to_coordinate(ratio)
+        assert list(got) == expected
+
+    def test_the_batch_companion_works_without_generators(self):
+        """``ratios_to_coordinates`` routes every ratio through
+        ``ratio_to_coordinate``, so it was dead by inheritance."""
+        got = self._mod().ratios_to_coordinates(['3/2', '5/4'])
+        assert [list(c) for c in got] == [[-1, 1, 0], [-2, 0, 1]]
+
+    def test_the_returned_vector_is_still_immutable(self):
+        got = self._mod().ratio_to_coordinate('3/2')
+        with pytest.raises(ValueError):
+            got[0] = 99
+
+    def test_the_too_small_vector_size_guard_still_fires(self):
+        """The line after the dead one -- unreachable before, so it needs
+        pinning now that it runs."""
+        with pytest.raises(ValueError, match='must be at least 3'):
+            self._mod().factors_to_lattice_vector({2: 1, 5: -1}, vector_size=2)
+
+    def test_the_advertised_names_are_importable_and_callable(self):
+        import klotho.utils.algorithms as algs
+        for name in ('factors_to_lattice_vector', 'ratio_to_coordinate',
+                     'ratios_to_coordinates'):
+            assert name in algs.__all__
+            assert callable(getattr(algs, name))
