@@ -41,6 +41,19 @@ def _uid():
     return fast_id()
 
 
+def _declared_controls(def_name):
+    """Controls the named SynthDef declares, or ``None`` if it is unknown.
+
+    ``None`` means "cannot be checked" and every caller must read it that
+    way -- withholding a pfield because the manifest has not heard of a
+    def would silently starve a runtime-registered instrument. The merged
+    manifest already includes runtime registrations and is memoized on the
+    registry version, so this is cheap but not free; hoist it out of loops.
+    """
+    from klotho.thetos.instruments._shared import load_ss_manifest
+    return load_ss_manifest().get(def_name)
+
+
 def _resolve_synth(inst, default_synth):
     """Resolve ``inst`` to ``(synth_name, inst_ctx)``.
 
@@ -272,6 +285,10 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfi
                                animation=False):
     events = []
     target = amp if amp is not None else 0.85
+    # Looked up once per call, not per chronon: the merged manifest is
+    # memoized on the registry version, but the dict lookup is not free
+    # and the synth does not change mid-unit.
+    perc_controls = _declared_controls(DEFAULT_RHYTHM_SYNTH)
 
     leaf_nodes = obj._rt.leaf_nodes if animation else None
     node_to_step = ({nid: idx for idx, nid in enumerate(leaf_nodes)}
@@ -328,7 +345,7 @@ def temporal_unit_to_sc_events(obj, use_absolute_time=False, amp=None, extra_pfi
         pf = {
             "baseFreq": DEFAULT_DRUM_FREQ,
             "amp": target,
-            **perc_env_pfields(dur),
+            **perc_env_pfields(dur, controls=perc_controls),
         }
         events.extend(_perc_note(uid, DEFAULT_RHYTHM_SYNTH, start, dur, pf,
                                  step_index=step_idx, extra_pfields=extra_pfields))
@@ -472,18 +489,34 @@ def _shift_events_to_zero(events):
     return events
 
 
-def temporal_sequence_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True):
+def temporal_sequence_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True,
+                                   amp=None):
+    """Lower a TemporalUnitSequence to SC events.
+
+    ``amp`` reaches bare :class:`TemporalUnit` members only, exactly as it
+    does in :func:`_temporal_container_sc_animation_parts` (the ``plot``
+    path this mirrors): a :class:`CompositionalUnit` carries its own
+    parameter layer and sources ``amp`` from there.
+
+    It is threaded rather than dropped because ``amp`` is reserved in
+    ``_converter_base.KNOWN_KWARGS``, so ``extract_convert_kwargs``
+    consumes it and it never survives as an extra pfield either. Dropping
+    it here did not ignore the request, it destroyed it: ``play(uts,
+    amp=0.2)`` used to lower at the 0.85 default, 12.6 dB above what was
+    asked for, while ``play(ut, amp=0.2)`` and ``plot(uts, amp=0.2)``
+    both honoured it.
+    """
     events = []
 
     for unit in obj:
         if isinstance(unit, CompositionalUnit):
             _merge_sub_sc(events, compositional_unit_to_sc_events(unit, extra_pfields=None))
         elif isinstance(unit, TemporalUnit):
-            _merge_sub_sc(events, temporal_unit_to_sc_events(unit, use_absolute_time=True, extra_pfields=extra_pfields))
+            _merge_sub_sc(events, temporal_unit_to_sc_events(unit, use_absolute_time=True, amp=amp, extra_pfields=extra_pfields))
         elif isinstance(unit, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False))
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False, amp=amp))
         elif isinstance(unit, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False))
+            _merge_sub_sc(events, temporal_block_to_sc_events(unit, extra_pfields=extra_pfields, rebase_to_zero=False, amp=amp))
 
     events = sort_sc_assembly_events(events)
     if rebase_to_zero:
@@ -491,18 +524,23 @@ def temporal_sequence_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True)
     return events
 
 
-def temporal_block_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True):
+def temporal_block_to_sc_events(obj, extra_pfields=None, rebase_to_zero=True,
+                                amp=None):
+    """Lower a TemporalBlock to SC events.
+
+    ``amp`` behaves exactly as in :func:`temporal_sequence_to_sc_events`.
+    """
     events = []
 
     for row in obj:
         if isinstance(row, CompositionalUnit):
             _merge_sub_sc(events, compositional_unit_to_sc_events(row, extra_pfields=None))
         elif isinstance(row, TemporalUnit):
-            _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True, extra_pfields=extra_pfields))
+            _merge_sub_sc(events, temporal_unit_to_sc_events(row, use_absolute_time=True, amp=amp, extra_pfields=extra_pfields))
         elif isinstance(row, TemporalUnitSequence):
-            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields, rebase_to_zero=False))
+            _merge_sub_sc(events, temporal_sequence_to_sc_events(row, extra_pfields=extra_pfields, rebase_to_zero=False, amp=amp))
         elif isinstance(row, TemporalBlock):
-            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields, rebase_to_zero=False))
+            _merge_sub_sc(events, temporal_block_to_sc_events(row, extra_pfields=extra_pfields, rebase_to_zero=False, amp=amp))
 
     events = sort_sc_assembly_events(events)
     if rebase_to_zero:
@@ -601,6 +639,11 @@ def convert_to_sc_events(obj, **kwargs):
     reset_kit_rotations()
     events = dispatch_convert(obj, kwargs, _SC_CONVERT_HANDLERS,
                               include_inst=True)
+    # Backstop only. Every type that can carry a ``speaker`` today is a
+    # CompositionalUnit, and those are already refused inside
+    # _compositional_unit_payload_parts, which this path also reaches. Kept
+    # so a type that GAINS mfield storage later is refused here rather than
+    # shipping a label the browser ignores.
     _refuse_bare_speaker(events)
     return events
 
@@ -613,6 +656,21 @@ def _refuse_bare_speaker(events) -> None:
     tracks, so there is nothing to resolve the label against and nothing to
     set the bus width. Silently ignoring it would drop the whole spatial
     intent of the material without a word.
+
+    Called from TWO places, and the second one is the load-bearing one:
+
+    * :func:`_compositional_unit_payload_parts` -- the single funnel for
+      every bare UC lowering, so it covers ``play(uc)``,
+      ``plot(uc).play()``, and the same through a UTS/BT.
+    * :func:`convert_to_sc_events` -- a backstop for future types.
+
+    Until 2026-09-01 only the backstop existed, and nothing reaching it had
+    mfield storage: the guard was dead for exactly the type it was written
+    for, and ``play(uc)`` shipped ``{'speaker': 7, 'speakerLane': None}``
+    to a scheduler that reads ``ev.speakerLane || 0``. The Score path never
+    comes through either call site (see :func:`_lower_score_uc` /
+    :func:`_apply_spatial_routing`), so a voice that HAS an array to
+    resolve against is never touched by this.
     """
     if not isinstance(events, list):
         return
@@ -1514,6 +1572,20 @@ def _compositional_unit_payload_parts(obj, extra_pfields=None, animation=False,
     i.e. silence) while ``play`` rendered the curve. Callers that do not
     want the descriptors drop them; they must not lower separately.
 
+    Being that single funnel is also why :func:`_refuse_bare_speaker` is
+    called here rather than at each entry point. A ``CompositionalUnit``
+    is the ONLY playable type with mfield storage, so it is the only
+    thing that can emit a ``speaker`` key at all — and the guard used to
+    be called from :func:`convert_to_sc_events` alone, which ``play(uc)``
+    and ``plot(uc).play()`` never reach. The guard was therefore dead for
+    exactly the type it was written for, and a spatial UC played
+    track-less collapsed onto lane 0 in silence (``scheduler_core.js``
+    reads ``ev.speakerLane || 0`` and ignores ``speaker``). The Score
+    path does not come through here — it lowers via
+    :func:`_lower_score_uc` and resolves labels to lanes in
+    :func:`_apply_spatial_routing` — so nothing that has an array to
+    resolve against is refused.
+
     Parameters
     ----------
     obj : CompositionalUnit
@@ -1538,17 +1610,21 @@ def _compositional_unit_payload_parts(obj, extra_pfields=None, animation=False,
         sort_output=True,
         return_node_map=True,
     )
+    _refuse_bare_speaker(events)
     descriptors = _collect_control_descriptors(obj, node_to_event_ids)
     return events, descriptors
 
 
-def _container_payload_parts(obj, extra_pfields=None):
+def _container_payload_parts(obj, extra_pfields=None, amp=None):
     """Recursively lower a UTS/BT to ``(events, control_descriptors)``
     with absolute (un-rebased) times.
 
     Mirrors :func:`temporal_sequence_to_sc_events` /
     :func:`temporal_block_to_sc_events` member handling (UC members get
-    no extra_pfields; bare TemporalUnits keep their absolute times).
+    no extra_pfields; bare TemporalUnits keep their absolute times), and
+    threads ``amp`` to bare TemporalUnit members the same way they do --
+    this is the path ``play(uts)`` actually takes, so an ``amp`` honoured
+    there and dropped here would still be inaudible in the widget.
     """
     events: list[dict] = []
     descriptors: list[dict] = []
@@ -1559,10 +1635,12 @@ def _container_payload_parts(obj, extra_pfields=None):
             descriptors.extend(desc)
         elif isinstance(unit, TemporalUnit):
             events.extend(temporal_unit_to_sc_events(
-                unit, use_absolute_time=True, extra_pfields=extra_pfields
+                unit, use_absolute_time=True, amp=amp,
+                extra_pfields=extra_pfields
             ))
         elif isinstance(unit, (TemporalUnitSequence, TemporalBlock)):
-            ev, desc = _container_payload_parts(unit, extra_pfields=extra_pfields)
+            ev, desc = _container_payload_parts(
+                unit, extra_pfields=extra_pfields, amp=amp)
             events.extend(ev)
             descriptors.extend(desc)
     return events, descriptors
@@ -1595,6 +1673,13 @@ def convert_to_sc_payload(obj, block_size=_DEFAULT_SCORE_BLOCK_SIZE, **kwargs):
     produces continuous bus automation outside a Score. Other object
     types fall through to :func:`convert_to_sc_events` with an empty
     ``control_data``.
+
+    This is the path ``player.play`` takes for a UC/UTS/BT, so two things
+    that used to be true only of :func:`convert_to_sc_events` are true
+    here as well: ``amp=`` reaches bare TemporalUnit members instead of
+    being consumed and discarded, and a ``speaker`` mfield with no Score
+    to resolve it against is refused rather than shipped to a scheduler
+    that ignores it.
     """
     from klotho.utils.playback._sc_validate import validate_sc_events
     from klotho.thetos.instruments.base import reset_kit_rotations
@@ -1605,7 +1690,7 @@ def convert_to_sc_payload(obj, block_size=_DEFAULT_SCORE_BLOCK_SIZE, **kwargs):
     elif isinstance(obj, (TemporalUnitSequence, TemporalBlock)):
         kw = extract_convert_kwargs(kwargs)
         events, descriptors = _container_payload_parts(
-            obj, extra_pfields=kw['extra_pfields']
+            obj, extra_pfields=kw['extra_pfields'], amp=kw['amp']
         )
         events = sort_sc_assembly_events(events)
         events, descriptors = _shift_payload_to_zero(events, descriptors)

@@ -197,11 +197,17 @@ def _build_convert_registry():
 
     @reg.register(TemporalUnitSequence)
     def _convert_temporal_sequence(obj, kw, handlers, inst_kw):
-        return handlers['temporal_sequence'](obj, extra_pfields=kw['extra_pfields'])
+        # ``amp`` is forwarded for the same reason the TemporalUnit adapter
+        # below forwards it: KNOWN_KWARGS reserves the name, so a value not
+        # passed on here is not merely ignored -- it is destroyed, with no
+        # unknown-kwarg error left to notice it by.
+        return handlers['temporal_sequence'](obj, amp=kw['amp'],
+                                             extra_pfields=kw['extra_pfields'])
 
     @reg.register(TemporalBlock)
     def _convert_temporal_block(obj, kw, handlers, inst_kw):
-        return handlers['temporal_block'](obj, extra_pfields=kw['extra_pfields'])
+        return handlers['temporal_block'](obj, amp=kw['amp'],
+                                          extra_pfields=kw['extra_pfields'])
 
     @reg.register(CompositionalUnit)
     def _convert_compositional_unit(obj, kw, handlers, inst_kw):
@@ -307,15 +313,37 @@ PERC_ATTACK = 0.005
 PERC_BODY_RATIO = 1 / 3
 
 
-def perc_env_pfields(dur):
+def perc_env_pfields(dur, controls=None):
+    """A length-proportional percussion envelope as pfields.
+
+    ``controls`` is the target SynthDef's declared control mapping (from
+    ``load_ss_manifest()``); fields it does not declare are omitted.
+
+    The filter is here because the bundled ``DEFAULT_RHYTHM_SYNTH``
+    (``kl_kicktone``) declares none of these four names, so every bare
+    rhythm note shipped four pfields that scsynth silently discarded --
+    which reads, to anyone looking at the payload or at
+    ``temporal_unit_to_sc_events``, as though the note's length shapes its
+    envelope. It does not; ``kl_kicktone`` has its own ``bodyAtk`` /
+    ``bodyDec`` / ``sustainRel`` family with its own defaults.
+
+    It is a FILTER and not a deletion so that a rhythm synth which *does*
+    declare these controls still receives them. ``controls=None`` means
+    "no declaration available" and ships everything -- a runtime-registered
+    def missing from the manifest must not be quietly starved of its
+    envelope for a bookkeeping reason.
+    """
     body = dur * PERC_BODY_RATIO
     attack = min(PERC_ATTACK, body * 0.5)
-    return {
+    fields = {
         "attack": attack,
         "decay": 0,
         "sustain": max(0, body - attack),
         "release": max(0, dur - body),
     }
+    if controls is None:
+        return fields
+    return {k: v for k, v in fields.items() if k in controls}
 
 
 def _is_tuple_value(value):
