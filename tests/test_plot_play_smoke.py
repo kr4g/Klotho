@@ -177,7 +177,7 @@ class TestTimelineStepConsistency:
         assert len(sd.step_halo_ids) == total_steps
         assert len(sd.step_durations) == total_steps
 
-        sc = temporal_container_to_sc_animation_events(obj)
+        sc = temporal_container_to_sc_animation_events(obj)['events']
         sc_steps = {ev['_stepIndex'] for ev in sc
                     if ev.get('_stepIndex') is not None}
         assert sc_steps == set(range(total_steps))

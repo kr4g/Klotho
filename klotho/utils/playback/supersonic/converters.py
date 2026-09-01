@@ -33,6 +33,9 @@ DEFAULT_SPECTRUM_SYNTH = "kl_sine"
 DEFAULT_RHYTHM_SYNTH = "kl_kicktone"
 DEFAULT_COMPOSITION_SYNTH = "kl_tri"
 
+# Control-envelope curve samples per descriptor block.
+_DEFAULT_SCORE_BLOCK_SIZE = 512
+
 
 def _uid():
     return fast_id()
@@ -343,9 +346,33 @@ def rhythm_tree_to_sc_events(obj, beat=None, bpm=None, amp=None, extra_pfields=N
                                      extra_pfields=extra_pfields)
 
 
+def _animation_payload(events, descriptors=(), block_size=_DEFAULT_SCORE_BLOCK_SIZE):
+    """Wrap animation events plus control descriptors as the payload dict
+    the animation bridge reads.
+
+    Every ``*_to_sc_animation_events`` converter answers in this shape —
+    the one :func:`convert_score_to_sc_animation_events` already used. An
+    animated figure template injects exactly one JSON blob, so
+    ``controlData`` has to ride inside the payload: a bare list reaches
+    ``_animation_bridge.js`` as ``controlData = null``, and the widget
+    then plays the enveloped pfield at its baked onset value — for a
+    ``0 -> 1 -> 0`` swell, silence.
+    """
+    from klotho.utils.playback.supersonic.engine import serialize_control_data
+    control_data = _build_score_control_data(list(descriptors), block_size)
+    return {"events": events, "controlData": serialize_control_data(control_data)}
+
+
 def temporal_unit_to_sc_animation_events(obj, use_absolute_time=False, amp=None, extra_pfields=None):
-    return temporal_unit_to_sc_events(obj, use_absolute_time=use_absolute_time, amp=amp,
-                                     extra_pfields=extra_pfields, animation=True)
+    """Animation payload for a TemporalUnit.
+
+    A bare TemporalUnit has no parameter layer, so its ``controlData`` is
+    always empty; the payload shape still matches the other animation
+    converters, so a caller never has to switch on the object type.
+    """
+    events = temporal_unit_to_sc_events(obj, use_absolute_time=use_absolute_time, amp=amp,
+                                        extra_pfields=extra_pfields, animation=True)
+    return _animation_payload(events)
 
 
 def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None, amp=None, extra_pfields=None):
@@ -356,14 +383,11 @@ def rhythm_tree_to_sc_animation_events(obj, beat=None, bpm=None, amp=None, extra
 
 def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False,
                                     use_absolute_time=False):
-    events = lower_compositional_ir_to_sc_assembly(
+    events, _ = _compositional_unit_payload_parts(
         obj,
         extra_pfields=extra_pfields,
         animation=animation,
         use_absolute_time=use_absolute_time,
-        default_synth=DEFAULT_COMPOSITION_SYNTH,
-        normalize_sc_pfields=True,
-        sort_output=True,
     )
     from klotho.utils.playback._sc_validate import validate_sc_events
     validate_sc_events(events, animation=animation)
@@ -371,7 +395,19 @@ def compositional_unit_to_sc_events(obj, extra_pfields=None, animation=False,
 
 
 def compositional_unit_to_sc_animation_events(obj, extra_pfields=None):
-    return compositional_unit_to_sc_events(obj, extra_pfields=extra_pfields, animation=True)
+    """Animation payload for a CompositionalUnit, control envelopes included.
+
+    Lowers with absolute times and rebases events *and* descriptors by one
+    shared delta, so a ``control=True`` envelope stays on the note it was
+    drawn over — and so ``plot(uc).play()`` plays what ``play(uc)`` plays.
+    """
+    events, descriptors = _compositional_unit_payload_parts(
+        obj, extra_pfields=extra_pfields, animation=True, use_absolute_time=True,
+    )
+    events, descriptors = _shift_payload_to_zero(events, descriptors)
+    from klotho.utils.playback._sc_validate import validate_sc_events
+    validate_sc_events(events, animation=True)
+    return _animation_payload(events, descriptors)
 
 
 def _build_seq_sc_events(pitches, start, synth, amp=None, per_voice_dur=None,
@@ -483,32 +519,36 @@ def _shift_sc_step_indices(events, step_offset):
     return events
 
 
-def _temporal_container_sc_animation_events(obj, amp=None, extra_pfields=None):
-    """Build SC animation events for a UTS/BT with global step indices.
+def _temporal_container_sc_animation_parts(obj, amp=None, extra_pfields=None):
+    """Build SC animation events and control descriptors for a UTS/BT with
+    global step indices.
 
     Traverses members in structural (DFS) order — the same enumeration
     used by the timeline SVG renderer — assigning each leaf-unit's local
-    step indices a running global offset.
+    step indices a running global offset. Times stay absolute; the caller
+    rebases events and descriptors together.
 
     Returns
     -------
-    tuple of (list, int)
-        ``(events, total_steps)``.
+    tuple of (list, list, int)
+        ``(events, control_descriptors, total_steps)``.
     """
     events = []
+    descriptors = []
     step_offset = 0
 
     for member in obj:
         if isinstance(member, CompositionalUnit):
-            sub = compositional_unit_to_sc_events(member, extra_pfields=None,
-                                                  animation=True, use_absolute_time=True)
+            sub, sub_descriptors = _compositional_unit_payload_parts(
+                member, extra_pfields=None, animation=True, use_absolute_time=True)
             n_steps = len(member._rt.leaf_nodes)
         elif isinstance(member, TemporalUnit):
             sub = temporal_unit_to_sc_events(member, use_absolute_time=True, amp=amp,
                                              extra_pfields=extra_pfields, animation=True)
+            sub_descriptors = []
             n_steps = len(member._rt.leaf_nodes)
         elif isinstance(member, (TemporalUnitSequence, TemporalBlock)):
-            sub, n_steps = _temporal_container_sc_animation_events(
+            sub, sub_descriptors, n_steps = _temporal_container_sc_animation_parts(
                 member, amp=amp, extra_pfields=extra_pfields)
         else:
             raise TypeError(
@@ -516,25 +556,29 @@ def _temporal_container_sc_animation_events(obj, amp=None, extra_pfields=None):
             )
         _shift_sc_step_indices(sub, step_offset)
         _merge_sub_sc(events, sub)
+        descriptors.extend(sub_descriptors)
         step_offset += n_steps
 
-    return events, step_offset
+    return events, descriptors, step_offset
 
 
 def temporal_container_to_sc_animation_events(obj, amp=None, extra_pfields=None):
-    """SC animation events for a TemporalUnitSequence or TemporalBlock.
+    """Animation payload for a TemporalUnitSequence or TemporalBlock.
 
     Events carry absolute times (rebased so the payload starts at zero)
     and a global ``_stepIndex`` matching the timeline renderer's step
-    enumeration.
+    enumeration. Control-envelope descriptors contributed by member
+    CompositionalUnits ride along in ``controlData``, rebased by the same
+    delta — so ``plot(container).play()`` plays what ``play(container)``
+    plays.
     """
-    events, _ = _temporal_container_sc_animation_events(obj, amp=amp,
-                                                        extra_pfields=extra_pfields)
+    events, descriptors, _ = _temporal_container_sc_animation_parts(
+        obj, amp=amp, extra_pfields=extra_pfields)
     events = sort_sc_assembly_events(events)
-    _shift_events_to_zero(events)
+    events, descriptors = _shift_payload_to_zero(events, descriptors)
     from klotho.utils.playback._sc_validate import validate_sc_events
     validate_sc_events(events, animation=True)
-    return events
+    return _animation_payload(events, descriptors)
 
 
 _SC_CONVERT_HANDLERS = {
@@ -559,7 +603,6 @@ def convert_to_sc_events(obj, **kwargs):
 
 
 _SC_EVENT_PRIORITY = {'new': 0, 'set': 1, 'release': 2}
-_DEFAULT_SCORE_BLOCK_SIZE = 512
 
 
 def _iter_ucs(unit):
@@ -1144,17 +1187,40 @@ def convert_score_to_sc_animation_events(score) -> dict:
     }
 
 
-def _compositional_unit_payload_parts(obj):
+def _compositional_unit_payload_parts(obj, extra_pfields=None, animation=False,
+                                      use_absolute_time=False):
     """Lower a bare UC to ``(events, control_descriptors)``.
 
     Events keep their assembly uids (no Score-style regeneration) and
     absolute times; descriptors are keyed against those uids via the
     node→event-id map.
+
+    This is the single UC lowering for every non-Score surface — bare
+    ``play`` and the animated ``plot(...).play()`` alike. Splitting them
+    is what let the animation path return events with no descriptors, so
+    a ``control=True`` swell auditioned at its baked onset value (0.0,
+    i.e. silence) while ``play`` rendered the curve. Callers that do not
+    want the descriptors drop them; they must not lower separately.
+
+    Parameters
+    ----------
+    obj : CompositionalUnit
+        Unit to lower.
+    extra_pfields : dict, optional
+        Extra pfields merged into every event.
+    animation : bool, default False
+        Keep ``__rest__`` step markers and stamp per-leaf ``_stepIndex``.
+    use_absolute_time : bool, default False
+        Under ``animation=True``, keep absolute event times instead of
+        rebasing to the unit's own zero. Descriptor times are always
+        absolute, so a caller that rebases must rebase both together —
+        see :func:`_shift_payload_to_zero`.
     """
     events, node_to_event_ids = lower_compositional_ir_to_sc_assembly(
         obj,
-        extra_pfields=None,
-        animation=False,
+        extra_pfields=extra_pfields,
+        animation=animation,
+        use_absolute_time=use_absolute_time,
         default_synth=DEFAULT_COMPOSITION_SYNTH,
         normalize_sc_pfields=True,
         sort_output=True,

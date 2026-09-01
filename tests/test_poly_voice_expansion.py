@@ -56,6 +56,14 @@ class _FakeCU:
     def get_instrument(self, node_id):
         return self._instrument
 
+    def resolved_control_envelopes(self):
+        # A real CompositionalUnit always answers this; a unit carrying no
+        # control envelope answers with an empty sequence. The double needs it
+        # because the animation path now collects control descriptors like
+        # every other lowering path does -- it used to skip them, which is what
+        # made plot(uc).play() audition a swell as silence.
+        return ()
+
 
 class _SimpleSCInstrument:
     def __init__(self, defName="test-synth", has_gate=True):
