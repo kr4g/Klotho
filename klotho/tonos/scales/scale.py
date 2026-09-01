@@ -11,7 +11,11 @@ from ..pitch.pitch_collections import (
     _convert_degree,
     _resolve_reference,
 )
-from ..utils.interval_normalization import equave_reduce
+from ..utils.interval_normalization import (
+    equave_reduce,
+    _refuse_degenerate_equave,
+    _refuse_non_positive,
+)
 import numpy as np
 
 
@@ -106,9 +110,16 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
             has_float = any(isinstance(d, float) for d in converted)
             if has_float:
                 equave_val = float(equave) if not isinstance(equave, float) else equave
+                # This branch carries its own copy of the equave_reduce loop,
+                # so it needs the same guards; without them a 0 degree froze
+                # the interpreter here instead of raising.
+                if equave_val <= 1:
+                    raise _refuse_degenerate_equave('Scale', equave_val)
                 reduced = []
                 for d in converted:
                     val = float(d)
+                    if val <= 0:
+                        raise _refuse_non_positive('Scale', 'degree', val)
                     while val < 1:
                         val *= equave_val
                     while val >= equave_val:
@@ -257,11 +268,43 @@ class Scale(EquaveCyclicMixin, RelativePitchCollection):
         return result.root(self._reference_pitch)
     
     def __invert__(self) -> 'Scale':
+        """
+        Mirror the scale about its own equave.
+
+        Every degree ``d`` is replaced by ``equave / d`` (in cents, by
+        ``equave - d``), so the step pattern is reversed and the unison is
+        held fixed. Inversion is an involution: ``~~scale == scale``.
+
+        The equave is the scale's own, not the octave. A tritave-equave
+        scale inverts within the tritave, a Bohlen-Pierce scale within
+        ``3/1``. (Before 2026-09-01 the ratios branch mirrored about a
+        hardcoded 2 while the cents branch used the scale's equave, so
+        non-octave scales inverted to the wrong notes with no error.)
+
+        Returns
+        -------
+        Scale
+            A new Scale with the mirrored degrees, keeping this scale's
+            equave and reference pitch.
+        """
         if self._interval_type_mode == "cents":
             inverted = [0.0 if abs(d) < 1e-6 else self._equave - d for d in self._degrees]
         else:
-            inverted = [Fraction(1, 1) if d == Fraction(1, 1) else Fraction(d.denominator * 2, d.numerator) for d in self._degrees]
-        
+            equave = self._equave
+            inverted = []
+            for d in self._degrees:
+                if isinstance(d, Fraction):
+                    # `equave / d`; identical to the old `2 / d` when the
+                    # equave is the octave.
+                    inverted.append(Fraction(1, 1) if d == 1 else Fraction(equave) / d)
+                else:
+                    # _process_scale_degrees keeps degrees as floats when any
+                    # input degree was a float, so this branch is reachable
+                    # and used to raise AttributeError on `d.denominator`.
+                    val = float(d)
+                    inverted.append(1.0 if abs(val - 1.0) < 1e-9
+                                    else float(equave) / val)
+
         return Scale(sorted(inverted), self._interval_type_mode, self._equave, self._reference_pitch)
     
     def __neg__(self) -> 'Scale':

@@ -12,7 +12,11 @@ from ..pitch.pitch_collections import (
     _convert_degree,
     _resolve_reference,
 )
-from ..utils.interval_normalization import equave_reduce
+from ..utils.interval_normalization import (
+    equave_reduce,
+    _refuse_degenerate_equave,
+    _refuse_non_positive,
+)
 import numpy as np
 
 
@@ -103,9 +107,16 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
             has_float = any(isinstance(d, float) for d in converted)
             if has_float:
                 equave_val = float(equave) if not isinstance(equave, float) else equave
+                # This branch carries its own copy of the equave_reduce loop,
+                # so it needs the same guards; without them a 0 degree froze
+                # the interpreter here instead of raising.
+                if equave_val <= 1:
+                    raise _refuse_degenerate_equave('Chord', equave_val)
                 reduced = []
                 for d in converted:
                     val = float(d)
+                    if val <= 0:
+                        raise _refuse_non_positive('Chord', 'degree', val)
                     while val < 1:
                         val *= equave_val
                     while val >= equave_val:

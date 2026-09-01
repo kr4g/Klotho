@@ -16,6 +16,34 @@ __all__ = [
     'reduce_freq'
 ]
 
+
+def _refuse_non_positive(where: str, arg: str, value) -> ValueError:
+  """Build the refusal for a value that no amount of reduction can move."""
+  return ValueError(
+      f"{where} cannot reduce {arg}={value!r}. Reduction multiplies by the "
+      f"equave until the value reaches the bottom of the range, and no number "
+      f"of multiplications carries zero or a negative number there -- the loop "
+      f"would never end, and the process would hang with no exception and no "
+      f"output. Ratios and frequencies are positive by definition; a 0 here is "
+      f"usually an empty product, or a division that collapsed further "
+      f"upstream. Correct the value where it is produced, or drop it before "
+      f"reducing it."
+  )
+
+
+def _refuse_degenerate_equave(where: str, equave) -> ValueError:
+  """Build the refusal for an equave that cannot walk a value into range."""
+  return ValueError(
+      f"{where} cannot reduce by equave={equave!r}. An interval of equivalence "
+      f"must be greater than 1: reduction walks the value into range by "
+      f"multiplying or dividing by the equave, and an equave of 1 never moves "
+      f"it, while an equave of 0 or less never moves it consistently upward -- "
+      f"the loop would never end, and the process would hang with no exception "
+      f"and no output. Use 2 for the octave, 3 for the Bohlen-Pierce tritave, "
+      f"or any ratio above 1."
+  )
+
+
 def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fraction, int, str, float] = 2, n_equaves:int = 1) -> Union[int, float, Fraction]:
   """
   Reduce an interval into the range ``[1, equave^n_equaves)``.
@@ -36,10 +64,23 @@ def equave_reduce(interval:Union[int, float, Fraction, str], equave:Union[Fracti
   -------
   Fraction
       The equave-reduced interval.
+
+  Raises
+  ------
+  ValueError
+      If *interval* is zero or negative, or if *equave* is 1 or less.
+      Either case would spin the reduction loop forever.
   """
   interval = Fraction(interval)
   equave = Fraction(equave)
-  if equave == 2 and interval > 0:
+  if interval <= 0:
+    raise _refuse_non_positive('equave_reduce()', 'interval', interval)
+  if equave <= 1:
+    raise _refuse_degenerate_equave('equave_reduce()', equave)
+  if equave == 2:
+    # The guard above already established interval > 0, which this fast path
+    # requires; it used to test that itself and fall through into the
+    # unguarded slow loop, which is where the hang lived.
     # octave fast path: the multiply/divide loops are single bit-shifts.
     # Semantics preserved exactly: <1 multiplies until first >=1 (lands
     # in [1/2..1)*2 = [1,2)); >=2^n divides until first <2^n (lands in
@@ -82,9 +123,19 @@ def reduce_interval(interval:Union[Fraction, int, float, str], equave:Union[Frac
   -------
   Fraction
       The folded interval.
+
+  Raises
+  ------
+  ValueError
+      If *interval* is zero or negative, or if *equave* is 1 or less.
+      Either case would spin the folding loop forever.
   """
   interval = Fraction(interval)
-  equave = Fraction(equave)  
+  equave = Fraction(equave)
+  if interval <= 0:
+    raise _refuse_non_positive('reduce_interval()', 'interval', interval)
+  if equave <= 1:
+    raise _refuse_degenerate_equave('reduce_interval()', equave)
   while interval < 1/(equave**n_equaves):
     interval *= equave
   while interval >= (equave**n_equaves):
@@ -111,11 +162,24 @@ def reduce_interval_relative(target: Union[Fraction, int, float, str], source: U
     -------
     Fraction
         The transposition of *target* that minimizes ``|source - target|``.
+
+    Raises
+    ------
+    ValueError
+        If *target* or *source* is zero or negative, or if *equave* is 1 or
+        less. Any of these would spin the transposition loop forever.
     """
     target = Fraction(target)
     source = Fraction(source)
     equave = Fraction(equave)
-    
+
+    if target <= 0:
+        raise _refuse_non_positive('reduce_interval_relative()', 'target', target)
+    if source <= 0:
+        raise _refuse_non_positive('reduce_interval_relative()', 'source', source)
+    if equave <= 1:
+        raise _refuse_degenerate_equave('reduce_interval_relative()', equave)
+
     while target < 1:
         target *= equave
     while source < 1:
@@ -230,8 +294,18 @@ def reduce_freq(freq: float, lower: float = 27.5, upper: float = 4186, equave: U
   -------
   float
       The frequency folded into ``[lower, upper]``.
+
+  Raises
+  ------
+  ValueError
+      If *freq* is zero or negative, or if *equave* is 1 or less. Either
+      case would spin the folding loop forever.
   """
   equave = Fraction(equave)
+  if freq <= 0:
+    raise _refuse_non_positive('reduce_freq()', 'freq', freq)
+  if equave <= 1:
+    raise _refuse_degenerate_equave('reduce_freq()', equave)
   while freq < lower:
       freq *= equave
   while freq > upper:
