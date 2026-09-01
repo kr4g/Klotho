@@ -12,7 +12,13 @@ class AssemblyValidationError(Exception):
 
 
 _VALID_EVENT_TYPES = frozenset({'new', 'set', 'release'})
-_FORBIDDEN_PFIELD_KEYS = frozenset({'group', '_slur_id', '_slur_start', '_slur_end'})
+# Engine meta-fields that must never appear as synth controls. ``group``
+# was here until pfields and mfields were given separate storage: it could
+# only reach a pfields dict by leaking out of the shared node-data dict,
+# which is no longer possible. It is now a legal control name -- one a
+# composer may deliberately declare on a SynthDef -- so refusing it would
+# reject legitimate audio instead of catching a leak.
+_FORBIDDEN_PFIELD_KEYS = frozenset({'_slur_id', '_slur_start', '_slur_end'})
 
 
 def _is_buf_key(key):

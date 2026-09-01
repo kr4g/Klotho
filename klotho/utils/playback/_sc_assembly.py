@@ -474,10 +474,11 @@ def lower_compositional_ir_to_sc_assembly(
             voice_events = lower_event_ir_to_voice_events(event, step_index=step_idx)
             for voice_event in voice_events:
                 voice_start = voice_event["start"] - time_offset if animation else voice_event["start"]
-                voice_pfields = {
-                    k: v for k, v in voice_event["pfields"].items()
-                    if k != 'group'
-                }
+                # No 'group' strip here any more: routing is an MFIELD and
+                # pfields no longer share its storage, so a key named
+                # 'group' in this dict is a synth control the composer
+                # asked for. See ``mfield_storage_key``.
+                voice_pfields = dict(voice_event["pfields"])
                 voice_pfields = coerce_sc_pfield_values(voice_pfields)
                 _warn_unknown_pfields(
                     getattr(instrument, 'defName', None), voice_pfields, manifest
@@ -552,9 +553,14 @@ def lower_compositional_ir_to_sc_assembly(
                         _resolve_instrument_controls(voice_resolved, voice_def_name, manifest)
                     )
 
+            # The kit SELECTOR is dropped -- it chose the member, it is not
+            # a control. 'group' used to be dropped beside it because the
+            # routing mfield shared pfield storage and leaked in here; the
+            # namespaces are separate now, so a 'group' key at this point
+            # is a real synth control.
             voice_pfields = {
                 k: v for k, v in voice_event["pfields"].items()
-                if k != 'group' and k != _kit_selector
+                if k != _kit_selector
             }
 
             # A tuple selector merges defaults across members whose key

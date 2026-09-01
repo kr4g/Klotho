@@ -15,10 +15,48 @@ maintaining two mirrored trees.
 Storage model: overrides are stored only at the node where set. Effective
 values (inherited from ancestors) are computed on read and cached for O(1)
 subsequent reads.
+
+Namespaces: pfields (synth controls) and mfields (engine meta-fields such
+as ``group``, the routing track) are TWO namespaces, not one. They share
+the node payload dict, so an mfield is stored under a namespaced key --
+see :func:`mfield_storage_key` -- and a pfield under its bare name. Before
+that, both wrote the bare name and ``set_pfields(leaf, group=999.0)``
+silently re-routed the leaf's audio.
 """
 
 from ...topos.graphs.trees import Tree, TreeLayer
 import copy
+
+
+# Prefix marking a node-payload key as an MFIELD slot. Chosen so it cannot
+# be a SynthDef control name or a Python identifier: '@' and ':' are
+# illegal in both, so no legitimate field name can encode into another
+# field's slot. Field names carrying it are refused outright anyway (see
+# ``ParameterLayer._reject_reserved_keys``), which closes the door from the
+# ``**{...}`` direction where kwargs syntax does not.
+_MFIELD_PREFIX = '@mf:'
+
+
+def mfield_storage_key(name):
+    """Node-payload key under which the mfield *name* is stored.
+
+    pfields keep their bare name in the payload -- they are the open
+    namespace, they mirror SynthDef controls, and raw reads like
+    ``uc._rt[leaf]['freq']`` are an established idiom. mfields are the
+    small closed engine namespace, so they are the side that moves.
+    """
+    return _MFIELD_PREFIX + name
+
+
+def is_mfield_storage_key(key):
+    """True when a node-payload key is an mfield slot."""
+    return type(key) is str and key.startswith(_MFIELD_PREFIX)
+
+
+def mfield_name(storage_key):
+    """The plain mfield name behind a storage key (inverse of
+    :func:`mfield_storage_key`)."""
+    return storage_key[len(_MFIELD_PREFIX):]
 
 
 class ParameterLayer(TreeLayer):
@@ -35,12 +73,31 @@ class ParameterLayer(TreeLayer):
 
     @property
     def owned_keys(self):
-        """frozenset : All registered pfield and mfield keys (this layer's writable keys)."""
-        return frozenset(self._pfields | self._mfields)
+        """frozenset : Node-payload keys this layer writes.
+
+        The STORAGE keys, not the field names: mfields live under
+        :func:`mfield_storage_key`. This is what another layer would have
+        to avoid to share the payload safely, which is the question
+        ``owned_keys`` answers.
+        """
+        return self.storage_keys()
 
     def invalidate(self, tree):
         """Drop the effective-value cache (rebuilt lazily on the next read)."""
         self._effective_cache = None
+
+    def _drop_key_memos(self):
+        """Forget the frozen key views.
+
+        The memos below key on registry SIZE, which is sound while keys
+        are only ever added. The clone/adopt hooks REPLACE a registry
+        wholesale, so a same-sized replacement would be served the old
+        view; they call this instead of relying on the size check.
+        """
+        self._pfields_frozen = None
+        self._mfields_frozen = None
+        self._mfield_storage_frozen = None
+        self._storage_keys_frozen = None
 
     def pfields_frozen(self):
         """frozenset view of registered pfield names, memoized on the
@@ -60,6 +117,31 @@ class ParameterLayer(TreeLayer):
         cached = frozenset(self._mfields)
         self._mfields_frozen = cached
         return cached
+
+    def mfield_storage_keys(self):
+        """frozenset of the payload keys the registered mfields occupy."""
+        cached = getattr(self, '_mfield_storage_frozen', None)
+        if cached is not None and len(cached) == len(self._mfields):
+            return cached
+        cached = frozenset(mfield_storage_key(k) for k in self._mfields)
+        self._mfield_storage_frozen = cached
+        return cached
+
+    def storage_keys(self):
+        """frozenset of every node-payload key this layer owns.
+
+        pfield names verbatim plus the encoded mfield slots. This is the
+        set every raw-payload filter in the codebase must use; filtering
+        on ``pfields | mfields`` (the NAMES) would silently drop every
+        mfield now that they are namespaced.
+        """
+        sizes = (len(self._pfields), len(self._mfields))
+        cached = getattr(self, '_storage_keys_frozen', None)
+        if cached is not None and cached[0] == sizes:
+            return cached[1]
+        keys = frozenset(self._pfields) | self.mfield_storage_keys()
+        self._storage_keys_frozen = (sizes, keys)
+        return keys
 
     def on_structure_changed(self, tree, scope, op):
         """Drop the effective-value cache, and any binding whose node is gone.
@@ -85,6 +167,7 @@ class ParameterLayer(TreeLayer):
         self._mfields = set()
         self._node_instruments = {}
         self._effective_cache = None
+        self._drop_key_memos()
 
     def clone_state(self, source_layer, new_tree, memo):
         """Deep-copy registered keys and instrument bindings from a source layer."""
@@ -92,6 +175,7 @@ class ParameterLayer(TreeLayer):
         self._mfields = set(source_layer._mfields)
         self._node_instruments = copy.deepcopy(source_layer._node_instruments, memo)
         self._effective_cache = None
+        self._drop_key_memos()
 
     def adopt_state(self, source_layer, new_tree):
         """Carry key registrations and instrument bindings into a structural
@@ -102,6 +186,7 @@ class ParameterLayer(TreeLayer):
         self._mfields = set(source_layer._mfields)
         self._node_instruments = dict(source_layer._node_instruments)
         self._effective_cache = None
+        self._drop_key_memos()
 
     def on_nodes_remapped(self, tree, mapping):
         """Move instrument bindings to the ids now holding their content.
@@ -123,7 +208,7 @@ class ParameterLayer(TreeLayer):
     def _build_effective(self, tree):
         if self._effective_cache is not None:
             return
-        keys = self._pfields | self._mfields
+        keys = self.storage_keys()
         self._effective_cache = {}
         stack = [tree.root]
         while stack:
@@ -145,7 +230,7 @@ class ParameterLayer(TreeLayer):
         None and the next read rebuilds in full).
         """
         cache = self._effective_cache
-        keys = self._pfields | self._mfields
+        keys = self.storage_keys()
         stack = [node]
         while stack:
             n = stack.pop()
@@ -190,7 +275,25 @@ class ParameterLayer(TreeLayer):
         write that caused it. The mirror door has always been shut
         (``set_node_data(leaf, amp=0.5)`` raises ``Illegal RhythmTree node
         attribute update``); this is the other half of the same lock.
+
+        The storage sentinel is refused here too, and on EVERY tree
+        including a bare :class:`ParameterTree`. A pfield literally named
+        ``'@mf:group'`` would occupy the slot the mfield ``group`` lives
+        in and re-open the very collision the namespacing closes. Keyword
+        syntax cannot express such a name, but ``set_pfields(**{...})``
+        can.
         """
+        keys = list(keys)
+        smuggled = sorted(k for k in keys if is_mfield_storage_key(k))
+        if smuggled:
+            raise ValueError(
+                f"Illegal {what} name(s) {smuggled}: names beginning with "
+                f"{_MFIELD_PREFIX!r} are reserved -- that prefix is how a "
+                f"meta-field is stored in the node payload, so a field of "
+                f"that name would share storage with the mfield it encodes "
+                f"and the two namespaces would collide again. Choose a "
+                f"different field name."
+            )
         reserved = self.reserved_keys(tree)
         if not reserved:
             return
@@ -222,11 +325,19 @@ class ParameterLayer(TreeLayer):
             self._patch_effective(tree, node)
 
     def set_mfields(self, tree, node, **kwargs):
-        """Register the keys and write mfield overrides at *node*."""
+        """Register the keys and write mfield overrides at *node*.
+
+        Written under :func:`mfield_storage_key`, so an mfield and a
+        pfield of the same name are two independent values.
+        """
         self._reject_reserved_keys(tree, kwargs.keys(), 'mfield')
         self._mfields.update(kwargs.keys())
         cache = self._effective_cache
-        tree._write_node_data(node, kwargs, replace=False)
+        tree._write_node_data(
+            node,
+            {mfield_storage_key(k): v for k, v in kwargs.items()},
+            replace=False,
+        )
         if cache is not None:
             self._effective_cache = cache
             self._patch_effective(tree, node)
@@ -272,22 +383,62 @@ class ParameterLayer(TreeLayer):
         if key not in self._mfields:
             return None
         self._build_effective(tree)
-        return self._effective_cache[node].get(key)
+        return self._effective_cache[node].get(mfield_storage_key(key))
 
     def get(self, tree, node, key):
-        """Effective value of any key at *node* (``'instrument'`` resolves the instrument)."""
+        """Effective value of any key at *node* (``'instrument'`` resolves the instrument).
+
+        Namespace-blind by design -- it is the ``pt[node][key]`` idiom.
+        The pfield answers when there is one, else the mfield, matching
+        what ``Parametron.__getitem__`` has always done. Use
+        :meth:`get_pfield` / :meth:`get_mfield` when the namespace matters.
+        """
         if key == 'instrument':
             return self.get_instrument(tree, node)
         self._build_effective(tree)
-        return self._effective_cache[node].get(key)
+        effective = self._effective_cache[node]
+        value = effective.get(key) if key in self._pfields else None
+        if value is None and key in self._mfields:
+            value = effective.get(mfield_storage_key(key))
+        return value
 
     def items(self, tree, node):
-        """dict of all effective field values at *node*."""
+        """dict of all effective field values at *node*, mfields decoded.
+
+        One flat dict, so a name registered in BOTH namespaces can only
+        appear once: the mfield wins, as it does in the ``uc.events``
+        column of that name. :meth:`pfield_items` / :meth:`mfield_items`
+        keep them apart -- every copy path must use those, because
+        splitting a merged dict by registry membership is exactly how a
+        colliding name used to be written into both.
+        """
         self._build_effective(tree)
-        return dict(self._effective_cache[node])
+        effective = self._effective_cache[node]
+        merged = {k: v for k, v in effective.items()
+                  if not is_mfield_storage_key(k)}
+        merged.update({mfield_name(k): v for k, v in effective.items()
+                       if is_mfield_storage_key(k)})
+        return merged
+
+    def pfield_items(self, tree, node):
+        """dict of the effective PFIELD values at *node*."""
+        self._build_effective(tree)
+        return {k: v for k, v in self._effective_cache[node].items()
+                if not is_mfield_storage_key(k)}
+
+    def mfield_items(self, tree, node):
+        """dict of the effective MFIELD values at *node*, keyed by plain name."""
+        self._build_effective(tree)
+        return {mfield_name(k): v
+                for k, v in self._effective_cache[node].items()
+                if is_mfield_storage_key(k)}
 
     def remove_fields(self, tree, node, keys):
         """Delete the given override keys at *node* (descendants revert to inherited values).
+
+        Namespace-blind: a name is removed from both namespaces, matching
+        :meth:`get`'s and ``clear_fields``' blindness. Callers that mean
+        one side say so by passing names only that side has.
 
         This was the ONE field path in this layer that reached into
         ``tree._rx[node]`` without announcing anything to the tree. Every
@@ -310,13 +461,14 @@ class ParameterLayer(TreeLayer):
         if isinstance(raw, dict):
             for k in keys:
                 raw.pop(k, None)
+                raw.pop(mfield_storage_key(k), None)
         self._effective_cache = None
         tree._invalidate_caches()
 
     def clear_fields(self, tree, node=None):
         """Remove all overrides and instrument bindings — whole tree, or *node*'s subtree."""
         self._instruments_version = getattr(self, '_instruments_version', 0) + 1
-        keys = self._pfields | self._mfields
+        keys = self.storage_keys()
         if node is None:
             for n in tree.nodes:
                 raw = tree._rx[n]
@@ -366,7 +518,9 @@ class ParameterApiMixin:
 
         kept = {}
         if mode == 'replace':
-            owned = set(self._param_layer._pfields) | set(self._param_layer._mfields)
+            # STORAGE keys: the payload holds mfields under their encoded
+            # slot, so filtering on the plain names would keep none of them.
+            owned = self._param_layer.storage_keys()
             donor_root_keys = set(dict(subtree.nodes[subtree.root]))
             kept = {k: v for k, v in dict(self.nodes[target_node]).items()
                     if k in owned and k not in donor_root_keys}
@@ -406,9 +560,9 @@ class ParameterApiMixin:
             # the rhythm layer owns the write path and rejects param keys
             # handed to update_node_data.
             pfields = {k: v for k, v in kept.items()
-                       if k in self._param_layer._pfields}
-            mfields = {k: v for k, v in kept.items()
-                       if k in self._param_layer._mfields}
+                       if not is_mfield_storage_key(k)}
+            mfields = {mfield_name(k): v for k, v in kept.items()
+                       if is_mfield_storage_key(k)}
             if pfields:
                 self.set_pfields(graft_result, **pfields)
             if mfields:
@@ -496,8 +650,18 @@ class ParameterApiMixin:
         return self._param_layer.get(self, node, key)
 
     def items(self, node):
-        """dict of all effective field values at *node*."""
+        """dict of all effective field values at *node* (see
+        :meth:`ParameterLayer.items` for what a name in both namespaces
+        does here)."""
         return self._param_layer.items(self, node)
+
+    def pfield_items(self, node):
+        """dict of the effective PFIELD values at *node*."""
+        return self._param_layer.pfield_items(self, node)
+
+    def mfield_items(self, node):
+        """dict of the effective MFIELD values at *node*."""
+        return self._param_layer.mfield_items(self, node)
 
     def clear_fields(self, node=None):
         """Remove all overrides and instruments — whole tree, or *node*'s subtree."""
@@ -543,6 +707,7 @@ class ParameterTree(ParameterApiMixin, Tree):
         dst = new_tree._param_layer
         dst._pfields = set(src._pfields)
         dst._mfields = set(src._mfields)
+        dst._drop_key_memos()
         dst._node_instruments = {}
         for old_node, inst in src._node_instruments.items():
             if old_node in node_mapping:

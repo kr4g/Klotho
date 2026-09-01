@@ -35,7 +35,13 @@ from klotho.chronos import TemporalUnit, RhythmTree, Meas
 from klotho.chronos.temporal_units.temporal import Chronon, NodeContext, UTNodeHandle, UTNodeSelector
 from klotho.chronos.temporal_units.temporal import _UNSET as _UT_UNSET
 from klotho.thetos.parameters import ParameterTree
-from klotho.thetos.parameters.parameter_tree import ParameterApiMixin, ParameterLayer
+from klotho.thetos.parameters.parameter_tree import (
+    ParameterApiMixin,
+    ParameterLayer,
+    is_mfield_storage_key,
+    mfield_name,
+    mfield_storage_key,
+)
 from klotho.thetos.parameters.bind import Bind
 from klotho.thetos.instruments import Instrument
 from klotho.thetos.instruments.base import Effect
@@ -120,12 +126,12 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         new_tree.register_pfields(self.pfield_names)
         new_tree.register_mfields(self.mfield_names)
 
-        pfield_names = self.pfield_names
-        mfield_names = self.mfield_names
         for old_node, new_node in node_mapping.items():
-            effective = self.items(old_node)
-            pfields = {k: v for k, v in effective.items() if k in pfield_names}
-            mfields = {k: v for k, v in effective.items() if k in mfield_names}
+            # The two namespaces are read SEPARATELY. Splitting one merged
+            # ``items()`` dict by registry membership is what used to write
+            # a name registered on both sides into both.
+            pfields = self.pfield_items(old_node)
+            mfields = self.mfield_items(old_node)
             if pfields:
                 new_tree.set_pfields(new_node, **pfields)
             if mfields:
@@ -1406,7 +1412,9 @@ class CompositionalUnit(TemporalUnit):
         pt = ParameterTree.from_tree_structure(src)
         pt.register_pfields(src.pfield_names)
         pt.register_mfields(src.mfield_names)
-        keys = src.pfield_names | src.mfield_names
+        # Raw payload -> raw payload, so the filter is on STORAGE keys
+        # (mfields are namespaced there) and the encoding travels intact.
+        keys = src._param_layer.storage_keys()
         for node in src.nodes:
             raw = src._rx[node]
             if isinstance(raw, dict):
@@ -1424,9 +1432,8 @@ class CompositionalUnit(TemporalUnit):
         dst.register_pfields(src.pfield_names)
         dst.register_mfields(src.mfield_names)
         for old_node, new_node in mapping.items():
-            eff = src.items(old_node)
-            pf = {k: v for k, v in eff.items() if k in src.pfield_names}
-            mf = {k: v for k, v in eff.items() if k in src.mfield_names}
+            pf = src.pfield_items(old_node)
+            mf = src.mfield_items(old_node)
             if pf:
                 dst.set_pfields(new_node, **pf)
             if mf:
@@ -1487,7 +1494,7 @@ class CompositionalUnit(TemporalUnit):
             bind_targets = {src.root: (dst.root, *dst.leaf_nodes)}
         dst.register_pfields(src.pfield_names)
         dst.register_mfields(src.mfield_names)
-        keys = src.pfield_names | src.mfield_names
+        keys = src._param_layer.storage_keys()
         for src_node, dst_node in mapping.items():
             raw = src._rx[src_node]
             if isinstance(raw, dict):
@@ -1508,12 +1515,24 @@ class CompositionalUnit(TemporalUnit):
     # ------------------------------------------------------------------
     # Late-bound (Bind) value resolution
     # ------------------------------------------------------------------
-    def _bind_origin(self, node: int, key: str) -> int:
-        """Nearest ancestor-or-self holding a raw Bind override for *key*."""
+    def _bind_origin(self, node: int, key: str, value=None) -> int:
+        """Nearest ancestor-or-self holding a raw Bind override for *key*.
+
+        Both storage slots are searched -- *key* is a NAME, and a name can
+        be registered in both namespaces -- and *value*, when given,
+        settles which of the two this resolution belongs to by identity.
+        Without that, an mfield Bind resolved against a same-named pfield's
+        ancestor and got the wrong read set for its context.
+        """
+        slots = (key, mfield_storage_key(key))
         for ancestor in reversed(self._rt.branch(node)):
             raw = self._rt._rx[ancestor]
-            if isinstance(raw, dict) and isinstance(raw.get(key), Bind):
-                return ancestor
+            if not isinstance(raw, dict):
+                continue
+            for slot in slots:
+                held = raw.get(slot)
+                if isinstance(held, Bind) and (value is None or held is value):
+                    return ancestor
         return node
 
     def _resolve_bound_value(self, node: int, key: str, value):
@@ -1550,7 +1569,7 @@ class CompositionalUnit(TemporalUnit):
                 f"Bind cycle detected: field '{key}' at node {node} is being "
                 f"evaluated while already under evaluation"
             )
-        origin = self._bind_origin(node, key)
+        origin = self._bind_origin(node, key, value)
         leaves = self._rt.subtree_leaves(origin)
         try:
             index = leaves.index(node)
@@ -1746,7 +1765,9 @@ class CompositionalUnit(TemporalUnit):
         cached = self.__dict__.get('_bind_keys_cache')
         if cached is not None and cached[0] == version:
             return cached[1]
-        keys = self._rt.pfield_names | self._rt.mfield_names
+        # Scans the raw payload, so it matches on STORAGE keys and reports
+        # plain field NAMES -- its callers gate on names.
+        keys = self._rt._param_layer.storage_keys()
         found = set()
         rx = self._rt._rx
         for node in self._rt.nodes:
@@ -1754,7 +1775,7 @@ class CompositionalUnit(TemporalUnit):
             if isinstance(raw, dict):
                 for k, v in raw.items():
                     if k in keys and isinstance(v, Bind):
-                        found.add(k)
+                        found.add(mfield_name(k) if is_mfield_storage_key(k) else k)
         if not self._rt._write_batch_depth:
             self.__dict__['_bind_keys_cache'] = (version, found)
         return found
@@ -1994,6 +2015,23 @@ class CompositionalUnit(TemporalUnit):
                 stacklevel=2,
             )
 
+        # A name registered in BOTH namespaces is two independent values
+        # (a synth control and an engine meta-field) and one column name.
+        # Same shape of answer as the structural columns above: the
+        # narrower, engine-owned side wins the column, one warning names
+        # what it hid, and the hidden pfield stays readable on the unit.
+        both = [k for k in all_pf_keys if k in mf_seen]
+        if both:
+            all_pf_keys = [k for k in all_pf_keys if k not in mf_seen]
+            warnings.warn(
+                f"{sorted(both)} name both a pfield and an mfield of this "
+                f"unit; the table shows the mfield. They are separate "
+                f"values -- read the pfield with uc.get_pfield(node, key), "
+                f"and it still reaches the synth.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         data = []
         for event, inst, pf, mf in rows:
             row = {
@@ -2090,7 +2128,11 @@ class CompositionalUnit(TemporalUnit):
     def set_mfields(self, node, include_rests=False, **kwargs) -> None:
         """
         Set meta field values for target node(s).
-        
+
+        Meta fields are a namespace of their own: setting ``group`` here
+        sets the ROUTING group and never touches a synth control of the
+        same name (and vice versa in :meth:`set_pfields`).
+
         Parameters
         ----------
         node : int or list/tuple/set of int
@@ -3897,6 +3939,14 @@ class CompositionalUnit(TemporalUnit):
         mfields : dict or None, optional
             Explicit meta fields. Escape hatch: values here always go to
             mfields, even if a name collides with a SynthDef control.
+
+        Notes
+        -----
+        The two hatches are safe because pfields and mfields are two
+        NAMESPACES, not one dict: a pfield named ``group`` is a synth
+        control the engine passes through, and the routing ``group``
+        beside it is untouched. Both can be set on the same node in the
+        same call and neither reads the other.
         **fields
             Auto-routed fields (see above). Values may be scalars,
             Patterns, or callables, exactly as in ``set_pfields`` /
