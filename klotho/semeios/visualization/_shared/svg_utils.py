@@ -24,9 +24,35 @@ def svg_wrap(inner_svg, width_px, height_px, background="black"):
     )
 
 
-def svg_wrap_viewbox(inner_svg, width_px, height_px, y_min, y_max, background="black"):
-    vb_y = -y_max
+def svg_wrap_viewbox(inner_svg, width_px, height_px, y_min, y_max,
+                     background="black", flip=True):
+    """Wrap raw SVG content in a sized ``<svg>`` with a y-range viewBox.
+
+    Parameters
+    ----------
+    flip : bool, optional
+        ``True`` (the default) wraps the content in a ``scale(1,-1)`` group
+        and anchors the viewBox at ``-y_max``, giving a **math frame**: the
+        caller authors y-UP coordinates and larger y draws higher. Text
+        drawn in that frame is mirrored unless it counter-transforms (see
+        :func:`svg_text` with ``invert_y=True``).
+
+        ``False`` emits the plain **screen frame** ``viewBox="0 y_min w h"``
+        with no transform group: the caller authors y-DOWN coordinates,
+        y=0 is the top edge, and text renders the right way up.
+
+        Which one a caller needs is decided by the coordinates it already
+        authors, and picking the wrong one is silent -- the picture is
+        simply upside down, with no exception and no failing assertion.
+        ``svg_score`` and ``svg_timeline`` place lane 0 at y=0 and write
+        labels *below* a band's top edge, so they are screen-frame
+        (``flip=False``); ``svg_rt`` builds a y-up tree layout and is
+        math-frame.
+    """
+    vb_y = -y_max if flip else y_min
     vb_h = y_max - y_min
+    open_group = '<g transform="scale(1,-1)">' if flip else ""
+    close_group = "</g>" if flip else ""
     return (
         f'<div style="overflow-x:auto;overflow-y:hidden;max-width:100%;">'
         f'<svg xmlns="http://www.w3.org/2000/svg" '
@@ -34,9 +60,9 @@ def svg_wrap_viewbox(inner_svg, width_px, height_px, y_min, y_max, background="b
         f'viewBox="0 {vb_y:.4f} {width_px} {vb_h:.4f}" '
         f'preserveAspectRatio="none" '
         f'style="display:block;background:{background};">'
-        f'<g transform="scale(1,-1)">'
+        f"{open_group}"
         f"{inner_svg}"
-        f"</g>"
+        f"{close_group}"
         f"</svg></div>"
     )
 

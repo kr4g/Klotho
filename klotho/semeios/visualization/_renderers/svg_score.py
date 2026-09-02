@@ -318,7 +318,12 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
 
     inner = '\n'.join(els + halo_els)
     tooltip_html = render_tooltip_system(uid, hover_texts)
-    svg_str = svg_wrap_viewbox(inner, width_px, height_px, 0, height_px) + tooltip_html
+    # flip=False: every coordinate above is authored y-DOWN (screen frame) --
+    # lane 0 at y=0, band labels 13px BELOW their band's top edge. Wrapping
+    # that in the default math frame drew the first-registered track at the
+    # bottom and mirrored every label glyph, with nothing to signal it.
+    svg_str = svg_wrap_viewbox(inner, width_px, height_px, 0, height_px,
+                               flip=False) + tooltip_html
 
     return SvgScoreData(
         svg_str=svg_str, width_px=width_px, height_px=height_px,

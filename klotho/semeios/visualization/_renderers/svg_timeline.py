@@ -269,7 +269,11 @@ def _svg_timeline_ratios(container, figsize=None, outlines=True):
 
     inner = '\n'.join(els + halo_els)
     tooltip_html = render_tooltip_system(uid, hover_texts)
-    svg_str = svg_wrap_viewbox(inner, width_px, height_px, 0, height_px) + tooltip_html
+    # flip=False: lanes are authored y-DOWN (lane 0 at y=0), so the default
+    # math frame drew a TemporalBlock's rows bottom-up. No text here to give
+    # it away -- the same wrap bug as svg_score, just quieter.
+    svg_str = svg_wrap_viewbox(inner, width_px, height_px, 0, height_px,
+                               flip=False) + tooltip_html
 
     return SvgTimelineData(
         svg_str=svg_str, width_px=width_px, height_px=height_px,
