@@ -200,9 +200,12 @@ class Tree(GraphCore):
                 f"it were a subtree root and silently rewrites its "
                 f"metric_duration; replace_node_data with an empty dict also "
                 f"erases the node's payload and leaves the tree unreadable. "
-                f"To reset a node's attributes use replace_node(node), which "
-                f"re-derives them from the parent; to write nothing, do not "
-                f"call this."
+                f"To reset a node's STRUCTURAL attributes use "
+                f"replace_node(node), which drops them to the layer's own "
+                f"defaults -- on a RhythmTree, proportion 1; it does NOT read "
+                f"the parent, and on a CompositionalTree it leaves the "
+                f"parameter data in place (use clear_fields or remove_fields "
+                f"for that half). To write nothing, do not call this."
             )
 
     def _apply_layer_node_write(self, node, attrs, replace, op):

@@ -231,6 +231,17 @@ route through the attached layers, ensuring:
 4. Caches are invalidated and derived fields recomputed —
    `layer.on_structure_changed`.
 
+Step 2 guards a layer's data against being **overwritten** by a foreign
+write. Until AF2-3 it did not guard that data against being **deleted**:
+`replace_node`/`replace_node_data` swap the whole payload, so on a
+`CompositionalTree` a structural edit took the parameter layer's data with
+it — and the caller could not prevent that, because step 2 refuses every
+key but `proportion`/`tied`, so no payload existed that carried a pfield
+through. Those two verbs now preserve the parameter half, matching
+`graft_subtree`, which was already ruled the same way. **The rule
+generalizes: a layer's data survives a write aimed at another layer,
+whether the write sets keys or replaces them.**
+
 Node views are read-only `MappingProxyType` objects, so a direct write
 fails at the language level, not by convention.
 
