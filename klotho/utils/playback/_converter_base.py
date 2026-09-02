@@ -107,8 +107,36 @@ def resolve_instrument(inst):
 
 
 def freq_to_midi(freq):
-    if not isinstance(freq, (int, float)) or freq <= 0:
-        return 69.0
+    """Convert a frequency in Hz to a MIDI note number (A440 = 69).
+
+    Raises
+    ------
+    TypeError
+        If *freq* is not an int or float.
+    ValueError
+        If *freq* is not positive, or is not finite.
+
+    Notes
+    -----
+    This used to answer ``69.0`` for every rejected input -- zero, a
+    negative frequency, a string, ``None``. That is A440's own answer, so a
+    bad frequency did not surface as an error; it surfaced as a note that
+    looks entirely reasonable sitting in the payload next to real ones.
+    ``nan`` and ``inf`` were worse still: they passed the old guard
+    untouched (``nan <= 0`` is ``False``) and propagated into the JSON
+    payload, and ``nan`` is not valid JSON.
+    """
+    if isinstance(freq, bool) or not isinstance(freq, (int, float)):
+        raise TypeError(
+            f"freq_to_midi requires an int or float frequency in Hz, got "
+            f"{type(freq).__name__}: {freq!r}"
+        )
+    if not math.isfinite(freq):
+        raise ValueError(f"freq_to_midi requires a finite frequency, got {freq!r}")
+    if freq <= 0:
+        raise ValueError(
+            f"freq_to_midi requires a positive frequency in Hz, got {freq!r}"
+        )
     return 69.0 + 12.0 * math.log2(freq / 440.0)
 
 

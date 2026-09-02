@@ -4,7 +4,6 @@ from klotho.tonos import Pitch
 from klotho.tonos.pitch.pitch_collections import PitchCollectionBase
 from klotho.tonos.chords.chord import Chord, Voicing, ChordSequence
 from klotho.tonos.scales.scale import Scale
-from klotho.tonos.systems.harmonic_trees import Spectrum, HarmonicTree
 from klotho.chronos.rhythm_trees.rhythm_tree import RhythmTree
 from klotho.chronos.temporal_units.temporal import TemporalUnit, TemporalUnitSequence, TemporalBlock
 from klotho.thetos.composition.compositional import CompositionalUnit
@@ -1498,6 +1497,15 @@ def _lower_score_event(item):
     manifest = load_ss_manifest()
     events = []
     voice_ids = []
+    # AUD-69: a Kit resolves a DIFFERENT member per voice, and members may
+    # differ in whether they are gated -- ``SynthDefKit.has_gate`` is only
+    # the default member's, "a display/fallback hint" by its own docstring.
+    # Deciding the release from the event-level ``has_gate`` therefore got
+    # both directions wrong: a gated voice under an ungated default was
+    # never released and sustained until the widget stopped, and an ungated
+    # voice under a gated default was sent a release that names no control.
+    # Keep the per-voice answer instead.
+    voice_gating = []
 
     for voice in voices:
         uid = fast_id()
@@ -1512,6 +1520,7 @@ def _lower_score_event(item):
             voice_sel = user_pf.pop(kit.selector, None)
             member = kit._resolve(voice_sel)
             v_def_name, v_inst_pfields, v_has_gate = resolve_instrument(member)
+        voice_gating.append((uid, v_has_gate, v_def_name))
         pf = coerce_sc_pfield_values(_combine_extras(v_inst_pfields, user_pf))
         # AUD-49: the injected note length is timeline seconds sitting under a
         # name that otherwise holds an authored constant. A tuple selector
@@ -1601,20 +1610,24 @@ def _lower_score_event(item):
             })
 
     if release_time is not None:
-        if not has_gate:
+        ungated_defs = sorted({d for _, gated, d in voice_gating if not gated})
+        if ungated_defs:
             _event_fyi(
-                ('release-ungated', item.name),
-                f"event '{item.name}' uses ungated synth '{def_name}'; "
-                f"the scheduled release is a no-op and was dropped.",
+                ('release-ungated', item.name, tuple(ungated_defs)),
+                f"event '{item.name}' has voice(s) on ungated synth(s) "
+                f"{', '.join(repr(d) for d in ungated_defs)}; the scheduled "
+                f"release is a no-op for those voices and was dropped for "
+                f"them.",
             )
-        else:
-            for uid in voice_ids:
-                events.append({
-                    "type": "release",
-                    "id": uid,
-                    "start": release_time,
-                    "group": group,
-                })
+        for uid, gated, _ in voice_gating:
+            if not gated:
+                continue
+            events.append({
+                "type": "release",
+                "id": uid,
+                "start": release_time,
+                "group": group,
+            })
 
     return events
 

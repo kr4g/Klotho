@@ -1,3 +1,4 @@
+import numbers
 from fractions import Fraction
 from typing import Union, List
 from sympy import isprime
@@ -7,6 +8,26 @@ __all__ = [
     'superparticular_base',
     'validate_primes',
 ]
+
+
+def _as_whole_number(value) -> int:
+    """Coerce ``value`` to ``int``, refusing anything that is not exactly whole.
+
+    ``int(2.5)`` is ``2``, so coercing first and validating afterwards turns a
+    non-integer into a perfectly plausible prime. This checks first.
+    Integral types (including numpy integers) pass straight through; every
+    other value goes via ``Fraction``, which keeps the string and
+    ``Fraction`` inputs that already worked.
+    """
+    if isinstance(value, numbers.Integral):
+        return int(value)
+    try:
+        as_fraction = Fraction(value)
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        raise ValueError(f"primes must be whole numbers, got {value!r}") from None
+    if as_fraction.denominator != 1:
+        raise ValueError(f"primes must be whole numbers, got {value!r}")
+    return int(as_fraction)
 
 
 def is_superparticular(ratio: Union[int, float, Fraction, str]) -> bool:
@@ -107,27 +128,41 @@ def validate_primes(primes: List[Union[int, float]]) -> List[int]:
     Raises
     ------
     ValueError
-        If any value is not prime or if there are duplicates.
+        If any value is not a whole number, is not prime, or if there are
+        duplicates.
+
+    Notes
+    -----
+    A float is accepted only when it is exactly a whole number, so
+    ``2.0 -> 2`` still works while ``2.5`` is refused. The truncation used
+    to happen *before* validation, which let ``[2.5, 3.7]`` "validate" as
+    ``[2, 3]`` -- two primes the caller never asked for, silently
+    substituted for two values that are not integers at all.
 
     Examples
     --------
     >>> validate_primes([2, 3, 5])
     [2, 3, 5]
-    
+
     >>> validate_primes([2.0, 3.0, 5.0])
     [2, 3, 5]
-    
+
     >>> validate_primes([2, 3, 4])  # 4 is not prime
     Traceback (most recent call last):
         ...
     ValueError: all entries in primes must be prime
-    
+
     >>> validate_primes([2, 3, 3])  # duplicate
     Traceback (most recent call last):
         ...
     ValueError: primes must be unique
+
+    >>> validate_primes([2.5])  # not a whole number
+    Traceback (most recent call last):
+        ...
+    ValueError: primes must be whole numbers, got 2.5
     """
-    primes = [int(p) for p in primes]
+    primes = [_as_whole_number(p) for p in primes]
     if len(set(primes)) != len(primes):
         raise ValueError("primes must be unique")
     if any(not isprime(p) for p in primes):

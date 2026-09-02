@@ -168,6 +168,37 @@
     return this._allocAudioBusN(BUS_CHANNELS);
   };
 
+  // Allocate one scsynth BUFFER number, from a single page-global cursor.
+  //
+  // AUD-126: the spatial geometry table and the control-envelope buffer used
+  // to pick their bufnum with two copies of the same inline snippet, whose
+  // fallback was "no __klothoSonic stash on the page means use 0". With no
+  // stash BOTH preloads therefore allocated bufnum 0 and the second /b_alloc
+  // replaced the first buffer's contents. Nothing raises: the decoder then
+  // reads envelope samples as geometry (every speaker in the wrong place) or
+  // the envelope reads geometry coefficients as levels. Same failure shape as
+  // an audio-bus overlap, so it gets the same shape of answer as
+  // __klothoBusAlloc -- ONE cursor, ONE implementation.
+  //
+  // __klothoSonic._nextBufnum stays authoritative WHEN THE STASH EXISTS,
+  // because _lifecycle.js's sample loader draws its bufnums from that same
+  // field. The two cursors are kept as one cursor by taking the max, so a
+  // sample loaded between two preloads can never be handed out twice.
+  proto._allocBufnum = function() {
+    var g = globalThis.__klothoBufAlloc;
+    if (!g) g = globalThis.__klothoBufAlloc = { next: 0 };
+    var state = globalThis.__klothoSonic;
+    if (state) {
+      if (state._nextBufnum == null || state._nextBufnum < g.next) {
+        state._nextBufnum = g.next;
+      }
+      g.next = state._nextBufnum;
+    }
+    var bufnum = g.next++;
+    if (state) state._nextBufnum = g.next;
+    return bufnum;
+  };
+
   proto._allocControlBus = function() {
     var g = globalThis.__klothoBusAlloc;
     var idx = Math.max(this._nextControlBus, g.nextControl);
@@ -597,14 +628,7 @@
     var coeffs = plan.decoder.coefficients;
     var width = plan.mainWidth;
 
-    var bufnum = 0;
-    var sharedState = globalThis.__klothoSonic;
-    if (sharedState && sharedState._nextBufnum != null) {
-      bufnum = sharedState._nextBufnum++;
-    } else if (sharedState) {
-      sharedState._nextBufnum = 1;
-      bufnum = 0;
-    }
+    var bufnum = this._allocBufnum();
 
     // N frames of SIX channels. The same floats in an "N*6 frames of 1"
     // buffer are read as six consecutive lanes' worth of numbers by
@@ -700,14 +724,7 @@
     for (var i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
     var floats = new Float32Array(ab);
 
-    var bufnum = 0;
-    var sharedState = globalThis.__klothoSonic;
-    if (sharedState && sharedState._nextBufnum != null) {
-      bufnum = sharedState._nextBufnum++;
-    } else if (sharedState) {
-      sharedState._nextBufnum = 1;
-      bufnum = 0;
-    }
+    var bufnum = this._allocBufnum();
 
     sonic.send('/b_alloc', bufnum, controlData.numFrames, 1);
 
@@ -773,9 +790,19 @@
       // its __klEnvCtrl synth starts writing.
       var firstValue = (startFrame < floats.length) ? floats[startFrame] : 0;
       sonic.send('/c_set', ctrlBus, firstValue);
+      // AUD-75: the WHOLE pfield list, not just the first one.
+      //
+      // ``apply_envelope(env, ['amp', 'pan'], node, control=True)`` is a
+      // single ordinary call and it produces ONE descriptor carrying both
+      // names. Keeping only ``pfields[0]`` mapped ``amp`` to the envelope
+      // bus and left ``pan`` on the staircase baked at lowering time --
+      // while ``uc.events`` reported both as enveloped. No error, no
+      // warning: the second parameter simply did not move.
       this._controlBusMap.push({
         bus: ctrlBus,
-        param: (desc.pfields && desc.pfields.length > 0) ? desc.pfields[0] : 'amp',
+        params: (desc.pfields && desc.pfields.length > 0)
+          ? desc.pfields.slice()
+          : ['amp'],
         targets: desc.targets || [],
         start: desc.start,
         dur: desc.dur,
@@ -823,12 +850,18 @@
         if (tgt && tgt.id === evId) {
           if (!mappings) mappings = [];
           var deferred = (evStart != null) && (tgt.startTime > evStart + 1e-9);
-          mappings.push({
-            param: cm.param,
-            bus: cm.bus,
-            startTime: tgt.startTime,
-            deferred: deferred
-          });
+          // One mapping per declared pfield (AUD-75). Both /n_map emitters
+          // in scheduler_core.js already loop over whatever this returns,
+          // so widening the list here is the whole fix.
+          var params = cm.params || [];
+          for (var pi = 0; pi < params.length; pi++) {
+            mappings.push({
+              param: params[pi],
+              bus: cm.bus,
+              startTime: tgt.startTime,
+              deferred: deferred
+            });
+          }
           break;
         }
       }

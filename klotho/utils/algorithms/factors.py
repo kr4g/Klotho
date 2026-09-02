@@ -32,21 +32,34 @@ def to_factors(value: Union[int, Fraction, str]) -> Dict[int, int]:
     ------
     TypeError
         If input type is not supported.
+    ValueError
+        If the value is zero or negative. Prime factorization is defined
+        only for positive rationals.
+
+    Notes
+    -----
+    Zero and negative values used to come back carrying keys that are not
+    primes -- ``to_factors(0)`` was ``{0: 1}`` and ``to_factors(-6)`` was
+    ``{2: 1, 3: 1, -1: 1}``, following sympy's ``factorint`` convention.
+    Every consumer here reads the keys as primes, so the ``0`` or ``-1``
+    entry surfaced far downstream as an error about a *lattice* or a
+    *basis*, pointing away from the actual bad input. Refusing here names
+    the real problem at the place it enters.
 
     Examples
     --------
     Factor an integer:
-    
+
     >>> to_factors(12)
     {2: 2, 3: 1}
-    
+
     Factor a fraction:
-    
+
     >>> to_factors(Fraction(3, 2))
     {3: 1, 2: -1}
-    
+
     Factor from string representation:
-    
+
     >>> to_factors('5/4')
     {5: 1, 2: -2}
     """
@@ -59,6 +72,11 @@ def to_factors(value: Union[int, Fraction, str]) -> Dict[int, int]:
             ratio = Fraction(s)
         case _:
             raise TypeError("Unsupported type")
+    if ratio <= 0:
+        raise ValueError(
+            f"to_factors requires a positive value, got {value!r}. Prime "
+            "factorization is defined only for positive rationals."
+        )
     # callers may mutate the returned dict, so the memo stores an
     # immutable snapshot (factorint dominates the cost: this sits under
     # indigestibility, interval-cost, and coordinate paths)

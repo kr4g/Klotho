@@ -17,40 +17,73 @@ def normalize_sum(data):
     -------
     list, tuple, or numpy.ndarray
         Collection of the same type as input with values scaled so that
-        their sum equals 1.0. If input sum is zero, returns collection
-        of zeros with same shape and type.
+        their sum equals 1.0. An all-zero input is returned unchanged --
+        there is nothing to scale.
 
     Raises
     ------
+    ValueError
+        If the values sum to zero while at least one of them is nonzero.
+        No scalar can make such a collection sum to 1, so there is no
+        answer to give.
     TypeError
         If input is not a list, tuple, or numpy array.
+
+    Notes
+    -----
+    **A negative total flips every sign.** Scaling by ``1 / total`` is the
+    only linear map that makes the sum 1, so when the total is negative the
+    result is the input reflected through zero: ``[-1, -2, -3]`` normalizes
+    to ``[1/6, 1/3, 1/2]``. Every pairwise proportion survives the flip
+    exactly (``result[1] / result[0]`` is still ``2``), which is why this is
+    kept rather than refused -- the answer is correct for the question the
+    function asks. It is documented here because a caller who passes
+    negative weights and gets positive ones back is otherwise surprised.
+    If signs carry meaning for you, normalize the magnitudes and reapply
+    the signs yourself.
 
     Examples
     --------
     Normalize a list of integers:
-    
+
     >>> normalize_sum([1, 2, 3, 4])
     [0.1, 0.2, 0.3, 0.4]
-    
+
     Normalize a tuple of floats:
-    
+
     >>> normalize_sum((1.5, 2.5, 1.0))
     (0.3, 0.5, 0.2)
-    
-    Handle zero sum case:
-    
+
+    An all-zero collection is returned as is:
+
     >>> normalize_sum([0, 0, 0])
     [0, 0, 0]
+
+    A negative total reflects the values through zero:
+
+    >>> normalize_sum([-1, -1])
+    [0.5, 0.5]
     """
     if isinstance(data, (list, tuple)):
         total = sum(data)
         if total == 0:
+            if any(x != 0 for x in data):
+                raise ValueError(
+                    "cannot normalize a collection that sums to zero while "
+                    f"holding nonzero values: {list(data)!r}. No scalar makes "
+                    "these sum to 1."
+                )
             return type(data)([0] * len(data))
         normalized = [x / total for x in data]
         return type(data)(normalized)
     elif isinstance(data, np.ndarray):
         total = np.sum(data)
         if total == 0:
+            if np.any(data != 0):
+                raise ValueError(
+                    "cannot normalize an array that sums to zero while "
+                    "holding nonzero values. No scalar makes these sum to 1."
+                )
             return np.zeros_like(data)
         return data / total
     else:

@@ -25,7 +25,18 @@ __all__ = [
     'ratio_to_coordinate',
     'ratios_to_coordinates',
     'cost_matrix',
+    # graph traversals -- these are exported by graphs.py itself, so leaving
+    # them out here made the package star-import and the module star-import
+    # disagree about the same eight names.
+    'greedy_tsp',
     'minimum_cost_path',
+    'greedy_random_walk',
+    'probabilistic_random_walk',
+    'deterministic_greedy_walk',
+    'prim_order_traversal',
+    'greedy_nearest_unvisited',
+    'dijkstra_order_traversal',
+    'weighted_dfs_traversal',
     'diverse_sample',
     'sample_with_replacement',
     'is_superparticular',
