@@ -416,11 +416,38 @@ class GraphCore:
                 yield idx
 
     def subgraph(self, node, renumber=True):
-        """Extract a subgraph starting from a given node."""
+        """Extract a subgraph starting from a given node.
+
+        The result is re-indexed from zero, so ``node`` is generally NOT the
+        same id in the subgraph that it was here; read the new root off
+        :attr:`root_nodes` rather than assuming it kept its number.
+
+        Notes
+        -----
+        AF-1b / audit H1, third door -- and unlike the other two this one was
+        never broken. Child order in this codebase is ascending node id
+        (:meth:`successors` sorts), so a copy is faithful only if old-to-new
+        is monotone, and the id list here is assembled in traversal order,
+        which is exactly the shape that permuted
+        :meth:`~klotho.topos.graphs.trees.trees.Tree.subtree`.
+
+        It survives because ``rx.subgraph`` walks the SOURCE graph's own node
+        indices and keeps the ones in the set -- the list's order never
+        reaches the result. Measured on rustworkx 0.17.1 over randomised
+        graphs with reused (LIFO) ids in shuffled input orders: monotone
+        every time, and pinned by
+        ``test_rustworkx_subgraph_reindexes_by_ascending_original_index``.
+
+        The list is sorted anyway. That is a no-op under the behaviour above,
+        but rustworkx does not document it, and the ONE other reading a
+        maintainer would guess -- "nodes are added in the order given" --
+        makes a sorted list monotone too. Sorting costs nothing and removes
+        the need to know which of the two is true.
+        """
         if node not in self:
             raise ValueError(f"Node {node} not found in graph")
 
-        descendants = [node] + list(self.descendants(node))
+        descendants = sorted({node, *self.descendants(node)})
 
         subgraph_rx = self._rx.subgraph(descendants)
 

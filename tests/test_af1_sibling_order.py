@@ -361,3 +361,325 @@ def test_a_recycled_tree_answers_exactly_as_a_pristine_one():
     assert not mismatches, (
         f'{len(mismatches)}/500 recycled trees differ from the pristine '
         f'answer; first: {mismatches[0]}')
+
+
+# ===========================================================================
+# AF-1b -- the same defect class on the EXTRACTION doors.
+#
+# ``52aeb09`` fixed the three WRITE doors above.  Its verifier flagged two
+# more sites of the same shape, and this half of the file settles both.
+#
+# ``Tree.subtree`` is the second door and it is a genuine defect, by a
+# different mechanism.  It copies nodes into a FRESH graph, whose ids are
+# therefore handed out ``0, 1, 2, ...`` in whatever order the copy loop
+# visits them -- and the loop visits them in ``Tree.descendants`` order,
+# which is ``rx.dfs_edges``, i.e. rustworkx ADJACENCY order.  Adjacency
+# order is EDGE-INSERTION order.  Ascending node id and edge-insertion
+# order are the same list only while no id has ever been reused; the moment
+# the LIFO free list hands a low id back to a late insert, they diverge and
+# the extracted subtree comes back with its children permuted.
+#
+# The give-away is that the extracted tree contradicts ITSELF: the ``Group``
+# rebuilt at the bottom of ``subtree`` walks ``sorted(children)`` over the
+# SOURCE ids and was always right, so ``sub.group.S`` and ``sub.successors``
+# disagreed about the same object.
+#
+# ``GraphCore.subgraph`` has the same SHAPE and is NOT the same defect --
+# it hands the id list to ``rx.subgraph``, which re-indexes by ascending
+# ORIGINAL index and ignores the list's order entirely.  That is measured
+# below rather than assumed, and pinned, because it is an undocumented
+# rustworkx property that the whole ordering model would silently ride on.
+#
+# Every expected value below is derived by hand from the ordering model
+# ("child order is ascending node id and nothing else") and the arithmetic
+# is written into the test.
+# ===========================================================================
+
+import rustworkx as rx
+
+from klotho.topos.graphs import Graph
+from klotho.thetos.parameters import ParameterTree
+
+
+def _labels(tree, node=None):
+    """Structure by ``label``, in child order, with node ids factored out."""
+    node = tree.root if node is None else node
+    kids = tree.successors(node)
+    value = tree[node].get('label')
+    if not kids:
+        return value
+    return (value, tuple(_labels(tree, k) for k in kids))
+
+
+# ---------------------------------------------------------------------------
+# Tree.subtree -- door 2
+# ---------------------------------------------------------------------------
+
+def test_subtree_after_a_reused_id_keeps_the_source_child_order():
+    """``subtree`` must hand back the tree it was pointed at.
+
+    Derivation, entirely from the ordering model.  ``Tree('A', (B, C, D, E))``
+    allocates the root 0 and the four children 1, 2, 3, 4 in order, so the
+    root reads ``(B C D E)``.  ``prune(2)`` destroys C and frees id 2, leaving
+    ``(B D E)`` on ids 1, 3, 4.  ``add_child`` then takes the one id on the
+    free list -- 2 -- so X sits at id 2 and, because child order is ascending
+    node id, the root now reads::
+
+        1=B  2=X  3=D  4=E   ->   (B X D E)
+
+    which is exactly the example ``Tree.add_child``'s own docstring gives for
+    "this is not a guaranteed append".  Extracting that tree cannot change
+    what it says, so the copy must read ``(B X D E)`` too.
+
+    Measured before the fix: ``(B D E X)``.  The copy loop walked
+    ``descendants`` = ``(1, 3, 4, 2)`` -- depth-first in edge-insertion order,
+    with X last because its edge was added last -- and the empty destination
+    graph numbered them 1, 2, 3, 4 in that sequence, so X came out last and
+    D and E each moved one rank left.
+    """
+    tree = Tree('A', ('B', 'C', 'D', 'E'))
+    assert [tree[n].get('label') for n in sorted(tree.nodes)] == \
+        ['A', 'B', 'C', 'D', 'E']
+    assert tree.successors(tree.root) == (1, 2, 3, 4)
+
+    tree.prune(2)
+    assert tree.successors(tree.root) == (1, 3, 4)
+
+    reused = tree.add_child(tree.root, label='X')
+    assert reused == 2, f'expected the free list to hand back 2, got {reused}'
+    assert _labels(tree) == ('A', ('B', 'X', 'D', 'E'))
+
+    assert _labels(tree.subtree(tree.root)) == ('A', ('B', 'X', 'D', 'E'))
+
+
+def test_subtree_does_not_contradict_its_own_group():
+    """One extracted object must not give two different child orders.
+
+    ``subtree`` rebuilds the ``Group`` from ``sorted(children)`` over the
+    SOURCE ids, so ``sub.group.S`` was always the correct ``(B X D E)`` --
+    while the graph it was attached to said ``(B D E X)``.  Whichever a
+    caller happened to read decided what the music was.
+    """
+    tree = Tree('A', ('B', 'C', 'D', 'E'))
+    tree.prune(2)
+    tree.add_child(tree.root, label='X')
+
+    sub = tree.subtree(tree.root)
+    from_graph = tuple(sub[k].get('label') for k in sub.successors(sub.root))
+
+    assert sub.group.S == ('B', 'X', 'D', 'E')
+    assert from_graph == sub.group.S, (
+        f'graph says {from_graph}, group says {sub.group.S}')
+
+
+def test_subtree_of_an_inner_node_keeps_the_child_order():
+    """The same, one level down, extracting a node that is not the root.
+
+    ``Tree('R', ((P, (a, b, c, d)), Q))`` allocates depth-first: R=0, P=1,
+    a=2, b=3, c=4, d=5, Q=6.  Pruning b frees id 3; the next ``add_child``
+    on P takes it, so P reads ``2=a 3=Z 4=c 5=d`` -> ``(a Z c d)``.
+
+    Measured before the fix: ``(a c d Z)`` -- ``descendants(P)`` was
+    ``(2, 4, 5, 3)``.
+    """
+    tree = Tree('R', (('P', ('a', 'b', 'c', 'd')), 'Q'))
+    parent = tree.successors(tree.root)[0]
+    assert parent == 1 and tree.successors(parent) == (2, 3, 4, 5)
+
+    tree.prune(3)
+    reused = tree.add_child(parent, label='Z')
+    assert reused == 3
+    assert _labels(tree, parent) == ('P', ('a', 'Z', 'c', 'd'))
+
+    assert _labels(tree.subtree(parent)) == ('P', ('a', 'Z', 'c', 'd'))
+
+
+def test_parameter_subtree_leaves_each_value_on_the_rank_that_held_it():
+    """The silent one: values and instrument bindings change RANK.
+
+    A ``ParameterTree`` whose four children carry 100, 200, 300, 400.
+    Pruning the second frees id 2; the replacement takes id 2 back and is
+    given 999, so by ascending-id order the children read::
+
+        1=100   2=999   3=300   4=400
+
+    Extraction must not move a value between ranks.  Measured before the
+    fix the subtree read ``100, 300, 400, 999``: rank 1 answered 300 -- the
+    value belonging to rank 2 -- and 999 had walked to the end.  Nothing
+    raised; every number is a number a composer could have written.
+
+    The instrument binding is carried by ``node_mapping`` through
+    ``ParameterLayer.on_nodes_remapped``, so it follows its own node
+    faithfully -- straight to the wrong rank with it.
+    """
+    tree = ParameterTree('root', (1, 2, 3, 4))
+    tree.register_pfields(['freq'])
+    kids = list(tree.successors(tree.root))
+    assert kids == [1, 2, 3, 4]
+    for node, freq in zip(kids, (100, 200, 300, 400)):
+        tree.set_pfields(node, freq=freq)
+
+    tree.prune(2)
+    reused = tree.add_child(tree.root)
+    assert reused == 2
+    tree.set_pfields(reused, freq=999)
+    tree.set_instrument(reused, 'kl_saw')
+
+    source = tuple(tree.get_pfield(k, 'freq')
+                   for k in tree.successors(tree.root))
+    assert source == (100, 999, 300, 400)
+
+    sub = tree.subtree(tree.root)
+    extracted = tuple(sub.get_pfield(k, 'freq')
+                      for k in sub.successors(sub.root))
+    assert extracted == (100, 999, 300, 400), (
+        f'ranks were permuted: {extracted}')
+
+    # the instrument must still govern the note that carries 999 -- rank 1.
+    bound = [k for k in sub.successors(sub.root)
+             if k in sub.node_instruments]
+    assert len(bound) == 1
+    assert sub.successors(sub.root).index(bound[0]) == 1
+    assert sub.get_pfield(bound[0], 'freq') == 999
+
+
+def test_subtree_on_a_clean_tree_is_unchanged_ids_included():
+    """No freed ids -> the fix must be a no-op, down to the node numbers.
+
+    A tree built in one pass allocates depth-first, so edge-insertion order
+    and ascending-id order are the same list and the pre-fix loop already
+    produced this.  Pinned so a future ordering change cannot pass unnoticed
+    as "just the subtree fix".
+    """
+    tree = Tree('R', (('P', ('a', 'b')), 'Q', ('S', ('c', 'd', 'e'))))
+    assert [tree[n].get('label') for n in sorted(tree.nodes)] == \
+        ['R', 'P', 'a', 'b', 'Q', 'S', 'c', 'd', 'e']
+
+    sub = tree.subtree(tree.root)
+    assert sorted(sub.nodes) == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    assert [sub[n].get('label') for n in sorted(sub.nodes)] == \
+        ['R', 'P', 'a', 'b', 'Q', 'S', 'c', 'd', 'e']
+    assert sub.root == 0
+    assert _labels(sub) == _labels(tree)
+
+
+def test_an_extracted_subtree_equals_what_it_was_extracted_from():
+    """400 randomised recycled trees; the SOURCE is the oracle.
+
+    No reference implementation is involved: ``subtree`` is a copy, so the
+    only right answer is the thing it copied.  The source shapes are built
+    by ``prune``/``add_child``, whose ordering model ("child order is
+    ascending node index") is the documented one this file rests on.
+
+    Measured against the pre-fix implementation this fails on roughly a
+    quarter of the trials -- 105 of 400 -- so the defect was ordinary, not
+    exotic.
+    """
+    rng = random.Random(20260901)
+    mismatches = []
+
+    for trial in range(400):
+        def branch(depth=0):
+            kids = []
+            for i in range(rng.randint(2, 5)):
+                name = f'n{depth}_{i}_{rng.randint(0, 9999)}'
+                if depth < 2 and rng.random() < 0.4:
+                    kids.append((name, branch(depth + 1)))
+                else:
+                    kids.append(name)
+            return tuple(kids)
+
+        tree = Tree('root', branch())
+
+        victims = [n for n in tree.nodes if n != tree.root]
+        rng.shuffle(victims)
+        for v in sorted(victims[:rng.randint(1, 3)]):   # ascending arms LIFO
+            if v in tree and v != tree.root:
+                tree.prune(v)
+
+        for k in range(rng.randint(1, 3)):
+            hosts = [n for n in tree.nodes]
+            tree.add_child(rng.choice(hosts), label=f'fresh{trial}_{k}')
+
+        targets = [tree.root] + [n for n in tree.nodes
+                                 if tree.successors(n)]
+        target = rng.choice(targets)
+
+        want = _labels(tree, target)
+        got = _labels(tree.subtree(target))
+        if got != want:
+            mismatches.append((trial, target, want, got))
+
+    assert not mismatches, (
+        f'{len(mismatches)}/400 extracted subtrees differ from their source; '
+        f'first: {mismatches[0]}')
+
+
+# ---------------------------------------------------------------------------
+# GraphCore.subgraph -- door 3, flagged by shape, measured here
+# ---------------------------------------------------------------------------
+
+def test_rustworkx_subgraph_reindexes_by_ascending_original_index():
+    """The property ``GraphCore.subgraph``'s correctness rests on.
+
+    ``rx.subgraph(nodes)`` does NOT number the result in the order of the
+    list it is given: it walks the graph's own node indices and keeps the
+    ones in the set, so old-to-new is MONOTONE whatever order the list
+    arrives in.  That is what makes the ``[node] + list(descendants)`` call
+    order-safe despite looking exactly like the two doors above.
+
+    It is undocumented, so it is pinned here: if a rustworkx upgrade ever
+    numbers by input order instead, this fails loudly rather than permuting
+    every extracted subgraph in silence.
+    """
+    graph = rx.PyDiGraph()
+    for i in range(6):
+        graph.add_node(f'n{i}')
+    graph.remove_node(1)
+    graph.remove_node(2)
+    late = graph.add_node('late')       # LIFO hands back 2, then 1
+    later = graph.add_node('later')
+    assert (late, later) == (2, 1)
+
+    for order in ([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], [3, 0, 5, 1, 4, 2]):
+        sub = graph.subgraph(order)
+        assert [sub[i] for i in sub.node_indices()] == \
+            [graph[i] for i in sorted(order)], f'input order {order} leaked'
+
+
+def test_subgraph_keeps_child_order_on_a_recycled_graph():
+    """The door itself, on a graph whose ids have been reused.
+
+    Built so the ordering model has teeth: node 5 is the parent, and its two
+    children hold the REUSED ids 1 and 2 -- so ascending-id order puts them
+    ahead of their own parent, and any re-numbering that followed the
+    descendants list rather than the ids would swap them.
+    """
+    graph = Graph.directed()
+    for i in range(6):
+        graph.add_node(label=f'n{i}')
+    graph.remove_node(1)
+    graph.remove_node(2)
+    first = graph.add_node(label='FIRST')     # id 2
+    second = graph.add_node(label='SECOND')   # id 1
+    assert (first, second) == (2, 1)
+    graph.add_edge(5, first)
+    graph.add_edge(5, second)
+
+    # ascending id order: 1=SECOND before 2=FIRST
+    parent_kids = [graph[k]['label'] for k in graph.successors(5)]
+    assert parent_kids == ['SECOND', 'FIRST']
+
+    sub = graph.subgraph(5)
+    root = sub.root_nodes[0]
+    assert [sub[k]['label'] for k in sub.successors(root)] == parent_kids
+
+
+def test_tree_subgraph_keeps_child_order_on_a_recycled_tree():
+    """``Tree`` inherits ``subgraph``; it must agree with ``subtree``."""
+    tree = Tree('A', ('B', 'C', 'D', 'E'))
+    tree.prune(2)
+    tree.add_child(tree.root, label='X')
+    assert _labels(tree) == ('A', ('B', 'X', 'D', 'E'))
+
+    assert _labels(tree.subgraph(tree.root)) == ('A', ('B', 'X', 'D', 'E'))

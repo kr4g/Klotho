@@ -554,11 +554,46 @@ class Tree(GraphCore):
         return lca
 
     def subtree(self, node, renumber=True):
-        """Extract a tree subtree rooted at the given node."""
+        """Extract a tree subtree rooted at the given node.
+
+        The copy reads exactly what it was pointed at, sibling order
+        included.
+
+        Notes
+        -----
+        AF-1b / audit H1, second door. Child order is ascending node id
+        (:meth:`~klotho.topos.graphs.core.GraphCore.successors` sorts), so a
+        copy is faithful only if old-to-new is MONOTONE. The destination
+        graph is empty, so it hands ids out ``0, 1, 2, ...`` in whatever
+        order the copy loop visits the source -- and the loop used to visit
+        in :meth:`descendants` order, which is ``rx.dfs_edges``, i.e.
+        rustworkx ADJACENCY order, i.e. EDGE-INSERTION order.
+
+        Insertion order and ascending id are the same list only while no id
+        has ever been reused. **The rustworkx free list is LIFO**, so as soon
+        as a removal hands a low id back to a late insert the two diverge and
+        the extracted subtree came back permuted: ``(B X D E)`` was copied as
+        ``(B D E X)``, and on a :class:`~klotho.thetos.parameters.parameter_tree.ParameterTree`
+        the per-node values and instrument bindings moved rank with it -- no
+        exception, just other plausible numbers on the wrong notes.
+
+        Sorting the descendants makes the pairing a monotone bijection, so
+        every sibling group keeps its order at every depth -- the same
+        reasoning as :meth:`_map_donor_ids`. ``node`` itself is placed first
+        and separately, as :meth:`_graft_replace_leaf` places the donor root:
+        it is a sibling of nothing, and keeping it at index 0 leaves a tree
+        whose ids were never reused byte-identical to before (such a tree is
+        built depth-first, so its insertion order already WAS ascending).
+
+        The give-away for the old behaviour was self-contradiction: the
+        ``Group`` rebuilt below walks ``sorted(children)`` over the SOURCE
+        ids and was always right, so one extracted object answered ``(B X D
+        E)`` from ``group`` and ``(B D E X)`` from the graph.
+        """
         if node not in self:
             raise ValueError(f"Node {node} not found in tree")
 
-        descendants = [node] + list(self.descendants(node))
+        descendants = [node] + sorted(self.descendants(node))
 
         new_tree = self.__class__.__new__(self.__class__)
         new_tree._rx = rx.PyDiGraph()
