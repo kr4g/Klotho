@@ -78,7 +78,11 @@
       + 'widths 1, 2, 4, 6, 8, 12, 16, 24 and 32; a speaker count outside '
       + 'that list has no compiled def to send, and scsynth does not refuse a '
       + 'missing def -- it creates nothing and the array plays SILENTLY. '
-      + 'Declare an array at one of those widths, or fold to stereo offline.');
+      + 'Declare an array at one of those widths, or fold to stereo offline '
+      + 'with klotho.thetos.spatial.fold_to_stereo, which has neither a '
+      + 'wire-buffer budget nor a delay line. (Klotho refuses an off-family '
+      + 'width in Python now, so a payload reaching here in this state was '
+      + 'either hand-built or saved by an older release.)');
   }
 
   // How many audio bus CHANNELS this page's engine actually booted with.
@@ -393,6 +397,61 @@
         + 'SILENT. Declare the master with its array too -- '
         + "score.track('main', speakers=..., inserts=[...]) -- so the widths "
         + 'are checked, or take the inserts off main.');
+    }
+
+    // The unguarded SIBLING of the warning above, and the reason it needed
+    // one: main DECLARING an array does not make the widths agree, it only
+    // makes the test above false. A main declared at two speakers while
+    // another track declares twenty-four is still built at twenty-four --
+    // main's own array then describes lanes 0..1 of a bus that is 24 wide,
+    // its inserts were width-checked against 2 and bridge lanes 0..1 alone
+    // (measured on the shipped defs: kl_reverb writes fxBus 120-121 while
+    // __spatialDecode24 reads 120-143), and main is not in the decoder
+    // tie-break at all, so the fold silently uses another track's geometry.
+    //
+    // Klotho refuses this at lowering now, in Python, where the composer can
+    // read it -- converters._build_spatial_meta. This stays for the payloads
+    // Python did not build: a saved output from an older release, or a
+    // hand-written meta.
+    var declaredMain = spatial ? spatial.widths['main'] : null;
+    if (spatial && declaredMain != null && declaredMain < mainWidth) {
+      var mainSpecs = insertSpecs['main'] || [];
+      // The widener is usually another track, but it can be the stereo
+      // FLOOR: mainWidth starts at BUS_CHANNELS, so a lone speakers=[1] on
+      // main is narrower than its own chain with no track to blame.
+      var widener = null;
+      for (var wn in spatial.widths) {
+        if (wn !== 'main' && spatial.widths[wn] === mainWidth) {
+          widener = wn;
+          break;
+        }
+      }
+      console.warn('[Klotho] main declares ' + declaredMain + ' speakers but '
+        + (widener !== null
+            ? 'track ' + JSON.stringify(widener) + ' declares ' + mainWidth
+              + ', and every track sums into main'
+            : 'a master chain is never narrower than a stereo pair')
+        + ' -- so main\'s chain is built ' + mainWidth + ' channels '
+        + 'wide and the ' + declaredMain + '-speaker array declared on it '
+        + 'describes only lanes 0..' + (declaredMain - 1) + ' of it. '
+        + (mainSpecs.length > 0
+            ? 'Main\'s ' + mainSpecs.length + ' insert(s) were checked '
+              + 'against ' + declaredMain + ' channels and leave the other '
+              + (mainWidth - declaredMain) + ' lanes of main\'s post-FX bus '
+              + 'unwritten: those speakers will be SILENT. '
+            : widener !== null
+              ? 'Main is also out of the decoder tie-break, so the headphone '
+                + 'fold uses ' + JSON.stringify(widener) + '\'s geometry and '
+                + 'not the one declared here -- SILENT about the '
+                + 'substitution. '
+              : 'Nothing is as wide as the chain main is built at, so the '
+                + 'decoder tie-break selects no track at all and this score '
+                + 'gets NO headphone fold -- reported below as "labels but '
+                + 'no positions", which is not what happened. ')
+        + "Declare main at the full array (score.track('main', "
+        + 'speakers=<the widest array>, ...)), or leave speakers= off main '
+        + 'entirely (score.track(\'main\', speakers=[]) to un-declare) so it '
+        + 'is widened to fit.');
     }
 
     var allTracks = trackNames.concat(["main"]);

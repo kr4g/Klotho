@@ -161,8 +161,10 @@ __all__ = [
     'BINAURAL_FIELDS',
     'BINAURAL_STRIDE',
     'DECODER_MAX_DELAY_S',
+    'DEFAULT_FOLD_SAMPLE_RATE',
     'DECODER_WIRE_BUFS_PER_SPEAKER',
     'decoder_wire_bufs',
+    'fold_to_stereo',
     'FACINGS',
     'HEAD_HALF',
     'HEAD_HALF_FT',
@@ -484,7 +486,11 @@ class SpeakerArray:
                 f"{SCSYNTH_DEFAULT_MAX_WIRE_BUFS}. Past that it refuses to "
                 "load the decoder, keeps running, and the piece plays "
                 "SILENTLY with no error -- so this is refused here, where you "
-                "can see it. Use fewer speakers, fold the array offline, or "
+                "can see it. Use fewer speakers, fold the array offline with "
+                "fold_to_stereo (in this module; it has neither a "
+                "wire-buffer budget nor a delay line -- but its input is a "
+                "SpeakerArray, so a rig THIS wide has to be split into "
+                f"arrays of at most {MAX_DECODER_SPEAKERS} first), or "
                 "boot the engine with a larger maxWireBufs (at least "
                 f"{decoder_wire_bufs(len(labels))} for this array), which "
                 "Klotho does not set today.")
@@ -1072,7 +1078,8 @@ class SpeakerArray:
                     f"is {worst_s:.2f} s from the listener at "
                     f"{tuple(point)!r}, past the {limit:.2f} s delay line. "
                     "Move the listener inside the array, or fold this one "
-                    "offline, which has no delay limit.")
+                    "offline with fold_to_stereo (in this module), which has "
+                    "no delay limit.")
 
         return BinauralCoefficients(
             labels=self._labels,
@@ -1209,3 +1216,155 @@ class SpeakerArray:
         if reverse:
             order.reverse()
         return tuple(self._labels[i] for i in order)
+
+
+# ----------------------------------------------------------------------
+# the offline fold
+# ----------------------------------------------------------------------
+
+
+#: The rate the fold quantizes delays to when the caller does not say.
+#: Only a default: a fold of a 44.1 kHz file must pass 44100, or every
+#: propagation delay comes out about 9% short.
+DEFAULT_FOLD_SAMPLE_RATE = 48000
+
+
+def fold_to_stereo(block, array: 'SpeakerArray', listener=None, *,
+                   facing: str = 'north',
+                   head_half: Optional[float] = None,
+                   sample_rate: int = DEFAULT_FOLD_SAMPLE_RATE):
+    """Fold a finished multichannel block down to two ears, offline.
+
+    The second consumer this module's opening paragraph names, and the
+    remedy five refusals send a composer to: an array too wide for the
+    live decoder's interconnect budget, or a listener standing past its
+    0.33 s delay line, can still be auditioned here, because **nothing
+    offline has either limit**.  There is no wire-buffer budget and no
+    delay line -- a delay is an index into an array -- so the only cost of
+    a 64-speaker fold is time.
+
+    Identical model to the real-time ``__spatialDecodeN``, from the same
+    numbers: :meth:`SpeakerArray.binaural_coefficients` supplies the
+    per-speaker delay, gain and head-shadow cutoff, and each lane is
+    delayed, scaled, one-pole lowpassed and summed into the ear.  The
+    one-pole is written to match ``OnePole.ar`` exactly --
+    ``y[n] = (1 - a) x[n] + a y[n-1]`` with ``a = exp(-2 pi fc / sr)``,
+    one pole and 6 dB/octave, not an ``LPF``'s two -- so the two paths
+    agree above the corner as well as at it.  They are not sample
+    identical end to end (a host filter is not bit-for-bit scsynth's, and
+    the live path has the insert chain in front of it), but nothing about
+    the geometry can drift between them.
+
+    **Binaural-lite, and the limits are the model's**: interaural time
+    difference, interaural level difference and a head shadow on the
+    left-right axis only.  No pinna filtering, so a source in front and
+    one behind fold identically.  See
+    :meth:`SpeakerArray.binaural_coefficients`.
+
+    Parameters
+    ----------
+    block : array-like, shape (frames, speakers)
+        The multichannel material, one COLUMN per speaker lane, in the
+        array's lane order -- the shape a soundfile reader hands back.
+        Lane ``k`` is the speaker ``array.label_at(k)``, never the label
+        itself.
+    array : SpeakerArray
+        The rig the block was written for.  Its
+        :attr:`~SpeakerArray.labels` decide how many columns *block* must
+        have.
+    listener : label, sequence of float, or None
+        Where the head is; defaults to the array's centroid.
+    facing : str, optional
+        ``'north'`` (default) or ``'east'``.
+    head_half : float, optional
+        Half the interaural distance, in the array's units.
+    sample_rate : int, optional
+        The block's sample rate.  Delays are quantized to whole samples at
+        this rate, so passing the wrong one moves every speaker.
+
+    Returns
+    -------
+    numpy.ndarray, shape (frames + longest delay, 2)
+        Left in column 0, right in column 1.
+
+        **Longer than the input, deliberately.**  A propagation delay
+        pushes real material past the end of the block, and truncating to
+        the input length would drop the tail of the piece in silence --
+        the failure class this whole module is written against.  Trim it
+        yourself if a fixed length matters.
+
+    Raises
+    ------
+    ValueError
+        If *block* is not two-dimensional, if its column count is not the
+        array's speaker count, or if *sample_rate* is not a positive
+        integer.  Also anything
+        :meth:`SpeakerArray.binaural_coefficients` refuses -- an unknown
+        facing, a listener standing on a speaker.
+    ImportError
+        If NumPy or SciPy is missing.  Both are Klotho dependencies; the
+        import is deferred only so that importing this module costs
+        nothing for the callers that just want geometry.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> rig = SpeakerArray.grid(cols=2, rows=2, col_spacing=1.0,
+    ...                         row_spacing=1.0)
+    >>> stereo = fold_to_stereo(np.zeros((480, 4)), rig)
+    >>> stereo.shape[1]
+    2
+    """
+    try:
+        import numpy as np
+        from scipy.signal import lfilter
+    except ImportError as exc:                # pragma: no cover - env-dependent
+        raise ImportError(
+            f"the offline fold needs NumPy and SciPy ({exc}). Both are "
+            f"Klotho dependencies, so this normally means a partial "
+            f"install: pip install numpy scipy.") from exc
+
+    if not isinstance(sample_rate, int) or isinstance(sample_rate, bool) \
+            or sample_rate <= 0:
+        raise ValueError(
+            f"sample_rate={sample_rate!r} must be a positive integer number "
+            f"of frames per second. It quantizes every propagation delay, so "
+            f"a wrong rate moves every speaker: at 44100 a delay written for "
+            f"48000 lands about 9% early.")
+
+    x = np.asarray(block, dtype=float)
+    if x.ndim != 2:
+        raise ValueError(
+            f"block has {x.ndim} dimension(s), shape {x.shape}. The fold "
+            f"takes (frames, speakers) -- one COLUMN per speaker lane, which "
+            f"is the shape a soundfile reader returns. A flat sequence of "
+            f"samples is one lane's worth and names no speaker; reshape it "
+            f"to (frames, 1) if that is what it is.")
+    n_frames, n_lanes = x.shape
+    if n_lanes != len(array):
+        raise ValueError(
+            f"block has {n_lanes} channel(s) but {array._what()} has "
+            f"{len(array)} speakers ({_format_labels(array.labels)}). The "
+            f"fold cannot guess which lanes are missing -- summing or "
+            f"duplicating them would move the music to a different "
+            f"loudspeaker. Pass the block the array was written for, or fold "
+            f"against the array the block actually came from.")
+
+    # max_delay is deliberately NOT passed: the delay line the live decoder
+    # is bounded by does not exist here, and being able to fold a listener
+    # the decoder cannot reach is precisely why the refusals point here.
+    coeffs = array.binaural_coefficients(listener, facing=facing,
+                                         head_half=head_half,
+                                         sample_rate=sample_rate)
+    longest = max(max(coeffs.delay_l), max(coeffs.delay_r))
+    out = np.zeros((n_frames + longest, 2), dtype=float)
+    ears = ((coeffs.delay_l, coeffs.gain_l, coeffs.shadow_l_hz),
+            (coeffs.delay_r, coeffs.gain_r, coeffs.shadow_r_hz))
+    for lane in range(n_lanes):
+        for ear, (delays, gains, cutoffs) in enumerate(ears):
+            offset = delays[lane]
+            wet = np.zeros(n_frames + longest, dtype=float)
+            wet[offset:offset + n_frames] = x[:, lane] * gains[lane]
+            a = math.exp(-2.0 * math.pi * cutoffs[lane] / sample_rate)
+            out[:, ear] += lfilter([1.0 - a], [1.0, -a], wet)
+    return out

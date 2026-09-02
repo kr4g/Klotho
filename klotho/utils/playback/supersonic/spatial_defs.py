@@ -20,9 +20,21 @@ fixes a SynthDef's channel count while the graph is being built:
 there raises ``MustBeBooleanError``.  Channel count is structure, not a
 parameter.
 
-Precompiled widths are :data:`PRECOMPILED_WIDTHS`.  Any other width is
-compiled here at lowering time and sent with ``/d_recv``, so an unusual
-array costs one compile rather than being a missing feature.
+Precompiled widths are :data:`PRECOMPILED_WIDTHS`, and today they are the
+only widths that play.  The builders below can compile any width, and
+sending one with ``/d_recv`` is how an unusual array would cost one compile
+rather than being a missing feature -- but **that path is not wired**:
+nothing in the live pipeline imports these builders, ``register_compiled``
+has no ``'infra'`` kind to file the result under, and no lowering step emits
+``/d_recv``.  Until it is,
+:func:`klotho.utils.playback.supersonic.engine.needed_spatial_synthdefs`
+refuses an off-family width in Python.  It has to: scsynth does not complain
+about an ``/s_new`` naming a def it never received -- it creates nothing, and
+the array plays silently.
+
+(This paragraph used to say the runtime compile happened "at lowering time"
+as a matter of course.  It never did, and that sentence is exactly why a
+30-speaker rig felt supported all the way to the concert.)
 
 **The failure this module exists to prevent is SILENCE.**  scsynth does not
 refuse a SynthDef it cannot fit: past the interconnect ("wire") buffer
@@ -153,8 +165,12 @@ def check_width(n: int, max_wire_bufs: int = SCSYNTH_DEFAULT_MAX_WIRE_BUFS) -> N
             f"and the engine has {max_wire_bufs}, which fits {fits} speakers. "
             f"scsynth would not refuse this: it prints one line, skips the "
             f"SynthDef, and the score then plays SILENTLY. Fold this array "
-            f"offline instead (fold_to_stereo has no delay-line or "
-            f"wire-buffer limit), or boot the engine with maxWireBufs >= "
+            f"offline instead (klotho.thetos.spatial.fold_to_stereo has no "
+            f"delay-line or wire-buffer limit -- though it takes a "
+            f"SpeakerArray, which itself refuses more than "
+            f"{MAX_DECODER_SPEAKERS} speakers, so a wider rig must be split "
+            f"before it can be folded), or boot the engine with "
+            f"maxWireBufs >= "
             f"{need} -- one wire buffer is bufLength * 4 bytes, so {need} of "
             f"them is {need * 128 * 4 // 1024} KiB.")
 
@@ -227,8 +243,9 @@ def check_coefficients(flat, n: int, *,
                     f"drop out of the array unnoticed. Pass "
                     f"max_delay=DECODER_MAX_DELAY_S to binaural_coefficients "
                     f"so the refusal happens there with the listener position "
-                    f"in hand, or fold this array offline, which has no delay "
-                    f"limit.")
+                    f"in hand, or fold this array offline with "
+                    f"klotho.thetos.spatial.fold_to_stereo, which has no "
+                    f"delay limit.")
         for f in _GAIN_FIELDS:
             g = flat[base + f]
             if not (0.0 <= g <= 1.0):

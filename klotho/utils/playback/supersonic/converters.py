@@ -897,11 +897,103 @@ def _apply_spatial_routing(score, events) -> None:
         event['speakerLane'] = lane
 
 
+def _refuse_narrower_main(score, spatial) -> None:
+    """Refuse a ``main`` whose declared array is narrower than a track's.
+
+    Every track sums into main, so main's buses are built at the WIDEST
+    declared width -- that is the one place the whole array exists at once.
+    A ``main`` that declares an array of its own does not change that; it
+    only makes the browser's existing warning (which tests
+    ``spatial.widths['main'] == null``) stop firing.  Two things then go
+    wrong at once, and both are SILENT:
+
+    * **main's inserts were checked against the wrong width.**
+      ``Score.track`` validates an insert against ``len(labels)`` -- main's
+      own array -- and the chain is then built at ``mainWidth``.  Measured
+      on the shipped defs: ``score.track('main', speakers=['L', 'R'],
+      inserts=[SynthDefFX('kl_reverb')])`` beside a 24-speaker track puts a
+      2-in/2-out reverb writing fxBus 120-121 onto a chain whose decoder
+      reads 120-143.  Twenty-two speakers go silent, with no error and no
+      warning, at a concert.
+    * **main loses the headphone fold.**  ``scheduler_score.js`` breaks the
+      decoder tie in main's favour only when main is AS WIDE as the widest
+      track (``chosen = widest.indexOf('main') !== -1 ? 'main' : ...``), so
+      a narrower main is not in the tie at all and the geometry the
+      composer declared on the master chain is quietly replaced by another
+      track's.
+
+    Refused in Python, at lowering, because that is where the composer can
+    read it: the same refusal thrown in the browser dies as an unhandled
+    promise rejection and reaches nobody.  A ``main`` that declares NO
+    array is untouched -- that is the ordinary shape, it is what the
+    browser warning already covers, and refusing it would break every
+    score that declares its rig on one track.
+    """
+    main = spatial.get('main')
+    if main is None:
+        return
+    # The width main's chain is actually BUILT at, computed the way the
+    # scheduler computes it: the widest declared track, but never narrower
+    # than a stereo pair (``mainWidth`` starts at ``BUS_CHANNELS``). The
+    # floor matters -- a lone ``speakers=[1]`` on main leaves lane 1 of a
+    # two-channel chain unwritten with no track anywhere to blame for it.
+    built = max(list(spatial.values()) + [2])
+    if main >= built:
+        return
+    others = {n: w for n, w in spatial.items() if n != 'main' and w == built}
+    widest_name = next(iter(others), None)
+    widener = (
+        f"track {widest_name!r} declares {built}, and every track sums into "
+        f"main"
+        if widest_name is not None else
+        f"a master chain is never narrower than a stereo pair"
+    )
+    inserts = (getattr(score, '_tracks', None) or {}).get('main', {})
+    n_inserts = len(inserts.get('inserts') or ())
+    if n_inserts:
+        damage = (
+            f"Main's {n_inserts} insert(s) were width-checked against "
+            f"{main} channel(s) and will be placed on the {built}-channel "
+            f"chain, where they read and write {main} lane(s) and leave the "
+            f"other {built - main} of main's post-FX bus UNWRITTEN -- those "
+            f"speakers play SILENTLY, with nothing downstream to say so. ")
+    elif widest_name is not None:
+        damage = (
+            f"Main is also out of the decoder tie-break -- it is picked only "
+            f"when it is as wide as the widest track -- so the headphone fold "
+            f"would use {widest_name!r}'s geometry and not the array declared "
+            f"here, SILENTLY substituting one for the other. ")
+    else:
+        damage = (
+            f"Nothing is as wide as the chain main is built at, so the "
+            f"decoder tie-break selects no track at all and the score gets NO "
+            f"headphone fold -- reported as 'labels but no positions', which "
+            f"is not what happened. ")
+    remedy = (
+        f"speakers=<the {built}-speaker array>"
+        if widest_name is not None else
+        f"speakers=<at least {built} labels>")
+    raise ValueError(
+        f"track 'main' declares {main} speaker(s) but {widener} -- so main's "
+        f"chain is built {built} channels wide and the {main}-speaker array "
+        f"declared on it describes only lanes 0..{main - 1} of it. {damage}"
+        f"Declare main at the full array -- score.track('main', {remedy}, "
+        f"...) -- or take the array off main with score.track('main', "
+        f"speakers=[]) and let it be widened to fit, which is what a master "
+        f"chain with no speakers= of its own already does.")
+
+
 def _build_spatial_meta(score) -> dict:
     """Build ``meta.spatial``, or ``{}`` when the score has no spatial track.
 
     Arrays are deduplicated: two tracks declared against the same speakers
     share one entry, so a 24-speaker coefficient table is serialized once.
+
+    Cross-track width invariants are checked here rather than in
+    ``Score.track``, because this is the first moment every track is
+    declared: ``score.track('main', speakers=['L', 'R'])`` is not wrong
+    until some later cell declares a wider one, and a check at declaration
+    would have to guess which of the two calls the composer meant.
     """
     tracks = getattr(score, '_tracks', None) or {}
     spatial = [(name, data) for name, data in tracks.items()
@@ -923,6 +1015,8 @@ def _build_spatial_meta(score) -> dict:
             by_key[key] = array_id
             arrays[array_id] = _array_meta(array, labels)
         track_meta[name] = {"array": array_id, "width": len(labels)}
+    _refuse_narrower_main(
+        score, {name: entry['width'] for name, entry in track_meta.items()})
     return {"arrays": arrays, "tracks": track_meta}
 
 

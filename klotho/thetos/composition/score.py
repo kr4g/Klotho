@@ -594,6 +594,17 @@ class Score:
             the array declared earlier, and the inserts it carries over are
             re-checked against that array's width.
 
+            **Two width checks happen later, at lowering, not here**, because
+            neither is decidable from one track: a speaker count outside the
+            precompiled SynthDef family (see
+            :data:`~klotho.utils.playback.supersonic.spatial_defs.PRECOMPILED_WIDTHS`)
+            is refused when the score is prepared for playback, and a
+            ``"main"`` declaring an array NARROWER than some other track is
+            refused when the score is lowered.  The second one cannot be
+            checked at declaration: ``track('main', speakers=['L', 'R'])`` is
+            not wrong until a later cell declares a wider track, and by then
+            either call could be the one the composer meant to change.
+
             ``speakers=[]`` is the un-declare, matching ``inserts=[]``: the
             track keeps existing and stops being spatial.  It is refused on
             a track that declares no array, where it would be a no-op that
@@ -659,15 +670,27 @@ class Score:
             # when the tie has more than one array in it, which under the
             # erasure it never did.
             #
-            # The other warning at the far end goes the other way and is
-            # correctly quieter: the one at scheduler_score.js line ~385
-            # ("the master chain has inserts and main was widened ... but
-            # main declares no speakers of its own -- so those inserts were
-            # only ever checked as STEREO") tests
-            # ``spatial.widths['main'] == null``.  The erasure made that true
-            # and the warning fired; keeping the array makes it false, and
-            # the warning stops -- rightly, since the inserts really were
-            # checked against the array, a few lines below this one.
+            # The other warning at the far end goes the other way: the one
+            # in scheduler_score.js beginning "the master chain has inserts
+            # and main was widened ... but main declares no speakers of its
+            # own -- so those inserts were only ever checked as STEREO"
+            # tests ``spatial.widths['main'] == null``.  The erasure made
+            # that true and the warning fired; keeping the array makes it
+            # false and the warning stops.
+            #
+            # CORRECTED (AF-1): "and rightly so, since the inserts really
+            # were checked against the array" is true only when main's array
+            # is AS WIDE as the widest track.  Declaring a NARROWER one --
+            # ``speakers=['L', 'R']`` beside a 24-speaker track -- silenced
+            # that warning while leaving every bit of the damage: main's
+            # chain is still built at 24, the inserts were still checked
+            # against 2, and lanes 2..23 of main's post-FX bus are still
+            # never written.  Following the warning's own advice was
+            # therefore a way to make it stop lying about nothing.  That
+            # configuration is now REFUSED at lowering
+            # (``converters._refuse_narrower_main``), and the browser warns
+            # about it too, so "the warning stops" once again means "there
+            # is nothing to warn about".
             labels, lanes, array = (prior["labels"], prior["lanes"],
                                     prior["speakers"])
         else:

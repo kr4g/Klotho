@@ -59,6 +59,23 @@ def needed_spatial_synthdefs(meta):
     whole array exists at once.  Whether a fold is actually possible (a
     labels-only array has no geometry) is the scheduler's decision, and
     one small blob is cheaper than duplicating that decision here.
+
+    **An off-family width is refused here rather than named.**  The family
+    is compiled one def per width -- SuperCollider fixes a SynthDef's
+    channel count while its graph is built, so ``In.ar(bus, width)`` with
+    a control raises rather than adapting -- and only the widths in
+    :data:`~klotho.utils.playback.supersonic.spatial_defs.PRECOMPILED_WIDTHS`
+    have a blob on disk.  A 30-speaker rig (a 5x6 grid: an entirely
+    plausible thing to build) used to pass every Python layer, have its
+    two missing names dropped without a word by
+    :func:`_filter_synthdef_assets`, and turn into silence and a stuck
+    play icon in the browser.  The refusal belongs on this path, not in
+    ``Score.track``: a 30-speaker array is a perfectly reasonable thing to
+    write down and inspect, and what is missing is only the blob that
+    would let it be AUDITIONED.  So it is the audition that refuses, and
+    both surfaces reach it -- ``play(score)`` through
+    :class:`SuperSonicEngine`, ``plot(score)`` through
+    ``_extract_needed_synthdefs``.
     """
     tracks = ((meta or {}).get("spatial") or {}).get("tracks") or {}
     widths = {
@@ -68,9 +85,75 @@ def needed_spatial_synthdefs(meta):
     if not widths:
         return set()
     main_width = max(widths | {2})
+    _refuse_off_family_widths(tracks, widths | {main_width})
     names = {f"__busRouter{w}" for w in widths | {main_width} if w != 2}
     names.add(f"__spatialDecode{main_width}")
     return names
+
+
+def _refuse_off_family_widths(tracks, widths):
+    """Refuse any width with no compiled blob, naming who declared it.
+
+    ``is_precompiled`` and ``PRECOMPILED_WIDTHS`` had no caller outside
+    their own module and its tests; this is that caller, so the list of
+    widths that work is read from the place that knows rather than
+    restated here.  *widths* is every declared track width plus main's,
+    which is the widest of them (or 2, the stereo floor) -- so an offender
+    always has a track to name today, and the anonymous branch below is
+    defensive rather than reachable.
+    """
+    from klotho.utils.playback.supersonic.spatial_defs import (
+        PRECOMPILED_WIDTHS, is_precompiled,
+    )
+    bad = sorted(w for w in widths if not is_precompiled(w))
+    if not bad:
+        return
+    who = {}
+    for name, entry in tracks.items():
+        w = entry.get("width")
+        if w in bad:
+            who.setdefault(w, []).append(name)
+    parts = []
+    for w in bad:
+        owners = who.get(w)
+        if owners:
+            said = (f"track{'s' if len(owners) > 1 else ''} "
+                    f"{', '.join(repr(o) for o in sorted(owners))}")
+        else:
+            # Defensive: main's width is the max of the declared ones (or
+            # the stereo floor, which is precompiled), so today every
+            # offender is a track's own declaration.
+            said = "main, widened to the widest track"
+        below = max((p for p in PRECOMPILED_WIDTHS if p < w), default=None)
+        above = min((p for p in PRECOMPILED_WIDTHS if p > w), default=None)
+        near = [str(p) for p in (below, above) if p is not None]
+        hint = f"; nearest that work: {' or '.join(near)}" if near else ""
+        parts.append(f"{w} ({said}{hint})")
+    # The names that would have gone out with no bytes behind them. The
+    # decoder is main's width only -- one fold for the summed array -- so
+    # it joins the list only when main's own width is one of the bad ones.
+    main_width = max(widths)
+    missing = {f"__busRouter{w}" for w in bad}
+    if main_width in bad:
+        missing.add(f"__spatialDecode{main_width}")
+    missing = sorted(missing)
+    raise ValueError(
+        f"speaker count{'s' if len(bad) > 1 else ''} {', '.join(parts)} "
+        f"{'have' if len(bad) > 1 else 'has'} no compiled SynthDef. Klotho "
+        f"precompiles the spatial family one def per width -- SuperCollider "
+        f"fixes a SynthDef's channel count while the graph is built, so a "
+        f"width control is impossible -- and the widths on disk are "
+        f"{', '.join(str(w) for w in PRECOMPILED_WIDTHS)}. "
+        f"{', '.join(missing)} would be sent to the page as "
+        f"{'names' if len(missing) > 1 else 'a name'} with no bytes behind "
+        f"{'them' if len(missing) > 1 else 'it'}, and scsynth does not refuse "
+        f"an /s_new naming a def it never received: it creates nothing and "
+        f"says nothing, so the array would play SILENTLY. Declare the rig at "
+        f"one of the widths above, or fold the array offline with "
+        f"klotho.thetos.spatial.fold_to_stereo, which needs no compiled def "
+        f"at all. Building the missing def at lowering time and sending it "
+        f"with /d_recv is designed (see spatial_defs.build_spatial_decoder) "
+        f"and NOT wired -- nothing in the live pipeline calls it.")
 
 
 def needed_synthdefs(events, meta=None, control_data=None):
