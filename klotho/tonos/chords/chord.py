@@ -428,7 +428,13 @@ class Voicing(RelativePitchCollection):
         are removed. ``dedupe=False`` preserves duplicates (sorted), so
         unison doublings survive — used by
         :func:`~klotho.tonos.chords.voice_leading.voice_lead` with a
-        fixed ``voices=`` count.
+        fixed ``voices=`` count. The policy is stored on the instance
+        and carried by every rebuild — :meth:`root`, :meth:`transpose`,
+        :meth:`equave_shift` and
+        :func:`~klotho.tonos.chords.voice_leading.fold` — so a locked
+        voice count survives being moved around. Before that it did
+        not, and a four-voice texture came back as three with no
+        exception and no warning.
 
     Examples
     --------
@@ -469,8 +475,12 @@ class Voicing(RelativePitchCollection):
         self._degrees = processed_degrees
         self._interval_type_mode = interval_type
         self._reference_pitch = _resolve_reference(reference_pitch)
+        # The construction policy is part of the object, not a one-shot
+        # argument: a voicing whose doublings were deliberately kept must
+        # still have them after root/transpose/equave_shift/fold.
+        self._dedupe = bool(dedupe)
         self._intervals = self._compute_sonority_intervals()
-    
+
     def _process_sonority_degrees(self, degrees: DegreeList, interval_type: str,
                                    equave: Union[float, Fraction],
                                    dedupe: bool = True) -> List[IntervalType]:
@@ -545,6 +555,10 @@ class Voicing(RelativePitchCollection):
         """
         Return a copy rooted at the given pitch.
 
+        Only the reference pitch changes; the degrees — including any
+        unison doublings kept by ``dedupe=False`` — come through
+        unchanged.
+
         Parameters
         ----------
         pitch : Pitch or str
@@ -558,9 +572,51 @@ class Voicing(RelativePitchCollection):
             list(self._degrees),
             self._interval_type_mode,
             self._equave,
-            pitch
+            pitch,
+            dedupe=self._dedupe,
         )
-    
+
+    def transpose(self, interval) -> 'Voicing':
+        """
+        Return a copy transposed by *interval*, carried in the degrees.
+
+        Semantics are :meth:`RelativePitchCollection.transpose`'s — the
+        reference pitch is unchanged and every degree is multiplied by
+        the interval (ratios mode) or offset by it (cents mode) — with
+        this voicing's ``dedupe`` policy carried across, so a texture
+        built with ``dedupe=False`` keeps its unison doublings.
+
+        Parameters
+        ----------
+        interval : Fraction, int, float, str, Ratio, or Cent
+            The transposition interval, as in :meth:`Pitch.transpose`.
+
+        Returns
+        -------
+        Voicing
+        """
+        # The inherited implementation rebuilds through ``type(self)(...)``,
+        # which cannot see this instance's dedupe policy, so it silently
+        # collapsed doubled voices. Run the base arithmetic on a plain
+        # relative collection (which neither sorts nor dedupes) and then
+        # rebuild under our own policy: the shift maths is not duplicated
+        # here, so it cannot drift away from the base implementation.
+        # equave_shift() delegates to transpose(), so it is covered too.
+        proxy = RelativePitchCollection(
+            list(self._degrees),
+            self._interval_type_mode,
+            self._equave,
+            self._reference_pitch,
+        )
+        shifted = proxy.transpose(interval)
+        return Voicing(
+            list(shifted._degrees),
+            self._interval_type_mode,
+            self._equave,
+            self._reference_pitch,
+            dedupe=self._dedupe,
+        )
+
     def __getitem__(self, index: Union[int, slice, Sequence[int], np.ndarray]) -> Union[Pitch, IntervalType, PitchCollectionBase]:
         if isinstance(index, slice):
             return self._getitem_slice_sonority(index)

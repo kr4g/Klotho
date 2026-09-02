@@ -160,7 +160,10 @@ def fold(collection, lo=None, hi=None) -> Voicing:
     Returns
     -------
     Voicing
-        The folded sonority (out-of-equave degrees are legal in a Voicing).
+        The folded sonority (out-of-equave degrees are legal in a
+        Voicing). One degree in, one degree out: folding never merges
+        two degrees that land on the same pitch, so a doubled voice
+        stays doubled.
 
     Examples
     --------
@@ -173,8 +176,14 @@ def fold(collection, lo=None, hi=None) -> Voicing:
     if lo_hz is not None and hi_hz is not None and lo_hz > hi_hz:
         raise ValueError(f"lo bound ({lo_hz:.2f} Hz) is above hi bound ({hi_hz:.2f} Hz)")
     degrees = _fold_degrees(collection, lo_hz, hi_hz)
+    # dedupe=False: folding is per-degree, so N degrees in must be N
+    # degrees out. It is also the step that MAKES duplicates -- an octave
+    # doubling folded into a window narrower than the pair becomes a
+    # unison -- and voice_lead's doublings are normally written at the
+    # octave, so deduping here silently dropped a voice from a texture
+    # whose voice count had been locked with voices=N.
     return Voicing(degrees, collection._interval_type_mode,
-                   collection.equave, ref)
+                   collection.equave, ref, dedupe=False)
 
 
 # ---------------------------------------------------------------------------
