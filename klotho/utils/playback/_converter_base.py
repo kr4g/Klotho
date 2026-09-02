@@ -186,7 +186,50 @@ def _build_convert_registry():
 
     @reg.register(HarmonicTree)
     def _convert_harmonic_tree(obj, kw, handlers, inst_kw):
-        spectrum = Spectrum(Pitch("C4"), list(obj.partials) if hasattr(obj, 'partials') else [1, 2, 3, 4, 5])
+        """Audition a ``HarmonicTree`` as a spectrum on the convention root C4.
+
+        The tree's content is its leaf ``harmonics`` -- the product of the
+        ``factor`` values along each path from the root -- and those are the
+        partial numbers that sound. (This used to read ``obj.partials``
+        behind a ``hasattr`` guard; ``HarmonicTree`` has no such attribute,
+        so the guard never matched and EVERY tree auditioned as the same
+        hardcoded C4 stack of partials 1-5, silently and regardless of its
+        content.)
+
+        **C4 is a convention, not a derivation.** ``HarmonicTree`` is
+        pitch-abstract: it models multiplicative harmonic relationships and
+        carries no fundamental, so an audition has to supply one. C4
+        (261.6256 Hz) is that supplied root, stated here because silently
+        choosing a fundamental is exactly what produced the bug above. To
+        hear the same relationships on another fundamental, build the
+        ``Spectrum`` yourself: ``Spectrum(Pitch("A", 2), list(ht.harmonics))``.
+
+        **``equave`` is deliberately NOT applied, pending a ruling.** A tree
+        built with an equave also exposes ``ratios``, the harmonics reduced
+        into that window (``HarmonicTree(2, (3, 5, 7), equave=2)`` has
+        harmonics ``(6, 10, 14)`` and ratios ``(3/2, 5/4, 7/4)``). Whether an
+        audition should sound the raw harmonics or the reduced ratios is an
+        open design question, so this adapter sounds the harmonics -- the
+        tree's primary data -- rather than guessing. Reducing here would also
+        make the audition of a tree depend on a field that has no effect on
+        ``harmonics`` itself.
+        """
+        harmonics = list(obj.harmonics)
+        # A negative factor gives a negative harmonic, hence a negative
+        # frequency, and the pitch machinery dies inside log2 with a bare
+        # "math domain error". Whether an undertone -2 means the subharmonic
+        # 1/2 is unsettled (see measure_partials, which keeps the sign), so
+        # refuse audibly rather than invent a convention or crash opaquely.
+        bad = [h for h in harmonics if not h > 0]
+        if bad:
+            raise ValueError(
+                f"Cannot audition this HarmonicTree: leaf harmonics {bad} are "
+                f"not positive, and a non-positive partial has no frequency. "
+                f"Undertones (negative factors) have no settled playback "
+                f"convention yet -- build a Spectrum explicitly with the "
+                f"partial numbers you mean, e.g. Spectrum(Pitch('C4'), [1/2])."
+            )
+        spectrum = Spectrum(Pitch("C4"), harmonics)
         return _convert_spectrum(spectrum, kw, handlers, inst_kw)
 
     @reg.register(RhythmTree)
