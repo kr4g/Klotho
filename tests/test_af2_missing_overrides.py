@@ -166,3 +166,35 @@ def test_replace_node_clearing_tied_by_omission_announces():
     for spec in uc._slur_specs.values():
         for n in spec['leaf_nodes']:
             assert uc._rt[n].get('proportion', 1) >= 0
+
+
+# ------------------------------------------ AUD-10's third instance (AF2-1)
+
+def test_set_node_attributes_is_overridden():
+    """Found by the definitive gap list AF-2 owed, not by the coverage guard --
+    the guard's detector matches literal ``'tied'``/``'proportion'`` and the
+    structural helpers, and this verb's body names none of them: it just calls
+    ``_apply_layer_node_write``. So the guard was green over a live HIGH."""
+    assert 'set_node_attributes' in CompositionalTree.__dict__
+
+
+def test_set_node_attributes_resting_a_leaf_dissolves_the_slur():
+    """Byte-identical symptoms to AUD-10 through a different public door."""
+    uc = slurred()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        uc._rt.set_node_attributes(3, {'proportion': -1})
+    assert uc._slur_specs == {}
+    assert any('Slur removed' in str(x.message) for x in w)
+
+
+def test_set_node_attributes_does_not_hold_the_synth_through_the_rest():
+    """The same payload: before this, ('new', 0.0), ('new', 1.0), ('set', 3.0)."""
+    rested = slurred()
+    rested._rt.make_rest(3)
+    oracle = event_shape(rested)
+
+    uc = slurred()
+    uc._rt.set_node_attributes(3, {'proportion': -1})
+    assert event_shape(uc) == oracle
+    assert all(kind == 'new' for kind, _ in event_shape(uc))

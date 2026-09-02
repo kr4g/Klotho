@@ -476,7 +476,15 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
 
     #: A body naming any of these touches the SOUNDING/TIE surface an overlay
     #: is defined against, without necessarily moving or destroying an id.
-    SURFACE = ("'tied'", "'proportion'", 'tied=', 'proportion=')
+    #: ``_apply_layer_node_write`` added 2026-09-01 by AF-2. Without it the
+    #: detector missed ``set_node_attributes`` entirely -- a one-line delegation
+    #: whose body names no surface key and no structural helper, sitting beside
+    #: three overridden siblings on the same door. It was a live HIGH with this
+    #: guard fully green: resting a slurred leaf through it left the spec naming
+    #: the rest and lowered to a synth held across it. Matching the WRITE PATH,
+    #: not only the key names, is what makes the next such verb fail loudly.
+    SURFACE = ("'tied'", "'proportion'", 'tied=', 'proportion=',
+               '_apply_layer_node_write')
 
     @classmethod
     def _structural_mutators(cls_, cls):

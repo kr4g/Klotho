@@ -370,6 +370,28 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_if_surface_write(attrs or {})
         return result
 
+    def set_node_attributes(self, node, attributes):
+        """Set node attributes (see :meth:`Tree.set_node_attributes`),
+        announcing when the write changes the sounding or tie surface.
+
+        The THIRD instance of AUD-10, found by the gap list AF-2 owed rather
+        than by the coverage guard -- and the reason the guard missed it is
+        worth keeping. That detector matches a literal ``'tied'``/
+        ``'proportion'`` or one of the structural helpers in a method's body.
+        This verb's body names none of them; it is a one-line delegation to
+        ``_apply_layer_node_write``, exactly as :meth:`set_node_data` and
+        :meth:`update_node_data` are. So three siblings on one door were
+        overridden and the fourth was invisible, with the guard fully green.
+        ``_apply_layer_node_write`` is now in the detector's list.
+
+        Symptoms were byte-identical to ``replace_node``'s: resting a slurred
+        leaf left the spec naming it, with no warning, and lowered to one synth
+        held from 1.0 straight across the rest and re-addressed at 3.0.
+        """
+        result = super().set_node_attributes(node, attributes)
+        self._announce_if_surface_write(attributes or {})
+        return result
+
     def replace_node_data(self, node, attrs: dict):
         """Replace node data (see :meth:`Tree.replace_node_data`), announcing
         a sounding/tie surface change.
