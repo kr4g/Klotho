@@ -1438,17 +1438,95 @@ class CompositionalUnit(TemporalUnit):
         return pt
 
     def _copy_pt_node_data(self, target_cu: 'CompositionalUnit', mapping: dict[int, int]) -> None:
+        """Carry the parameter layer onto a copy, PRESERVING OVERRIDE PLACEMENT.
+
+        Used by :meth:`from_subtree` and by :meth:`_copy_rebuild` (which is the
+        ``copy()`` path for every ``CompositionalUnit`` SUBCLASS), and through
+        ``from_subtree`` by ``decompose``.
+
+        This copies RAW per-node overrides, exactly as
+        :meth:`_extract_parameter_tree` and :meth:`_mirror_param_state` already
+        do, and then writes what the extracted subtree INHERITED FROM OUTSIDE
+        itself at the destination root only.
+
+        It used to write ``pfield_items``/``mfield_items`` -- the EFFECTIVE
+        (inherited) values -- at every mapped node, which materialized an
+        override everywhere and destroyed the inheritance structure while the
+        values still read correctly. A later rewrite at the copy's root then
+        changed nothing below it: **the composer edited the score and heard the
+        old music** (docket AUD-6, ruling R32, wishlist NEW-45).
+
+        Two consequences worth naming, because neither is obvious:
+
+        * **A ``Bind`` is carried, not resolved.** The old flattening copied a
+          root-held ``Bind`` onto every node, so each leaf became its own read
+          set of one -- a ``Bind.index`` field then raised on every read of the
+          copy, and a ctx-reading ``Bind`` that does not self-identify as
+          selection-reading flattened a pan spread or a per-note ramp with no
+          message at all (docket AUD-7). Placing the ``Bind`` once, at the node
+          that held it, restores its read set.
+        * **A ``Bind`` inherited from OUTSIDE the extract lands at the
+          destination root and stays live**, so it re-draws over the extract's
+          own leaves. That is ruling **R33** -- *"we copy the ``Bind`` itself,
+          not the drawn value"* -- applied unchanged; it is not a special case
+          for extraction. A composer who wants the draws frozen bakes them with
+          a bare lambda, which is evaluated once and survives copying.
+        """
         src = self._rt
         dst = target_cu._rt
         dst.register_pfields(src.pfield_names)
         dst.register_mfields(src.mfield_names)
+
+        # The subtree root is the one mapped source node whose parent is NOT
+        # itself mapped. That identifies it without needing the caller to pass
+        # it, and it is exact at both call sites: ``from_subtree`` maps a branch
+        # plus its descendants, and ``_copy_rebuild`` maps the whole tree, whose
+        # root has no parent at all.
+        src_root = None
+        for old_node in mapping:
+            if src.parent(old_node) not in mapping:
+                src_root = old_node
+                break
+
+        # 1. Raw overrides, verbatim, at their own nodes. The filter is on
+        #    STORAGE keys, not names, so namespaced mfields survive -- filtering
+        #    on ``pfields | mfields`` would silently drop every mfield.
+        keys = src._param_layer.storage_keys()
         for old_node, new_node in mapping.items():
-            pf = src.pfield_items(old_node)
-            mf = src.mfield_items(old_node)
-            if pf:
-                dst.set_pfields(new_node, **pf)
-            if mf:
-                dst.set_mfields(new_node, **mf)
+            raw = src._rx[old_node]
+            if not isinstance(raw, dict):
+                continue
+            own = {k: v for k, v in raw.items() if k in keys}
+            if own:
+                dst._rx[new_node].update(own)
+
+        # 2. What the subtree inherited from ancestors that are NOT coming
+        #    along, re-homed at the destination root. Without this an extracted
+        #    branch loses everything set above it. The effective payload is
+        #    already in storage-key form and holds only values somebody actually
+        #    wrote -- registry defaults never enter it -- so this materializes no
+        #    default. It is written last because effective already carries the
+        #    node's own overrides at the correct precedence.
+        #
+        #    It is written at ``dst.root`` rather than at ``mapping[src_root]``,
+        #    and the two differ in one real case: extracting a LEAF. There
+        #    ``from_subtree`` takes its single-node arm and the ``(1,)`` S-form
+        #    fallback builds root + one child, so the source leaf maps to the
+        #    CHILD and the destination root is a synthetic wrapper. Writing the
+        #    payload onto that child would re-create the very defect this method
+        #    exists to fix -- a later ``set_pfields(root, ...)`` on the fragment
+        #    would be shadowed by the child's own override and reach nothing.
+        #    ``decompose`` produces exactly these single-leaf fragments, so this
+        #    is the common path, not a corner.
+        if src_root is not None:
+            src._param_layer._build_effective(src)
+            inherited = src._param_layer._effective_cache.get(src_root)
+            if inherited:
+                dst._rx[dst.root].update(inherited)
+
+        # Raw writes bypass the layer's own invalidation, so drop the cache the
+        # same way :meth:`_extract_parameter_tree` does.
+        dst._param_layer._effective_cache = None
 
     def _copy_pt_instruments(self, target_cu: 'CompositionalUnit', mapping: dict[int, int]) -> None:
         for old_node, inst in self._rt.node_instruments.items():
