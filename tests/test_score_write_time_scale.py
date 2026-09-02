@@ -47,7 +47,7 @@ from klotho.thetos.composition.score import Score
 # The kitchen-sink score: every injection site, plus negative controls
 # ----------------------------------------------------------------------
 
-def _kitchen_sink():
+def _kitchen_sink(bpm=60):
     """A score touching all five timeline-injection sites at once.
 
     Every unit is placed at a NON-ZERO start and the envelope is anchored
@@ -57,28 +57,28 @@ def _kitchen_sink():
 
     # A gated UC: exercises events[].dur on the UC path.
     uc_gated = UC.from_ut(UT(span=1, tempus='4/4', prolatio=(1, 1, 1, 1),
-                             beat='1/4', bpm=60))
+                             beat='1/4', bpm=bpm))
     uc_gated.leaves.set(inst='kl_saw', freq=440.0, amp=0.3)
     s.add(uc_gated, at=0.5)
 
     # A SLUR on an ungated def declaring releaseTime: the head's releaseTime
     # receives the slur's real span, in timeline seconds.
     uc_slur = UC.from_ut(UT(span=1, tempus='4/4', prolatio=(1, 1, 1, 1),
-                            beat='1/4', bpm=60))
+                            beat='1/4', bpm=bpm))
     uc_slur.leaves.set(inst='fd_arpy', freq=330.0)
     uc_slur.apply_slur(node=uc_slur._rt.root)
     s.add(uc_slur, at=5.0)
 
     # An ungated def declaring `dur`: the reserved note-length slot.
     uc_kick = UC.from_ut(UT(span=1, tempus='4/4', prolatio=(1, 1),
-                            beat='1/4', bpm=60))
+                            beat='1/4', bpm=bpm))
     uc_kick.leaves.set(inst='kl_kicktone')
     s.add(uc_kick, at=9.0)
 
     # A CONTROL envelope, anchored late so desc.start and every target
     # startTime are non-zero.
     uc_env = UC.from_ut(UT(span=1, tempus='4/4', prolatio=(1, 1, 1, 1),
-                           beat='1/4', bpm=60))
+                           beat='1/4', bpm=bpm))
     uc_env.leaves.set(inst='kl_saw', freq=220.0)
     uc_env.apply_envelope(Envelope([0.2, 1.0], times=[1.0]), 'amp',
                           node=uc_env._rt.root, control=True)
@@ -88,7 +88,7 @@ def _kitchen_sink():
     # instrument as the slurred unit, NOT slurred, carrying an AUTHORED
     # releaseTime.  One file, one pfield name, two opposite kinds of number.
     uc_authored = UC.from_ut(UT(span=1, tempus='4/4', prolatio=(1, 1),
-                                beat='1/4', bpm=60))
+                                beat='1/4', bpm=bpm))
     uc_authored.leaves.set(inst='fd_arpy', freq=550.0,
                            releaseTime=0.3, attackTime=0.05)
     s.add(uc_authored, at=20.0)
@@ -359,3 +359,127 @@ def test_every_numeric_field_in_the_written_file_is_classified(payloads):
         "Score.write(time_scale=k) should scale it, then add it to "
         "TIMELINE_* or INVARIANT_* in this module:\n  "
         + "\n  ".join(unclassified))
+
+
+# ----------------------------------------------------------------------
+# The class detector -- stronger than the census, and the reason it exists
+# ----------------------------------------------------------------------
+
+def test_no_pfield_that_moves_with_the_TEMPO_is_left_untagged():
+    """The real guard against the next AUD-49.
+
+    The census above can only check fields it already knows the names of, and
+    an untagged pfield is treated as authored *by construction*. That
+    construction is exactly what fails when someone adds a sixth injection
+    site and forgets to tag it -- and the scaling test would then PIN the
+    resulting wrong number as non-scaling, so the suite would be green on the
+    bug and go red on the fix.
+
+    So this does not reason about names at all. It lowers the SAME score at two
+    tempos and asks an empirical question: did this pfield's value move with
+    the tempo? A value that doubles when the music is halved is timeline-derived
+    whatever it is called, and it must carry the tag. Anything that moves and is
+    not tagged is a missing stamp site, named here with its defName and key.
+
+    (The converse -- tagged but not moving -- is not asserted: a slur span can
+    legitimately be tempo-invariant in edge cases, and a false alarm in a guard
+    like this one is how guards get deleted.)
+    """
+    from klotho.utils.playback.supersonic.converters import convert_score_to_sc_events
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fast = convert_score_to_sc_events(_kitchen_sink(bpm=60))
+        slow = convert_score_to_sc_events(_kitchen_sink(bpm=30))
+
+    assert len(fast["events"]) == len(slow["events"]), (
+        "halving the tempo changed the number of events; this detector "
+        "pairs them up and cannot run")
+
+    # Pair by defName, NOT by position. Halving the tempo makes every unit
+    # twice as long, so units placed at fixed absolute times overlap
+    # differently and the payload's sort order changes -- a positional zip
+    # silently compares unrelated events and under-reports.
+    def _by_def(payload):
+        out = {}
+        for ev in payload["events"]:
+            out.setdefault(ev.get("defName"), []).append(ev)
+        return out
+
+    fast_by, slow_by = _by_def(fast), _by_def(slow)
+    assert set(fast_by) == set(slow_by), (
+        "the two tempos produced different instruments; cannot pair events")
+
+    pairs = []
+    for name, evs in fast_by.items():
+        assert len(evs) == len(slow_by[name]), (
+            f"different event counts for {name} at the two tempos")
+        pairs.extend(zip(evs, slow_by[name]))
+
+    moved_untagged = []
+    moved_tagged = 0
+    for i, (a, b) in enumerate(pairs):
+        tagged = set(_timeline_pfield_keys(a))
+        for key, av in (a.get("pfields") or {}).items():
+            bv = (b.get("pfields") or {}).get(key)
+            if not (_is_num(av) and _is_num(bv)) or av == 0:
+                continue
+            # Halving the tempo doubles every timeline-derived value.
+            if bv == pytest.approx(av * 2.0, rel=1e-9):
+                if key in tagged:
+                    moved_tagged += 1
+                else:
+                    moved_untagged.append(
+                        f"events[{i}] ({a.get('defName')}).pfields.{key}: "
+                        f"{av} at bpm=60 -> {bv} at bpm=30")
+
+    # Non-vacuity: if nothing moved at all, the fixture stopped exercising the
+    # injection sites and this test is checking nothing.
+    assert moved_tagged, (
+        "no tagged pfield moved with the tempo -- the fixture no longer "
+        "reaches any injection site, so this detector is inert")
+
+    assert not moved_untagged, (
+        "these pfields move with the TEMPO and are therefore timeline-derived, "
+        "but lowering did not tag them -- so Score.write(time_scale=k) will "
+        "leave them behind, which is AUD-49 happening again at a new site:\n  "
+        + "\n  ".join(moved_untagged))
+
+
+def test_the_census_also_covers_insert_fx_arguments():
+    """``meta.inserts[*].args`` is numeric and reaches the written file.
+
+    It is deliberately NOT scaled (an FX ``delayTime`` may be rhythm or may be
+    a timbral constant -- an open question for the client, filed as AF35-14).
+    This asserts the CURRENT decision explicitly so that changing it is a
+    deliberate act that turns this test red, rather than a silent drift.
+    """
+    from klotho.thetos.instruments.synthdef import SynthDefFX
+
+    s = _kitchen_sink()
+    try:
+        s.track('lead', inserts=[SynthDefFX('kl_delay', delayTime=0.25)])
+    except Exception as exc:                       # pragma: no cover
+        pytest.skip(f"kl_delay unavailable in this build: {exc}")
+
+    import tempfile
+    from pathlib import Path
+    d = Path(tempfile.mkdtemp())
+    ref, got = _write(s, d, 1.0), _write(s, d, 2.0)
+
+    ref_ins = ref["meta"].get("inserts") or {}
+    got_ins = got["meta"].get("inserts") or {}
+    found = False
+    for track, entries in ref_ins.items():
+        for i, entry in enumerate(entries):
+            for k, v in (entry.get("args") or {}).items():
+                if not _is_num(v):
+                    continue
+                found = True
+                assert got_ins[track][i]["args"][k] == v, (
+                    f"meta.inserts.{track}[{i}].args.{k} moved under "
+                    f"time_scale. That may well be RIGHT -- see AF35-14 -- but "
+                    f"it is currently an open question for the client, so it "
+                    f"must not change by accident")
+    assert found, (
+        "no numeric insert argument reached the payload, so this is checking "
+        "nothing -- the fixture's FX chain has stopped being built")

@@ -425,7 +425,8 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
 
         The key set is ``ParameterLayer.storage_keys()`` -- pfield names
         verbatim plus the encoded ``@mf:`` mfield slots -- intersected with the
-        node's current payload, minus whatever the caller is writing.
+        node's current payload, minus whatever the caller is writing, and minus
+        the keys another layer owns or derives.
 
         It is deliberately NOT "the keys this write path would refuse", which
         is a strictly larger set and a trap: that set also contains
@@ -433,12 +434,23 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         inside ``super()``. Restoring those overwrites the freshly computed
         values with stale pre-edit ones that nothing recomputes again, so the
         bar stops summing to its own span -- silently, with the parameter half
-        working and the full suite green. ``tests/...preserves_parameters.py``
-        fences it.
+        working and the full suite green.
+
+        The ``reserved_keys`` subtraction is what makes that true rather than
+        merely intended. ``storage_keys()`` is NOT guaranteed to exclude a
+        derived key: ``ParameterLayer.set_instrument`` is the one registration
+        door with no reserved-name check, so an instrument whose ``pfields``
+        happen to be named ``metric_duration``/``metric_onset`` registers them
+        as pfields and this helper would then restore stale rhythm --
+        reintroducing the exact defect the paragraph above rejects. Measured:
+        without the subtraction a 4/4 bar's durations sum to 5/8. Subtracting
+        the other layers' keys closes it here regardless of what the registry
+        was allowed to accept (the registration hole itself is ``LAYER-22``).
         """
         if not self._has_node(node):
             return {}
-        owned = self._param_layer.storage_keys()
+        layer = self._param_layer
+        owned = layer.storage_keys() - layer.reserved_keys(self)
         return {k: v for k, v in dict(self[node]).items()
                 if k in owned and k not in incoming}
 

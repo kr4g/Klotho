@@ -243,3 +243,43 @@ def test_a_rest_leaf_and_a_tie_survive_the_preserve():
     props = [u._rt[n].get('proportion') for n in u._rt.leaf_nodes]
     assert props[2] < 0, "the rest stopped being a rest"
     assert props[1] == 2, "the structural edit did not take"
+
+
+def test_a_derived_key_smuggled_in_as_a_pfield_cannot_corrupt_the_rhythm():
+    """The preserve set must exclude keys another LAYER owns or derives.
+
+    ``ParameterLayer.storage_keys()`` does not guarantee that on its own.
+    ``ParameterLayer.set_instrument`` is the one pfield-registration door with
+    no reserved-name check (``LAYER-22``), so an instrument whose ``pfields``
+    are named ``metric_duration``/``metric_onset`` registers them as ordinary
+    pfields.  The preserve step would then restore the PRE-EDIT rhythm over the
+    values ``super()`` had just recomputed -- silently, and the bar stops
+    summing to its own span.
+
+    Measured before the ``reserved_keys`` subtraction: a 4/4 bar came back with
+    durations summing to 5/8.  This is the fence for that, and it is a RELATION
+    (the bar fills its own span) rather than a literal, so it cannot go stale.
+    """
+    from fractions import Fraction
+
+    from klotho.thetos.composition.compositional import CompositionalUnit
+    from klotho.thetos.instruments.base import Instrument
+
+    uc = CompositionalUnit(span=1, tempus='4/4', prolatio=(1, 1, 1, 1))
+    rt = uc._rt
+    rt.set_instrument(
+        rt.leaf_nodes[0],
+        Instrument(name='kl_saw', pfields={'metric_duration': 99.0}),
+    )
+    # Premise guard: without this the test would pass by the key never
+    # reaching the registry at all.
+    assert 'metric_duration' in rt._param_layer.storage_keys(), (
+        "set_instrument no longer registers an arbitrary pfield name, so this "
+        "test is guarding nothing -- check LAYER-22 before deleting it")
+
+    rt.replace_node(rt.leaf_nodes[0], proportion=5)
+
+    total = sum(Fraction(str(d)) for d in rt.durations)
+    assert total == Fraction(1), (
+        f"the bar's notes sum to {total}, not to its own span -- a derived "
+        f"key was preserved over the value super() recomputed")
