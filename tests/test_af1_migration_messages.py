@@ -100,7 +100,7 @@ class TestSegmentRefusalNamesSegmentProportions:
 
     def test_a_lone_tree_is_told_factor_is_missing_and_nothing_else(self):
         """Guard against the fix over-reaching. ``segment(rt)`` is a caller
-        who forgot an argument, not a pre-10.19 caller: ``Fraction`` never
+        who forgot an argument, not a 10.18.0 caller: ``Fraction`` never
         accepted a ``RhythmTree``, so no old call could look like this, and
         the rename breadcrumb would be noise."""
         rt = RhythmTree(meas='4/4', subdivisions=(1, 1))
@@ -157,7 +157,7 @@ class TestTheBreadcrumbDoesNotFireOnATempus:
         question*."
 
     So ``segment(Meas('4/4'), f)`` is a caller who transposed the arguments of
-    the CURRENT operator, not a pre-10.19 caller. Measured before the fix, it
+    the CURRENT operator, not a 10.18.0 caller. Measured before the fix, it
     was told to go use ``segment_proportions`` -- advice for a mistake it did
     not make.
     """

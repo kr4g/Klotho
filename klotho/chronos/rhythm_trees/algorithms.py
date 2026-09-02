@@ -1225,7 +1225,7 @@ _SEGMENT_FACTOR_UNSET = object()
 
 
 def _segment_migration_hint(obj) -> str:
-    """The breadcrumb a pre-10.19 ``segment(ratio)`` caller needs.
+    """The breadcrumb a 10.18.0 ``segment(ratio)`` caller needs.
 
     ``segment`` used to take ONE argument, a ratio, and return the pair
     ``(numerator, denominator - numerator)``. It is now Haddad's
@@ -1259,7 +1259,7 @@ def _segment_migration_hint(obj) -> str:
     """
     if isinstance(obj, (str, float, Fraction)):
         return (
-            " If you meant the pre-10.19 segment(ratio), which returned "
+            " If you meant 10.18.0's segment(ratio), which returned "
             "(numerator, denominator - numerator): it was renamed "
             "segment_proportions -- import it from "
             "klotho.chronos.rhythm_trees.algorithms. This name is now "
@@ -1271,7 +1271,7 @@ def _segment_migration_hint(obj) -> str:
 def _segment_arity_refusal(obj) -> TypeError:
     """The refusal for a ONE-ARGUMENT ``segment`` call, in either namespace.
 
-    This is the door a real pre-10.19 caller walks into. 10.18.0's whole
+    This is the door a real 10.18.0 caller walks into. 10.18.0's whole
     signature was ``segment(ratio)``; today's operator needs a second
     argument, so every old call site fails on arity and never reaches the
     type guard that carries the migration sentence. Python's own message
