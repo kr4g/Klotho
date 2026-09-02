@@ -905,6 +905,31 @@ class Tree(GraphCore):
             f"carries them."
         )
 
+    def _map_donor_ids(self, donor_nodes):
+        """Allocate one host id per donor node, paired so sibling order holds.
+
+        AF-1 / audit H1. Sibling order is ascending node id
+        (:meth:`~klotho.topos.graphs.core.GraphCore.successors` sorts), and
+        **the rustworkx free list is LIFO** -- nodes removed in ascending id
+        order are reallocated DESCENDING. Copying a donor by walking its
+        nodes and keeping whatever id each raw insert returned therefore
+        permuted the donor's children on any host that had had a node
+        removed: a grafted ``(5, 3, 1)`` arrived as ``(3, 5, 1)``, with no
+        exception and plausible-looking durations.
+
+        Pairing SORTED donor ids with SORTED host ids is a monotone
+        bijection, so for any two donor nodes ``u < v`` the host ids satisfy
+        ``map[u] < map[v]`` -- every sibling group keeps its order, at every
+        depth. On a host with no freed ids the allocations are already
+        ascending and this returns exactly the mapping the old loop built.
+
+        The nodes come back EMPTY; the caller writes the payloads, because
+        ``graft`` treats the donor root differently from the rest.
+        """
+        donor_nodes = sorted(donor_nodes)
+        new_ids = sorted(self._add_node_raw() for _ in donor_nodes)
+        return dict(zip(donor_nodes, new_ids))
+
     def add_subtree(self, parent, subtree):
         """Add a subtree as a child of a parent node. Returns the attached subtree root id."""
         if not isinstance(subtree, Tree):
@@ -912,11 +937,10 @@ class Tree(GraphCore):
 
         self._reject_donor_this_verb_cannot_carry(subtree)
 
-        node_mapping = {}
-
-        for node in subtree.nodes:
-            new_id = self._add_node_raw(**dict(subtree.nodes[node]))
-            node_mapping[node] = new_id
+        node_mapping = self._map_donor_ids(subtree.nodes)
+        for node, new_id in node_mapping.items():
+            self._write_node_data(new_id, dict(subtree.nodes[node]),
+                                  replace=True)
 
         for u, v in subtree.edges:
             self._add_edge_raw(node_mapping[u], node_mapping[v])
@@ -1035,12 +1059,15 @@ class Tree(GraphCore):
         """Replace the leaf node with the subtree root."""
         parent = self.parent(target_node)
 
-        node_mapping = {subtree.root: target_node}
-        for node in subtree.nodes:
-            if node == subtree.root:
-                continue
-            new_id = self._add_node_raw(**dict(subtree.nodes[node]))
-            node_mapping[node] = new_id
+        # The donor root keeps the target's id; the rest are placed by sorted
+        # rank so the free list's LIFO reuse cannot permute the donor's
+        # siblings (see :meth:`_map_donor_ids`).
+        node_mapping = self._map_donor_ids(
+            n for n in subtree.nodes if n != subtree.root)
+        for node, new_id in node_mapping.items():
+            self._write_node_data(new_id, dict(subtree.nodes[node]),
+                                  replace=True)
+        node_mapping[subtree.root] = target_node
 
         self._write_node_data(target_node, copy.deepcopy(dict(subtree.nodes[subtree.root])), replace=True)
 
@@ -1057,10 +1084,12 @@ class Tree(GraphCore):
         """Keep the leaf node and give it the children from subtree root."""
         subtree_nodes_except_root = [node for node in subtree.nodes if node != subtree.root]
 
-        node_mapping = {}
-        for node in subtree_nodes_except_root:
-            new_id = self._add_node_raw(**dict(subtree.nodes[node]))
-            node_mapping[node] = new_id
+        # Placed by sorted rank, not by allocation order -- see
+        # :meth:`_map_donor_ids` for why the two differ.
+        node_mapping = self._map_donor_ids(subtree_nodes_except_root)
+        for node, new_id in node_mapping.items():
+            self._write_node_data(new_id, dict(subtree.nodes[node]),
+                                  replace=True)
 
         for u, v in subtree.edges:
             if u != subtree.root and v != subtree.root:

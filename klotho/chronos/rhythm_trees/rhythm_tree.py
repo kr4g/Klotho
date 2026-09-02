@@ -1056,9 +1056,38 @@ class RhythmTree(Tree):
         S = self._cast_subdivs(S)
 
         def add_children(parent, children):
-            # raw inserts: one _post_mutation (and thus one _evaluate)
-            # below instead of a full-tree re-evaluate per added child
-            first_id = None
+            """Grow one child per element of *children*, in the order asked
+            for. Returns the id holding rank 0, or None for an empty group.
+
+            Raw inserts: one _post_mutation (and thus one _evaluate) below
+            instead of a full-tree re-evaluate per added child.
+
+            AF-1 / audit H1. This used to write each proportion onto the id
+            ``_add_child_raw`` had just handed back, trusting that ALLOCATION
+            order equals sibling order. It does not. Sibling order is
+            ascending node id (``successors`` returns ``tuple(sorted(...))``,
+            so the sort IS the ordering model) and **the rustworkx free list
+            is LIFO** -- so two nodes removed in ascending id order are
+            reallocated DESCENDING, and a batch of raw inserts on any tree
+            that has ever had a node freed came back with the proportions
+            permuted::
+
+                rt = RhythmTree(meas='4/4', subdivisions=(1, 1, 1, 1))
+                rt.remove_subtree(1); rt.remove_subtree(2)
+                rt.subdivide(3, (3, 1))     # -> (1 3), durations 1/8, 3/8
+
+            Nothing raised; the composer got wrong beats and, on a tied leaf,
+            a tie bound to the wrong note. Reversing the two removals gave
+            the right answer, so the result depended on the order of an
+            earlier, unrelated edit.
+
+            The repair is the idiom ``_respell`` and ``insert_child`` already
+            use: place the content by SORTED SLOT RANK rather than by
+            arrival. Allocation stays depth-first and the ids handed out are
+            exactly the ids handed out before, so on a tree with no freed ids
+            ``ordered == alloc`` and this is a no-op.
+            """
+            alloc = []
             for child in children:
                 if isinstance(child, tuple) and len(child) == 2:
                     D, sub = child
@@ -1066,15 +1095,33 @@ class RhythmTree(Tree):
                     add_children(child_id, sub)
                 else:
                     child_id = self._add_child_raw(parent, proportion=child)
-                if first_id is None:
-                    first_id = child_id
-            return first_id
+                alloc.append(child_id)
+
+            ordered = sorted(alloc)
+            if ordered != alloc:
+                # Content is the pair (node data, child list), captured AFTER
+                # the recursion so each moving sibling takes the subtree that
+                # was built under it. Every id here was allocated by this very
+                # call, so nothing outside the tree points at one and there is
+                # no relocation to announce (contrast `insert_child`, which
+                # shifts pre-existing siblings and must announce).
+                contents = [(dict(self.nodes[a]), list(self.successors(a)))
+                            for a in alloc]
+                for a in alloc:
+                    for c in list(self.successors(a)):
+                        self._remove_edge_raw(a, c)
+                for slot, (payload, kids) in zip(ordered, contents):
+                    self._write_node_data(slot, payload, replace=True)
+                    for c in kids:
+                        self._add_edge_raw(slot, c)
+            return ordered[0] if ordered else None
 
         for n in nodes:
             # Subdividing a tied leaf would strand the tie on an interior
             # node, where it has no meaning (charter sect1, the OpenMusic
             # resolution). "Continues my predecessor" has exactly one
-            # lossless landing spot: the group's first leaf.
+            # lossless landing spot: the group's first leaf -- which is the
+            # SMALLEST new id, not the first allocated one.
             was_tied = bool(self._rx[n].get('tied', False))
             first_child = add_children(n, S)
             if was_tied and first_child is not None:
