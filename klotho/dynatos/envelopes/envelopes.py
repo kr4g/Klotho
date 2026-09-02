@@ -25,15 +25,17 @@ class Envelope:
     Parameters
     ----------
     values : list
-        List of breakpoint values to interpolate between.
+        List of breakpoint values to interpolate between. At least two are
+        required, since an envelope interpolates between breakpoints.
     times : float or list, optional
-        Duration(s) for each segment. If a single value, all segments use 
-        the same duration. If a list, must have one fewer element than values.
-        Default is 1.0.
+        Duration(s) for each segment, which must be non-negative. If a single
+        value, all segments use the same duration. If a list, must have one
+        fewer element than values. Default is 1.0.
     curve : float or list, optional
         Curve shape for each segment. 0 = linear, negative = exponential,
         positive = logarithmic. If a single value, all segments use the same
-        curve. Default is 0.0.
+        curve; if a list, it must have one fewer element than values.
+        Default is 0.0.
     warp : str, optional
         Interpolation domain for all segments: ``'lin'`` (default)
         interpolates values linearly; ``'exp'`` interpolates in the
@@ -49,13 +51,23 @@ class Envelope:
     value_scale : float, optional
         Scale factor applied to all values at construction. Default is 1.0.
     time_scale : float, optional
-        Scale factor applied to all times when computing durations. Default is 1.0.
-        
+        Scale factor applied to all times when computing durations. Must be
+        non-negative. Default is 1.0.
+
+    Raises
+    ------
+    ValueError
+        If fewer than two values are given; if a supplied ``times`` or
+        ``curve`` list does not have exactly one entry per segment; if any
+        segment time or ``time_scale`` is negative; if ``warp`` is neither
+        ``'lin'`` nor ``'exp'``; or if ``warp='exp'`` and any value is not
+        strictly positive after normalization and scaling.
+
     Examples
     --------
     >>> env = Envelope([0, 1, 0.5, 0], times=[0.1, 0.8, 0.1])
     >>> env.at_time(0.5)
-    0.875
+    0.75
     
     >>> decay = Envelope([1, 0], times=2.0, curve=-3)
     >>> decay.at_time(0)
@@ -67,11 +79,55 @@ class Envelope:
                  normalize_values=False, normalize_times=False,
                  value_scale=1.0, time_scale=1.0):
         values = list(values)
-        times = times if isinstance(times, (list, tuple)) else [times] * (len(values) - 1)
-        times = list(times)
-        curve = curve if isinstance(curve, (list, tuple)) else [curve] * (len(values) - 1)
-        curve = list(curve)
-        
+        # An envelope interpolates BETWEEN breakpoints, so fewer than two of
+        # them describes no segment. `Envelope([])` used to construct happily
+        # and then raise IndexError on the first `at_time`, a page away from
+        # the call that was actually wrong.
+        n_segments = len(values) - 1
+        if n_segments < 1:
+            raise ValueError(
+                f"values must have at least 2 breakpoints to define a "
+                f"segment; got {len(values)}"
+            )
+
+        times_given_as_list = isinstance(times, (list, tuple))
+        times = list(times) if times_given_as_list else [times] * n_segments
+        curve_given_as_list = isinstance(curve, (list, tuple))
+        curve = list(curve) if curve_given_as_list else [curve] * n_segments
+
+        # A caller-supplied list has to match the segment count exactly. Too
+        # many times silently LENGTHENED the envelope (total_time grew and the
+        # surplus segments answered with the last value); too few silently
+        # TRUNCATED it. A short curve list was the only loud one, and it was
+        # loud late -- an IndexError from at_time, not from the constructor.
+        if times_given_as_list and len(times) != n_segments:
+            raise ValueError(
+                f"times must have one entry per segment: got {len(times)} "
+                f"times for {len(values)} values, which needs {n_segments}"
+            )
+        if curve_given_as_list and len(curve) != n_segments:
+            raise ValueError(
+                f"curve must have one entry per segment: got {len(curve)} "
+                f"curve values for {len(values)} values, which needs "
+                f"{n_segments}"
+            )
+
+        # Durations run forward. A negative one made the cumulative boundary
+        # list non-monotonic, which both shortened total_time and left
+        # bisect_left searching an unsorted sequence -- a wrong answer with no
+        # error anywhere. `time_scale` is the same quantity through another
+        # door: a negative scale built an envelope that refused every query,
+        # including at_time(0). Zero is still allowed for both, because
+        # apply_envelope reaches time_scale=0 for a zero-duration span.
+        if any(t < 0 for t in times):
+            raise ValueError(f"segment times must be non-negative; got {times}")
+        if time_scale < 0:
+            raise ValueError(
+                f"time_scale must be non-negative; got {time_scale}"
+            )
+
+        values_as_given = list(values)
+
         if normalize_values and len(values) > 1:
             min_val = min(values)
             max_val = max(values)
@@ -89,9 +145,18 @@ class Envelope:
         if warp not in ('lin', 'exp'):
             raise ValueError(f"warp must be 'lin' or 'exp', got {warp!r}")
         if warp == 'exp' and any(v <= 0 for v in values):
+            # Report what the caller typed. The check has to run AFTER
+            # normalize_values/value_scale (a scale of -1 is exactly how a
+            # positive list turns negative), but quoting only the rewritten
+            # list named no number the caller had ever seen.
+            detail = f"got {values_as_given}"
+            if values != values_as_given:
+                detail += (
+                    f", which becomes {values} after normalization/scaling"
+                )
             raise ValueError(
                 "warp='exp' requires all envelope values to be strictly "
-                f"positive; got {values}"
+                f"positive; {detail}"
             )
 
         self._values = values
@@ -320,32 +385,42 @@ class Envelope:
         if time < 0 or time > total:
             raise ValueError(f"Time {time} is outside envelope duration [0, {total}]")
         if time == 0:
-            return self._values[0]
-        if time == total:
-            return self._values[-1]
-
-        # first segment whose end boundary is >= time — identical to the
-        # old linear scan's `time <= segment_end_time`, without rebuilding
-        # the scaled-times list per call
-        seg = bisect_left(boundaries, time) - 1
-        n_segments = len(self._values) - 1
-        if seg >= n_segments:
-            return self._values[-1]
-        current_time = boundaries[seg]
-        segment_duration = scaled_times[seg]
-        segment_progress = (time - current_time) / segment_duration
-        start_val = self._values[seg]
-        end_val = self._values[seg + 1]
-        curve_val = self._curve[seg]
-
-        if curve_val == 0:
-            progress = segment_progress
+            value = self._values[0]
+        elif time == total:
+            value = self._values[-1]
         else:
-            progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
+            # First segment whose end boundary is >= time — identical to the
+            # old linear scan's `time <= segment_end_time`, without rebuilding
+            # the scaled-times list per call.
+            #
+            # The constructor now guarantees len(times) == len(values) - 1, so
+            # `boundaries` has exactly len(values) entries and, for
+            # 0 < time < total, `seg` can never reach len(values) - 1. The
+            # `seg >= n_segments` fallback that used to sit here was only ever
+            # reachable through an over-long `times` list, which is refused.
+            seg = bisect_left(boundaries, time) - 1
+            current_time = boundaries[seg]
+            segment_duration = scaled_times[seg]
+            segment_progress = (time - current_time) / segment_duration
+            start_val = self._values[seg]
+            end_val = self._values[seg + 1]
+            curve_val = self._curve[seg]
 
-        if self._warp == 'exp':
-            return start_val * (end_val / start_val) ** progress
-        return start_val + (end_val - start_val) * progress
+            if curve_val == 0:
+                progress = segment_progress
+            else:
+                progress = (np.exp(curve_val * segment_progress) - 1) / (np.exp(curve_val) - 1)
+
+            if self._warp == 'exp':
+                value = start_val * (end_val / start_val) ** progress
+            else:
+                value = start_val + (end_val - start_val) * progress
+
+        # One coercion, at the return boundary, so every path answers in the
+        # type the docstring promises. Before this the two endpoint branches
+        # handed back whatever the caller put in `values` (an int stayed an
+        # int) and the curved branch handed back a numpy scalar.
+        return float(value)
 
     def sample(self, times):
         """
@@ -362,7 +437,20 @@ class Envelope:
             Envelope values, sample-for-sample identical to calling
             :meth:`at_time` per element (shared precomputed segment
             state; no per-call memoization traffic).
+
+        Raises
+        ------
+        TypeError
+            If *times* is not iterable. A scalar used to reach the list
+            comprehension and surface as ``'float' object is not iterable``,
+            which names neither the method nor the alternative.
         """
+        if not hasattr(times, '__iter__'):
+            raise TypeError(
+                f"sample() expects an iterable of times, got "
+                f"{type(times).__name__} ({times!r}); use at_time() for a "
+                f"single time"
+            )
         at = self._at_time_uncached
         return [at(float(t)) for t in times]
 

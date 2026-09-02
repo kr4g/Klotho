@@ -5,6 +5,8 @@ This module provides classes for working with musical dynamics, including
 individual dynamic markings and dynamic ranges.
 """
 
+from types import MappingProxyType
+
 import numpy as np
 from .utils import dbamp
 
@@ -120,6 +122,15 @@ class DynamicRange:
        https://en.wikipedia.org/wiki/Dynamics_(music)
     """
     def __init__(self, min_dynamic=-60, max_dynamic=-3, curve=0, dynamics=DYNAMIC_MARKINGS):
+        # A range needs two ends. One marking divided by zero when the
+        # normalized position was computed; none constructed silently and then
+        # made .min_dynamic raise IndexError, a page from the actual mistake.
+        dynamics = tuple(dynamics)
+        if len(dynamics) < 2:
+            raise ValueError(
+                f"dynamics must contain at least 2 markings to span a range; "
+                f"got {len(dynamics)}: {dynamics}"
+            )
         self._min_db = min_dynamic
         self._max_db = max_dynamic
         self._curve = curve
@@ -143,8 +154,23 @@ class DynamicRange:
     
     @property
     def ranges(self):
-        """dict : Mapping of dynamic markings to Dynamic objects."""
-        return self._range
+        """Mapping : Read-only view of dynamic markings to Dynamic objects.
+
+        A ``MappingProxyType``, per this package's read-only-view doctrine.
+        The property used to hand out the instance's own dict, so a caller
+        assigning through it changed what ``dr['f']`` answered, and a caller
+        deleting a key made ``.min_dynamic`` raise KeyError for the rest of
+        the object's life.
+
+        The proxy is built per access and deliberately NOT cached. Caching it
+        on the instance made a ``DynamicRange`` that had been READ stop being
+        copyable and picklable -- a ``mappingproxy`` is neither -- while one
+        that had not been read still was. That is the worst available shape for
+        a defect: the same object copies fine, then silently stops, depending
+        on whether anything happened to touch a property. The cache also bought
+        nothing; ``MappingProxyType()`` is an O(1) wrapper.
+        """
+        return MappingProxyType(self._range)
 
     def _calculate_range(self):
         min_db = float(self._min_db)

@@ -27,13 +27,29 @@ def freq_amp_scale(freq: float, db_level: float, min_db: float = -60) -> float:
     db_level : float
         The input level in dB.
     min_db : float, optional
-        The minimum dB level in the dynamic range (default is -60).
-        
+        The minimum dB level in the dynamic range (default is -60). Must be
+        strictly negative: it is the FLOOR of a range whose ceiling is unity
+        gain (0 dB).
+
     Returns
     -------
     float
         The perceptually scaled amplitude (linear scale).
+
+    Raises
+    ------
+    ValueError
+        If ``min_db`` is not strictly negative. Zero divided by zero when the
+        range width was computed; a positive floor was worse, because it
+        inverted the range and the phon estimate built from it and returned a
+        perfectly plausible number with no error anywhere.
     """
+    if min_db >= 0:
+        raise ValueError(
+            f"min_db must be strictly negative -- it is the floor of a range "
+            f"whose ceiling is 0 dB; got {min_db}"
+        )
+
     range_db = abs(min_db)
     phon_level = 40 + ((db_level - min_db) / range_db) * 60
     
