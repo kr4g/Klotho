@@ -11,7 +11,20 @@
   // V4 (V5-scheduler batch): plumbs onIdle through play() so transports
   // re-arm after ring-out + teardown, not at finish. Same discipline:
   // keys on its own name, claims every older one.
-  if (typeof globalThis.__klothoPlaybackBridgeV4 !== "undefined") return;
+  // V5: play()'s returned promise gets a rejection handler, and record()
+  // an onError that abandons the capture. Before it, every refusal raised
+  // inside the scheduler's setup was an UNHANDLED rejection — devtools and
+  // nowhere else — the transport never re-armed, and record() hung. V4 is
+  // the marker klotho-cac 10.18.0 SHIPPED, so leaving the guard on V4
+  // would have meant this fix installing on nothing but a cold page: every
+  // notebook whose saved output already ran a 10.18.0 widget defines V4,
+  // the guard would return, and the old silent build would keep the public
+  // name. THE RULE, earned by the stop/purge race and re-earned here: a
+  // behavioural change inside a shipped guard version REQUIRES bumping the
+  // marker. tests/test_recording.py drives that in a Node vm, and
+  // TestGuardMarkersMoveWithBehaviour fails the suite if this file moves
+  // without the number moving.
+  if (typeof globalThis.__klothoPlaybackBridgeV5 !== "undefined") return;
 
   function buildBridge(config) {
     var audioPayload = config.audioPayload || null;
@@ -537,4 +550,5 @@
   globalThis.__klothoPlaybackBridgeV2 = buildBridge;
   globalThis.__klothoPlaybackBridgeV3 = buildBridge;
   globalThis.__klothoPlaybackBridgeV4 = buildBridge;
+  globalThis.__klothoPlaybackBridgeV5 = buildBridge;
 })();

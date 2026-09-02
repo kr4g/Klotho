@@ -35,6 +35,16 @@ def _newest_core_marker():
     return max(ns)
 
 
+def _newest_bridge_marker(src=None):
+    """The highest ``__klothoPlaybackBridgeVn`` the bridge claims on its way
+    out."""
+    ns = [int(n) for n in
+          re.findall(r"globalThis\.__klothoPlaybackBridgeV(\d+) = buildBridge;",
+                     BRIDGE_SRC if src is None else src)]
+    assert ns, "the bridge claims no version marker at all"
+    return max(ns)
+
+
 class TestBusFloorContract:
     def test_first_private_bus_matches_across_files(self):
         assert _const(CORE_SRC, "FIRST_PRIVATE_BUS") == \
@@ -172,17 +182,46 @@ class TestSchedulerRecordingContract:
 
 
 class TestBridgeRecordContract:
-    def test_versioned_guard_bumped_to_v4(self):
-        assert '__klothoPlaybackBridgeV4 !== "undefined"' in BRIDGE_SRC
-        assert '__klothoPlaybackBridgeV3 !== "undefined"' not in BRIDGE_SRC
+    def test_bridge_install_guard_is_versioned(self):
+        """The same discipline the core is held to, and for the same reason:
+        whatever the newest marker N is, the install guard keys on N alone,
+        every marker from V2 to N is claimed on the way out, and no older
+        marker is used as a guard.
 
-    def test_v4_claims_all_versioned_names(self):
-        """A stale 10.15/10.16 output rendered after a newer widget must
-        not clobber the public name: V4 is a superset, so it owns every
-        older name too."""
-        assert "globalThis.__klothoPlaybackBridgeV2 = buildBridge" in BRIDGE_SRC
-        assert "globalThis.__klothoPlaybackBridgeV3 = buildBridge" in BRIDGE_SRC
-        assert "globalThis.__klothoPlaybackBridgeV4 = buildBridge" in BRIDGE_SRC
+        Written generically rather than naming a literal, because it is
+        edited on every behavioural fix to the bridge — and the previous
+        version of this test *was* named ``test_versioned_guard_bumped_to_v4``,
+        which is exactly the shape that gets read as "V4 is correct" instead
+        of "bump me".  A test that has to be hand-edited to say a new number
+        is a test that gets edited without being read.
+        """
+        newest = _newest_bridge_marker()
+        assert newest >= 5, newest
+        assert (f'if (typeof globalThis.__klothoPlaybackBridgeV{newest} '
+                f'!== "undefined") return;') in BRIDGE_SRC
+        # Every marker up to the newest is claimed, so a stale bridge
+        # rendering later can never clobber the public name with an older
+        # build…
+        for n in range(2, newest + 1):
+            assert (f"globalThis.__klothoPlaybackBridgeV{n} = buildBridge"
+                    in BRIDGE_SRC), n
+        # …and none of the older ones is what the install guard keys on,
+        # or a page that cached that older build would skip this one.
+        for n in range(2, newest):
+            assert (f'__klothoPlaybackBridgeV{n} !== "undefined"'
+                    not in BRIDGE_SRC), n
+
+    def test_bridge_still_claims_every_shipped_marker(self):
+        """The three names klotho-cac **10.18.0** assigns on its way out.
+
+        Not derived from the current source: read off the released build with
+        ``git show origin/main:klotho/utils/playback/_animation_bridge.js``.
+        A newer bridge that stopped claiming one of them would let a stale
+        saved output from that release win the public name on a shared page.
+        """
+        for n in (2, 3, 4):
+            assert (f"globalThis.__klothoPlaybackBridgeV{n} = buildBridge"
+                    in BRIDGE_SRC), n
 
     def test_bridge_plumbs_on_idle_to_scheduler(self):
         """Controllers re-arm their play button at onIdle (finish +
@@ -316,3 +355,357 @@ class TestPlayKwargPlumbing:
         )
         assert "record" in _PLAYBACK_KWARGS
         assert "record" in _PASSTHROUGH_KWARGS
+
+
+# ===========================================================================
+# Install-guard behaviour: does a page that already cached the SHIPPED
+# bridge actually get a behaviourally-changed one?
+#
+# The static contracts above pin the *shape* of the guard.  They cannot see
+# the failure this section exists for, which is that the shape stayed
+# perfectly correct while the NUMBER went stale: a fix landed in the bridge
+# and the marker it is guarded by did not move, so on every page holding a
+# cached copy of the previous release the fix does not install at all.  That
+# is a recorded lesson in this project, from the stop/purge race -- "a
+# behavioural fix inside a shipped guard version => bump the marker".
+#
+# So these are behavioural: the REAL bridge source is executed in a Node
+# ``vm`` against a page that has already been primed, and the question asked
+# is the browser's question -- which build ends up under the public name.
+# Modelled on the harness in ``tests/test_spatial_routing_js.py`` and
+# ``tests/test_af1_play_error_surfacing.py``.
+# ===========================================================================
+
+_ROOT = Path(__file__).parent.parent
+
+#: The markers a cached **klotho-cac 10.18.0** page has already defined.
+#: Read off the released build, not off the source under test:
+#: ``git show origin/main:klotho/utils/playback/_animation_bridge.js``
+#: assigns exactly V2, V3 and V4 on its way out (verified 2026-09-01).
+SHIPPED_MARKERS_1018 = [
+    "__klothoPlaybackBridgeV2",
+    "__klothoPlaybackBridgeV3",
+    "__klothoPlaybackBridgeV4",
+]
+
+#: A width the precompiled decoder family cannot serve, so ``play()`` is
+#: refused inside the scheduler's setup.  32 is the top of the family --
+#: ``scheduler_score.js`` builds the message as ``' declares ' + w +
+#: ' speakers and the decoder family stops at '`` -- so 40 refuses.
+_REFUSED_WIDTH = 40
+_REFUSAL_PHRASE = "decoder family stops at"
+
+
+STALE_BRIDGE_PROBE_JS = r'''
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import vm from 'node:vm';
+
+const argv = process.argv.slice(2);
+const ROOT = argv[argv.indexOf('--root') + 1];
+const seedIx = argv.indexOf('--seed');
+const SEED = (seedIx !== -1 && argv[seedIx + 1])
+  ? argv[seedIx + 1].split(',').filter(Boolean) : [];
+const staleIx = argv.indexOf('--stale-bridge');
+const STALE_BRIDGE = staleIx !== -1 ? argv[staleIx + 1] : null;
+const widthIx = argv.indexOf('--width');
+const WIDTH = widthIx !== -1 ? Number(argv[widthIx + 1]) : 40;
+
+const SS_DIR = join(ROOT, 'klotho', 'utils', 'playback', 'supersonic');
+const BRIDGE_FILE = join(ROOT, 'klotho', 'utils', 'playback',
+                         '_animation_bridge.js');
+
+// The browser's own verdict on an unhandled rejection.  Anything landing
+// here reached no handler -- i.e. the devtools console and nowhere else.
+const unhandled = [];
+process.on('unhandledRejection', (r) => {
+  unhandled.push(String((r && r.message) || r));
+});
+
+const consoleErrors = [];
+const sonic = {
+  _id: 1000,
+  nextNodeId() { return this._id++; },
+  send() {},
+  sendOSC() {},
+  purge() {},
+  async sync() {},
+  getMetrics() { return {}; },
+  audioContext: { state: 'running', resume: async () => {} },
+};
+
+const sandbox = {
+  performance: { timeOrigin: 0, now: () => 0 },
+  setTimeout: () => 1,
+  clearTimeout: () => {},
+  console: {
+    log: () => {}, debug: () => {}, warn: () => {},
+    error: (...a) => { consoleErrors.push(a.join(' ')); },
+  },
+  atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+  DrawScheduler: class { schedule() {} clear() {} },
+  SuperSonic: {
+    osc: { encodeSingleBundle: (ntp, addr, args) => ({ ntp, addr, args }) },
+  },
+  __klothoSonic: {
+    bootConfig: { scsynthOptions: { numAudioBusChannels: 1024 } },
+    _nextBufnum: 7,
+    instance: sonic,
+  },
+  __ensureSuperSonic: async () => sonic,
+  __klothoSynthdefAssets: {
+    '__busRouter': 'x', '__busRouterMonitor': 'x', '__chainLimiter': 'x',
+    '__klEnvCtrl': 'x', 'kl_tri': 'x',
+    '__busRouter1': 'x', '__busRouter2': 'x', '__busRouter4': 'x',
+    '__busRouter8': 'x', '__busRouter16': 'x', '__busRouter32': 'x',
+    '__spatialDecode1': 'x', '__spatialDecode2': 'x', '__spatialDecode4': 'x',
+    '__spatialDecode8': 'x', '__spatialDecode16': 'x', '__spatialDecode32': 'x',
+  },
+  Blob: class { constructor(parts) { this.parts = parts; } },
+};
+vm.createContext(sandbox);
+vm.runInContext(readFileSync(join(SS_DIR, 'scheduler_core.js'), 'utf8'), sandbox);
+vm.runInContext(readFileSync(join(SS_DIR, 'scheduler_score.js'), 'utf8'), sandbox);
+
+// ---- prime the page, exactly as a cached saved output would -------------
+const out = {};
+if (STALE_BRIDGE) {
+  // The genuine article: a previously released bridge, run first, claiming
+  // its own marker names and the public name.
+  vm.runInContext(readFileSync(STALE_BRIDGE, 'utf8'), sandbox);
+  out.primedWith = 'real-source';
+} else {
+  // Marker-only priming: no old build needed to ask the guard's question.
+  const STALE = function stalePlaceholder() { throw new Error('stale ran'); };
+  sandbox.KlothoPlaybackBridge = STALE;
+  for (const name of SEED) sandbox[name] = STALE;
+  out.primedWith = 'markers';
+}
+out.seeded = SEED;
+const before = sandbox.KlothoPlaybackBridge;
+
+// ---- now render a fresh widget on that same page ------------------------
+vm.runInContext(readFileSync(BRIDGE_FILE, 'utf8'), sandbox);
+out.publicReplaced = sandbox.KlothoPlaybackBridge !== before;
+
+// ---- and ask whether the CURRENT behaviour is what actually runs --------
+// The discriminator is the AF-1 refusal surfacing: the shipped 10.18.0
+// bridge calls play() with neither await nor .catch, so a refused play is an
+// unhandled rejection and no onError exists at all.  If the fixed build
+// installed, onError carries the message and nothing goes unhandled.
+const arrayMeta = (w) => {
+  const labels = [];
+  for (let i = 0; i < w; i++) labels.push('S' + (i + 1));
+  return { name: 'arr', labels, width: w,
+           positions: null, units: null, speedOfSound: null, decoder: null };
+};
+const tick = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Only meaningful when a real build won the public name.  In the
+// marker-primed short-circuit case the placeholder is still installed and
+// calling it would abort the probe, turning a clean verdict into a crash --
+// so report the verdict and stop.
+out.ready = null;
+out.onErrorMsg = null;
+out.onIdleFired = null;
+if (out.publicReplaced) {
+  const bridge = sandbox.KlothoPlaybackBridge({
+    audioPayload: { events: [{
+      id: 1, type: 'new', defName: 'kl_tri', start: 0, dur: 1, group: 'a',
+      pfields: { freq: 220, amp: 0.3 },
+    }] },
+    ringTime: 0.1,
+    meta: { groups: ['a'], spatial: {
+      arrays: { arr: arrayMeta(WIDTH) },
+      tracks: { a: { array: 'arr', width: WIDTH } },
+    } },
+    manifest: { kl_tri: { amp: 0.5, gate: 1 } },
+  });
+  out.ready = await bridge.ensureReady();
+
+  let onErrorMsg = null, onIdleFired = false;
+  // Fire-and-forget, exactly how _engine_widget.js's doPlay() calls it.
+  bridge.play(null, {
+    onIdle: function () { onIdleFired = true; },
+    onError: function (m) { onErrorMsg = String(m); },
+  });
+  await tick(80);
+  out.onErrorMsg = onErrorMsg;
+  out.onIdleFired = onIdleFired;
+}
+
+out.unhandledRejections = unhandled;
+out.consoleErrors = consoleErrors;
+process.stdout.write(JSON.stringify(out));
+'''
+
+
+@pytest.fixture(scope="module")
+def stale_bridge_probe(tmp_path_factory):
+    p = tmp_path_factory.mktemp("bridge_guard") / "stale_bridge_probe.mjs"
+    p.write_text(STALE_BRIDGE_PROBE_JS)
+    return p
+
+
+def _run_stale_probe(probe, seed=(), stale_bridge=None, width=_REFUSED_WIDTH):
+    cmd = ["node", str(probe), "--root", str(_ROOT),
+           "--seed", ",".join(seed), "--width", str(width)]
+    if stale_bridge is not None:
+        cmd += ["--stale-bridge", str(stale_bridge)]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not available")
+class TestBridgeInstallsOverACachedPage:
+    """A page holding the previous release's marker must still get this build.
+
+    ``_animation_bridge.js``'s marker is a **shipped** one -- unlike
+    ``scheduler_core.js``'s, which was bumped to V6 on this branch and so was
+    never released under its current behaviour.  Every marker in
+    :data:`SHIPPED_MARKERS_1018` is already defined in a notebook page that
+    rendered a 10.18.0 widget, so the guard sees them on real users' pages.
+    """
+
+    def test_shipped_marker_set_does_not_block_this_build(
+            self, stale_bridge_probe):
+        """The whole finding, in one assertion.
+
+        With V2/V3/V4 already defined -- which is the state of every cached
+        10.18.0 page -- the current bridge must still install, and the fix it
+        carries must be the behaviour that actually runs.
+        """
+        r = _run_stale_probe(stale_bridge_probe, seed=SHIPPED_MARKERS_1018)
+        assert r["publicReplaced"] is True, (
+            "the bridge short-circuited on a marker the last RELEASE already "
+            "defines, so this build never installs on a cached page")
+        assert r["ready"] is True
+        # …and the behaviour that runs is this build's, not a placeholder's.
+        assert r["onErrorMsg"] is not None
+        assert _REFUSAL_PHRASE in r["onErrorMsg"]
+        assert r["unhandledRejections"] == []
+
+    def test_this_builds_own_marker_set_still_short_circuits(
+            self, stale_bridge_probe):
+        """The guard is bumped, not deleted.
+
+        Re-including the same build (two widgets in one notebook) must be a
+        no-op; otherwise every extra widget would rebuild the bridge and a
+        genuinely stale copy rendering later could still win the public name.
+        """
+        newest = _newest_bridge_marker()
+        seed = [f"__klothoPlaybackBridgeV{n}" for n in range(2, newest + 1)]
+        r = _run_stale_probe(stale_bridge_probe, seed=seed)
+        assert r["publicReplaced"] is False, (
+            f"seeding every marker up to V{newest} did not short-circuit the "
+            "install -- the guard no longer guards")
+
+    def test_the_real_released_bridge_is_replaced(self, stale_bridge_probe,
+                                                  tmp_path):
+        """The same question, with no placeholder: run the genuine released
+        bridge first, then render a new widget on that page.
+
+        The expectation does not come from the new code.  The released build
+        is the one whose ``play()`` has neither ``await`` nor ``.catch`` --
+        that is why a refusal was an unhandled rejection, pinned independently
+        in ``tests/test_af1_play_error_surfacing.py``.  So if the released
+        build is still the one under the public name, ``onError`` cannot fire
+        (it does not exist there) and the refusal must show up unhandled.
+        """
+        try:
+            text = subprocess.run(
+                ["git", "show",
+                 "origin/main:klotho/utils/playback/_animation_bridge.js"],
+                capture_output=True, text=True, cwd=str(_ROOT),
+                check=True).stdout
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pytest.skip("origin/main not reachable from this checkout")
+        released = tmp_path / "released_animation_bridge.js"
+        released.write_text(text)
+        # Sanity on the fixture itself: it must be an OLDER build, or this
+        # test proves nothing.
+        assert _newest_bridge_marker(text) < _newest_bridge_marker()
+
+        r = _run_stale_probe(stale_bridge_probe, stale_bridge=released)
+        assert r["publicReplaced"] is True
+        assert r["onErrorMsg"] is not None and _REFUSAL_PHRASE in r["onErrorMsg"]
+        assert r["unhandledRejections"] == []
+
+
+class TestGuardMarkersMoveWithBehaviour:
+    """A behavioural change to a version-guarded module must move its marker.
+
+    The rule this file exists to enforce, stated once and checked against the
+    last release rather than against a literal: **if the module's source
+    differs from the published build, its newest install-guard marker must be
+    greater than the published one.**  Written this way it needs no editing
+    when the branch merges -- once ``origin/main`` carries the new source the
+    two sides match again and the check is vacuous until the next edit.
+
+    ``scheduler_score.js`` is the one exception, and deliberately so: its
+    guard is a *prototype* flag on ``BrowserScheduler``, so a core bump
+    installs a fresh class whose prototype has no flag and the extension
+    re-installs.  Its marker therefore moves with the core's.
+    """
+
+    _MODULES = {
+        "_animation_bridge.js": (
+            "klotho/utils/playback/_animation_bridge.js",
+            r"globalThis\.__klothoPlaybackBridgeV(\d+) = buildBridge;"),
+        "scheduler_core.js": (
+            "klotho/utils/playback/supersonic/scheduler_core.js",
+            r"globalThis\.__klothoSchedCoreV(\d+) = true;"),
+        "_recorder.js": (
+            "klotho/utils/playback/_recorder.js",
+            r"__klothoRecorderV(\d+)"),
+    }
+
+    @staticmethod
+    def _released(rel_path):
+        try:
+            return subprocess.run(["git", "show", f"origin/main:{rel_path}"],
+                                  capture_output=True, text=True,
+                                  cwd=str(_ROOT), check=True).stdout
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+    @staticmethod
+    def _newest(pattern, text):
+        ns = [int(n) for n in re.findall(pattern, text)]
+        assert ns, "no version marker found"
+        return max(ns)
+
+    @pytest.mark.parametrize("name", sorted(_MODULES))
+    def test_changed_module_has_a_bumped_marker(self, name):
+        rel, pattern = self._MODULES[name]
+        old = self._released(rel)
+        if old is None:
+            pytest.skip("origin/main not reachable from this checkout")
+        new = (_ROOT / rel).read_text()
+        if old == new:
+            return  # unchanged since the release; nothing to bump
+        assert self._newest(pattern, new) > self._newest(pattern, old), (
+            f"{name} changed since the last release but its install guard "
+            f"marker did not move: every page that cached the released build "
+            f"will short-circuit the install and keep running the old one")
+
+    def test_changed_score_extension_rides_a_core_bump(self):
+        """The prototype-flag exception, checked rather than assumed."""
+        rel = "klotho/utils/playback/supersonic/scheduler_score.js"
+        old = self._released(rel)
+        if old is None:
+            pytest.skip("origin/main not reachable from this checkout")
+        new = (_ROOT / rel).read_text()
+        if old == new:
+            return
+        pat = r"__klothoScoreExtV(\d+)"
+        core_rel, core_pat = self._MODULES["scheduler_core.js"]
+        old_core = self._released(core_rel)
+        assert (self._newest(pat, new) > self._newest(pat, old)
+                or self._newest(core_pat, CORE_SRC)
+                > self._newest(core_pat, old_core)), (
+            "scheduler_score.js changed since the last release, but neither "
+            "its own prototype marker nor the core's global marker moved -- "
+            "a cached page keeps the released extension methods")
