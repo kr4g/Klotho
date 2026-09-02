@@ -218,3 +218,49 @@ def test_stochastic_bind_rerolls_but_is_stable_within_the_extract():
     assert first == list(ex.events['amp']), "extract draws must be stable across reads"
     assert len(first) == 2
     assert first != src[:2], "R33: a duplicating verb copies the Bind, so it re-rolls"
+
+
+# ------------------- the authored-vs-inherited distinction, both directions
+
+def test_an_authored_leaf_value_still_wins_over_a_root_write_on_a_fragment():
+    """CONTROL — passes before and after, and it is here because an adversarial
+    verifier read this behaviour as a surviving AUD-6 defect. It is not.
+
+    Measured on the SOURCE: a leaf carrying its OWN ``amp`` is NOT changed by a
+    later root write — ``[0.5, 0.5, 0.5, 0.5]`` stays — while a leaf with no
+    override of its own follows the root to 0.9. So a single-leaf fragment that
+    keeps answering 0.5 after ``frag.root.set_pfields(amp=0.9)`` is REPRODUCING
+    its source faithfully. Expecting 0.9 there means expecting a root write to
+    erase an authored value, which is not what inheritance means here and not
+    what the source does.
+
+    Pinned so the next reader does not 'fix' it into a real defect."""
+    uc = flat_uc(pfields={'amp': 0.5})
+    uc.leaves.set_pfields(amp=0.5)
+    uc.set_pfields(uc._rt.root, amp=0.9)
+    assert list(uc.events['amp']) == [0.5, 0.5, 0.5, 0.5], (
+        "source premise: an authored leaf value survives a root write"
+    )
+
+    from klotho.chronos.temporal_units.algorithms import decompose
+    src = flat_uc(pfields={'amp': 0.5})
+    src.leaves.set_pfields(amp=0.5)
+    frag = list(decompose(src))[0]
+    frag.set_pfields(frag._rt.root, amp=0.9)
+    assert list(frag.events['amp']) == [0.5], (
+        "the fragment must answer as its source does, not cascade over an "
+        "authored value"
+    )
+
+
+def test_a_fragment_root_write_DOES_reach_a_leaf_that_authored_nothing():
+    """The other direction, and this one WAS red before `bb0164e`: the fragment's
+    root must carry what the leaf inherited from outside, so a root write on the
+    fragment cascades exactly as it would on the source."""
+    from klotho.chronos.temporal_units.algorithms import decompose
+    src = flat_uc(pfields={'amp': 0.0})
+    src.set_pfields(src._rt.root, amp=0.5)
+    frag = list(decompose(src))[0]
+    assert list(frag.events['amp']) == [0.5], "inherited context must survive the extract"
+    frag.set_pfields(frag._rt.root, amp=0.9)
+    assert list(frag.events['amp']) == [0.9]

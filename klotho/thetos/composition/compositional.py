@@ -1590,6 +1590,19 @@ class CompositionalUnit(TemporalUnit):
         #    would be shadowed by the child's own override and reach nothing.
         #    ``decompose`` produces exactly these single-leaf fragments, so this
         #    is the common path, not a corner.
+        #
+        #    Precisely what this does and does NOT promise, because an
+        #    adversarial verifier read the second half as a surviving defect:
+        #    it puts what the leaf INHERITED at the fragment's root, so a later
+        #    root write cascades. It does not, and must not, dislodge an
+        #    override the source leaf AUTHORED -- step 1 keeps that at the leaf,
+        #    where a root write is correctly shadowed by it. That is exactly how
+        #    the SOURCE answers: measured, a leaf carrying its own ``amp`` is
+        #    unmoved by a root write while a leaf carrying none follows it. A
+        #    fragment that cascaded over an authored value would be erasing the
+        #    authored-vs-inherited distinction this method exists to preserve.
+        #    Both directions are pinned in
+        #    ``tests/test_af2_raw_override_placement.py``.
         if src_root is not None:
             src._param_layer._build_effective(src)
             inherited = src._param_layer._effective_cache.get(src_root)
