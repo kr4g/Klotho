@@ -49,6 +49,33 @@ def _tied_arc():
     return uc, leaves, slur_id
 
 
+def _tied_arc_with_a_survivor():
+    """The same seam, one beat longer, so an arc OUTLIVES the rest.
+
+    AF-3.5. Resting leaf 3 in :func:`_tied_arc` leaves runs of one on both
+    sides, so the whole slur dies and every ``for spec in
+    uc._slur_specs.values()`` loop below runs ZERO times -- the checks pass
+    because there is no arc, not because no arc spans a rest.
+
+    Five beats with the tie at 3 and the arc authored over leaves 2..5
+    leaves beats 4 and 5 adjacent and sounding, so one arc survives and the
+    span check is actually made. Both fixtures are exercised: the surviving
+    one is where the loop does work, the dissolving one is where the death
+    is the answer.
+    """
+    uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1, 1), beat='1/4', bpm=60,
+            pfields={'freq': 440})
+    leaves = list(uc._rt.leaf_nodes)
+    uc._rt.set_node_data(leaves[2], tied=True)
+    slur_id = uc.apply_slur([leaves[1], leaves[2], leaves[3], leaves[4]])
+    return uc, leaves, slur_id
+
+
+#: ``(builder, survives)`` -- whether resting ``leaves[2]`` leaves an arc.
+_REST_FIXTURES = [(_tied_arc, False), (_tied_arc_with_a_survivor, True)]
+_REST_IDS = ['dissolves', 'survives']
+
+
 def _arc_whose_head_can_be_swallowed():
     """Leaf 1 rests; leaf 2 carries ``tied`` but continues nothing while it
     does. Slur over leaves 2..3, so ``_slur_start`` sits on leaf 2.
@@ -97,15 +124,25 @@ class TestRestingATieContinuationUnderAnArc:
     silences a MEMBER: the arc dissolves, and it says so.
     """
 
+    @pytest.mark.parametrize('build,survives', _REST_FIXTURES, ids=_REST_IDS)
     @pytest.mark.parametrize('handle', ['uc', 'raw'])
-    def test_no_arc_is_left_spanning_the_new_rest(self, handle):
-        uc, leaves, slur_id = _tied_arc()
+    def test_no_arc_is_left_spanning_the_new_rest(self, handle, build,
+                                                  survives):
+        uc, leaves, slur_id = build()
         continuation = leaves[2]
 
         if handle == 'uc':
             uc.make_rest(continuation)
         else:
             uc._rt.make_rest(continuation)
+
+        # Which of the two outcomes we are in is asserted, not assumed. On
+        # the ``dissolves`` fixture the loop below is empty, and without
+        # this line it would be a green check over nothing.
+        assert bool(uc._slur_specs) is survives, (
+            f'{handle}: expected an arc to '
+            f'{"survive" if survives else "dissolve"}, got '
+            f'{ {k: v["leaf_nodes"] for k, v in uc._slur_specs.items()} }')
 
         for spec in uc._slur_specs.values():
             span = _span_leaves(uc, spec)
@@ -132,10 +169,16 @@ class TestRestingATieContinuationUnderAnArc:
             f'{handle}: silent, caught {[str(w.message) for w in caught]}'
         )
 
-    def test_the_two_handles_agree(self):
-        """R12 lens 2: one musical question, one answer, whichever handle."""
-        uc_a, leaves_a, _ = _tied_arc()
-        uc_b, leaves_b, _ = _tied_arc()
+    @pytest.mark.parametrize('build,survives', _REST_FIXTURES, ids=_REST_IDS)
+    def test_the_two_handles_agree(self, build, survives):
+        """R12 lens 2: one musical question, one answer, whichever handle.
+
+        AF-3.5: run on ``_tied_arc`` alone this compared ``{} == {}``, which
+        is true whether or not either handle did anything at all. The
+        ``survives`` fixture makes the agreed answer a non-empty one.
+        """
+        uc_a, leaves_a, _ = build()
+        uc_b, leaves_b, _ = build()
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
@@ -146,6 +189,10 @@ class TestRestingATieContinuationUnderAnArc:
                   for k, v in uc_a._slur_specs.items()}
         via_raw = {k: tuple(v['leaf_nodes'])
                    for k, v in uc_b._slur_specs.items()}
+        assert bool(via_uc) is survives, (
+            f'the answer both handles are being compared on is '
+            f'{"empty" if not via_uc else via_uc}, which is not the '
+            f'{"non-empty" if survives else "empty"} one this fixture is for')
         assert via_uc == via_raw
 
     def test_resting_a_leaf_outside_the_arc_leaves_it_alone(self):

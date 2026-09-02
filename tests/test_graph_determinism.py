@@ -57,7 +57,16 @@ class TestNeighborOrder:
             assert G.neighbors(node) == sorted(G.neighbors(node))
 
     def test_neighbors_mirror_successors(self):
-        """``successors`` has sorted since core.py:229; ``neighbors`` now agrees."""
+        """``successors`` has sorted since it grew its sorted-order contract
+        in ``klotho/topos/graphs/core.py`` :: ``successors()``; ``neighbors``
+        now agrees.
+
+        AUD-135: this said ``core.py:229``, which is not that function and
+        has not been for some time -- ``successors`` is nowhere near line
+        229. Cite the function, never the line: line numbers in this repo
+        demonstrably drift, and a citation pointing at unrelated code reads
+        as a fabricated one.
+        """
         G = Graph.directed()
         for _ in range(4):
             G.add_node()

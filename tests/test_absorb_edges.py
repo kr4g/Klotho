@@ -274,33 +274,74 @@ class TestNothingIsAdmittedThatWasNotSelected:
         for members in _members(uc).values():
             assert len(members) >= 2
 
-    def test_a_sibling_the_overlay_does_not_cover_refuses_the_newcomer(self):
+    #: ``(door, index or None, does the arc survive)``. The newcomer lands
+    #: BETWEEN the two arc members for ``add_child`` and index 2, so their
+    #: adjacency breaks and the arc dies; at index 0 or 1 it lands before
+    #: them and the arc lives on with exactly the notes it started with.
+    SIBLING_DOORS = [('add_child', None, False), ('insert_at_0', 0, True),
+                     ('insert_at_1', 1, True), ('insert_at_2', 2, False)]
+
+    @pytest.mark.parametrize('door,at,survives', SIBLING_DOORS,
+                             ids=[d[0] for d in SIBLING_DOORS])
+    def test_a_sibling_the_overlay_does_not_cover_refuses_the_newcomer(
+            self, door, at, survives):
         """Provenance, stated as its own test. Parent holds a sounding leaf
-        outside the arc, so nothing under it may join."""
+        outside the arc, so nothing under it may join.
+
+        **AF-3.5 -- this had two faults that hid each other.**
+
+        1. Its only door was ``add_child``, which drops the newcomer BETWEEN
+           the two arc members and so dissolves the arc. ``after`` came back
+           ``None``, the whole ``if`` body was skipped and the provenance
+           loop ran zero times: nothing was ever checked.
+        2. Membership was compared as ``set(after['leaf_nodes']) - before``,
+           a set difference over RAW NODE IDS taken across an edit that
+           renumbers them. Measured on the ``insert_at_0`` door: ids go
+           ``{3, 4}`` -> ``{4, 6}``, which reads as "leaf 6 joined and leaf 3
+           left" when, tracked by a marker pfield, the members are the very
+           same two notes. Had the loop ever run it would have reported a
+           newcomer that does not exist.
+
+        Both are fixed here: every door is exercised with the outcome it
+        must produce, and membership is compared by a per-leaf MARKER rather
+        than by an id that the tree is free to reassign.
+        """
         uc = UC(tempus='4/4', prolatio=((2, (1, 1)), 1, 1), beat='1/4',
                 bpm=60, pfields={'freq': 440})
         leaves = list(uc._rt.leaf_nodes)
+        for i, leaf in enumerate(leaves):
+            uc.set_pfields(leaf, freq=100 + i)
+        mark = lambda n: uc._rt[n].get('freq')
+
         slur_id = uc.apply_slur([leaves[1], leaves[2]])
-        before = set(uc._slur_specs[slur_id]['leaf_nodes'])
+        before = {mark(n) for n in uc._slur_specs[slur_id]['leaf_nodes']}
         group = uc._rt.parent(leaves[1])
-        assert leaves[0] not in before and uc._rt.parent(leaves[0]) is group, (
+        assert mark(leaves[0]) not in before and (
+            uc._rt.parent(leaves[0]) is group), (
             'fixture: the group must hold a sounding leaf the arc misses')
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            uc._rt.add_child(group, proportion=1)
+            if at is None:
+                uc._rt.add_child(group, proportion=1)
+            else:
+                uc._rt.insert_child(group, at, proportion=1)
 
         after = uc._slur_specs.get(slur_id)
-        if after is not None:
-            new = set(after['leaf_nodes']) - before
-            for leaf in new:
-                siblings = [n for n in uc._rt.subtree_leaves(uc._rt.parent(leaf))
-                            if n != leaf
-                            and uc._rt[n].get('proportion', 1) >= 0]
-                assert all(n in before or n in set(after['leaf_nodes'])
-                           for n in siblings), (
-                    f'leaf {leaf} joined although its parent holds music the '
-                    f'arc does not cover')
+        assert (after is not None) is survives, (
+            f'{door}: expected the arc to '
+            f'{"survive" if survives else "dissolve"}, got {after}')
+        if after is None:
+            return
+
+        now = {mark(n) for n in after['leaf_nodes']}
+        # The newcomer carries no marker, so it is detectable by identity
+        # rather than by an id the edit may have reassigned.
+        assert now == before, (
+            f'{door}: the arc\'s membership changed from {sorted(before)} to '
+            f'{sorted(now, key=lambda v: (v is None, v))} -- the inserted '
+            f'note (marker None) was never selected by the composer, and no '
+            f'selected note may be dropped either')
 
     @pytest.mark.parametrize('door,grow', GROWTH_DOORS, ids=[d[0] for d in GROWTH_DOORS])
     def test_two_slurs_never_come_to_share_a_leaf(self, door, grow):

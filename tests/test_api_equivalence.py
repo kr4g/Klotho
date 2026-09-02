@@ -9,9 +9,15 @@ Each test has a "before" version using the current API and an "after" version
 using the proposed new API. Both use the same random seed and must produce
 the same event data.
 
-The "after" tests are marked with @pytest.mark.xfail(reason="new API not yet
-implemented") so the test suite passes before implementation. Remove the xfail
-markers as each feature is implemented.
+The "after" tests WERE marked ``@pytest.mark.xfail(reason="new API not yet
+implemented")`` while the new API was being built. That work is done: the
+markers were removed as each feature landed, and every test in this file now
+runs for real. There is no ``xfail`` anywhere in this module.
+
+(AUD-136: this paragraph stood in the present tense long after the last
+marker was gone, so it described a file that did not exist. A reader looking
+for the markers to remove found none and had no way to tell whether they had
+already been removed or had never been added.)
 
 Abbreviations (from French musical terminology):
     RT  = RhythmTree

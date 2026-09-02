@@ -272,7 +272,17 @@ class TestOffFamilyWidthsAreRefusedInPython:
             needed_spatial_synthdefs(payload['meta'])
         msg = str(e.value)
         assert '30' in msg
-        assert '__busRouter30' in msg or '__spatialDecode30' in msg
+        # AF1-55: this was ``or``, so either half alone satisfied it.
+        # A 5x6 rig makes 30 BOTH a declared track width and main's width,
+        # so the refusal owes the composer both missing names -- the router
+        # that would carry the array and the decoder that would fold it.
+        # Measured 2026-09-02 by deleting the one line in
+        # ``_refuse_off_family_widths`` that adds ``__spatialDecode30``:
+        # the whole file stayed green, 54 passed.
+        for name in ('__busRouter30', '__spatialDecode30'):
+            assert name in msg, (
+                f'the refusal never names {name}, so a composer cannot tell '
+                f'which def is missing: {msg}')
         assert 'SILENT' in msg
 
     def test_the_refusal_lists_the_widths_that_do_work(self):

@@ -294,12 +294,28 @@ class TestSingleDegreePlots:
     def test_both_interval_modes_agree_that_one_degree_is_plottable(self):
         """The relation: plottability is a property of the collection, not
         of how its intervals happen to be spelled. A one-note sonority is
-        drawable in cents mode, so it is drawable in ratios mode."""
+        drawable in cents mode, so it is drawable in ratios mode.
+
+        AF-3.5 checked whether this was vacuous and it is NOT: the old
+        second line, ``(len(ratios.data) > 0) == (len(cents.data) > 0)``,
+        has its left side pinned True by the line above it, so it reduces
+        to ``len(cents.data) > 0`` -- weak, but a real assertion. Measured
+        2026-09-02 by patching ``_plot_scale_chord`` to hand back a figure
+        with no traces in cents mode: the test went RED.
+
+        It is stated as a count comparison now because the boolean equality
+        threw away the interesting half. Two modes that both draw, but draw
+        a different NUMBER of traces for the same one-note sonority, is the
+        spelling leaking into the drawing -- and the old form could not say
+        so.
+        """
         from klotho.semeios.visualization.plots import _plot_scale_chord
         cents = _plot_scale_chord(Chord([100.0], interval_type='cents'))
         ratios = _plot_scale_chord(Chord(['1/1'], interval_type='ratios'))
-        assert len(ratios.data) >= 1
-        assert (len(ratios.data) > 0) == (len(cents.data) > 0)
+        assert len(ratios.data) >= 1, 'ratios mode drew nothing at all'
+        assert len(cents.data) == len(ratios.data), (
+            f'the two spellings of one degree drew different numbers of '
+            f'traces: cents {len(cents.data)}, ratios {len(ratios.data)}')
 
     @pytest.mark.parametrize('layout', ['circle', 'line'])
     def test_the_one_degree_is_the_thing_that_gets_drawn(self, layout):

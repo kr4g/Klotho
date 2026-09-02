@@ -30,79 +30,93 @@ Recorded HERE rather than only in the session handoff, because the handoff
 lives outside this repository and a pointer to it is a dead reference for
 anyone auditing these tests later.
 
+AUD-135 -- these citations name a FUNCTION, never a line number. They
+used to carry ``file.py:NNNN``, and five of the fourteen had drifted off
+the code they quote: the ``scale`` mutation said ``rhythm_tree.py:1629``
+where the line lives at 1755, ``_respell`` said 1254 for 1343, ``segment``
+said 1432 for 1517, ``_split_nodes`` said 1265 for 1342, and
+``_process_child`` said 710 for 736. A citation that points at the wrong
+line is worse than none: the next reader applies the mutation to whatever
+happens to be there and concludes the register is fiction. The quoted line
+plus its function is stable under every edit that does not touch the code
+itself, and ``test_af35_guard_sweep.py`` now checks these citations resolve.
+
 * ``test_flatten_is_a_projection_of_the_event_sequence``
-      klotho/chronos/rhythm_trees/algorithms.py:223 — change `s = (-1,) if
-      md < 0 else (1,)` to `s = (1,)` (decompose stops carrying rest
-      signs, ALG-1)
+      klotho/chronos/rhythm_trees/algorithms.py :: ``decompose()`` — change
+      `s = (-1,) if md < 0 else (1,)` to `s = (1,)` (decompose stops
+      carrying rest signs, ALG-1)
 
 * ``test_box_verbs_factor_through_flatten``
-      klotho/chronos/rhythm_trees/algorithms.py:318 — change `return
-      fuse(decompose(rt))` to `return fuse(decompose(rt)[::-1])`
+      klotho/chronos/rhythm_trees/algorithms.py :: ``flatten()`` — change
+      `return fuse(decompose(rt))` to `return fuse(decompose(rt)[::-1])`
 
 * ``test_box_verbs_edit_the_decomposed_sequence``
-      klotho/chronos/rhythm_trees/algorithms.py:497 — change `survivors =
-      [p for i, p in enumerate(parts) if i not in drop]` to `... if i in
-      drop]`
+      klotho/chronos/rhythm_trees/algorithms.py :: ``diminish()`` — change
+      `survivors = [p for i, p in enumerate(parts) if i not in drop]` to
+      `... if i in drop]`
 
 * ``test_tempus_following_and_preserving_agree_projectively``
-      klotho/chronos/rhythm_trees/rhythm_tree.py:1629 — change `out[k] =
-      out[k] * value` to `out[k] = abs(out[k]) * value` (circle scale
-      silently un-rests the scaled event)
+      klotho/chronos/rhythm_trees/rhythm_tree.py :: ``scale()`` — change
+      `out[k] = out[k] * value` to `out[k] = abs(out[k]) * value` (circle
+      scale silently un-rests the scaled event)
 
 * ``test_diminish_then_augment_restores_the_event_sequence``
-      klotho/chronos/rhythm_trees/algorithms.py:547 — change `negative =
-      (num < 0) != (den < 0)` to `negative = False` (reinserted rests come
-      back as sounds)
+      klotho/chronos/rhythm_trees/algorithms.py :: ``_as_prolatio()`` —
+      change `negative = (num < 0) != (den < 0)` to `negative = False`
+      (reinserted rests come back as sounds)
 
 * ``test_preserving_family_inverses_and_meter_invariance``
-      klotho/chronos/rhythm_trees/rhythm_tree.py:1254 — change `S =
-      tuple(int(d * den) for d in durations)` to `S = tuple(int(abs(d) *
-      den) for d in durations)` (the respell drops rest signs)
+      klotho/chronos/rhythm_trees/rhythm_tree.py :: ``_respell()`` — change
+      `S = tuple(int(d * den) for d in durations)` to `S = tuple(int(abs(d)
+      * den) for d in durations)` (the respell drops rest signs)
 
 * ``test_scale_tempus_commutes_and_composes_multiplicatively``
-      klotho/chronos/rhythm_trees/algorithms.py:766 — change
-      `meas=Meas(part.meas.numerator * num,` to
+      klotho/chronos/rhythm_trees/algorithms.py :: ``scale_tempus()`` —
+      change `meas=Meas(part.meas.numerator * num,` to
       `meas=Meas(part.meas.numerator + num,`
 
 * ``test_augment_batch_equals_sequential_composition``
-      klotho/chronos/rhythm_trees/algorithms.py:637 — change `for value, p
-      in zip(adds, idx):` to `for off, (value, p) in enumerate(zip(adds,
-      idx)):` and `pending.setdefault(p, [])` to `pending.setdefault(p +
-      off, [])` (batch indices become order-dependent)
+      klotho/chronos/rhythm_trees/algorithms.py :: ``augment()`` — change
+      `for value, p in zip(adds, idx):` to `for off, (value, p) in
+      enumerate(zip(adds, idx)):` and `pending.setdefault(p, [])` to
+      `pending.setdefault(p + off, [])` (batch indices become
+      order-dependent)
 
 * ``test_evide_is_a_support_complement_involution``
-      klotho/chronos/rhythm_trees/algorithms.py:1016 — change `flipped =
-      -int(abs(p)) if p > 0 else int(abs(p))` to `flipped = int(abs(p))`
+      klotho/chronos/rhythm_trees/algorithms.py :: ``evide()`` — change
+      `flipped = -int(abs(p)) if p > 0 else int(abs(p))` to `flipped =
+      int(abs(p))`
 
 * ``test_filtrage_rests_exactly_the_walked_positions``
-      klotho/chronos/rhythm_trees/algorithms.py:889-890 — replace the two
-      lines `if p < len(leaves): # CLIP...` / `out.make_rest(leaves[p])`
-      with `out.make_rest(leaves[p % len(leaves)])` (the documented
-      rejected WRAP alternative)
+      klotho/chronos/rhythm_trees/algorithms.py :: ``filtrage()`` — replace
+      the two lines `if p < len(leaves): # CLIP...` /
+      `out.make_rest(leaves[p])` with `out.make_rest(leaves[p %
+      len(leaves)])` (the documented rejected WRAP alternative)
 
 * ``test_segment_partitions_the_timeline``
-      klotho/chronos/rhythm_trees/algorithms.py:1432 — in the LEFT result
-      change `meas=Meas(num * f.numerator, den * f.denominator)` to
-      `meas=Meas(num * g.numerator, den * g.denominator)`
+      klotho/chronos/rhythm_trees/algorithms.py :: ``segment()`` — in the
+      LEFT result change `meas=Meas(num * f.numerator, den *
+      f.denominator),` to `meas=Meas(num * g.numerator, den *
+      g.denominator),`
 
 * ``test_fuse_of_segment_outputs_restores_or_splits_events``
-      klotho/chronos/rhythm_trees/algorithms.py:1265 — change
-      `left.append(['leaf', sign * head, nd[2]])` to `left.append(['leaf',
-      sign * head, False])` (the left piece of a cut leaf loses its
-      inherited tie)
+      klotho/chronos/rhythm_trees/algorithms.py :: ``_split_nodes()`` —
+      change `left.append(['leaf', sign * head, nd[2]])` to
+      `left.append(['leaf', sign * head, False])` (the left piece of a cut
+      leaf loses its inherited tie)
 
 * ``test_operator_family_is_closed``
-      klotho/chronos/rhythm_trees/rhythm_tree.py:710 — change `ratio =
-      Fraction(s, div) * parent_ratio` to `ratio = Fraction(s, div + 1) *
-      parent_ratio`
+      klotho/chronos/rhythm_trees/rhythm_tree.py :: ``_process_child()`` —
+      change `ratio = Fraction(s, div) * parent_ratio` to `ratio =
+      Fraction(s, div + 1) * parent_ratio`
       CAVEAT: this mutation breaks RhythmTree's core duration arithmetic,
       so it reddens far more than closure alone. It proves the test runs
       and can fail; it is NOT a discriminating probe of the closure claim.
 
 * ``test_a_leading_tie_operand_merges_with_its_new_predecessor``
-      klotho/chronos/rhythm_trees/algorithms.py:167 — change
-      `s_out.append(float(w))` to `s_out.append(w)` (the fused spelling
-      drops the tie marker)
+      klotho/chronos/rhythm_trees/algorithms.py :: ``_fuse_parts()`` —
+      change `s_out.append(float(w))` to `s_out.append(w)` (the fused
+      spelling drops the tie marker)
 """
 
 # FILE PREAMBLE shared by PROP-RT-01..14 (one file).

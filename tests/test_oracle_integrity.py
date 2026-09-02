@@ -172,11 +172,18 @@ def _undeclared_oracles(repo=None, tests=None):
 def _regen_scan_paths(repo=None, tests=None):
     """Every file that could carry a regeneration switch.
 
-    scripts/ is included although it is gitignored here. That cuts the wrong
-    way on purpose: an untracked file can only ADD findings for whoever has it,
-    never remove one from a clone, so the check stays at least as strict for a
-    reader as it is for the author. The opposite arrangement -- an untracked
-    file making a check PASS -- is the bug this module shipped with.
+    scripts/ is included because that is where the capture scripts live.
+
+    AUD-133: this used to say "scripts/ is included although it is gitignored
+    here", and then argued that scanning an untracked directory cuts the safe
+    way -- an untracked file can only ADD findings for whoever has it, never
+    remove one from a clone. The ARGUMENT is still sound and still worth
+    keeping, because it is why scanning extra paths here is safe in general.
+    The PREMISE is simply no longer true: scripts/ has been tracked since
+    1e2f3f8 (2026-08-30), so every reader scans the same files the author
+    does. The failure mode named below -- an untracked file making a check
+    PASS -- is the bug this module shipped with, and it remains the reason
+    rule 1 above insists a provenance declaration live in a TRACKED file.
     """
     repo = REPO if repo is None else repo
     tests = TESTS if tests is None else tests

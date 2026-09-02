@@ -8,10 +8,17 @@ to run it from a separate worktree checked out to origin/main, against that
 remote code -- never against the working tree. Nothing enforces that; the
 script only says it.
 
-That capture script is NOT tracked (scripts/ is gitignored), so a clone of this
-repo has the baseline and no way to re-run the capture. This paragraph is
-therefore the whole surviving account of where these numbers came from, which
-is why it lives here in a tracked file instead of next to the script.
+That capture script IS tracked, and has been since 1e2f3f8 (2026-08-30,
+"chore: track scripts/, and retire the blanket rule that hid it"), so a clone
+of this repo has both the baseline and the script that made it.
+
+(AUD-133: this paragraph used to read "That capture script is NOT tracked
+(scripts/ is gitignored), so a clone of this repo has the baseline and no way
+to re-run the capture." Both halves stopped being true at 1e2f3f8 -- there is
+no ``scripts/`` rule in .gitignore any more, and ``git ls-files scripts/``
+lists the capture scripts. The paragraph stays because the PROVENANCE above
+is still the thing a reader needs, and it is still worth having in a tracked
+file next to the baseline rather than only beside the script.)
 
 Regenerating the file from the working tree would pin the code to itself: every
 test that reads it would then pass for any behaviour, including the behaviour

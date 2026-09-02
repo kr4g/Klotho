@@ -111,6 +111,14 @@ class TestRespellCarriesOverlays:
         # must NOT happen is a spec pointing at a node that no longer exists,
         # which made every later read of `events` raise.
         assert len(uc.events) == 3
+        # AF-3.5: state the disposition rather than leaving it implied. The
+        # loop below runs zero times on this fixture -- the arc dies whole --
+        # so on its own it is a green check over an empty dict, and a spec
+        # left dangling on the destroyed node would make it non-empty. The
+        # surviving-slur direction is the next test.
+        assert uc._slur_specs == {}, (
+            f'one of two members was destroyed, so no arc may remain: '
+            f'{ {k: v["leaf_nodes"] for k, v in uc._slur_specs.items()} }')
         for spec in uc._slur_specs.values():
             assert set(spec['leaf_nodes']).issubset(set(uc._rt.leaf_nodes))
 

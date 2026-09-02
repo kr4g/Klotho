@@ -490,17 +490,47 @@ class TestAMidSlurInstrumentChangeIsAnnounced:
     actually split: an unreachable warning that is unreachable because the
     feature silently stopped working would also be silent, and only the
     second assertion can tell those apart.
+
+    **AF-3.5 -- that second assertion did not do the job it was written
+    for, and the fixture is why.**  The unit was four beats with a
+    THREE-leaf arc and the instrument set on its middle note, so the split
+    left runs of 1, 1 and 1 -- no run of two, hence no surviving arc at
+    all.  ``uc._slur_specs`` came back empty, the ``for arc in arcs`` loop
+    below ran ZERO times, and the guard meant to catch that read
+    ``assert len(uc._slur_specs) < 1 or arcs``, where ``arcs`` is derived
+    from ``_slur_specs``: it is ``len(x) < 1 or bool(x)``, true for every
+    possible ``x``.  A guard whose failure branch cannot be reached.
+
+    Measured 2026-09-02 by monkeypatching ``UC.set_instrument`` to CLEAR
+    every slur instead of splitting it -- the exact "feature silently
+    stopped working" this class names -- and re-running the class: **2
+    passed.**  The whole split could be deleted and nothing here noticed.
+
+    The fixture is now five beats with the arc over all five and the
+    instrument on the MIDDLE one, so the runs are ``[0,1]``, ``[2]``,
+    ``[3,4]`` and TWO arcs survive.  The loop runs, and the arcs are
+    compared against the split derived by hand from the fixture rather than
+    against a count.  The total-dissolution case the old fixture actually
+    exercised is kept, as its own test, asserting the outcome it produces.
     """
 
     @staticmethod
-    def _slurred(instrument_on_member):
-        uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), bpm=60,
+    def _slurred(instrument_on_member, n=5, on=2):
+        """*n* beats under one arc; the instrument lands on beat *on*.
+
+        Defaults split the arc into two surviving runs. Callers wanting the
+        dissolution case pass a shape whose runs are all shorter than two.
+        """
+        uc = UC(tempus='4/4', prolatio=(1,) * n, bpm=60,
                 pfields={'freq': 440})
         L = list(uc._rt.leaf_nodes)
         uc.set_instrument(uc._rt.root, 'kl_tri')
-        uc.apply_slur([L[0], L[1], L[2]])
+        uc.apply_slur(L)
         if instrument_on_member:
-            uc.set_instrument(L[1], 'kl_saw')
+            # Deliberately NOT suppressed: the dissolution case below
+            # records the warning this raises, and swallowing it here would
+            # make that assertion unfalsifiable.
+            uc.set_instrument(L[on], 'kl_saw')
         return uc
 
     @staticmethod
@@ -514,6 +544,7 @@ class TestAMidSlurInstrumentChangeIsAnnounced:
 
     def test_a_mid_slur_instrument_change_can_no_longer_be_constructed(self):
         uc = self._slurred(instrument_on_member=True)
+        L = list(uc._rt.leaf_nodes)
 
         assert self._lower(uc) == [], (
             'the arc still spans two instruments at lowering, so the ruling '
@@ -521,18 +552,45 @@ class TestAMidSlurInstrumentChangeIsAnnounced:
 
         arcs = sorted(tuple(spec['leaf_nodes'])
                       for spec in uc._slur_specs.values())
+        # Derived from the fixture, not from the code: one arc over beats
+        # 0-4, the instrument on beat 2, so the same-instrument runs are
+        # [0,1], [2] and [3,4] and only the two-long ones are still slurs.
+        assert arcs == [(L[0], L[1]), (L[3], L[4])], (
+            f'the arc did not split into the two runs either side of the '
+            f'instrument change -- got {arcs}. An EMPTY list here means the '
+            f'slur vanished rather than splitting, which is the failure the '
+            f'silence above cannot distinguish on its own')
+
         instruments = {leaf: uc.get_instrument(leaf)
                        for arc in arcs for leaf in arc}
         for arc in arcs:
             assert len({instruments[leaf] for leaf in arc}) == 1, (
                 f'arc {arc} spans {[instruments[l] for l in arc]}')
-        assert len(uc._slur_specs) < 1 or arcs, (
-            'the warning went quiet because the slur vanished, not because '
-            'the arc split -- those are not the same thing')
+
+    def test_a_split_that_leaves_no_run_of_two_dissolves_the_arc(self):
+        """The old fixture's case, now asserting what it actually produces.
+
+        Three beats under one arc with the instrument on the middle beat
+        leaves runs of 1, 1 and 1. One note is not a slur, so nothing
+        survives -- and a slur death is never silent (SLUR-B1).
+        """
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            uc = self._slurred(instrument_on_member=True, n=3, on=1)
+
+        assert uc._slur_specs == {}, (
+            f'a run of one is not a slur, so no arc may survive: '
+            f'{dict(uc._slur_specs)}')
+        assert any('Slur removed' in str(w.message) for w in caught), (
+            f'the arc dissolved silently: {[str(w.message) for w in caught]}')
 
     def test_a_uniform_slur_does_not_warn(self):
         """The other direction: a warning that always fires is noise."""
-        assert self._lower(self._slurred(instrument_on_member=False)) == []
+        uc = self._slurred(instrument_on_member=False)
+        assert len(uc._slur_specs) == 1, (
+            f'fixture: an untouched arc must still be there, or the silence '
+            f'below is silence over nothing: {dict(uc._slur_specs)}')
+        assert self._lower(uc) == []
 
 
 class TestARebakeTouchesOnlyWhatTheEditChanged:

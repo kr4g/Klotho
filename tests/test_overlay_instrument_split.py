@@ -315,24 +315,49 @@ class TestTheStructuralHealSplitsToo:
     arc left the arc stored as two members on two different instruments,
     which is exactly the state the ruling forbids and the state the lowering
     warning was written to announce.
+
+    **AF-3.5 -- the fixture used to make that unobservable.** The arc was
+    TWO leaves and the destination was the second of them, so the move
+    stopped that leaf being a leaf, the arc dropped to one member and
+    dissolved. ``_slur_specs`` came back ``{}``, the loop below ran zero
+    times, and "no arc spans two instruments" was true because there was no
+    arc. Measured 2026-09-02 by building the fixture and then making every
+    leaf report a UNIQUE instrument -- under which no arc of two could
+    possibly be uniform -- and re-running: **1 passed.**
+
+    The arc is now three leaves and the newcomer is moved under the LAST of
+    them, so one arc survives the move with the ``kl_tri`` leaf sitting
+    inside its span. The question the class is named for is then actually
+    asked, and an absorb that pulled the newcomer in would be caught.
     """
 
     @staticmethod
     def _mixed_by_moving():
+        """Returns ``(uc, leaves, mover)``; *mover* is the ``kl_tri`` leaf."""
         uc = UC(tempus='6/4', prolatio=(1,) * 6, beat='1/4', bpm=60,
                 pfields={'freq': 440})
         leaves = list(uc._rt.leaf_nodes)
         for leaf in leaves:
             uc.set_instrument(leaf, 'kl_saw')
-        uc.set_instrument(leaves[4], 'kl_tri')
-        uc.apply_slur([leaves[0], leaves[1]])
+        mover = leaves[4]
+        uc.set_instrument(mover, 'kl_tri')
+        uc.apply_slur([leaves[0], leaves[1], leaves[2]])
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            uc._rt.move_subtree(leaves[4], leaves[1])
-        return uc
+            uc._rt.move_subtree(mover, leaves[2])
+        return uc, leaves, mover
 
     def test_no_arc_survives_spanning_two_instruments(self):
-        uc = self._mixed_by_moving()
+        uc, leaves, mover = self._mixed_by_moving()
+
+        # Without this the loop below is a green check over an empty dict.
+        assert uc._slur_specs, (
+            'no arc survived the move at all, so the uniformity check below '
+            'asserts nothing. Restore a fixture whose arc outlives the edit, '
+            'or this test cannot fail')
+        assert uc._rt.parent(mover) == leaves[2], (
+            f'fixture: the kl_tri leaf must land inside the arc, not beside '
+            f'it -- parent is {uc._rt.parent(mover)}, wanted {leaves[2]}')
 
         for slur_id, spec in uc._slur_specs.items():
             instruments = [uc.get_instrument(n) for n in spec['leaf_nodes']]

@@ -68,9 +68,61 @@ class TestStopFreeVsPurgeContract:
     hanging stop() or play() forever."""
 
     @staticmethod
-    def _method_body(src, header, span=2600):
+    def _method_body(src, header):
+        """The method's REAL body, found by matching its braces.
+
+        AF1-35: this used to be ``src[start:start + span]`` with *span* a raw
+        character count passed per call site (2600, 4000, 7000, 2200). Both
+        directions of that were wrong, and measured on 2026-09-02:
+
+        =============================  =========  ===========
+        method                         real size  span used
+        =============================  =========  ===========
+        ``async stop()``                    1646         2600
+        ``async play(events, options)``     7306    4000/7000
+        ``_deferUnregister()``              1776         2200
+        ``_unregisterPlayer()``             1160         2600
+        ``async _awaitBounded()``            245         2600
+        =============================  =========  ===========
+
+        An OVERRUN is the dangerous one: ``_awaitBounded`` is 245 characters
+        and was searched over 2600, so ``assert "Promise.race" in body`` could
+        be satisfied by a ``Promise.race`` belonging to some later method
+        entirely -- a green check on a function that no longer does the thing.
+        A TRUNCATION is the loud one: ``play()`` is 7306 characters and two
+        call sites searched only its first 4000, so a needle that drifted past
+        that point turned a correct file red.
+
+        Both failure modes are removed by finding the closing brace instead of
+        guessing a length -- and the body then stays correct when anyone adds
+        a comment. String literals and comments are skipped so a brace inside
+        one cannot unbalance the count.
+        """
         start = src.index(header)
-        return src[start:start + span]
+        i = src.index('{', start + len(header))
+        depth, j, n = 0, i, len(src)
+        while j < n:
+            c = src[j]
+            if c in '"\'`':
+                quote, j = c, j + 1
+                while j < n and src[j] != quote:
+                    j += 2 if src[j] == '\\' else 1
+            elif c == '/' and j + 1 < n and src[j + 1] == '/':
+                j = src.find('\n', j)
+                if j == -1:
+                    break
+            elif c == '/' and j + 1 < n and src[j + 1] == '*':
+                j = src.find('*/', j) + 1
+            elif c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return src[start:j + 1]
+            j += 1
+        raise AssertionError(
+            f'unbalanced braces after {header!r} -- the body could not be '
+            f'delimited, so every check over it would be meaningless')
 
     def test_stop_syncs_between_frees_and_purge(self):
         body = self._method_body(CORE_SRC, "async stop()")
@@ -80,7 +132,7 @@ class TestStopFreeVsPurgeContract:
         assert free < sync < unreg
 
     def test_play_restart_syncs_between_frees_and_purge(self):
-        body = self._method_body(CORE_SRC, "async play(events, options)", span=4000)
+        body = self._method_body(CORE_SRC, "async play(events, options)")
         free = body.index("self._freeGroup();")
         sync = body.index("await self._fastSync(")
         unreg = body.index("self._unregisterPlayer();")
@@ -94,17 +146,16 @@ class TestStopFreeVsPurgeContract:
         press's purge then eats the first's frees and in-flight /sync
         (browser-verified failure mode)."""
         assert "_engineLock(work)" in CORE_SRC
-        for method, span in (("async stop()", 2600),
-                             ("async play(events, options)", 4000),
-                             ("_deferUnregister()", 2200)):
-            body = self._method_body(CORE_SRC, method, span=span)
+        for method in ("async stop()", "async play(events, options)",
+                       "_deferUnregister()"):
+            body = self._method_body(CORE_SRC, method)
             assert "._engineLock(" in body, f"{method} not serialized"
 
     def test_play_flush_section_settles_before_scheduling(self):
         """The purge ack must settle inside play()'s serialized section,
         before anything is scheduled: a late clearSched ack would eat a
         random slice of the new batch."""
-        body = self._method_body(CORE_SRC, "async play(events, options)", span=7000)
+        body = self._method_body(CORE_SRC, "async play(events, options)")
         lock = body.index("await this._engineLock(")
         purge = body.index("_awaitBounded(_schedLoad().purgePromise")
         plan = body.index("this._buildSendPlan(evts)")
@@ -116,7 +167,7 @@ class TestStopFreeVsPurgeContract:
         assert "g.purgePromise = p;" in body
 
     def test_play_awaits_inflight_purge_before_scheduling(self):
-        body = self._method_body(CORE_SRC, "async play(events, options)", span=7000)
+        body = self._method_body(CORE_SRC, "async play(events, options)")
         unreg = body.index("self._unregisterPlayer();")
         purge_await = body.index("_awaitBounded(_schedLoad().purgePromise")
         plan = body.index("this._buildSendPlan(evts)")

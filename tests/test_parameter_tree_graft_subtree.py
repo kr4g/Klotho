@@ -126,12 +126,38 @@ def test_parameter_tree_add_child_invalidates_effective_cache_and_updates_struct
 
 
 def test_parameter_tree_replace_node_updates_structure_and_data():
+    """AF-3.5: this could not tell REPLACE from MERGE, and it is named for
+    the difference.
+
+    The target node carried ``{}`` before the call, so replacing its data and
+    merging into it produce the same dict -- and ``expected`` was itself built
+    with ``dict.update``, a merge. Measured 2026-09-02 by redefining
+    ``Tree.replace_node`` to merge the new attributes over the old ones
+    instead of replacing them: **1 passed**.
+
+    The target now carries an ``amp`` the call does not mention, so the two
+    semantics disagree: a replace drops it, a merge keeps it. ``expected``
+    never has it, and the dropped key is asserted directly as well so the
+    failure names the difference rather than showing two dicts.
+    """
     source = ParameterTree(1, (11, 12, 13))
     source.set_pfields(_node_at_path(source, tuple()), tempo=100)
-    source.replace_node(_node_at_path(source, (2,)), pitch=64, velocity=90)
+    target = _node_at_path(source, (2,))
+    source.set_pfields(target, amp=0.5)
+    assert dict(source.nodes[target]) == {"amp": 0.5}, 'fixture did not take'
+
+    source.replace_node(target, pitch=64, velocity=90)
+
+    assert "amp" not in dict(source.nodes[target]), (
+        f'replace_node MERGED instead of replacing: the pre-existing amp '
+        f'survived a call that never mentioned it -- '
+        f'{dict(source.nodes[target])}')
 
     expected = ParameterTree(1, (11, 12, 13))
     expected.set_pfields(_node_at_path(expected, tuple()), tempo=100)
+    # ``amp`` was registered on the source by the write above; registration
+    # is tree-level and outlives the node data the replace discarded.
+    expected.register_pfields(["amp"])
     expected._rx[_node_at_path(expected, (2,))].update({"pitch": 64, "velocity": 90})
 
     _assert_parameter_tree_equivalent(source, expected)

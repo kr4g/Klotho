@@ -25,6 +25,7 @@ a door that commit never covered. It reproduces on an ordinary insert near the
 top of the bar, not on anything exotic.
 """
 
+import math
 import warnings
 
 import pytest
@@ -49,6 +50,20 @@ def _uc_with_envelope_over_the_tail():
 
 def _amps(uc):
     return list(uc.events['amp'])
+
+
+def _holes(amps):
+    """The indices carrying no value at all.
+
+    AF-3.5. ``uc.events['amp']`` is a float64 column, so a leaf with no value
+    comes back as ``NaN`` and NEVER as ``None`` -- ``a is not None`` is True
+    over the hole it is written to catch. Measured 2026-09-02: writing
+    ``amp=None`` onto a mid-span leaf gives ``[0.1, nan, 0.0, 0.5]``, over
+    which ``all(a is not None for a in amps)`` is True. This is the check
+    that reads the column correctly.
+    """
+    return [i for i, a in enumerate(amps)
+            if a is None or (isinstance(a, float) and math.isnan(a))]
 
 
 class TestAnEditOutsideTheSpanDoesNotReassertTheEnvelope:
@@ -167,7 +182,8 @@ class TestAnEditInsideTheSpanStillRebakes:
                 uc._rt.subdivide(leaves[3], (1, 1))
 
         amps = _amps(uc)
-        assert all(a is not None for a in amps), 'a leaf mid-span has no value'
+        assert not _holes(amps), (
+            f'leaves {_holes(amps)} mid-span have no value at all: {amps}')
         assert amps[-1] > amps[-2], (
             f'{handle}: the ramp flattened instead of continuing over the new '
             f'leaf -- {before} -> {amps}'

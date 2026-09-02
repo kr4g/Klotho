@@ -297,9 +297,29 @@ def test_a_recycled_tree_answers_exactly_as_a_pristine_one():
 
     All four writers are exercised, over nested subdivision specs up to
     three levels deep, with the removals sometimes ascending (which arms the
-    LIFO) and sometimes not.  Measured against the pre-fix implementation
-    this fails on roughly a QUARTER of the trials -- 999 mismatches in 4000
-    -- so the defect was common, not exotic.
+    LIFO) and sometimes not.
+
+    AF1-60 -- the failure rate, RE-MEASURED, with the mutation that produces
+    it.  This paragraph used to say "999 mismatches in 4000", a count over a
+    trial budget this test does not have: the loop below runs ``range(500)``
+    and always has, so 4000 could not have come from it and the fraction was
+    unreproducible either way.
+
+    Re-measured 2026-09-02 against a copy of ``klotho/`` with the two sorts
+    that ``52aeb09`` added put back to allocation order --
+    ``rhythm_tree.py`` :: ``subdivide()``, ``ordered = sorted(alloc)`` ->
+    ``ordered = list(alloc)``, and ``trees.py`` :: ``graft_subtree()``,
+    ``new_ids = sorted(self._add_node_raw() for _ in donor_nodes)`` ->
+    ``new_ids = [self._add_node_raw() for _ in donor_nodes]`` -- replaying
+    this exact loop and seed:
+
+        **134 mismatches of 500**, spread over every writer:
+        graft_replace 49, graft_adopt 36, subdivide 34, add_subtree 15.
+
+    So the shape of the old claim survives -- the defect was common, better
+    than one trial in four, and it hit all four doors rather than one exotic
+    path.  Only the numbers were wrong.  They are stated with their mutation
+    now, because a rate with no reproduction is a number nobody can check.
     """
     rng = random.Random(20260901)
     mismatches = []

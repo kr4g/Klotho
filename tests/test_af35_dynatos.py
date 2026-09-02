@@ -301,10 +301,43 @@ class TestAmplitudeDecibelContract:
             dbamp(float('nan'))
 
     def test_nan_never_survives_either_converter(self):
-        """The whole point of the contract, stated as one relation."""
-        probes = [0.0, 1e-9, 0.5, 1.0, 4.0]
-        assert not any(math.isnan(ampdb(a)) for a in probes)
-        assert not any(math.isnan(dbamp(ampdb(a))) for a in probes)
+        """The whole point of the contract, stated as one relation.
+
+        AF-3.5: this used to probe ``[0.0, 1e-9, 0.5, 1.0, 4.0]`` -- five
+        ordinary finite amplitudes and not one NaN. A guard named for NaN
+        whose probe set contains no NaN cannot fail for the reason it is
+        named, whatever else it happens to check. The probes now include
+        every edge the docstring above names: NaN itself, both infinities
+        and a negative amplitude.
+
+        The relation, for BOTH converters and in both directions: every
+        input either comes back a non-NaN number or is REFUSED by name.
+        NaN leaving a converter is the one outcome forbidden outright.
+        """
+        probes = [float('nan'), float('inf'), float('-inf'), -0.5,
+                  0.0, 1e-9, 0.5, 1.0, 4.0]
+        refused = {'ampdb': [], 'dbamp': []}
+        for fn, key in ((ampdb, 'ampdb'), (dbamp, 'dbamp')):
+            for p in probes:
+                try:
+                    out = fn(p)
+                except ValueError:
+                    refused[key].append(p)
+                    continue
+                assert not math.isnan(out), (
+                    f'{key}({p!r}) returned NaN instead of refusing it')
+
+        # A refusal is only an answer if it actually happens: NaN must be
+        # among the values each converter turned away, or "refused by name"
+        # is a claim nothing here checks.
+        for key, turned_away in refused.items():
+            assert any(math.isnan(p) for p in turned_away), (
+                f'{key} accepted NaN rather than refusing it; it refused '
+                f'{turned_away}')
+
+        # ...and the round trip cannot manufacture one either.
+        for a in (0.0, 1e-9, 0.5, 1.0, 4.0):
+            assert not math.isnan(dbamp(ampdb(a))), a
 
     def test_round_trip_is_the_identity_on_the_defined_domain(self):
         for db in (-90.0, -60.0, -12.0, -3.0, 0.0, 6.0):
