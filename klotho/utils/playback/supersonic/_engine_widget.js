@@ -44,6 +44,38 @@
             + "margin-left:0;background:#ef4444";
     }
 
+    // A refused play (a speaker array the decoder family cannot serve, a
+    // SynthDef this page never received, exhausted private audio buses) used
+    // to reach only the browser devtools console: the button flipped to
+    // "stop", nothing sounded, and nothing said why. Put the reason on the
+    // control bar, next to the button that was pressed. The full text goes
+    // in the tooltip — these refusals are a paragraph long by design, and
+    // the first sentence is the part that identifies the problem.
+    var errEl = null;
+    function showError(msg) {
+        var bar = document.getElementById(wid);
+        if (!bar) return;
+        if (!errEl) {
+            errEl = document.createElement("span");
+            errEl.id = wid + "_err";
+            errEl.style.cssText = "color:#ef4444;font-size:11px;line-height:1.25;"
+                + "max-width:360px;white-space:normal;";
+            bar.appendChild(errEl);
+        }
+        var full = String(msg);
+        var brief = full.replace(/^\[Klotho\]\s*/, "");
+        var stop = brief.indexOf(". ");
+        if (stop > 0) brief = brief.slice(0, stop + 1);
+        else if (brief.length > 180) brief = brief.slice(0, 180) + "\u2026";
+        errEl.textContent = brief;
+        errEl.title = full;
+        errEl.style.display = "";
+    }
+
+    function clearError() {
+        if (errEl) errEl.style.display = "none";
+    }
+
     // The icon re-arms at onIdle — finish + ring-out + teardown — so
     // "play" never shows while tails still ring. `ringing` marks that
     // window: a press during it STOPS (cuts the tails and re-arms) — a
@@ -52,12 +84,14 @@
     var ringing = false;
     function doPlay() {
         if (!bridge.hasPlayableEvents()) return;
+        clearError();
         setStopIcon();
         ringing = false;
         bridge.play(null, {
             loop: loopCtl.schedulerValue(),
             onFinish: function() { ringing = true; },
             onIdle: function() { ringing = false; setPlayIcon(); },
+            onError: showError,
         });
     }
 
@@ -139,8 +173,10 @@
             recBtn.style.opacity = "1";
             loopBtn.disabled = true;
             loopBtn.style.opacity = "0.3";
+            clearError();
             var result = await bridge.record(null, {
                 stems: !!(stemsBox && stemsBox.checked),
+                onError: showError,
             });
             recBtn.style.background = "#16213e";
             loopBtn.disabled = false;

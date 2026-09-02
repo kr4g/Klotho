@@ -79,7 +79,19 @@
         // press-to-play; replays reuse the same buffer.
         if (controlData && controlData.bufferB64
             && typeof _ssScheduler.preloadControlBuffer === "function") {
-          try { _ssScheduler.preloadControlBuffer(controlData); } catch(e) {}
+          try {
+            // Returns the /b_setn fill-completion promise. Nothing here
+            // awaits it (that is the point — the upload is paid at init),
+            // so it needs its own rejection handler or a failed fill is an
+            // unhandled rejection at widget construction.
+            var _preload = _ssScheduler.preloadControlBuffer(controlData);
+            if (_preload && typeof _preload.then === "function") {
+              _preload.then(null, function(e) {
+                console.warn("[Klotho] control-envelope preload failed: "
+                  + ((e && e.message) || e));
+              });
+            }
+          } catch(e) {}
         }
         _ssReady = true;
         return true;
@@ -206,6 +218,34 @@
       var onEvent = options.onEvent || null;
       var onFinish = options.onFinish || null;
       var onIdle = options.onIdle || null;
+      // Called with the refusal message when the scheduler will not start
+      // this payload. Optional: a transport that only needs its button back
+      // gets that from onIdle, which fires on the failure path too.
+      var onError = options.onError || null;
+
+      // Both end-of-play callbacks are rebound to once-only wrappers, and
+      // those same wrappers are what the scheduler is handed below. That is
+      // what makes the failure path safe to run unconditionally: whichever
+      // side gets there first — the scheduler on a normal finish, or the
+      // rejection handler on a refusal — the other is a no-op. The wrappers
+      // also isolate a throwing callback, so a caller's bug cannot become a
+      // second unhandled rejection.
+      if (onFinish) {
+        var _userFinish = onFinish, _finishDone = false;
+        onFinish = function() {
+          if (_finishDone) return;
+          _finishDone = true;
+          try { _userFinish(); } catch (e) {}
+        };
+      }
+      if (onIdle) {
+        var _userIdle = onIdle, _idleDone = false;
+        onIdle = function() {
+          if (_idleDone) return;
+          _idleDone = true;
+          try { _userIdle(); } catch (e) {}
+        };
+      }
 
       var evts = Array.isArray(events) ? events : _scEvents();
       if (!_ssScheduler || evts.length === 0) {
@@ -213,7 +253,18 @@
         if (onIdle) onIdle();
         return;
       }
-      _ssScheduler.play(evts, {
+      // Deliberately NOT awaited: a press must not block its click handler
+      // for the length of the engine teardown fence. That makes the returned
+      // promise's rejection handler mandatory rather than optional. Without
+      // it, every refusal raised inside the scheduler's setup — a malformed
+      // speaker array, a width with no compiled SynthDef, exhausted private
+      // audio buses, a corrupted control-envelope buffer — became an
+      // UNHANDLED promise rejection: the message reached the browser
+      // devtools console and nowhere a composer in a notebook would see it,
+      // the transport never re-armed (and its stop icon then re-ran the
+      // failed play), and record() waited forever for a finish that could
+      // not come.
+      var pending = _ssScheduler.play(evts, {
         tailPause: _pause,
         meta: meta,
         controlData: controlData,
@@ -223,6 +274,28 @@
         onFinish: onFinish || null,
         onIdle: onIdle,
       });
+      if (pending && typeof pending.then === "function") {
+        // Handled, never re-thrown: play() is called without `await`, so
+        // re-throwing would only recreate the unhandled rejection one turn
+        // later. Callers who need the failure ask for it with onError.
+        pending.then(null, function(err) {
+          var msg = (err && err.message) ? String(err.message) : String(err);
+          var detail = (msg.indexOf("[Klotho] ") === 0) ? msg.slice(9) : msg;
+          // The scheduler reports and flags the refusals it raises itself;
+          // anything else that rejects here (a teardown fence, a scheduler
+          // too old to flag) has been reported by nobody, so report it.
+          if (!(err && err._klothoReported)) {
+            try {
+              console.error("[Klotho] playback could not start: " + detail);
+            } catch (e) {}
+          }
+          // onError first: a recorder must abandon its capture before the
+          // finish callback below arms the wait for a ring-out.
+          if (onError) { try { onError(msg); } catch (e) {} }
+          if (onFinish) onFinish();
+          if (onIdle) onIdle();
+        });
+      }
     }
 
     // ------------------------------------------------------------------
@@ -326,6 +399,19 @@
           loop: false,
           stemTaps: wantStems,
           onEvent: options.onEvent || null,
+          onError: function(m) {
+            // The play was refused: there is nothing to capture and no
+            // finish coming. Drop the capture and resolve null, so an
+            // `await record()` returns instead of waiting forever (and the
+            // widget's record button resets) — the same outcome a stop()
+            // mid-record produces. The caller's own onError still runs, so
+            // a record button surfaces the reason exactly as a play button
+            // does.
+            _recCancel = null;
+            session.abort();
+            if (options.onError) { try { options.onError(m); } catch (e) {} }
+            settle(null);
+          },
           onFinish: function() {
             if (options.onFinish) { try { options.onFinish(); } catch (e) {} }
             // Piece (+ tail pause) is done; keep capturing through the

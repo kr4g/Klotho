@@ -930,6 +930,44 @@
       }
     }
 
+    // Undo a play() whose SETUP refused the payload.
+    //
+    // Setup can refuse for good reasons -- a malformed speaker array, an
+    // array width with no compiled SynthDef, exhausted private audio buses,
+    // a corrupted control-envelope buffer -- and every one of those messages
+    // is written to be loud. But play() is called fire-and-forget by every
+    // transport, so the rejection used to reach the browser devtools console
+    // and NOTHING ELSE: the score group created moments earlier stayed
+    // allocated, onFinish/onIdle never ran, so the widget held a stop icon
+    // whose next press RETRIED the failed play, and record() waited forever
+    // for a finish that could not come. Free what was built, say why once,
+    // then run the end-of-play callbacks so transports re-arm.
+    //
+    // Frees only, no fence: _registerPlayer() has not run yet at this point
+    // (play()'s teardown section unregistered), so nothing is racing a purge
+    // and there is no in-flight batch to drain.
+    _abortPlaySetup(err) {
+      this.isPlaying = false;
+      this._stemLayout = null;
+      this._trackMap = null;
+      globalThis.__klothoTrackWarned = {};
+      this._controlBusMap = [];
+      try { this._freeGroup(); } catch (e) {}
+      this._freeBuffers();
+      var msg = (err && err.message) ? String(err.message) : String(err);
+      var detail = (msg.indexOf('[Klotho] ') === 0) ? msg.slice(9) : msg;
+      try {
+        console.error('[Klotho] playback could not start: ' + detail);
+        // Tells the bridge's rejection handler this refusal has already been
+        // reported, so the console gets it once. A bridge paired with an
+        // older core sees no flag and reports it itself — twice is noisy, but
+        // never reporting it is the bug this whole path exists to fix.
+        if (err && typeof err === 'object') err._klothoReported = true;
+      } catch (e) {}
+      if (this.onFinish) { try { this.onFinish(); } catch (e) {} }
+      if (this.onIdle) { try { this.onIdle(); } catch (e) {} }
+    }
+
     async play(events, options) {
       options = options || {};
       this.stopToken++;
@@ -1004,32 +1042,46 @@
       var scoreMeta = options.meta || null;
       var scoreControlData = options.controlData || null;
 
-      // `spatial` counts as score metadata in its own right: a score whose
-      // only speaker array is declared on "main" has no `groups` and may
-      // have no `inserts`, and without this it would take the bare
-      // single-group path -- no track map, no array bus, every voice on
-      // out=0 and the whole declaration silently ignored.
-      if (scoreMeta && (scoreMeta.groups || scoreMeta.inserts || scoreMeta.spatial)
-          && typeof this.setupTracks === 'function') {
-        this._createScoreGroup();
-        await this.setupTracks(scoreMeta, this._scoreGroupId);
-      } else {
-        this._createGroup();
-      }
+      // Setup: every refusal this scheduler can raise lives inside this
+      // block, and each one rejects the promise play() returns. See
+      // _abortPlaySetup for what an escaping rejection used to cost.
+      try {
+        // `spatial` counts as score metadata in its own right: a score whose
+        // only speaker array is declared on "main" has no `groups` and may
+        // have no `inserts`, and without this it would take the bare
+        // single-group path -- no track map, no array bus, every voice on
+        // out=0 and the whole declaration silently ignored.
+        if (scoreMeta && (scoreMeta.groups || scoreMeta.inserts || scoreMeta.spatial)
+            && typeof this.setupTracks === 'function') {
+          this._createScoreGroup();
+          await this.setupTracks(scoreMeta, this._scoreGroupId);
+        } else {
+          this._createGroup();
+        }
 
-      // Stems recording: tap each track's post-FX bus onto its own
-      // hardware output pair for the widget's capture node.
-      this._stemLayout = null;
-      if (options.stemTaps && this._trackMap
-          && typeof this.setupStemTaps === 'function') {
-        this._stemLayout = this.setupStemTaps();
-      }
+        // Stems recording: tap each track's post-FX bus onto its own
+        // hardware output pair for the widget's capture node.
+        this._stemLayout = null;
+        if (options.stemTaps && this._trackMap
+            && typeof this.setupStemTaps === 'function') {
+          this._stemLayout = this.setupStemTaps();
+        }
 
-      // Control envelopes are independent of track/insert setup: they fire
-      // for any payload carrying descriptors (bare UC/UTS/BT play included).
-      if (scoreControlData && scoreControlData.bufferB64 && typeof this.setupControlEnvelopes === 'function') {
-        var ctrlParent = (this._scoreGroupId != null) ? this._scoreGroupId : this._groupId;
-        await this.setupControlEnvelopes(scoreControlData, ctrlParent);
+        // Control envelopes are independent of track/insert setup: they fire
+        // for any payload carrying descriptors (bare UC/UTS/BT play included).
+        if (scoreControlData && scoreControlData.bufferB64 && typeof this.setupControlEnvelopes === 'function') {
+          var ctrlParent = (this._scoreGroupId != null) ? this._scoreGroupId : this._groupId;
+          await this.setupControlEnvelopes(scoreControlData, ctrlParent);
+        }
+      } catch (err) {
+        // A newer play(), or a stop(), already took the lifecycle over while
+        // we were awaiting: it owns the group, the buses and the callbacks,
+        // so cleaning up here would tear down ITS setup instead of ours.
+        // Leave everything to it -- the same recheck the success path makes
+        // two lines below.
+        if (token !== this.stopToken) return;
+        this._abortPlaySetup(err);
+        throw err;
       }
 
       // A stop() during the awaits above must win; without this recheck the
