@@ -280,6 +280,56 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         self._announce_leaf_surface_change()
         return result
 
+    def scale(self, index, ratio):
+        """Expand or compress events in place (see :meth:`RhythmTree.scale`),
+        announcing the leaf-surface change.
+
+        AUD-9, and the third member of the family :meth:`insert` and
+        :meth:`extract` already cover. ``scale`` is the one that hides best,
+        because it changes no leaf at all: the SET is identical and only the
+        DURATIONS move. So a control envelope kept values it sampled at onsets
+        that no longer exist, and nothing raised. Measured before this: a 0->1
+        ramp over four equal beats read ``[0.0, 0.25, 0.5, 0.75]`` and still
+        read ``[0.0, 0.25, 0.5, 0.75]`` after ``scale(0, 3)`` had made the
+        durations ``[2.0, 0.667, 0.667, 0.667]`` -- against ``[0.0, 0.5, 0.667,
+        0.833]`` for the same shape built from scratch.
+
+        The announcement alone is not enough, and that is the instructive half:
+        ``_queue_envelope_rebakes`` compared the leaf SET and nothing else, so
+        with the gate open it still dropped every descriptor. Both halves had
+        to change together.
+        """
+        result = super().scale(index, ratio)
+        self._announce_leaf_surface_change()
+        return result
+
+    def replace_node(self, old_node, **attr):
+        """Replace a node's attributes (see :meth:`Tree.replace_node`),
+        announcing a sounding/tie surface change.
+
+        AUD-10, and the last node-data door in this class without an
+        announcement. Like :meth:`replace_node_data` it can change the surface
+        by OMISSION -- dropping ``tied`` where it was set -- so the surface keys
+        are checked on BOTH sides of the write, not only in the incoming payload.
+
+        The lowered consequence is why this is filed above "a slur drawn across
+        a rest". Resting node 3 of a slurred ``(1,1,1,1)`` through the sanctioned
+        :meth:`make_rest` gives three separate attacks. Doing it through
+        ``replace_node`` gave ``new`` at 0.0, ``new`` at 1.0, then ``set`` on
+        THAT SAME synth at 3.0 -- one voice held from 1.0 straight across the
+        rest and re-addressed after it. The rest was not merely mis-notated; it
+        was audibly played.
+
+        Note this verb still clears pfield overrides at the replaced node, which
+        is what ``replace=True`` means and is left alone here deliberately -- see
+        the docket row for the separate question of whether a silent wipe is the
+        right answer for a parameter layer.
+        """
+        before = set(self[old_node]) if self._has_node(old_node) else set()
+        result = super().replace_node(old_node, **attr)
+        self._announce_if_surface_write(set(attr) | before)
+        return result
+
     #: Node-data keys that define the SOUNDING and TIE surface an overlay is
     #: drawn against. A write touching one of these changes what the overlay
     #: means without moving a single id.
@@ -2429,6 +2479,58 @@ class CompositionalUnit(TemporalUnit):
                     f"existing_pfields={sorted(desc['pfields'])})"
                 )
 
+    def _control_envelope_timing(self, leaves):
+        """The span's own RELATIVE geometry, as a comparable signature.
+
+        ``baked_leaves`` answers *which* leaves the stored values were computed
+        for; this answers *how they were laid out*. The two are independent, and
+        until AUD-9 only the first was checked -- so ``scale``, which reweights
+        events while leaving the leaf set identical, read as "nothing changed"
+        and an envelope kept values sampled at onsets that no longer existed.
+
+        **It is normalised to the span, and that is the load-bearing part.** An
+        absolute signature was tried first and it re-created the regression
+        ``784a3b5`` fixed: an ``insert_child`` at the top of the bar shifts and
+        rescales every onset in the envelope's span, so absolute numbers move and
+        the gate fired on an edit that had touched nothing the envelope covers --
+        reverting the composer's own later ``set_pfields`` and flattening a stored
+        ``Bind`` to the float it happened to evaluate to. A baked value depends
+        only on where its leaf sits WITHIN the span, exactly as
+        :meth:`_bake_envelope` computes it, so a uniform shift or a uniform tempo
+        change must read as unchanged and only a change in relative layout must
+        read as stale.
+
+        Returns ``None`` when the geometry cannot be read -- a leaf without a
+        metric layer, which happens mid-mutation, or a degenerate zero-width
+        span. ``None`` means *unknown*, and the gate treats unknown as "no timing
+        signal" rather than as a change, so a half-built tree cannot force a
+        rebake that would die inside ``_compute_timing_cache``.
+        """
+        leaves = tuple(leaves)
+        if not leaves:
+            return ()
+        try:
+            self._ensure_timing_cache()
+            times = self._real_times
+        except Exception:
+            return None
+        rows = []
+        for n in leaves:
+            entry = times.get(n)
+            if entry is None:
+                return None
+            rows.append((float(entry['real_onset']),
+                         abs(float(entry['real_duration']))))
+        start = min(o for o, _ in rows)
+        end = max(o + d for o, d in rows)
+        width = end - start
+        if width <= 0:
+            return None
+        # Rounded because these are floats reached by division; a uniform shift
+        # must compare EQUAL, and exact float equality would not survive it.
+        return tuple((round((o - start) / width, 9), round(d / width, 9))
+                     for o, d in rows)
+
     def _rebake_control_envelope(self, desc):
         sounding = self._resolve_control_envelope_leaves(desc)
         if sounding:
@@ -2439,6 +2541,7 @@ class CompositionalUnit(TemporalUnit):
                                 desc["endpoint"],
                                 curve_window=desc.get("curve_window"))
         desc["baked_leaves"] = tuple(sounding)
+        desc["baked_timing"] = self._control_envelope_timing(sounding)
 
     def _record_control_envelope(self, selected, envelope, pfields_list, endpoint):
         self._ensure_timing_cache()
@@ -2483,6 +2586,9 @@ class CompositionalUnit(TemporalUnit):
                 # edit rebakes ONLY when this no longer matches -- see
                 # ``_queue_envelope_rebakes``.
                 "baked_leaves": tuple(run),
+                # ...and WHEN they were computed. ``scale`` moves every onset
+                # without touching the leaf set, so the set alone cannot see it.
+                "baked_timing": self._control_envelope_timing(run),
                 # the slice of the whole curve this descriptor carries, so a
                 # later rebake reproduces its VALUES rather than restarting
                 # the gesture. ``(0.0, 1.0)`` for an unsplit envelope.
@@ -3111,6 +3217,7 @@ class CompositionalUnit(TemporalUnit):
                 **desc,
                 "leaf_subset": tuple(run),
                 "baked_leaves": tuple(run),
+                "baked_timing": self._control_envelope_timing(run),
                 "curve_window": (start + inner_start * width,
                                  start + inner_end * width),
             }
@@ -3194,7 +3301,12 @@ class CompositionalUnit(TemporalUnit):
         Registered as the tree's id-state observer, so a verb reached
         THROUGH ``uc._rt`` -- the preserved family's ``insert``/``extract``/
         ``scale``, or a positional ``insert_child`` -- heals the same
-        overlays this unit's own deleters heal. ``mapping`` is total over
+        overlays this unit's own deleters heal. (Until AUD-9 that sentence
+        named ``scale`` while ``CompositionalTree`` had no ``scale`` override
+        at all, so the announcement it describes never fired and a reader who
+        stopped at this paragraph concluded ``scale`` was covered. The override
+        now exists, which is what makes the sentence true rather than merely
+        qualified by the paragraph below.) ``mapping`` is total over
         surviving ids: an id absent from it was destroyed.
 
         Overlays are MOVED here, and a control envelope is additionally
@@ -3634,6 +3746,17 @@ class CompositionalUnit(TemporalUnit):
                 None if any(n not in mapping for n in baked)
                 else tuple(mapping[n] for n in baked)
             )
+            # The signature is NOT discarded here, and that is the whole point.
+            # A relocation is exactly the moment onsets move, so the recorded
+            # numbers are the only surviving record of what the stored values
+            # were computed against -- dropping them to "unknown" is what let
+            # ``scale`` through, since it renumbers ids while keeping the leaf
+            # set one-to-one, so identity matches and only timing can tell.
+            # Positional comparison stays valid because ``baked_leaves`` is
+            # remapped IN ORDER just above. It is dropped only when the leaf set
+            # itself died, where identity already forces the rebake.
+            if desc["baked_leaves"] is None:
+                desc["baked_timing"] = None
             if desc["leaf_subset"] is None:
                 # anchor-based: targets are re-derived from the subtree on
                 # every resolve, so membership needs no repair -- but the
@@ -3714,9 +3837,25 @@ class CompositionalUnit(TemporalUnit):
         # callable never ran again. Before this seam rebaked at all, an edit
         # outside an envelope's span could not touch its values; that
         # property is restored here rather than traded away.
+        # A pure TIMING change is invisible to the leaf-set comparison below --
+        # ``scale`` reweights events without adding or removing one -- so the
+        # onsets the bake sampled are compared too (AUD-9). A descriptor with no
+        # recorded timing answers False and falls back to identity alone, which
+        # is exactly the pre-AUD-9 behaviour; copies deliberately do not carry a
+        # signature, since their absolute onsets differ from the source's and
+        # carrying one would make the gate false-positive on every copy.
+        def _timing_moved(d):
+            baked = d.get("baked_timing")
+            if baked is None:
+                return False
+            now = self._control_envelope_timing(
+                self._resolve_control_envelope_leaves(d))
+            return now is not None and now != baked
+
         descriptors = [d for d in descriptors
                        if tuple(self._resolve_control_envelope_leaves(d))
-                       != tuple(d.get("baked_leaves") or ())]
+                       != tuple(d.get("baked_leaves") or ())
+                       or _timing_moved(d)]
         if not descriptors:
             return
         pending = getattr(self, '_pending_envelope_rebakes', None)

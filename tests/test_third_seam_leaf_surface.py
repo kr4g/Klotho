@@ -442,22 +442,25 @@ class TestEveryStructuralMutatorIsWiredToTheSeam:
 
     #: Structural mutators that legitimately need no leaf-surface
     #: announcement, each with the measurement that says so.
+    #: **``replace_node`` and ``scale`` were BOTH removed from this list on
+    #: 2026-09-01 by AF-2, which overrode them (AUD-10 and AUD-9).** Their
+    #: entries are worth recording rather than merely deleting, because one of
+    #: them was a WRONG MEASUREMENT that sat here unchallenged:
+    #:
+    #: ``replace_node`` claimed it *"preserves structure, so no leaf starts or
+    #: stops being one. Measured: a slurred leaf keeps its membership, no stale
+    #: member, one head and one tail."* That is false. ``replace_node(n,
+    #: proportion=-1)`` makes a leaf STOP SOUNDING, and the slur spec keeps it:
+    #: measured on a slurred ``(1,1,1,1)``, the spec still read ``(2,3,4)`` with
+    #: node 3 a rest, and it LOWERED to one synth held from 1.0 straight across
+    #: the rest and re-``set`` at 3.0 -- the rest was audibly played. The
+    #: allowlist entry read plausibly and was never re-run.
+    #:
+    #: ``scale`` was an honest KNOWN GAP naming its own exit: closing it needed
+    #: the rebake gate re-keyed on timing, which AF-2 did (normalised to the
+    #: span, so a uniform shift still reads as unchanged and ENV-6's
+    #: last-write-wins property survives).
     NO_ANNOUNCEMENT_NEEDED = {
-        'replace_node':
-            'replaces a node\'s attributes and preserves structure, so no '
-            'leaf starts or stops being one. Measured: a slurred leaf keeps '
-            'its membership, no stale member, one head and one tail.',
-        'scale':
-            'KNOWN GAP, not a clean case -- ENV-9 part B. Its id relocation '
-            'is the IDENTITY, so the baked_leaves gate (which compares '
-            'resolved leaf id sequences, never timings) correctly reports '
-            '"nothing changed" while every onset moves. Measured: onsets '
-            '1.333 -> 0.571 with the envelope values untouched. An override '
-            'would announce and still not rebake, so adding one would make '
-            'this guard read WIRED over a live defect. Closing it means '
-            're-keying the gate on timing, which is a ruling (the gate holds '
-            'ENV-6 last-write-wins) and not a measurement. Pinned red-side-up '
-            'in tests/test_env9_respell_rebake.py.',
         'tie_groups':
             'a pure READ -- it DERIVES the groups from the tied flags rather '
             'than writing them, and the charter says tie-group identity is '

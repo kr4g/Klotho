@@ -21,14 +21,24 @@ This was already incoherent with its own neighbour: subdividing a leaf the
 envelope never named rebakes correctly, while ``insert``, which moves every
 onset the envelope depends on, did not.
 
-``scale`` IS NOT FIXED HERE and that is deliberate. Its id relocation is the
-identity, so the ``baked_leaves`` gate -- which compares resolved leaf ID
-sequences, never timings -- correctly reports "nothing changed" while every
-onset moved. Fixing it means re-keying that gate on timing, and the gate
-exists to hold a ruled property: an edit outside an envelope's span must not
-re-assert it over values written later. That is a design call, not a
-measurement, so it is filed as ENV-9 part B and named in the guard's
-allowlist rather than quietly left out.
+``scale`` WAS NOT FIXED HERE, and part B closed it on 2026-09-01 (AF-2, docket
+AUD-9). This module's ``TestScaleIsKnowinglyLeftOut`` pinned the gap red-side-up
+and said in its own docstring that whoever re-keyed the gate should delete it and
+say so -- this paragraph is that notice. Its ``scale`` allowlist entry in
+``tests/test_third_seam_leaf_surface.py`` went with it.
+
+Both halves were needed and neither was sufficient. ``CompositionalTree`` gained
+a ``scale`` override to open the gate, AND the gate learned to compare TIMING,
+because ``scale`` leaves the leaf set identical and only identity was checked.
+The ruled property the gate exists to hold -- an edit outside an envelope's span
+must not re-assert it over values written later -- survives because the timing
+signature is NORMALISED to the span: a uniform shift or tempo change reads as
+unchanged, and only a change in relative layout reads as stale. An absolute
+signature was tried first and re-created exactly the regression ``784a3b5``
+fixed; the live coverage of that is
+``tests/test_overlay_rebake_gate.py::TestAnEditOutsideTheSpanDoesNotReassertTheEnvelope``.
+The ``scale`` row of the table above is therefore now HISTORICAL -- it records
+what the defect looked like, not what the code does.
 """
 
 import warnings
@@ -91,22 +101,3 @@ class TestTheEnvelopeFollowsARespell:
             assert tuple(desc['baked_leaves']) == resolved
 
 
-class TestScaleIsKnowinglyLeftOut:
-    """A test that PINS a known gap rather than a fix.
-
-    It exists so the gap cannot be closed by accident and then forgotten, and
-    so that whoever takes ENV-9 part B finds a red test waiting rather than a
-    silent success. If this starts failing, the gate was re-keyed and part B
-    is done -- delete it and say so.
-    """
-
-    def test_scale_still_does_not_rebake(self):
-        uc = _ramped()
-        before = _amps(uc)
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            uc._rt.scale(0, '1/2')
-
-        assert _amps(uc) == before, (
-            'scale now rebakes -- ENV-9 part B has been done, so this pin and '
-            'the allowlist entry naming it should both go')
