@@ -174,14 +174,33 @@ class TestScoreWriteEnvelopeTiming:
         assert env_desc["start"] == pytest.approx(10.0, abs=1e-9)
 
     def test_write_time_scale_scales_envelope(self, tmp_path):
-        score = self._build_score_with_envelope()
-        out_path = tmp_path / "out.json"
-        score.write(str(out_path), start_time=None, time_scale=0.5)
-        with open(out_path) as f:
-            data = json.load(f)
-        env_desc = data["meta"]["controlEnvelopes"][0]
-        first_event_start = min(ev["start"] for ev in data["events"])
-        assert env_desc["start"] == pytest.approx(first_event_start, abs=1e-9)
+        """AUD-49 note: this assertion used to be VACUOUS.
+
+        The score placed its only unit at 0.0, so the descriptor start and the
+        first event start were both ``0.0`` and the comparison was
+        ``0.0 == 0.0`` -- true whether or not any scaling had happened. It is
+        now a RELATION against a ``time_scale=1.0`` reference, on a score whose
+        envelope starts at a non-zero time, so a missing scale fails it.
+        """
+        ref_path, scaled_path = tmp_path / "ref.json", tmp_path / "scaled.json"
+        self._build_score_with_envelope().write(str(ref_path), time_scale=1.0)
+        self._build_score_with_envelope().write(str(scaled_path), time_scale=0.5)
+        with open(ref_path) as f:
+            ref = json.load(f)
+        with open(scaled_path) as f:
+            got = json.load(f)
+
+        ref_desc = ref["meta"]["controlEnvelopes"][0]
+        got_desc = got["meta"]["controlEnvelopes"][0]
+
+        # Non-vacuity: a duration of 0 would scale to 0 and prove nothing.
+        assert ref_desc["dur"] > 0, "the reference envelope has no duration"
+
+        assert got_desc["dur"] == pytest.approx(ref_desc["dur"] * 0.5, abs=1e-9)
+        assert got_desc["start"] == pytest.approx(ref_desc["start"] * 0.5, abs=1e-9)
+        # And the descriptor still agrees with the events it belongs to.
+        assert got_desc["start"] == pytest.approx(
+            min(ev["start"] for ev in got["events"]), abs=1e-9)
 
     def test_write_both_shift_and_scale(self, tmp_path):
         score = self._build_score_with_envelope()

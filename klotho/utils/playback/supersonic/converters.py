@@ -1513,6 +1513,12 @@ def _lower_score_event(item):
             member = kit._resolve(voice_sel)
             v_def_name, v_inst_pfields, v_has_gate = resolve_instrument(member)
         pf = coerce_sc_pfield_values(_combine_extras(v_inst_pfields, user_pf))
+        # AUD-49: the injected note length is timeline seconds sitting under a
+        # name that otherwise holds an authored constant. A tuple selector
+        # re-resolves the Kit member PER VOICE, so one Score.new can emit a
+        # 'duration' voice beside a 'dur' voice -- hence per voice, not per
+        # event.
+        injected_key = None
         if not is_hold:
             # Precedence (WL-36, path 3): an explicitly authored
             # duration/dur in user_pf WINS -- injection only fills a slot
@@ -1522,8 +1528,10 @@ def _lower_score_event(item):
             # _sc_assembly._duration_inject_key states the whole picture.
             if 'duration' in v_inst_pfields and 'duration' not in user_pf:
                 pf['duration'] = voice["duration"]
+                injected_key = 'duration'
             elif not v_has_gate and 'dur' in v_inst_pfields and 'dur' not in user_pf:
                 pf['dur'] = voice["duration"]
+                injected_key = 'dur'
         _warn_unknown_pfields(v_def_name, pf, manifest)
 
         if release_time is not None:
@@ -1548,6 +1556,8 @@ def _lower_score_event(item):
         }
         if speaker is not None:
             new_event["speaker"] = speaker
+        if injected_key is not None:
+            new_event["_timelinePfields"] = [injected_key]
         _attach_poly_meta(new_event, voice)
         events.append(new_event)
 
@@ -1708,6 +1718,86 @@ def convert_score_to_sc_events(score, start_time=None, **kwargs) -> dict:
         "meta": meta,
         "control_data": control_data,
     }
+
+
+def _is_seconds(value):
+    """True for a real number of seconds.
+
+    ``bool`` is excluded deliberately (it is an ``int`` in Python and never a
+    duration), and ``None`` is excluded so a held event's ``dur: null`` passes
+    through untouched rather than raising.
+    """
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def scale_payload_times(events, descriptors, time_scale):
+    """Return ``(events, descriptors)`` with every TIMELINE field scaled.
+
+    AUD-49. ``Score.write`` used to enumerate the payload's time fields itself,
+    independently of the ``start_time`` shift in
+    :func:`convert_score_to_sc_events`, and the two lists disagreed -- the
+    shift moved ``ev.start``, ``desc.start`` and ``targets[].startTime`` while
+    the scale moved only the first two and no durations at all. That
+    duplication IS the defect. This helper is the one place that answers "what
+    is a timeline field", so the next field added has one list to be added to.
+
+    What is scaled, and why each is a duration rather than a constant:
+
+    * ``ev["start"]`` and ``ev["dur"]`` -- position and length on the timeline.
+      The scheduler gates a note off at ``start + dur`` and computes the
+      piece's length the same way, so leaving ``dur`` behind makes every gated
+      note staccato and stops the finish timer early.
+    * the pfields named by ``ev["_timelinePfields"]`` -- values LOWERING filled
+      from the timeline (a slur's span, a tie's span, the note's own slot)
+      under names that otherwise hold authored timbral constants. Only lowering
+      knows which is which, so it says so; scaling by NAME here would rewrite
+      the composer's own ``releaseTime`` on the un-slurred notes of the same
+      instrument.
+    * ``desc["start"]``/``desc["dur"]`` and ``targets[].startTime`` -- the
+      envelope's span and the instants its ``/n_map`` messages are deferred to.
+      The scheduler compares ``startTime`` against an already-scaled event
+      start with an EXACT equality, so an unscaled one silently drops every
+      automation mapping and the knob stays at its default for the whole piece.
+
+    Copies are made one level deeper than ``dict(ev)`` reaches: ``pfields`` and
+    the ``targets`` dicts are shared with the payload (and, for a descriptor's
+    ``pfields`` list, with UC-owned state), so scaling in place would re-tune
+    the score in memory as a side effect of writing a file, and twice if
+    written twice.
+    """
+    scaled_events = []
+    for ev in events:
+        ev_copy = dict(ev)
+        if _is_seconds(ev.get("start")):
+            ev_copy["start"] = ev["start"] * time_scale
+        if _is_seconds(ev.get("dur")):
+            ev_copy["dur"] = ev["dur"] * time_scale
+        tagged = ev.get("_timelinePfields")
+        pfields = ev.get("pfields")
+        if tagged and isinstance(pfields, dict):
+            pf_copy = dict(pfields)
+            # dict.fromkeys dedupes: a key named twice would scale twice.
+            for key in dict.fromkeys(tagged):
+                if _is_seconds(pf_copy.get(key)):
+                    pf_copy[key] = pf_copy[key] * time_scale
+            ev_copy["pfields"] = pf_copy
+        scaled_events.append(ev_copy)
+
+    scaled_descriptors = []
+    for d in descriptors:
+        d_copy = dict(d)
+        if _is_seconds(d.get("start")):
+            d_copy["start"] = d["start"] * time_scale
+        if _is_seconds(d.get("dur")):
+            d_copy["dur"] = d["dur"] * time_scale
+        d_copy["targets"] = [
+            {**t, "startTime": t["startTime"] * time_scale}
+            if _is_seconds(t.get("startTime")) else dict(t)
+            for t in d.get("targets", ())
+        ]
+        scaled_descriptors.append(d_copy)
+
+    return scaled_events, scaled_descriptors
 
 
 def _payload_sample_assets(events):

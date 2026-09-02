@@ -613,6 +613,16 @@ def lower_compositional_ir_to_sc_assembly(
                     if k in member_keys or k in ('note', 'out')
                 }
 
+            # AUD-49. Some pfields below are filled from the TIMELINE (a slur's
+            # span, a tie's span, the note's own slot length) while sitting
+            # under names that otherwise hold authored timbral constants. By
+            # the time ``Score.write(time_scale=k)`` sees the payload the
+            # provenance is gone -- one file can carry an injected
+            # ``releaseTime`` of 3.0 on a slur head and an authored 0.3 on the
+            # very next note of the same instrument. So lowering, which is the
+            # only place that knows, records which keys it filled.
+            injected_sustain_param = None
+
             if not voice_has_gate:
                 instrument_id = id(voice_resolved) if voice_resolved is not None else None
                 sustain_param = sustain_param_cache.get(instrument_id)
@@ -628,12 +638,14 @@ def lower_compositional_ir_to_sc_assembly(
                     end_event = slur_end_events.get(slur_id)
                     if end_event is not None:
                         voice_pfields[sustain_param] = end_event.end - voice_event["start"]
+                        injected_sustain_param = sustain_param
                 elif sustain_param and slur_id is None and id(event) in tie_continuations:
                     # charter sect3: an ungated instrument's sustain control
                     # gets the summed tie span -- the tie extends the SLOT;
                     # a one-shot sample still sounds only as long as the
                     # sample sounds
                     voice_pfields[sustain_param] = voice_dur
+                    injected_sustain_param = sustain_param
 
             voice_pfields = coerce_sc_pfield_values(voice_pfields)
             _warn_unknown_pfields(voice_def_name, voice_pfields, manifest)
@@ -649,6 +661,15 @@ def lower_compositional_ir_to_sc_assembly(
             if inject_key is not None:
                 merged_pfields = dict(merged_pfields)
                 merged_pfields[inject_key] = voice_dur
+
+            # The completed tag for this voice. ``dict.fromkeys`` dedupes while
+            # keeping order: a key named twice would be scaled twice.
+            timeline_tag = None
+            if injected_sustain_param is not None or inject_key is not None:
+                timeline_tag = list(dict.fromkeys(
+                    k for k in (injected_sustain_param, inject_key)
+                    if k is not None
+                ))
 
             if is_slur_start:
                 slur_uid = fast_id()
@@ -668,6 +689,8 @@ def lower_compositional_ir_to_sc_assembly(
                     new_event["speaker"] = speaker
                     slur_uid_speakers[slur_uid] = speaker
                 slur_uid_defnames[slur_uid] = voice_def_name
+                if timeline_tag:
+                    new_event["_timelinePfields"] = timeline_tag
                 events.append(_attach_poly_meta(new_event, voice_event))
                 _track_event(slur_uid)
                 while len(active_uids) <= voice_index:
@@ -708,6 +731,8 @@ def lower_compositional_ir_to_sc_assembly(
                     head_speaker = slur_uid_speakers.get(target_uid)
                     if head_speaker is not None:
                         set_event["speaker"] = head_speaker
+                    if timeline_tag:
+                        set_event["_timelinePfields"] = timeline_tag
                     events.append(_attach_poly_meta(set_event, voice_event))
                     _track_event(target_uid)
                     _record(event.node_id, target_uid, voice_start)
@@ -729,6 +754,8 @@ def lower_compositional_ir_to_sc_assembly(
                     if group is not None:
                         new_event["group"] = group
                         slur_uid_groups[slur_uid] = group
+                    if timeline_tag:
+                        new_event["_timelinePfields"] = timeline_tag
                     events.append(_attach_poly_meta(new_event, voice_event))
                     _track_event(slur_uid)
                     while len(active_uids) <= voice_index:
@@ -752,6 +779,8 @@ def lower_compositional_ir_to_sc_assembly(
                 new_event["group"] = group
             if speaker is not None:
                 new_event["speaker"] = speaker
+            if timeline_tag:
+                new_event["_timelinePfields"] = timeline_tag
             events.append(_attach_poly_meta(new_event, voice_event))
             _track_event(uid)
             _record(event.node_id, uid, voice_start)

@@ -171,11 +171,49 @@ Handles:
   + auto-release; free instruments use a single `new`.
 - **Slur rendering** — slurred notes sustain across boundaries, with
   `set` messages updating pitch/amp mid-note; voice counts are pinned
-  per slur group (10.13.1).
+  per slur group (10.13.1). For a non-gated synth declaring a
+  `sustainTime`/`releaseTime` control, the slur head's pfield receives
+  the slur's real span (slur end minus head start), and a tie head
+  receives the summed tie span. Both are **timeline** values living
+  under a name that otherwise holds an authored timbral constant — see
+  *Timeline-valued pfields* below.
 - **Polyphonic voice expansion** — tuple pfields expand into concurrent
   voice events.
 - **Kit member resolution** — per voice, from the selector pfield (see
   §5, including family round-robin).
+
+### Timeline-valued pfields and the `_timelinePfields` tag (AUD-49)
+
+Some pfields are filled by **lowering** from the timeline — a slur's
+span, a tie's span, the note's own slot length — while sitting under
+names (`duration`, `dur`, `sustainTime`, `releaseTime`) that otherwise
+hold constants the composer authored. One written file routinely carries
+both kinds under one key:
+
+```
+new  start=0.0  releaseTime=3.0   <- INJECTED slur span   (scales with tempo)
+set  start=1.0  releaseTime=0.3   <- AUTHORED timbre      (must not scale)
+```
+
+By the time a serializer sees the payload the provenance is gone, and no
+value-based heuristic recovers it: the canonical corpus idiom
+`set_pfields(duration=lambda c: c.real_duration)` *authors* a value equal
+to the slot, so equality cannot separate the two.
+
+So lowering records what it filled. Each event it injects into carries
+`_timelinePfields`, a list of the pfield names whose values are timeline
+seconds. It is an event-level meta key (like `_poly*` and `_stepIndex`),
+ignored by the scheduler, and it is stamped at **five** sites: the slur
+head, the tie head, the reserved note-length slot on the UC path, and
+the loose-`Event`/drum-kit path — the last **per voice**, because a tuple
+selector can put a `duration` voice beside a `dur` voice in one event.
+
+`Score.write(time_scale=k)` scales exactly the tagged keys, alongside
+`start`, `dur`, and the control-envelope descriptors' `start`, `dur` and
+`targets[].startTime`. All of that lives in one place —
+`converters.scale_payload_times` — deliberately: `write` used to
+enumerate the timeline fields independently of the `start_time` shift
+and the two lists disagreed, which *is* how AUD-49 happened.
 
 ### Duration injection and its precedence (WL-36)
 

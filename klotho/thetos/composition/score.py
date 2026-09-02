@@ -1197,6 +1197,7 @@ class Score:
 
         from klotho.utils.playback.supersonic.converters import (
             convert_score_to_sc_events,
+            scale_payload_times,
         )
 
         payload = convert_score_to_sc_events(self, start_time=start_time)
@@ -1206,18 +1207,9 @@ class Score:
             "buffer": None, "blockSize": self._block_size, "descriptors": []
         }
 
-        shifted_events = []
-        for ev in events:
-            ev_copy = dict(ev)
-            ev_copy["start"] = ev["start"] * time_scale
-            shifted_events.append(ev_copy)
-
-        shifted_descriptors = []
-        for d in ctrl.get("descriptors", []):
-            d_copy = dict(d)
-            d_copy["start"] = d["start"] * time_scale
-            d_copy["dur"] = d["dur"] * time_scale
-            shifted_descriptors.append(d_copy)
+        shifted_events, shifted_descriptors = scale_payload_times(
+            events, ctrl.get("descriptors", []), time_scale
+        )
 
         output: dict = {"meta": dict(meta), "events": shifted_events}
         if shifted_descriptors:
