@@ -18,6 +18,15 @@ DEFAULT_CHORD_DURATION = 2.0
 DEFAULT_SPECTRUM_DURATION = 3.0
 DEFAULT_DRUM_FREQ = 110.0
 
+# Above this a partial is, at best, inaudible.  20 kHz is the nominal top of
+# human hearing AND it sits below the Nyquist frequency of every sample rate
+# the engine can run at (22.05 kHz at 44.1 k, 24 kHz at 48 k), so one number
+# covers both failure modes: silence above the ear, and aliasing above
+# Nyquist.  The engine's actual rate belongs to the browser's AudioContext
+# and is not knowable at lowering time, which is why the guard cannot key on
+# Nyquist itself.
+AUDIBLE_CEILING_HZ = 20000.0
+
 KNOWN_KWARGS = frozenset({
     'dur', 'duration', 'arp', 'strum', 'dir', 'direction',
     'equaves', 'beat', 'bpm', 'mode', 'amp', 'ring_time', 'pause',
@@ -213,6 +222,22 @@ def _build_convert_registry():
         tree's primary data -- rather than guessing. Reducing here would also
         make the audition of a tree depend on a field that has no effect on
         ``harmonics`` itself.
+
+        **The audition sounds ascending by partial, not in leaf order.**
+        ``Spectrum`` is pitch-ordered, so this adapter's output is invariant
+        under any permutation of the tree's leaves, and ``direction='d'`` is
+        the explicit way to ask for the other order. That is deliberate on
+        both counts: a score cannot notate "these noteheads, but in tree
+        order" (a chord is a stack, and the arpeggio roll is bottom-to-top),
+        and leaf order is not authorial order anyway -- ``leaf_nodes`` walks
+        children in sorted node-id order while rustworkx recycles the ids of
+        deleted nodes, so a leaf APPENDED to a tree can land in the middle of
+        ``harmonics``. Ordering the audition by that would make what you hear
+        depend on the tree's edit history.
+
+        **Partials above** :data:`AUDIBLE_CEILING_HZ` **warn but still
+        sound** -- see the guard below for why the tree, specifically, needs
+        one.
         """
         harmonics = list(obj.harmonics)
         # A negative factor gives a negative harmonic, hence a negative
@@ -229,7 +254,43 @@ def _build_convert_registry():
                 f"convention yet -- build a Spectrum explicitly with the "
                 f"partial numbers you mean, e.g. Spectrum(Pitch('C4'), [1/2])."
             )
-        spectrum = Spectrum(Pitch("C4"), harmonics)
+        fundamental = Pitch("C4")
+        # A HarmonicTree's magnitudes are EMERGENT -- each leaf harmonic is
+        # the PRODUCT of the factors along its path -- so nobody ever types
+        # the number that goes ultrasonic.  A chain 2 -> 3 -> 5 -> 7 -> 11 is
+        # five small, ordinary factors and one partial of 2310, which on C4
+        # is 604 kHz.  Above AUDIBLE_CEILING_HZ such a partial is at best
+        # inaudible, and above the engine's Nyquist frequency it ALIASES:
+        # folded back into the audible band as a pitch with no relation to
+        # the one asked for.  That is a wrong note which sounds entirely
+        # plausible -- the exact failure mode this adapter's history is made
+        # of -- so it gets named.
+        #
+        # It is named and NOT refused, and NOT clamped.  This is a spectral
+        # tool; a composer who builds a deep tree may well mean it, and the
+        # frequency asked for is still the frequency sent.  (The check is
+        # against the convention root above: change the fundamental and the
+        # ceiling lands on a different partial number.)
+        over = [(h, fundamental.freq * h) for h in harmonics
+                if fundamental.freq * h > AUDIBLE_CEILING_HZ]
+        if over:
+            import warnings
+            shown = ", ".join(f"{h} ({f:.1f} Hz)" for h, f in over[:6])
+            if len(over) > 6:
+                shown += f", and {len(over) - 6} more"
+            warnings.warn(
+                f"HarmonicTree audition: {len(over)} of {len(harmonics)} leaf "
+                f"harmonics sound above {AUDIBLE_CEILING_HZ:.0f} Hz on the "
+                f"convention root C4 -- {shown}. Leaf harmonics are the "
+                f"product of the factors along each path, so they grow much "
+                f"faster than the factors do. These sound as asked and are "
+                f"not clamped, but above the engine's Nyquist frequency they "
+                f"alias to unrelated audible pitches. To hear the structure "
+                f"instead, reduce it into an equave (HarmonicTree(..., "
+                f"equave=2).ratios) or build the Spectrum yourself on a "
+                f"lower fundamental.",
+                UserWarning, stacklevel=2)
+        spectrum = Spectrum(fundamental, harmonics)
         return _convert_spectrum(spectrum, kw, handlers, inst_kw)
 
     @reg.register(RhythmTree)
