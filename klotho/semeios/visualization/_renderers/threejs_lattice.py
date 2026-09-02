@@ -1,3 +1,4 @@
+from html import escape as html_escape
 import math
 import numpy as np
 from pathlib import Path
@@ -215,7 +216,12 @@ def _static_threejs_html(sd):
     halo_json = json.dumps(sd.halo_data)
     w = sd.width_px
     h = sd.height_px
-    title_escaped = (sd.title or '').replace("'", "\\'").replace('"', '\\"')
+    # HTML-escaped, not quote-escaped. This value is interpolated into the
+    # <div> below, so `<` and `&` are what matter; escaping only quotes (which
+    # is what this line used to do, under the same name) left a title
+    # containing markup free to inject script into the notebook. The sibling
+    # SVG renderers already use html.escape for the same value.
+    title_escaped = html_escape(sd.title or '')
 
     from klotho.semeios.visualization._cdn import (
         THREEJS_CDN, THREEJS_ORBIT_CDN, THREEJS_TRACKBALL_CDN,

@@ -17,6 +17,7 @@ DFS order with leaves in rhythm-tree order (rests included); a loose
 Event is one step.
 """
 import uuid as _uuid
+from html import escape as _html_escape
 
 from klotho.thetos.composition.events import Event
 
@@ -32,6 +33,9 @@ _ITEM_OUTLINE_COLOR = 'rgba(210,170,110,0.55)'
 _EVENT_COLOR = '#8ecae6'
 _EVENT_BRIGHT = '#cdeefe'
 _HELD_OPACITY = 0.35
+# Seconds of nominal x-axis given to a score that spans none of its own --
+# every item held (dur=None) or zero-duration. See AUD-115 below.
+_NOMINAL_SPAN_S = 1.0
 
 
 class SvgScoreData(SvgFigureData):
@@ -116,7 +120,16 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
     t_max = max(item.end for item in items)
     total_time = t_max - t_min
     if total_time <= 0:
-        raise ValueError("Cannot plot a zero-duration Score")
+        # AUD-115. A held Event (dur=None) has end == start, so a score of
+        # nothing but held or zero-duration Events spans zero seconds and
+        # used to be refused -- even though the held branch below already
+        # knows how to draw exactly that, as a full-width bar at reduced
+        # opacity. There is no real span to scale to, so one is
+        # synthesized: the picture is a frame, and the axis it carries is
+        # nominal rather than measured. A genuinely EMPTY score is still
+        # refused above, because there is nothing to draw at all.
+        total_time = _NOMINAL_SPAN_S
+        t_max = t_min + total_time
 
     bands = _score_bands(score)
     band_layout = []      # (name, lane_start, lane_count, {item name -> item lane offset})
@@ -128,9 +141,18 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
     lanes = max(lane_cursor, 1)
 
     if figsize is None:
-        figsize = (12, max(0.6 * lanes, 0.6 * len(bands)))
-    width_px = int(figsize[0] * 100)
-    height_px = int(figsize[1] * 100)
+        # Every band occupies at least one lane (a band's height is
+        # ``max(item heights, default=1)`` and ``_resolve_lanes`` never
+        # returns less than 1), so ``lanes >= len(bands)`` always and the
+        # old ``max(0.6 * lanes, 0.6 * len(bands))`` second arm could
+        # never win -- AUD-125.
+        figsize = (12, 0.6 * lanes)
+    # round, not truncate: 0.6 * 3 is 1.7999999999999998, so ``int(... * 100)``
+    # returned 179 for a three-lane score and lane 3 came out a pixel short
+    # of lanes 1 and 2. Deleting the dead ``max`` arm above does NOT fix
+    # this -- they are two separate defects that shared one line (AF1-3).
+    width_px = int(round(figsize[0] * 100))
+    height_px = int(round(figsize[1] * 100))
     lane_h = height_px / lanes
 
     x_pad_frac = 0.015
@@ -160,10 +182,12 @@ def _svg_score_timeline(score, figsize=None, outlines=True):
                 f'<line x1="0" y1="{y0:.2f}" x2="{width_px}" y2="{y0:.2f}" '
                 f'stroke="{_TRACK_RULE_COLOR}" stroke-width="1"/>'
             )
+        # A track name is caller data and may hold & < >. Interpolated raw
+        # it produced malformed XML that no browser could parse -- AUD-116.
         els.append(
             f'<text x="6" y="{y0 + 13:.2f}" fill="{_TRACK_LABEL_COLOR}" '
             f'font-family="ui-monospace, Menlo, monospace" font-size="11" '
-            f'pointer-events="none">{name}</text>'
+            f'pointer-events="none">{_html_escape(str(name))}</text>'
         )
         for item in band_items:
             item_band_lane[item.name] = lane_start

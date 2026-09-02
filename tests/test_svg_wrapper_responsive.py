@@ -20,6 +20,14 @@ def _svg_tag(html):
     return m.group(0)
 
 
+def _viewbox_numbers(html):
+    m = re.search(r'viewBox="([^"]+)"', html)
+    assert m is not None, f"no viewBox in html: {html[:200]}"
+    parts = [float(v) for v in m.group(1).split()]
+    assert len(parts) == 4, m.group(1)
+    return parts
+
+
 class TestSvgWrap:
     def test_svg_has_fixed_pixel_dimensions(self):
         html = svg_wrap('<circle r="5"/>', 400, 200)
@@ -29,7 +37,11 @@ class TestSvgWrap:
 
     def test_svg_viewbox_present(self):
         html = svg_wrap('<circle r="5"/>', 400, 200)
-        assert 'viewBox="0 0 400 200"' in html
+        # Asserted as four numbers, not as one literal string: the exact
+        # text is a formatting convention shared with svg_wrap_viewbox
+        # (see viewbox_attr) and a literal here went stale the first time
+        # that convention was unified (AF1-1). The box itself is the claim.
+        assert _viewbox_numbers(html) == [0.0, 0.0, 400.0, 200.0]
 
     def test_outer_div_scrolls_horizontally(self):
         html = svg_wrap('<circle r="5"/>', 400, 200)
@@ -61,7 +73,7 @@ class TestSvgWrap:
 class TestSvgWrapViewbox:
     def test_viewbox_preserved(self):
         html = svg_wrap_viewbox('<circle r="5"/>', 800, 200, y_min=-10, y_max=190)
-        assert 'viewBox="0 -190.0000 800 200.0000"' in html
+        assert _viewbox_numbers(html) == [0.0, -190.0, 800.0, 200.0]
 
     def test_fixed_pixel_dimensions(self):
         html = svg_wrap_viewbox('<circle r="5"/>', 800, 200, y_min=-10, y_max=190)

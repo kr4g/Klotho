@@ -1,7 +1,8 @@
 from klotho.chronos.rhythm_trees import RhythmTree
-from ._klotho_plot import transport_kwargs
+from ._klotho_plot import honors_output_file, transport_kwargs
 
 
+@honors_output_file
 def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, float] | None = None, 
             invert: bool = True, output_file: str | None = None, 
             attributes: list[str] | None = None, vertical_lines: bool = True, 
@@ -27,7 +28,11 @@ def _plot_rt(rt: RhythmTree, layout: str = 'containers', figsize: tuple[float, f
     invert : bool, optional
         When ``True``, places the root at the top.
     output_file : str or None, optional
-        Path to save the visualization.
+        Path to write the rendered figure to. ``.html`` saves the
+        interactive figure; ``.svg`` saves only the ``<svg>`` element, a
+        static picture without tooltips or playback controls. Any other
+        extension raises. The file is written on every render, so calling
+        ``.play()`` on the result replaces it with the animated figure.
     attributes : list of str or None, optional
         Node attributes to display (tree layout only).
     vertical_lines : bool, optional

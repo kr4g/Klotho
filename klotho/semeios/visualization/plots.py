@@ -3017,18 +3017,42 @@ def _plot_ratio_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
     """Render ratio-based scales/chords as proportional segments (clean style)."""
     n_degrees = len(degrees)
     pitch_objs = obj.pitches
-    
-    if n_degrees < 2:
-        raise ValueError("Need at least 2 degrees to plot intervals")
-    
+
+    # AUD-119: a one-degree collection used to raise here ("Need at least 2
+    # degrees to plot intervals") while the cents-mode renderer drew it
+    # happily. Whether a sonority can be pictured is a property of the
+    # sonority, not of how its intervals happen to be spelled, so the
+    # single degree is drawn and the (empty) segment loop simply does
+    # nothing.
+
     # Use the intervals property (Scale now includes final interval)
     interval_ratios = calc_obj.intervals
-    
+
     # Convert interval ratios to log sizes for proportional display
     intervals = [math.log(float(ratio)) for ratio in interval_ratios]
     n_segments = len(interval_ratios)
     total_log_size = sum(intervals)
-    
+
+    # AF1-16: every degree the same pitch -- which ``fold`` produces from an
+    # ordinary octave-collapse, because it never merges two voices that land
+    # together. The intervals are then all 1/1, their log sizes all 0, and
+    # every ``interval / total_log_size`` below divided by zero. Refuse with
+    # a sentence instead of a ZeroDivisionError from inside the label loop.
+    if n_segments and total_log_size <= 0:
+        distinct = {str(d) for d in calc_degrees}
+        detail = (
+            f"its {n_degrees} degrees are all the same pitch "
+            f"({next(iter(distinct))})"
+            if len(distinct) == 1 else
+            f"its intervals sum to a non-positive total span "
+            f"(degrees: {[str(d) for d in calc_degrees]})"
+        )
+        raise ValueError(
+            f"Cannot plot {type(obj).__name__} as proportional intervals: "
+            f"{detail}, so there is no span to divide the plot into. Plot a "
+            f"sonority with at least two distinct pitches."
+        )
+
     # Generate distinct colors for each segment
     colors = plt.cm.Set1(np.linspace(0, 1, n_segments))
     
@@ -3037,15 +3061,37 @@ def _plot_ratio_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
         
         # Add degree labels at borders first
         if show_labels:
+            # AUD-118. Two label defects lived here, both at 12 o'clock:
+            #
+            # (1) A hardcoded "1/1" was drawn on top of degree 0's own
+            #     label. For a Scale that was merely redundant; for a Chord
+            #     or Voicing rooted anywhere else -- Chord(['5/4', '3/2',
+            #     '15/8']) -- it asserted a unison the sonority does not
+            #     contain. It is gone: degree 0's label already marks that
+            #     point, and it names the actual root.
+            # (2) NOT FIXED HERE, deliberately -- see AF35-19. A Chord's
+            #     ``intervals`` span root..top only, so the cumulative
+            #     fraction of the LAST degree is exactly 1 and it is DRAWN at
+            #     12 o'clock, on top of the root. Skipping its label (which
+            #     this code briefly did) reads as tidying up an overprint, but
+            #     it is not: 15/8 in Chord(['5/4','3/2','15/8']) is a real
+            #     pitch, not a coincidence with the root, and dropping its
+            #     label removes it from the picture silently. An overprint is
+            #     ugly and visible; a missing pitch is a wrong score that
+            #     looks right. The underlying defect is the POSITION, not the
+            #     label, and it needs its own fix.
             for i, calc_degree in enumerate(calc_degrees):
-                degree_angle = current_angle
-                for j in range(i):
-                    degree_angle -= 2 * math.pi * (intervals[j] / total_log_size)
-                
+                # i == 0 short-circuits the division: a one-degree
+                # collection has no intervals at all, so total_log_size is
+                # 0 and there is nothing to divide (AUD-119).
+                cumulative = (sum(intervals[:i]) / total_log_size) if i else 0.0
+
+                degree_angle = current_angle - 2 * math.pi * cumulative
+
                 degree_radius = 1.1
                 degree_x = degree_radius * math.cos(degree_angle)
                 degree_y = degree_radius * math.sin(degree_angle)
-                
+
                 fig.add_trace(go.Scatter(
                     x=[degree_x], y=[degree_y],
                     mode='text',
@@ -3055,20 +3101,7 @@ def _plot_ratio_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
                     hovertemplate=f'Node {i}<br>Degree: {calc_degree}<br>{_pitch_hover(pitch_objs, i)}<extra></extra>',
                     hoverlabel=dict(bgcolor='lightgrey', font_color='black')
                 ))
-            
-            # Add equave label at the end
-            equave_x = 1.1 * math.cos(math.pi / 2)
-            equave_y = 1.1 * math.sin(math.pi / 2)
-            fig.add_trace(go.Scatter(
-                x=[equave_x], y=[equave_y],
-                mode='text',
-                text=["1/1"],
-                textfont=dict(color='white', size=text_size+2, family='Arial'),
-                showlegend=False,
-                hovertemplate=f'Node 0<br>Degree: 1/1<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
-                hoverlabel=dict(bgcolor='lightgrey', font_color='black')
-            ))
-        
+
         # Draw interval segments
         for i, (interval_size, interval_ratio) in enumerate(zip(intervals, interval_ratios)):
             if interval_size <= 0:
@@ -3153,14 +3186,16 @@ def _plot_ratio_scale_chord(obj, calc_obj, degrees, calc_degrees, fig, figsize,
         
         # Add degree labels at borders
         if show_labels:
-            # First degree (1/1)
+            # First degree. Was a hardcoded "1/1" (AUD-118): a Chord or
+            # Voicing rooted on 5/4 has no unison in it, so the label named
+            # a pitch that is not in the sonority.
             fig.add_trace(go.Scatter(
                 x=[0], y=[y_center + bar_height/2 + 0.05],
                 mode='text',
-                text=["1/1"],
+                text=[f"{calc_degrees[0]}"],
                 textfont=dict(color='white', size=text_size+2, family='Arial'),
                 showlegend=False,
-                hovertemplate=f'Node 0<br>Degree: 1/1<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
+                hovertemplate=f'Node 0<br>Degree: {calc_degrees[0]}<br>{_pitch_hover(pitch_objs, 0)}<extra></extra>',
                 hoverlabel=dict(bgcolor='lightgrey', font_color='black')
             ))
             

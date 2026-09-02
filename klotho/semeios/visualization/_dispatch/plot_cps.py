@@ -5,10 +5,11 @@ from klotho.tonos.systems.combination_product_sets import CombinationProductSet,
 from klotho.tonos.systems.combination_product_sets.master_set import MASTER_SETS
 
 from .._projections import apply_projection
-from ._klotho_plot import transport_kwargs
+from ._klotho_plot import honors_output_file, transport_kwargs
 from .._shared.audio_ref import reference_freq
 
 
+@honors_output_file
 def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
                      show_labels=True, title=None, output_file=None,
                      dim_reduction='mds', nodes=None, path=None,
@@ -40,7 +41,11 @@ def _plot_master_set(ms, figsize=(12, 12), node_size=30, text_size=12,
     title : str or None, optional
         Plot title.  Auto-generated when ``None``.
     output_file : str or None, optional
-        Path to save the figure.
+        Path to write the rendered figure to. ``.html`` saves the
+        interactive figure; ``.svg`` saves only the ``<svg>`` element, a
+        static picture without tooltips or playback controls. Any other
+        extension raises. The file is written on every render, so calling
+        ``.play()`` on the result replaces it with the animated figure.
     dim_reduction : str, optional
         Projection method used when ``ms.dimensionality > 3``. One of
         ``'mds'`` (default), ``'pca'``, ``'ortho_best'``, or
@@ -310,6 +315,7 @@ def _cps_render_node_order(G, node_positions):
             if node in node_positions and 'combo' in attrs]
 
 
+@honors_output_file
 def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
              node_size: int = 30, text_size: int = 12, show_labels: bool = True,
              title: str = None, output_file: str = None, nodes: list = None,
@@ -342,7 +348,11 @@ def _plot_cps(cps: CombinationProductSet, figsize: tuple = (12, 12),
     title : str or None, optional
         Plot title.  Derived from the CPS when ``None``.
     output_file : str or None, optional
-        Path to save the figure.
+        Path to write the rendered figure to. ``.html`` saves the
+        interactive figure; ``.svg`` saves only the ``<svg>`` element, a
+        static picture without tooltips or playback controls. Any other
+        extension raises. The file is written on every render, so calling
+        ``.play()`` on the result replaces it with the animated figure.
     nodes : list or None, optional
         Node IDs to highlight in pale green.
     path : list or None, optional

@@ -9,7 +9,7 @@ from klotho.topos.graphs.lattices import Lattice
 from .._shared.audio_ref import reference_freq
 from .._shared.colors import SHAPE_COLORS as _SHAPE_COLORS_GLOBAL
 from .._projections import apply_projection
-from ._klotho_plot import transport_kwargs
+from ._klotho_plot import honors_output_file, transport_kwargs
 
 
 _PREVIEW_CONTROL_KEYS = frozenset({
@@ -742,6 +742,7 @@ def _setup_lattice_animation(lattice, coords, G, original_coords, coord_mapping,
     return None
 
 
+@honors_output_file
 def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
                  node_size: float = 8, title: str = None,
                  output_file: str = None,
@@ -774,7 +775,11 @@ def _plot_lattice(lattice: Lattice, figsize: tuple[float, float] = (12, 12),
     title : str or None, optional
         Plot title.  Auto-generated when ``None``.
     output_file : str or None, optional
-        Path to save the figure.
+        Path to write the rendered figure to. ``.html`` saves the
+        interactive figure; ``.svg`` saves only the ``<svg>`` element, a
+        static picture without tooltips or playback controls. Any other
+        extension raises. The file is written on every render, so calling
+        ``.play()`` on the result replaces it with the animated figure.
     dim_reduction : str, optional
         Dimensionality-reduction method used when ``lattice.dimensionality``
         exceeds 3. One of ``'mds'`` (default), ``'spectral'``, ``'pca'``,

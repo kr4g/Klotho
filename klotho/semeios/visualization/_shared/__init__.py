@@ -3,6 +3,7 @@ from .colors import SHAPE_COLORS, _path_color_array, _rgba_to_hex
 from .geometry import bezier_2d, bezier_3d, rodrigues_rotate, get_perp, unpack3
 from .svg_utils import (
     SvgFigureData,
+    viewbox_attr,
     svg_wrap,
     svg_wrap_viewbox,
     svg_radial_halo,
@@ -32,6 +33,7 @@ __all__ = [
     "get_perp",
     "unpack3",
     "SvgFigureData",
+    "viewbox_attr",
     "svg_wrap",
     "svg_wrap_viewbox",
     "svg_radial_halo",
