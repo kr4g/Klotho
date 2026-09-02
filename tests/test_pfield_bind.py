@@ -119,8 +119,15 @@ class TestBindMemoStability:
         uc.set_pfields(branch, freq=Bind(lambda: 1.0))
         assert uc.get_pfield(leaf, 'freq') == 1.0
         uc.root.set_pfields(freq=Bind(lambda: 2.0))
-        # the branch's own Bind still governs (nearer override)
-        assert uc.get_pfield(leaf, 'freq') == 1.0
+        # INVERTED 2026-09-01 -- "a set is a set" (Ryan). This used to assert
+        # 1.0, with the comment "the branch's own Bind still governs (nearer
+        # override)". A write at an ancestor now OVERWRITES what descendants
+        # authored earlier, Binds included: you set it, so it is set. The old
+        # rule made a unit permanently deaf to a root write after any per-leaf
+        # authoring pass, silently.
+        assert uc.get_pfield(leaf, 'freq') == 2.0
+        # ...and re-authoring BELOW the root still wins, because it is the
+        # later write. Order expresses intent; proximity does not.
         uc.set_pfields(branch, freq=Bind(lambda: 3.0))
         assert uc.get_pfield(leaf, 'freq') == 3.0
 

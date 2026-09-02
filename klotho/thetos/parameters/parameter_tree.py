@@ -319,11 +319,49 @@ class ParameterLayer(TreeLayer):
                 f"field name."
             )
 
+    def _overwrite_descendants(self, tree, node, storage_keys):
+        """Clear *storage_keys* from every descendant of *node*.
+
+        **"A set is a set" (Ryan, 2026-09-01).** A write at an ancestor
+        OVERWRITES what descendants authored earlier, rather than being
+        shadowed by them:
+
+        *"we can always overwrite anything. I may have authored values to the
+        leaf nodes by iterating over them, but then I may want to overwrite
+        them by setting something at the root and cascading down… otherwise, a
+        set is a set."*
+
+        Before this, ``uc.leaves.set_pfields(amp=0.5)`` — which authors an
+        override on EVERY leaf, and is an ordinary idiom — made the unit
+        permanently deaf to a later ``root`` write: the values stayed at 0.5
+        with no error and no warning. That is the "composer edits the score and
+        hears the old music" failure, on the original unit, with no copy and no
+        extraction involved.
+
+        The old behaviour is still reachable deliberately: write at the
+        descendants AFTER the ancestor, which is the order that expresses
+        "these are the exceptions". A per-node **lock** to stop a cascade
+        flowing past it was raised in the same ruling as the principled opt-out
+        and is filed as its own item; it is deliberately NOT invented here.
+        """
+        stack = list(tree.successors(node))
+        while stack:
+            child = stack.pop()
+            raw = tree._rx[child]
+            if isinstance(raw, dict):
+                for key in storage_keys:
+                    raw.pop(key, None)
+            stack.extend(tree.successors(child))
+
     def set_pfields(self, tree, node, **kwargs):
-        """Register the keys and write pfield overrides at *node*."""
+        """Register the keys and write pfield overrides at *node*.
+
+        The write CASCADES: see :meth:`_overwrite_descendants`.
+        """
         self._reject_reserved_keys(tree, kwargs.keys(), 'pfield')
         self._pfields.update(kwargs.keys())
         cache = self._effective_cache
+        self._overwrite_descendants(tree, node, set(kwargs))
         tree._write_node_data(node, kwargs, replace=False)
         if cache is not None:
             # the write's invalidation sweep dropped the cache; restore it
@@ -338,10 +376,14 @@ class ParameterLayer(TreeLayer):
 
         Written under :func:`mfield_storage_key`, so an mfield and a
         pfield of the same name are two independent values.
+
+        The write CASCADES: see :meth:`_overwrite_descendants`.
         """
         self._reject_reserved_keys(tree, kwargs.keys(), 'mfield')
         self._mfields.update(kwargs.keys())
         cache = self._effective_cache
+        self._overwrite_descendants(
+            tree, node, {mfield_storage_key(k) for k in kwargs})
         tree._write_node_data(
             node,
             {mfield_storage_key(k): v for k, v in kwargs.items()},

@@ -136,10 +136,12 @@ def test_interior_override_is_not_flattened_onto_its_descendants():
     assert raw_override_nodes(sub) == raw_override_nodes(uc), (
         "the branch override must stay on the branch, not spread to its leaves"
     )
-    # And the branch override must still shadow a root rewrite, as it does on
-    # the source: leaves 2 and 3 keep 0.5 while 5 and 6 follow the root to 0.9.
+    # A later ROOT write then cascades over the branch override, on the copy
+    # exactly as on the source -- "a set is a set" (Ryan, 2026-09-01). This
+    # assertion used to expect [0.5, 0.5, 0.9, 0.9], i.e. the branch override
+    # surviving; that encoded the pre-ruling semantics.
     sub.set_pfields(sub._rt.root, amp=0.9)
-    assert list(sub.events['amp']) == [0.5, 0.5, 0.9, 0.9]
+    assert list(sub.events['amp']) == [0.9, 0.9, 0.9, 0.9]
 
 
 def test_inheritance_from_outside_the_extract_survives_at_the_new_root():
@@ -222,24 +224,26 @@ def test_stochastic_bind_rerolls_but_is_stable_within_the_extract():
 
 # ------------------- the authored-vs-inherited distinction, both directions
 
-def test_an_authored_leaf_value_still_wins_over_a_root_write_on_a_fragment():
-    """CONTROL — passes before and after, and it is here because an adversarial
-    verifier read this behaviour as a surviving AUD-6 defect. It is not.
+def test_a_root_write_cascades_over_an_authored_leaf_value_on_a_fragment():
+    """REWRITTEN 2026-09-01 -- "a set is a set" (Ryan).
 
-    Measured on the SOURCE: a leaf carrying its OWN ``amp`` is NOT changed by a
-    later root write — ``[0.5, 0.5, 0.5, 0.5]`` stays — while a leaf with no
-    override of its own follows the root to 0.9. So a single-leaf fragment that
-    keeps answering 0.5 after ``frag.root.set_pfields(amp=0.9)`` is REPRODUCING
-    its source faithfully. Expecting 0.9 there means expecting a root write to
-    erase an authored value, which is not what inheritance means here and not
-    what the source does.
+    This test previously asserted the OPPOSITE, under the name
+    ``test_an_authored_leaf_value_still_wins_over_a_root_write_on_a_fragment``,
+    and its docstring argued at length that a fragment answering 0.5 was
+    "reproducing its source faithfully". **The premise was wrong: the source
+    itself was wrong.** Treating the shipped behaviour as the specification is
+    exactly how that error was made, and it is recorded here rather than quietly
+    deleted.
 
-    Pinned so the next reader does not 'fix' it into a real defect."""
+    A write at an ancestor overwrites what descendants authored earlier, on a
+    fragment exactly as on the source -- an extracted subtree is a normal tree
+    and behaves like one.
+    """
     uc = flat_uc(pfields={'amp': 0.5})
     uc.leaves.set_pfields(amp=0.5)
     uc.set_pfields(uc._rt.root, amp=0.9)
-    assert list(uc.events['amp']) == [0.5, 0.5, 0.5, 0.5], (
-        "source premise: an authored leaf value survives a root write"
+    assert list(uc.events['amp']) == [0.9, 0.9, 0.9, 0.9], (
+        "source: a root write must cascade over authored leaf values"
     )
 
     from klotho.chronos.temporal_units.algorithms import decompose
@@ -247,9 +251,8 @@ def test_an_authored_leaf_value_still_wins_over_a_root_write_on_a_fragment():
     src.leaves.set_pfields(amp=0.5)
     frag = list(decompose(src))[0]
     frag.set_pfields(frag._rt.root, amp=0.9)
-    assert list(frag.events['amp']) == [0.5], (
-        "the fragment must answer as its source does, not cascade over an "
-        "authored value"
+    assert list(frag.events['amp']) == [0.9], (
+        "the fragment must answer as its source does -- and the source cascades"
     )
 
 
