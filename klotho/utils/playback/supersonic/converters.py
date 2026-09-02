@@ -897,90 +897,263 @@ def _apply_spatial_routing(score, events) -> None:
         event['speakerLane'] = lane
 
 
-def _refuse_narrower_main(score, spatial) -> None:
-    """Refuse a ``main`` whose declared array is narrower than a track's.
+def _main_chain_width(spatial) -> int:
+    """The width main's chain is BUILT at, for a score's declared widths.
 
-    Every track sums into main, so main's buses are built at the WIDEST
-    declared width -- that is the one place the whole array exists at once.
-    A ``main`` that declares an array of its own does not change that; it
-    only makes the browser's existing warning (which tests
-    ``spatial.widths['main'] == null``) stop firing.  Two things then go
-    wrong at once, and both are SILENT:
+    Mirrors ``scheduler_score.js`` exactly: ``var mainWidth = BUS_CHANNELS``
+    and then ``if (w > mainWidth) mainWidth = w`` over every declared
+    track.  The floor is the half that surprises people -- a lone
+    ``speakers=[1]`` on main is built two channels wide with lane 1
+    unwritten, and there is no other track to blame it on.
 
-    * **main's inserts were checked against the wrong width.**
-      ``Score.track`` validates an insert against ``len(labels)`` -- main's
-      own array -- and the chain is then built at ``mainWidth``.  Measured
-      on the shipped defs: ``score.track('main', speakers=['L', 'R'],
-      inserts=[SynthDefFX('kl_reverb')])`` beside a 24-speaker track puts a
-      2-in/2-out reverb writing fxBus 120-121 onto a chain whose decoder
-      reads 120-143.  Twenty-two speakers go silent, with no error and no
-      warning, at a concert.
-    * **main loses the headphone fold.**  ``scheduler_score.js`` breaks the
-      decoder tie in main's favour only when main is AS WIDE as the widest
-      track (``chosen = widest.indexOf('main') !== -1 ? 'main' : ...``), so
-      a narrower main is not in the tie at all and the geometry the
-      composer declared on the master chain is quietly replaced by another
-      track's.
-
-    Refused in Python, at lowering, because that is where the composer can
-    read it: the same refusal thrown in the browser dies as an unhandled
-    promise rejection and reaches nobody.  A ``main`` that declares NO
-    array is untouched -- that is the ordinary shape, it is what the
-    browser warning already covers, and refusing it would break every
-    score that declares its rig on one track.
+    **This floor is main's alone, and it is the only reason main needs a
+    cross-track check at all.**  Every other track's chain is built at
+    ``widthOf(name)`` -- exactly the width it declared, never widened,
+    never floored -- and its inserts are checked against that number by
+    ``Score.track`` at declaration time.  So there is no
+    narrower-than-my-own-chain case to catch anywhere but here.
     """
-    main = spatial.get('main')
-    if main is None:
-        return
-    # The width main's chain is actually BUILT at, computed the way the
-    # scheduler computes it: the widest declared track, but never narrower
-    # than a stereo pair (``mainWidth`` starts at ``BUS_CHANNELS``). The
-    # floor matters -- a lone ``speakers=[1]`` on main leaves lane 1 of a
-    # two-channel chain unwritten with no track anywhere to blame for it.
-    built = max(list(spatial.values()) + [2])
-    if main >= built:
-        return
-    others = {n: w for n, w in spatial.items() if n != 'main' and w == built}
-    widest_name = next(iter(others), None)
-    widener = (
-        f"track {widest_name!r} declares {built}, and every track sums into "
-        f"main"
-        if widest_name is not None else
-        f"a master chain is never narrower than a stereo pair"
+    return max(list(spatial.values()) + [2])
+
+
+def _fx_defs_of_width(width: int):
+    """Registered EFFECTS that read and write exactly *width* channels.
+
+    Bundled and runtime registrations both, because the ``_shared``
+    loaders merge them: a SynthDef authored with Supriya and passed to
+    ``register_synthdef(..., kind='fx')`` is visible here the moment it is
+    registered.
+
+    Restricted to ``kind == 'fx'`` deliberately.  ``__busRouter24`` is
+    24-in/24-out and would pass an arithmetic test, but naming a bus
+    router as the master effect a composer is looking for is worse advice
+    than naming none.
+    """
+    from klotho.thetos.instruments._shared import load_ss_io, load_ss_kinds
+    kinds = load_ss_kinds()
+    return tuple(sorted(
+        name for name, rec in load_ss_io().items()
+        if kinds.get(name) == 'fx'
+        and rec.get('ins') == width and rec.get('outs') == width))
+
+
+def _fx_def_census():
+    """``(effects registered, how many of them are 2-in/2-out)``.
+
+    Only a refusal calls this, and only to keep one sentence honest: on
+    the shipped tree the answer is ``(30, 30)`` -- every bundled effect is
+    stereo -- and a message that hardcoded "all 30" would go stale the
+    first time one was added, while one that said "stereo" without a count
+    would be an adjective a reader cannot check.
+    """
+    from klotho.thetos.instruments._shared import load_ss_io, load_ss_kinds
+    kinds = load_ss_kinds()
+    io = load_ss_io()
+    names = [n for n, k in kinds.items() if k == 'fx']
+    stereo = sum(1 for n in names
+                 if (io.get(n) or {}).get('ins') == 2
+                 and (io.get(n) or {}).get('outs') == 2)
+    return len(names), stereo
+
+
+def _insert_label(effect) -> str:
+    from klotho.thetos.instruments._shared import canonical_def_name
+    def_name = canonical_def_name(getattr(effect, 'defName', None))
+    label = getattr(effect, 'name', None) or def_name
+    return repr(label) if label == def_name else f"{label!r} ({def_name})"
+
+
+def _main_insert_damage(effect, built: int):
+    """What an insert of the wrong width does to main's chain, or ``None``.
+
+    Returns the sentence a composer needs -- what goes wrong, in
+    loudspeakers -- rather than a boolean, because every one of these
+    failures is inaudible as an error and audible only as a wrong sound.
+    """
+    from klotho.thetos.instruments._shared import (
+        canonical_def_name, ss_synth_channels,
     )
-    inserts = (getattr(score, '_tracks', None) or {}).get('main', {})
-    n_inserts = len(inserts.get('inserts') or ())
-    if n_inserts:
-        damage = (
-            f"Main's {n_inserts} insert(s) were width-checked against "
-            f"{main} channel(s) and will be placed on the {built}-channel "
-            f"chain, where they read and write {main} lane(s) and leave the "
-            f"other {built - main} of main's post-FX bus UNWRITTEN -- those "
-            f"speakers play SILENTLY, with nothing downstream to say so. ")
-    elif widest_name is not None:
-        damage = (
-            f"Main is also out of the decoder tie-break -- it is picked only "
-            f"when it is as wide as the widest track -- so the headphone fold "
-            f"would use {widest_name!r}'s geometry and not the array declared "
-            f"here, SILENTLY substituting one for the other. ")
-    else:
-        damage = (
-            f"Nothing is as wide as the chain main is built at, so the "
-            f"decoder tie-break selects no track at all and the score gets NO "
-            f"headphone fold -- reported as 'labels but no positions', which "
-            f"is not what happened. ")
-    remedy = (
-        f"speakers=<the {built}-speaker array>"
+    shown = _insert_label(effect)
+    ins, outs = ss_synth_channels(
+        canonical_def_name(getattr(effect, 'defName', None)))
+    if ins is None or outs is None:
+        return (
+            f"Insert {shown} has no recorded channel count, so Klotho "
+            f"cannot tell whether it writes all {built} lanes of main's "
+            f"chain or leaves most of them SILENT. Bundled SynthDefs record "
+            f"their width in assets/io.json; one registered at runtime "
+            f"records it via register_synthdef(). ")
+    if ins == built and outs == built:
+        return None
+
+    parts = [f"Insert {shown} reads {ins} and writes {outs} channels on a "
+             f"chain that carries {built}. "]
+    if outs < built:
+        parts.append(
+            f"It bridges lanes 0..{outs - 1} of main's {built}-channel "
+            f"post-FX bus and leaves the other {built - outs} UNWRITTEN: "
+            f"{built - outs} of the {built} speakers play SILENTLY, with "
+            f"nothing downstream to say so. ")
+    elif outs > built:
+        parts.append(
+            f"It writes {outs - built} channel(s) PAST the end of main's "
+            f"{built}-channel post-FX bus, onto whatever the allocator "
+            f"handed out next -- which is another track's live audio. ")
+    if ins > built:
+        parts.append(
+            f"It also reads {ins - built} channel(s) PAST the end of main's "
+            f"{built}-channel source bus, so material from another track's "
+            f"bus is mixed into the master. ")
+    elif ins < built and outs >= built:
+        # Only worth saying when the OUTPUT is already the right width: a
+        # too-narrow output has explained the same lanes already, and
+        # repeating it makes a long refusal longer without adding a fact.
+        parts.append(
+            f"It hears only lanes 0..{ins - 1} of the array, so the other "
+            f"{built - ins} speakers are not in the effect at all. ")
+    return ''.join(parts)
+
+
+def _refuse_broken_main_chain(score, spatial) -> None:
+    """Refuse a ``main`` whose chain cannot carry the array it is built at.
+
+    ``main`` is the master chain: every track sums into it, so its buses
+    are built at the WIDEST declared width -- that is the one place the
+    whole array exists at once.  Two independent things can then be wrong
+    with it, and **both are SILENT**:
+
+    * **an insert that is not as wide as the chain.**  ``scheduler_score.js``
+      wires each insert ``inBus=<prev>`` / ``outBus=<next>`` at main's
+      chain width and does not re-check it.  A 2-in/2-out def on a
+      24-channel chain therefore bridges lanes 0..1 and leaves 2..23 of
+      main's post-FX bus unwritten: 22 of 24 speakers silent, no error,
+      no warning that reaches Python.  (Measured on the shipped defs:
+      ``kl_reverb`` writes fxBus 120-121 while ``__spatialDecode24`` reads
+      120-143.)
+    * **a declared array narrower than the chain.**  Main is then out of
+      the decoder tie-break -- ``chosen = widest.indexOf('main') !== -1 ?
+      'main' : widest[0]`` picks main only when it is AS WIDE as the
+      widest track -- so the headphone fold quietly uses some other
+      track's geometry instead of the one declared on the master chain.
+
+    **CORRECTED (AF-1b).**  The first bullet used to be checked only
+    against main's OWN ``speakers=``, so it was enforced when main
+    declared an array and skipped entirely when main declared none.  That
+    got the rule exactly backwards: main's own declaration was never what
+    made the insert width matter -- the other track's width is.  The
+    consequence was concrete and bad.  AF-1's refusal offered two ways
+    out, and its verifier ran both:
+
+    * *"Declare main at the full array"* moves the failure to
+      ``Score.track``, which refuses a 2-channel insert on a 24-channel
+      track.  Loud, and correct, but a dead end: **no bundled effect
+      reads and writes more than two channels**, so there is nothing to
+      put there.
+    * *"take the array off main with ``speakers=[]``"* was ACCEPTED, and
+      rebuilt the exact silence the refusal exists to prevent.
+
+    A refusal whose remedy silently fails is barely better than no
+    refusal, so the rule is now the whole rule -- an insert on main must
+    read and write ``max(every declared width, 2)`` channels, declared
+    array or not -- and the message says plainly that Klotho ships no
+    effect wide enough, naming ``register_synthdef(defn, kind='fx')`` as
+    the only way to get one and the stereo-submix route as the only way
+    without one.
+
+    Checked here rather than in ``Score.track`` because neither half is
+    decidable from one track: ``track('main', inserts=[reverb])`` is not
+    wrong until a later cell declares a wider track, and by then either
+    call could be the one the composer meant to change.
+    """
+    built = _main_chain_width(spatial)
+    declared = spatial.get('main')
+    inserts = tuple(
+        ((getattr(score, '_tracks', None) or {}).get('main') or {})
+        .get('inserts') or ())
+
+    narrow_array = declared is not None and declared < built
+    damage = next(
+        (d for d in (_main_insert_damage(e, built) for e in inserts)
+         if d is not None), None)
+    if not narrow_array and damage is None:
+        return
+
+    widest_name = next(
+        (n for n, w in spatial.items() if n != 'main' and w == built), None)
+    widener = (
+        f"track {widest_name!r} declares {built} and every track sums into it"
         if widest_name is not None else
-        f"speakers=<at least {built} labels>")
+        "a master chain is never narrower than a stereo pair")
+    head = (
+        f"track 'main' is the master chain, so its buses are built {built} "
+        f"channel(s) wide ({widener}). ")
+
+    if narrow_array:
+        if widest_name is not None:
+            fold = (
+                f"the headphone fold would use the geometry of "
+                f"{widest_name!r} and not the array declared here, SILENTLY "
+                f"substituted for it")
+        else:
+            fold = (
+                "the tie-break selects no track at all and this score gets "
+                "NO headphone fold -- reported as 'labels but no positions', "
+                "which is not what happened")
+        head += (
+            f"The {declared}-speaker array declared on main describes only "
+            f"lanes 0..{declared - 1} of that bus, and a narrower main is "
+            f"not in the decoder tie-break -- which picks main only when it "
+            f"is AS WIDE as the widest track -- so {fold}. ")
+
+    if damage is None:
+        # The floor case has no "full array" to point at: nothing in the
+        # score is {built} wide, so name the count instead of a thing.
+        full = (f"the {built}-speaker array" if widest_name is not None
+                else f"at least {built} labels")
+        raise ValueError(
+            head +
+            f"Declare main at the full width -- score.track('main', "
+            f"speakers=<{full}>, ...) -- or take the array off main with "
+            f"score.track('main', speakers=[]) and let it be widened to fit, "
+            f"which is what a master chain with no speakers= of its own "
+            f"already does.")
+
+    fits = _fx_defs_of_width(built)
+    if fits:
+        shown = ', '.join(fits[:6])
+        if len(fits) > 6:
+            shown += f", and {len(fits) - 6} more"
+        available = f"The registered effects that fit are: {shown}. "
+    else:
+        # State the missing capability with a count, not an adjective: the
+        # bundle is 30 stereo effects today and the sentence has to stay
+        # true if that changes.  ``all_fx`` is every registered effect;
+        # ``_fx_defs_of_width(2)`` is how many of them are 2-in/2-out.
+        all_fx, stereo_fx = _fx_def_census()
+        census = (
+            f"every one of the {all_fx} effects registered here is 2-in/"
+            f"2-out"
+            if stereo_fx == all_fx else
+            f"none of the {all_fx} effects registered here is {built}-in/"
+            f"{built}-out")
+        available = (
+            f"NOTHING REGISTERED FITS: {census}. A master insert on a rig "
+            f"wider than a stereo pair is not a capability this release has "
+            f"off the shelf -- it needs a SynthDef you write yourself, "
+            f"In.ar(inBus, {built}) ... ReplaceOut.ar(outBus, sig) with "
+            f"{built} channels, registered with "
+            f"register_synthdef(defn, kind='fx'). ")
     raise ValueError(
-        f"track 'main' declares {main} speaker(s) but {widener} -- so main's "
-        f"chain is built {built} channels wide and the {main}-speaker array "
-        f"declared on it describes only lanes 0..{main - 1} of it. {damage}"
-        f"Declare main at the full array -- score.track('main', {remedy}, "
-        f"...) -- or take the array off main with score.track('main', "
-        f"speakers=[]) and let it be widened to fit, which is what a master "
-        f"chain with no speakers= of its own already does.")
+        head + str(damage) +
+        f"An insert on main must read and write exactly {built} channels. "
+        + available +
+        f"With one: score.track('main', speakers=<the {built}-speaker "
+        f"array>, inserts=[SynthDefFX(<that def>)]). Without one, take the "
+        f"effect off the master chain -- score.track('main', inserts=[]) -- "
+        f"and put it on a track that IS two channels wide (one declaring no "
+        f"speakers=, or exactly two). That is a submix and not a master bus: "
+        f"a stereo track sums into lanes 0..1, so the effect reaches the "
+        f"first two speakers of the array and no others.")
 
 
 def _build_spatial_meta(score) -> dict:
@@ -1015,7 +1188,7 @@ def _build_spatial_meta(score) -> dict:
             by_key[key] = array_id
             arrays[array_id] = _array_meta(array, labels)
         track_meta[name] = {"array": array_id, "width": len(labels)}
-    _refuse_narrower_main(
+    _refuse_broken_main_chain(
         score, {name: entry['width'] for name, entry in track_meta.items()})
     return {"arrays": arrays, "tracks": track_meta}
 

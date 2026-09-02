@@ -127,25 +127,55 @@ class TestMainMayNotBeNarrowerThanTheWidestTrack:
             convert_score_to_sc_events(self._narrow_main())
         assert "'main'" in str(e.value)
 
-    def test_the_refusal_says_both_ways_out(self):
+    def test_the_refusal_says_both_ways_out_when_both_ways_work(self):
+        """With NO inserts on main, both remedies really do work.
+
+        CORRECTED (AF-1b).  This test used to run the ``inserts=[reverb]``
+        case and assert that ``speakers=[]`` was offered there too.  It is
+        not offered there any more, and must not be: AF-1's verifier ran
+        it and found it ACCEPTED the score straight back into the silence
+        the refusal exists to prevent (main still widened to 24 by the
+        other track, ``kl_reverb`` still bridging lanes 0..1).  With an
+        empty chain there are no lanes to leave unwritten, so both ways
+        out are honest and both are still named.
+        """
         with pytest.raises(ValueError) as e:
-            convert_score_to_sc_events(self._narrow_main(
-                inserts=[SynthDefFX('kl_reverb')]))
+            convert_score_to_sc_events(self._narrow_main())
         msg = str(e.value)
-        # Declare main at the full array ...
+        # Declare main at the full width ...
         assert "score.track('main'" in msg
         # ... or stop declaring speakers on main at all.
         assert 'speakers=[]' in msg
 
-    def test_main_declaring_no_array_at_all_is_still_accepted(self):
-        """The ordinary shape, and the one the JS warning already covers.
+    def test_the_refusal_does_not_offer_speakers_empty_when_it_would_fail(
+            self):
+        """The remedy that silently failed is gone from the case it fails in.
 
-        Over-refusing here would break every score that declares its rig on
-        one track and leaves the master alone -- which is how the whole
-        corpus is written.
+        ``speakers=[]`` does not narrow main's chain -- nothing does but
+        the widest track -- so with a stereo insert on a 24-wide chain it
+        removes the array and leaves every muted speaker exactly where it
+        was.
+        """
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(self._narrow_main(
+                inserts=[SynthDefFX('kl_reverb')]))
+        assert 'speakers=[]' not in str(e.value)
+
+    def test_main_declaring_no_array_at_all_is_still_accepted(self):
+        """The ordinary shape: declare the rig on one track, leave main alone.
+
+        Over-refusing here would break every score written that way --
+        which is how the whole corpus is written.  main is left out of
+        ``meta.spatial.tracks`` entirely and the score lowers.
+
+        CORRECTED (AF-1b): this used to hang ``inserts=[kl_reverb]`` on
+        that main and assert it lowered clean.  It did, and that was the
+        flagship defect, not the safe shape -- a 2-in/2-out insert on the
+        24-channel chain main is built at.  The insert is what is refused;
+        the undeclared main is not.
         """
         s = Score()
-        s.track('main', inserts=[SynthDefFX('kl_reverb')])
+        s.track('main')
         s.track('wide', speakers=grid(6, 4, name='PAVILION'))
         s.add(voices(), name='x', track='wide')
         meta = convert_score_to_sc_events(s)['meta']['spatial']
@@ -686,3 +716,288 @@ class TestTheBrowserSaysSoToo:
         hit = [w for w in r['warnings'] if 'SILENT' in w]
         assert hit, r['warnings']
         assert any('2' in w and '24' in w for w in hit)
+
+
+# ---------------------------------------------------------------------------
+# 5. AF-1b: the refusal's own remedies, and whose rule the stereo floor is
+# ---------------------------------------------------------------------------
+
+
+PROBE_DIR = Path(__file__).parent / 'fixtures' / 'synthdefs'
+
+
+@pytest.fixture
+def probe_fx24():
+    """Register the only 24-in/24-out effect that exists anywhere.
+
+    It is a TEST fixture on purpose: the tree ships 179 non-infrastructure
+    SynthDefs and every one of them is stereo, which is the fact the new
+    refusal has to state out loud.  Registration is process-global, so it
+    is torn down again.
+    """
+    from klotho.utils.playback.supersonic import registry
+    registry.register_compiled_file(PROBE_DIR / 'spatial_probe_fx24.scsyndef',
+                                    kind='fx')
+    try:
+        yield 'spatial_probe_fx24'
+    finally:
+        registry.clear_runtime()
+
+
+class TestMainsInsertsAreCheckedAgainstTheWidthMainIsBuiltAt:
+    """AUD-3b.  The refusal added for AUD-3 offered two ways out.
+
+    Ran against the flagship repro -- ``kl_reverb`` on ``main`` beside a
+    24-speaker track -- neither of them produced a working master chain:
+
+    * *"Declare main at the full array"* moves the failure to
+      ``Score.track``, which refuses a 2-channel insert on a 24-channel
+      track.  Loud, but there is nowhere to go from there: no bundled
+      effect reads and writes 24 channels.
+    * *"take the array off main with ``speakers=[]``"* was **accepted**,
+      and rebuilt the exact silence the refusal exists to prevent -- main
+      is still widened to 24 by the other track, ``kl_reverb`` still
+      bridges lanes 0..1, and lanes 2..23 of main's post-FX bus are still
+      never written.  The only diagnostic left is a browser
+      ``console.warn`` nobody reads at a concert.
+
+    The rule underneath both is one sentence, and it was only ever half
+    enforced: **an insert on main must read and write as many channels as
+    main's chain is BUILT at**, which is ``max(every declared width, 2)``
+    -- not as many as main's own ``speakers=`` happens to name, and not
+    two just because main named none.  Declaring an array on main was
+    never what made the insert width matter; the other track's width is.
+    """
+
+    def _wide_rig_with_main_insert(self, def_name='kl_reverb', declare=None):
+        s = Score()
+        if declare is None:
+            s.track('main', inserts=[SynthDefFX(def_name)])
+        else:
+            s.track('main', speakers=declare, inserts=[SynthDefFX(def_name)])
+        s.track('wide', speakers=grid(6, 4, name='PAVILION'))
+        s.add(voices(), name='x', track='wide')
+        return s
+
+    def test_a_stereo_insert_on_an_undeclared_main_is_refused(self):
+        """The flagship silence, reachable with entirely bundled pieces.
+
+        Hand-derived: a 6x4 grid is 24 speakers, so ``mainWidth`` is
+        ``max(24, 2) == 24`` and main's post-FX bus is a run of 24
+        channels.  ``kl_reverb`` is 2-in/2-out (``assets/io.json``), so the
+        chain writes 2 of those 24 lanes and leaves 22 unwritten: 22 of the
+        24 speakers play silently.
+        """
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(self._wide_rig_with_main_insert())
+        msg = str(e.value)
+        assert "'main'" in msg
+        assert '24' in msg and '2' in msg
+        assert '22' in msg                      # the unwritten lanes, counted
+        assert 'SILENT' in msg
+
+    def test_the_speakers_empty_remedy_no_longer_leads_back_into_it(self):
+        """``speakers=[]`` was the second way out the AUD-3 text offered.
+
+        It is the same configuration as the test above once the array is
+        gone, so it must reach the same refusal.  Before this change it
+        lowered clean.
+        """
+        s = self._wide_rig_with_main_insert(declare=['L', 'R'])
+        s.track('main', speakers=[])
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(s)
+        assert 'SILENT' in str(e.value)
+
+    def test_the_refusal_admits_that_no_bundled_effect_fits(self):
+        """A missing capability, named as one.
+
+        The remedy text may not send a composer looking for a wide reverb
+        in the bundle; there is not one, and this pins the message against
+        the bundle rather than against itself.
+        """
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(self._wide_rig_with_main_insert())
+        msg = str(e.value)
+        assert 'register_synthdef' in msg
+        assert "kind='fx'" in msg
+        # ... and the claim is true of the shipped assets, counted from
+        # them rather than from the code that writes the message.
+        io = json.loads((_SS_DIR / 'assets' / 'io.json').read_text())
+        kinds = json.loads((_SS_DIR / 'assets' / 'kinds.json').read_text())
+        fx = [n for n, k in kinds.items() if k == 'fx']
+        fits = [n for n in fx
+                if io.get(n, {}).get('ins') == 24
+                and io.get(n, {}).get('outs') == 24]
+        stereo = [n for n in fx
+                  if io.get(n, {}).get('ins') == 2
+                  and io.get(n, {}).get('outs') == 2]
+        assert fits == []
+        assert len(stereo) == len(fx)          # ALL of them, not most
+        assert f"{len(fx)} effects" in msg     # and the message says so
+
+    def test_the_refusal_offers_the_route_that_needs_no_new_synthdef(self):
+        """Moving the effect off main works today and must be offered."""
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(self._wide_rig_with_main_insert())
+        msg = str(e.value)
+        assert "inserts=[]" in msg
+
+    def test_a_matching_width_insert_on_main_is_accepted(self, probe_fx24):
+        """The configuration the message sends the composer to must work."""
+        rig = grid(6, 4, name='PAVILION')
+        s = Score()
+        s.track('main', speakers=rig, inserts=[SynthDefFX(probe_fx24)])
+        s.track('wide', speakers=rig)
+        s.add(voices(), name='x', track='wide')
+        meta = convert_score_to_sc_events(s)['meta']
+        assert meta['spatial']['tracks']['main']['width'] == 24
+        assert [i['defName'] for i in meta['inserts']['main']] == [probe_fx24]
+
+    def test_a_matching_insert_is_accepted_even_with_main_undeclared(
+            self, probe_fx24):
+        """main's own ``speakers=`` was never what made the width matter.
+
+        Refusing this too would be over-refusing: the chain is 24 wide, the
+        insert is 24 wide, every lane is written.
+        """
+        s = self._wide_rig_with_main_insert(def_name=probe_fx24)
+        meta = convert_score_to_sc_events(s)['meta']
+        assert meta['spatial']['tracks']['wide']['width'] == 24
+        assert 'main' not in meta['spatial']['tracks']
+
+    def test_an_insert_wider_than_mains_chain_reads_past_it(self, probe_fx24):
+        """The other direction, and the more dangerous one.
+
+        A quad rig makes ``mainWidth`` 4.  A 24-channel insert on it reads
+        24 channels from a 4-channel bus run -- 20 of them belong to
+        whatever the allocator handed out next, which is another track's
+        live audio.
+        """
+        s = Score()
+        s.track('main', inserts=[SynthDefFX(probe_fx24)])
+        s.track('quad', speakers=grid(2, 2, name='QUAD'))
+        s.add(voices(), name='x', track='quad')
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(s)
+        assert 'PAST' in str(e.value)
+
+    def test_a_stereo_insert_on_a_stereo_spatial_score_is_untouched(self):
+        """``built`` is 2, the insert is 2, nothing is wrong.
+
+        This is the shape the whole corpus is written in and the refusal
+        must not reach it.
+        """
+        s = Score()
+        s.track('main', inserts=[SynthDefFX('kl_reverb')])
+        s.track('pair', speakers=['L', 'R'])
+        # Both notes at 'L': ``kl_tri`` is a 2-out def, so it occupies the
+        # speaker it names and the one above it, and naming 'R' on a
+        # 2-speaker array trips the (separate) lane-overrun refusal.
+        s.add(voices(speakers=('L', 'L')), name='x', track='pair')
+        meta = convert_score_to_sc_events(s)['meta']
+        assert meta['spatial']['tracks']['pair']['width'] == 2
+
+    def test_an_insert_with_no_recorded_width_is_refused_not_guessed(self):
+        """Same policy ``_check_insert_width`` already applies on a track.
+
+        An unrecorded width is not a width of two.  Guessing two here is
+        exactly the assumption that produced the flagship silence, so the
+        unknown is refused and the composer is told where widths are
+        recorded.
+        """
+        s = Score()
+        s.track('main', inserts=[SynthDefFX('no_such_def_anywhere')])
+        s.track('wide', speakers=grid(6, 4, name='PAVILION'))
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(s)
+        assert 'no recorded channel count' in str(e.value)
+
+    def test_the_plot_surface_refuses_it_too(self):
+        """``plot(score)`` lowers through the same ``_build_score_meta``.
+
+        A refusal reachable only from ``play()`` would let a composer
+        build, animate and export a score that cannot sound, and find out
+        at the concert.
+        """
+        from klotho.utils.playback.supersonic.converters import (
+            convert_score_to_sc_animation_events,
+        )
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_animation_events(
+                self._wide_rig_with_main_insert())
+        assert 'SILENT' in str(e.value)
+
+    def test_main_with_no_inserts_at_all_stays_accepted_at_any_width(self):
+        """A chain with no inserts is bypassed at the FULL width.
+
+        ``scheduler_score.js`` sends ``routerDefName(chainWidth)`` when a
+        track has no inserts, so an empty main writes all 24 lanes.  Only
+        an insert can narrow the bridge, so only an insert is refused.
+        """
+        s = Score()
+        s.track('main')
+        s.track('wide', speakers=grid(6, 4, name='PAVILION'))
+        s.add(voices(), name='x', track='wide')
+        meta = convert_score_to_sc_events(s)['meta']
+        assert meta['spatial']['tracks']['wide']['width'] == 24
+
+
+class TestTheStereoFloorBelongsToMainAlone:
+    """AUD-3c.  Is the rule about the NAME ``main`` or about the role?
+
+    It is about the role, and in Klotho the role is addressed by that
+    literal name everywhere -- ``Score.track`` exempts only ``"main"`` from
+    the already-registered refusal, ``add()`` exempts only ``"main"`` from
+    the must-exist check, and ``scheduler_score.js`` builds
+    ``trackMap["main"]`` by hand at ``mainWidth`` after every other track.
+
+    The floor follows from that and from nothing else: ``mainWidth``
+    starts at ``BUS_CHANNELS`` and is raised by every other track, so
+    main's chain can be wider than main's own declaration.  Every OTHER
+    track's chain is built at ``widthOf(name)`` -- exactly its declared
+    width, with no floor and no widening -- and its inserts are checked
+    against that number at declaration time.  So there is no narrower-than-
+    my-own-chain case to catch on a track that is not main, and refusing
+    one would be inventing a rule.
+    """
+
+    def test_a_one_speaker_track_that_is_not_main_is_accepted(self):
+        """Hand-derived: ``widthOf('mono')`` is 1, ``__busRouter1`` is in
+        ``PRECOMPILED_WIDTHS``, and the router sums main's lane 0.  Nothing
+        is unwritten anywhere, so nothing is refused."""
+        s = Score()
+        s.track('wide', speakers=grid(6, 4, name='PAVILION'))
+        s.track('mono', speakers=[1])
+        s.add(voices(), name='x', track='wide')
+        meta = convert_score_to_sc_events(s)['meta']['spatial']
+        assert meta['tracks']['mono']['width'] == 1
+        assert meta['tracks']['wide']['width'] == 24
+        assert 1 in PRECOMPILED_WIDTHS
+
+    def test_the_same_one_speaker_declaration_on_main_is_refused(self):
+        """The contrast that shows the rule is main's, not the width's."""
+        s = Score()
+        s.track('main', speakers=[1])
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(s)
+        assert 'stereo pair' in str(e.value)
+
+    def test_a_narrow_non_main_tracks_inserts_are_checked_at_its_own_width(
+            self):
+        """And they are checked at declaration, before lowering is reached."""
+        s = Score()
+        s.track('wide', speakers=grid(6, 4, name='PAVILION'))
+        with pytest.raises(ValueError) as e:
+            s.track('mono', speakers=[1], inserts=[SynthDefFX('kl_reverb')])
+        assert '1 channels wide' in str(e.value)
+
+    def test_the_refusal_says_which_track_the_floor_belongs_to(self):
+        """A composer reading it must not conclude every track has a floor."""
+        s = Score()
+        s.track('main', speakers=[1])
+        with pytest.raises(ValueError) as e:
+            convert_score_to_sc_events(s)
+        msg = str(e.value)
+        assert 'master' in msg
+        assert 'main' in msg

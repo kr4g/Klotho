@@ -184,6 +184,15 @@ def _check_insert_width(effect, track_name: str, width: int) -> None:
     must read and write exactly that many.  Klotho does not adapt the
     width: summing lanes would move the music to a different loudspeaker
     and duplicating them would put it on two.
+
+    *width* is the declaring track's own speaker count, which is the whole
+    story for every track **but** ``"main"``.  Main's chain is built at
+    ``max(every declared width, 2)``, so its inserts are checked a second
+    time at lowering, against that number, by
+    ``converters._refuse_broken_main_chain`` -- including when main
+    declares no array at all and this function was never reached.  The
+    floor and the widening are main's alone; every other track's chain is
+    built at exactly the width checked here.
     """
     def_name = canonical_def_name(getattr(effect, 'defName', None))
     label = getattr(effect, 'name', None) or def_name
@@ -594,16 +603,36 @@ class Score:
             the array declared earlier, and the inserts it carries over are
             re-checked against that array's width.
 
-            **Two width checks happen later, at lowering, not here**, because
-            neither is decidable from one track: a speaker count outside the
-            precompiled SynthDef family (see
-            :data:`~klotho.utils.playback.supersonic.spatial_defs.PRECOMPILED_WIDTHS`)
-            is refused when the score is prepared for playback, and a
-            ``"main"`` declaring an array NARROWER than some other track is
-            refused when the score is lowered.  The second one cannot be
-            checked at declaration: ``track('main', speakers=['L', 'R'])`` is
-            not wrong until a later cell declares a wider track, and by then
-            either call could be the one the composer meant to change.
+            **Width checks that need more than one track happen later, at
+            lowering, not here**, because none of them is decidable from a
+            single call:
+
+            * a speaker count outside the precompiled SynthDef family (see
+              :data:`~klotho.utils.playback.supersonic.spatial_defs.PRECOMPILED_WIDTHS`)
+              is refused when the score is prepared for playback;
+            * ``"main"`` declaring an array NARROWER than some other track
+              is refused when the score is lowered;
+            * **every insert on ``"main"`` is re-checked against the width
+              main's chain is actually BUILT at** -- ``max(every declared
+              width, 2)``, not the width main itself declared, and not two
+              just because main declared nothing.  ``main`` is the master
+              chain and every track sums into it, so a stereo insert on a
+              24-speaker rig bridges lanes 0..1 and leaves 22 speakers
+              silent whether or not main names an array of its own.
+
+            The last two cannot be checked at declaration:
+            ``track('main', speakers=['L', 'R'])`` and
+            ``track('main', inserts=[reverb])`` are not wrong until a later
+            cell declares a wider track, and by then either call could be
+            the one the composer meant to change.
+
+            **There is no bundled effect wider than stereo.**  All 30 of
+            Klotho's bundled ``fx`` SynthDefs are 2-in/2-out, so a master
+            insert on a rig wider than a stereo pair needs a SynthDef the
+            composer authors and passes to
+            :func:`~klotho.utils.playback.supersonic.registry.register_synthdef`
+            with ``kind='fx'``.  The refusal says so rather than offering a
+            remedy that cannot be carried out.
 
             ``speakers=[]`` is the un-declare, matching ``inserts=[]``: the
             track keeps existing and stops being spatial.  It is refused on
@@ -686,11 +715,23 @@ class Score:
             # chain is still built at 24, the inserts were still checked
             # against 2, and lanes 2..23 of main's post-FX bus are still
             # never written.  Following the warning's own advice was
-            # therefore a way to make it stop lying about nothing.  That
-            # configuration is now REFUSED at lowering
-            # (``converters._refuse_narrower_main``), and the browser warns
-            # about it too, so "the warning stops" once again means "there
-            # is nothing to warn about".
+            # therefore a way to make it stop lying about nothing.
+            #
+            # CORRECTED AGAIN (AF-1b): the whole width argument above is
+            # about main's ARRAY, and main's array was never what made the
+            # insert width matter -- the widest OTHER track's width is.
+            # Both branches of that JS warning (main declares none, main
+            # declares a narrow one) are the same defect wearing two hats,
+            # and lowering now checks the thing they share:
+            # ``converters._refuse_broken_main_chain`` refuses any insert on
+            # main that does not read and write ``max(every declared width,
+            # 2)`` channels, array or no array.  Note the consequence for
+            # that JS warning: it fires on ``widths['main'] == null`` alone,
+            # so it now also fires on the ONE configuration that works --
+            # main undeclared carrying a correctly-wide insert -- where its
+            # "only ever checked as STEREO" is no longer true.  Conservative
+            # and merely noisy, not a silence, and scheduler_score.js is not
+            # this lane's file to fix; filed for the JS owner.
             labels, lanes, array = (prior["labels"], prior["lanes"],
                                     prior["speakers"])
         else:
