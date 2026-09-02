@@ -215,7 +215,9 @@ class TestBridgeRecordContract:
         """The three names klotho-cac **10.18.0** assigns on its way out.
 
         Not derived from the current source: read off the released build with
-        ``git show origin/main:klotho/utils/playback/_animation_bridge.js``.
+        ``git show 9c1646c:klotho/utils/playback/_animation_bridge.js``
+        (``RELEASED_COMMIT``; it was ``origin/main`` until that stopped
+        naming the published release on 2026-09-01).
         A newer bridge that stopped claiming one of them would let a stale
         saved output from that release win the public name on a shared page.
         """
@@ -378,9 +380,22 @@ class TestPlayKwargPlumbing:
 
 _ROOT = Path(__file__).parent.parent
 
+#: The commit whose build is on PyPI as **klotho-cac 10.18.0**.
+#:
+#: This used to be spelled ``origin/main``, which was correct only while
+#: ``origin/main`` happened to equal the published release.  That accident
+#: ENDED on 2026-09-01 when the Haddad block merged: ``origin/main`` became
+#: ``f37fd51`` (version 11.0.0, unpublished), so "the released bridge" and
+#: "the bridge on main" stopped being the same file and the A/B below started
+#: comparing a build against itself.  Its own sanity assertion caught that --
+#: the test went red rather than vacuous, which is why this pin exists.
+#:
+#: **Move this when a RELEASE is published, not when ``main`` moves.**
+RELEASED_COMMIT = "9c1646c"
+
 #: The markers a cached **klotho-cac 10.18.0** page has already defined.
 #: Read off the released build, not off the source under test:
-#: ``git show origin/main:klotho/utils/playback/_animation_bridge.js``
+#: ``git show 9c1646c:klotho/utils/playback/_animation_bridge.js``
 #: assigns exactly V2, V3 and V4 on its way out (verified 2026-09-01).
 SHIPPED_MARKERS_1018 = [
     "__klothoPlaybackBridgeV2",
@@ -617,16 +632,21 @@ class TestBridgeInstallsOverACachedPage:
         try:
             text = subprocess.run(
                 ["git", "show",
-                 "origin/main:klotho/utils/playback/_animation_bridge.js"],
+                 f"{RELEASED_COMMIT}:klotho/utils/playback"
+                 "/_animation_bridge.js"],
                 capture_output=True, text=True, cwd=str(_ROOT),
                 check=True).stdout
         except (subprocess.CalledProcessError, FileNotFoundError):
-            pytest.skip("origin/main not reachable from this checkout")
+            pytest.skip(f"{RELEASED_COMMIT} not reachable from this checkout")
         released = tmp_path / "released_animation_bridge.js"
         released.write_text(text)
         # Sanity on the fixture itself: it must be an OLDER build, or this
-        # test proves nothing.
-        assert _newest_bridge_marker(text) < _newest_bridge_marker()
+        # test proves nothing.  If this fires, RELEASED_COMMIT is stale --
+        # do NOT relax it to a skip, which would disable the test silently.
+        assert _newest_bridge_marker(text) < _newest_bridge_marker(), (
+            f"RELEASED_COMMIT ({RELEASED_COMMIT}) no longer names an OLDER "
+            f"bridge than the source under test, so this A/B would compare a "
+            f"build against itself and prove nothing")
 
         r = _run_stale_probe(stale_bridge_probe, stale_bridge=released)
         assert r["publicReplaced"] is True
@@ -640,9 +660,17 @@ class TestGuardMarkersMoveWithBehaviour:
     The rule this file exists to enforce, stated once and checked against the
     last release rather than against a literal: **if the module's source
     differs from the published build, its newest install-guard marker must be
-    greater than the published one.**  Written this way it needs no editing
-    when the branch merges -- once ``origin/main`` carries the new source the
-    two sides match again and the check is vacuous until the next edit.
+    greater than the published one.**  The published build is
+    ``RELEASED_COMMIT``, so the check stays live until a RELEASE goes out and
+    goes vacuous only for a module nobody has touched since.
+
+    **It used to read ``origin/main``, and that was the same thing only by
+    accident.**  When the Haddad block merged on 2026-09-01, ``origin/main``
+    became HEAD, every side matched, and all three parametrizations plus the
+    score-extension case went silently VACUOUS -- green, and guarding nothing.
+    Nothing failed, which is why this is written down: the sibling A/B below
+    had a sanity assertion and went RED instead, and that red is the only
+    reason the vacuum here was noticed.
 
     ``scheduler_score.js`` is the one exception, and deliberately so: its
     guard is a *prototype* flag on ``BrowserScheduler``, so a core bump
@@ -665,9 +693,10 @@ class TestGuardMarkersMoveWithBehaviour:
     @staticmethod
     def _released(rel_path):
         try:
-            return subprocess.run(["git", "show", f"origin/main:{rel_path}"],
-                                  capture_output=True, text=True,
-                                  cwd=str(_ROOT), check=True).stdout
+            return subprocess.run(
+                ["git", "show", f"{RELEASED_COMMIT}:{rel_path}"],
+                capture_output=True, text=True,
+                cwd=str(_ROOT), check=True).stdout
         except (subprocess.CalledProcessError, FileNotFoundError):
             return None
 
@@ -677,12 +706,34 @@ class TestGuardMarkersMoveWithBehaviour:
         assert ns, "no version marker found"
         return max(ns)
 
+    def test_released_commit_pin_is_not_stale(self):
+        """The sentinel for every other check in this class.
+
+        Each check below returns early when ``old == new``, so a STALE
+        ``RELEASED_COMMIT`` does not make them fail -- it makes them go
+        quiet.  Measured on 2026-09-01 by pointing the pin at ``HEAD``: the
+        A/B in the sibling class went red, and all four checks here passed
+        while guarding nothing.  This test is the one that goes red instead.
+
+        The bridge is the probe because it is the module that has moved most
+        recently; if a future release makes this vacuous too, that is the
+        signal to pick a different probe, not to delete the test.
+        """
+        old = self._released(self._MODULES["_animation_bridge.js"][0])
+        if old is None:
+            pytest.skip(f"{RELEASED_COMMIT} not reachable from this checkout")
+        assert _newest_bridge_marker(old) < _newest_bridge_marker(), (
+            f"RELEASED_COMMIT ({RELEASED_COMMIT}) no longer names a build "
+            f"OLDER than the tree, so every changed-module check in this "
+            f"class is silently vacuous. Repoint it at the commit whose "
+            f"build is on PyPI -- it moves on a RELEASE, not when main moves")
+
     @pytest.mark.parametrize("name", sorted(_MODULES))
     def test_changed_module_has_a_bumped_marker(self, name):
         rel, pattern = self._MODULES[name]
         old = self._released(rel)
         if old is None:
-            pytest.skip("origin/main not reachable from this checkout")
+            pytest.skip(f"{RELEASED_COMMIT} not reachable from this checkout")
         new = (_ROOT / rel).read_text()
         if old == new:
             return  # unchanged since the release; nothing to bump
@@ -696,7 +747,7 @@ class TestGuardMarkersMoveWithBehaviour:
         rel = "klotho/utils/playback/supersonic/scheduler_score.js"
         old = self._released(rel)
         if old is None:
-            pytest.skip("origin/main not reachable from this checkout")
+            pytest.skip(f"{RELEASED_COMMIT} not reachable from this checkout")
         new = (_ROOT / rel).read_text()
         if old == new:
             return
