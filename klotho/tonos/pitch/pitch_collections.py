@@ -681,19 +681,30 @@ class RelativePitchCollection(PitchCollectionBase):
         """
         Convert to a :class:`~klotho.tonos.chords.chord.Voicing`.
 
-        Dedupes and sorts the degrees but does NOT equave-reduce, so
-        multi-octave spreads survive. The reference pitch carries over.
+        Sorts the degrees but does NOT equave-reduce, so multi-octave
+        spreads survive. The reference pitch carries over.
+
+        Duplicate degrees are removed, EXCEPT when ``self`` is itself a
+        ``Voicing`` built with ``dedupe=False``: that voicing's stored
+        policy is carried, so a deliberately doubled voice survives the
+        conversion. A collection with no such policy (this base class,
+        ``Chord``, a slice) gets ``Voicing``'s documented default.
 
         Returns
         -------
         Voicing
         """
         from klotho.tonos.chords.chord import Voicing
+        # getattr rather than isinstance(self, Voicing): "has a stored
+        # policy" is the question, and it is the same question for every
+        # collection that grows one later. Absent policy == the default,
+        # which is what every non-Voicing source here already got.
         return Voicing(
             list(self._degrees),
             self._interval_type_mode,
             self._equave,
             self._reference_pitch,
+            dedupe=getattr(self, '_dedupe', True),
         )
 
     def _get_cyclic_index(self, index: int) -> tuple:

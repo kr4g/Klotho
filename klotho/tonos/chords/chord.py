@@ -267,32 +267,50 @@ class Chord(EquaveCyclicMixin, RelativePitchCollection):
         Returns
         -------
         Voicing
+            One voice per requested index, in ascending order. Repeating
+            an index doubles that chord tone rather than collapsing it —
+            see the note below.
+
+        Notes
+        -----
+        The returned Voicing is built with ``dedupe=False``, so it has
+        exactly as many voices as *index* asked for, and keeps them
+        through later moves. Cyclic lookup is injective on the index, so
+        the only way two selected degrees can be equal is the caller
+        repeating an index — which is a request for a doubling, not
+        something to silently discard. ``chord[[0, 0, 2]]`` already
+        returned three degrees; this makes ``chord.voicing([0, 0, 2])``
+        agree with it.
         """
         if isinstance(index, slice):
             size = len(self._degrees)
             if size == 0:
-                return Voicing([], self._interval_type_mode, self._equave, self._reference_pitch)
-            
+                return Voicing([], self._interval_type_mode, self._equave,
+                               self._reference_pitch, dedupe=False)
+
             start, stop, step = index.indices(size)
             use_cyclic = index.stop is not None and abs(index.stop) > size
-            
+
             if use_cyclic:
                 indices = list(range(index.start or 0, index.stop, step))
                 selected = [self._get_degree_cyclic(i) for i in indices]
             else:
                 selected = [self._degrees[i] for i in range(start, stop, step)]
-            
-            return Voicing(selected, self._interval_type_mode, self._equave, self._reference_pitch)
-        
+
+            return Voicing(selected, self._interval_type_mode, self._equave,
+                           self._reference_pitch, dedupe=False)
+
         if hasattr(index, '__iter__') and not isinstance(index, str):
             selected = [self._get_degree_cyclic(int(i) if not isinstance(i, int) else i) for i in index]
-            return Voicing(selected, self._interval_type_mode, self._equave, self._reference_pitch)
-        
+            return Voicing(selected, self._interval_type_mode, self._equave,
+                           self._reference_pitch, dedupe=False)
+
         if not isinstance(index, int):
             raise TypeError("Index must be an integer, slice, or sequence of integers")
-        
+
         degree = self._get_degree_cyclic(index)
-        return Voicing([degree], self._interval_type_mode, self._equave, self._reference_pitch)
+        return Voicing([degree], self._interval_type_mode, self._equave,
+                       self._reference_pitch, dedupe=False)
     
     def _get_degree_cyclic(self, index: int) -> IntervalType:
         equave_shift, wrapped_index = self._get_cyclic_index(index)
@@ -428,13 +446,25 @@ class Voicing(RelativePitchCollection):
         are removed. ``dedupe=False`` preserves duplicates (sorted), so
         unison doublings survive — used by
         :func:`~klotho.tonos.chords.voice_leading.voice_lead` with a
-        fixed ``voices=`` count. The policy is stored on the instance
-        and carried by every rebuild — :meth:`root`, :meth:`transpose`,
-        :meth:`equave_shift` and
-        :func:`~klotho.tonos.chords.voice_leading.fold` — so a locked
-        voice count survives being moved around. Before that it did
-        not, and a four-voice texture came back as three with no
-        exception and no warning.
+        fixed ``voices=`` count.
+
+        The policy is stored on the instance and carried by every rebuild
+        — ``root()``, ``transpose()``, ``equave_shift()``,
+        ``as_voicing()`` and ``Voicing.from_collection()`` — so a locked
+        voice count survives being moved around. Before that it did not,
+        and a four-voice texture came back as three with no exception and
+        no warning.
+
+        Two more doors produce a Voicing but do NOT read a source policy,
+        because they *set* their own: ``fold()`` and ``Chord.voicing()``
+        always build with ``dedupe=False``. Both are one-out-per-one-in
+        (one folded degree per degree; one voice per requested index) and
+        both are able to CREATE duplicates — folding an octave pair into
+        a narrow window makes a unison; repeating an index doubles a
+        chord tone — so deduping there would discard exactly what the
+        caller asked for. This list is enumerated on purpose and is
+        pinned by ``tests/test_af1_voicing_doublings.py``: an enumeration
+        that has drifted is worse than none.
 
     Examples
     --------
@@ -660,6 +690,10 @@ class Voicing(RelativePitchCollection):
         Returns
         -------
         Voicing
+            Carries *collection*'s ``dedupe`` policy when it has one, so
+            round-tripping a ``dedupe=False`` texture does not quietly
+            drop a doubled voice. A source with no policy of its own (a
+            ``Chord``, a plain relative collection) gets the default.
 
         Raises
         ------
@@ -678,7 +712,8 @@ class Voicing(RelativePitchCollection):
             list(collection._degrees),
             collection._interval_type_mode,
             target_equave,
-            collection._reference_pitch
+            collection._reference_pitch,
+            dedupe=getattr(collection, '_dedupe', True),
         )
 
 
@@ -784,6 +819,11 @@ class ChordSequence:
         Returns
         -------
         ChordSequence
+            Every element has one voice per requested index. Because the
+            passed voicing *replaces* the old one, the voice count comes
+            from *index* rather than from the source element's ``dedupe``
+            policy — which the reduction to Chord form has already
+            discarded along with its doublings.
         """
         voiced = []
         for ch in self._chords:
