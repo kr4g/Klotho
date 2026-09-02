@@ -17,8 +17,10 @@ def normalize_sum(data):
     -------
     list, tuple, or numpy.ndarray
         Collection of the same type as input with values scaled so that
-        their sum equals 1.0. An all-zero input is returned unchanged --
-        there is nothing to scale.
+        their sum equals 1.0. An all-zero input is returned as zeros of the
+        same collection type -- there is nothing to scale. (Note the list and
+        tuple paths rebuild from Python ``int`` zeros, so a list of floats
+        comes back as a list of ints; only the ndarray path preserves dtype.)
 
     Raises
     ------
@@ -31,15 +33,23 @@ def normalize_sum(data):
 
     Notes
     -----
-    **A negative total flips every sign.** Scaling by ``1 / total`` is the
-    only linear map that makes the sum 1, so when the total is negative the
-    result is the input reflected through zero: ``[-1, -2, -3]`` normalizes
-    to ``[1/6, 1/3, 1/2]``. Every pairwise proportion survives the flip
-    exactly (``result[1] / result[0]`` is still ``2``), which is why this is
-    kept rather than refused -- the answer is correct for the question the
-    function asks. It is documented here because a caller who passes
-    negative weights and gets positive ones back is otherwise surprised.
-    If signs carry meaning for you, normalize the magnitudes and reapply
+    **A negative total is REFUSED** (ruling, 2026-09-02). Scaling by
+    ``1 / total`` is the only linear map that makes the sum 1, so a negative
+    total reflects every value through zero: ``[-1, -2, -3]`` would normalize
+    to ``[1/6, 1/3, 1/2]``. Every pairwise proportion survives that flip
+    exactly, so the answer is arithmetically defensible -- and it was kept on
+    that ground until the consequence was measured.
+
+    The consequence is why it is now refused. This function's one live caller
+    (``klotho/topos/collections/sequences.py``) hands the result to numpy as a
+    PROBABILITY VECTOR, and the flipped result **sums to 1**, so numpy accepts
+    it without complaint and the caller silently receives a distribution
+    weighted in reverse. Every other invalid input to that caller is loud one
+    frame later, because numpy rejects a vector that does not sum to 1. The
+    sign flip was the single input that turned a caller error into a plausible
+    wrong result.
+
+    If the signs carry meaning for you, normalize the magnitudes and reapply
     the signs yourself.
 
     Examples
@@ -59,10 +69,12 @@ def normalize_sum(data):
     >>> normalize_sum([0, 0, 0])
     [0, 0, 0]
 
-    A negative total reflects the values through zero:
+    A negative total is refused rather than silently reflected:
 
     >>> normalize_sum([-1, -1])
-    [0.5, 0.5]
+    Traceback (most recent call last):
+        ...
+    ValueError: cannot normalize a collection whose values sum to a negative number: [-1, -1] sums to -2. Scaling by 1/total would make them sum to 1 by REFLECTING every value through zero, turning negative weights into positive ones. If the signs are meaningful, normalize the magnitudes and reapply the signs yourself.
     """
     if isinstance(data, (list, tuple)):
         total = sum(data)
@@ -74,6 +86,15 @@ def normalize_sum(data):
                     "these sum to 1."
                 )
             return type(data)([0] * len(data))
+        if total < 0:
+            raise ValueError(
+                f"cannot normalize a collection whose values sum to a "
+                f"negative number: {list(data)!r} sums to {total}. Scaling by "
+                f"1/total would make them sum to 1 by REFLECTING every value "
+                f"through zero, turning negative weights into positive ones. "
+                f"If the signs are meaningful, normalize the magnitudes and "
+                f"reapply the signs yourself."
+            )
         normalized = [x / total for x in data]
         return type(data)(normalized)
     elif isinstance(data, np.ndarray):
@@ -85,6 +106,13 @@ def normalize_sum(data):
                     "holding nonzero values. No scalar makes these sum to 1."
                 )
             return np.zeros_like(data)
+        if total < 0:
+            raise ValueError(
+                f"cannot normalize an array whose values sum to a negative "
+                f"number ({total}). Scaling by 1/total would make them sum to "
+                f"1 by REFLECTING every value through zero. If the signs are "
+                f"meaningful, normalize the magnitudes and reapply the signs."
+            )
         return data / total
     else:
         raise TypeError("Input must be list, tuple, or numpy array")

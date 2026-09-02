@@ -71,23 +71,38 @@ def test_aud102_all_zero_numpy_still_returns_zeros():
     assert np.array_equal(result, np.zeros(3))
 
 
-def test_aud102_negative_total_flips_signs_and_is_documented():
-    """The sign flip is KEPT (see docstring) -- so the docstring must say so.
+def test_aud102_a_negative_total_is_refused():
+    """RULED 2026-09-02 (Ryan): a negative total is REFUSED, not reflected.
 
-    Scaling by ``1/total`` is the only linear map that makes the sum 1, and it
-    genuinely preserves every pairwise proportion.  What it does not preserve
-    is sign, and that surprise is what the docstring now names.  This test
-    pins BOTH halves: the behaviour, and the documentation of it.
+    This test previously pinned the opposite -- the sign flip was kept on the
+    ground that scaling by ``1/total`` preserves every pairwise proportion, so
+    the answer is arithmetically defensible.  It is; the ruling turned on the
+    CONSEQUENCE rather than the arithmetic.
+
+    ``normalize_sum``'s one live caller hands the result to numpy as a
+    probability vector, and a flipped result **sums to 1**, so numpy accepts it
+    and the caller silently receives a distribution weighted in reverse.  Every
+    other invalid input to that caller is loud one frame later, because numpy
+    rejects a vector that does not sum to 1.  The flip was the single input
+    that converted a caller error into a plausible wrong result.
+
+    Under R38 the old test asserted a rule, not a truth, so it is rewritten
+    here rather than the refusal being softened to accommodate it.
     """
-    result = normalize_sum([-1, -2, -3])
-    assert all(x > 0 for x in result), "negative total still flips every sign"
-    assert math.isclose(sum(result), 1.0)
-    # pairwise proportions survive the flip
-    assert math.isclose(result[1] / result[0], 2.0)
+    for bad in ([-1, -2, -3], [-1, -1], (-2, -5)):
+        with pytest.raises(ValueError, match="negative"):
+            normalize_sum(bad)
 
-    doc = normalize_sum.__doc__
-    assert doc is not None
-    assert "sign" in doc.lower(), "the sign flip must be documented, not silent"
+    with pytest.raises(ValueError, match="negative"):
+        normalize_sum(np.array([-1.0, -2.0]))
+
+    # The refusal must say what to do instead, not merely refuse.
+    try:
+        normalize_sum([-1, -2])
+    except ValueError as exc:
+        assert "magnitudes" in str(exc), (
+            "the refusal must name the remedy (normalize the magnitudes and "
+            "reapply the signs), or the caller is left guessing")
 
 
 def test_aud102_mixed_sign_with_nonzero_total_is_untouched():
