@@ -11,6 +11,9 @@ from klotho.chronos.rhythm_trees.algorithms import (
     fuse as _rt_fuse,
     flatten as _rt_flatten,
     segment as _rt_segment,
+    _segment_migration_hint,
+    _segment_arity_refusal,
+    _SEGMENT_FACTOR_UNSET,
     augment as _rt_augment,
     diminish as _rt_diminish,
     scale_tempus as _rt_scale_tempus,
@@ -115,7 +118,7 @@ def _coerce_segment_factor(factor):
     return factor
 
 
-def segment(obj, factor, tie: bool = False):
+def segment(obj, factor=_SEGMENT_FACTOR_UNSET, tie: bool = False):
     """
     Divide a temporal unit in two — Haddad's segmentation operator (⊥).
 
@@ -180,6 +183,13 @@ def segment(obj, factor, tie: bool = False):
     """
     from klotho.thetos.composition.compositional import CompositionalUnit
 
+    # Arity FIRST, and identically to the RT-level sibling: 10.18.0's
+    # `segment(ratio)` took ONE argument, so an old call site fails on
+    # arity in BOTH namespaces and never reaches the type guard below
+    # that carries the migration sentence.
+    if factor is _SEGMENT_FACTOR_UNSET:
+        raise _segment_arity_refusal(obj)
+
     if isinstance(obj, CompositionalUnit):
         raise NotImplementedError(
             "segment for CompositionalUnits is a staged surface (R13-E): "
@@ -207,6 +217,7 @@ def segment(obj, factor, tie: bool = False):
         f"{type(obj).__name__}. A TemporalUnitSequence or TemporalBlock "
         f"holds several units, and there is no single Tempus to divide -- "
         f"segment the member you mean."
+        + _segment_migration_hint(obj)
     )
 
 def decompose(ut: Union[TemporalUnit, 'CompositionalUnit'], prolatio: Union[tuple, str, None] = None, depth: Union[int, None] = None) -> TemporalUnitSequence:
@@ -1526,7 +1537,23 @@ def convolve(x: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], 
     h : TemporalUnit, CompositionalUnit, or TemporalUnitSequence
         The second temporal structure (kernel).
     reference : tuple of (beat, bpm), optional
-        Explicit reconciliation reference.
+        Explicit reconciliation reference, as a single 2-tuple. This
+        REPLACED the separate ``beat=``/``bpm=`` parameters of 10.18.0:
+        ``convolve(x, h, beat='1/2', bpm=120)`` is now
+        ``convolve(x, h, reference=('1/2', 120))``. Anything that is not a
+        2-tuple (a 2-element list is also taken) is refused up front, with
+        that migration named.
+
+        **This is a NARROWING, disclosed.** The body reads only
+        ``reference[0]`` and ``reference[1]``, so any object answering those
+        two subscripts used to return a result with the rest discarded in
+        silence -- measured: ``('1/2', 120, 3)``, ``{0: '1/2', 1: 120}`` and
+        ``np.array([Fraction(1, 2), 120], dtype=object)`` all returned
+        normally. They now raise. A caller who writes a third element means
+        something by it and was not getting it, which is the defect class
+        this guard exists for (R35: correctness over compatibility). No call
+        site in ``klotho/``, ``tests/`` or ``examples/mat111mc_notebooks/``
+        uses any of those shapes.
 
     Returns
     -------
@@ -1535,6 +1562,37 @@ def convolve(x: Union[TemporalUnit, 'CompositionalUnit', TemporalUnitSequence], 
         (zero terms deleted); negative terms come back as rests.
     """
     from klotho.thetos.composition.compositional import CompositionalUnit
+
+    # `reference` is validated BEFORE any work, because the two spellings a
+    # 10.18.0 caller reaches for -- `convolve(x, h, '1/2')` and
+    # `convolve(x, h, 120)`, the old third positional `beat` and the old
+    # fourth positional `bpm` -- used to fall straight through to
+    # `reference[0]` / `reference[1]` below. Subscripting a string gave
+    # `Fraction('/')` ("Invalid literal for Fraction: '/'") and subscripting
+    # an int gave "'int' object is not subscriptable"; neither named
+    # `convolve`, `reference`, or the signature change that caused it. The
+    # two-element LIST is accepted because subscripting already accepted it.
+    #
+    # It DOES narrow, and the narrowing is deliberate. Because only
+    # `reference[0]` and `reference[1]` are ever read, three malformed
+    # shapes used to return a result with the surplus silently dropped --
+    # measured against a guard-free copy of this module: `('1/2', 120, 3)`,
+    # `{0: '1/2', 1: 120}` and `np.array([Fraction(1, 2), 120],
+    # dtype=object)` each returned `['16/9', '32/9', '32/9', '16/9']`. All
+    # three now raise. Silently discarding a third element is the worse
+    # behaviour, nothing in the tree or the corpora passes these shapes,
+    # and R35 puts correctness ahead of compatibility.
+    if reference is not None and not (
+        isinstance(reference, (tuple, list)) and len(reference) == 2
+    ):
+        raise TypeError(
+            f"convolve's reference must be a 2-tuple (beat, bpm); got "
+            f"{reference!r}. The separate beat= and bpm= parameters were "
+            f"removed (R13-B): write convolve(x, h, reference=('1/2', 120)) "
+            f"where you used to write convolve(x, h, beat='1/2', bpm=120). "
+            f"Omit reference entirely to reconcile at the FIRST operand's "
+            f"own (beat, bpm), which is the default."
+        )
 
     if isinstance(x, (TemporalUnit, CompositionalUnit)):
         x = decompose(x)

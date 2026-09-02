@@ -26,10 +26,33 @@ def _parse_autoref_args(args, mode_hint:bool):
     the ``lst1 is lst2`` case Haddad always works in; two arguments are the
     Klotho extension documented on both public functions.
 
-    A second positional argument whose elements are not numbers is rejected
-    loudly. It used to be taken as ``lst2`` in silence: because ``mode`` is
-    keyword-only, ``autoref_rotmat(lst, 'GSDC')`` made ``('G','S','D','C')``
-    the tail list and returned a matrix of letters.
+    A second positional argument whose elements are not ``int`` or ``float``
+    is rejected loudly. It used to be taken as ``lst2`` in silence: because
+    ``mode`` is keyword-only, ``autoref_rotmat(lst, 'GSDC')`` made
+    ``('G','S','D','C')`` the tail list and returned a matrix of letters
+    (docket RT-9).
+
+    **The guard is NARROWER than its target.** Its target is a string; its
+    test is ``isinstance(x, (int, float))``, which also turns away
+    ``Fraction`` -- this library's own exact type for every proportion --
+    ``Decimal``, and the numpy INTEGERS that come out of every generator in
+    ``sequences.py``. Those ARE numbers, and the message used to tell the
+    caller they were not. It now says what the check really is and how to
+    get past it. Widening the predicate to ``numbers.Real`` is a behaviour
+    change and is filed as docket AUD-158, not decided here.
+
+    Two things the message must get right, both of which it got wrong once:
+
+    * **"numpy scalars" is a false generalisation.** ``np.float64``
+      subclasses Python ``float``, so this guard ACCEPTS it. ``np.int64``,
+      ``np.int32`` and ``np.float32`` do not, so they are refused. The
+      message names those, not "numpy scalars".
+    * **``int()`` is not a way past this guard.** The tail list holds
+      PROPORTIONS, and ``Fraction.__int__`` truncates toward zero:
+      ``int(Fraction(1, 2))`` is ``0``. A caller who took that advice got a
+      tuple of zeros, no exception, and a rhythm tree of zero-valued terms.
+      The recommendation is ``float()``, and the truncation is spelled out
+      so nobody reaches for ``int()`` anyway.
     '''
     if len(args) == 1:
         lst1 = lst2 = tuple(args[0])
@@ -42,9 +65,19 @@ def _parse_autoref_args(args, mode_hint:bool):
                         f"mode={args[1]!r}, not a bare second argument."
                         ) if mode_hint else ''
                 raise ValueError(
-                    'The second positional argument is the tail list and must '
-                    f'contain only numbers, but element {i} is {x!r} '
-                    f'({type(x).__name__}).' + hint
+                    'The second positional argument is the tail list, and '
+                    'this guard is narrow: it takes plain int and float '
+                    f'elements only, so element {i}, {x!r} '
+                    f'({type(x).__name__}), is turned away. Fraction, '
+                    'Decimal, the numpy integers (np.int64, np.int32) and '
+                    'np.float32 are all numbers, and are refused here only '
+                    'by that narrowness (docket AUD-158); np.float64 is '
+                    'not refused, because it subclasses float. Convert with '
+                    'float(). Do NOT use int(): this list is proportions '
+                    'and int() truncates a Fraction toward zero -- '
+                    'int(Fraction(1, 2)) is 0 -- which would pass the guard '
+                    'and give you a row of zeros in silence. What the guard '
+                    'exists to catch is a string.' + hint
                 )
     else:
         raise ValueError('Function expects either one or two iterable arguments.')

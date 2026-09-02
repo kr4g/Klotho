@@ -1216,6 +1216,83 @@ def segment_proportions(ratio: Union[Fraction, float, str]) -> tuple[int]:
     return (ratio.numerator, ratio.denominator - ratio.numerator)
 
 
+#: Sentinel for ``segment``'s ``factor``. It exists ONLY so that the
+#: one-argument call -- 10.18.0's entire signature -- reaches our own
+#: refusal instead of Python's ``missing 1 required positional argument:
+#: 'factor'``, which names a parameter the caller has never heard of and
+#: nothing else. See :func:`_segment_arity_refusal`.
+_SEGMENT_FACTOR_UNSET = object()
+
+
+def _segment_migration_hint(obj) -> str:
+    """The breadcrumb a pre-10.19 ``segment(ratio)`` caller needs.
+
+    ``segment`` used to take ONE argument, a ratio, and return the pair
+    ``(numerator, denominator - numerator)``. It is now Haddad's
+    segmentation operator in BOTH the ``rhythm_trees`` and
+    ``temporal_units`` namespaces, and the old arithmetic moved to
+    :func:`segment_proportions` (2026-08-29, docket OPS-5).
+
+    Neither namespace's refusal named the new function, so an old caller
+    got a loud failure with no route out of it -- and the RT-level one
+    sent them to the TemporalUnit operator, a third function that would
+    also refuse them. This appends the missing sentence, and ONLY when
+    the offending argument has the shape of the old call.
+
+    **The predicate is EXACTLY 10.18.0's annotation**, ``segment(ratio:
+    Union[Fraction, float, str])`` -- no wider. An earlier version tested
+    ``numbers.Number``, which is wrong twice over:
+
+    * ``meas.py:316`` is ``Rational.register(Meas)``, so
+      ``isinstance(Meas('4/4'), numbers.Number)`` is **True**. Not being
+      a ``Fraction`` subclass does not make a Tempus not a Number.
+    * A ``Meas`` is a LEGITIMATE factor for this very operator -- « ...ou
+      aussi, par un Tempus donne, relatif a celui de l'Unite Temporelle
+      en question », *"or else by a given Tempus, relative to that of the
+      Temporal Unit in question"*. So ``segment(Meas('4/4'), f)`` is a
+      caller who transposed the CURRENT arguments, and sending them to
+      ``segment_proportions`` is advice for a mistake they did not make.
+
+    ``int`` is excluded for the same reason: no old caller passed one
+    (``Fraction(2) >= 1`` always raised "Ratio must be less than 1"),
+    while an int IS a live factor spelling today.
+    """
+    if isinstance(obj, (str, float, Fraction)):
+        return (
+            " If you meant the pre-10.19 segment(ratio), which returned "
+            "(numerator, denominator - numerator): it was renamed "
+            "segment_proportions -- import it from "
+            "klotho.chronos.rhythm_trees.algorithms. This name is now "
+            "Haddad's segmentation operator, which divides a tree in two."
+        )
+    return ''
+
+
+def _segment_arity_refusal(obj) -> TypeError:
+    """The refusal for a ONE-ARGUMENT ``segment`` call, in either namespace.
+
+    This is the door a real pre-10.19 caller walks into. 10.18.0's whole
+    signature was ``segment(ratio)``; today's operator needs a second
+    argument, so every old call site fails on arity and never reaches the
+    type guard that carries the migration sentence. Python's own message
+    -- ``segment() missing 1 required positional argument: 'factor'`` --
+    names ``factor`` and stops, which tells a composer nothing about the
+    function that took the old behaviour with it.
+
+    The rename breadcrumb is appended only for a ratio-shaped argument,
+    so ``segment(rt)`` (someone who simply forgot the factor) is told
+    what is missing and is not sent anywhere.
+    """
+    return TypeError(
+        f"segment(obj, factor) takes two arguments -- the RhythmTree or "
+        f"TemporalUnit to divide, and the segmentation factor -- but only "
+        f"one was given ({type(obj).__name__}). The factor is Haddad's "
+        f"proportional factor strictly between 0 and 1, or a Meas read as "
+        f"a Tempus relative to the source's."
+        + _segment_migration_hint(obj)
+    )
+
+
 def _S_to_split_nodes(S):
     """Lower a subdivision tuple into the mutable form the splitter uses.
 
@@ -1348,7 +1425,7 @@ def _resolve_segment_factor(meas, factor) -> Fraction:
     return f
 
 
-def segment(rt, factor, tie: bool = False) -> tuple:
+def segment(rt, factor=_SEGMENT_FACTOR_UNSET, tie: bool = False) -> tuple:
     """
     Divide a rhythm tree in two — Haddad's segmentation operator (⊥).
 
@@ -1401,6 +1478,13 @@ def segment(rt, factor, tie: bool = False) -> tuple:
     from .rhythm_tree import RhythmTree
     from .meas import Meas
 
+    # Arity FIRST: `factor` carries a sentinel default purely so that
+    # 10.18.0's one-argument `segment(ratio)` lands here rather than on
+    # Python's own "missing 1 required positional argument". `tie` cannot
+    # be reached positionally without a factor, so nothing else changes.
+    if factor is _SEGMENT_FACTOR_UNSET:
+        raise _segment_arity_refusal(rt)
+
     if tie:
         raise NotImplementedError(
             "the tie variant of segmentation (his variant (c), preserving "
@@ -1416,6 +1500,7 @@ def segment(rt, factor, tie: bool = False) -> tuple:
             f"{type(rt).__name__}. For TemporalUnits use "
             f"klotho.chronos.temporal_units.algorithms.segment, which "
             f"returns a two-unit TemporalUnitSequence."
+            + _segment_migration_hint(rt)
         )
 
     f = _resolve_segment_factor(rt.meas, factor)

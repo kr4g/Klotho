@@ -47,6 +47,7 @@ not.
 """
 from dataclasses import dataclass
 from fractions import Fraction
+import numbers
 from typing import Any, Callable, Iterable, Iterator, Optional, Union
 from ..rhythm_trees import Meas, RhythmTree
 from ..rhythm_trees.algorithms import auto_subdiv
@@ -901,18 +902,74 @@ class TemporalUnit(_RepeatableTemporal, metaclass=TemporalMeta):
         # overlapping timeline. A non-integer Fraction is DELIBERATELY still
         # accepted -- it is exact all the way down and is event-for-event
         # identical to writing the tempus you mean.
-        if not isinstance(span, (int, Fraction)) or span <= 0:
+        #
+        # ONE predicate, TWO unrelated refusals -- and they get TWO raises.
+        # A single message covering both was measured saying, to
+        # `span=np.int64(0)`, `span=np.int64(-3)`, `span=0` and `span=-3`
+        # alike: "the value itself is fine and RhythmTree accepts it; only
+        # this check is narrow, so wrap it: span=int(...)". Every clause of
+        # that is false on the non-positive branch. `int(np.int64(0))` is
+        # `0`, which this same guard refuses again, so the prescribed wrap
+        # cannot work; and "RhythmTree accepts it" is true only in the sense
+        # that RhythmTree does not validate `span` AT ALL -- which is
+        # SPAN-1's live silent-corruption door, not a reassurance.
+        #
+        # SIGN IS CHECKED FIRST for anything numeric, precisely so that a
+        # non-positive numpy integer never receives the int() advice that
+        # cannot help it. Every numpy scalar integer and float registers as
+        # `numbers.Real`, which is the case that mattered; `Decimal` is
+        # `numbers.Number` but not `Real`, and it orders against 0 too, so
+        # the predicate is the wider one. `complex` is a Number and does NOT
+        # order -- it raises TypeError inside the comparison, so the
+        # comparison is guarded and such a value falls through to the type
+        # branch, where it belongs. A str, a Meas, or a numpy ARRAY is not a
+        # Number at all and never reaches the comparison.
+        _non_positive = False
+        if isinstance(span, numbers.Number):
+            try:
+                _non_positive = span <= 0
+            except TypeError:
+                _non_positive = False
+        if _non_positive:
+            raise ValueError(
+                f"span must be POSITIVE; got {span!r}. A span of 0 has no "
+                "duration and a negative span runs backwards -- neither is a "
+                "passage a player could read, and no conversion rescues "
+                "either: int(np.int64(0)) is still 0 and lands right back "
+                "here. Note that RhythmTree does NOT validate span, so it "
+                "builds what this refuses and says nothing: "
+                "RhythmTree(span=0, meas='4/4', subdivisions=(1, 1)) has "
+                "durations (0, 0), and span=-3 gives (-3/2, -3/2) -- a "
+                "zero-length or backwards tree, raising nothing (docket "
+                "SPAN-1). Write a positive whole number of measures, or "
+                "Fraction(1, 2) for half of one."
+            )
+
+        # The TYPE branch, and the only place the numpy sentence belongs.
+        # `isinstance(np.int64(2), (int, Fraction))` is False while
+        # `np.random.randint(1, 5)` returns `np.int64` directly -- so the
+        # commonest way to arrive here is not a float at all. A numpy int is
+        # NOT the float hazard: it is `numbers.Integral` and carries
+        # `.numerator`, so `RhythmTree(span=np.int64(2), ...)` builds and
+        # evaluates correctly, and RT and UT therefore disagree about the
+        # same value. Whether this predicate should be widened to
+        # `numbers.Integral` is a behaviour question and is NOT settled here.
+        # Having passed the sign check above, anything reaching this message
+        # is positive, so `int()` really is a working way out of it.
+        if not isinstance(span, (int, Fraction)):
             raise ValueError(
                 "span must be a positive int or Fraction of measures; got "
                 f"{span!r}. A float span is never converted -- it reaches "
                 "RhythmTree intact and dies with \"'float' object has no "
                 "attribute 'numerator'\" the first time you read .events, "
-                "after the unit has already reported a duration. A span of 0 "
-                "has no duration and a negative span runs backwards -- "
-                "neither is a passage a player could read. Write span=2 for "
-                "two measures, Fraction(1, 2) for half of one, or say it in "
-                "the tempus: UT(tempus='2/4') rather than "
-                "UT(span=0.5, tempus='4/4')."
+                "after the unit has already reported a duration. Write "
+                "span=2 for two measures, Fraction(1, 2) for half of one, or "
+                "say it in the tempus: UT(tempus='2/4') rather than "
+                "UT(span=0.5, tempus='4/4'). If this is a numpy integer -- "
+                "np.random.randint and the numpy-backed generators all "
+                "return np.int64, not int -- the value itself is a whole "
+                "number of measures and RhythmTree takes it; only this check "
+                "is narrow, so wrap it: span=int(np.random.randint(1, 5))."
             )
 
         # Attribution (NEW-39's prerequisite, ruled with LAYER-5): record
