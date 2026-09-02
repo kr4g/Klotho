@@ -260,7 +260,22 @@ class TestNothingIsAdmittedThatWasNotSelected:
     result by admitting music the composer never chose.
     """
 
-    def test_an_insertion_beside_uncovered_music_is_still_an_intruder(self):
+    #: ``(root index to insert at, does the arc survive)``. Position 1 lands
+    #: BETWEEN the two slurred beats and breaks their adjacency, so the arc
+    #: cannot survive; position 2 lands just after the arc's tail, so it
+    #: survives and the newcomer is the intruder this class is named for.
+    INSERTION_SITES = [(1, False), (2, True)]
+
+    @pytest.mark.parametrize('at,survives', INSERTION_SITES,
+                             ids=['between', 'after'])
+    def test_an_insertion_beside_uncovered_music_is_still_an_intruder(
+            self, at, survives):
+        """AF-3.5: this only ever ran at ``at=1``, where the insert breaks the
+        arc's adjacency and the slur dies outright. ``_members(uc)`` came back
+        ``{}``, the loop ran zero times, and "no arc grew" was true because no
+        arc remained. The ``after`` case keeps an arc alive so the size check
+        is actually made, and each case now states which outcome it expects.
+        """
         uc = UC(tempus='4/4', prolatio=(1, 1, 1, 1), beat='1/4', bpm=60,
                 pfields={'freq': 440})
         leaves = list(uc._rt.leaf_nodes)
@@ -268,11 +283,18 @@ class TestNothingIsAdmittedThatWasNotSelected:
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            uc._rt.insert_child(uc._rt.root, 1, proportion=1)
+            uc._rt.insert_child(uc._rt.root, at, proportion=1)
 
         assert slur_contract_violations(uc) == []
-        for members in _members(uc).values():
-            assert len(members) >= 2
+        members = _members(uc)
+        assert bool(members) is survives, (
+            f'insert at {at}: expected the arc to '
+            f'{"survive" if survives else "dissolve"}, got {members}')
+        for spec in members.values():
+            assert len(spec) == 2, (
+                f'insert at {at} grew the arc from 2 members to {len(spec)}: '
+                f'{spec} -- the newcomer was never selected by the composer')
+
 
     #: ``(door, index or None, does the arc survive)``. The newcomer lands
     #: BETWEEN the two arc members for ``add_child`` and index 2, so their
