@@ -320,13 +320,20 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         rest and re-addressed after it. The rest was not merely mis-notated; it
         was audibly played.
 
-        Note this verb still clears pfield overrides at the replaced node, which
-        is what ``replace=True`` means and is left alone here deliberately -- see
-        the docket row for the separate question of whether a silent wipe is the
-        right answer for a parameter layer.
+        This verb used to clear the parameter overrides at the replaced node as
+        well, on the reading that this is simply what ``replace=True`` means.
+        AF2-3 settled that it is not. ``RhythmLayer.validate_attrs`` REFUSES
+        every key but ``proportion``/``tied``, so there is no payload a caller
+        could pass that carries a pfield through this door -- and ``replace``
+        is only a coherent contract where the caller can supply the full
+        replacement. The parameter half is now preserved, which also makes this
+        door agree with ``graft_subtree``, where the same question was already
+        ruled the same way for the same reason.
         """
         before = set(self[old_node]) if self._has_node(old_node) else set()
+        kept = self._param_keys_to_preserve(old_node, set(attr))
         result = super().replace_node(old_node, **attr)
+        self._restore_param_keys(old_node, kept)
         self._announce_if_surface_write(set(attr) | before)
         return result
 
@@ -400,11 +407,60 @@ class CompositionalTree(ParameterApiMixin, RhythmTree):
         where it used to be set -- so this announces whenever the surface
         keys appear on either side of the write, not only in the incoming
         dict.
+
+        Like :meth:`replace_node`, this preserves the node's parameter data
+        (AF2-3). At the ROOT the destroyed key was ``group`` -- track and
+        loudspeaker routing, which the constructor sets on every unit -- so a
+        root replace silently unrouted the whole unit.
         """
         before = set(self[node]) if self._has_node(node) else set()
+        kept = self._param_keys_to_preserve(node, set(attrs or {}))
         result = super().replace_node_data(node, attrs)
+        self._restore_param_keys(node, kept)
         self._announce_if_surface_write(set(attrs or {}) | before)
         return result
+
+    def _param_keys_to_preserve(self, node, incoming):
+        """Capture the parameter-layer payload a ``replace`` would drop.
+
+        The key set is ``ParameterLayer.storage_keys()`` -- pfield names
+        verbatim plus the encoded ``@mf:`` mfield slots -- intersected with the
+        node's current payload, minus whatever the caller is writing.
+
+        It is deliberately NOT "the keys this write path would refuse", which
+        is a strictly larger set and a trap: that set also contains
+        ``metric_duration``/``metric_onset``, which the rhythm layer RECOMPUTES
+        inside ``super()``. Restoring those overwrites the freshly computed
+        values with stale pre-edit ones that nothing recomputes again, so the
+        bar stops summing to its own span -- silently, with the parameter half
+        working and the full suite green. ``tests/...preserves_parameters.py``
+        fences it.
+        """
+        if not self._has_node(node):
+            return {}
+        owned = self._param_layer.storage_keys()
+        return {k: v for k, v in dict(self[node]).items()
+                if k in owned and k not in incoming}
+
+    def _restore_param_keys(self, node, kept):
+        """Write the captured values back, as THE SAME OBJECTS.
+
+        Same objects, never copies: a stored :class:`Bind` must come back
+        itself, not a re-draw of itself, or R33 is violated by the repair.
+
+        The cache is dropped by hand because ``_write_node_data`` invalidates
+        nothing and ``ParameterLayer._build_effective`` returns early on a warm
+        cache.
+
+        MUST be called between ``super()`` and ``_announce_if_surface_write``.
+        After the announce, a ``control=True`` respell has already run and this
+        write puts the edited node's pre-edit value back over its respelled
+        one -- a kink in a curve nobody drew. The window is one line wide.
+        """
+        if not kept:
+            return
+        self._write_node_data(node, kept, replace=False)
+        self._param_layer._effective_cache = None
 
     def make_rest(self, node):
         """Rest a node and its subtree (see :meth:`RhythmTree.make_rest`),
