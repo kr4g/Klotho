@@ -114,6 +114,15 @@ check_docs.py
 *.pkl
 *.zip
 
+# The MAT 111MC corpus is its OWN PRIVATE REPO -- kr4g/mat111mc-notebooks --
+# checked out here as a nested repo. Ignore the whole directory so this public
+# repo never picks it up: the notebooks were already ignored by *.ipynb, but
+# its README, .gitignore and run_corpus.py are not, and a bare `git add .`
+# would otherwise commit a gitlink pointing at a private repository.
+# (Supersedes the narrower mat_kit/ rule, kept below for anyone who removes
+# the nested checkout.)
+examples/mat111mc_notebooks/
+
 # Course sample kits — fetched locally via fetch_samples(), not stored in repo
 examples/mat111mc_notebooks/mat_kit/
 
